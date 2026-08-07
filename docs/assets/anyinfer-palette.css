@@ -1,0 +1,65 @@
+/* AnyInfer palette — deep teal + amber
+   Tuned for GitHub's light, light-high-contrast, dark, dark-dimmed and dark-high-contrast canvases.
+   Icon art is background-independent; only text/link colors swap. */
+
+:root {
+  /* Brand constants — identical in every theme */
+  --anyinfer-teal:        #2C7A6F;  /* chip body, primary accent shape AND text on light (4.8:1 on #fff) */
+  --anyinfer-teal-deep:   #0B3B3C;  /* primary ink / dark surface */
+  --anyinfer-teal-bright: #4FBFA8;  /* teal for TEXT on dark backgrounds */
+  --anyinfer-amber:       #E8963C;  /* output / signal */
+  --anyinfer-gold:        #F0C86A;  /* secondary warm accent */
+  --anyinfer-slate:       #7E9A9B;  /* source ports, meta marks */
+  --anyinfer-knockout:    #FFFFFF;  /* glyph knocked out of the teal chip */
+
+  /* Light theme (github-light, github-light-high-contrast) */
+  --anyinfer-bg:          #ffffff;
+  --anyinfer-surface:     #f6f8fa;
+  --anyinfer-border:      #d1d9e0;
+  --anyinfer-text:        var(--anyinfer-teal-deep);
+  --anyinfer-text-muted:  #59636e;
+  --anyinfer-accent-text: var(--anyinfer-teal);
+  --anyinfer-link:        #1f6f63;
+  --anyinfer-link-hover:  var(--anyinfer-teal);
+  --anyinfer-accent-bg:   #eaf4f1;
+  --anyinfer-accent-border: #a8cfc6;
+  --anyinfer-focus:       var(--anyinfer-teal);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark theme (github-dark #0d1117, github-dark-dimmed #212830) */
+    --anyinfer-bg:          #0d1117;
+    --anyinfer-surface:     #151b23;
+    --anyinfer-border:      #3d444d;
+    --anyinfer-text:        #f0f6fc;
+    --anyinfer-text-muted:  #9198a1;
+    --anyinfer-accent-text: var(--anyinfer-teal-bright);
+    --anyinfer-link:        var(--anyinfer-teal-bright);
+    --anyinfer-link-hover:  #7fd8c4;
+    --anyinfer-accent-bg:   #0f2b28;
+    --anyinfer-accent-border: #275d54;
+    --anyinfer-focus:       var(--anyinfer-teal-bright);
+  }
+}
+
+/* GitHub Primer sets data-color-mode / data-dark-theme on <html>. */
+[data-color-mode="dark"],
+[data-theme="dark"],
+.dark {
+  --anyinfer-bg:          #0d1117;
+  --anyinfer-surface:     #151b23;
+  --anyinfer-border:      #3d444d;
+  --anyinfer-text:        #f0f6fc;
+  --anyinfer-text-muted:  #9198a1;
+  --anyinfer-accent-text: var(--anyinfer-teal-bright);
+  --anyinfer-link:        var(--anyinfer-teal-bright);
+  --anyinfer-link-hover:  #7fd8c4;
+  --anyinfer-accent-bg:   #0f2b28;
+  --anyinfer-accent-border: #275d54;
+  --anyinfer-focus:       var(--anyinfer-teal-bright);
+}
+
+body { background: var(--anyinfer-bg); color: var(--anyinfer-text); }
+a { color: var(--anyinfer-link); }
+a:hover { color: var(--anyinfer-link-hover); }

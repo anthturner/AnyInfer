@@ -1,0 +1,2169 @@
+{
+  "format_version": 1,
+  "_comment": [
+    "Bundled model-pricing table (D27). Prices are USD per 1M tokens, written as JSON",
+    "strings so they parse losslessly as Decimals. Every entry records when and against",
+    "what source it was last verified — dates are real verification dates, never",
+    "fabricated (D24 rule). The weekly pricing-refresh workflow proposes updates as PRs;",
+    "scripts/validate_pricing.py gates the file's shape and sanity.",
+    "Standard on-demand tier only: batch discounts, cache-hit rates, long-context tiers",
+    "(Gemini and Claude price >200k-token prompts higher), and per-request search fees",
+    "(Perplexity) are not modelled — use capability_overrides where they matter.",
+    "Deliberately absent: azure-foundry (prices vary by region and deployment — use",
+    "capability_overrides or the Azure retail prices API app-side), copilot and",
+    "m365-copilot (subscription + premium-request billing, no per-token price), ollama",
+    "and llama-cpp (local inference is a genuine zero, supplied by capability assembly),",
+    "openrouter (reports live pricing in its model listing, discovered provenance),",
+    "sambanova and baseten (their model listings report live pricing too, though the",
+    "table seeds flagship models for preflight estimates before discovery runs),",
+    "and the local-engine presets (vllm, sglang, jan, ...), which are genuine zeroes.",
+    "Also absent, each for a stated reason rather than an oversight: nebius and nscale",
+    "(rates live behind an authenticated console; both return a pricing object from",
+    "their model listing, so discovery supplies them), inference-net (per-model rates",
+    "only via an authenticated CLI), featherless (subscription tiers metered by",
+    "concurrency, not tokens), scaleway (publishes no per-model token rate card),",
+    "parasail (its pricing page names models by display name and the id mapping is",
+    "unpublished, so no key could be written honestly), nous (docs rate-limited at",
+    "verification time), and the enterprise clouds databricks (DBUs), snowflake-cortex",
+    "(credits), and oci-genai (per-character transactions) — none of which publish a",
+    "per-token USD price that this table could represent without inventing a conversion.",
+    "Absent for the same reason after the 2026-08-07 re-verification: hunyuan and stepfun",
+    "publish per-model rates in CNY only, and converting them here would bake in an FX",
+    "rate this file has no way to keep current; qianfan and nscale return per-model",
+    "pricing from their own model listings; and volcengine, spark and watsonx publish no",
+    "loadable per-token rate card at all. Routers (requesty, martian, helicone, portkey)",
+    "bill at the upstream provider's price, so a table entry would describe the wrong",
+    "party — requesty additionally reports usage.cost per response, which is ground truth."
+  ],
+  "generated": "2026-08-07",
+  "providers": {
+    "openai": [
+      {
+        "model": "gpt-5",
+        "input_per_1m": "1.25",
+        "output_per_1m": "10",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "openai/gpt-5"
+      },
+      {
+        "model": "gpt-5-mini",
+        "input_per_1m": "0.25",
+        "output_per_1m": "2",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "openai/gpt-5-mini"
+      },
+      {
+        "model": "gpt-5-nano",
+        "input_per_1m": "0.05",
+        "output_per_1m": "0.4",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "openai/gpt-5-nano"
+      },
+      {
+        "model": "gpt-4.1",
+        "input_per_1m": "2",
+        "output_per_1m": "8",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "openai/gpt-4.1"
+      },
+      {
+        "model": "gpt-4.1-mini",
+        "input_per_1m": "0.4",
+        "output_per_1m": "1.6",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "openai/gpt-4.1-mini"
+      },
+      {
+        "model": "gpt-4o",
+        "input_per_1m": "2.5",
+        "output_per_1m": "10",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "openai/gpt-4o"
+      }
+    ],
+    "anthropic": [
+      {
+        "model": "claude-haiku-4-5",
+        "input_per_1m": "1",
+        "output_per_1m": "5",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "anthropic/claude-haiku-4.5"
+      },
+      {
+        "model": "claude-sonnet-4-5",
+        "input_per_1m": "3",
+        "output_per_1m": "15",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "anthropic/claude-sonnet-4.5"
+      },
+      {
+        "model": "claude-opus-4-1",
+        "input_per_1m": "15",
+        "output_per_1m": "75",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "anthropic/claude-opus-4.1"
+      },
+      {
+        "model": "claude-opus-4-5",
+        "input_per_1m": "5",
+        "output_per_1m": "25",
+        "last_verified": "2026-08-07",
+        "source": "https://openrouter.ai/api/v1/models",
+        "openrouter_id": "anthropic/claude-opus-4.5"
+      }
+    ],
+    "gemini": [
+      {
+        "model": "gemini-3.6-flash",
+        "input_per_1m": "1.50",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      {
+        "model": "gemini-3.5-flash",
+        "input_per_1m": "1.50",
+        "output_per_1m": "9.00",
+        "last_verified": "2026-08-07",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      {
+        "model": "gemini-3.5-flash-lite",
+        "input_per_1m": "0.30",
+        "output_per_1m": "2.50",
+        "last_verified": "2026-08-07",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      {
+        "model": "gemini-3.1-pro-preview",
+        "input_per_1m": "2.00",
+        "output_per_1m": "12.00",
+        "last_verified": "2026-08-07",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      {
+        "model": "gemini-2.5-pro",
+        "input_per_1m": "1.25",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      {
+        "model": "gemini-2.5-flash",
+        "input_per_1m": "0.30",
+        "output_per_1m": "2.50",
+        "last_verified": "2026-08-07",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      }
+    ],
+    "cerebras": [
+      {
+        "model": "gpt-oss-120b",
+        "input_per_1m": "0.35",
+        "output_per_1m": "0.75",
+        "last_verified": "2026-08-07",
+        "source": "https://www.cerebras.ai/pricing"
+      },
+      {
+        "model": "zai-glm-4.7",
+        "input_per_1m": "2.25",
+        "output_per_1m": "2.75",
+        "last_verified": "2026-08-07",
+        "source": "https://www.cerebras.ai/pricing"
+      },
+      {
+        "model": "gemma-4-31b",
+        "input_per_1m": "0.99",
+        "output_per_1m": "1.49",
+        "last_verified": "2026-08-07",
+        "source": "https://www.cerebras.ai/pricing"
+      }
+    ],
+    "sambanova": [
+      {
+        "model": "MiniMax-M2.7",
+        "input_per_1m": "0.60",
+        "output_per_1m": "2.40",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.sambanova.ai/plans/pricing"
+      },
+      {
+        "model": "DeepSeek-V3.1",
+        "input_per_1m": "3.00",
+        "output_per_1m": "4.50",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.sambanova.ai/plans/pricing"
+      },
+      {
+        "model": "gpt-oss-120b",
+        "input_per_1m": "0.22",
+        "output_per_1m": "0.59",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.sambanova.ai/plans/pricing"
+      },
+      {
+        "model": "Meta-Llama-3.3-70B-Instruct",
+        "input_per_1m": "0.60",
+        "output_per_1m": "1.20",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.sambanova.ai/plans/pricing"
+      },
+      {
+        "model": "DeepSeek-V3.2",
+        "input_per_1m": "3.00",
+        "output_per_1m": "4.50",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.sambanova.ai/plans/pricing"
+      },
+      {
+        "model": "gemma-4-31B-it",
+        "input_per_1m": "0.22",
+        "output_per_1m": "0.59",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.sambanova.ai/plans/pricing"
+      }
+    ],
+    "together": [
+      {
+        "model": "deepseek-ai/DeepSeek-V4-Pro",
+        "input_per_1m": "1.74",
+        "output_per_1m": "3.48",
+        "last_verified": "2026-08-07",
+        "source": "https://www.together.ai/pricing"
+      },
+      {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-08-07",
+        "source": "https://www.together.ai/pricing"
+      },
+      {
+        "model": "moonshotai/Kimi-K3",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://www.together.ai/pricing"
+      },
+      {
+        "model": "Qwen/Qwen3.7-Plus",
+        "input_per_1m": "0.32",
+        "output_per_1m": "1.28",
+        "last_verified": "2026-08-07",
+        "source": "https://www.together.ai/pricing"
+      },
+      {
+        "model": "zai-org/GLM-5.2",
+        "input_per_1m": "1.40",
+        "output_per_1m": "4.40",
+        "last_verified": "2026-08-07",
+        "source": "https://www.together.ai/pricing"
+      },
+      {
+        "model": "openai/gpt-oss-120b",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://www.together.ai/pricing"
+      }
+    ],
+    "fireworks": [
+      {
+        "model": "accounts/fireworks/models/kimi-k3",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.fireworks.ai/serverless/pricing"
+      },
+      {
+        "model": "accounts/fireworks/models/deepseek-v4-pro",
+        "input_per_1m": "1.74",
+        "output_per_1m": "3.48",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.fireworks.ai/serverless/pricing"
+      },
+      {
+        "model": "accounts/fireworks/models/deepseek-v4-flash",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.fireworks.ai/serverless/pricing"
+      },
+      {
+        "model": "accounts/fireworks/models/glm-5p2",
+        "input_per_1m": "1.40",
+        "output_per_1m": "4.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.fireworks.ai/serverless/pricing"
+      },
+      {
+        "model": "accounts/fireworks/models/qwen3p7-plus",
+        "input_per_1m": "0.40",
+        "output_per_1m": "1.60",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.fireworks.ai/serverless/pricing"
+      },
+      {
+        "model": "accounts/fireworks/models/gpt-oss-120b",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.fireworks.ai/serverless/pricing"
+      }
+    ],
+    "deepinfra": [
+      {
+        "model": "deepseek-ai/DeepSeek-V4-Pro",
+        "input_per_1m": "1.30",
+        "output_per_1m": "2.60",
+        "last_verified": "2026-08-07",
+        "source": "https://deepinfra.com/pricing"
+      },
+      {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "input_per_1m": "0.09",
+        "output_per_1m": "0.18",
+        "last_verified": "2026-08-07",
+        "source": "https://deepinfra.com/pricing"
+      },
+      {
+        "model": "Qwen/Qwen3.7-Max",
+        "input_per_1m": "2.50",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://deepinfra.com/pricing"
+      },
+      {
+        "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.32",
+        "last_verified": "2026-08-07",
+        "source": "https://deepinfra.com/pricing"
+      },
+      {
+        "model": "anthropic/claude-sonnet-5",
+        "input_per_1m": "2.00",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://deepinfra.com/pricing"
+      }
+    ],
+    "baseten": [
+      {
+        "model": "moonshotai/Kimi-K3",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://www.baseten.co/pricing"
+      },
+      {
+        "model": "moonshotai/Kimi-K2.6",
+        "input_per_1m": "0.95",
+        "output_per_1m": "4.00",
+        "last_verified": "2026-08-07",
+        "source": "https://www.baseten.co/pricing"
+      },
+      {
+        "model": "zai-org/GLM-5.2",
+        "input_per_1m": "1.40",
+        "output_per_1m": "4.40",
+        "last_verified": "2026-08-07",
+        "source": "https://www.baseten.co/pricing"
+      },
+      {
+        "model": "deepseek-ai/DeepSeek-V4-Pro",
+        "input_per_1m": "1.74",
+        "output_per_1m": "3.48",
+        "last_verified": "2026-08-07",
+        "source": "https://www.baseten.co/pricing"
+      },
+      {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "input_per_1m": "0.13",
+        "output_per_1m": "0.26",
+        "last_verified": "2026-08-07",
+        "source": "https://www.baseten.co/pricing"
+      },
+      {
+        "model": "openai/gpt-oss-120b",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.50",
+        "last_verified": "2026-08-07",
+        "source": "https://www.baseten.co/pricing"
+      }
+    ],
+    "mistral": [
+      {
+        "model": "mistral-medium-3-5",
+        "input_per_1m": "1.50",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04"
+      },
+      {
+        "model": "mistral-large-2512",
+        "input_per_1m": "0.50",
+        "output_per_1m": "1.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.mistral.ai/models/model-cards/mistral-large-3-25-12"
+      },
+      {
+        "model": "mistral-small-2603",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.mistral.ai/models/model-selection-guide"
+      },
+      {
+        "model": "codestral-2508",
+        "input_per_1m": "0.30",
+        "output_per_1m": "0.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.mistral.ai/models/model-cards/codestral-25-08"
+      }
+    ],
+    "perplexity": [
+      {
+        "model": "sonar",
+        "input_per_1m": "1.00",
+        "output_per_1m": "1.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.perplexity.ai/getting-started/pricing"
+      },
+      {
+        "model": "sonar-pro",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.perplexity.ai/getting-started/pricing"
+      },
+      {
+        "model": "sonar-reasoning-pro",
+        "input_per_1m": "2.00",
+        "output_per_1m": "8.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.perplexity.ai/getting-started/pricing"
+      },
+      {
+        "model": "sonar-deep-research",
+        "input_per_1m": "2.00",
+        "output_per_1m": "8.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.perplexity.ai/getting-started/pricing"
+      }
+    ],
+    "moonshot": [
+      {
+        "model": "kimi-k3",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.kimi.ai/docs/pricing/chat-k3.md"
+      },
+      {
+        "model": "kimi-k2.7-code",
+        "input_per_1m": "0.95",
+        "output_per_1m": "4.00",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.kimi.ai/docs/pricing/chat-k27-code.md"
+      },
+      {
+        "model": "kimi-k2.7-code-highspeed",
+        "input_per_1m": "1.90",
+        "output_per_1m": "8.00",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.kimi.ai/docs/pricing/chat-k27-code.md"
+      },
+      {
+        "model": "kimi-k2.6",
+        "input_per_1m": "0.95",
+        "output_per_1m": "4.00",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.kimi.ai/docs/pricing/chat-k26.md"
+      }
+    ],
+    "z-ai": [
+      {
+        "model": "glm-5.2",
+        "input_per_1m": "1.4",
+        "output_per_1m": "4.4",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.z.ai/guides/overview/pricing"
+      },
+      {
+        "model": "glm-5",
+        "input_per_1m": "1.0",
+        "output_per_1m": "3.2",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.z.ai/guides/overview/pricing"
+      },
+      {
+        "model": "glm-5-turbo",
+        "input_per_1m": "1.2",
+        "output_per_1m": "4.0",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.z.ai/guides/overview/pricing"
+      },
+      {
+        "model": "glm-4.7",
+        "input_per_1m": "0.6",
+        "output_per_1m": "2.2",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.z.ai/guides/overview/pricing"
+      },
+      {
+        "model": "glm-4.7-flashx",
+        "input_per_1m": "0.07",
+        "output_per_1m": "0.4",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.z.ai/guides/overview/pricing"
+      }
+    ],
+    "dashscope": [
+      {
+        "model": "qwen3.7-max",
+        "input_per_1m": "2.5",
+        "output_per_1m": "7.5",
+        "last_verified": "2026-08-07",
+        "source": "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+      },
+      {
+        "model": "qwen3-max",
+        "input_per_1m": "1.2",
+        "output_per_1m": "6",
+        "last_verified": "2026-08-07",
+        "source": "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+      },
+      {
+        "model": "qwen-plus",
+        "input_per_1m": "0.4",
+        "output_per_1m": "1.2",
+        "last_verified": "2026-08-07",
+        "source": "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+      },
+      {
+        "model": "qwen-flash",
+        "input_per_1m": "0.05",
+        "output_per_1m": "0.4",
+        "last_verified": "2026-08-07",
+        "source": "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+      }
+    ],
+    "minimax": [
+      {
+        "model": "MiniMax-M3",
+        "input_per_1m": "0.30",
+        "output_per_1m": "1.20",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.minimax.io/docs/guides/pricing-paygo"
+      },
+      {
+        "model": "MiniMax-M2.7",
+        "input_per_1m": "0.3",
+        "output_per_1m": "1.2",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.minimax.io/docs/guides/pricing-paygo"
+      },
+      {
+        "model": "MiniMax-M2.7-highspeed",
+        "input_per_1m": "0.6",
+        "output_per_1m": "2.4",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.minimax.io/docs/guides/pricing-paygo"
+      },
+      {
+        "model": "MiniMax-M2.5",
+        "input_per_1m": "0.3",
+        "output_per_1m": "1.2",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.minimax.io/docs/guides/pricing-paygo"
+      }
+    ],
+    "ai21": [
+      {
+        "model": "jamba-large",
+        "input_per_1m": "2",
+        "output_per_1m": "8",
+        "last_verified": "2026-08-07",
+        "source": "https://www.ai21.com/pricing"
+      },
+      {
+        "model": "jamba-mini",
+        "input_per_1m": "0.2",
+        "output_per_1m": "0.4",
+        "last_verified": "2026-08-07",
+        "source": "https://www.ai21.com/pricing"
+      }
+    ],
+    "deepseek": [
+      {
+        "model": "deepseek-v4-flash",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-08-07",
+        "source": "https://api-docs.deepseek.com/quick_start/pricing"
+      },
+      {
+        "model": "deepseek-v4-pro",
+        "input_per_1m": "0.435",
+        "output_per_1m": "0.87",
+        "last_verified": "2026-08-07",
+        "source": "https://api-docs.deepseek.com/quick_start/pricing"
+      }
+    ],
+    "xai": [
+      {
+        "model": "grok-4.5",
+        "input_per_1m": "2.00",
+        "output_per_1m": "6.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.x.ai/developers/pricing"
+      },
+      {
+        "model": "grok-4.3",
+        "input_per_1m": "1.25",
+        "output_per_1m": "2.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.x.ai/developers/models/grok-4.3"
+      },
+      {
+        "model": "grok-4.20-0309-reasoning",
+        "input_per_1m": "1.25",
+        "output_per_1m": "2.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.x.ai/developers/models"
+      },
+      {
+        "model": "grok-4.20-0309-non-reasoning",
+        "input_per_1m": "1.25",
+        "output_per_1m": "2.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.x.ai/developers/models"
+      },
+      {
+        "model": "grok-build-0.1",
+        "input_per_1m": "1.00",
+        "output_per_1m": "2.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.x.ai/developers/models"
+      }
+    ],
+    "cohere": [
+      {
+        "model": "command-r-plus-08-2024",
+        "input_per_1m": "2.50",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://cohere.com/pricing"
+      },
+      {
+        "model": "command-r-08-2024",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://cohere.com/pricing"
+      },
+      {
+        "model": "command-r7b-12-2024",
+        "input_per_1m": "0.0375",
+        "output_per_1m": "0.15",
+        "last_verified": "2026-08-07",
+        "source": "https://cohere.com/pricing"
+      }
+    ],
+    "bedrock": [
+      {
+        "model": "amazon.nova-micro-v1:0",
+        "input_per_1m": "0.035",
+        "output_per_1m": "0.14",
+        "last_verified": "2026-08-07",
+        "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json"
+      },
+      {
+        "model": "amazon.nova-lite-v1:0",
+        "input_per_1m": "0.06",
+        "output_per_1m": "0.24",
+        "last_verified": "2026-08-07",
+        "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json"
+      },
+      {
+        "model": "amazon.nova-pro-v1:0",
+        "input_per_1m": "0.80",
+        "output_per_1m": "3.20",
+        "last_verified": "2026-08-07",
+        "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json"
+      },
+      {
+        "model": "amazon.nova-premier-v1:0",
+        "input_per_1m": "2.50",
+        "output_per_1m": "12.50",
+        "last_verified": "2026-08-07",
+        "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json"
+      },
+      {
+        "model": "deepseek.v3.2",
+        "input_per_1m": "0.62",
+        "output_per_1m": "1.85",
+        "last_verified": "2026-08-07",
+        "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json"
+      }
+    ],
+    "vertex": [
+      {
+        "model": "gemini-2.5-pro",
+        "input_per_1m": "1.25",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      },
+      {
+        "model": "gemini-2.5-flash",
+        "input_per_1m": "0.30",
+        "output_per_1m": "2.50",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      },
+      {
+        "model": "gemini-2.5-flash-lite",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.40",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      },
+      {
+        "model": "gemini-3.1-pro-preview",
+        "input_per_1m": "2.00",
+        "output_per_1m": "12.00",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      },
+      {
+        "model": "gemini-3.5-flash",
+        "input_per_1m": "1.50",
+        "output_per_1m": "9.00",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      },
+      {
+        "model": "gemini-3.6-flash",
+        "input_per_1m": "1.50",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      }
+    ],
+    "venice": [
+      {
+        "model": "aion-labs-aion-3-0",
+        "input_per_1m": "3.75",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "aion-labs-aion-3-0-mini",
+        "input_per_1m": "0.88",
+        "output_per_1m": "1.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-fable-5",
+        "input_per_1m": "12.00",
+        "output_per_1m": "60.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-opus-4-5",
+        "input_per_1m": "6.00",
+        "output_per_1m": "30.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-opus-4-6",
+        "input_per_1m": "6.00",
+        "output_per_1m": "30.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-opus-4-7",
+        "input_per_1m": "6.00",
+        "output_per_1m": "30.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-opus-4-8",
+        "input_per_1m": "6.00",
+        "output_per_1m": "30.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-opus-4-8-fast",
+        "input_per_1m": "12.00",
+        "output_per_1m": "60.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-opus-5",
+        "input_per_1m": "6.00",
+        "output_per_1m": "30.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-opus-5-fast",
+        "input_per_1m": "12.00",
+        "output_per_1m": "60.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-sonnet-4-5",
+        "input_per_1m": "3.75",
+        "output_per_1m": "18.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-sonnet-4-6",
+        "input_per_1m": "3.60",
+        "output_per_1m": "18.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "claude-sonnet-5",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "deepseek-v3.2",
+        "input_per_1m": "0.33",
+        "output_per_1m": "0.48",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-deepseek-v4-flash",
+        "input_per_1m": "0.18",
+        "output_per_1m": "0.37",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "deepseek-v4-flash",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "deepseek-v4-flash-0731",
+        "input_per_1m": "0.17",
+        "output_per_1m": "0.35",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "deepseek-v4-pro",
+        "input_per_1m": "1.65",
+        "output_per_1m": "3.30",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "gemini-3-flash-preview",
+        "input_per_1m": "0.70",
+        "output_per_1m": "3.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "gemini-3-1-pro-preview",
+        "input_per_1m": "2.50",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "gemini-3-5-flash",
+        "input_per_1m": "1.55",
+        "output_per_1m": "9.45",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "gemini-3-5-flash-lite",
+        "input_per_1m": "0.38",
+        "output_per_1m": "3.13",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "gemini-3-6-flash",
+        "input_per_1m": "1.88",
+        "output_per_1m": "9.38",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-gemma-3-27b-p",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-gemma-4-26b-a4b-uncensored-p",
+        "input_per_1m": "0.19",
+        "output_per_1m": "0.88",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-gemma-4-31b",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.43",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "gemma-4-uncensored",
+        "input_per_1m": "0.16",
+        "output_per_1m": "0.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "zai-org-glm-4.6",
+        "input_per_1m": "0.43",
+        "output_per_1m": "1.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "zai-org-glm-4.7",
+        "input_per_1m": "0.55",
+        "output_per_1m": "2.65",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "zai-org-glm-4.7-flash",
+        "input_per_1m": "0.06",
+        "output_per_1m": "0.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "olafangensan-glm-4.7-flash-heretic",
+        "input_per_1m": "0.07",
+        "output_per_1m": "0.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "zai-org-glm-5",
+        "input_per_1m": "1.00",
+        "output_per_1m": "3.20",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "z-ai-glm-5-turbo",
+        "input_per_1m": "1.20",
+        "output_per_1m": "4.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "zai-org-glm-5-1",
+        "input_per_1m": "1.54",
+        "output_per_1m": "4.84",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-glm-5-1",
+        "input_per_1m": "1.10",
+        "output_per_1m": "4.15",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "zai-org-glm-5-2",
+        "input_per_1m": "1.40",
+        "output_per_1m": "4.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-glm-5-2-p",
+        "input_per_1m": "1.75",
+        "output_per_1m": "5.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "z-ai-glm-5v-turbo",
+        "input_per_1m": "1.50",
+        "output_per_1m": "5.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "google-gemma-3-27b-it",
+        "input_per_1m": "0.12",
+        "output_per_1m": "0.20",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "google-gemma-4-26b-a4b-it",
+        "input_per_1m": "0.13",
+        "output_per_1m": "0.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "google-gemma-4-31b-it",
+        "input_per_1m": "0.12",
+        "output_per_1m": "0.36",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-gpt-oss-120b-p",
+        "input_per_1m": "0.13",
+        "output_per_1m": "0.65",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-gpt-oss-20b-p",
+        "input_per_1m": "0.05",
+        "output_per_1m": "0.19",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-4o-2024-11-20",
+        "input_per_1m": "3.13",
+        "output_per_1m": "12.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-4o-mini-2024-07-18",
+        "input_per_1m": "0.19",
+        "output_per_1m": "0.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-52",
+        "input_per_1m": "2.19",
+        "output_per_1m": "17.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-52-codex",
+        "input_per_1m": "2.19",
+        "output_per_1m": "17.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-53-codex",
+        "input_per_1m": "2.19",
+        "output_per_1m": "17.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-54",
+        "input_per_1m": "3.13",
+        "output_per_1m": "18.80",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-54-mini",
+        "input_per_1m": "0.94",
+        "output_per_1m": "5.63",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-54-pro",
+        "input_per_1m": "37.50",
+        "output_per_1m": "225.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-55",
+        "input_per_1m": "6.25",
+        "output_per_1m": "37.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-55-pro",
+        "input_per_1m": "37.50",
+        "output_per_1m": "225.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-56-luna",
+        "input_per_1m": "1.25",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-56-luna-pro",
+        "input_per_1m": "1.25",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-56-sol",
+        "input_per_1m": "6.25",
+        "output_per_1m": "37.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-56-sol-pro",
+        "input_per_1m": "6.25",
+        "output_per_1m": "37.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-56-terra",
+        "input_per_1m": "3.13",
+        "output_per_1m": "18.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-56-terra-pro",
+        "input_per_1m": "3.13",
+        "output_per_1m": "18.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "grok-4-20",
+        "input_per_1m": "1.42",
+        "output_per_1m": "2.83",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "grok-4-20-multi-agent",
+        "input_per_1m": "1.42",
+        "output_per_1m": "2.83",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "grok-4-3",
+        "input_per_1m": "1.42",
+        "output_per_1m": "2.83",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "grok-4-5",
+        "input_per_1m": "2.27",
+        "output_per_1m": "6.80",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "grok-build-0-1",
+        "input_per_1m": "1.00",
+        "output_per_1m": "2.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "hermes-3-llama-3.1-405b",
+        "input_per_1m": "1.10",
+        "output_per_1m": "3.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "inkling",
+        "input_per_1m": "1.25",
+        "output_per_1m": "5.06",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "kimi-k2-5",
+        "input_per_1m": "0.56",
+        "output_per_1m": "3.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "kimi-k2-6",
+        "input_per_1m": "0.75",
+        "output_per_1m": "3.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "kimi-k2-7-code",
+        "input_per_1m": "0.75",
+        "output_per_1m": "3.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "kimi-k3",
+        "input_per_1m": "3.75",
+        "output_per_1m": "18.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "kimi-k3-fast-api",
+        "input_per_1m": "4.50",
+        "output_per_1m": "22.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "llama-3.2-3b",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "llama-3.3-70b",
+        "input_per_1m": "0.70",
+        "output_per_1m": "2.80",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "mercury-2",
+        "input_per_1m": "0.31",
+        "output_per_1m": "0.94",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "xiaomi-mimo-v2-5",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "minimax-m25",
+        "input_per_1m": "0.27",
+        "output_per_1m": "0.95",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "minimax-m27",
+        "input_per_1m": "0.38",
+        "output_per_1m": "1.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "minimax-m3-preview",
+        "input_per_1m": "0.30",
+        "output_per_1m": "1.20",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "mistral-small-3-2-24b-instruct",
+        "input_per_1m": "0.09",
+        "output_per_1m": "0.25",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "mistral-small-2603",
+        "input_per_1m": "0.19",
+        "output_per_1m": "0.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "nvidia-nemotron-3-nano-30b-a3b",
+        "input_per_1m": "0.07",
+        "output_per_1m": "0.30",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "nvidia-nemotron-3-ultra-550b-a55b",
+        "input_per_1m": "0.63",
+        "output_per_1m": "3.13",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "openai-gpt-oss-120b",
+        "input_per_1m": "0.07",
+        "output_per_1m": "0.30",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-qwen-2-5-7b-p",
+        "input_per_1m": "0.05",
+        "output_per_1m": "0.13",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-235b-a22b-instruct-2507",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-235b-a22b-thinking-2507",
+        "input_per_1m": "0.45",
+        "output_per_1m": "3.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-coder-480b-a35b-instruct-turbo",
+        "input_per_1m": "0.35",
+        "output_per_1m": "1.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-next-80b",
+        "input_per_1m": "0.35",
+        "output_per_1m": "1.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-5-35b-a3b",
+        "input_per_1m": "0.31",
+        "output_per_1m": "1.25",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-5-397b-a17b",
+        "input_per_1m": "0.75",
+        "output_per_1m": "4.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-5-9b",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.15",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-6-27b",
+        "input_per_1m": "0.33",
+        "output_per_1m": "3.25",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-qwen3-6-27b",
+        "input_per_1m": "0.35",
+        "output_per_1m": "3.46",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-6-35b-a3b",
+        "input_per_1m": "0.10",
+        "output_per_1m": "1.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-qwen3-6-35b-a3b",
+        "input_per_1m": "0.18",
+        "output_per_1m": "1.18",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen-3-6-plus",
+        "input_per_1m": "0.63",
+        "output_per_1m": "3.75",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen-3-7-max",
+        "input_per_1m": "2.70",
+        "output_per_1m": "8.05",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen-3-7-plus",
+        "input_per_1m": "0.50",
+        "output_per_1m": "2.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen-3-8-max",
+        "input_per_1m": "2.50",
+        "output_per_1m": "7.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "qwen3-vl-235b-a22b",
+        "input_per_1m": "0.21",
+        "output_per_1m": "1.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-qwen3-vl-30b-a3b-p",
+        "input_per_1m": "0.25",
+        "output_per_1m": "0.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "e2ee-qwen3-6-35b-a3b-uncensored-p",
+        "input_per_1m": "0.38",
+        "output_per_1m": "1.88",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "seed-2-1-turbo",
+        "input_per_1m": "0.63",
+        "output_per_1m": "3.13",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "venice-uncensored-role-play",
+        "input_per_1m": "0.50",
+        "output_per_1m": "2.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      },
+      {
+        "model": "venice-uncensored-1-2",
+        "input_per_1m": "0.20",
+        "output_per_1m": "0.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.venice.ai/overview/pricing"
+      }
+    ],
+    "reka": [
+      {
+        "model": "reka-edge",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.10",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.reka.ai/pricing"
+      },
+      {
+        "model": "reka-flash",
+        "input_per_1m": "0.80",
+        "output_per_1m": "2.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.reka.ai/pricing"
+      },
+      {
+        "model": "reka-core",
+        "input_per_1m": "2.00",
+        "output_per_1m": "6.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.reka.ai/pricing"
+      }
+    ],
+    "upstage": [
+      {
+        "model": "solar-pro4",
+        "input_per_1m": "0.30",
+        "output_per_1m": "1.20",
+        "last_verified": "2026-08-07",
+        "source": "https://www.upstage.ai/pricing/api"
+      },
+      {
+        "model": "solar-pro3",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://www.upstage.ai/pricing/api"
+      },
+      {
+        "model": "solar-pro2",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://www.upstage.ai/pricing/api"
+      },
+      {
+        "model": "solar-mini",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.15",
+        "last_verified": "2026-08-07",
+        "source": "https://www.upstage.ai/pricing/api"
+      }
+    ],
+    "arcee": [
+      {
+        "model": "trinity-large-thinking",
+        "input_per_1m": "0.25",
+        "output_per_1m": "0.80",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.arcee.ai/get-started/pricing"
+      }
+    ],
+    "digitalocean": [
+      {
+        "model": "anthropic-claude-fable-5",
+        "input_per_1m": "10.00",
+        "output_per_1m": "50.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-haiku-4.5",
+        "input_per_1m": "1.00",
+        "output_per_1m": "5.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-opus-5",
+        "input_per_1m": "5.00",
+        "output_per_1m": "25.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-opus-4.8",
+        "input_per_1m": "5.00",
+        "output_per_1m": "25.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-opus-4.7",
+        "input_per_1m": "5.00",
+        "output_per_1m": "25.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-opus-4.6",
+        "input_per_1m": "5.00",
+        "output_per_1m": "25.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-opus-4.5",
+        "input_per_1m": "5.00",
+        "output_per_1m": "25.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-5-sonnet",
+        "input_per_1m": "2.00",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-4.6-sonnet",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "anthropic-claude-4.5-sonnet",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-oss-120b",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.70",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-oss-20b",
+        "input_per_1m": "0.05",
+        "output_per_1m": "0.45",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.6-sol",
+        "input_per_1m": "5.00",
+        "output_per_1m": "30.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.6-terra",
+        "input_per_1m": "2.00",
+        "output_per_1m": "12.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.6-luna",
+        "input_per_1m": "0.20",
+        "output_per_1m": "1.20",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.5",
+        "input_per_1m": "5.00",
+        "output_per_1m": "30.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.4",
+        "input_per_1m": "2.50",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.4-mini",
+        "input_per_1m": "0.75",
+        "output_per_1m": "4.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.4-nano",
+        "input_per_1m": "0.20",
+        "output_per_1m": "1.25",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.4-pro",
+        "input_per_1m": "30.00",
+        "output_per_1m": "180.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.3-codex",
+        "input_per_1m": "1.75",
+        "output_per_1m": "14.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.2",
+        "input_per_1m": "1.75",
+        "output_per_1m": "14.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5.2-pro",
+        "input_per_1m": "21.00",
+        "output_per_1m": "168.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5",
+        "input_per_1m": "1.25",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5-mini",
+        "input_per_1m": "0.25",
+        "output_per_1m": "2.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-5-nano",
+        "input_per_1m": "0.05",
+        "output_per_1m": "0.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-4.1",
+        "input_per_1m": "2.00",
+        "output_per_1m": "8.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-4o",
+        "input_per_1m": "2.50",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-gpt-4o-mini",
+        "input_per_1m": "0.15",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-o1",
+        "input_per_1m": "15.00",
+        "output_per_1m": "60.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-o3",
+        "input_per_1m": "2.00",
+        "output_per_1m": "8.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "openai-o3-mini",
+        "input_per_1m": "1.10",
+        "output_per_1m": "4.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "alibaba-qwen3-32b",
+        "input_per_1m": "0.25",
+        "output_per_1m": "0.55",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "qwen3-coder-flash",
+        "input_per_1m": "0.45",
+        "output_per_1m": "1.70",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "qwen3.5-397b-a17b",
+        "input_per_1m": "0.302",
+        "output_per_1m": "1.925",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "deepseek-v4-flash-0731",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "deepseek-r1-distill-llama-70b",
+        "input_per_1m": "0.99",
+        "output_per_1m": "0.99",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "deepseek-v4-pro",
+        "input_per_1m": "0.87",
+        "output_per_1m": "1.74",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "deepseek-3.2",
+        "input_per_1m": "0.25",
+        "output_per_1m": "0.80",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "kimi-k3",
+        "input_per_1m": "3.00",
+        "output_per_1m": "15.00",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "kimi-k2.6",
+        "input_per_1m": "0.76",
+        "output_per_1m": "3.20",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "kimi-k2.5",
+        "input_per_1m": "0.375",
+        "output_per_1m": "2.025",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "llama3.3-70b-instruct",
+        "input_per_1m": "0.65",
+        "output_per_1m": "0.65",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "llama-4-maverick",
+        "input_per_1m": "0.20",
+        "output_per_1m": "0.696",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "nemotron-3-ultra-550b",
+        "input_per_1m": "0.90",
+        "output_per_1m": "1.70",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "nvidia-nemotron-3-super-120b",
+        "input_per_1m": "0.165",
+        "output_per_1m": "0.358",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "nemotron-3-nano-omni",
+        "input_per_1m": "0.50",
+        "output_per_1m": "0.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "nemotron-nano-12b-v2-vl",
+        "input_per_1m": "0.20",
+        "output_per_1m": "0.60",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "mimo-v2.5-pro",
+        "input_per_1m": "0.40",
+        "output_per_1m": "1.50",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "glm-5.2",
+        "input_per_1m": "0.70",
+        "output_per_1m": "2.20",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "glm-5.1",
+        "input_per_1m": "0.975",
+        "output_per_1m": "4.30",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "glm-5",
+        "input_per_1m": "0.75",
+        "output_per_1m": "2.40",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "minimax-m2.5",
+        "input_per_1m": "0.225",
+        "output_per_1m": "0.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      },
+      {
+        "model": "arcee-trinity-large-thinking",
+        "input_per_1m": "0.25",
+        "output_per_1m": "0.90",
+        "last_verified": "2026-08-07",
+        "source": "https://docs.digitalocean.com/products/inference/details/pricing/"
+      }
+    ],
+    "qianfan": [
+      {
+        "model": "ernie-5.0",
+        "input_per_1m": "6.00",
+        "output_per_1m": "24.00",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.baidu.com/doc/qianfan/s/wmh4sv6ya"
+      },
+      {
+        "model": "ernie-4.5-turbo-32k",
+        "input_per_1m": "0.80",
+        "output_per_1m": "3.20",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.baidu.com/doc/qianfan/s/wmh4sv6ya"
+      },
+      {
+        "model": "ernie-4.5-turbo-128k",
+        "input_per_1m": "0.80",
+        "output_per_1m": "3.20",
+        "last_verified": "2026-08-07",
+        "source": "https://cloud.baidu.com/doc/qianfan/s/wmh4sv6ya"
+      }
+    ],
+    "stepfun": [
+      {
+        "model": "step-3.7-flash",
+        "input_per_1m": "0.20",
+        "output_per_1m": "1.15",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.stepfun.ai/docs/en/guides/pricing/details"
+      },
+      {
+        "model": "step-3.5-flash",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.30",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.stepfun.ai/docs/en/guides/pricing/details"
+      },
+      {
+        "model": "step-3.5-flash-2603",
+        "input_per_1m": "0.10",
+        "output_per_1m": "0.30",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.stepfun.ai/docs/en/guides/pricing/details"
+      },
+      {
+        "model": "stepaudio-2.5-chat",
+        "input_per_1m": "1.50",
+        "output_per_1m": "3.50",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.stepfun.ai/docs/en/guides/pricing/details"
+      },
+      {
+        "model": "stepaudio-2.5-realtime",
+        "input_per_1m": "1.50",
+        "output_per_1m": "10.00",
+        "last_verified": "2026-08-07",
+        "source": "https://platform.stepfun.ai/docs/en/guides/pricing/details"
+      }
+    ],
+    "chutes": [
+      {
+        "model": "Qwen/Qwen3-32B-TEE",
+        "input_per_1m": "0.104",
+        "output_per_1m": "0.416",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "Qwen/Qwen3.5-397B-A17B-TEE",
+        "input_per_1m": "0.45",
+        "output_per_1m": "3.0",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "google/gemma-4-31B-turbo-TEE",
+        "input_per_1m": "0.12",
+        "output_per_1m": "0.37",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "moonshotai/Kimi-K2.6-TEE",
+        "input_per_1m": "0.58",
+        "output_per_1m": "3.4",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "deepseek-ai/DeepSeek-V3.2-TEE",
+        "input_per_1m": "1.0",
+        "output_per_1m": "1.0",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "zai-org/GLM-5.1-TEE",
+        "input_per_1m": "0.98",
+        "output_per_1m": "3.08",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "moonshotai/Kimi-K3-TEE",
+        "input_per_1m": "3.0",
+        "output_per_1m": "15.0",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "Qwen/Qwen3.6-27B-TEE",
+        "input_per_1m": "0.3",
+        "output_per_1m": "2.0",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE",
+        "input_per_1m": "0.2989",
+        "output_per_1m": "1.1957",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "zai-org/GLM-5.2-TEE",
+        "input_per_1m": "1.25",
+        "output_per_1m": "3.95",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "unsloth/Mistral-Nemo-Instruct-2407-TEE",
+        "input_per_1m": "0.0245",
+        "output_per_1m": "0.0978",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731-TEE",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      },
+      {
+        "model": "Nemotron-3-Nano-Omni-30B-TEE",
+        "input_per_1m": "0.0245",
+        "output_per_1m": "0.0978",
+        "last_verified": "2026-08-07",
+        "source": "https://chutes.ai/pricing"
+      }
+    ],
+    "avian": [
+      {
+        "model": "deepseek/deepseek-v4-flash",
+        "input_per_1m": "0.0805",
+        "output_per_1m": "0.161",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "deepseek/deepseek-v4-pro",
+        "input_per_1m": "1.305",
+        "output_per_1m": "2.61",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "deepseek/deepseek-v3.2",
+        "input_per_1m": "0.23",
+        "output_per_1m": "0.33",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "minimax/minimax-m2.5",
+        "input_per_1m": "0.27",
+        "output_per_1m": "1.08",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "z-ai/glm-4.7",
+        "input_per_1m": "0.388",
+        "output_per_1m": "1.806",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "z-ai/glm-5",
+        "input_per_1m": "0.516",
+        "output_per_1m": "2.322",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "z-ai/glm-5.1",
+        "input_per_1m": "0.743",
+        "output_per_1m": "2.971",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "z-ai/glm-5.2",
+        "input_per_1m": "0.495",
+        "output_per_1m": "1.733",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "moonshotai/kimi-k2.5",
+        "input_per_1m": "0.45",
+        "output_per_1m": "2.2",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      },
+      {
+        "model": "moonshotai/kimi-k2.6",
+        "input_per_1m": "0.95",
+        "output_per_1m": "4.0",
+        "last_verified": "2026-08-07",
+        "source": "https://avian.io/pricing/"
+      }
+    ]
+  }
+}

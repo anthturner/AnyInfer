@@ -1,0 +1,22 @@
+{
+  // The repo-local venv (docs/contributing/README.md). On macOS/Linux the path
+  // does not resolve and the Python extension falls back to auto-discovering .venv.
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+
+  // Use the versions pinned in the venv, not the extensions' bundled copies, so the
+  // editor agrees with `workspace check` and CI.
+  "ruff.importStrategy": "fromEnvironment",
+  "mypy-type-checker.importStrategy": "fromEnvironment",
+
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  // The formatter is deliberately not a gate in this repo (see workspace.py) — never
+  // reformat on save.
+  "editor.formatOnSave": false
+}

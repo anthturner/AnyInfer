@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose an integration or product improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What integration problem cannot be solved cleanly today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the behavior and who would use it, not just an implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: workstream
+    attributes:
+      label: Primary workstream
+      options:
+        - Core engine
+        - Shared configuration
+        - Python SDK
+        - CLI
+        - OpenAI-compatible sidecar
+        - Demo app
+        - Provider adapter or preset
+        - Documentation or contributor tooling
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: I checked the documentation and existing issues for this request.
+          required: true

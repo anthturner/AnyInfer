@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible AnyInfer defect.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve AnyInfer. Never include API keys, tokens, private prompts,
+        or model output. Report vulnerabilities through the private security link instead.
+  - type: input
+    id: version
+    attributes:
+      label: AnyInfer version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration path
+      options:
+        - Python SDK
+        - CLI
+        - OpenAI-compatible sidecar
+        - Demo app
+        - Contributor tooling
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, operating system, and provider or local engine.
+      placeholder: Python 3.13, Windows 11, Ollama 0.x
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include the smallest configuration and code or command that reproduces it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Redacted traceback, logs, or screenshots if they add information.

@@ -1,0 +1,254 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anyinfer"
+version = "0.1.0"
+description = "An application-owned hybrid inference runtime for Python, spanning hosted APIs and managed local models."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Anthony Turner", email = "anthony@bitoblivion.com" }]
+keywords = ["llm", "inference", "openai", "anthropic", "ollama", "llama.cpp", "routing"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
+]
+# httpx2 is the Pydantic-stewarded continuation of httpx (same BSD-3-Clause license,
+# original author credited); adopted core-wide in D26 after upstream httpx stagnated.
+dependencies = ["httpx2>=2.0", "jsonschema>=4.21"]
+
+[project.optional-dependencies]
+copilot = ["github-copilot-sdk>=0.1"]
+azure = ["azure-identity>=1.17"]
+keyring = ["keyring>=24"]
+otel = ["opentelemetry-api>=1.25"]
+# Bedrock and Vertex authenticate with hand-rolled SigV4 and a JWT-bearer exchange.
+# Installing boto3 or google-auth alongside is optional and, when present, preferred for
+# credential resolution. Signing a Vertex service-account JWT needs an RSA implementation.
+vertex = ["cryptography>=42"]
+serve = ["starlette>=0.37", "uvicorn>=0.30"]
+# The pack-in PySide6 reference application (`src/demo_app`). Kept in an extra so ADR-007's
+# slim core holds: nothing in `anyinfer` imports Qt, and a library install never pulls it in.
+demo = ["PySide6>=6.6", "markdown>=3.6"]
+all = [
+  "github-copilot-sdk>=0.1",
+  "azure-identity>=1.17",
+  "keyring>=24",
+  "opentelemetry-api>=1.25",
+  "starlette>=0.37",
+  "uvicorn>=0.30",
+  "PySide6>=6.6",
+  "markdown>=3.6",
+  "cryptography>=42",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "import-linter>=2.0",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.26",
+  "PySide6>=6.6",
+  "markdown>=3.6",
+  # Test-only: lets the OTel bridge tests assert against real exported spans rather than
+  # a fake tracer. Deliberately *not* in the `otel` extra or `all` — the bridge depends on
+  # opentelemetry-api alone, and shipping the SDK would undercut the slim core (ADR-007).
+  "opentelemetry-sdk>=1.25",
+]
+
+[project.scripts]
+anyinfer = "anyinfer.cli:main"
+anyinfer-demo = "demo_app:main"
+
+[project.urls]
+Homepage = "https://github.com/anthturner/anyinfer"
+Documentation = "https://anthturner.github.io/anyinfer/"
+Changelog = "https://github.com/anthturner/anyinfer/releases"
+Issues = "https://github.com/anthturner/anyinfer/issues"
+
+# The developer task runner (workspace.py) deliberately does NOT ship: a wheel that
+# installs a generic top-level `workspace` module would collide with unrelated
+# distributions claiming the same name. It stays a repo-root tool (`python workspace.py`).
+[tool.hatch.build.targets.wheel]
+packages = ["src/anyinfer", "src/demo_app"]
+
+[tool.hatch.build.targets.sdist]
+# The sdist is a working source tree: it can rebuild the wheel, run the test suite, and
+# build the docs (which is why mkdocs.yml, overrides/, and scripts/ ship alongside docs/).
+include = [
+  "src/anyinfer",
+  "src/demo_app",
+  "tests",
+  "docs",
+  "overrides",
+  "scripts",
+  "contracts",
+  "mkdocs.yml",
+  "workspace.py",
+  "README.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "LICENSE",
+]
+
+[tool.ruff]
+line-length = 99
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D"]
+ignore = [
+  "RUF012",  # ClassVar annotations on mutable class attrs — descriptors are frozen by convention
+  "B008",    # function call in default arg — not used; dataclass field() is fine
+  "D203",    # incompatible with D211 (no blank line before class docstring)
+  "D213",    # incompatible with D212 (summary on the first line)
+  "D401",    # imperative-mood rule misfires on property and attribute docstrings
+  "D107",    # __init__ args are documented on the class docstring (Google convention)
+  "RUF009",  # frozen dataclass defaults are themselves frozen, so sharing them is safe
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "SIM117"]
+# The conformance matrix uses ✅/➖/❌ deliberately; they are the published symbols.
+# workspace.py renders the matrix page, so its template strings carry them too.
+"src/anyinfer/testing/conformance.py" = ["RUF001", "RUF002"]
+"workspace.py" = ["RUF001", "RUF002"]
+# Raw SVG path data — splitting it across lines would fragment the "d" attribute string.
+"src/demo_app/widgets/icons.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["anyinfer", "demo_app"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/anyinfer", "src/demo_app", "workspace.py"]
+warn_unreachable = true
+disallow_any_generics = true
+no_implicit_reexport = false
+
+[[tool.mypy.overrides]]
+module = [
+  "jsonschema.*",
+  "keyring.*",
+  "azure.*",
+  "opentelemetry.*",
+  "starlette.*",
+  "uvicorn.*",
+  "copilot.*",
+  "PySide6.*",
+  "markdown.*",
+  # Optional cloud-auth SDKs. The adapters prefer them when present and fall back to
+  # the hand-rolled flows when not, so neither is a declared dependency.
+  "boto3.*",
+  "google.*",
+  "cryptography.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Imported lazily by workspace.py: the conformance harness modules live in tests/
+# (outside mypy's `files`), and pillow is an optional build-time dependency of the
+# demo bundle.
+module = ["test_conformance", "test_ollama", "test_gemini", "test_presets", "test_cohere_lmstudio", "test_nebius", "PIL.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "error",
+    # Import-time warning from starlette's own test client about its httpx backend —
+    # third-party drift we cannot act on from here, not a defect in our code.
+    "ignore::DeprecationWarning:starlette.testclient",
+]
+addopts = "-q"
+
+[tool.importlinter]
+root_package = "anyinfer"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+# ADR-003: adapters translate; the core orchestrates. What an adapter must never contain is
+# *orchestration* — retry/fallback policy, schema validation and repair, or the client loop.
+#
+# `anyinfer.local` is deliberately absent from this list: the llama.cpp adapter's whole job
+# is composing the local subsystem (catalog artifact -> download -> tune -> supervise), and
+# that composition is translation, not orchestration. The supervisor's own lifecycle
+# telemetry reaches observers through `events.telemetry`, which carries no policy.
+name = "Adapters never orchestrate"
+type = "forbidden"
+source_modules = ["anyinfer.providers"]
+forbidden_modules = [
+  "anyinfer.routing",
+  "anyinfer.schema.validate",
+  "anyinfer.schema.repair",
+  "anyinfer._client",
+  "anyinfer.capabilities",
+  "anyinfer.context",
+]
+
+[[tool.importlinter.contracts]]
+# ADR-009: the sidecar is a wire codec around a normal client, never a second core. The
+# contract covers the codec and ASGI app. `serve.__main__` is only a module-runner shim into
+# the separate CLI process boundary, so it is not request-path code.
+name = "Sidecar is a codec around the client, never a second core"
+type = "forbidden"
+source_modules = ["anyinfer.serve.openai_codec", "anyinfer.serve.app"]
+forbidden_modules = [
+  "anyinfer.providers",
+  "anyinfer.routing",
+  "anyinfer.schema",
+  "anyinfer.catalog",
+  "anyinfer.credentials",
+  "anyinfer.local",
+  "anyinfer.context",
+]
+
+[[tool.importlinter.contracts]]
+name = "Types are leaf modules (zero I/O)"
+type = "forbidden"
+source_modules = ["anyinfer.types"]
+forbidden_modules = [
+  "anyinfer.providers",
+  "anyinfer.routing",
+  "anyinfer._client",
+  "anyinfer.schema",
+  "anyinfer.events",
+  "anyinfer.local",
+  "anyinfer.context",
+  "httpx2",
+]
+
+[[tool.importlinter.contracts]]
+# D28: context reduction composes the core's leaf surfaces and nothing else. distill
+# takes the client by structural Protocol, so even the one strategy that generates text
+# has no _client import — and no strategy can reach a provider, the wire, or the disk.
+name = "Context reduction is a leaf consumer"
+type = "forbidden"
+source_modules = ["anyinfer.context"]
+forbidden_modules = [
+  "anyinfer.providers",
+  "anyinfer.routing",
+  "anyinfer._client",
+  "anyinfer.serve",
+  "anyinfer.local",
+  "anyinfer.schema",
+  "anyinfer.catalog",
+  "anyinfer.credentials",
+  "httpx2",
+]

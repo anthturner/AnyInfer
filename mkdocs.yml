@@ -1,0 +1,208 @@
+site_name: AnyInfer
+site_description: >-
+  An application-owned hybrid inference runtime for Python, spanning hosted APIs,
+  routing hubs, existing local services, and supervised llama.cpp.
+site_url: https://anthturner.github.io/anyinfer/
+repo_url: https://github.com/anthturner/anyinfer
+repo_name: anthturner/anyinfer
+edit_uri: edit/main/docs/
+
+# docs/README.md is the table of contents GitHub renders when browsing the repo; the
+# published site has its own landing page (index.md) and navigation, so the TOC page is
+# excluded rather than duplicated. The leading slash anchors the pattern to docs/ itself —
+# the per-section README.md files below it are the site's section indexes and must stay.
+exclude_docs: |
+  /README.md
+
+# The downloads page is deliberately outside the nav: it is reached from the header's
+# "Download vX.Y.Z" button (overrides/partials/header.html) and from the landing page.
+# Keeping it out of the nav keeps Home a single page, so the mobile drawer opens on the
+# full top-level navigation instead of drilling into a two-item "Home" section.
+not_in_nav: |
+  /downloads.md
+
+# `mkdocs serve` only watches docs_dir and this config file by default, so template
+# edits under custom_dir (overrides/) never trigger a rebuild without this — a stale
+# dev server keeps serving old template output indefinitely, which looks identical to
+# a real bug from the browser.
+watch:
+  - overrides
+
+theme:
+  name: material
+  # Template overrides — currently just partials/header.html, which adds the download
+  # button. Re-sync that copy when bumping the mkdocs-material pin.
+  custom_dir: overrides
+  # The icon art is background-independent (see docs/assets/anyinfer-palette.css), so one
+  # header logo serves both schemes; the wordmark SVGs on the landing page and README
+  # are the theme-swapped pair.
+  logo: assets/anyinfer-icon-512.svg
+  favicon: assets/anyinfer-icon-512.png
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    # Brand colors are defined in stylesheets/extra.css against these custom schemes.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/home.css
+
+# Build hooks. mkdocs_hooks.py feeds the header download button the version from
+# pyproject.toml, so the button never drifts from the release it points at.
+hooks:
+  - scripts/mkdocs_hooks.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            members_order: source
+            show_root_heading: true
+            show_source: false
+            separate_signature: true
+            show_signature_annotations: true
+            merge_init_into_class: true
+            inherited_members: false
+
+nav:
+  - Home: index.md
+  - Integrate:
+      - guides/README.md
+      - When to use AnyInfer: guides/when-to-use.md
+      - Quickstart: guides/quickstart.md
+      - Choosing an integration path: guides/integration-paths.md
+      - Installation and extras: guides/installation.md
+      - Shared configuration: reference/configuration.md
+      - Python SDK: guides/python-sdk.md
+      - Command-line tool: guides/cli.md
+      - OpenAI-compatible sidecar: serve/README.md
+      - Python tasks:
+          - Stream typed events: guides/streaming.md
+          - Enforce a JSON schema: guides/structured-output.md
+          - Add a fallback chain: guides/fallback.md
+          - Run the tool loop: guides/tool-loop.md
+          - Fit a corpus to a budget: guides/fitting-context.md
+      - Operations:
+          - Run a model locally: guides/local-inference.md
+          - Choose and download a local model: guides/local-models.md
+          - Observability: guides/observability.md
+          - Credentials in the OS keyring: guides/credentials.md
+      - Reference application: guides/demo-app.md
+  - Concepts:
+      - concepts/README.md
+      - Targets and aliases: concepts/targets.md
+      - The event stream: concepts/events.md
+      - Routing: concepts/routing.md
+      - Structured output: concepts/structured-output.md
+      - Capabilities and provenance: concepts/capabilities.md
+      - Token estimation and context budgets: concepts/budgeting.md
+      - Context reduction: concepts/context-reduction.md
+      - Credentials and redaction: concepts/credentials.md
+      - Telemetry: concepts/telemetry.md
+      - The local subsystem: concepts/local.md
+      - The model catalog: concepts/catalog.md
+      - Acquiring models: concepts/models.md
+  - Examples:
+      - examples/README.md
+      - Structured summaries with fallback: examples/summarize-with-fallback.md
+      - A local tool-calling assistant: examples/local-tool-agent.md
+      - Distill a corpus: examples/distill-a-corpus.md
+  - Providers:
+      - providers/README.md
+      - Every provider: providers/all.md
+      - OpenAI: providers/openai.md
+      - Anthropic: providers/anthropic.md
+      - Google Gemini: providers/gemini.md
+      - DeepSeek: providers/deepseek.md
+      - xAI (Grok): providers/xai.md
+      - Google Vertex AI: providers/vertex.md
+      - AWS Bedrock: providers/bedrock.md
+      - Cohere: providers/cohere.md
+      - LM Studio: providers/lm-studio.md
+      - Hosted & local presets: providers/presets.md
+      - Azure AI Foundry: providers/azure-foundry.md
+      - GitHub Copilot: providers/copilot.md
+      - Microsoft 365 Copilot: providers/m365-copilot.md
+      - OpenRouter: providers/openrouter.md
+      - Nebius Token Factory: providers/nebius.md
+      - Ollama: providers/ollama.md
+      - llama.cpp: providers/llama-cpp.md
+      - OpenAI-compatible: providers/openai-compat.md
+  - Reference:
+      - reference/README.md
+      - SDK reference:
+          - reference/api/README.md
+          - Clients and streams: reference/api/client.md
+          - Requests and messages: reference/api/requests.md
+          - Results and stream events: reference/api/results.md
+          - Routing: reference/api/routing.md
+          - Capabilities: reference/api/capabilities.md
+          - Context reduction: reference/api/context.md
+          - Telemetry and redaction: reference/api/telemetry.md
+          - Registry, catalog, credentials: reference/api/registry.md
+          - Configuration: reference/api/configuration.md
+          - Local inference: reference/api/local.md
+          - Sidecar frontend: reference/api/serve.md
+          - Testing utilities: reference/api/testing.md
+          - Errors: reference/api/errors.md
+      - Error catalog: reference/errors.md
+      - Conformance matrix: reference/conformance-matrix.md
+      - Glossary: reference/glossary.md
+  - Contributing:
+      - contributing/README.md
+      - Architecture: contributing/architecture.md
+      - Coding agents and workstreams: contributing/automation.md
+      - Branding and visual assets: contributing/branding.md
+      - Writing an adapter: contributing/writing-an-adapter.md
+      - The conformance suite: contributing/conformance.md
+      - Testing: contributing/testing.md
+      - Branching and releases: contributing/releasing.md
+      - Repository setup: contributing/repository-setup.md

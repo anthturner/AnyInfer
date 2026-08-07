@@ -1,0 +1,479 @@
+/* AnyInfer brand palette for Material, derived from docs/assets/anyinfer-palette.css
+   (deep teal + amber). The header stays teal-deep in both schemes — the icon's teal
+   chip and amber dash are drawn against it — and only text/link inks swap, matching
+   how the logo SVGs themselves handle the two themes. */
+
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:        #0B3B3C;  /* --anyinfer-teal-deep: header, nav highlights */
+  --md-primary-fg-color--light: #2C7A6F;  /* --anyinfer-teal */
+  --md-primary-fg-color--dark:  #072a2b;
+  --md-accent-fg-color:         #E8963C;  /* --anyinfer-amber: hover/active/focus */
+  --md-typeset-a-color:         #1f6f63;  /* --anyinfer-link (light) */
+
+  /* Component tokens (P0 design system). Card/button/badge/code utilities below key
+     off these rather than the raw --anyinfer-* constants so a future palette swap is a
+     one-place edit. */
+  --anyinfer-accent:        #2C7A6F;
+  --anyinfer-accent-strong:  #0B3B3C;
+  --anyinfer-on-accent:      #FFFFFF;
+  --anyinfer-card-bg:        #ffffff;
+  --anyinfer-card-border:    #d1d9e0;
+  --anyinfer-code-keyword:   #0B3B3C;
+  --anyinfer-code-string:    #2C7A6F;
+  --anyinfer-code-name:      #B5651D;
+  --anyinfer-mermaid-primary: #eaf4f1;
+  --anyinfer-mermaid-border:  #2C7A6F;
+  --anyinfer-mermaid-text:    #0B3B3C;
+  --anyinfer-mermaid-line:    #7E9A9B;
+  --anyinfer-ok:    #1a7f4f;
+  --anyinfer-danger: #c53030;
+  --anyinfer-muted:  #7E9A9B;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        #0B3B3C;
+  --md-primary-fg-color--light: #2C7A6F;
+  --md-primary-fg-color--dark:  #072a2b;
+  --md-accent-fg-color:         #F0C86A;  /* --anyinfer-gold reads better than amber on slate */
+  --md-typeset-a-color:         #4FBFA8;  /* --anyinfer-teal-bright: text-teal on dark */
+
+  /* Nudge slate's neutrals toward the palette's dark surfaces. */
+  --md-default-bg-color:        #0d1117;  /* --anyinfer-bg (dark) */
+  --md-code-bg-color:           #151b23;  /* --anyinfer-surface (dark) */
+
+  --anyinfer-accent:        #4FBFA8;
+  --anyinfer-accent-strong:  #F0C86A;
+  --anyinfer-on-accent:      #072a2b;
+  --anyinfer-card-bg:        #151b23;
+  --anyinfer-card-border:    #3d444d;
+  --anyinfer-code-keyword:   #F0C86A;
+  --anyinfer-code-string:    #4FBFA8;
+  --anyinfer-code-name:      #e8a765;
+  --anyinfer-mermaid-primary: #0f2b28;
+  --anyinfer-mermaid-border:  #4FBFA8;
+  --anyinfer-mermaid-text:    #f0f6fc;
+  --anyinfer-mermaid-line:    #7E9A9B;
+  --anyinfer-ok:    #3fb97a;
+  --anyinfer-danger: #e5787a;
+  --anyinfer-muted:  #9198a1;
+}
+
+/* ---------------------------------------------------------------------------
+   Accessibility utilities
+   --------------------------------------------------------------------------- */
+
+/* Kept in the accessibility tree (screen readers, SEO) but not shown visually —
+   used where a heading is structurally required but a hero image already
+   communicates it visually (the landing page's wordmark). */
+.anyinfer-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Typography & rhythm
+   --------------------------------------------------------------------------- */
+
+.md-typeset h1 { font-weight: 800; }
+.md-typeset h2 { font-weight: 700; margin-block-start: 2.5rem; }
+.md-typeset h3 { font-weight: 600; margin-block-start: 1.5rem; }
+.md-typeset p,
+.md-typeset li { line-height: 1.6; }
+
+.md-typeset pre { margin: 1rem 0; }
+
+@media screen and (min-width: 76.25em) {
+  .md-content__inner {
+    max-width: 46rem;
+  }
+
+  /* Grids and hero content opt back into full width. */
+  .md-content__inner .grid.cards,
+  .md-content__inner .anyinfer-hero,
+  .md-content__inner .anyinfer-card-grid {
+    max-width: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Cards & grids
+   --------------------------------------------------------------------------- */
+
+.anyinfer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+/* Grid tracks default to min-width: auto, which refuses to shrink a card below its
+   widest unbreakable content (e.g. a long `pip install ...` line in a <pre>) — the
+   track — and therefore the whole grid — overflows its container instead of
+   wrapping. minmax(0, 1fr) above handles the tracks; this handles the same problem
+   one level down, since a card's own children (code blocks especially) need the
+   same override to shrink with it. */
+.anyinfer-card-grid > * {
+  min-width: 0;
+}
+
+.anyinfer-card-grid pre {
+  overflow-x: auto;
+}
+
+@media screen and (max-width: 59.9375em) {
+  .anyinfer-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media screen and (max-width: 44.9375em) {
+  .anyinfer-card-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* When .anyinfer-card-grid wraps a Markdown bullet list (- item syntax, as opposed to
+   explicit <div class="anyinfer-card"> children), the <ul>/<ol> itself must not take a
+   grid cell — collapse it out of layout so its <li> children become the grid items,
+   same trick Material's own .grid.cards uses. */
+.md-typeset .anyinfer-card-grid > ul:not([hidden]),
+.md-typeset .anyinfer-card-grid > ol:not([hidden]) {
+  display: contents;
+}
+
+.md-typeset .anyinfer-card-grid > ul > li,
+.md-typeset .anyinfer-card-grid > ol > li {
+  display: block;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--anyinfer-card-border);
+  border-radius: 0.5rem;
+  background: var(--anyinfer-card-bg);
+  margin: 0;
+}
+
+[dir="ltr"] .md-typeset .anyinfer-card-grid > ul > li,
+[dir="ltr"] .md-typeset .anyinfer-card-grid > ol > li {
+  margin-left: 0;
+}
+
+.anyinfer-card {
+  display: block;
+  padding: 1.25rem;
+  border: 1px solid var(--anyinfer-card-border);
+  border-radius: 0.5rem;
+  background: var(--anyinfer-card-bg);
+  color: inherit;
+  text-decoration: none !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .anyinfer-card,
+  .md-typeset .anyinfer-card-grid > ul > li,
+  .md-typeset .anyinfer-card-grid > ol > li,
+  .md-typeset .grid.cards > ul > li {
+    transition: transform 150ms ease, border-color 150ms ease;
+  }
+}
+
+.anyinfer-card:hover,
+.md-typeset .anyinfer-card-grid > ul > li:hover,
+.md-typeset .anyinfer-card-grid > ol > li:hover,
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--anyinfer-accent);
+  transform: translateY(-2px);
+}
+
+.anyinfer-card h3 {
+  margin-top: 0;
+}
+
+/* The landing page's grid cards pick up the brand border on hover. */
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--md-accent-fg-color);
+}
+
+/* ---------------------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------------------- */
+
+.anyinfer-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 0.4rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  border: 1px solid transparent;
+}
+
+.anyinfer-button-primary {
+  background: var(--anyinfer-accent-strong);
+  color: var(--anyinfer-on-accent);
+  border-bottom: 2px solid var(--md-accent-fg-color);
+}
+
+.anyinfer-button-primary:hover {
+  filter: brightness(1.1);
+}
+
+.anyinfer-button-secondary {
+  background: transparent;
+  color: var(--anyinfer-accent);
+  border-color: var(--anyinfer-accent);
+}
+
+.anyinfer-button-secondary:hover {
+  background: var(--anyinfer-accent);
+  color: var(--anyinfer-on-accent);
+}
+
+.anyinfer-button:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Badges
+   --------------------------------------------------------------------------- */
+
+.anyinfer-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.anyinfer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid var(--anyinfer-card-border);
+  background: var(--anyinfer-card-bg);
+}
+
+.anyinfer-badge-yes { border-color: var(--anyinfer-ok); color: var(--anyinfer-ok); }
+.anyinfer-badge-no { border-color: var(--anyinfer-danger); color: var(--anyinfer-danger); }
+.anyinfer-badge-partial { border-color: var(--anyinfer-muted); color: var(--anyinfer-muted); }
+
+/* ---------------------------------------------------------------------------
+   "See also" footers
+   --------------------------------------------------------------------------- */
+
+.anyinfer-see-also {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.anyinfer-see-also ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.anyinfer-see-also li {
+  margin: 0;
+}
+
+.anyinfer-see-also a {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--anyinfer-card-border);
+  border-radius: 1.5rem;
+  text-decoration: none !important;
+}
+
+.anyinfer-see-also a:hover {
+  border-color: var(--anyinfer-accent);
+  color: var(--anyinfer-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   Hero diagrams (concept pages) & Mermaid theming
+   --------------------------------------------------------------------------- */
+
+.anyinfer-hero-diagram {
+  margin: 1.5rem 0 2rem;
+  padding: 1rem;
+  border: 1px solid var(--anyinfer-card-border);
+  border-radius: 0.5rem;
+  background: var(--anyinfer-card-bg);
+  overflow-x: auto;
+}
+
+.md-typeset .mermaid {
+  text-align: center;
+}
+
+/* Copy button theming: teal icon, amber hover. */
+.md-typeset .md-clipboard {
+  color: var(--anyinfer-accent);
+}
+
+.md-typeset .md-clipboard:hover {
+  color: var(--md-accent-fg-color);
+}
+
+.md-typeset pre {
+  background: var(--anyinfer-card-bg);
+  border: 1px solid var(--anyinfer-card-border);
+}
+
+/* Command-output blocks: fenced with ```text .terminal or a `.terminal` wrapper div. */
+.md-typeset .terminal pre,
+.md-typeset pre.terminal {
+  background: #0d1117;
+  color: #f0f6fc;
+  border-radius: 8px;
+  border-color: #3d444d;
+}
+
+/* ---------------------------------------------------------------------------
+   API reference blocks
+   --------------------------------------------------------------------------- */
+
+.anyinfer-api-block {
+  margin: 1.5rem 0;
+  padding: 0.5rem 0 0.5rem 1rem;
+  border-left: 3px solid var(--anyinfer-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   Conformance matrix
+   --------------------------------------------------------------------------- */
+
+.anyinfer-matrix {
+  overflow-x: auto;
+}
+
+.anyinfer-matrix table {
+  display: table;
+}
+
+.anyinfer-matrix thead th {
+  position: sticky;
+  top: 0;
+  background: var(--anyinfer-card-bg);
+  z-index: 1;
+}
+
+.anyinfer-matrix-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.anyinfer-matrix-filters button {
+  padding: 0.35rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid var(--anyinfer-card-border);
+  background: var(--anyinfer-card-bg);
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.anyinfer-matrix-filters button.anyinfer-active,
+.anyinfer-matrix-filters button:hover {
+  border-color: var(--anyinfer-accent);
+  color: var(--anyinfer-accent);
+}
+
+.anyinfer-matrix tr.anyinfer-row-hidden {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Downloads page
+   --------------------------------------------------------------------------- */
+
+.anyinfer-download-card {
+  border-top: 3px solid var(--anyinfer-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   404 page
+   --------------------------------------------------------------------------- */
+
+.anyinfer-404 {
+  max-width: 46rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.anyinfer-404 h1 {
+  font-weight: 800;
+}
+
+/* ---------------------------------------------------------------------------
+   Error catalog
+   --------------------------------------------------------------------------- */
+
+.anyinfer-error-card {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--anyinfer-card-border);
+  border-top: 3px solid var(--anyinfer-muted);
+  border-radius: 0.4rem;
+}
+
+.anyinfer-error-card.anyinfer-severity-high { border-top-color: var(--anyinfer-danger); }
+.anyinfer-error-card.anyinfer-severity-medium { border-top-color: var(--md-accent-fg-color); }
+.anyinfer-error-card.anyinfer-severity-low { border-top-color: var(--anyinfer-ok); }
+
+/* The header's "Download vX.Y.Z" pill (overrides/partials/header.html). The scheme's
+   accent — amber on light, gold on slate — against the teal-deep header, with teal-deep
+   ink for contrast on both. On phones the label collapses and the icon remains. */
+.md-header__download {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.3rem;
+  margin: 0 0.2rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 1rem;
+  background-color: var(--md-accent-fg-color);
+  color: var(--md-primary-fg-color);
+  font-size: 0.65rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: filter 125ms;
+}
+
+.md-header__download:hover,
+.md-header__download:focus {
+  color: var(--md-primary-fg-color);
+  filter: brightness(1.1);
+}
+
+.md-header__download svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  fill: currentcolor;
+}
+
+@media screen and (max-width: 44.9375em) {
+  .md-header__download {
+    padding: 0.2rem 0.4rem;
+  }
+
+  .md-header__download-label {
+    display: none;
+  }
+}

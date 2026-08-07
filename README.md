@@ -1,0 +1,218 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/anthturner/anyinfer/main/docs/assets/anyinfer-horizontal-dark.svg">
+    <img src="https://raw.githubusercontent.com/anthturner/anyinfer/main/docs/assets/anyinfer-horizontal-light.svg" alt="AnyInfer" width="480" />
+  </picture>
+</p>
+
+<p align="center">
+  <a href="https://github.com/anthturner/anyinfer/actions/workflows/ci.yml"><img src="https://github.com/anthturner/anyinfer/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+  <a href="https://anthturner.github.io/anyinfer/"><img src="https://img.shields.io/badge/docs-anthturner.github.io-2C7A6F" alt="Documentation" /></a>
+  <a href="https://github.com/anthturner/anyinfer/releases/latest"><img src="https://img.shields.io/github/v/release/anthturner/anyinfer?include_prereleases&label=release&color=E8963C" alt="Latest release" /></a>
+  <a href="https://github.com/anthturner/anyinfer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-2C7A6F" alt="MIT license" /></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-0B3B3C" alt="Python 3.11+" />
+</p>
+
+**An application-owned hybrid inference runtime for Python.** Send one typed request to
+hosted providers, routing hubs, existing local servers, or a supervised `llama.cpp`
+process. The same core owns routing, structured output, context budgeting and reduction,
+telemetry, and shared configuration.
+
+```python
+import anyinfer as ai
+
+client = ai.Client([
+    ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+    ai.ProviderSettings.of("ollama"),
+])
+result = client.generate("Summarize this release note:\n" + text, target="anthropic:claude-sonnet-4-5")
+
+print(result.text)
+print(result.usage.output_tokens, "tokens in", result.timing.total_ms, "ms")
+```
+
+Point the same call at a local model by changing one string:
+
+```python
+result = client.generate(prompt, target="ollama:qwen3:8b")   # or "medium" — a catalog alias
+```
+
+---
+
+## Why this exists
+
+There are already good libraries for switching between cloud providers, good gateways for
+centralizing model traffic, and good local-model servers. If one of those is your whole
+problem, you may not need AnyInfer. See
+[when AnyInfer is the right layer](https://anthturner.github.io/anyinfer/guides/when-to-use/).
+
+AnyInfer is for applications that need those environments to behave as one runtime. It
+keeps provider translation, local process ownership, context preparation, routing, and
+result validation inside one testable boundary:
+
+- **One primitive.** A `GenerationRequest` becomes a typed event stream. Non-streaming is
+  the drained stream. It is *not* an OpenAI-API clone — the OpenAI dialect is one edge
+  format among several.
+- **Adapters only translate.** Retry, fallback, health gating, schema validation, repair,
+  TTFT measurement, usage normalization, telemetry, and redaction live in the core, once.
+- **Structured output is a contract.** A request carrying a schema always returns a
+  client-side-validated result, using the strongest mechanism the provider offers
+  (grammar → json_schema → json_mode → prompt), with an opt-in bounded repair loop.
+- **Context engineering is part of dispatch.** A provenance-aware budget estimates input,
+  output reserve, headroom, and cost before a call. Deterministic reducers fit approved
+  corpora to that budget and report exactly what they omitted; hierarchical distillation
+  handles material that cannot fit at any fidelity.
+- **Capabilities carry provenance.** Every context window, price, and feature flag records
+  whether it was catalogued, discovered, probed, or defaulted. Nothing is guessed silently.
+- **Local inference is first-class.** Hardware detection, backend selection, llama-server
+  supervision and tuning, verified GGUF downloads, and hardware→tier recommendation.
+- **Portability is verified behavior, not a provider count.** Contract snapshots and a
+  shared conformance suite document what each adapter actually supports and surface dropped
+  parameters or degraded mechanisms instead of hiding them.
+- **Slim by construction.** Mandatory dependencies are `httpx2` and `jsonschema`. Everything
+  else is an extra.
+
+## When it is the right layer
+
+Use AnyInfer when your application needs to own a hybrid route — for example, a hosted
+model with a managed local fallback — or when context fit, structured results, attempt
+history, and telemetry must retain the same meaning after the target changes.
+
+Use a simpler provider client when you only need cloud API switching. Use a gateway when
+you need organization-wide keys, quotas, spend controls, or an admin plane. Use Ollama,
+LM Studio, or LocalAI directly when a dedicated local-model service is the product boundary.
+
+The [decision guide](https://anthturner.github.io/anyinfer/guides/when-to-use/) compares
+those cases directly.
+
+## Install
+
+```bash
+pip install anyinfer                 # core + local lifecycle; runtimes fetched separately
+pip install "anyinfer[copilot]"      # GitHub Copilot
+pip install "anyinfer[azure]"        # Azure AI Foundry (Entra auth)
+pip install "anyinfer[vertex]"       # Vertex service-account authentication
+pip install "anyinfer[keyring]"      # credential:// references via the OS vault
+pip install "anyinfer[otel]"         # OpenTelemetry bridge
+pip install "anyinfer[serve]"        # the OpenAI-compatible HTTP frontend
+pip install "anyinfer[demo]"         # the PySide6 pack-in demo app
+pip install "anyinfer[all]"
+```
+
+Python 3.11+. Windows, macOS, and Linux are all first-class.
+
+### Try it without credentials
+
+```bash
+pip install "anyinfer[demo]"
+anyinfer-demo
+```
+
+The [pack-in demo app](https://anthturner.github.io/anyinfer/guides/demo-app/) runs offline against in-process fakes, and
+shows streaming, routing with retry and fallback, structured output, and the telemetry
+event stream. Standalone builds for Windows, macOS, and Linux — no Python required — are
+attached to [every release](https://github.com/anthturner/anyinfer/releases/latest); see the
+[downloads page](https://anthturner.github.io/anyinfer/downloads/).
+
+### Working on AnyInfer
+
+```bash
+python workspace.py setup    # install the project and dev extras
+python workspace.py check    # every gate CI runs
+python workspace.py demo     # launch the demo app
+```
+
+`python workspace.py` with no arguments lists every verb. See
+[Contributing](https://anthturner.github.io/anyinfer/contributing/).
+
+## Compatibility surface
+
+Provider breadth is compatibility inventory, not the product thesis. AnyInfer ships 17
+dedicated adapters plus 86 declarative OpenAI-compatible presets.
+**[See the complete inventory →](https://anthturner.github.io/anyinfer/providers/all/)**
+
+The dedicated adapters, each handling provider-specific protocol or discovery behavior:
+
+| Provider | Target prefix | Notes |
+|---|---|---|
+| OpenAI-compatible | `openai-compat:` | Any server speaking `/chat/completions` |
+| OpenAI | `openai:` | Responses API |
+| Anthropic | `anthropic:` (alias `claude:`) | Messages API |
+| Google Gemini | `gemini:` (alias `google:`) | Native generateContent, thinking levels |
+| DeepSeek | `deepseek:` | Reasoning channel, split cache accounting |
+| xAI | `xai:` (alias `grok:`) | Provider-reported cost, discovered pricing |
+| Google Vertex AI | `vertex:` | Gemini with GCP OAuth/ADC auth |
+| AWS Bedrock | `bedrock:` | Converse API, SigV4 or Bedrock API key |
+| Cohere | `cohere:` | Native v2 chat API |
+| LM Studio | `lm-studio:` | Native model discovery and residency |
+| Azure AI Foundry | `azure-foundry:` | Entra or API key |
+| GitHub Copilot | `copilot:` | Includes the `auto` sentinel |
+| Microsoft 365 Copilot | `m365-copilot:` | Interactive auth only |
+| OpenRouter | `openrouter:` | Rich discovered pricing/context metadata |
+| Nebius Token Factory | `nebius:` | Live pricing, context, and quantization discovery |
+| Ollama | `ollama:` | Native API, grammar-enforced schemas |
+| llama.cpp | `llama-cpp:` | Supervised `llama-server`, loopback-only |
+| 86 more, preconfigured | `groq:` `together:` `mistral:` `vllm:` … | [OpenAI-compatible presets](https://anthturner.github.io/anyinfer/providers/presets/) |
+
+See the [complete provider list](https://anthturner.github.io/anyinfer/providers/all/),
+the [provider guides](https://anthturner.github.io/anyinfer/providers/) and the
+[conformance matrix](https://anthturner.github.io/anyinfer/reference/conformance-matrix/) for exactly what each supports.
+
+## Integration paths
+
+| Path | Best for | Entry point |
+|---|---|---|
+| Python SDK | Python applications that want typed results and the full event stream | `Client` / `AsyncClient` |
+| Command-line tool | Shell scripts and one-off prompts | `anyinfer run` |
+| OpenAI-compatible sidecar | Non-Python applications and existing OpenAI clients | `anyinfer serve` (pip) or the standalone `anyinfer-serve` bundle |
+
+All three use the same engine and the same versioned JSON configuration format:
+
+```json
+{
+  "format_version": 1,
+  "providers": [{"id": "ollama"}],
+  "default_route": ["ollama:qwen3:8b"]
+}
+```
+
+Load it with `ai.load_config("anyinfer.json")`, pass it to `anyinfer run --config`, or use
+it unchanged with the sidecar. See [choosing an integration path](https://anthturner.github.io/anyinfer/guides/integration-paths/)
+and [shared configuration](https://anthturner.github.io/anyinfer/reference/configuration/).
+
+## Documentation
+
+**[anthturner.github.io/anyinfer](https://anthturner.github.io/anyinfer/)** — the published
+site, including the generated [SDK reference](https://anthturner.github.io/anyinfer/reference/api/)
+and [runnable examples](https://anthturner.github.io/anyinfer/examples/). The same pages are
+browsable in-repo from the **[documentation index](https://github.com/anthturner/anyinfer/blob/main/docs/README.md)**.
+
+Quick links by role:
+
+- **Integrating the Python SDK?** → [Python SDK guide](https://anthturner.github.io/anyinfer/guides/python-sdk/) ·
+  [Quickstart](https://anthturner.github.io/anyinfer/guides/quickstart/) · [SDK reference](https://anthturner.github.io/anyinfer/reference/api/)
+- **Running the HTTP service?** → [OpenAI-compatible sidecar](https://anthturner.github.io/anyinfer/serve/)
+- **Working from a shell?** → [Run a prompt from the shell](https://anthturner.github.io/anyinfer/guides/cli/)
+- **Sharing provider and route settings?** → [Configuration](https://anthturner.github.io/anyinfer/reference/configuration/)
+- **Contributing or writing an adapter?** →
+  [Contributor guide](https://github.com/anthturner/anyinfer/blob/main/CONTRIBUTING.md) ·
+  [Provider contracts](https://github.com/anthturner/anyinfer/blob/main/contracts/README.md)
+- **Reporting a vulnerability?** → [Security policy](https://github.com/anthturner/anyinfer/security/policy)
+
+## Project status
+
+Pre-1.0 and under active development: the public API is settled in shape but may still
+move before 1.0. Releases are published to
+[PyPI](https://pypi.org/project/anyinfer/) and
+[GitHub](https://github.com/anthturner/anyinfer/releases); the
+[release strategy](https://anthturner.github.io/anyinfer/contributing/releasing/) has the
+details. The architecture is settled and documented:
+
+- [DESIGN.md](https://github.com/anthturner/anyinfer/blob/main/DESIGN.md) — architecture and decision rationale
+- [IMPLEMENTATION.md](https://github.com/anthturner/anyinfer/blob/main/IMPLEMENTATION.md) — normative types, algorithms, and the build plan
+- [NOTES.md](https://github.com/anthturner/anyinfer/blob/main/NOTES.md) — decision record, assumptions, open questions, risks
+- [AGENTS.md](https://github.com/anthturner/anyinfer/blob/main/AGENTS.md) — canonical repository automation instructions
+
+## License
+
+[MIT](https://github.com/anthturner/anyinfer/blob/main/LICENSE).

@@ -1,0 +1,164 @@
+"""Build provider wire requests from normalized generation requests.
+
+Everything provider-specific that can be decided *before* the adapter runs is decided here:
+mechanism selection, schema projection, reasoning-effort translation, prompt injection, and
+provider-option narrowing. That keeps adapters focused on protocol translation.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+from typing import Any
+
+from ..providers.base import WireRequest
+from ..registry import ProviderDescriptor
+from ..schema.mechanism import choose_mechanism, system_prompt_for
+from ..schema.project import identity_projection
+from ..types.capabilities import ModelCapabilities
+from ..types.messages import Message, Text, system
+from ..types.requests import GenerationRequest, ResolvedTarget
+from ..types.results import Mechanism
+
+__all__ = ["build_wire_request", "dropped_parameters"]
+
+
+def build_wire_request(
+    request: GenerationRequest,
+    target: ResolvedTarget,
+    descriptor: ProviderDescriptor,
+    *,
+    capabilities: ModelCapabilities | None = None,
+    stream: bool = True,
+) -> WireRequest:
+    """Resolve a generation request for one provider.
+
+    Args:
+        request: The caller's request.
+        target: The resolved provider and model.
+        descriptor: The provider's descriptor, supplying translators and projection.
+        capabilities: Assembled capabilities, driving mechanism choice.
+        stream: Whether to ask the adapter to stream.
+
+    Returns:
+        A fully-resolved wire request.
+    """
+    mechanism: Mechanism | None = None
+    wire_schema: Mapping[str, Any] | None = None
+    schema_name: str | None = None
+    messages = request.messages
+
+    if request.schema is not None:
+        mechanism = choose_mechanism(capabilities)
+        schema_name = request.schema.name
+        projector = _projector_for(descriptor)
+        if mechanism in ("json_schema", "grammar"):
+            wire_schema = projector(request.schema.json_schema)
+        if _needs_prompt_injection(mechanism, descriptor):
+            messages = _inject_schema_prompt(messages, request.schema.json_schema)
+
+    # The "*" namespace applies to whichever provider serves the request; a namespace
+    # matching the resolved provider wins field-by-field over the wildcard.
+    provider_options = {
+        **request.provider_options.get("*", {}),
+        **request.provider_options.get(target.provider_id, {}),
+    }
+
+    return WireRequest(
+        model=target.model,
+        messages=tuple(messages),
+        sampling=request.sampling,
+        reasoning_wire=descriptor.reasoning_translator(request.reasoning),
+        mechanism=mechanism,
+        wire_schema=wire_schema,
+        schema_name=schema_name,
+        tools=request.tools,
+        tool_choice=request.tool_choice,
+        stream=stream,
+        timeout_s=request.effective_timeout_s,
+        max_response_bytes=request.max_response_bytes,
+        extra_options=dict(provider_options),
+    )
+
+
+def _projector_for(descriptor: ProviderDescriptor) -> Any:
+    """Find a descriptor's schema projector, defaulting to identity."""
+    projector = getattr(descriptor.factory, "project_schema", None)
+    if callable(projector):
+        return projector
+    return identity_projection
+
+
+def dropped_parameters(
+    request: GenerationRequest, descriptor: ProviderDescriptor
+) -> tuple[tuple[str, str], ...]:
+    """Find requested parameters this provider will silently discard.
+
+    Returns ``(parameter, reason)`` pairs so the caller can emit one
+    `ParameterDropped` event per parameter. A parameter
+    that is accepted and ignored is the worst failure mode available — it looks exactly
+    like success — so it is surfaced rather than tolerated.
+    """
+    if not descriptor.ignored_parameters:
+        return ()
+
+    supplied: dict[str, object] = {
+        "temperature": request.sampling.temperature,
+        "top_p": request.sampling.top_p,
+        "max_output_tokens": request.sampling.max_output_tokens,
+        "stop": request.sampling.stop or None,
+        "reasoning": request.reasoning,
+        "tools": request.tools or None,
+    }
+    return tuple(
+        (name, f"{descriptor.id} accepts but ignores {name}")
+        for name in descriptor.ignored_parameters
+        if supplied.get(name) is not None
+    )
+
+
+def _needs_prompt_injection(mechanism: Mechanism, descriptor: ProviderDescriptor) -> bool:
+    """Whether the schema must also be described in the prompt.
+
+    Always true for ``prompt`` and ``json_mode``, which carry no schema on the wire at all.
+
+    Also true for ``grammar``: a grammar *constrains* decoding but tells the model nothing
+    about what it is supposed to produce. A model that has not been shown the schema emits
+    syntactically valid JSON with meaningless content — it satisfies the grammar and fails
+    the caller. Providers whose json_schema mode already conditions the model (the hosted
+    dialects) do not need this, which is why it is a descriptor property rather than a
+    blanket rule.
+    """
+    if mechanism in ("prompt", "json_mode"):
+        return True
+    if mechanism == "grammar":
+        return descriptor.grammar_needs_prompt_injection
+    return False
+
+
+def _inject_schema_prompt(
+    messages: tuple[Message, ...],
+    json_schema: Mapping[str, Any],
+) -> tuple[Message, ...]:
+    """Append the schema instruction to the last system message, or prepend a new one.
+
+    Appending to an existing system message keeps instruction precedence intact: providers
+    that weight the *first* system message most heavily would otherwise see the schema
+    outrank the caller's actual instructions.
+    """
+    instruction = system_prompt_for(json.dumps(dict(json_schema), indent=2, sort_keys=True))
+
+    last_system = -1
+    for index, message in enumerate(messages):
+        if message.role == "system":
+            last_system = index
+
+    if last_system == -1:
+        return (system(instruction), *messages)
+
+    target = messages[last_system]
+    merged = Message(
+        role="system",
+        content=(*target.content, Text("\n\n" + instruction)),
+    )
+    return (*messages[:last_system], merged, *messages[last_system + 1 :])

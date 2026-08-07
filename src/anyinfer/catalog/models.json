@@ -1,0 +1,5170 @@
+{
+  "format_version": 1,
+  "_comment": [
+    "Bundled logical model catalog for local inference (llama.cpp + Ollama channels).",
+    "Machine-maintained: every value here is written by scripts/pin_catalog.py from",
+    "upstream Hugging Face and Ollama registry responses. Never hand-edit a hash, a size,",
+    "a revision, or a last_verified date -- re-run the pin script instead.",
+    "Validated by scripts/validate_catalog.py; drift-checked by scripts/check_catalog_drift.py.",
+    "Deliberately excluded for licensing (reachable via an application overlay): Codestral",
+    "22B (MNPL, non-production), Command R7B (CC-BY-NC), Qwen2.5 3B and 72B (Qwen research",
+    "license), Ministral 8B (Mistral research license), DeepSeek-Coder-V2-Lite (bespoke",
+    "model license).",
+    "Also excluded: Moondream 2, which publishes only an f16 GGUF paired with a companion",
+    "mmproj projector -- neither the curated quantization ladder nor request-side image",
+    "support covers it yet."
+  ],
+  "generated": "2026-08-08",
+  "models": [
+    {
+      "id": "deepseek-r1-distill-llama-70b",
+      "family": "deepseek-r1",
+      "display_name": "DeepSeek-R1 Distill Llama 70B",
+      "parameter_size": "70B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "mit",
+      "best_at": [
+        "reasoning"
+      ],
+      "est_file_bytes": 42520395936,
+      "est_ram_bytes": 53794685088,
+      "est_vram_bytes": 53660467360,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
+      "sources": {
+        "ollama": {
+          "tag": "deepseek-r1:70b",
+          "digest": "sha256:5e9a45d7d8b98eb61a65815d36008bfef6fd6ebad6f0be432fb61d83b70550f8"
+        }
+      },
+      "variants": [
+        {
+          "id": "deepseek-r1-distill-llama-70b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 74975051840,
+          "est_ram_bytes": 86249340992,
+          "est_vram_bytes": 86115123264,
+          "artifact_id": "deepseek-r1-distill-llama-70b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Llama-70B-GGUF",
+            "revision": "1842c5f7280f933ead58adf8afd078672c9f6cd0",
+            "files": [
+              "DeepSeek-R1-Distill-Llama-70B-Q8_0/DeepSeek-R1-Distill-Llama-70B-Q8_0-00001-of-00002.gguf",
+              "DeepSeek-R1-Distill-Llama-70B-Q8_0/DeepSeek-R1-Distill-Llama-70B-Q8_0-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Llama-70B-Q8_0/DeepSeek-R1-Distill-Llama-70B-Q8_0-00001-of-00002.gguf": "74e77eeeae9d2348979299ff1e495477c01c8f9d93989fdd7319fbcf2115e441",
+              "DeepSeek-R1-Distill-Llama-70B-Q8_0/DeepSeek-R1-Distill-Llama-70B-Q8_0-00002-of-00002.gguf": "74b567c55fb8d9b9eb958b871f75f55e20d818e51974fb2540cfc33025c0ed7a"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Llama-70B-Q8_0/DeepSeek-R1-Distill-Llama-70B-Q8_0-00001-of-00002.gguf": 39927000896,
+              "DeepSeek-R1-Distill-Llama-70B-Q8_0/DeepSeek-R1-Distill-Llama-70B-Q8_0-00002-of-00002.gguf": 35048050944
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-llama-70b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 57888145760,
+          "est_ram_bytes": 69162434912,
+          "est_vram_bytes": 69028217184,
+          "artifact_id": "deepseek-r1-distill-llama-70b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Llama-70B-GGUF",
+            "revision": "1842c5f7280f933ead58adf8afd078672c9f6cd0",
+            "files": [
+              "DeepSeek-R1-Distill-Llama-70B-Q6_K/DeepSeek-R1-Distill-Llama-70B-Q6_K-00001-of-00002.gguf",
+              "DeepSeek-R1-Distill-Llama-70B-Q6_K/DeepSeek-R1-Distill-Llama-70B-Q6_K-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Llama-70B-Q6_K/DeepSeek-R1-Distill-Llama-70B-Q6_K-00001-of-00002.gguf": "a0bccdec0e04ea38de33acfa614dcb3d4394df53954e2bd81fefec0b2ef74351",
+              "DeepSeek-R1-Distill-Llama-70B-Q6_K/DeepSeek-R1-Distill-Llama-70B-Q6_K-00002-of-00002.gguf": "159bf34c24a7a1ca2a3b0563d534e7e026f8b389ebe88051f92a232c20ed83da"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Llama-70B-Q6_K/DeepSeek-R1-Distill-Llama-70B-Q6_K-00001-of-00002.gguf": 39953845152,
+              "DeepSeek-R1-Distill-Llama-70B-Q6_K/DeepSeek-R1-Distill-Llama-70B-Q6_K-00002-of-00002.gguf": 17934300608
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-llama-70b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 49949819232,
+          "est_ram_bytes": 61224108384,
+          "est_vram_bytes": 61089890656,
+          "artifact_id": "deepseek-r1-distill-llama-70b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Llama-70B-GGUF",
+            "revision": "1842c5f7280f933ead58adf8afd078672c9f6cd0",
+            "files": [
+              "DeepSeek-R1-Distill-Llama-70B-Q5_K_M/DeepSeek-R1-Distill-Llama-70B-Q5_K_M-00001-of-00002.gguf",
+              "DeepSeek-R1-Distill-Llama-70B-Q5_K_M/DeepSeek-R1-Distill-Llama-70B-Q5_K_M-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Llama-70B-Q5_K_M/DeepSeek-R1-Distill-Llama-70B-Q5_K_M-00001-of-00002.gguf": "fa5da9538c5e2fe599f6d330e2fc09152b22e6f89c0292dbcf4f58838bff54c5",
+              "DeepSeek-R1-Distill-Llama-70B-Q5_K_M/DeepSeek-R1-Distill-Llama-70B-Q5_K_M-00002-of-00002.gguf": "af0c9e714ad2ac2297a4087ad97ef8475bb6a8821f364f63f424221cec68c8fe"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Llama-70B-Q5_K_M/DeepSeek-R1-Distill-Llama-70B-Q5_K_M-00001-of-00002.gguf": 39987552000,
+              "DeepSeek-R1-Distill-Llama-70B-Q5_K_M/DeepSeek-R1-Distill-Llama-70B-Q5_K_M-00002-of-00002.gguf": 9962267232
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-llama-70b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 42520395936,
+          "est_ram_bytes": 53794685088,
+          "est_vram_bytes": 53660467360,
+          "artifact_id": "deepseek-r1-distill-llama-70b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Llama-70B-GGUF",
+            "revision": "1842c5f7280f933ead58adf8afd078672c9f6cd0",
+            "files": [
+              "DeepSeek-R1-Distill-Llama-70B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Llama-70B-Q4_K_M.gguf": "181a82a1d6d2fa24fe4db83a68eee030384986bdbdd4773ba76424e3a6eb9fd8"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Llama-70B-Q4_K_M.gguf": 42520395936
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-1.5b",
+      "family": "deepseek-r1",
+      "display_name": "DeepSeek-R1 Distill Qwen 1.5B",
+      "parameter_size": "1.5B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "mit",
+      "best_at": [
+        "reasoning",
+        "low-resource"
+      ],
+      "est_file_bytes": 1117320800,
+      "est_ram_bytes": 2459498080,
+      "est_vram_bytes": 2325280352,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+      "sources": {
+        "ollama": {
+          "tag": "deepseek-r1:1.5b",
+          "digest": "sha256:a85fe2a2e58e2426116d3686dfdc1a6ea58640c1e684069976aa730be6c1fa01"
+        }
+      },
+      "variants": [
+        {
+          "id": "deepseek-r1-distill-qwen-1.5b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 1894532192,
+          "est_ram_bytes": 3236709472,
+          "est_vram_bytes": 3102491744,
+          "artifact_id": "deepseek-r1-distill-qwen-1.5b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
+            "revision": "9cc28b17e86fa2415fcb070f8ee5ec27c965aa61",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf": "166baa90e6a963de31a7713ff034f82317ff1fa41602f7c3ce583d3f6b551829"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf": 1894532192
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-1.5b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 1464178784,
+          "est_ram_bytes": 2806356064,
+          "est_vram_bytes": 2672138336,
+          "artifact_id": "deepseek-r1-distill-qwen-1.5b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
+            "revision": "9cc28b17e86fa2415fcb070f8ee5ec27c965aa61",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q6_K.gguf": "c9c8aff5a84e2e9c1fd6ea57af5ab52cf5d7272d34460403d82880075e611039"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q6_K.gguf": 1464178784
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-1.5b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 1285494368,
+          "est_ram_bytes": 2627671648,
+          "est_vram_bytes": 2493453920,
+          "artifact_id": "deepseek-r1-distill-qwen-1.5b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
+            "revision": "9cc28b17e86fa2415fcb070f8ee5ec27c965aa61",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q5_K_M.gguf": "4d8f6465e96258cf44303eb02812c391d15f6c77f0d72e47757c98fd14994608"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q5_K_M.gguf": 1285494368
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-1.5b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 1117320800,
+          "est_ram_bytes": 2459498080,
+          "est_vram_bytes": 2325280352,
+          "artifact_id": "deepseek-r1-distill-qwen-1.5b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
+            "revision": "9cc28b17e86fa2415fcb070f8ee5ec27c965aa61",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf": "1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf": 1117320800
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-14b",
+      "family": "deepseek-r1",
+      "display_name": "DeepSeek-R1 Distill Qwen 14B",
+      "parameter_size": "14B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "mit",
+      "best_at": [
+        "reasoning",
+        "math"
+      ],
+      "est_file_bytes": 8988110240,
+      "est_ram_bytes": 12880424352,
+      "est_vram_bytes": 12746206624,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+      "sources": {
+        "ollama": {
+          "tag": "deepseek-r1:14b",
+          "digest": "sha256:3c24b0c80794f0eb6e0de0033f8e3203075db1c4640e837e097712a4b88d393b"
+        }
+      },
+      "variants": [
+        {
+          "id": "deepseek-r1-distill-qwen-14b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 15701597600,
+          "est_ram_bytes": 19593911712,
+          "est_vram_bytes": 19459693984,
+          "artifact_id": "deepseek-r1-distill-qwen-14b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF",
+            "revision": "9f5d77d401799416e0702290a691038b44012e0c",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-14B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q8_0.gguf": "234bf54d16c772dc566325ffeadcb78b5a1d29b60e340da95d303da37ce33c13"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q8_0.gguf": 15701597600
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-14b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 12124683680,
+          "est_ram_bytes": 16016997792,
+          "est_vram_bytes": 15882780064,
+          "artifact_id": "deepseek-r1-distill-qwen-14b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF",
+            "revision": "9f5d77d401799416e0702290a691038b44012e0c",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-14B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q6_K.gguf": "96dca418f74255c3a27cd74ef594e8d6a13971b00e70d0351150b69e9d635dcf"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q6_K.gguf": 12124683680
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-14b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 10508873120,
+          "est_ram_bytes": 14401187232,
+          "est_vram_bytes": 14266969504,
+          "artifact_id": "deepseek-r1-distill-qwen-14b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF",
+            "revision": "9f5d77d401799416e0702290a691038b44012e0c",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-14B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q5_K_M.gguf": "3eea644370914aebfff274dd8f5a790aaee42ba69a1ce09051eeaad0f05afd32"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q5_K_M.gguf": 10508873120
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-14b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 8988110240,
+          "est_ram_bytes": 12880424352,
+          "est_vram_bytes": 12746206624,
+          "artifact_id": "deepseek-r1-distill-qwen-14b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF",
+            "revision": "9f5d77d401799416e0702290a691038b44012e0c",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf": "0b319bd0572f2730bfe11cc751defe82045fad5085b4e60591ac2cd2d9633181"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf": 8988110240
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-32b",
+      "family": "deepseek-r1",
+      "display_name": "DeepSeek-R1 Distill Qwen 32B",
+      "parameter_size": "32B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "mit",
+      "best_at": [
+        "reasoning",
+        "math"
+      ],
+      "est_file_bytes": 19851335840,
+      "est_ram_bytes": 25756915872,
+      "est_vram_bytes": 25622698144,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+      "sources": {
+        "ollama": {
+          "tag": "deepseek-r1:32b",
+          "digest": "sha256:c7f3ea903b50b3c9a42221b265ade4375d1bb5e3b6b6731488712886a8c41ff0"
+        }
+      },
+      "variants": [
+        {
+          "id": "deepseek-r1-distill-qwen-32b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 34820884352,
+          "est_ram_bytes": 40726464384,
+          "est_vram_bytes": 40592246656,
+          "artifact_id": "deepseek-r1-distill-qwen-32b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF",
+            "revision": "1dc8cf9ffa5dd333057ea1b09ccf4772d8726dec",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-32B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q8_0.gguf": "5b321bce035d98e61636e15cd468467e57dfaee4ea28acd42edd7edd1b6098d7"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q8_0.gguf": 34820884352
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-32b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 26886154400,
+          "est_ram_bytes": 32791734432,
+          "est_vram_bytes": 32657516704,
+          "artifact_id": "deepseek-r1-distill-qwen-32b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF",
+            "revision": "1dc8cf9ffa5dd333057ea1b09ccf4772d8726dec",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-32B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q6_K.gguf": "5a7d8d16853575a625fae0812e11fd021618ec254288f5088fb217268b83a1df"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q6_K.gguf": 26886154400
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-32b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 23262156960,
+          "est_ram_bytes": 29167736992,
+          "est_vram_bytes": 29033519264,
+          "artifact_id": "deepseek-r1-distill-qwen-32b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF",
+            "revision": "1dc8cf9ffa5dd333057ea1b09ccf4772d8726dec",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M.gguf": "9f345fb6721d413669afad82154b177cb45e333f49926e38c3586f01c37dfcca"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q5_K_M.gguf": 23262156960
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-32b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 19851335840,
+          "est_ram_bytes": 25756915872,
+          "est_vram_bytes": 25622698144,
+          "artifact_id": "deepseek-r1-distill-qwen-32b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF",
+            "revision": "1dc8cf9ffa5dd333057ea1b09ccf4772d8726dec",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf": "bed9b0f551f5b95bf9da5888a48f0f87c37ad6b72519c4cbd775f54ac0b9fc62"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf": 19851335840
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-7b",
+      "family": "deepseek-r1",
+      "display_name": "DeepSeek-R1 Distill Qwen 7B",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "mit",
+      "best_at": [
+        "reasoning",
+        "math"
+      ],
+      "est_file_bytes": 4683073504,
+      "est_ram_bytes": 7367428064,
+      "est_vram_bytes": 7233210336,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+      "sources": {
+        "ollama": {
+          "tag": "deepseek-r1:7b",
+          "digest": "sha256:40fb844194b25e429204e5163fb379ab462978a262b86aadd73d8944445c09fd"
+        }
+      },
+      "variants": [
+        {
+          "id": "deepseek-r1-distill-qwen-7b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8098525152,
+          "est_ram_bytes": 10782879712,
+          "est_vram_bytes": 10648661984,
+          "artifact_id": "deepseek-r1-distill-qwen-7b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+            "revision": "361004151d4f4f6b446dc5e6d46fbf4422a80d5f",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-7B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q8_0.gguf": "cae89f90c4c2f1894c95393903d2a9776aea7083023ae6cd285b1cc7adafc323"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q8_0.gguf": 8098525152
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-7b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6254198752,
+          "est_ram_bytes": 8938553312,
+          "est_vram_bytes": 8804335584,
+          "artifact_id": "deepseek-r1-distill-qwen-7b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+            "revision": "361004151d4f4f6b446dc5e6d46fbf4422a80d5f",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-7B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q6_K.gguf": "3ffa00e72db05668453687d5ab8e7c9fb19705cfd57292a956db17a3633c93f3"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q6_K.gguf": 6254198752
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-7b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5444831200,
+          "est_ram_bytes": 8129185760,
+          "est_vram_bytes": 7994968032,
+          "artifact_id": "deepseek-r1-distill-qwen-7b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+            "revision": "361004151d4f4f6b446dc5e6d46fbf4422a80d5f",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-7B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q5_K_M.gguf": "7b736fc4913dce4c7fbcebe5cb965a2fa7314a14b59e25fb53d415f9d18d7aa1"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q5_K_M.gguf": 5444831200
+            }
+          }
+        },
+        {
+          "id": "deepseek-r1-distill-qwen-7b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4683073504,
+          "est_ram_bytes": 7367428064,
+          "est_vram_bytes": 7233210336,
+          "artifact_id": "deepseek-r1-distill-qwen-7b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+            "revision": "361004151d4f4f6b446dc5e6d46fbf4422a80d5f",
+            "files": [
+              "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf": "731ece8d06dc7eda6f6572997feb9ee1258db0784827e642909d9b565641937b"
+            },
+            "size_bytes": {
+              "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf": 4683073504
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "devstral-small",
+      "family": "devstral",
+      "display_name": "Devstral Small",
+      "parameter_size": "24B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "apache-2.0",
+      "best_at": [
+        "agentic",
+        "coding"
+      ],
+      "est_file_bytes": 14333916096,
+      "est_ram_bytes": 19165754304,
+      "est_vram_bytes": 19031536576,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/mistralai/Devstral-Small-2507",
+      "sources": {
+        "ollama": {
+          "tag": "devstral",
+          "digest": "sha256:3dc762df9951ecae062822bbaa78b01f1252e2e316c911adbedcbe97bbff5b26"
+        }
+      },
+      "variants": [
+        {
+          "id": "devstral-small-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 25054786496,
+          "est_ram_bytes": 29886624704,
+          "est_vram_bytes": 29752406976,
+          "artifact_id": "devstral-small-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Devstral-Small-2507-GGUF",
+            "revision": "3aaee38f9345e582cca40a0d2a320dc23e21dc32",
+            "files": [
+              "mistralai_Devstral-Small-2507-Q8_0.gguf"
+            ],
+            "sha256": {
+              "mistralai_Devstral-Small-2507-Q8_0.gguf": "ff49a03f326386e156d052848b5964a5068935efbfe9878cbc6c71d7b9516637"
+            },
+            "size_bytes": {
+              "mistralai_Devstral-Small-2507-Q8_0.gguf": 25054786496
+            }
+          }
+        },
+        {
+          "id": "devstral-small-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 19345945536,
+          "est_ram_bytes": 24177783744,
+          "est_vram_bytes": 24043566016,
+          "artifact_id": "devstral-small-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Devstral-Small-2507-GGUF",
+            "revision": "3aaee38f9345e582cca40a0d2a320dc23e21dc32",
+            "files": [
+              "mistralai_Devstral-Small-2507-Q6_K.gguf"
+            ],
+            "sha256": {
+              "mistralai_Devstral-Small-2507-Q6_K.gguf": "d15267b280a58a492b129c59724286360bce2d900f9763caef99d94f3923571d"
+            },
+            "size_bytes": {
+              "mistralai_Devstral-Small-2507-Q6_K.gguf": 19345945536
+            }
+          }
+        },
+        {
+          "id": "devstral-small-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 16763990976,
+          "est_ram_bytes": 21595829184,
+          "est_vram_bytes": 21461611456,
+          "artifact_id": "devstral-small-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Devstral-Small-2507-GGUF",
+            "revision": "3aaee38f9345e582cca40a0d2a320dc23e21dc32",
+            "files": [
+              "mistralai_Devstral-Small-2507-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "mistralai_Devstral-Small-2507-Q5_K_M.gguf": "b6f8d0dd2a26b62ff5be0aa5979eb0fe0fa8d77c8834b76148ac19aa9030548d"
+            },
+            "size_bytes": {
+              "mistralai_Devstral-Small-2507-Q5_K_M.gguf": 16763990976
+            }
+          }
+        },
+        {
+          "id": "devstral-small-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 14333916096,
+          "est_ram_bytes": 19165754304,
+          "est_vram_bytes": 19031536576,
+          "artifact_id": "devstral-small-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Devstral-Small-2507-GGUF",
+            "revision": "3aaee38f9345e582cca40a0d2a320dc23e21dc32",
+            "files": [
+              "mistralai_Devstral-Small-2507-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "mistralai_Devstral-Small-2507-Q4_K_M.gguf": "6d597aa03c2a02bad861d15f282ae530d3b276b52255f37ba200d3c0de7d3aed"
+            },
+            "size_bytes": {
+              "mistralai_Devstral-Small-2507-Q4_K_M.gguf": 14333916096
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "falcon3-7b-instruct",
+      "family": "falcon3",
+      "display_name": "Falcon 3 7B Instruct",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "falcon-llm-2.0",
+      "best_at": [
+        "general-chat",
+        "math"
+      ],
+      "est_file_bytes": 4569726368,
+      "est_ram_bytes": 7254080928,
+      "est_vram_bytes": 7119863200,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/tiiuae/Falcon3-7B-Instruct",
+      "sources": {
+        "ollama": {
+          "tag": "falcon3:7b",
+          "digest": "sha256:acb75345e14b19be4b6c3305c30ffc072aed563824fbc79ad77ce615e9255e50"
+        }
+      },
+      "variants": [
+        {
+          "id": "falcon3-7b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 7926783392,
+          "est_ram_bytes": 10611137952,
+          "est_vram_bytes": 10476920224,
+          "artifact_id": "falcon3-7b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "tiiuae/Falcon3-7B-Instruct-GGUF",
+            "revision": "b5eb297a52350fa68f8b88be3ce16a57578ba114",
+            "files": [
+              "Falcon3-7B-Instruct-q8_0.gguf"
+            ],
+            "sha256": {
+              "Falcon3-7B-Instruct-q8_0.gguf": "349284391078e946c86f1da4a2165ed93458a4b3f58ae5008a9c4a4081c31dc2"
+            },
+            "size_bytes": {
+              "Falcon3-7B-Instruct-q8_0.gguf": 7926783392
+            }
+          }
+        },
+        {
+          "id": "falcon3-7b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6121184672,
+          "est_ram_bytes": 8805539232,
+          "est_vram_bytes": 8671321504,
+          "artifact_id": "falcon3-7b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "tiiuae/Falcon3-7B-Instruct-GGUF",
+            "revision": "b5eb297a52350fa68f8b88be3ce16a57578ba114",
+            "files": [
+              "Falcon3-7B-Instruct-q6_k.gguf"
+            ],
+            "sha256": {
+              "Falcon3-7B-Instruct-q6_k.gguf": "12f1045f479c770a33067d731cf4d4373ce2f78b2afc20e17eb619a7b6c01b3c"
+            },
+            "size_bytes": {
+              "Falcon3-7B-Instruct-q6_k.gguf": 6121184672
+            }
+          }
+        },
+        {
+          "id": "falcon3-7b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5321948576,
+          "est_ram_bytes": 8006303136,
+          "est_vram_bytes": 7872085408,
+          "artifact_id": "falcon3-7b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "tiiuae/Falcon3-7B-Instruct-GGUF",
+            "revision": "b5eb297a52350fa68f8b88be3ce16a57578ba114",
+            "files": [
+              "Falcon3-7B-Instruct-q5_k_m.gguf"
+            ],
+            "sha256": {
+              "Falcon3-7B-Instruct-q5_k_m.gguf": "a2ad17eab87358d4c57e6ce2063dff07a52367c528f0abb2fb4836ba294b3d4a"
+            },
+            "size_bytes": {
+              "Falcon3-7B-Instruct-q5_k_m.gguf": 5321948576
+            }
+          }
+        },
+        {
+          "id": "falcon3-7b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4569726368,
+          "est_ram_bytes": 7254080928,
+          "est_vram_bytes": 7119863200,
+          "artifact_id": "falcon3-7b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "tiiuae/Falcon3-7B-Instruct-GGUF",
+            "revision": "b5eb297a52350fa68f8b88be3ce16a57578ba114",
+            "files": [
+              "Falcon3-7B-Instruct-q4_k_m.gguf"
+            ],
+            "sha256": {
+              "Falcon3-7B-Instruct-q4_k_m.gguf": "17bc6e769a4248acd25fd7df934c8fa2c255c85dee88ec10a03d8655a7310cf3"
+            },
+            "size_bytes": {
+              "Falcon3-7B-Instruct-q4_k_m.gguf": 4569726368
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gemma-3-12b-it",
+      "family": "gemma-3",
+      "display_name": "Gemma 3 12B Instruct",
+      "parameter_size": "12B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "gemma-terms",
+      "best_at": [
+        "general-chat",
+        "long-context"
+      ],
+      "est_file_bytes": 7300575264,
+      "est_ram_bytes": 11192889376,
+      "est_vram_bytes": 11058671648,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/google/gemma-3-12b-it",
+      "sources": {
+        "ollama": {
+          "tag": "gemma3:12b",
+          "digest": "sha256:6819964c2bcf53f6dd3593f9571e91cbf2bab9665493f870f96eeb29873049b4"
+        }
+      },
+      "variants": [
+        {
+          "id": "gemma-3-12b-it-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 12509949984,
+          "est_ram_bytes": 16402264096,
+          "est_vram_bytes": 16268046368,
+          "artifact_id": "gemma-3-12b-it-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-12b-it-GGUF",
+            "revision": "648e3a36a77c8a9f12d86e741f9dcb9089c769c4",
+            "files": [
+              "google_gemma-3-12b-it-Q8_0.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-12b-it-Q8_0.gguf": "da78c6801f4fae0061780cdd0c12cf7b1deb4459587dca1c2d3c1c11528b60e1"
+            },
+            "size_bytes": {
+              "google_gemma-3-12b-it-Q8_0.gguf": 12509949984
+            }
+          }
+        },
+        {
+          "id": "gemma-3-12b-it-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 9660608544,
+          "est_ram_bytes": 13552922656,
+          "est_vram_bytes": 13418704928,
+          "artifact_id": "gemma-3-12b-it-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-12b-it-GGUF",
+            "revision": "648e3a36a77c8a9f12d86e741f9dcb9089c769c4",
+            "files": [
+              "google_gemma-3-12b-it-Q6_K.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-12b-it-Q6_K.gguf": "a1385c0fd73b8fcb560bf55f9e1870346292a096476a2b9372aa04bd0aeae1d0"
+            },
+            "size_bytes": {
+              "google_gemma-3-12b-it-Q6_K.gguf": 9660608544
+            }
+          }
+        },
+        {
+          "id": "gemma-3-12b-it-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 8444833824,
+          "est_ram_bytes": 12337147936,
+          "est_vram_bytes": 12202930208,
+          "artifact_id": "gemma-3-12b-it-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-12b-it-GGUF",
+            "revision": "648e3a36a77c8a9f12d86e741f9dcb9089c769c4",
+            "files": [
+              "google_gemma-3-12b-it-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-12b-it-Q5_K_M.gguf": "13d44e37860489806f575deb0b219c6058c9421fe1982a9311a0e367c4e8f444"
+            },
+            "size_bytes": {
+              "google_gemma-3-12b-it-Q5_K_M.gguf": 8444833824
+            }
+          }
+        },
+        {
+          "id": "gemma-3-12b-it-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 7300575264,
+          "est_ram_bytes": 11192889376,
+          "est_vram_bytes": 11058671648,
+          "artifact_id": "gemma-3-12b-it-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-12b-it-GGUF",
+            "revision": "648e3a36a77c8a9f12d86e741f9dcb9089c769c4",
+            "files": [
+              "google_gemma-3-12b-it-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-12b-it-Q4_K_M.gguf": "fc57f67efa46d711c346e587cbef7d049e95f3df8db2eb2271153343ef0acc7b"
+            },
+            "size_bytes": {
+              "google_gemma-3-12b-it-Q4_K_M.gguf": 7300575264
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gemma-3-1b-it",
+      "family": "gemma-3",
+      "display_name": "Gemma 3 1B Instruct",
+      "parameter_size": "1B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "gemma-terms",
+      "best_at": [
+        "low-resource"
+      ],
+      "est_file_bytes": 806058496,
+      "est_ram_bytes": 1879800320,
+      "est_vram_bytes": 1745582592,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/google/gemma-3-1b-it",
+      "sources": {
+        "ollama": {
+          "tag": "gemma3:1b",
+          "digest": "sha256:120007c81bf8b4eb54e896a4a3e5ff9949f124b0ea42295277c8523f7fa9c7f6"
+        }
+      },
+      "variants": [
+        {
+          "id": "gemma-3-1b-it-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 1069306624,
+          "est_ram_bytes": 2143048448,
+          "est_vram_bytes": 2008830720,
+          "artifact_id": "gemma-3-1b-it-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-1b-it-GGUF",
+            "revision": "116f76234503685a98f572982177b11d44ec8ff1",
+            "files": [
+              "google_gemma-3-1b-it-Q8_0.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-1b-it-Q8_0.gguf": "375e12a4a18929a641f9744b060d4a7cf4e279530750555828ec0c117870bc96"
+            },
+            "size_bytes": {
+              "google_gemma-3-1b-it-Q8_0.gguf": 1069306624
+            }
+          }
+        },
+        {
+          "id": "gemma-3-1b-it-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 1011738880,
+          "est_ram_bytes": 2085480704,
+          "est_vram_bytes": 1951262976,
+          "artifact_id": "gemma-3-1b-it-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-1b-it-GGUF",
+            "revision": "116f76234503685a98f572982177b11d44ec8ff1",
+            "files": [
+              "google_gemma-3-1b-it-Q6_K.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-1b-it-Q6_K.gguf": "ccad0cb14e9008f699f4b820110b899cf81983a987c40a05a8a1128d2fb713fb"
+            },
+            "size_bytes": {
+              "google_gemma-3-1b-it-Q6_K.gguf": 1011738880
+            }
+          }
+        },
+        {
+          "id": "gemma-3-1b-it-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 851345920,
+          "est_ram_bytes": 1925087744,
+          "est_vram_bytes": 1790870016,
+          "artifact_id": "gemma-3-1b-it-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-1b-it-GGUF",
+            "revision": "116f76234503685a98f572982177b11d44ec8ff1",
+            "files": [
+              "google_gemma-3-1b-it-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-1b-it-Q5_K_M.gguf": "59a10a3c8dc8a9c0bda2c8882198073b1cfebbb2b443aa2fc4cfca4f92eeb805"
+            },
+            "size_bytes": {
+              "google_gemma-3-1b-it-Q5_K_M.gguf": 851345920
+            }
+          }
+        },
+        {
+          "id": "gemma-3-1b-it-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 806058496,
+          "est_ram_bytes": 1879800320,
+          "est_vram_bytes": 1745582592,
+          "artifact_id": "gemma-3-1b-it-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-1b-it-GGUF",
+            "revision": "116f76234503685a98f572982177b11d44ec8ff1",
+            "files": [
+              "google_gemma-3-1b-it-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-1b-it-Q4_K_M.gguf": "12bf0fff8815d5f73a3c9b586bd8fee8e7b248c935de70dec367679873d0f29d"
+            },
+            "size_bytes": {
+              "google_gemma-3-1b-it-Q4_K_M.gguf": 806058496
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gemma-3-27b-it",
+      "family": "gemma-3",
+      "display_name": "Gemma 3 27B Instruct",
+      "parameter_size": "27B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "gemma-terms",
+      "best_at": [
+        "general-chat",
+        "multilingual"
+      ],
+      "est_file_bytes": 16546404992,
+      "est_ram_bytes": 21915114112,
+      "est_vram_bytes": 21780896384,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/google/gemma-3-27b-it",
+      "sources": {
+        "ollama": {
+          "tag": "gemma3:27b",
+          "digest": "sha256:f838f048d36876f9f411d302e8fc45cea6793a37cd978af1b6a0b042fcfb2f31"
+        }
+      },
+      "variants": [
+        {
+          "id": "gemma-3-27b-it-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 28707605120,
+          "est_ram_bytes": 34076314240,
+          "est_vram_bytes": 33942096512,
+          "artifact_id": "gemma-3-27b-it-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-27b-it-GGUF",
+            "revision": "4a05c54413bd0d87d77a97af403266f69cec0ee6",
+            "files": [
+              "google_gemma-3-27b-it-Q8_0.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-27b-it-Q8_0.gguf": "f997aef7f4ed368819f8bcd3e66262612eab4b9ecd562efbad2a7fdebc872693"
+            },
+            "size_bytes": {
+              "google_gemma-3-27b-it-Q8_0.gguf": 28707605120
+            }
+          }
+        },
+        {
+          "id": "gemma-3-27b-it-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 22166690432,
+          "est_ram_bytes": 27535399552,
+          "est_vram_bytes": 27401181824,
+          "artifact_id": "gemma-3-27b-it-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-27b-it-GGUF",
+            "revision": "4a05c54413bd0d87d77a97af403266f69cec0ee6",
+            "files": [
+              "google_gemma-3-27b-it-Q6_K.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-27b-it-Q6_K.gguf": "bb33daa83fab45a9323358fddc059df9fae3b5934461a7294ad20741ec5c3682"
+            },
+            "size_bytes": {
+              "google_gemma-3-27b-it-Q6_K.gguf": 22166690432
+            }
+          }
+        },
+        {
+          "id": "gemma-3-27b-it-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 19271391872,
+          "est_ram_bytes": 24640100992,
+          "est_vram_bytes": 24505883264,
+          "artifact_id": "gemma-3-27b-it-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-27b-it-GGUF",
+            "revision": "4a05c54413bd0d87d77a97af403266f69cec0ee6",
+            "files": [
+              "google_gemma-3-27b-it-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-27b-it-Q5_K_M.gguf": "7babc9bc281f07edae1cbfe519f61b12daa760b36be8ba53e72ddfdc9eceb846"
+            },
+            "size_bytes": {
+              "google_gemma-3-27b-it-Q5_K_M.gguf": 19271391872
+            }
+          }
+        },
+        {
+          "id": "gemma-3-27b-it-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 16546404992,
+          "est_ram_bytes": 21915114112,
+          "est_vram_bytes": 21780896384,
+          "artifact_id": "gemma-3-27b-it-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-27b-it-GGUF",
+            "revision": "4a05c54413bd0d87d77a97af403266f69cec0ee6",
+            "files": [
+              "google_gemma-3-27b-it-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-27b-it-Q4_K_M.gguf": "4e83142e3ad3719ac61334f70a956dcc60bbba8adb29de5114161310bb9f7170"
+            },
+            "size_bytes": {
+              "google_gemma-3-27b-it-Q4_K_M.gguf": 16546404992
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gemma-3-4b-it",
+      "family": "gemma-3",
+      "display_name": "Gemma 3 4B Instruct",
+      "parameter_size": "4B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "gemma-terms",
+      "best_at": [
+        "general-chat",
+        "multilingual"
+      ],
+      "est_file_bytes": 2489758112,
+      "est_ram_bytes": 4100370848,
+      "est_vram_bytes": 3966153120,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/google/gemma-3-4b-it",
+      "sources": {
+        "ollama": {
+          "tag": "gemma3:4b",
+          "digest": "sha256:b6ae5839783f2ba248e65e4b960ab15f9c4b7118db285827dba6cba9754759e2"
+        }
+      },
+      "variants": [
+        {
+          "id": "gemma-3-4b-it-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 4130226592,
+          "est_ram_bytes": 5740839328,
+          "est_vram_bytes": 5606621600,
+          "artifact_id": "gemma-3-4b-it-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-4b-it-GGUF",
+            "revision": "71506238f970075ca85125cd749c28b1b0eee84e",
+            "files": [
+              "google_gemma-3-4b-it-Q8_0.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-4b-it-Q8_0.gguf": "0bce184b82f70ef6f1fb12c8d4984844baaa0bad0f4aae7150e443f803c4f509"
+            },
+            "size_bytes": {
+              "google_gemma-3-4b-it-Q8_0.gguf": 4130226592
+            }
+          }
+        },
+        {
+          "id": "gemma-3-4b-it-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 3190604192,
+          "est_ram_bytes": 4801216928,
+          "est_vram_bytes": 4666999200,
+          "artifact_id": "gemma-3-4b-it-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-4b-it-GGUF",
+            "revision": "71506238f970075ca85125cd749c28b1b0eee84e",
+            "files": [
+              "google_gemma-3-4b-it-Q6_K.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-4b-it-Q6_K.gguf": "ee175bbd0c5ab8b3fdc9b707c98df2d0086d5b22e4d79e4dbeec927385b8c659"
+            },
+            "size_bytes": {
+              "google_gemma-3-4b-it-Q6_K.gguf": 3190604192
+            }
+          }
+        },
+        {
+          "id": "gemma-3-4b-it-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 2829562272,
+          "est_ram_bytes": 4440175008,
+          "est_vram_bytes": 4305957280,
+          "artifact_id": "gemma-3-4b-it-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-4b-it-GGUF",
+            "revision": "71506238f970075ca85125cd749c28b1b0eee84e",
+            "files": [
+              "google_gemma-3-4b-it-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-4b-it-Q5_K_M.gguf": "7b2da98f1f31f3467ca8812122809ff6da3fa3f33bd181b350b9a21996db6cef"
+            },
+            "size_bytes": {
+              "google_gemma-3-4b-it-Q5_K_M.gguf": 2829562272
+            }
+          }
+        },
+        {
+          "id": "gemma-3-4b-it-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 2489758112,
+          "est_ram_bytes": 4100370848,
+          "est_vram_bytes": 3966153120,
+          "artifact_id": "gemma-3-4b-it-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/google_gemma-3-4b-it-GGUF",
+            "revision": "71506238f970075ca85125cd749c28b1b0eee84e",
+            "files": [
+              "google_gemma-3-4b-it-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "google_gemma-3-4b-it-Q4_K_M.gguf": "4996030242583a40aa151ff93f49ed787ac8c25e4120c3ae4588b2e2a7d1ae94"
+            },
+            "size_bytes": {
+              "google_gemma-3-4b-it-Q4_K_M.gguf": 2489758112
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "glm-4-9b-chat",
+      "family": "glm-4",
+      "display_name": "GLM-4 9B Chat",
+      "parameter_size": "9B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "mit",
+      "best_at": [
+        "general-chat",
+        "multilingual"
+      ],
+      "est_file_bytes": 6166574464,
+      "est_ram_bytes": 8850929024,
+      "est_vram_bytes": 8716711296,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/THUDM/GLM-4-9B-0414",
+      "sources": {
+        "ollama": {
+          "tag": "glm4:9b",
+          "digest": "sha256:ca0dd08dd2823c9a1b04b6213bf3e95f1b2a7a46234c1871de23ad790a020d04"
+        }
+      },
+      "variants": [
+        {
+          "id": "glm-4-9b-chat-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 9999611264,
+          "est_ram_bytes": 12683965824,
+          "est_vram_bytes": 12549748096,
+          "artifact_id": "glm-4-9b-chat-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/THUDM_GLM-4-9B-0414-GGUF",
+            "revision": "211924cd949e153b1017ed635e5b127d0b594e6f",
+            "files": [
+              "THUDM_GLM-4-9B-0414-Q8_0.gguf"
+            ],
+            "sha256": {
+              "THUDM_GLM-4-9B-0414-Q8_0.gguf": "7b4ea2795934ca05dc409251dddd289160a194a4d920b575d1de4516808bb50d"
+            },
+            "size_bytes": {
+              "THUDM_GLM-4-9B-0414-Q8_0.gguf": 9999611264
+            }
+          }
+        },
+        {
+          "id": "glm-4-9b-chat-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 8266642816,
+          "est_ram_bytes": 10950997376,
+          "est_vram_bytes": 10816779648,
+          "artifact_id": "glm-4-9b-chat-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/THUDM_GLM-4-9B-0414-GGUF",
+            "revision": "211924cd949e153b1017ed635e5b127d0b594e6f",
+            "files": [
+              "THUDM_GLM-4-9B-0414-Q6_K.gguf"
+            ],
+            "sha256": {
+              "THUDM_GLM-4-9B-0414-Q6_K.gguf": "b20636a8389d30295959b64df48e3e4a0de29ea00a6abb9be494bf1773858b7c"
+            },
+            "size_bytes": {
+              "THUDM_GLM-4-9B-0414-Q6_K.gguf": 8266642816
+            }
+          }
+        },
+        {
+          "id": "glm-4-9b-chat-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 7050917248,
+          "est_ram_bytes": 9735271808,
+          "est_vram_bytes": 9601054080,
+          "artifact_id": "glm-4-9b-chat-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/THUDM_GLM-4-9B-0414-GGUF",
+            "revision": "211924cd949e153b1017ed635e5b127d0b594e6f",
+            "files": [
+              "THUDM_GLM-4-9B-0414-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "THUDM_GLM-4-9B-0414-Q5_K_M.gguf": "24013ada7a32e4e449e8aad7afb48261abb1c1d86be55506065c3676d0ad6742"
+            },
+            "size_bytes": {
+              "THUDM_GLM-4-9B-0414-Q5_K_M.gguf": 7050917248
+            }
+          }
+        },
+        {
+          "id": "glm-4-9b-chat-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 6166574464,
+          "est_ram_bytes": 8850929024,
+          "est_vram_bytes": 8716711296,
+          "artifact_id": "glm-4-9b-chat-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/THUDM_GLM-4-9B-0414-GGUF",
+            "revision": "211924cd949e153b1017ed635e5b127d0b594e6f",
+            "files": [
+              "THUDM_GLM-4-9B-0414-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "THUDM_GLM-4-9B-0414-Q4_K_M.gguf": "2b95f0b88eca423bfb874c4f8e7b9574ec76acab2befd272076e8a8dce31216a"
+            },
+            "size_bytes": {
+              "THUDM_GLM-4-9B-0414-Q4_K_M.gguf": 6166574464
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gpt-oss-120b",
+      "family": "gpt-oss",
+      "display_name": "gpt-oss 120B (MoE)",
+      "parameter_size": "120B",
+      "quantization": "MXFP4",
+      "context_window": 131072,
+      "license": "apache-2.0",
+      "best_at": [
+        "reasoning",
+        "agentic"
+      ],
+      "est_file_bytes": 63387346208,
+      "est_ram_bytes": 74661635360,
+      "est_vram_bytes": 74527417632,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/openai/gpt-oss-120b",
+      "sources": {
+        "ollama": {
+          "tag": "gpt-oss:120b",
+          "digest": "sha256:0b3eaefc220f88ee3875909c1306654b2fbda9e31dae0133d6cdf488b37f9402"
+        }
+      },
+      "variants": [
+        {
+          "id": "gpt-oss-120b-mxfp4",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "MXFP4",
+          "quality_rank": 45,
+          "est_file_bytes": 63387346208,
+          "est_ram_bytes": 74661635360,
+          "est_vram_bytes": 74527417632,
+          "artifact_id": "gpt-oss-120b-mxfp4",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ggml-org/gpt-oss-120b-GGUF",
+            "revision": "238abdd290bb874b90a5da1b4549881b7d05c091",
+            "files": [
+              "gpt-oss-120b-MXFP4.gguf"
+            ],
+            "sha256": {
+              "gpt-oss-120b-MXFP4.gguf": "582bd40f6886200101f4c4ed9f25f3fe80cc14c86e9e2b37746cd8904a0c622d"
+            },
+            "size_bytes": {
+              "gpt-oss-120b-MXFP4.gguf": 63387346208
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gpt-oss-20b",
+      "family": "gpt-oss",
+      "display_name": "gpt-oss 20B (MoE)",
+      "parameter_size": "20B",
+      "quantization": "MXFP4",
+      "context_window": 131072,
+      "license": "apache-2.0",
+      "best_at": [
+        "reasoning",
+        "tool-use",
+        "agentic"
+      ],
+      "est_file_bytes": 12109566624,
+      "est_ram_bytes": 16941404832,
+      "est_vram_bytes": 16807187104,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/openai/gpt-oss-20b",
+      "sources": {
+        "ollama": {
+          "tag": "gpt-oss:20b",
+          "digest": "sha256:776beb3adb235076157cfea408b8ea2a2d25eae99d7f5da997f607f6b69fa0fa"
+        }
+      },
+      "variants": [
+        {
+          "id": "gpt-oss-20b-mxfp4",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "MXFP4",
+          "quality_rank": 45,
+          "est_file_bytes": 12109566624,
+          "est_ram_bytes": 16941404832,
+          "est_vram_bytes": 16807187104,
+          "artifact_id": "gpt-oss-20b-mxfp4",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ggml-org/gpt-oss-20b-GGUF",
+            "revision": "ef9b12f2ff56c69cf32153a02784e7a3c88bf524",
+            "files": [
+              "gpt-oss-20b-MXFP4.gguf"
+            ],
+            "sha256": {
+              "gpt-oss-20b-MXFP4.gguf": "27cd6c432c7672cb812a92f611cf3ba7bbc35928262bb1e1253ff4ee6ae35901"
+            },
+            "size_bytes": {
+              "gpt-oss-20b-MXFP4.gguf": 12109566624
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "granite-3.3-8b-instruct",
+      "family": "granite",
+      "display_name": "Granite 3.3 8B Instruct",
+      "parameter_size": "8B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "apache-2.0",
+      "best_at": [
+        "rag",
+        "tool-use"
+      ],
+      "est_file_bytes": 4942873344,
+      "est_ram_bytes": 7627227904,
+      "est_vram_bytes": 7493010176,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/ibm-granite/granite-3.3-8b-instruct",
+      "sources": {
+        "ollama": {
+          "tag": "granite3.3:8b",
+          "digest": "sha256:122661774644959cd109295a907dc4305a7b72f9ce8b9ba0fe43dd2393a7becd"
+        }
+      },
+      "variants": [
+        {
+          "id": "granite-3.3-8b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8684264992,
+          "est_ram_bytes": 11368619552,
+          "est_vram_bytes": 11234401824,
+          "artifact_id": "granite-3.3-8b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ibm-granite/granite-3.3-8b-instruct-GGUF",
+            "revision": "e40e9dd739c7be00fa965c16ce167088190ce114",
+            "files": [
+              "granite-3.3-8b-instruct-Q8_0.gguf"
+            ],
+            "sha256": {
+              "granite-3.3-8b-instruct-Q8_0.gguf": "8ced2b014c6b5d4b1be698fd2cb5b051b08ce0b439d2584eb358e0d3f0a00611"
+            },
+            "size_bytes": {
+              "granite-3.3-8b-instruct-Q8_0.gguf": 8684264992
+            }
+          }
+        },
+        {
+          "id": "granite-3.3-8b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6705464064,
+          "est_ram_bytes": 9389818624,
+          "est_vram_bytes": 9255600896,
+          "artifact_id": "granite-3.3-8b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ibm-granite/granite-3.3-8b-instruct-GGUF",
+            "revision": "e40e9dd739c7be00fa965c16ce167088190ce114",
+            "files": [
+              "granite-3.3-8b-instruct-Q6_K.gguf"
+            ],
+            "sha256": {
+              "granite-3.3-8b-instruct-Q6_K.gguf": "b0fe6e279cf247a8119ca744286f53ce22890d871e26c3af38e12f5f9008b2bb"
+            },
+            "size_bytes": {
+              "granite-3.3-8b-instruct-Q6_K.gguf": 6705464064
+            }
+          }
+        },
+        {
+          "id": "granite-3.3-8b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5797462784,
+          "est_ram_bytes": 8481817344,
+          "est_vram_bytes": 8347599616,
+          "artifact_id": "granite-3.3-8b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ibm-granite/granite-3.3-8b-instruct-GGUF",
+            "revision": "e40e9dd739c7be00fa965c16ce167088190ce114",
+            "files": [
+              "granite-3.3-8b-instruct-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "granite-3.3-8b-instruct-Q5_K_M.gguf": "222bd5b4163cc3c9fbf534d47efb63957abf8abb6a23733915b56ee3c2d16218"
+            },
+            "size_bytes": {
+              "granite-3.3-8b-instruct-Q5_K_M.gguf": 5797462784
+            }
+          }
+        },
+        {
+          "id": "granite-3.3-8b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4942873344,
+          "est_ram_bytes": 7627227904,
+          "est_vram_bytes": 7493010176,
+          "artifact_id": "granite-3.3-8b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ibm-granite/granite-3.3-8b-instruct-GGUF",
+            "revision": "e40e9dd739c7be00fa965c16ce167088190ce114",
+            "files": [
+              "granite-3.3-8b-instruct-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "granite-3.3-8b-instruct-Q4_K_M.gguf": "77bcee066a76dcdd10d0d123c87e32c8ec2c74e31b6ffd87ebee49c9ac215dca"
+            },
+            "size_bytes": {
+              "granite-3.3-8b-instruct-Q4_K_M.gguf": 4942873344
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "hermes-3-llama-3.1-8b",
+      "family": "hermes-3",
+      "display_name": "Hermes 3 (Llama 3.1 8B)",
+      "parameter_size": "8B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "llama-3.1-community",
+      "best_at": [
+        "tool-use",
+        "agentic",
+        "general-chat"
+      ],
+      "est_file_bytes": 4920733824,
+      "est_ram_bytes": 7605088384,
+      "est_vram_bytes": 7470870656,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
+      "sources": {
+        "ollama": {
+          "tag": "hermes3:8b",
+          "digest": "sha256:9dfddf59cf5a85558d8b782db72c12e934b9b539ae48af03861938e4c383c167"
+        }
+      },
+      "variants": [
+        {
+          "id": "hermes-3-llama-3.1-8b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8540770432,
+          "est_ram_bytes": 11225124992,
+          "est_vram_bytes": 11090907264,
+          "artifact_id": "hermes-3-llama-3.1-8b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
+            "revision": "307a5dfb59aa38d88b6cfd32f44b8ad7c1da9fb8",
+            "files": [
+              "Hermes-3-Llama-3.1-8B.Q8_0.gguf"
+            ],
+            "sha256": {
+              "Hermes-3-Llama-3.1-8B.Q8_0.gguf": "c77c263f78b2f56fbaddd3ef2af750fda6ebb4344a546aaa0bfdd546b1ca8d84"
+            },
+            "size_bytes": {
+              "Hermes-3-Llama-3.1-8B.Q8_0.gguf": 8540770432
+            }
+          }
+        },
+        {
+          "id": "hermes-3-llama-3.1-8b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6596006016,
+          "est_ram_bytes": 9280360576,
+          "est_vram_bytes": 9146142848,
+          "artifact_id": "hermes-3-llama-3.1-8b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
+            "revision": "307a5dfb59aa38d88b6cfd32f44b8ad7c1da9fb8",
+            "files": [
+              "Hermes-3-Llama-3.1-8B.Q6_K.gguf"
+            ],
+            "sha256": {
+              "Hermes-3-Llama-3.1-8B.Q6_K.gguf": "098d66b070c3eda8008c6f5560c85bfcc3d1ad279d593ad6a6d85a6d21c75694"
+            },
+            "size_bytes": {
+              "Hermes-3-Llama-3.1-8B.Q6_K.gguf": 6596006016
+            }
+          }
+        },
+        {
+          "id": "hermes-3-llama-3.1-8b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5732987008,
+          "est_ram_bytes": 8417341568,
+          "est_vram_bytes": 8283123840,
+          "artifact_id": "hermes-3-llama-3.1-8b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
+            "revision": "307a5dfb59aa38d88b6cfd32f44b8ad7c1da9fb8",
+            "files": [
+              "Hermes-3-Llama-3.1-8B.Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Hermes-3-Llama-3.1-8B.Q5_K_M.gguf": "b2fb813afad50963f29a9e69cd844a02add63d6a29f965fef4e084fdd10075d3"
+            },
+            "size_bytes": {
+              "Hermes-3-Llama-3.1-8B.Q5_K_M.gguf": 5732987008
+            }
+          }
+        },
+        {
+          "id": "hermes-3-llama-3.1-8b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4920733824,
+          "est_ram_bytes": 7605088384,
+          "est_vram_bytes": 7470870656,
+          "artifact_id": "hermes-3-llama-3.1-8b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
+            "revision": "307a5dfb59aa38d88b6cfd32f44b8ad7c1da9fb8",
+            "files": [
+              "Hermes-3-Llama-3.1-8B.Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Hermes-3-Llama-3.1-8B.Q4_K_M.gguf": "d4403ce5a6e930f4c2509456388c20d633a15ff08dd52ef3b142ff1810ec3553"
+            },
+            "size_bytes": {
+              "Hermes-3-Llama-3.1-8B.Q4_K_M.gguf": 4920733824
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "llama-3.1-8b-instruct",
+      "family": "llama-3.1",
+      "display_name": "Llama 3.1 8B Instruct",
+      "parameter_size": "8B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "llama-3.1-community",
+      "best_at": [
+        "general-chat",
+        "tool-use"
+      ],
+      "est_file_bytes": 4920739232,
+      "est_ram_bytes": 7605093792,
+      "est_vram_bytes": 7470876064,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
+      "sources": {
+        "ollama": {
+          "tag": "llama3.1:8b",
+          "digest": "sha256:455f34728c9b5dd3376378bfb809ee166c145b0b4c1f1a6feca069055066ef9a"
+        }
+      },
+      "variants": [
+        {
+          "id": "llama-3.1-8b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8540775840,
+          "est_ram_bytes": 11225130400,
+          "est_vram_bytes": 11090912672,
+          "artifact_id": "llama-3.1-8b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+            "revision": "bf5b95e96dac0462e2a09145ec66cae9a3f12067",
+            "files": [
+              "Meta-Llama-3.1-8B-Instruct-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Meta-Llama-3.1-8B-Instruct-Q8_0.gguf": "9da71c45c90a821809821244d4971e5e5dfad7eb091f0b8ff0546392393b6283"
+            },
+            "size_bytes": {
+              "Meta-Llama-3.1-8B-Instruct-Q8_0.gguf": 8540775840
+            }
+          }
+        },
+        {
+          "id": "llama-3.1-8b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6596011424,
+          "est_ram_bytes": 9280365984,
+          "est_vram_bytes": 9146148256,
+          "artifact_id": "llama-3.1-8b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+            "revision": "bf5b95e96dac0462e2a09145ec66cae9a3f12067",
+            "files": [
+              "Meta-Llama-3.1-8B-Instruct-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Meta-Llama-3.1-8B-Instruct-Q6_K.gguf": "33981adf6bae52c503fb5c24f72539010632f7ed290a56c1315a8cd50adca587"
+            },
+            "size_bytes": {
+              "Meta-Llama-3.1-8B-Instruct-Q6_K.gguf": 6596011424
+            }
+          }
+        },
+        {
+          "id": "llama-3.1-8b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5732992416,
+          "est_ram_bytes": 8417346976,
+          "est_vram_bytes": 8283129248,
+          "artifact_id": "llama-3.1-8b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+            "revision": "bf5b95e96dac0462e2a09145ec66cae9a3f12067",
+            "files": [
+              "Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf": "14e10feba0c82a55da198dcd69d137206ad22d116a809926d27fa5f2398c69c7"
+            },
+            "size_bytes": {
+              "Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf": 5732992416
+            }
+          }
+        },
+        {
+          "id": "llama-3.1-8b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4920739232,
+          "est_ram_bytes": 7605093792,
+          "est_vram_bytes": 7470876064,
+          "artifact_id": "llama-3.1-8b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+            "revision": "bf5b95e96dac0462e2a09145ec66cae9a3f12067",
+            "files": [
+              "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf": "7b064f5842bf9532c91456deda288a1b672397a54fa729aa665952863033557c"
+            },
+            "size_bytes": {
+              "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf": 4920739232
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "llama-3.2-1b-instruct",
+      "family": "llama-3.2",
+      "display_name": "Llama 3.2 1B Instruct",
+      "parameter_size": "1B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "llama-3.2-community",
+      "best_at": [
+        "low-resource",
+        "drafting"
+      ],
+      "est_file_bytes": 807694464,
+      "est_ram_bytes": 1881436288,
+      "est_vram_bytes": 1747218560,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct",
+      "sources": {
+        "ollama": {
+          "tag": "llama3.2:1b",
+          "digest": "sha256:4f659a1e86d7f5a33c389f7991e7224b7ee6ad0358b53437d54c02d2e1b1118d"
+        }
+      },
+      "variants": [
+        {
+          "id": "llama-3.2-1b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 1321083008,
+          "est_ram_bytes": 2394824832,
+          "est_vram_bytes": 2260607104,
+          "artifact_id": "llama-3.2-1b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-1B-Instruct-GGUF",
+            "revision": "067b946cf014b7c697f3654f621d577a3e3afd1c",
+            "files": [
+              "Llama-3.2-1B-Instruct-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-1B-Instruct-Q8_0.gguf": "432f310a77f4650a88d0fd59ecdd7cebed8d684bafea53cbff0473542964f0c3"
+            },
+            "size_bytes": {
+              "Llama-3.2-1B-Instruct-Q8_0.gguf": 1321083008
+            }
+          }
+        },
+        {
+          "id": "llama-3.2-1b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 1021800576,
+          "est_ram_bytes": 2095542400,
+          "est_vram_bytes": 1961324672,
+          "artifact_id": "llama-3.2-1b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-1B-Instruct-GGUF",
+            "revision": "067b946cf014b7c697f3654f621d577a3e3afd1c",
+            "files": [
+              "Llama-3.2-1B-Instruct-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-1B-Instruct-Q6_K.gguf": "0f4c510daf16e0d1b3bc94931fd9296c28936bebdda2593687d4eb70c5b70628"
+            },
+            "size_bytes": {
+              "Llama-3.2-1B-Instruct-Q6_K.gguf": 1021800576
+            }
+          }
+        },
+        {
+          "id": "llama-3.2-1b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 911503488,
+          "est_ram_bytes": 1985245312,
+          "est_vram_bytes": 1851027584,
+          "artifact_id": "llama-3.2-1b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-1B-Instruct-GGUF",
+            "revision": "067b946cf014b7c697f3654f621d577a3e3afd1c",
+            "files": [
+              "Llama-3.2-1B-Instruct-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-1B-Instruct-Q5_K_M.gguf": "4f22f95fb1679ef8e2fd6f1659d23f06cd1dbedb79ff291db7413a7ae509e2a9"
+            },
+            "size_bytes": {
+              "Llama-3.2-1B-Instruct-Q5_K_M.gguf": 911503488
+            }
+          }
+        },
+        {
+          "id": "llama-3.2-1b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 807694464,
+          "est_ram_bytes": 1881436288,
+          "est_vram_bytes": 1747218560,
+          "artifact_id": "llama-3.2-1b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-1B-Instruct-GGUF",
+            "revision": "067b946cf014b7c697f3654f621d577a3e3afd1c",
+            "files": [
+              "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-1B-Instruct-Q4_K_M.gguf": "6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83"
+            },
+            "size_bytes": {
+              "Llama-3.2-1B-Instruct-Q4_K_M.gguf": 807694464
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "llama-3.2-3b-instruct",
+      "family": "llama-3.2",
+      "display_name": "Llama 3.2 3B Instruct",
+      "parameter_size": "3B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "llama-3.2-community",
+      "best_at": [
+        "general-chat",
+        "low-resource"
+      ],
+      "est_file_bytes": 2019377696,
+      "est_ram_bytes": 3629990432,
+      "est_vram_bytes": 3495772704,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
+      "sources": {
+        "ollama": {
+          "tag": "llama3.2:3b",
+          "digest": "sha256:34bb5ab01051a11372a91f95f3fbbc51173eed8e7f13ec395b9ae9b8bd0e242b"
+        }
+      },
+      "variants": [
+        {
+          "id": "llama-3.2-3b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 3421899296,
+          "est_ram_bytes": 5032512032,
+          "est_vram_bytes": 4898294304,
+          "artifact_id": "llama-3.2-3b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+            "revision": "5ab33fa94d1d04e903623ae72c95d1696f09f9e8",
+            "files": [
+              "Llama-3.2-3B-Instruct-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-3B-Instruct-Q8_0.gguf": "b5607b5090a8280063fff2d706bb3408ca6542341b06aab39c3eca0a28575921"
+            },
+            "size_bytes": {
+              "Llama-3.2-3B-Instruct-Q8_0.gguf": 3421899296
+            }
+          }
+        },
+        {
+          "id": "llama-3.2-3b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 2643853856,
+          "est_ram_bytes": 4254466592,
+          "est_vram_bytes": 4120248864,
+          "artifact_id": "llama-3.2-3b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+            "revision": "5ab33fa94d1d04e903623ae72c95d1696f09f9e8",
+            "files": [
+              "Llama-3.2-3B-Instruct-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-3B-Instruct-Q6_K.gguf": "1771887c15fc3d327cfee6fd593553b2126e88834bf48eae50e709d3f70dd998"
+            },
+            "size_bytes": {
+              "Llama-3.2-3B-Instruct-Q6_K.gguf": 2643853856
+            }
+          }
+        },
+        {
+          "id": "llama-3.2-3b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 2322154016,
+          "est_ram_bytes": 3932766752,
+          "est_vram_bytes": 3798549024,
+          "artifact_id": "llama-3.2-3b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+            "revision": "5ab33fa94d1d04e903623ae72c95d1696f09f9e8",
+            "files": [
+              "Llama-3.2-3B-Instruct-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-3B-Instruct-Q5_K_M.gguf": "0b94ccd04d908304cec5246a3d942b64417a423bc5c6d47c73bc557e590b5194"
+            },
+            "size_bytes": {
+              "Llama-3.2-3B-Instruct-Q5_K_M.gguf": 2322154016
+            }
+          }
+        },
+        {
+          "id": "llama-3.2-3b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 2019377696,
+          "est_ram_bytes": 3629990432,
+          "est_vram_bytes": 3495772704,
+          "artifact_id": "llama-3.2-3b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+            "revision": "5ab33fa94d1d04e903623ae72c95d1696f09f9e8",
+            "files": [
+              "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Llama-3.2-3B-Instruct-Q4_K_M.gguf": "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff"
+            },
+            "size_bytes": {
+              "Llama-3.2-3B-Instruct-Q4_K_M.gguf": 2019377696
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mistral-7b-instruct-v0.3",
+      "family": "mistral",
+      "display_name": "Mistral 7B Instruct v0.3",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat"
+      ],
+      "est_file_bytes": 4372812000,
+      "est_ram_bytes": 7057166560,
+      "est_vram_bytes": 6922948832,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+      "sources": {
+        "ollama": {
+          "tag": "mistral:7b",
+          "digest": "sha256:1064e17101bdd2460dd5c4e03e4f5cc1b38a4dee66084dc91faba294ccb64a92"
+        }
+      },
+      "variants": [
+        {
+          "id": "mistral-7b-instruct-v0.3-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 7702565088,
+          "est_ram_bytes": 10386919648,
+          "est_vram_bytes": 10252701920,
+          "artifact_id": "mistral-7b-instruct-v0.3-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
+            "revision": "61fd4167fff3ab01ee1cfe0da183fa27a944db48",
+            "files": [
+              "Mistral-7B-Instruct-v0.3-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Mistral-7B-Instruct-v0.3-Q8_0.gguf": "404857e776114baada71a08ebd3bba79d721ec7fca99705e7e7b892ae8bc583f"
+            },
+            "size_bytes": {
+              "Mistral-7B-Instruct-v0.3-Q8_0.gguf": 7702565088
+            }
+          }
+        },
+        {
+          "id": "mistral-7b-instruct-v0.3-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 5947248864,
+          "est_ram_bytes": 8631603424,
+          "est_vram_bytes": 8497385696,
+          "artifact_id": "mistral-7b-instruct-v0.3-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
+            "revision": "61fd4167fff3ab01ee1cfe0da183fa27a944db48",
+            "files": [
+              "Mistral-7B-Instruct-v0.3-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Mistral-7B-Instruct-v0.3-Q6_K.gguf": "757d75df89821a94841f341f3270b0709d36891dd8fbc41dfd059d213b54c3f5"
+            },
+            "size_bytes": {
+              "Mistral-7B-Instruct-v0.3-Q6_K.gguf": 5947248864
+            }
+          }
+        },
+        {
+          "id": "mistral-7b-instruct-v0.3-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5136175328,
+          "est_ram_bytes": 7820529888,
+          "est_vram_bytes": 7686312160,
+          "artifact_id": "mistral-7b-instruct-v0.3-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
+            "revision": "61fd4167fff3ab01ee1cfe0da183fa27a944db48",
+            "files": [
+              "Mistral-7B-Instruct-v0.3-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Mistral-7B-Instruct-v0.3-Q5_K_M.gguf": "0374072546aaf1257d1e34610edb11b691730d8ef7d44b5629693a2dd8e8d472"
+            },
+            "size_bytes": {
+              "Mistral-7B-Instruct-v0.3-Q5_K_M.gguf": 5136175328
+            }
+          }
+        },
+        {
+          "id": "mistral-7b-instruct-v0.3-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4372812000,
+          "est_ram_bytes": 7057166560,
+          "est_vram_bytes": 6922948832,
+          "artifact_id": "mistral-7b-instruct-v0.3-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
+            "revision": "61fd4167fff3ab01ee1cfe0da183fa27a944db48",
+            "files": [
+              "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf": "1270d22c0fbb3d092fb725d4d96c457b7b687a5f5a715abe1e818da303e562b6"
+            },
+            "size_bytes": {
+              "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf": 4372812000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mistral-nemo-instruct",
+      "family": "mistral",
+      "display_name": "Mistral Nemo Instruct",
+      "parameter_size": "12B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "long-context",
+        "multilingual"
+      ],
+      "est_file_bytes": 7477208192,
+      "est_ram_bytes": 11369522304,
+      "est_vram_bytes": 11235304576,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407",
+      "sources": {
+        "ollama": {
+          "tag": "mistral-nemo",
+          "digest": "sha256:65d37de20e5951c7434ad4230c51a4d5be99b8cb7407d2135074d82c40b44b45"
+        }
+      },
+      "variants": [
+        {
+          "id": "mistral-nemo-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 13022372992,
+          "est_ram_bytes": 16914687104,
+          "est_vram_bytes": 16780469376,
+          "artifact_id": "mistral-nemo-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+            "revision": "a2dd64a0a76ea1bdb2bb6ab6fa5496b003c7c908",
+            "files": [
+              "Mistral-Nemo-Instruct-2407-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Mistral-Nemo-Instruct-2407-Q8_0.gguf": "7985eab9b84d7d514253a53f372095d51f941f84a62cadaa0ccf6e1b3fbef494"
+            },
+            "size_bytes": {
+              "Mistral-Nemo-Instruct-2407-Q8_0.gguf": 13022372992
+            }
+          }
+        },
+        {
+          "id": "mistral-nemo-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 10056213632,
+          "est_ram_bytes": 13948527744,
+          "est_vram_bytes": 13814310016,
+          "artifact_id": "mistral-nemo-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+            "revision": "a2dd64a0a76ea1bdb2bb6ab6fa5496b003c7c908",
+            "files": [
+              "Mistral-Nemo-Instruct-2407-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Mistral-Nemo-Instruct-2407-Q6_K.gguf": "da9ac0c204363b96dcfdfdf9fedea0d6dd0a923dee0e22bf589994e118482482"
+            },
+            "size_bytes": {
+              "Mistral-Nemo-Instruct-2407-Q6_K.gguf": 10056213632
+            }
+          }
+        },
+        {
+          "id": "mistral-nemo-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 8727635072,
+          "est_ram_bytes": 12619949184,
+          "est_vram_bytes": 12485731456,
+          "artifact_id": "mistral-nemo-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+            "revision": "a2dd64a0a76ea1bdb2bb6ab6fa5496b003c7c908",
+            "files": [
+              "Mistral-Nemo-Instruct-2407-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Mistral-Nemo-Instruct-2407-Q5_K_M.gguf": "f2118506b57d31403cba021b476ceb95600cc278fbc2feeaaf884b6e64fa6ee5"
+            },
+            "size_bytes": {
+              "Mistral-Nemo-Instruct-2407-Q5_K_M.gguf": 8727635072
+            }
+          }
+        },
+        {
+          "id": "mistral-nemo-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 7477208192,
+          "est_ram_bytes": 11369522304,
+          "est_vram_bytes": 11235304576,
+          "artifact_id": "mistral-nemo-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+            "revision": "a2dd64a0a76ea1bdb2bb6ab6fa5496b003c7c908",
+            "files": [
+              "Mistral-Nemo-Instruct-2407-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Mistral-Nemo-Instruct-2407-Q4_K_M.gguf": "7c1a10d202d8788dbe5628dc962254d10654c853cae6aaeca0618f05490d4a46"
+            },
+            "size_bytes": {
+              "Mistral-Nemo-Instruct-2407-Q4_K_M.gguf": 7477208192
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mistral-small-3.2",
+      "family": "mistral",
+      "display_name": "Mistral Small 3.2 Instruct",
+      "parameter_size": "24B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "tool-use"
+      ],
+      "est_file_bytes": 14333915264,
+      "est_ram_bytes": 19165753472,
+      "est_vram_bytes": 19031535744,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+      "sources": {
+        "ollama": {
+          "tag": "mistral-small3.2",
+          "digest": "sha256:7ae301728ba8f217be575419ca950190a4d43cfa293ffa9732ce6eb6498d7f6d"
+        }
+      },
+      "variants": [
+        {
+          "id": "mistral-small-3.2-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 25054785664,
+          "est_ram_bytes": 29886623872,
+          "est_vram_bytes": 29752406144,
+          "artifact_id": "mistral-small-3.2-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Mistral-Small-3.2-24B-Instruct-2506-GGUF",
+            "revision": "b3592d09be469bedab6be51f577824b3b6b76ba1",
+            "files": [
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q8_0.gguf"
+            ],
+            "sha256": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q8_0.gguf": "980c4969d46bf016ef78de4206bd74a66a6ca7de18152cb603a7b0c4d348bc55"
+            },
+            "size_bytes": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q8_0.gguf": 25054785664
+            }
+          }
+        },
+        {
+          "id": "mistral-small-3.2-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 19345944704,
+          "est_ram_bytes": 24177782912,
+          "est_vram_bytes": 24043565184,
+          "artifact_id": "mistral-small-3.2-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Mistral-Small-3.2-24B-Instruct-2506-GGUF",
+            "revision": "b3592d09be469bedab6be51f577824b3b6b76ba1",
+            "files": [
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q6_K.gguf"
+            ],
+            "sha256": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q6_K.gguf": "3b1f9516b3446859f145f114152b260388253b4f911528bfe7545a79a09a8874"
+            },
+            "size_bytes": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q6_K.gguf": 19345944704
+            }
+          }
+        },
+        {
+          "id": "mistral-small-3.2-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 16763990144,
+          "est_ram_bytes": 21595828352,
+          "est_vram_bytes": 21461610624,
+          "artifact_id": "mistral-small-3.2-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Mistral-Small-3.2-24B-Instruct-2506-GGUF",
+            "revision": "b3592d09be469bedab6be51f577824b3b6b76ba1",
+            "files": [
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q5_K_M.gguf": "c3313e3e8edfc76ffea18e42d94646a56868c57c64c6b0845d35adb3156a201f"
+            },
+            "size_bytes": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q5_K_M.gguf": 16763990144
+            }
+          }
+        },
+        {
+          "id": "mistral-small-3.2-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 14333915264,
+          "est_ram_bytes": 19165753472,
+          "est_vram_bytes": 19031535744,
+          "artifact_id": "mistral-small-3.2-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/mistralai_Mistral-Small-3.2-24B-Instruct-2506-GGUF",
+            "revision": "b3592d09be469bedab6be51f577824b3b6b76ba1",
+            "files": [
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf": "80f5bda68f156f12650ca03a0a2dbfae06a215ac41caa773b8631a479f82415e"
+            },
+            "size_bytes": {
+              "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf": 14333915264
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "olmo-2-7b-instruct",
+      "family": "olmo-2",
+      "display_name": "OLMo 2 7B Instruct",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 4096,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat"
+      ],
+      "est_file_bytes": 4472020256,
+      "est_ram_bytes": 7156374816,
+      "est_vram_bytes": 7022157088,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/allenai/OLMo-2-1124-7B-Instruct",
+      "sources": {
+        "ollama": {
+          "tag": "olmo2:7b",
+          "digest": "sha256:d3d81dcf3ed1ec0108bd55ca284901be05a1fa76627c6705b344bd2fda19539d"
+        }
+      },
+      "variants": [
+        {
+          "id": "olmo-2-7b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 7759895840,
+          "est_ram_bytes": 10444250400,
+          "est_vram_bytes": 10310032672,
+          "artifact_id": "olmo-2-7b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "allenai/OLMo-2-1124-7B-Instruct-GGUF",
+            "revision": "410e0069f64869e4b1d17d8de04810b881fd824b",
+            "files": [
+              "olmo-2-1124-7B-instruct-Q8_0.gguf"
+            ],
+            "sha256": {
+              "olmo-2-1124-7B-instruct-Q8_0.gguf": "fc410f17c151bed25e91e999eda63867e031e1def86cd4d5c854abebdf442f97"
+            },
+            "size_bytes": {
+              "olmo-2-1124-7B-instruct-Q8_0.gguf": 7759895840
+            }
+          }
+        },
+        {
+          "id": "olmo-2-7b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 5992389920,
+          "est_ram_bytes": 8676744480,
+          "est_vram_bytes": 8542526752,
+          "artifact_id": "olmo-2-7b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "allenai/OLMo-2-1124-7B-Instruct-GGUF",
+            "revision": "410e0069f64869e4b1d17d8de04810b881fd824b",
+            "files": [
+              "olmo-2-1124-7B-instruct-Q6_K.gguf"
+            ],
+            "sha256": {
+              "olmo-2-1124-7B-instruct-Q6_K.gguf": "ad289e6a0de5c810fb20cb0e77570f17f70212c7692351df000a38818fff1a0b"
+            },
+            "size_bytes": {
+              "olmo-2-1124-7B-instruct-Q6_K.gguf": 5992389920
+            }
+          }
+        },
+        {
+          "id": "olmo-2-7b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5209169184,
+          "est_ram_bytes": 7893523744,
+          "est_vram_bytes": 7759306016,
+          "artifact_id": "olmo-2-7b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "allenai/OLMo-2-1124-7B-Instruct-GGUF",
+            "revision": "410e0069f64869e4b1d17d8de04810b881fd824b",
+            "files": [
+              "olmo-2-1124-7B-instruct-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "olmo-2-1124-7B-instruct-Q5_K_M.gguf": "d0fb53a7cce66a13a3d68bafa4593abcdaf5d3800c33db99fe67609c76172e6f"
+            },
+            "size_bytes": {
+              "olmo-2-1124-7B-instruct-Q5_K_M.gguf": 5209169184
+            }
+          }
+        },
+        {
+          "id": "olmo-2-7b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4472020256,
+          "est_ram_bytes": 7156374816,
+          "est_vram_bytes": 7022157088,
+          "artifact_id": "olmo-2-7b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "allenai/OLMo-2-1124-7B-Instruct-GGUF",
+            "revision": "410e0069f64869e4b1d17d8de04810b881fd824b",
+            "files": [
+              "olmo-2-1124-7B-instruct-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "olmo-2-1124-7B-instruct-Q4_K_M.gguf": "e08112e5f84aab7c05fa6e713c58e5214cd5d8e32ed773ff3354b006eed41b95"
+            },
+            "size_bytes": {
+              "olmo-2-1124-7B-instruct-Q4_K_M.gguf": 4472020256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "phi-4",
+      "family": "phi-4",
+      "display_name": "Phi-4",
+      "parameter_size": "14B",
+      "quantization": "Q6_K",
+      "context_window": 16384,
+      "license": "mit",
+      "best_at": [
+        "reasoning",
+        "math"
+      ],
+      "est_file_bytes": 12030251200,
+      "est_ram_bytes": 15922565312,
+      "est_vram_bytes": 15788347584,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/microsoft/phi-4",
+      "sources": {
+        "ollama": {
+          "tag": "phi4",
+          "digest": "sha256:f5d6f49c64775df1536e9d747c6b6b4c101f6a8658108fbd18a15d046575c68b"
+        }
+      },
+      "variants": [
+        {
+          "id": "phi-4-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 15580500160,
+          "est_ram_bytes": 19472814272,
+          "est_vram_bytes": 19338596544,
+          "artifact_id": "phi-4-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "microsoft/phi-4-gguf",
+            "revision": "6edc2ef6664b739a8e11e62f2672ff6afe0c15ac",
+            "files": [
+              "phi-4-Q8_0.gguf"
+            ],
+            "sha256": {
+              "phi-4-Q8_0.gguf": "f68df5d3a22a01ea9ec547741f42ee7fedbf949bf42ef526fb1944fa0cfaa110"
+            },
+            "size_bytes": {
+              "phi-4-Q8_0.gguf": 15580500160
+            }
+          }
+        },
+        {
+          "id": "phi-4-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 12030251200,
+          "est_ram_bytes": 15922565312,
+          "est_vram_bytes": 15788347584,
+          "artifact_id": "phi-4-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "microsoft/phi-4-gguf",
+            "revision": "6edc2ef6664b739a8e11e62f2672ff6afe0c15ac",
+            "files": [
+              "phi-4-Q6_K.gguf"
+            ],
+            "sha256": {
+              "phi-4-Q6_K.gguf": "a70147a8a8adb24d62a28e5038aca78c4c145a1c3043a38e8634738a9e6bbd93"
+            },
+            "size_bytes": {
+              "phi-4-Q6_K.gguf": 12030251200
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "phi-4-mini-instruct",
+      "family": "phi-4",
+      "display_name": "Phi-4 Mini Instruct",
+      "parameter_size": "3.8B",
+      "quantization": "Q4_K_M",
+      "context_window": 131072,
+      "license": "mit",
+      "best_at": [
+        "low-resource",
+        "reasoning"
+      ],
+      "est_file_bytes": 2491874688,
+      "est_ram_bytes": 4102487424,
+      "est_vram_bytes": 3968269696,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/microsoft/Phi-4-mini-instruct",
+      "sources": {
+        "ollama": {
+          "tag": "phi4-mini",
+          "digest": "sha256:8c2539a423c4df2d9d2609fba56e7bad554696b66ed0e280c56e0ef4a32498fa"
+        }
+      },
+      "variants": [
+        {
+          "id": "phi-4-mini-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 4084611456,
+          "est_ram_bytes": 5695224192,
+          "est_vram_bytes": 5561006464,
+          "artifact_id": "phi-4-mini-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/microsoft_Phi-4-mini-instruct-GGUF",
+            "revision": "7ff82c2aaa4dde30121698a973765f39be5288c0",
+            "files": [
+              "microsoft_Phi-4-mini-instruct-Q8_0.gguf"
+            ],
+            "sha256": {
+              "microsoft_Phi-4-mini-instruct-Q8_0.gguf": "a12f242c4ee379b9da91673e5d78b30bfacfe4fd86a0b2259d2ecad5d93cb6c7"
+            },
+            "size_bytes": {
+              "microsoft_Phi-4-mini-instruct-Q8_0.gguf": 4084611456
+            }
+          }
+        },
+        {
+          "id": "phi-4-mini-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 3155623296,
+          "est_ram_bytes": 4766236032,
+          "est_vram_bytes": 4632018304,
+          "artifact_id": "phi-4-mini-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/microsoft_Phi-4-mini-instruct-GGUF",
+            "revision": "7ff82c2aaa4dde30121698a973765f39be5288c0",
+            "files": [
+              "microsoft_Phi-4-mini-instruct-Q6_K.gguf"
+            ],
+            "sha256": {
+              "microsoft_Phi-4-mini-instruct-Q6_K.gguf": "59dba927b98f39c26859aab7fb27d5f577666f8a5db38f0eccf3f207902ba23b"
+            },
+            "size_bytes": {
+              "microsoft_Phi-4-mini-instruct-Q6_K.gguf": 3155623296
+            }
+          }
+        },
+        {
+          "id": "phi-4-mini-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 2848128384,
+          "est_ram_bytes": 4458741120,
+          "est_vram_bytes": 4324523392,
+          "artifact_id": "phi-4-mini-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/microsoft_Phi-4-mini-instruct-GGUF",
+            "revision": "7ff82c2aaa4dde30121698a973765f39be5288c0",
+            "files": [
+              "microsoft_Phi-4-mini-instruct-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "microsoft_Phi-4-mini-instruct-Q5_K_M.gguf": "840ad85cff01e41701e2b2a3826016916f8e51242c8f25d62e59fa7eb93acbc5"
+            },
+            "size_bytes": {
+              "microsoft_Phi-4-mini-instruct-Q5_K_M.gguf": 2848128384
+            }
+          }
+        },
+        {
+          "id": "phi-4-mini-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 2491874688,
+          "est_ram_bytes": 4102487424,
+          "est_vram_bytes": 3968269696,
+          "artifact_id": "phi-4-mini-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "bartowski/microsoft_Phi-4-mini-instruct-GGUF",
+            "revision": "7ff82c2aaa4dde30121698a973765f39be5288c0",
+            "files": [
+              "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf": "01999f17c39cc3074afae5e9c539bc82d45f2dd7faa3917c66cbef76fce8c0c2"
+            },
+            "size_bytes": {
+              "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf": 2491874688
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-1.5b-instruct",
+      "family": "qwen2.5",
+      "display_name": "Qwen2.5 1.5B Instruct",
+      "parameter_size": "1.5B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "low-resource",
+        "drafting"
+      ],
+      "est_file_bytes": 1117320736,
+      "est_ram_bytes": 2459498016,
+      "est_vram_bytes": 2325280288,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5:1.5b",
+          "digest": "sha256:377ac4d7aeefd5b870c9fccff9a6d4df36901d99fe3277c2f755bc401601ba1c"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-1.5b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 1894532128,
+          "est_ram_bytes": 3236709408,
+          "est_vram_bytes": 3102491680,
+          "artifact_id": "qwen2.5-1.5b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+            "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+            "files": [
+              "qwen2.5-1.5b-instruct-q8_0.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-1.5b-instruct-q8_0.gguf": "d7efb072e7724d25048a4fda0a3e10b04bdef5d06b1403a1c93bd9f1240a63c8"
+            },
+            "size_bytes": {
+              "qwen2.5-1.5b-instruct-q8_0.gguf": 1894532128
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-1.5b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 1464178720,
+          "est_ram_bytes": 2806356000,
+          "est_vram_bytes": 2672138272,
+          "artifact_id": "qwen2.5-1.5b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+            "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+            "files": [
+              "qwen2.5-1.5b-instruct-q6_k.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-1.5b-instruct-q6_k.gguf": "e16d94f3b1eb243f6f6be9eee51090ef5dfd741324394fd5b6e0e425c33df5c7"
+            },
+            "size_bytes": {
+              "qwen2.5-1.5b-instruct-q6_k.gguf": 1464178720
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-1.5b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 1285494304,
+          "est_ram_bytes": 2627671584,
+          "est_vram_bytes": 2493453856,
+          "artifact_id": "qwen2.5-1.5b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+            "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+            "files": [
+              "qwen2.5-1.5b-instruct-q5_k_m.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-1.5b-instruct-q5_k_m.gguf": "b46661073c18e5b56a41fa320975f866a00def1ff08feef4718e013258896f8c"
+            },
+            "size_bytes": {
+              "qwen2.5-1.5b-instruct-q5_k_m.gguf": 1285494304
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-1.5b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 1117320736,
+          "est_ram_bytes": 2459498016,
+          "est_vram_bytes": 2325280288,
+          "artifact_id": "qwen2.5-1.5b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+            "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+            "files": [
+              "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-1.5b-instruct-q4_k_m.gguf": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"
+            },
+            "size_bytes": {
+              "qwen2.5-1.5b-instruct-q4_k_m.gguf": 1117320736
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-14b-instruct",
+      "family": "qwen2.5",
+      "display_name": "Qwen2.5 14B Instruct",
+      "parameter_size": "14B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "multilingual"
+      ],
+      "est_file_bytes": 8988110496,
+      "est_ram_bytes": 12880424608,
+      "est_vram_bytes": 12746206880,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5:14b",
+          "digest": "sha256:db59b814cab753a51167db007fa6b6e0095f678ff24c9f7284753b75b34c6df3"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-14b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 15701597984,
+          "est_ram_bytes": 19593912096,
+          "est_vram_bytes": 19459694368,
+          "artifact_id": "qwen2.5-14b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-14B-Instruct-GGUF",
+            "revision": "b466e1f8c07172155743e8e1307507d8a4f91fbd",
+            "files": [
+              "qwen2.5-14b-instruct-q8_0-00001-of-00004.gguf",
+              "qwen2.5-14b-instruct-q8_0-00002-of-00004.gguf",
+              "qwen2.5-14b-instruct-q8_0-00003-of-00004.gguf",
+              "qwen2.5-14b-instruct-q8_0-00004-of-00004.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-14b-instruct-q8_0-00001-of-00004.gguf": "e09f3aef8f7fee2840d958a993b932133790aacb494af0e7b0014eba5240d9f5",
+              "qwen2.5-14b-instruct-q8_0-00002-of-00004.gguf": "fa8ae95d203b6ebcf2e3e8afaa9f400577e706cf3561e47d9eebb317d5642acb",
+              "qwen2.5-14b-instruct-q8_0-00003-of-00004.gguf": "b64f5050b3e33293d3ad4d2843a38f8eb418bed16545316f3010c08fcdb0b0c4",
+              "qwen2.5-14b-instruct-q8_0-00004-of-00004.gguf": "12e4ce99c972b709a27e7587406393578f6085791bef693dd5834bceb46bbdd6"
+            },
+            "size_bytes": {
+              "qwen2.5-14b-instruct-q8_0-00001-of-00004.gguf": 3975711104,
+              "qwen2.5-14b-instruct-q8_0-00002-of-00004.gguf": 3953267776,
+              "qwen2.5-14b-instruct-q8_0-00003-of-00004.gguf": 3986695424,
+              "qwen2.5-14b-instruct-q8_0-00004-of-00004.gguf": 3785923680
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-14b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 12124684064,
+          "est_ram_bytes": 16016998176,
+          "est_vram_bytes": 15882780448,
+          "artifact_id": "qwen2.5-14b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-14B-Instruct-GGUF",
+            "revision": "b466e1f8c07172155743e8e1307507d8a4f91fbd",
+            "files": [
+              "qwen2.5-14b-instruct-q6_k-00001-of-00004.gguf",
+              "qwen2.5-14b-instruct-q6_k-00002-of-00004.gguf",
+              "qwen2.5-14b-instruct-q6_k-00003-of-00004.gguf",
+              "qwen2.5-14b-instruct-q6_k-00004-of-00004.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-14b-instruct-q6_k-00001-of-00004.gguf": "f8f1d7fa692f12d9cf2862ab7e6b3ff5e6ee9c3427819237c517f7aad8acfa6b",
+              "qwen2.5-14b-instruct-q6_k-00002-of-00004.gguf": "cd882b7dd357b1092e44efba7d9cdc8baa0203705d6089ca69dc6998bfeffa0e",
+              "qwen2.5-14b-instruct-q6_k-00003-of-00004.gguf": "0cbe30479f75c8e40a420c14b5ac50d5e1d9dd43ac594c5756972ca8a6d5395a",
+              "qwen2.5-14b-instruct-q6_k-00004-of-00004.gguf": "73af4ed0b85ad55fcedebfde2a14af056db5cf2981e7ee7a18178dd4eea3e09b"
+            },
+            "size_bytes": {
+              "qwen2.5-14b-instruct-q6_k-00001-of-00004.gguf": 3985204096,
+              "qwen2.5-14b-instruct-q6_k-00002-of-00004.gguf": 3945074624,
+              "qwen2.5-14b-instruct-q6_k-00003-of-00004.gguf": 3497613920,
+              "qwen2.5-14b-instruct-q6_k-00004-of-00004.gguf": 696791424
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-14b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 10508873376,
+          "est_ram_bytes": 14401187488,
+          "est_vram_bytes": 14266969760,
+          "artifact_id": "qwen2.5-14b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-14B-Instruct-GGUF",
+            "revision": "b466e1f8c07172155743e8e1307507d8a4f91fbd",
+            "files": [
+              "qwen2.5-14b-instruct-q5_k_m-00001-of-00003.gguf",
+              "qwen2.5-14b-instruct-q5_k_m-00002-of-00003.gguf",
+              "qwen2.5-14b-instruct-q5_k_m-00003-of-00003.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-14b-instruct-q5_k_m-00001-of-00003.gguf": "5899521e6d7196db09bc78dc50c066b1514e48f0cd6ae085e481ee06e2134ac6",
+              "qwen2.5-14b-instruct-q5_k_m-00002-of-00003.gguf": "ada99d5a4222c0d2b0394f35ad4cd4281bdd1d8b7e9fa4be4f80f036621c580a",
+              "qwen2.5-14b-instruct-q5_k_m-00003-of-00003.gguf": "02a06964fa37f5e9cd21c92aa3851309ae3f3dcc2f52d631f1ce31b5b93640c0"
+            },
+            "size_bytes": {
+              "qwen2.5-14b-instruct-q5_k_m-00001-of-00003.gguf": 4005690208,
+              "qwen2.5-14b-instruct-q5_k_m-00002-of-00003.gguf": 3997407296,
+              "qwen2.5-14b-instruct-q5_k_m-00003-of-00003.gguf": 2505775872
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-14b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 8988110496,
+          "est_ram_bytes": 12880424608,
+          "est_vram_bytes": 12746206880,
+          "artifact_id": "qwen2.5-14b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-14B-Instruct-GGUF",
+            "revision": "b466e1f8c07172155743e8e1307507d8a4f91fbd",
+            "files": [
+              "qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf",
+              "qwen2.5-14b-instruct-q4_k_m-00002-of-00003.gguf",
+              "qwen2.5-14b-instruct-q4_k_m-00003-of-00003.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf": "a09ea5e7b1eafb1b30b241726c3cc3c905c96f14ad41e246ffa5f44e53904f68",
+              "qwen2.5-14b-instruct-q4_k_m-00002-of-00003.gguf": "21b9457d079680d284e90ef69607c4b2d8ef64a09d4729cb7b5e1357bdba41ae",
+              "qwen2.5-14b-instruct-q4_k_m-00003-of-00003.gguf": "c8d37006760a387a35216e070e6664d7da927f10be8eb870fef2e3d4833d9976"
+            },
+            "size_bytes": {
+              "qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf": 3991999872,
+              "qwen2.5-14b-instruct-q4_k_m-00002-of-00003.gguf": 3989373504,
+              "qwen2.5-14b-instruct-q4_k_m-00003-of-00003.gguf": 1006737120
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-32b-instruct",
+      "family": "qwen2.5",
+      "display_name": "Qwen2.5 32B Instruct",
+      "parameter_size": "32B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "tool-use"
+      ],
+      "est_file_bytes": 19851336384,
+      "est_ram_bytes": 25756916416,
+      "est_vram_bytes": 25622698688,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-32B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5:32b",
+          "digest": "sha256:833f525ce183cdb6a00e35838035c46507fcd08332d6a753aa39dbb77d68e2a1"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-32b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 34820885632,
+          "est_ram_bytes": 40726465664,
+          "est_vram_bytes": 40592247936,
+          "artifact_id": "qwen2.5-32b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-32B-Instruct-GGUF",
+            "revision": "a15e3cc10f8bbb2c0af6f8f1f34a32e3b060c09d",
+            "files": [
+              "qwen2.5-32b-instruct-q8_0-00001-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00002-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00003-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00004-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00005-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00006-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00007-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00008-of-00009.gguf",
+              "qwen2.5-32b-instruct-q8_0-00009-of-00009.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-32b-instruct-q8_0-00001-of-00009.gguf": "a2020baa6f28f3c3783ab83ae725f6b6168b7c45ccc557cabdc691f9a4604eba",
+              "qwen2.5-32b-instruct-q8_0-00002-of-00009.gguf": "ec6c0bb6b76013d00a0f9a57ca3b77e8ce8dd215cc5a3c13e66da7db1a386a9c",
+              "qwen2.5-32b-instruct-q8_0-00003-of-00009.gguf": "f68b1c67d2f25c94ff26389b32d7dc6b91780984735e68c6cccda0bee4a3aefc",
+              "qwen2.5-32b-instruct-q8_0-00004-of-00009.gguf": "377292038c5f89f00d78726f87ff84542140736b598ea5102ba508cc1ee80e16",
+              "qwen2.5-32b-instruct-q8_0-00005-of-00009.gguf": "2d6c8b01140e81185a36dc88e655f5d6cc2068206e6ec26245bc5cc3845cb59b",
+              "qwen2.5-32b-instruct-q8_0-00006-of-00009.gguf": "e70b8c7e09263c749eeb3513a0a3ae9eace8362ffc952bd3c0814814a270b7be",
+              "qwen2.5-32b-instruct-q8_0-00007-of-00009.gguf": "7c609382c54100a2a750a11756bd32b731bb6a0004babc50dd6f69cd27b48daa",
+              "qwen2.5-32b-instruct-q8_0-00008-of-00009.gguf": "2f33e61cf725ba37f114a56a16d5c1ea37f1467e89d804b5eb49a02620a303d6",
+              "qwen2.5-32b-instruct-q8_0-00009-of-00009.gguf": "82e154a199e9bfc4edad5dabb4359784c18aab1e9eaf3ce8ee23c994764422dc"
+            },
+            "size_bytes": {
+              "qwen2.5-32b-instruct-q8_0-00001-of-00009.gguf": 3941956768,
+              "qwen2.5-32b-instruct-q8_0-00002-of-00009.gguf": 3927757760,
+              "qwen2.5-32b-instruct-q8_0-00003-of-00009.gguf": 3994654144,
+              "qwen2.5-32b-instruct-q8_0-00004-of-00009.gguf": 3994654144,
+              "qwen2.5-32b-instruct-q8_0-00005-of-00009.gguf": 3927737280,
+              "qwen2.5-32b-instruct-q8_0-00006-of-00009.gguf": 3994654144,
+              "qwen2.5-32b-instruct-q8_0-00007-of-00009.gguf": 3994654144,
+              "qwen2.5-32b-instruct-q8_0-00008-of-00009.gguf": 3927737280,
+              "qwen2.5-32b-instruct-q8_0-00009-of-00009.gguf": 3117079968
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-32b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 26886155104,
+          "est_ram_bytes": 32791735136,
+          "est_vram_bytes": 32657517408,
+          "artifact_id": "qwen2.5-32b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-32B-Instruct-GGUF",
+            "revision": "a15e3cc10f8bbb2c0af6f8f1f34a32e3b060c09d",
+            "files": [
+              "qwen2.5-32b-instruct-q6_k-00001-of-00007.gguf",
+              "qwen2.5-32b-instruct-q6_k-00002-of-00007.gguf",
+              "qwen2.5-32b-instruct-q6_k-00003-of-00007.gguf",
+              "qwen2.5-32b-instruct-q6_k-00004-of-00007.gguf",
+              "qwen2.5-32b-instruct-q6_k-00005-of-00007.gguf",
+              "qwen2.5-32b-instruct-q6_k-00006-of-00007.gguf",
+              "qwen2.5-32b-instruct-q6_k-00007-of-00007.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-32b-instruct-q6_k-00001-of-00007.gguf": "d006bf175a36163a82389634b94957f853a1cd6ab64a1ae824d5d3f2b804b970",
+              "qwen2.5-32b-instruct-q6_k-00002-of-00007.gguf": "1c5cd49fba4a3a3b5a3cd97eff44b98d6d4958e1963fb0d1dbb9cb6c1b8a5041",
+              "qwen2.5-32b-instruct-q6_k-00003-of-00007.gguf": "d88fbd46fa2af06262940657effecf2aacaf933a5dd30ab5a0390571d431cb54",
+              "qwen2.5-32b-instruct-q6_k-00004-of-00007.gguf": "2eeb70bb8c290afe5cea12aeb03555bab5aad31a2089ea20d6dd99001c2dc211",
+              "qwen2.5-32b-instruct-q6_k-00005-of-00007.gguf": "e7275e145e80ac23ba1cab483981267a75c4475615fce7443c185dc09c209254",
+              "qwen2.5-32b-instruct-q6_k-00006-of-00007.gguf": "c85a27c7fbcbfe628313552a35bad792e22eeaaf66e16ddc57459d03ac13b1a0",
+              "qwen2.5-32b-instruct-q6_k-00007-of-00007.gguf": "aa74275a5c47350d2173e01d61a164cf20dfac4c79852085cb82316225547fef"
+            },
+            "size_bytes": {
+              "qwen2.5-32b-instruct-q6_k-00001-of-00007.gguf": 3986912000,
+              "qwen2.5-32b-instruct-q6_k-00002-of-00007.gguf": 3978922688,
+              "qwen2.5-32b-instruct-q6_k-00003-of-00007.gguf": 3996162848,
+              "qwen2.5-32b-instruct-q6_k-00004-of-00007.gguf": 3884305120,
+              "qwen2.5-32b-instruct-q6_k-00005-of-00007.gguf": 3996146464,
+              "qwen2.5-32b-instruct-q6_k-00006-of-00007.gguf": 3978939104,
+              "qwen2.5-32b-instruct-q6_k-00007-of-00007.gguf": 3064766880
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-32b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 23262157568,
+          "est_ram_bytes": 29167737600,
+          "est_vram_bytes": 29033519872,
+          "artifact_id": "qwen2.5-32b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-32B-Instruct-GGUF",
+            "revision": "a15e3cc10f8bbb2c0af6f8f1f34a32e3b060c09d",
+            "files": [
+              "qwen2.5-32b-instruct-q5_k_m-00001-of-00006.gguf",
+              "qwen2.5-32b-instruct-q5_k_m-00002-of-00006.gguf",
+              "qwen2.5-32b-instruct-q5_k_m-00003-of-00006.gguf",
+              "qwen2.5-32b-instruct-q5_k_m-00004-of-00006.gguf",
+              "qwen2.5-32b-instruct-q5_k_m-00005-of-00006.gguf",
+              "qwen2.5-32b-instruct-q5_k_m-00006-of-00006.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-32b-instruct-q5_k_m-00001-of-00006.gguf": "3dd436249faeb97564bce5c8d1afecfcd613ac76b39b89b09c2c2afc30a61cee",
+              "qwen2.5-32b-instruct-q5_k_m-00002-of-00006.gguf": "794d6ba9c3ea904f7968c80d80a5b56c9cb127e6ded4ea4ff620de88776e5c0a",
+              "qwen2.5-32b-instruct-q5_k_m-00003-of-00006.gguf": "f25a3217100c226cb05aba31e314ad851382009451e0d105806c1be80b6da725",
+              "qwen2.5-32b-instruct-q5_k_m-00004-of-00006.gguf": "ad6495f3bb80717af8769efe92c250c93fe1307d15cef28e3222f8b8226816bb",
+              "qwen2.5-32b-instruct-q5_k_m-00005-of-00006.gguf": "3be0e3bebae1c398e8cd921f5e615f8dfe67dd7db162bf1a5bd469742247cc1d",
+              "qwen2.5-32b-instruct-q5_k_m-00006-of-00006.gguf": "824a4ddced41142f62f5e1cc5721946118355768bfaef4dd60ad77947df2730a"
+            },
+            "size_bytes": {
+              "qwen2.5-32b-instruct-q5_k_m-00001-of-00006.gguf": 3952703168,
+              "qwen2.5-32b-instruct-q5_k_m-00002-of-00006.gguf": 3960827616,
+              "qwen2.5-32b-instruct-q5_k_m-00003-of-00006.gguf": 3982458784,
+              "qwen2.5-32b-instruct-q5_k_m-00004-of-00006.gguf": 3982438240,
+              "qwen2.5-32b-instruct-q5_k_m-00005-of-00006.gguf": 3906789440,
+              "qwen2.5-32b-instruct-q5_k_m-00006-of-00006.gguf": 3476940320
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-32b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 19851336384,
+          "est_ram_bytes": 25756916416,
+          "est_vram_bytes": 25622698688,
+          "artifact_id": "qwen2.5-32b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-32B-Instruct-GGUF",
+            "revision": "a15e3cc10f8bbb2c0af6f8f1f34a32e3b060c09d",
+            "files": [
+              "qwen2.5-32b-instruct-q4_k_m-00001-of-00005.gguf",
+              "qwen2.5-32b-instruct-q4_k_m-00002-of-00005.gguf",
+              "qwen2.5-32b-instruct-q4_k_m-00003-of-00005.gguf",
+              "qwen2.5-32b-instruct-q4_k_m-00004-of-00005.gguf",
+              "qwen2.5-32b-instruct-q4_k_m-00005-of-00005.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-32b-instruct-q4_k_m-00001-of-00005.gguf": "403434e5c845452c013661d586b97d5a53cf207462d180a07c301eafa9390d05",
+              "qwen2.5-32b-instruct-q4_k_m-00002-of-00005.gguf": "7371e5c5d717a8c20f526dbfce5d3f201dc3f02140d1c836314cd0756e02e8d7",
+              "qwen2.5-32b-instruct-q4_k_m-00003-of-00005.gguf": "f023ccc294c3bd3b2eac5b2dd40dea3aa4ca1d06c7460ead67c36386cd62e8fc",
+              "qwen2.5-32b-instruct-q4_k_m-00004-of-00005.gguf": "05fe76d941454390cd7aa0de3b342f83a1d1226a959479af85bbfae7cd93e771",
+              "qwen2.5-32b-instruct-q4_k_m-00005-of-00005.gguf": "8c2e8ecc686129c37821bd9f3b3e251e6ae80deadd3d3348f7e3e84492a63c24"
+            },
+            "size_bytes": {
+              "qwen2.5-32b-instruct-q4_k_m-00001-of-00005.gguf": 3961498272,
+              "qwen2.5-32b-instruct-q4_k_m-00002-of-00005.gguf": 3948996064,
+              "qwen2.5-32b-instruct-q4_k_m-00003-of-00005.gguf": 3993478688,
+              "qwen2.5-32b-instruct-q4_k_m-00004-of-00005.gguf": 3950347744,
+              "qwen2.5-32b-instruct-q4_k_m-00005-of-00005.gguf": 3997015616
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-7b-instruct",
+      "family": "qwen2.5",
+      "display_name": "Qwen2.5 7B Instruct",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "multilingual",
+        "tool-use"
+      ],
+      "est_file_bytes": 4683073632,
+      "est_ram_bytes": 7367428192,
+      "est_vram_bytes": 7233210464,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5:7b",
+          "digest": "sha256:2f15b3218f0552c60647ce60ada83632d2c09755b16259b13e3e4458e9ae419d"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-7b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8098525408,
+          "est_ram_bytes": 10782879968,
+          "est_vram_bytes": 10648662240,
+          "artifact_id": "qwen2.5-7b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+            "revision": "bb5d59e06d9551d752d08b292a50eb208b07ab1f",
+            "files": [
+              "qwen2.5-7b-instruct-q8_0-00001-of-00003.gguf",
+              "qwen2.5-7b-instruct-q8_0-00002-of-00003.gguf",
+              "qwen2.5-7b-instruct-q8_0-00003-of-00003.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-7b-instruct-q8_0-00001-of-00003.gguf": "26e30cb4559f0d9e9e11f34d351292af6f42199ce3fa742b5e7c5af4bc35b0f0",
+              "qwen2.5-7b-instruct-q8_0-00002-of-00003.gguf": "e93856ce0cb05d5abd698eb439c0fea3acd412d9040f5ab7d2d4d088add5287d",
+              "qwen2.5-7b-instruct-q8_0-00003-of-00003.gguf": "8f29c0e4173d4d92d35c52a7c5807c34a3edfe6bb078ea785d145b7d88c16e44"
+            },
+            "size_bytes": {
+              "qwen2.5-7b-instruct-q8_0-00001-of-00003.gguf": 3980069248,
+              "qwen2.5-7b-instruct-q8_0-00002-of-00003.gguf": 3942935680,
+              "qwen2.5-7b-instruct-q8_0-00003-of-00003.gguf": 175520480
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-7b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6254198880,
+          "est_ram_bytes": 8938553440,
+          "est_vram_bytes": 8804335712,
+          "artifact_id": "qwen2.5-7b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+            "revision": "bb5d59e06d9551d752d08b292a50eb208b07ab1f",
+            "files": [
+              "qwen2.5-7b-instruct-q6_k-00001-of-00002.gguf",
+              "qwen2.5-7b-instruct-q6_k-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-7b-instruct-q6_k-00001-of-00002.gguf": "156c51f478e073210d2fd3923d0f5840e31b51745cc05f93a65cc416f1191e4f",
+              "qwen2.5-7b-instruct-q6_k-00002-of-00002.gguf": "8d1d3fbbe7a4238744d2cbf64fc54bae2ecd65017871de34bca47cb8598b6275"
+            },
+            "size_bytes": {
+              "qwen2.5-7b-instruct-q6_k-00001-of-00002.gguf": 3950642464,
+              "qwen2.5-7b-instruct-q6_k-00002-of-00002.gguf": 2303556416
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-7b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5444831360,
+          "est_ram_bytes": 8129185920,
+          "est_vram_bytes": 7994968192,
+          "artifact_id": "qwen2.5-7b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+            "revision": "bb5d59e06d9551d752d08b292a50eb208b07ab1f",
+            "files": [
+              "qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf",
+              "qwen2.5-7b-instruct-q5_k_m-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf": "42f6693004793ee6cf1b2b723f0273b10f86a3bb2a949bd9128d4cda5fb866cd",
+              "qwen2.5-7b-instruct-q5_k_m-00002-of-00002.gguf": "beba9d4f2f5a1fe7d144dcae332e68b52c26705c5310dece2e5d1997e091e134"
+            },
+            "size_bytes": {
+              "qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf": 3989841792,
+              "qwen2.5-7b-instruct-q5_k_m-00002-of-00002.gguf": 1454989568
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-7b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4683073632,
+          "est_ram_bytes": 7367428192,
+          "est_vram_bytes": 7233210464,
+          "artifact_id": "qwen2.5-7b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+            "revision": "bb5d59e06d9551d752d08b292a50eb208b07ab1f",
+            "files": [
+              "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf",
+              "qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf": "dfce12e3862a5283ccfb88221b48480e58745165de856439950d0f22590580db",
+              "qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf": "539cf93f78e887edea1c04e2d7d8cdaca9d01dae9c9025bcb8accbe29df3d72a"
+            },
+            "size_bytes": {
+              "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf": 3993201344,
+              "qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf": 689872288
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-1.5b-instruct",
+      "family": "qwen2.5-coder",
+      "display_name": "Qwen2.5-Coder 1.5B Instruct",
+      "parameter_size": "1.5B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "code-completion",
+        "low-resource"
+      ],
+      "est_file_bytes": 1117320768,
+      "est_ram_bytes": 2459498048,
+      "est_vram_bytes": 2325280320,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5-coder:1.5b",
+          "digest": "sha256:152cb442202b836b5415fe4397169982b74dc3bdbb06b9777a126e0161c740da"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-coder-1.5b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 1894532160,
+          "est_ram_bytes": 3236709440,
+          "est_vram_bytes": 3102491712,
+          "artifact_id": "qwen2.5-coder-1.5b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+            "revision": "f86cb2c1fa58255f8052cc32aeede1b7482d4361",
+            "files": [
+              "qwen2.5-coder-1.5b-instruct-q8_0.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-1.5b-instruct-q8_0.gguf": "507de59046601282ba768a9789900e6ccf60ed93ddf346730b7c68eb0715bc47"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-1.5b-instruct-q8_0.gguf": 1894532160
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-1.5b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 1464178752,
+          "est_ram_bytes": 2806356032,
+          "est_vram_bytes": 2672138304,
+          "artifact_id": "qwen2.5-coder-1.5b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+            "revision": "f86cb2c1fa58255f8052cc32aeede1b7482d4361",
+            "files": [
+              "qwen2.5-coder-1.5b-instruct-q6_k.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-1.5b-instruct-q6_k.gguf": "9b05dce8089197c866b9f76e1db45de8617cda98d9d06059958cb8ad32c56dfa"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-1.5b-instruct-q6_k.gguf": 1464178752
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-1.5b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 1285494336,
+          "est_ram_bytes": 2627671616,
+          "est_vram_bytes": 2493453888,
+          "artifact_id": "qwen2.5-coder-1.5b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+            "revision": "f86cb2c1fa58255f8052cc32aeede1b7482d4361",
+            "files": [
+              "qwen2.5-coder-1.5b-instruct-q5_k_m.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-1.5b-instruct-q5_k_m.gguf": "f15d02e8e51a5c6f9448b972819acfa66aee4d8bb7d881a8b8ba3d90da08ef09"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-1.5b-instruct-q5_k_m.gguf": 1285494336
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-1.5b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 1117320768,
+          "est_ram_bytes": 2459498048,
+          "est_vram_bytes": 2325280320,
+          "artifact_id": "qwen2.5-coder-1.5b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+            "revision": "f86cb2c1fa58255f8052cc32aeede1b7482d4361",
+            "files": [
+              "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf": "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf": 1117320768
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-14b-instruct",
+      "family": "qwen2.5-coder",
+      "display_name": "Qwen2.5-Coder 14B Instruct",
+      "parameter_size": "14B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "coding"
+      ],
+      "est_file_bytes": 8988110400,
+      "est_ram_bytes": 12880424512,
+      "est_vram_bytes": 12746206784,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5-coder:14b",
+          "digest": "sha256:0578f229f23ad620e123654fd0b4708405e7af3629ec1aecf3f553f54e06bc40"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-coder-14b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 15701597760,
+          "est_ram_bytes": 19593911872,
+          "est_vram_bytes": 19459694144,
+          "artifact_id": "qwen2.5-coder-14b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+            "revision": "d0a692ef765eefbf2fabb130b3cb2e8917e3d225",
+            "files": [
+              "qwen2.5-coder-14b-instruct-q8_0-00001-of-00002.gguf",
+              "qwen2.5-coder-14b-instruct-q8_0-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-14b-instruct-q8_0-00001-of-00002.gguf": "957ba4cf4cbdd5bc1c1c28f7cc7a939f71d1fe2707f1d18e35a028aaf1b7c6cd",
+              "qwen2.5-coder-14b-instruct-q8_0-00002-of-00002.gguf": "5ca3f878a3313f5ef72e7210dc9b03f1e4a4af791674d36f14e8256c8c52ee45"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-14b-instruct-q8_0-00001-of-00002.gguf": 8004181408,
+              "qwen2.5-coder-14b-instruct-q8_0-00002-of-00002.gguf": 7697416352
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-14b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 12124683840,
+          "est_ram_bytes": 16016997952,
+          "est_vram_bytes": 15882780224,
+          "artifact_id": "qwen2.5-coder-14b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+            "revision": "d0a692ef765eefbf2fabb130b3cb2e8917e3d225",
+            "files": [
+              "qwen2.5-coder-14b-instruct-q6_k-00001-of-00002.gguf",
+              "qwen2.5-coder-14b-instruct-q6_k-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-14b-instruct-q6_k-00001-of-00002.gguf": "a218084c9a4dae8598d9249bad44850cab122dd6f1903a8dffdf3f66002cbf9b",
+              "qwen2.5-coder-14b-instruct-q6_k-00002-of-00002.gguf": "9aaddc340eabfc31cac05508c1414bb4dbdba8c346605888d6dbc00ed455be8b"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-14b-instruct-q6_k-00001-of-00002.gguf": 7988339488,
+              "qwen2.5-coder-14b-instruct-q6_k-00002-of-00002.gguf": 4136344352
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-14b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 10508873280,
+          "est_ram_bytes": 14401187392,
+          "est_vram_bytes": 14266969664,
+          "artifact_id": "qwen2.5-coder-14b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+            "revision": "d0a692ef765eefbf2fabb130b3cb2e8917e3d225",
+            "files": [
+              "qwen2.5-coder-14b-instruct-q5_k_m-00001-of-00002.gguf",
+              "qwen2.5-coder-14b-instruct-q5_k_m-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-14b-instruct-q5_k_m-00001-of-00002.gguf": "330cf62999feff0972ebe91fb5cdaa174facae625d07a971cd19cf96bad91fb8",
+              "qwen2.5-coder-14b-instruct-q5_k_m-00002-of-00002.gguf": "593c385c768195edcdf079801459821777f706f325320ae4e9bcf388ff6c4935"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-14b-instruct-q5_k_m-00001-of-00002.gguf": 8003097408,
+              "qwen2.5-coder-14b-instruct-q5_k_m-00002-of-00002.gguf": 2505775872
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-14b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 8988110400,
+          "est_ram_bytes": 12880424512,
+          "est_vram_bytes": 12746206784,
+          "artifact_id": "qwen2.5-coder-14b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+            "revision": "d0a692ef765eefbf2fabb130b3cb2e8917e3d225",
+            "files": [
+              "qwen2.5-coder-14b-instruct-q4_k_m-00001-of-00002.gguf",
+              "qwen2.5-coder-14b-instruct-q4_k_m-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-14b-instruct-q4_k_m-00001-of-00002.gguf": "310a553a856d7b238c05ed1b0cb877c4dca5b65c2286324854a1397149a00af2",
+              "qwen2.5-coder-14b-instruct-q4_k_m-00002-of-00002.gguf": "7a52538b39090d99ce93b1b05a406b805427171f890dbef8684c57fb28b2d96a"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-14b-instruct-q4_k_m-00001-of-00002.gguf": 8000444480,
+              "qwen2.5-coder-14b-instruct-q4_k_m-00002-of-00002.gguf": 987665920
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-32b-instruct",
+      "family": "qwen2.5-coder",
+      "display_name": "Qwen2.5-Coder 32B Instruct",
+      "parameter_size": "32B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "coding",
+        "agentic"
+      ],
+      "est_file_bytes": 19851336128,
+      "est_ram_bytes": 25756916160,
+      "est_vram_bytes": 25622698432,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5-coder:32b",
+          "digest": "sha256:f0676bd3c336a0f995e270c5e2c80ce09aa5cfcab0c59ff574088eca52da32ee"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-coder-32b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 34820885152,
+          "est_ram_bytes": 40726465184,
+          "est_vram_bytes": 40592247456,
+          "artifact_id": "qwen2.5-coder-32b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-32B-Instruct-GGUF",
+            "revision": "9d3053fce650fe1cdbdb75998c2a87add9d178ef",
+            "files": [
+              "qwen2.5-coder-32b-instruct-q8_0-00001-of-00005.gguf",
+              "qwen2.5-coder-32b-instruct-q8_0-00002-of-00005.gguf",
+              "qwen2.5-coder-32b-instruct-q8_0-00003-of-00005.gguf",
+              "qwen2.5-coder-32b-instruct-q8_0-00004-of-00005.gguf",
+              "qwen2.5-coder-32b-instruct-q8_0-00005-of-00005.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-32b-instruct-q8_0-00001-of-00005.gguf": "00dcfb0da177f106142d38c076591909f58362d2b8b653183c9dab2e9a53080d",
+              "qwen2.5-coder-32b-instruct-q8_0-00002-of-00005.gguf": "4fa9fd8a9759f6ec261e9012b1d44b8cfd3667a5f5baa00d48d9be4e017db54e",
+              "qwen2.5-coder-32b-instruct-q8_0-00003-of-00005.gguf": "122317f46232eeb8b10e94806aedbf0206bf1f629c1c6c9b453c02b873e1d7ac",
+              "qwen2.5-coder-32b-instruct-q8_0-00004-of-00005.gguf": "044bb559123a5b31daa772018d319672273eca43582291d408be2e1f3ecbe719",
+              "qwen2.5-coder-32b-instruct-q8_0-00005-of-00005.gguf": "b6270642cd97f329a51f1356d658909b3652e71fbfa39b1462b1764740dbc9d4"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-32b-instruct-q8_0-00001-of-00005.gguf": 7869714432,
+              "qwen2.5-coder-32b-instruct-q8_0-00002-of-00005.gguf": 7989308160,
+              "qwen2.5-coder-32b-instruct-q8_0-00003-of-00005.gguf": 7922391296,
+              "qwen2.5-coder-32b-instruct-q8_0-00004-of-00005.gguf": 7922391296,
+              "qwen2.5-coder-32b-instruct-q8_0-00005-of-00005.gguf": 3117079968
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-32b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 26886154816,
+          "est_ram_bytes": 32791734848,
+          "est_vram_bytes": 32657517120,
+          "artifact_id": "qwen2.5-coder-32b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-32B-Instruct-GGUF",
+            "revision": "9d3053fce650fe1cdbdb75998c2a87add9d178ef",
+            "files": [
+              "qwen2.5-coder-32b-instruct-q6_k-00001-of-00004.gguf",
+              "qwen2.5-coder-32b-instruct-q6_k-00002-of-00004.gguf",
+              "qwen2.5-coder-32b-instruct-q6_k-00003-of-00004.gguf",
+              "qwen2.5-coder-32b-instruct-q6_k-00004-of-00004.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-32b-instruct-q6_k-00001-of-00004.gguf": "e00876cddc8dcf9edaac3e1648944beaba9b4b5b0367b84053a8cd6cc9859fd2",
+              "qwen2.5-coder-32b-instruct-q6_k-00002-of-00004.gguf": "6e512972b4769851cf1f936a744978de9843a5b3804c76ecf3ee80a5864ee3f8",
+              "qwen2.5-coder-32b-instruct-q6_k-00003-of-00004.gguf": "ce70310166851e06214783119cf8e2ad4c5fab9205ae6e726cde1f581fc092fc",
+              "qwen2.5-coder-32b-instruct-q6_k-00004-of-00004.gguf": "32f1a979e83c8b182af396da794bfb46549cf3a8880c9f7ebcd5a6e923e992d2"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-32b-instruct-q6_k-00001-of-00004.gguf": 7987359200,
+              "qwen2.5-coder-32b-instruct-q6_k-00002-of-00004.gguf": 7979369920,
+              "qwen2.5-coder-32b-instruct-q6_k-00003-of-00004.gguf": 7996593664,
+              "qwen2.5-coder-32b-instruct-q6_k-00004-of-00004.gguf": 2922832032
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-32b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 23262157216,
+          "est_ram_bytes": 29167737248,
+          "est_vram_bytes": 29033519520,
+          "artifact_id": "qwen2.5-coder-32b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-32B-Instruct-GGUF",
+            "revision": "9d3053fce650fe1cdbdb75998c2a87add9d178ef",
+            "files": [
+              "qwen2.5-coder-32b-instruct-q5_k_m-00001-of-00003.gguf",
+              "qwen2.5-coder-32b-instruct-q5_k_m-00002-of-00003.gguf",
+              "qwen2.5-coder-32b-instruct-q5_k_m-00003-of-00003.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-32b-instruct-q5_k_m-00001-of-00003.gguf": "3242bc92d648dc5b97fb23b65d2b3ef51014f91dad64f9e201dd8f62809a3c1d",
+              "qwen2.5-coder-32b-instruct-q5_k_m-00002-of-00003.gguf": "4ba5648f9ddd613071fe0d12ee3f61baf653ad4b4111b4283c778767dbe17ec1",
+              "qwen2.5-coder-32b-instruct-q5_k_m-00003-of-00003.gguf": "7e5eb19cb2b094fac7cc32ce546e95c721e48736a819cd5c1224c1538260ca67"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-32b-instruct-q5_k_m-00001-of-00003.gguf": 7913530688,
+              "qwen2.5-coder-32b-instruct-q5_k_m-00002-of-00003.gguf": 7964896896,
+              "qwen2.5-coder-32b-instruct-q5_k_m-00003-of-00003.gguf": 7383729632
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-32b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 19851336128,
+          "est_ram_bytes": 25756916160,
+          "est_vram_bytes": 25622698432,
+          "artifact_id": "qwen2.5-coder-32b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-32B-Instruct-GGUF",
+            "revision": "9d3053fce650fe1cdbdb75998c2a87add9d178ef",
+            "files": [
+              "qwen2.5-coder-32b-instruct-q4_k_m-00001-of-00003.gguf",
+              "qwen2.5-coder-32b-instruct-q4_k_m-00002-of-00003.gguf",
+              "qwen2.5-coder-32b-instruct-q4_k_m-00003-of-00003.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-32b-instruct-q4_k_m-00001-of-00003.gguf": "0a9145d25318b7584094e77044cc256bc9f1374c8f168a3812119242b456f69b",
+              "qwen2.5-coder-32b-instruct-q4_k_m-00002-of-00003.gguf": "de1e27aa436e0856582eed095418fd3db8538b0d5d6e71b6362208b3a7f6d16f",
+              "qwen2.5-coder-32b-instruct-q4_k_m-00003-of-00003.gguf": "4d893bec57ae6b2c898c0f2f0f9804a5d855dc7091255b76f3671cb8787919fe"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-32b-instruct-q4_k_m-00001-of-00003.gguf": 7990120512,
+              "qwen2.5-coder-32b-instruct-q4_k_m-00002-of-00003.gguf": 7943826304,
+              "qwen2.5-coder-32b-instruct-q4_k_m-00003-of-00003.gguf": 3917389312
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-7b-instruct",
+      "family": "qwen2.5-coder",
+      "display_name": "Qwen2.5-Coder 7B Instruct",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "coding",
+        "code-completion"
+      ],
+      "est_file_bytes": 4683073664,
+      "est_ram_bytes": 7367428224,
+      "est_vram_bytes": 7233210496,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5-coder:7b",
+          "digest": "sha256:d9bb33f2786931fea42f50936a2424818aa2f14500638af2f01861eb2c8fb446"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-coder-7b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8098525440,
+          "est_ram_bytes": 10782880000,
+          "est_vram_bytes": 10648662272,
+          "artifact_id": "qwen2.5-coder-7b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+            "revision": "13fb94bfda8c8cf22497dc57b78f391a9acb426a",
+            "files": [
+              "qwen2.5-coder-7b-instruct-q8_0-00001-of-00003.gguf",
+              "qwen2.5-coder-7b-instruct-q8_0-00002-of-00003.gguf",
+              "qwen2.5-coder-7b-instruct-q8_0-00003-of-00003.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-7b-instruct-q8_0-00001-of-00003.gguf": "e2fc5918a2b579d8e03a3752ad74dd191bc0f43204c90a29070f273f5283fee1",
+              "qwen2.5-coder-7b-instruct-q8_0-00002-of-00003.gguf": "912b7876d43dc19bbcf09368f4472f6cfea3458067a5bcaa660a68a9958276db",
+              "qwen2.5-coder-7b-instruct-q8_0-00003-of-00003.gguf": "478f6a6b37072eeda02a98a59b6ef0b1a9131c9eae9a1181b6077f5e255fa6b2"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-7b-instruct-q8_0-00001-of-00003.gguf": 3980069280,
+              "qwen2.5-coder-7b-instruct-q8_0-00002-of-00003.gguf": 3942935680,
+              "qwen2.5-coder-7b-instruct-q8_0-00003-of-00003.gguf": 175520480
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-7b-instruct-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6254198912,
+          "est_ram_bytes": 8938553472,
+          "est_vram_bytes": 8804335744,
+          "artifact_id": "qwen2.5-coder-7b-instruct-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+            "revision": "13fb94bfda8c8cf22497dc57b78f391a9acb426a",
+            "files": [
+              "qwen2.5-coder-7b-instruct-q6_k-00001-of-00002.gguf",
+              "qwen2.5-coder-7b-instruct-q6_k-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-7b-instruct-q6_k-00001-of-00002.gguf": "6b99ee26f4b1f887b25dbb45491ec158391ba7ba73dbc4c75ca9560d3da4493a",
+              "qwen2.5-coder-7b-instruct-q6_k-00002-of-00002.gguf": "5103917f06a316394b6766b69217c7af101dbb3c53f5a84a2a4c1747b53c5109"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-7b-instruct-q6_k-00001-of-00002.gguf": 3950642496,
+              "qwen2.5-coder-7b-instruct-q6_k-00002-of-00002.gguf": 2303556416
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-7b-instruct-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5444831360,
+          "est_ram_bytes": 8129185920,
+          "est_vram_bytes": 7994968192,
+          "artifact_id": "qwen2.5-coder-7b-instruct-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+            "revision": "13fb94bfda8c8cf22497dc57b78f391a9acb426a",
+            "files": [
+              "qwen2.5-coder-7b-instruct-q5_k_m-00001-of-00002.gguf",
+              "qwen2.5-coder-7b-instruct-q5_k_m-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-7b-instruct-q5_k_m-00001-of-00002.gguf": "c605613a68d9e02d22d411f6304134457352a4d1e4dfdcaf8f2f25203901c03f",
+              "qwen2.5-coder-7b-instruct-q5_k_m-00002-of-00002.gguf": "e268483babb39a48cb1380b5b43e2d7ec202ebac2775efcfbaac939d9218f6ff"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-7b-instruct-q5_k_m-00001-of-00002.gguf": 3989841792,
+              "qwen2.5-coder-7b-instruct-q5_k_m-00002-of-00002.gguf": 1454989568
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-coder-7b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4683073664,
+          "est_ram_bytes": 7367428224,
+          "est_vram_bytes": 7233210496,
+          "artifact_id": "qwen2.5-coder-7b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+            "revision": "13fb94bfda8c8cf22497dc57b78f391a9acb426a",
+            "files": [
+              "qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf",
+              "qwen2.5-coder-7b-instruct-q4_k_m-00002-of-00002.gguf"
+            ],
+            "sha256": {
+              "qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf": "89f120544682078148c5a86117de9af3a65c339111262f2d3ff01d80d48b14be",
+              "qwen2.5-coder-7b-instruct-q4_k_m-00002-of-00002.gguf": "0183b3c850cfa96c31082c3af0123115300d3f62798c4448fa8f57bd0eac05e0"
+            },
+            "size_bytes": {
+              "qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf": 3993201376,
+              "qwen2.5-coder-7b-instruct-q4_k_m-00002-of-00002.gguf": 689872288
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-vl-7b-instruct",
+      "family": "qwen2.5-vl",
+      "display_name": "Qwen2.5-VL 7B Instruct",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "vision",
+        "general-chat"
+      ],
+      "est_file_bytes": 4683072032,
+      "est_ram_bytes": 7367426592,
+      "est_vram_bytes": 7233208864,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct",
+      "sources": {
+        "ollama": {
+          "tag": "qwen2.5vl:7b",
+          "digest": "sha256:83b9da835d9f13632a97e550cc8fd02ff7f39b88a843f0a8923330890682977a"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen2.5-vl-7b-instruct-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8098523680,
+          "est_ram_bytes": 10782878240,
+          "est_vram_bytes": 10648660512,
+          "artifact_id": "qwen2.5-vl-7b-instruct-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+            "revision": "508edd0afaa66bb9e9f40587acc2184f02daf1f6",
+            "files": [
+              "Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Qwen2.5-VL-7B-Instruct-Q8_0.gguf": "e191b017a8406c60f59c3bd023964aa2dea83ae0ab89caa57ba3290b7379846c"
+            },
+            "size_bytes": {
+              "Qwen2.5-VL-7B-Instruct-Q8_0.gguf": 8098523680
+            }
+          }
+        },
+        {
+          "id": "qwen2.5-vl-7b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4683072032,
+          "est_ram_bytes": 7367426592,
+          "est_vram_bytes": 7233208864,
+          "artifact_id": "qwen2.5-vl-7b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+            "revision": "508edd0afaa66bb9e9f40587acc2184f02daf1f6",
+            "files": [
+              "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf": "9258bf05b12686d097ff3b6b18d968ab393649780aa2b3cd67fec43d50554392"
+            },
+            "size_bytes": {
+              "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf": 4683072032
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen3-14b",
+      "family": "qwen3",
+      "display_name": "Qwen3 14B",
+      "parameter_size": "14B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "reasoning"
+      ],
+      "est_file_bytes": 9001752960,
+      "est_ram_bytes": 12894067072,
+      "est_vram_bytes": 12759849344,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen3-14B-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen3:14b",
+          "digest": "sha256:78b3b822087d5199783c8203553a5a92ce5eb7b683a5a81003f8efea9b399d74"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen3-14b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 15698533728,
+          "est_ram_bytes": 19590847840,
+          "est_vram_bytes": 19456630112,
+          "artifact_id": "qwen3-14b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-14B-GGUF",
+            "revision": "530227a7d994db8eca5ab5ced2fb692b614357fd",
+            "files": [
+              "Qwen3-14B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Qwen3-14B-Q8_0.gguf": "a0dfe649137410b7d82f06a209240508e218f32f5b6fd81b69d6932160cfcd9d"
+            },
+            "size_bytes": {
+              "Qwen3-14B-Q8_0.gguf": 15698533728
+            }
+          }
+        },
+        {
+          "id": "qwen3-14b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 12121937248,
+          "est_ram_bytes": 16014251360,
+          "est_vram_bytes": 15880033632,
+          "artifact_id": "qwen3-14b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-14B-GGUF",
+            "revision": "530227a7d994db8eca5ab5ced2fb692b614357fd",
+            "files": [
+              "Qwen3-14B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Qwen3-14B-Q6_K.gguf": "ec1f1d1421d7636a23e17645cac6fda39ee4b5f1f11e42eb09238089705ef699"
+            },
+            "size_bytes": {
+              "Qwen3-14B-Q6_K.gguf": 12121937248
+            }
+          }
+        },
+        {
+          "id": "qwen3-14b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 10514569568,
+          "est_ram_bytes": 14406883680,
+          "est_vram_bytes": 14272665952,
+          "artifact_id": "qwen3-14b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-14B-GGUF",
+            "revision": "530227a7d994db8eca5ab5ced2fb692b614357fd",
+            "files": [
+              "Qwen3-14B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-14B-Q5_K_M.gguf": "e7c9aba1129ca2936be9eca01419d9f86af40e08caa01230d5574b34d08e3e31"
+            },
+            "size_bytes": {
+              "Qwen3-14B-Q5_K_M.gguf": 10514569568
+            }
+          }
+        },
+        {
+          "id": "qwen3-14b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 9001752960,
+          "est_ram_bytes": 12894067072,
+          "est_vram_bytes": 12759849344,
+          "artifact_id": "qwen3-14b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-14B-GGUF",
+            "revision": "530227a7d994db8eca5ab5ced2fb692b614357fd",
+            "files": [
+              "Qwen3-14B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-14B-Q4_K_M.gguf": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0"
+            },
+            "size_bytes": {
+              "Qwen3-14B-Q4_K_M.gguf": 9001752960
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen3-30b-a3b",
+      "family": "qwen3",
+      "display_name": "Qwen3 30B-A3B (MoE)",
+      "parameter_size": "30B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "reasoning"
+      ],
+      "est_file_bytes": 18556685824,
+      "est_ram_bytes": 24462265856,
+      "est_vram_bytes": 24328048128,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen3-30B-A3B-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen3:30b",
+          "digest": "sha256:3cdc64c2b371af88ae18b4cdac63d1097f76a8f6fd23d785aaaaa02c59450d61"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen3-30b-a3b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 32483931648,
+          "est_ram_bytes": 38389511680,
+          "est_vram_bytes": 38255293952,
+          "artifact_id": "qwen3-30b-a3b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-30B-A3B-GGUF",
+            "revision": "e4d4bafdfb96a411a163846265362aceb0b9c63a",
+            "files": [
+              "Qwen3-30B-A3B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Qwen3-30B-A3B-Q8_0.gguf": "4ad960d180b16f56024f5b704697e5dd5b0837167c2e515ef0569abfc599743c"
+            },
+            "size_bytes": {
+              "Qwen3-30B-A3B-Q8_0.gguf": 32483931648
+            }
+          }
+        },
+        {
+          "id": "qwen3-30b-a3b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 25092531712,
+          "est_ram_bytes": 30998111744,
+          "est_vram_bytes": 30863894016,
+          "artifact_id": "qwen3-30b-a3b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-30B-A3B-GGUF",
+            "revision": "e4d4bafdfb96a411a163846265362aceb0b9c63a",
+            "files": [
+              "Qwen3-30B-A3B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Qwen3-30B-A3B-Q6_K.gguf": "0c1754eaf4514d9cb6aaf1a6a2c15cd496d56b8413843b2ea9328f215a5eb8ff"
+            },
+            "size_bytes": {
+              "Qwen3-30B-A3B-Q6_K.gguf": 25092531712
+            }
+          }
+        },
+        {
+          "id": "qwen3-30b-a3b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 21725580800,
+          "est_ram_bytes": 27631160832,
+          "est_vram_bytes": 27496943104,
+          "artifact_id": "qwen3-30b-a3b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-30B-A3B-GGUF",
+            "revision": "e4d4bafdfb96a411a163846265362aceb0b9c63a",
+            "files": [
+              "Qwen3-30B-A3B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-30B-A3B-Q5_K_M.gguf": "e6db7da56bdb19ba30541c73628f15e8f1f45be1b1f96df4383e03fec375e43a"
+            },
+            "size_bytes": {
+              "Qwen3-30B-A3B-Q5_K_M.gguf": 21725580800
+            }
+          }
+        },
+        {
+          "id": "qwen3-30b-a3b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 18556685824,
+          "est_ram_bytes": 24462265856,
+          "est_vram_bytes": 24328048128,
+          "artifact_id": "qwen3-30b-a3b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-30B-A3B-GGUF",
+            "revision": "e4d4bafdfb96a411a163846265362aceb0b9c63a",
+            "files": [
+              "Qwen3-30B-A3B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-30B-A3B-Q4_K_M.gguf": "0d003f6662faee786ed5da3e31b29c978de5ae5d275c8794c606a7f3c01aa8f5"
+            },
+            "size_bytes": {
+              "Qwen3-30B-A3B-Q4_K_M.gguf": 18556685824
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen3-32b",
+      "family": "qwen3",
+      "display_name": "Qwen3 32B",
+      "parameter_size": "32B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "reasoning",
+        "general-chat"
+      ],
+      "est_file_bytes": 19762149024,
+      "est_ram_bytes": 25667729056,
+      "est_vram_bytes": 25533511328,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen3-32B-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen3:32b",
+          "digest": "sha256:afdf5c7585b363536f93782f1e44f1b81db4237847cd8b4bd2c5c33b0d76c94b"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen3-32b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 34817718912,
+          "est_ram_bytes": 40723298944,
+          "est_vram_bytes": 40589081216,
+          "artifact_id": "qwen3-32b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-32B-GGUF",
+            "revision": "938a7432affaec9157f883a87164e2646ae17555",
+            "files": [
+              "Qwen3-32B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Qwen3-32B-Q8_0.gguf": "2c50eb8aad05047dbf24fa014eb621adf552e14176cabe0c5db4ef38c91e2169"
+            },
+            "size_bytes": {
+              "Qwen3-32B-Q8_0.gguf": 34817718912
+            }
+          }
+        },
+        {
+          "id": "qwen3-32b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 26883306112,
+          "est_ram_bytes": 32788886144,
+          "est_vram_bytes": 32654668416,
+          "artifact_id": "qwen3-32b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-32B-GGUF",
+            "revision": "938a7432affaec9157f883a87164e2646ae17555",
+            "files": [
+              "Qwen3-32B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Qwen3-32B-Q6_K.gguf": "c4c7c3cb6da260df1fe1d3cfd090a32dc7cc348f1278158be18e301f390d6f6e"
+            },
+            "size_bytes": {
+              "Qwen3-32B-Q6_K.gguf": 26883306112
+            }
+          }
+        },
+        {
+          "id": "qwen3-32b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 23214831232,
+          "est_ram_bytes": 29120411264,
+          "est_vram_bytes": 28986193536,
+          "artifact_id": "qwen3-32b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-32B-GGUF",
+            "revision": "938a7432affaec9157f883a87164e2646ae17555",
+            "files": [
+              "Qwen3-32B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-32B-Q5_K_M.gguf": "82ec20068a0cc9388ffc93eb968015b0941931d0ff65a216baba5b4824d2a966"
+            },
+            "size_bytes": {
+              "Qwen3-32B-Q5_K_M.gguf": 23214831232
+            }
+          }
+        },
+        {
+          "id": "qwen3-32b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 19762149024,
+          "est_ram_bytes": 25667729056,
+          "est_vram_bytes": 25533511328,
+          "artifact_id": "qwen3-32b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-32B-GGUF",
+            "revision": "938a7432affaec9157f883a87164e2646ae17555",
+            "files": [
+              "Qwen3-32B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-32B-Q4_K_M.gguf": "efd971561896866f0e910cce52761ca77b1b138090c7f15fe284676d57d1f689"
+            },
+            "size_bytes": {
+              "Qwen3-32B-Q4_K_M.gguf": 19762149024
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen3-4b",
+      "family": "qwen3",
+      "display_name": "Qwen3 4B",
+      "parameter_size": "4B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "reasoning",
+        "low-resource"
+      ],
+      "est_file_bytes": 2497280256,
+      "est_ram_bytes": 4107892992,
+      "est_vram_bytes": 3973675264,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen3-4B-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen3:4b",
+          "digest": "sha256:e18a783aae5525fd2852fc94c985541a77e791e034abc2d3056474d59de336fc"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen3-4b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 4280404704,
+          "est_ram_bytes": 5891017440,
+          "est_vram_bytes": 5756799712,
+          "artifact_id": "qwen3-4b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-4B-GGUF",
+            "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+            "files": [
+              "Qwen3-4B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Qwen3-4B-Q8_0.gguf": "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300"
+            },
+            "size_bytes": {
+              "Qwen3-4B-Q8_0.gguf": 4280404704
+            }
+          }
+        },
+        {
+          "id": "qwen3-4b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 3306260704,
+          "est_ram_bytes": 4916873440,
+          "est_vram_bytes": 4782655712,
+          "artifact_id": "qwen3-4b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-4B-GGUF",
+            "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+            "files": [
+              "Qwen3-4B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Qwen3-4B-Q6_K.gguf": "8a08533841623c2a689763b9318d8e27b3e052ad5b38015d4be4c04fa96f68a3"
+            },
+            "size_bytes": {
+              "Qwen3-4B-Q6_K.gguf": 3306260704
+            }
+          }
+        },
+        {
+          "id": "qwen3-4b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 2889513184,
+          "est_ram_bytes": 4500125920,
+          "est_vram_bytes": 4365908192,
+          "artifact_id": "qwen3-4b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-4B-GGUF",
+            "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+            "files": [
+              "Qwen3-4B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-4B-Q5_K_M.gguf": "aca596860e8cb40af6539e3f2ea40df305f42515deac56d49c08d39a02e6533f"
+            },
+            "size_bytes": {
+              "Qwen3-4B-Q5_K_M.gguf": 2889513184
+            }
+          }
+        },
+        {
+          "id": "qwen3-4b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 2497280256,
+          "est_ram_bytes": 4107892992,
+          "est_vram_bytes": 3973675264,
+          "artifact_id": "qwen3-4b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-4B-GGUF",
+            "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+            "files": [
+              "Qwen3-4B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-4B-Q4_K_M.gguf": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5"
+            },
+            "size_bytes": {
+              "Qwen3-4B-Q4_K_M.gguf": 2497280256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwen3-8b",
+      "family": "qwen3",
+      "display_name": "Qwen3 8B",
+      "parameter_size": "8B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "general-chat",
+        "reasoning",
+        "tool-use"
+      ],
+      "est_file_bytes": 5027783488,
+      "est_ram_bytes": 7712138048,
+      "est_vram_bytes": 7577920320,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/Qwen3-8B-GGUF",
+      "sources": {
+        "ollama": {
+          "tag": "qwen3:8b",
+          "digest": "sha256:05a61d37b08453e59290add468e3bb2f688e23a01e967fecb0e2fa41218cea76"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwen3-8b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 8709518112,
+          "est_ram_bytes": 11393872672,
+          "est_vram_bytes": 11259654944,
+          "artifact_id": "qwen3-8b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-8B-GGUF",
+            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+            "files": [
+              "Qwen3-8B-Q8_0.gguf"
+            ],
+            "sha256": {
+              "Qwen3-8B-Q8_0.gguf": "408b955510e196121c1c375201744783b5c9a43c7956d73fc78df54c66e883d6"
+            },
+            "size_bytes": {
+              "Qwen3-8B-Q8_0.gguf": 8709518112
+            }
+          }
+        },
+        {
+          "id": "qwen3-8b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 6725899040,
+          "est_ram_bytes": 9410253600,
+          "est_vram_bytes": 9276035872,
+          "artifact_id": "qwen3-8b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-8B-GGUF",
+            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+            "files": [
+              "Qwen3-8B-Q6_K.gguf"
+            ],
+            "sha256": {
+              "Qwen3-8B-Q6_K.gguf": "cb042ccd76795a8830d6be6bd4165245847cc68e41797b13bd61aed4c2cfbce6"
+            },
+            "size_bytes": {
+              "Qwen3-8B-Q6_K.gguf": 6725899040
+            }
+          }
+        },
+        {
+          "id": "qwen3-8b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5851112224,
+          "est_ram_bytes": 8535466784,
+          "est_vram_bytes": 8401249056,
+          "artifact_id": "qwen3-8b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-8B-GGUF",
+            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+            "files": [
+              "Qwen3-8B-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-8B-Q5_K_M.gguf": "068bae163faa96ad48032daf4e071a6a28fe67d8dcc95367609c2ff165e52738"
+            },
+            "size_bytes": {
+              "Qwen3-8B-Q5_K_M.gguf": 5851112224
+            }
+          }
+        },
+        {
+          "id": "qwen3-8b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 5027783488,
+          "est_ram_bytes": 7712138048,
+          "est_vram_bytes": 7577920320,
+          "artifact_id": "qwen3-8b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/Qwen3-8B-GGUF",
+            "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+            "files": [
+              "Qwen3-8B-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "Qwen3-8B-Q4_K_M.gguf": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785"
+            },
+            "size_bytes": {
+              "Qwen3-8B-Q4_K_M.gguf": 5027783488
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "qwq-32b",
+      "family": "qwq",
+      "display_name": "QwQ 32B",
+      "parameter_size": "32B",
+      "quantization": "Q4_K_M",
+      "context_window": 32768,
+      "license": "apache-2.0",
+      "best_at": [
+        "reasoning",
+        "math"
+      ],
+      "est_file_bytes": 19851335840,
+      "est_ram_bytes": 25756915872,
+      "est_vram_bytes": 25622698144,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/Qwen/QwQ-32B",
+      "sources": {
+        "ollama": {
+          "tag": "qwq",
+          "digest": "sha256:1972e9972e2ee42bac42b9aa761087ca5c010de49ceda2b2829dd3de2419d858"
+        }
+      },
+      "variants": [
+        {
+          "id": "qwq-32b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 34820884640,
+          "est_ram_bytes": 40726464672,
+          "est_vram_bytes": 40592246944,
+          "artifact_id": "qwq-32b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/QwQ-32B-GGUF",
+            "revision": "8728e66249190b78dee8404869827328527f6b3b",
+            "files": [
+              "qwq-32b-q8_0.gguf"
+            ],
+            "sha256": {
+              "qwq-32b-q8_0.gguf": "eb98ac969a968629efbbfe43ca7f1a511cf5c08f71d2e559ce0c1e0e4270e3df"
+            },
+            "size_bytes": {
+              "qwq-32b-q8_0.gguf": 34820884640
+            }
+          }
+        },
+        {
+          "id": "qwq-32b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 26886154400,
+          "est_ram_bytes": 32791734432,
+          "est_vram_bytes": 32657516704,
+          "artifact_id": "qwq-32b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/QwQ-32B-GGUF",
+            "revision": "8728e66249190b78dee8404869827328527f6b3b",
+            "files": [
+              "qwq-32b-q6_k.gguf"
+            ],
+            "sha256": {
+              "qwq-32b-q6_k.gguf": "60306e3b4ca2aa39a034aac10e40a6b1ef205e5cdf6c9fbf521d7990390b4b45"
+            },
+            "size_bytes": {
+              "qwq-32b-q6_k.gguf": 26886154400
+            }
+          }
+        },
+        {
+          "id": "qwq-32b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 23262156960,
+          "est_ram_bytes": 29167736992,
+          "est_vram_bytes": 29033519264,
+          "artifact_id": "qwq-32b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/QwQ-32B-GGUF",
+            "revision": "8728e66249190b78dee8404869827328527f6b3b",
+            "files": [
+              "qwq-32b-q5_k_m.gguf"
+            ],
+            "sha256": {
+              "qwq-32b-q5_k_m.gguf": "de6f65f9d8009fad80fb3b8ecbc7cc3383f32272ded2d77b1d7e9166debf519e"
+            },
+            "size_bytes": {
+              "qwq-32b-q5_k_m.gguf": 23262156960
+            }
+          }
+        },
+        {
+          "id": "qwq-32b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 19851335840,
+          "est_ram_bytes": 25756915872,
+          "est_vram_bytes": 25622698144,
+          "artifact_id": "qwq-32b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "Qwen/QwQ-32B-GGUF",
+            "revision": "8728e66249190b78dee8404869827328527f6b3b",
+            "files": [
+              "qwq-32b-q4_k_m.gguf"
+            ],
+            "sha256": {
+              "qwq-32b-q4_k_m.gguf": "524a6c9b91ec47b0b1279f6e06884111c74e822c56c919cfd7769227abed93cd"
+            },
+            "size_bytes": {
+              "qwq-32b-q4_k_m.gguf": 19851335840
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "smollm2-1.7b-instruct",
+      "family": "smollm2",
+      "display_name": "SmolLM2 1.7B Instruct",
+      "parameter_size": "1.7B",
+      "quantization": "Q4_K_M",
+      "context_window": 8192,
+      "license": "apache-2.0",
+      "best_at": [
+        "low-resource",
+        "drafting"
+      ],
+      "est_file_bytes": 1055609536,
+      "est_ram_bytes": 2397786816,
+      "est_vram_bytes": 2263569088,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "sources": {
+        "ollama": {
+          "tag": "smollm2:1.7b",
+          "digest": "sha256:6c6b9193c4172ace7fee7ae8c669b581b15e7c0b676ba012915dfc3c58a0fe52"
+        }
+      },
+      "variants": [
+        {
+          "id": "smollm2-1.7b-instruct-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 1055609536,
+          "est_ram_bytes": 2397786816,
+          "est_vram_bytes": 2263569088,
+          "artifact_id": "smollm2-1.7b-instruct-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF",
+            "revision": "2d4a76a30b4af41ecd395c35725ac11688d4cfe4",
+            "files": [
+              "smollm2-1.7b-instruct-q4_k_m.gguf"
+            ],
+            "sha256": {
+              "smollm2-1.7b-instruct-q4_k_m.gguf": "decd2598bc2c8ed08c19adc3c8fdd461ee19ed5708679d1c54ef54a5a30d4f33"
+            },
+            "size_bytes": {
+              "smollm2-1.7b-instruct-q4_k_m.gguf": 1055609536
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "starcoder2-7b",
+      "family": "starcoder2",
+      "display_name": "StarCoder2 7B",
+      "parameter_size": "7B",
+      "quantization": "Q4_K_M",
+      "context_window": 16384,
+      "license": "openrail-m",
+      "best_at": [
+        "code-completion"
+      ],
+      "est_file_bytes": 4402887488,
+      "est_ram_bytes": 7087242048,
+      "est_vram_bytes": 6953024320,
+      "last_verified": "2026-08-08",
+      "source": "https://huggingface.co/bigcode/starcoder2-7b",
+      "sources": {
+        "ollama": {
+          "tag": "starcoder2:7b",
+          "digest": "sha256:2ac306bb56587fb3cf66da7510c8c20d4dbb7b3396e497f4ba79d5a195e87913"
+        }
+      },
+      "variants": [
+        {
+          "id": "starcoder2-7b-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 7628929856,
+          "est_ram_bytes": 10313284416,
+          "est_vram_bytes": 10179066688,
+          "artifact_id": "starcoder2-7b-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "second-state/StarCoder2-7B-GGUF",
+            "revision": "b5a3389fafb6c1686d221d4400ee3be5a702bcde",
+            "files": [
+              "starcoder2-7b-Q8_0.gguf"
+            ],
+            "sha256": {
+              "starcoder2-7b-Q8_0.gguf": "48b4842e14dc891e2abd7165ad36297cb45b702db0f98325f83fb0a94fd68dd8"
+            },
+            "size_bytes": {
+              "starcoder2-7b-Q8_0.gguf": 7628929856
+            }
+          }
+        },
+        {
+          "id": "starcoder2-7b-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 5891898176,
+          "est_ram_bytes": 8576252736,
+          "est_vram_bytes": 8442035008,
+          "artifact_id": "starcoder2-7b-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "second-state/StarCoder2-7B-GGUF",
+            "revision": "b5a3389fafb6c1686d221d4400ee3be5a702bcde",
+            "files": [
+              "starcoder2-7b-Q6_K.gguf"
+            ],
+            "sha256": {
+              "starcoder2-7b-Q6_K.gguf": "73836e765b166d41038c1535174425c1be288310d9ad27fd8180f0f94b846e44"
+            },
+            "size_bytes": {
+              "starcoder2-7b-Q6_K.gguf": 5891898176
+            }
+          }
+        },
+        {
+          "id": "starcoder2-7b-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 5124832064,
+          "est_ram_bytes": 7809186624,
+          "est_vram_bytes": 7674968896,
+          "artifact_id": "starcoder2-7b-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "second-state/StarCoder2-7B-GGUF",
+            "revision": "b5a3389fafb6c1686d221d4400ee3be5a702bcde",
+            "files": [
+              "starcoder2-7b-Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "starcoder2-7b-Q5_K_M.gguf": "d385b900e824be5d24b7fda98b898c2bcac07e008f3cb8ac49a0d0883ae3a747"
+            },
+            "size_bytes": {
+              "starcoder2-7b-Q5_K_M.gguf": 5124832064
+            }
+          }
+        },
+        {
+          "id": "starcoder2-7b-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 4402887488,
+          "est_ram_bytes": 7087242048,
+          "est_vram_bytes": 6953024320,
+          "artifact_id": "starcoder2-7b-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "second-state/StarCoder2-7B-GGUF",
+            "revision": "b5a3389fafb6c1686d221d4400ee3be5a702bcde",
+            "files": [
+              "starcoder2-7b-Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "starcoder2-7b-Q4_K_M.gguf": "d6d6e50fa0c240bb5ea13bae6c06e7d3dbb689b0edc55b3610c867c44d9baa7b"
+            },
+            "size_bytes": {
+              "starcoder2-7b-Q4_K_M.gguf": 4402887488
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

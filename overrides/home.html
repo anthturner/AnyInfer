@@ -1,0 +1,80 @@
+{#-
+  Landing page template for docs/index.md (template: home.html in front matter).
+  Extends mkdocs-material's main.html and replaces the content block with a full-width
+  hero + feature grid + code teaser, followed by the page's own Markdown content
+  (Install / What AnyInfer gives you / Next steps) rendered normally.
+  Based on mkdocs-material 9.7.7 — re-sync the surrounding structure on Material pin bumps.
+-#}
+{% extends "main.html" %}
+
+{% block content %}
+<div class="anyinfer-home">
+  <section class="anyinfer-hero">
+    <div class="anyinfer-hero__wordmark">
+      <img src="{{ 'assets/anyinfer-horizontal-light.svg' | url }}#only-light" alt="AnyInfer" width="440" decoding="async">
+      <img src="{{ 'assets/anyinfer-horizontal-dark.svg' | url }}#only-dark" alt="AnyInfer" width="440" decoding="async">
+    </div>
+    <p class="anyinfer-hero__tagline">
+      Application-owned hybrid inference, from hosted APIs to a supervised local model.
+    </p>
+    <div class="anyinfer-hero__ctas">
+      <a href="{{ 'guides/quickstart/' | url }}" class="anyinfer-button anyinfer-button-primary">Quickstart</a>
+      <a href="{{ 'guides/installation/' | url }}" class="anyinfer-button anyinfer-button-secondary">Installation</a>
+      <a href="{{ 'downloads/' | url }}" class="anyinfer-button anyinfer-button-secondary">Downloads</a>
+    </div>
+
+    <div class="anyinfer-hero__diagram" aria-hidden="true">
+      <span class="anyinfer-hero__diagram-node">approved context</span>
+      <span class="anyinfer-hero__diagram-arrow">&rarr;</span>
+      <span class="anyinfer-hero__diagram-node">budget + route</span>
+      <span class="anyinfer-hero__diagram-arrow">&rarr;</span>
+      <span class="anyinfer-hero__diagram-node">cloud or local</span>
+    </div>
+  </section>
+
+  <section class="anyinfer-feature-grid">
+    <a class="anyinfer-card" href="{{ 'concepts/events/' | url }}">
+      <h3>{% include ".icons/material/lightning-bolt-outline.svg" %} Typed events</h3>
+      <p>A generation is an ordered stream of typed events; non-streaming is just the
+      drained stream.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'concepts/routing/' | url }}">
+      <h3>{% include ".icons/material/routes.svg" %} Routing &amp; fallback</h3>
+      <p>Deterministic retries, failure-specific fallback chains, and health gating —
+      fully traceable after the fact.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'concepts/local/' | url }}">
+      <h3>{% include ".icons/material/desktop-tower.svg" %} Local inference</h3>
+      <p>Hardware detection, tuning, verified downloads, and supervised llama-server —
+      one target string.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'concepts/structured-output/' | url }}">
+      <h3>{% include ".icons/material/code-json.svg" %} Structured output</h3>
+      <p>A schema is a contract: strongest native mechanism, always client-side
+      validated, optional bounded repair.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'concepts/budgeting/' | url }}">
+      <h3>{% include ".icons/material/scale-balance.svg" %} Context budgets</h3>
+      <p>Estimate fit and cost before dispatch, then reduce approved context with an
+      explicit record of what was omitted.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'concepts/telemetry/' | url }}">
+      <h3>{% include ".icons/material/chart-line.svg" %} Observability</h3>
+      <p>Typed in-process telemetry, payload-free by default, with a lazy OpenTelemetry
+      bridge.</p>
+    </a>
+  </section>
+
+  <article class="md-typeset anyinfer-home__body">
+    {% include "partials/content.html" %}
+  </article>
+
+  <section class="anyinfer-home__footer">
+    {% if config.extra.anyinfer_version %}
+      <span class="anyinfer-badge">v{{ config.extra.anyinfer_version }}</span>
+    {% endif %}
+    <span class="anyinfer-badge">Python 3.11+</span>
+    <a href="{{ 'reference/conformance-matrix/' | url }}">Conformance matrix &rarr;</a>
+  </section>
+</div>
+{% endblock %}

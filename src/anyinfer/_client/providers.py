@@ -1,0 +1,278 @@
+"""Provider configuration and lazily-instantiated adapter management.
+
+Adapters are built on first use and cached for the client's lifetime: connection pools and
+supervised local servers are expensive to create and must outlive a single request.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
+from typing import Any, Literal
+
+from ..credentials import ResolverChain, default_resolver
+from ..errors import ConfigError
+from ..events.telemetry import TelemetryEvent
+from ..local.server import is_loopback
+from ..providers.base import ProviderAdapter, ProviderConfig
+from ..registry import ProviderDescriptor, ProviderRegistry, normalize_provider_id
+
+__all__ = ["AdapterPool", "ProviderSettings"]
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderSettings:
+    """How one provider instance should be configured on a client.
+
+    A client may hold several instances of the same underlying engine — two Azure
+    tenants, a local and a remote Ollama — by giving each one an `alias`. The alias is
+    the instance's identity everywhere else: it is what a ``alias:model`` target names,
+    what `AdapterPool` keys its adapters by, and what telemetry reports.
+
+    Attributes:
+        provider_id: Registered provider id or alias, e.g. ``"openai"`` or ``"claude"``.
+            This selects the *engine* — which adapter is built and how it talks.
+        alias: Instance id, when this is one of several instances of ``provider_id``.
+            Defaults to ``provider_id`` itself, which is the single-instance case.
+        base_url: Endpoint override. Optional for providers with a default; required for
+            ones that have none (``openai-compat``, ``azure-foundry``).
+        api_key: Credential for the provider. Accepts a *reference*
+            (``"env://OPENAI_API_KEY"``, ``"credential://system/openai"``) as well as a
+            literal; it is resolved once, when the adapter is first built, and registered
+            for redaction at that point.
+        api_version: Version pin for providers that take one (Azure, Anthropic).
+        headers: Extra headers merged into every request.
+        options: Provider-specific settings, per the provider's documented
+            `ProviderSetupSpec` fields.
+        timeout_s: Default per-request timeout for this provider.
+        transport: Test seam — an ``httpx2`` transport that intercepts this provider's
+            traffic (used by the fake-server and cassette modes).
+    """
+
+    provider_id: str
+    base_url: str | None = None
+    api_key: str | None = None
+    api_version: str | None = None
+    headers: Mapping[str, str] = field(default_factory=dict)
+    options: Mapping[str, Any] = field(default_factory=dict)
+    timeout_s: float = 120.0
+    transport: Any | None = None
+    alias: str | None = None
+
+    @property
+    def instance_id(self) -> str:
+        """This instance's identity: the alias when set, else the provider id."""
+        return normalize_provider_id(self.alias or self.provider_id)
+
+    @classmethod
+    def of(cls, provider_id: str, **kwargs: Any) -> ProviderSettings:
+        """Build settings for a provider id, normalizing the id and any alias."""
+        alias = kwargs.pop("alias", None)
+        return cls(
+            provider_id=normalize_provider_id(provider_id),
+            alias=normalize_provider_id(alias) if alias else None,
+            **kwargs,
+        )
+
+
+class AdapterPool:
+    """Owns adapter instances and their lifecycles for one client.
+
+    Adapters are keyed by **instance id** rather than by engine, so two settings entries
+    naming the same ``provider_id`` under different aliases get two independent adapters
+    with their own credentials, endpoints, and connection pools.
+    """
+
+    def __init__(
+        self,
+        settings: list[ProviderSettings],
+        *,
+        registry: ProviderRegistry,
+        resolver: ResolverChain | None = None,
+        events: Callable[[TelemetryEvent], None] | None = None,
+    ) -> None:
+        self._registry = registry
+        self._resolver = resolver or default_resolver()
+        self._events = events
+        self._settings: dict[str, ProviderSettings] = {}
+        self._order: list[str] = []
+        for setting in settings:
+            instance_id = setting.instance_id
+            if instance_id in self._settings:
+                raise ConfigError(
+                    f"provider instance {instance_id!r} is configured twice",
+                    provider=instance_id,
+                    hint=(
+                        "give each instance a distinct alias, e.g. "
+                        "ProviderSettings.of('azure-foundry', alias='work-azure', ...)"
+                    ),
+                )
+            self._settings[instance_id] = setting
+            self._order.append(instance_id)
+            self._register_alias(setting)
+        self._adapters: dict[str, ProviderAdapter] = {}
+        self._lock = asyncio.Lock()
+
+    def _register_alias(self, settings: ProviderSettings) -> None:
+        """Make ``alias:model`` resolvable by deriving a descriptor for the instance.
+
+        Target resolution runs against the registry, so an aliased instance only becomes
+        addressable once the registry knows its id. The derived descriptor is the engine's
+        own, re-labelled: same factory, same setup spec, same capabilities — only the
+        identity differs, which is exactly what an instance *is*.
+        """
+        instance_id = settings.instance_id
+        engine_id = normalize_provider_id(settings.provider_id)
+        if instance_id == engine_id:
+            return
+        base = self._registry.get(engine_id)
+        if self._registry.has(instance_id):
+            # Replacing a *previously derived* descriptor is the normal case: an
+            # application that rebuilds its client on every settings change re-derives
+            # the same instances against a long-lived registry. Taking the name of a
+            # real provider is not — that would silently reroute its traffic.
+            existing = self._registry.get(instance_id)
+            if not getattr(existing, "derived_from", None):
+                owner = self._registry.resolve_alias(instance_id)
+                raise ConfigError(
+                    f"instance alias {instance_id!r} is already registered "
+                    f"(it names provider {owner!r})",
+                    provider=instance_id,
+                    hint="choose an instance alias that is not a provider id or alias",
+                )
+        derived = replace(
+            base, id=instance_id, aliases=(), derived_from=normalize_provider_id(base.id)
+        )
+        self._registry.register(derived, replace=True)
+
+    @property
+    def configured_ids(self) -> tuple[str, ...]:
+        """Configured instance ids, in the order the application supplied them.
+
+        This order is what makes catalog-alias resolution deterministic: the first
+        configured provider that realizes an alias wins.
+        """
+        return tuple(self._order)
+
+    def descriptor_for(self, provider_id: str) -> ProviderDescriptor:
+        """Look up a provider instance's descriptor."""
+        return self._registry.get(provider_id)
+
+    def base_url_for(self, provider_id: str) -> str | None:
+        """The endpoint an instance will actually talk to, after defaults and shorthand."""
+        try:
+            descriptor = self._registry.get(provider_id)
+        except ConfigError:
+            return None
+        settings = self._settings.get(provider_id)
+        base_url = (settings.base_url if settings else None) or descriptor.default_base_url
+        if descriptor.setup.host_shorthand is not None and base_url:
+            base_url = descriptor.setup.host_shorthand.expand(base_url)
+        return base_url
+
+    def locality_for(self, provider_id: str) -> Literal["hosted", "local", "remote"]:
+        """Where this *instance* runs, which the descriptor alone cannot say.
+
+        A ``local`` engine pointed at a non-loopback address is running on somebody else's
+        machine: its per-token cost is not a genuine zero, and this machine's RAM is not
+        the RAM that matters. Reporting ``remote`` is what keeps both of those honest.
+        """
+        try:
+            descriptor = self._registry.get(provider_id)
+        except ConfigError:
+            return "hosted"
+        if descriptor.locality != "local":
+            return descriptor.locality
+        base_url = self.base_url_for(provider_id)
+        if base_url is None:
+            # No endpoint at all means a supervised in-process engine (llama.cpp), which
+            # is as local as it gets.
+            return "local"
+        return "local" if is_loopback(base_url) else "remote"
+
+    async def get(self, provider_id: str) -> ProviderAdapter:
+        """Return the adapter for a provider instance, building it on first use.
+
+        Raises:
+            ConfigError: If the provider is unknown, or its required settings are missing.
+        """
+        key = self._registry.resolve_alias(provider_id)
+        adapter = self._adapters.get(key)
+        if adapter is not None:
+            return adapter
+        async with self._lock:
+            adapter = self._adapters.get(key)
+            if adapter is not None:
+                return adapter
+            adapter = self._build(key)
+            self._adapters[key] = adapter
+            return adapter
+
+    def _build(self, provider_id: str) -> ProviderAdapter:
+        descriptor = self._registry.get(provider_id)
+        settings = self._settings.get(provider_id) or ProviderSettings(provider_id=provider_id)
+
+        base_url = settings.base_url or descriptor.default_base_url
+        if descriptor.setup.host_shorthand is not None and base_url:
+            base_url = descriptor.setup.host_shorthand.expand(base_url)
+        if descriptor.requires_base_url and not base_url:
+            raise ConfigError(
+                f"provider {provider_id!r} requires a base URL",
+                provider=provider_id,
+                hint=(
+                    f"pass ProviderSettings.of({provider_id!r}, base_url=...) when "
+                    "constructing the client"
+                ),
+            )
+
+        api_key = self._resolver.resolve(settings.api_key)
+        options = self._resolve_secret_options(descriptor, settings.options)
+
+        config = ProviderConfig(
+            provider_id=provider_id,
+            base_url=base_url,
+            api_key=api_key,
+            api_version=settings.api_version,
+            headers=settings.headers,
+            options=options,
+            timeout_s=settings.timeout_s,
+            transport=settings.transport,
+            events=self._events,
+        )
+        return descriptor.factory(config)
+
+    def _resolve_secret_options(
+        self, descriptor: ProviderDescriptor, options: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
+        """Resolve option values the descriptor declares as secrets.
+
+        A provider that takes a second credential (Anthropic's OAuth token beside its API
+        key) carries it in ``options``, which is otherwise passed through verbatim. Left
+        alone it would never reach the resolver — so ``env://`` would arrive at the
+        adapter as the literal string, and a real token would never be registered for
+        redaction. Driven off the setup spec's ``secret`` fields, so this stays true for
+        any provider, including third-party ones, without naming one.
+        """
+        secret_keys = {
+            f.key
+            for f in descriptor.setup.fields
+            if f.kind == "secret" and isinstance(options.get(f.key), str)
+        }
+        if not secret_keys:
+            return options
+        resolved = dict(options)
+        for key in secret_keys:
+            resolved[key] = self._resolver.resolve(resolved[key])
+        return resolved
+
+    async def aclose(self) -> None:
+        """Close every built adapter, gathering failures rather than stopping at the first."""
+        adapters = list(self._adapters.values())
+        self._adapters.clear()
+        results = await asyncio.gather(
+            *(a.aclose() for a in adapters), return_exceptions=True
+        )
+        for result in results:
+            if isinstance(result, BaseException) and not isinstance(result, Exception):
+                raise result

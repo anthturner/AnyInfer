@@ -1,0 +1,232 @@
+"""Capability types with provenance tagging.
+
+Every capability value records *where it came from* so consumers know how much to trust it.
+An estimate is never presented as authoritative: a value assembled from a bundled catalog is
+``"catalog"``, one read from a provider's model listing is ``"discovered"``, one measured by
+an opt-in probe is ``"probed"``, and a descriptor-level fallback is ``"default"``. A value
+the integrating application set deliberately is ``"override"`` — it outranks everything,
+because a user's explicit correction must never lose to data the library merely collected.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+from enum import Flag, auto
+from typing import Generic, Literal, TypeVar
+
+__all__ = [
+    "DiscoveredModel",
+    "Feature",
+    "Health",
+    "LocalModelInfo",
+    "ModelCapabilities",
+    "Pricing",
+    "Provenance",
+    "Sourced",
+    "conjunction",
+]
+
+Provenance = Literal["catalog", "discovered", "probed", "default", "override"]
+"""Where a capability value came from, weakest (``default``) to strongest (``override``)."""
+
+_PROVENANCE_RANK: dict[Provenance, int] = {
+    "default": 0,
+    "catalog": 1,
+    "discovered": 2,
+    "probed": 3,
+    "override": 4,
+}
+
+
+_T = TypeVar("_T")
+
+
+@dataclass(frozen=True, slots=True)
+class Sourced(Generic[_T]):
+    """A capability value paired with its provenance."""
+
+    value: _T
+    provenance: Provenance = "default"
+
+    def outranks(self, other: Sourced[_T] | None) -> bool:
+        """Whether this value's provenance is at least as strong as ``other``'s."""
+        if other is None:
+            return True
+        return _PROVENANCE_RANK[self.provenance] >= _PROVENANCE_RANK[other.provenance]
+
+
+class Feature(Flag):
+    """Capabilities a model may support.
+
+    Structured-output mechanism selection reads these in the order
+    ``GRAMMAR > JSON_SCHEMA > JSON_MODE > prompt injection``.
+    """
+
+    STREAMING = auto()
+    JSON_SCHEMA = auto()
+    GRAMMAR = auto()
+    JSON_MODE = auto()
+    TOOLS = auto()
+    REASONING = auto()
+    SYSTEM_PROMPT = auto()
+    CACHE_USAGE = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class Pricing:
+    """Per-million-token pricing used to compute `cost_usd`.
+
+    Attributes:
+        input_per_1m: Price per one million prompt tokens.
+        output_per_1m: Price per one million generated tokens.
+        currency: Currency code the prices are quoted in.
+    """
+
+    input_per_1m: Decimal
+    output_per_1m: Decimal
+    currency: str = "USD"
+
+
+@dataclass(frozen=True, slots=True)
+class LocalModelInfo:
+    """Facts about a local model artifact, used for tuning and recommendation.
+
+    Attributes:
+        artifact_size_bytes: On-disk size of the model weights.
+        parameter_size: Parameter count as the runtime reports it (e.g. ``"7B"``).
+        quantization: Quantization scheme of the artifact (e.g. ``"Q4_K_M"``).
+        est_ram_bytes: Estimated system memory needed to run the model.
+        est_vram_bytes: Estimated GPU memory needed to run the model.
+        observed_vram_bytes: GPU memory actually measured in use while the model was
+            loaded, when the runtime reports it.
+    """
+
+    artifact_size_bytes: int | None = None
+    parameter_size: str | None = None
+    quantization: str | None = None
+    est_ram_bytes: int | None = None
+    est_vram_bytes: int | None = None
+    observed_vram_bytes: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ModelCapabilities:
+    """What a model can do, as far as we know.
+
+    Attributes:
+        context_window: Maximum tokens of input context, with provenance; ``None`` when
+            unknown.
+        max_output_tokens: Maximum tokens one response may contain, with provenance;
+            ``None`` when unknown.
+        features: Which `Feature` flags the model supports, with provenance.
+        pricing: Per-million-token pricing, when known.
+        local: Facts about the local artifact, for locally-run models only.
+    """
+
+    context_window: Sourced[int] | None = None
+    max_output_tokens: Sourced[int] | None = None
+    features: Sourced[Feature] = Sourced(Feature(0), "default")
+    pricing: Sourced[Pricing] | None = None
+    local: LocalModelInfo | None = None
+
+    def overlay(self, other: ModelCapabilities) -> ModelCapabilities:
+        """Layer ``other`` on top of this, field by field, stronger provenance winning.
+
+        This is the assembly rule: later layers override earlier ones, but a
+        weaker-provenance value never displaces a stronger one.
+        """
+        return ModelCapabilities(
+            context_window=_stronger(self.context_window, other.context_window),
+            max_output_tokens=_stronger(self.max_output_tokens, other.max_output_tokens),
+            features=_stronger(self.features, other.features) or self.features,
+            pricing=_stronger(self.pricing, other.pricing),
+            local=other.local if other.local is not None else self.local,
+        )
+
+
+def _stronger(current: Sourced[_T] | None, incoming: Sourced[_T] | None) -> Sourced[_T] | None:
+    if incoming is None:
+        return current
+    return incoming if incoming.outranks(current) else current
+
+
+def conjunction(candidates: list[ModelCapabilities]) -> ModelCapabilities:
+    """Tightest bound across candidate models — the ``auto``-sentinel rule.
+
+    When a provider delegates model choice at request time (GitHub Copilot's ``"auto"``), the
+    only safe capability claim is the conjunction: the minimum of each numeric bound and the
+    intersection of feature flags. Provenance degrades to the weakest contributor.
+
+    Args:
+        candidates: Capabilities of every model the provider might pick.
+
+    Returns:
+        Capabilities guaranteed to hold whichever candidate is chosen. An empty candidate
+        list yields fully-unknown capabilities.
+    """
+    if not candidates:
+        return ModelCapabilities()
+
+    context = _min_sourced([c.context_window for c in candidates])
+    max_out = _min_sourced([c.max_output_tokens for c in candidates])
+
+    features = candidates[0].features.value
+    provenance = candidates[0].features.provenance
+    for cap in candidates[1:]:
+        features &= cap.features.value
+        provenance = _weaker(provenance, cap.features.provenance)
+
+    return ModelCapabilities(
+        context_window=context,
+        max_output_tokens=max_out,
+        features=Sourced(features, provenance),
+        pricing=None,
+        local=None,
+    )
+
+
+def _min_sourced(values: list[Sourced[int] | None]) -> Sourced[int] | None:
+    known = [v for v in values if v is not None]
+    if not known or len(known) != len(values):
+        # An unknown bound makes the conjunction unknown — we cannot promise a minimum.
+        return None
+    best = min(known, key=lambda s: s.value)
+    provenance = best.provenance
+    for other in known:
+        provenance = _weaker(provenance, other.provenance)
+    return Sourced(best.value, provenance)
+
+
+def _weaker(a: Provenance, b: Provenance) -> Provenance:
+    return a if _PROVENANCE_RANK[a] <= _PROVENANCE_RANK[b] else b
+
+
+@dataclass(frozen=True, slots=True)
+class Health:
+    """Result of a provider's cheap readiness probe.
+
+    Attributes:
+        ok: Whether the provider answered its readiness probe successfully.
+        detail: Short human-readable explanation, most useful when ``ok`` is false.
+    """
+
+    ok: bool
+    detail: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class DiscoveredModel:
+    """A model reported by a provider's listing endpoint.
+
+    ``capabilities`` carries only fields the provider actually reported; the capability
+    assembler tags them ``"discovered"``.
+
+    Attributes:
+        id: The model identifier exactly as the provider lists it.
+        capabilities: Capability fields the listing reported; ``None`` when the provider
+            lists ids only.
+    """
+
+    id: str
+    capabilities: ModelCapabilities | None = None

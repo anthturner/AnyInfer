@@ -1,0 +1,53 @@
+name: Docs site
+
+# Builds the mkdocs site and publishes it to GitHub Pages. Runs on every merge to
+# `main`, and again when a release publishes so the downloads page never lags a
+# release. Requires Settings -> Pages -> Source to be set to "GitHub Actions" once;
+# see docs/contributing/releasing.md.
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a queued deploy for a newer commit supersedes older ones.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # mkdocstrings imports the package to render the SDK reference, so the site
+      # build needs a real install, same as the docs CI job.
+      - run: pip install -e ".[all,dev]"
+
+      - name: build the site
+        run: python workspace.py build docs
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

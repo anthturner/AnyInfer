@@ -1,0 +1,105 @@
+name: Catalog refresh
+
+# Weekly semi-automated refresh of the bundled local-model catalog and llama-server runtime
+# table (D30). Same two-stage shape as the pricing refresh, and for the same reason:
+#
+#   1. `check` — deterministic, stdlib-only: HEADs every pinned GGUF file at its pinned
+#      revision, compares every recorded Ollama manifest digest against the registry, and
+#      HEADs every pinned runtime archive. Cheap, machine-readable, and immune to
+#      hallucination — but it only *detects* drift.
+#   2. `propose` — runs only when drift was detected (or on manual dispatch): a Claude
+#      session re-runs the pin scripts for the affected entries, which read hashes, sizes,
+#      and revisions from upstream APIs rather than inventing them, and opens a pull
+#      request.
+#
+# The PR is never auto-merged. A catalog entry is a recommendation to download several
+# gigabytes under a particular license: a human reviews every change, and the ordinary CI
+# gates run on the PR — including scripts/validate_catalog.py via the test suite — before
+# it can land.
+
+on:
+  schedule:
+    - cron: "30 6 * * 1" # Mondays 06:30 UTC, after the pricing check
+  workflow_dispatch:
+    inputs:
+      force_propose:
+        description: Run the proposal stage even if the deterministic check saw no drift
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    name: deterministic drift check
+    runs-on: ubuntu-latest
+    outputs:
+      drift: ${{ steps.drift.outputs.drift }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: validate bundled catalog
+        run: python scripts/validate_catalog.py
+      - name: compare pinned artifacts against upstream
+        id: drift
+        # Exit 1 means drift (the propose job takes over); exit 2 means the check itself
+        # failed and the workflow should surface that, not silently pass.
+        run: |
+          python scripts/check_catalog_drift.py && status=0 || status=$?
+          if [ "$status" = "2" ]; then exit 2; fi
+
+  propose:
+    name: re-pin drifted entries and open a PR
+    needs: check
+    if: needs.check.outputs.drift == 'true' || inputs.force_propose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e .
+      - name: re-pin the catalog
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Either secret works; set exactly one (docs/contributing/repository-setup.md).
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--allowedTools Bash,Read,Edit,Write,WebSearch,WebFetch"
+          prompt: |
+            You are refreshing this repository's bundled local-model catalog
+            (src/anyinfer/catalog/models.json) and llama-server runtime table
+            (src/anyinfer/local/runtimes.json). Read each file's _comment block first —
+            it states the rules.
+
+            1. Run `python scripts/check_catalog_drift.py` to see exactly what drifted.
+            2. Hashes, sizes, revisions, and dates enter these files ONLY through
+               `python scripts/pin_catalog.py <model-id>...` and
+               `python scripts/pin_runtimes.py`, which read them from the Hugging Face,
+               Ollama registry, and GitHub release APIs. Never hand-edit a digest, a
+               size, a revision, or a last_verified date. Never invent a date.
+            3. If a model's repository was renamed, deleted, or gated, do NOT silently
+               substitute another repository: report it in the PR body and, if the model
+               is no longer obtainable, remove the entry rather than shipping a broken
+               pointer. A repository that changed its license out of the allowlist must
+               be removed too — scripts/validate_catalog.py enforces the allowlist.
+            4. If the runtime table drifted because upstream cut a new llama.cpp release
+               and deleted the old assets, re-run `python scripts/pin_runtimes.py` and
+               note the build bump prominently: a build bump can change the minimum CUDA
+               driver and compute capability, and CUDA_REQUIREMENTS in
+               scripts/pin_runtimes.py must be re-verified against the CUDA version in
+               the asset names before it lands.
+            5. Run `python scripts/validate_catalog.py` and make it pass.
+            6. Create a branch `catalog-refresh/<today's date>`, commit with a message
+               summarizing what moved, push it, and open a pull request against `develop`
+               titled "Catalog refresh <date>". The PR body must list each change, name
+               the upstream source, and state which drifted entries you left untouched
+               and why.
+
+            If nothing actually needed changing, do not open a PR — print a summary
+            saying so instead.

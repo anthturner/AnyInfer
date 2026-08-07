@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Creates .venv and installs the dev environment on folder open, and is a no-op
+      // once .venv exists. VSCode asks once to allow automatic tasks ("Manage Automatic
+      // Tasks" to change). Also runnable by hand: Terminal > Run Task > Bootstrap venv.
+      "label": "Bootstrap venv",
+      "type": "shell",
+      "windows": {
+        "command": "if (-not (Test-Path .venv)) { py -3.11 -m venv .venv; .venv\\Scripts\\python.exe workspace.py setup }",
+        "options": {
+          "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] }
+        }
+      },
+      "linux": {
+        "command": "test -d .venv || (python3.11 -m venv .venv && .venv/bin/python workspace.py setup)"
+      },
+      "osx": {
+        "command": "test -d .venv || (python3.11 -m venv .venv && .venv/bin/python workspace.py setup)"
+      },
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "workspace check",
+      "type": "shell",
+      "windows": {
+        "command": ".venv\\Scripts\\python.exe workspace.py check",
+        "options": {
+          "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] }
+        }
+      },
+      "linux": { "command": ".venv/bin/python workspace.py check" },
+      "osx": { "command": ".venv/bin/python workspace.py check" },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Run the checkout's task runner, forwarding all arguments: `./workspace <verb> [...]`.
+# The installed `workspace` console script is a copy that can go stale (see
+# _warn_if_shadowed in workspace.py); this wrapper always executes the file beside it.
+# A repo-local .venv wins over whatever `python` happens to be on PATH.
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$root/.venv/bin/python" ]; then
+  exec "$root/.venv/bin/python" "$root/workspace.py" "$@"
+elif [ -x "$root/.venv/Scripts/python.exe" ]; then  # a venv made on Windows
+  exec "$root/.venv/Scripts/python.exe" "$root/workspace.py" "$@"
+elif command -v python >/dev/null 2>&1; then
+  exec python "$root/workspace.py" "$@"
+else
+  exec python3 "$root/workspace.py" "$@"
+fi

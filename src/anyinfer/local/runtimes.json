@@ -1,0 +1,125 @@
+{
+  "format_version": 1,
+  "_comment": [
+    "Pinned llama-server runtime variants, written by scripts/pin_runtimes.py from the",
+    "upstream ggml-org/llama.cpp GitHub release. Never hand-edit a digest, size, or date.",
+    "AnyInfer does not bundle these binaries (they are hundreds of megabytes for CUDA);",
+    "install_runtime() fetches, verifies, and unpacks them into the runtime root."
+  ],
+  "generated": "2026-08-08",
+  "build": "b10327",
+  "release_url": "https://github.com/ggml-org/llama.cpp/releases/tag/b10327",
+  "last_verified": "2026-08-08",
+  "cuda_requirements": {
+    "toolkit": "13.3",
+    "min_driver_major": 580,
+    "min_compute_capability": "7.5",
+    "warn_below_vram_bytes": 6442450944
+  },
+  "variants": [
+    {
+      "platform": "darwin-amd64",
+      "backend": "cpu",
+      "filename": "llama-b10327-bin-macos-x64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-macos-x64.tar.gz",
+      "sha256": "14b3e1df27f8a433230afaa1fbce1b8482e7f4122646cdbd38f91b4d9d292b7e",
+      "size_bytes": 11268063
+    },
+    {
+      "platform": "darwin-arm64",
+      "backend": "metal",
+      "filename": "llama-b10327-bin-macos-arm64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-macos-arm64.tar.gz",
+      "sha256": "a909ed6e907f9cd671ff271c68f1174320b7c59da746045092cd37e705360f1e",
+      "size_bytes": 10997689
+    },
+    {
+      "platform": "linux-amd64",
+      "backend": "cpu",
+      "filename": "llama-b10327-bin-ubuntu-x64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-ubuntu-x64.tar.gz",
+      "sha256": "b0d1c644a73902f374ab736baff1e9333aaf60f41dab9b21dff66e402b2c668c",
+      "size_bytes": 16479533
+    },
+    {
+      "platform": "linux-amd64",
+      "backend": "rocm",
+      "filename": "llama-b10327-bin-ubuntu-rocm-7.2-x64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-ubuntu-rocm-7.2-x64.tar.gz",
+      "sha256": "7061bc54ec5172d7f1cf96197ad6b8447c0520106976782573edc68de3001007",
+      "size_bytes": 130119569
+    },
+    {
+      "platform": "linux-amd64",
+      "backend": "vulkan",
+      "filename": "llama-b10327-bin-ubuntu-vulkan-x64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-ubuntu-vulkan-x64.tar.gz",
+      "sha256": "852fa511ab8a9b16021d1fff8fe20043cce10b16c4f220e6a5392119538c30ec",
+      "size_bytes": 32494053
+    },
+    {
+      "platform": "linux-arm64",
+      "backend": "cpu",
+      "filename": "llama-b10327-bin-ubuntu-arm64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-ubuntu-arm64.tar.gz",
+      "sha256": "5e2e235dff2e0b5a28ac8da5c58215ab563bcd0ffa06bf9fc888ba68cf9837a4",
+      "size_bytes": 13362145
+    },
+    {
+      "platform": "linux-arm64",
+      "backend": "vulkan",
+      "filename": "llama-b10327-bin-ubuntu-vulkan-arm64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-ubuntu-vulkan-arm64.tar.gz",
+      "sha256": "8867ddeeb88259c7daf79ca5c44b643e129d17bd073a3b26a4de04ec01d133bc",
+      "size_bytes": 26543715
+    },
+    {
+      "platform": "win32-amd64",
+      "backend": "cpu",
+      "filename": "llama-b10327-bin-win-cpu-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-win-cpu-x64.zip",
+      "sha256": "c2781932f9af623c9498a12f002f667d2b668f65e0f19b4401e12b5fe9f860c3",
+      "size_bytes": 18377141
+    },
+    {
+      "platform": "win32-amd64",
+      "backend": "cuda",
+      "filename": "llama-b10327-bin-win-cuda-13.3-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-win-cuda-13.3-x64.zip",
+      "sha256": "d75a395c112d71c780d5fe0cdfd33172b21987994067edca371797cc10f98e18",
+      "size_bytes": 146539920,
+      "companions": [
+        {
+          "filename": "cudart-llama-bin-win-cuda-13.3-x64.zip",
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/cudart-llama-bin-win-cuda-13.3-x64.zip",
+          "sha256": "1462a050eb4c684921ba51dcc4cc488a036674c3e73e9945ee705b854808d03e",
+          "size_bytes": 390970417
+        }
+      ]
+    },
+    {
+      "platform": "win32-amd64",
+      "backend": "rocm",
+      "filename": "llama-b10327-bin-win-hip-radeon-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-win-hip-radeon-x64.zip",
+      "sha256": "79b8cf1c368cfd87222df5b1c18b81128b08d64a57b9d4e4ef21db7434eae1de",
+      "size_bytes": 324623983
+    },
+    {
+      "platform": "win32-amd64",
+      "backend": "vulkan",
+      "filename": "llama-b10327-bin-win-vulkan-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-win-vulkan-x64.zip",
+      "sha256": "d6863f1e0d6044fff8c8ff78dc898599d5061c18ddca825aa77de0bc5396b8f4",
+      "size_bytes": 34126051
+    },
+    {
+      "platform": "win32-arm64",
+      "backend": "cpu",
+      "filename": "llama-b10327-bin-win-cpu-arm64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10327/llama-b10327-bin-win-cpu-arm64.zip",
+      "sha256": "0a7d04263d02dbc6792d7bbc24412ab7a3c4f50d27175ee1b3952211a6a7f16d",
+      "size_bytes": 12212244
+    }
+  ]
+}

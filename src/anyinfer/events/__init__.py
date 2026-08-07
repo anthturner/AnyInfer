@@ -1,0 +1,57 @@
+"""Telemetry events, observers, and secret redaction."""
+
+from ..redaction import (
+    REDACTED,
+    RedactionRegistry,
+    redact,
+    register_secret,
+)
+from .observers import EventDispatcher, Observer, Subscription
+from .telemetry import (
+    PAYLOAD_FIELDS,
+    AttemptCompleted,
+    AttemptStarted,
+    ContextReduced,
+    DownloadProgress,
+    FallbackTriggered,
+    FirstToken,
+    ParameterDropped,
+    RepairAttempted,
+    RequestCompleted,
+    RequestFailed,
+    RequestStarted,
+    RetryScheduled,
+    ServerLifecycle,
+    TargetResolved,
+    TelemetryEvent,
+    UsageEstimated,
+    strip_payloads,
+)
+
+__all__ = [
+    "PAYLOAD_FIELDS",
+    "REDACTED",
+    "AttemptCompleted",
+    "AttemptStarted",
+    "ContextReduced",
+    "DownloadProgress",
+    "EventDispatcher",
+    "FallbackTriggered",
+    "FirstToken",
+    "Observer",
+    "ParameterDropped",
+    "RedactionRegistry",
+    "RepairAttempted",
+    "RequestCompleted",
+    "RequestFailed",
+    "RequestStarted",
+    "RetryScheduled",
+    "ServerLifecycle",
+    "Subscription",
+    "TargetResolved",
+    "TelemetryEvent",
+    "UsageEstimated",
+    "redact",
+    "register_secret",
+    "strip_payloads",
+]

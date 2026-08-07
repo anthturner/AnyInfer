@@ -1,0 +1,46 @@
+{#-
+  Custom 404 page. Extends mkdocs-material's main.html (which extends base.html) and
+  replaces the content block with a friendly message, a search prompt, and links to every
+  top-level section — so a broken/renamed link still gets a reader somewhere useful.
+  Based on mkdocs-material 9.7.7 — re-sync on Material pin bumps.
+-#}
+{% extends "main.html" %}
+
+{% block content %}
+<div class="anyinfer-404">
+  <h1>Page not found</h1>
+  <p>
+    The page you were looking for doesn't exist, or moved. Use the search icon in the
+    header, or pick a section below.
+  </p>
+
+  <div class="anyinfer-card-grid">
+    <a class="anyinfer-card" href="{{ 'guides/' | url }}">
+      <h3>Integrate</h3>
+      <p>Python SDK, command-line tool, sidecar, and shared configuration.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'concepts/' | url }}">
+      <h3>Concepts</h3>
+      <p>The mental model: events, routing, capabilities, credentials, telemetry.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'providers/' | url }}">
+      <h3>Providers</h3>
+      <p>Setup and quirks for {{ config.extra.anyinfer_provider_count }} providers.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'serve/' | url }}">
+      <h3>Sidecar</h3>
+      <p>The OpenAI-compatible HTTP service for non-Python integrations.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'reference/' | url }}">
+      <h3>Reference</h3>
+      <p>SDK reference, error catalog, conformance matrix, glossary.</p>
+    </a>
+    <a class="anyinfer-card" href="{{ 'contributing/' | url }}">
+      <h3>Contributing</h3>
+      <p>Architecture, writing an adapter, testing, releases.</p>
+    </a>
+  </div>
+
+  <p><a href="{{ base_url | url }}">&larr; Back to the homepage</a></p>
+</div>
+{% endblock %}

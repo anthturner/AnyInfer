@@ -1,0 +1,110 @@
+{
+  "format_version": 1,
+  "default_alias": "medium",
+  "_comment": [
+    "Bundled default alias catalog (DESIGN.md §13, risk R6).",
+    "This file is the hand-edited alias policy: which model each tier means, per provider.",
+    "The logical model table it references -- pinned GGUF artifacts, Ollama tags, licenses,",
+    "and memory estimates -- lives in models.json and is machine-maintained by",
+    "scripts/pin_catalog.py. Applications overlay either file to pin their own tiers;",
+    "see docs/concepts/catalog.md and docs/concepts/targets.md."
+  ],
+  "aliases": {
+    "small": {
+      "description": "Lightweight and fast; runs comfortably on modest hardware.",
+      "min_ram_bytes": 4294967296,
+      "targets": {
+        "llama-cpp": {
+          "gguf": "qwen2.5-1.5b-instruct-q4-k-m",
+          "context_window": 8192,
+          "max_output_tokens": 2048,
+          "description": "Qwen2.5 1.5B Instruct Q4_K_M"
+        },
+        "ollama": {
+          "model": "qwen2.5:1.5b",
+          "context_window": 8192,
+          "max_output_tokens": 2048,
+          "description": "Qwen2.5 1.5B"
+        },
+        "copilot": {
+          "model": "gpt-5-mini",
+          "context_window": 64000,
+          "max_output_tokens": 8192,
+          "description": "GPT-5 Mini"
+        },
+        "openai": {
+          "model": "gpt-5-mini",
+          "description": "GPT-5 Mini"
+        },
+        "anthropic": {
+          "model": "claude-haiku-4-5",
+          "description": "Claude Haiku 4.5"
+        }
+      }
+    },
+    "medium": {
+      "description": "Balanced speed and quality for everyday work.",
+      "min_ram_bytes": 8589934592,
+      "targets": {
+        "llama-cpp": {
+          "gguf": "qwen3-4b-q4-k-m",
+          "context_window": 16384,
+          "max_output_tokens": 4096,
+          "description": "Qwen3 4B Q4_K_M"
+        },
+        "ollama": {
+          "model": "qwen3:4b",
+          "context_window": 16384,
+          "max_output_tokens": 4096,
+          "description": "Qwen3 4B"
+        },
+        "copilot": {
+          "model": "gpt-4.1",
+          "context_window": 64000,
+          "max_output_tokens": 8192,
+          "description": "GPT-4.1"
+        },
+        "openai": {
+          "model": "gpt-5",
+          "description": "GPT-5"
+        },
+        "anthropic": {
+          "model": "claude-sonnet-4-5",
+          "description": "Claude Sonnet 4.5"
+        }
+      }
+    },
+    "large": {
+      "description": "Highest quality; needs substantial memory locally.",
+      "min_ram_bytes": 17179869184,
+      "targets": {
+        "llama-cpp": {
+          "gguf": "qwen2.5-7b-instruct-q4-k-m",
+          "context_window": 32768,
+          "max_output_tokens": 8192,
+          "description": "Qwen2.5 7B Instruct Q4_K_M"
+        },
+        "ollama": {
+          "model": "qwen2.5:7b",
+          "context_window": 32768,
+          "max_output_tokens": 8192,
+          "description": "Qwen2.5 7B"
+        },
+        "copilot": {
+          "model": "gpt-5.4",
+          "context_window": 64000,
+          "max_output_tokens": 8192,
+          "description": "GPT-5.4"
+        },
+        "openai": {
+          "model": "gpt-5",
+          "description": "GPT-5"
+        },
+        "anthropic": {
+          "model": "claude-opus-4-1",
+          "description": "Claude Opus 4.1"
+        }
+      }
+    }
+  }
+}

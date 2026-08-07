@@ -1,0 +1,595 @@
+"""A provider settings dialog with no provider-specific code in it.
+
+Every widget in this file is built by reading a
+`ProviderSetupSpec` off a descriptor. There is no ``if provider ==
+"openai"`` anywhere, which is the whole claim being demonstrated: install a third-party
+adapter that advertises itself through the ``anyinfer.providers`` entry-point group and it
+shows up here, correctly rendered, without this file changing.
+
+The dialog configures *instances*, not engines. An engine can be added more than once —
+two Azure tenants, a local and a remote Ollama — and each instance carries an editable
+alias that becomes its id in a ``alias:model`` target. Only engines the user actually
+added appear; the registry is offered through a searchable dropdown instead of as a
+checklist of everything installed.
+
+The mapping from `SetupFieldKind` to widget is the only knowledge
+the UI needs:
+
+===================  =========================================================
+Field kind           Rendered as
+===================  =========================================================
+``endpoint``         Line edit, with host-shorthand expansion hinted
+``secret``           Password-masked line edit
+``api-version``      Line edit
+``model-list``       Editable combo box, populated by discovery when available
+``reasoning-efforts``Combo box over the normalized effort levels
+``host-profile``     Line edit
+===================  =========================================================
+
+Everything *else* about a field comes from the descriptor rather than from this file: the
+example value in an empty editor is the field's own ``placeholder`` (guessing it here
+would stamp one provider's environment-variable convention onto all the others), a
+mandatory field is marked with a red asterisk from its ``required`` flag, and a provider
+that accepts a *choice* of credential declares that as an ``any_of`` group with a
+``requirement_note`` explaining it.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QCompleter,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
+from anyinfer.providers.base import ProviderAdapter
+from anyinfer.providers.base import ProviderConfig as ProviderAdapterConfig
+from anyinfer.registry import ProviderDescriptor, ProviderRegistry, SetupField
+
+from ..config import DemoConfig, ProviderConfig
+from .icons import themed_icon
+
+__all__ = ["ProviderSettingsDialog"]
+
+_REASONING_EFFORTS = ("", "minimal", "low", "medium", "high")
+
+_REQUIRED_MARK = "<span style='color:#d13438;'>*</span>"
+"""The red asterisk marking a mandatory field.
+
+Inline rather than themed, because a `QFormLayout` label carries no object name to hang a
+stylesheet rule on, and the mark has to read as "required" identically in both palettes.
+"""
+
+
+def _field_label(setup_field: SetupField) -> QLabel:
+    """Build a field's label, marking it when the provider declares it required."""
+    label = QLabel(
+        f"{setup_field.label} {_REQUIRED_MARK}" if setup_field.required else setup_field.label
+    )
+    label.setTextFormat(Qt.TextFormat.RichText)
+    if setup_field.required:
+        # The colour alone is not an accessible signal, so say it where a screen reader
+        # and a hover both reach.
+        label.setAccessibleName(f"{setup_field.label}, required")
+        label.setToolTip("Required")
+    return label
+
+
+def unique_alias(preferred: str, taken: set[str]) -> str:
+    """Return ``preferred``, or the first ``preferred-N`` that is not already taken.
+
+    Adding an engine twice must not silently collide, and must not refuse either: the
+    second instance gets a distinct default the user is free to rename.
+    """
+    if preferred not in taken:
+        return preferred
+    suffix = 2
+    while f"{preferred}-{suffix}" in taken:
+        suffix += 1
+    return f"{preferred}-{suffix}"
+
+
+class _ProviderPanel(QWidget):
+    """One instance's setup fields, rendered from its engine's setup spec.
+
+    Deliberately just the *fields*: enabling, alias editing, and deletion belong to the
+    row that owns this panel, so the same field-rendering logic serves every instance of
+    every engine without knowing which.
+    """
+
+    def __init__(self, descriptor: ProviderDescriptor, config: ProviderConfig) -> None:
+        super().__init__()
+        self._descriptor = descriptor
+        self._editors: dict[str, QWidget] = {}
+        # The dialog has no editor for the free-form options mapping; carry it through
+        # unchanged so a save round-trip never silently drops it.
+        self._options = dict(config.options)
+
+        layout = QFormLayout(self)
+        layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        layout.setContentsMargins(24, 4, 8, 8)
+
+        locality = "local engine" if descriptor.locality == "local" else "hosted provider"
+        subtitle = QLabel(f"<i>{locality} — engine <code>{descriptor.id}</code></i>")
+        subtitle.setTextFormat(Qt.TextFormat.RichText)
+        layout.addRow(subtitle)
+
+        for setup_field in descriptor.setup.fields:
+            label, editor = self._build_field(setup_field, config.values)
+            self._editors[setup_field.key] = editor
+            layout.addRow(label, editor)
+
+        if not descriptor.setup.fields:
+            layout.addRow(QLabel("<i>No configuration required.</i>"))
+
+        if descriptor.setup.requirement_note:
+            note = QLabel(f"<i>{_REQUIRED_MARK} {descriptor.setup.requirement_note}</i>")
+            note.setTextFormat(Qt.TextFormat.RichText)
+            note.setWordWrap(True)
+            layout.addRow(note)
+
+        if descriptor.setup.host_shorthand is not None:
+            shorthand = descriptor.setup.host_shorthand
+            layout.addRow(
+                QLabel(
+                    f"<i>A bare hostname expands to "
+                    f"{shorthand.scheme}://&lt;host&gt;:{shorthand.default_port}</i>"
+                )
+            )
+
+    def _build_field(
+        self, setup_field: SetupField, values: Mapping[str, str]
+    ) -> tuple[QLabel, QWidget]:
+        """Render one field according to its declared kind."""
+        current = values.get(setup_field.key, "")
+        editor: QWidget
+
+        if setup_field.kind == "reasoning-efforts":
+            combo = QComboBox()
+            combo.addItems(_REASONING_EFFORTS)
+            combo.setCurrentText(current)
+            editor = combo
+        elif setup_field.kind == "model-list":
+            combo = QComboBox()
+            combo.setEditable(True)
+            combo.setCurrentText(current)
+            editor = combo
+        else:
+            line = QLineEdit(current)
+            if setup_field.kind == "secret":
+                line.setEchoMode(QLineEdit.EchoMode.Password)
+            line.setPlaceholderText(self._placeholder_for(setup_field))
+            editor = line
+
+        if setup_field.help_text:
+            editor.setToolTip(setup_field.help_text)
+
+        return _field_label(setup_field), editor
+
+    def _placeholder_for(self, setup_field: SetupField) -> str:
+        """The example value to show in an empty editor.
+
+        The provider's own `SetupField.placeholder` wins, because only it knows which
+        environment variable its credential conventionally lives in. The fallbacks are
+        deliberately generic: a kind-level default that named one provider's convention
+        would be wrong for every other provider that shares the kind.
+        """
+        if setup_field.placeholder:
+            return setup_field.placeholder
+        if setup_field.kind == "secret":
+            return "env://VARIABLE_NAME or a literal key"
+        if setup_field.kind == "endpoint":
+            return self._descriptor.default_base_url or "https://…"
+        return ""
+
+    def values(self) -> dict[str, str]:
+        """Current field values, keyed by setup-field key."""
+        result: dict[str, str] = {}
+        for key, editor in self._editors.items():
+            if isinstance(editor, QComboBox):
+                result[key] = editor.currentText().strip()
+            elif isinstance(editor, QLineEdit):
+                result[key] = editor.text().strip()
+        return result
+
+    def missing_required(self) -> list[str]:
+        """Labels of unsatisfied requirements, so the dialog can refuse to save.
+
+        Covers both kinds the setup spec can express: fields that are individually
+        required, and ``any_of`` groups where a provider accepts a choice of credential
+        and needs one of them. A group is reported as its alternatives joined by "or",
+        so the message names what would satisfy it rather than just what is absent.
+        """
+        setup = self._descriptor.setup
+        values = self.values()
+        missing = [f.label for f in setup.fields if f.required and not values.get(f.key)]
+        missing.extend(
+            " or ".join(setup.label_for(key) for key in group)
+            for group in setup.unsatisfied_groups(values)
+        )
+        return missing
+
+    @property
+    def options(self) -> dict[str, object]:
+        """The options mapping this panel carries through untouched."""
+        return dict(self._options)
+
+
+class _ConfiguredEngineRow(QFrame):
+    """One configured instance: header (alias, engine, delete) plus expandable detail."""
+
+    delete_requested = Signal(object)
+    alias_changed = Signal()
+
+    def __init__(self, descriptor: ProviderDescriptor, config: ProviderConfig) -> None:
+        super().__init__()
+        self._descriptor = descriptor
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(8, 6, 8, 6)
+        outer.setSpacing(4)
+
+        header = QHBoxLayout()
+
+        self._expander = QPushButton()
+        self._expander.setObjectName("IconButton")
+        self._expander.setFixedSize(24, 24)
+        self._expander.setIconSize(QSize(16, 16))
+        self._expander.setAccessibleName(f"Expand {descriptor.display_name} settings")
+        self._expander.setToolTip("Show or hide this engine's setup fields.")
+        self._expander.clicked.connect(self.toggle_expanded)
+        header.addWidget(self._expander)
+
+        self._enabled = QCheckBox()
+        self._enabled.setChecked(config.enabled)
+        self._enabled.setAccessibleName(f"Enable {descriptor.display_name}")
+        self._enabled.setToolTip("Enabled engines appear in the engine picker.")
+        header.addWidget(self._enabled)
+
+        name = QLabel(f"<b>{descriptor.display_name}</b>")
+        name.setTextFormat(Qt.TextFormat.RichText)
+        header.addWidget(name)
+
+        header.addWidget(QLabel("Alias:"))
+        self._alias = QLineEdit(config.instance_id)
+        self._alias.setPlaceholderText(descriptor.id)
+        self._alias.setAccessibleName(f"Alias for {descriptor.display_name}")
+        self._alias.setToolTip(
+            "This instance's id, as used in a target string. Rename it to configure the "
+            "same engine more than once."
+        )
+        self._alias.textChanged.connect(lambda *_: self.alias_changed.emit())
+        header.addWidget(self._alias, 1)
+
+        self._delete = QPushButton()
+        self._delete.setObjectName("IconButton")
+        self._delete.setFixedSize(28, 28)
+        self._delete.setIconSize(QSize(16, 16))
+        self._delete.setAccessibleName(f"Remove {descriptor.display_name}")
+        self._delete.setToolTip("Remove this engine from the configured list.")
+        self._delete.clicked.connect(lambda: self.delete_requested.emit(self))
+        header.addWidget(self._delete)
+
+        outer.addLayout(header)
+
+        self._panel = _ProviderPanel(descriptor, config)
+        outer.addWidget(self._panel)
+
+        # A freshly added engine opens expanded (there is something to fill in); a row
+        # restored from saved settings starts collapsed, which is what keeps a long list
+        # scannable.
+        self._expanded = True
+        self.set_expanded(not config.values and not config.enabled)
+        self.reapply_theme()
+
+    # ---- state -----------------------------------------------------------------------
+
+    @property
+    def descriptor(self) -> ProviderDescriptor:
+        """The engine this row configures an instance of."""
+        return self._descriptor
+
+    def alias(self) -> str:
+        """The instance id the user typed, stripped."""
+        return self._alias.text().strip()
+
+    def is_enabled(self) -> bool:
+        """Whether this instance is turned on."""
+        return self._enabled.isChecked()
+
+    def missing_required(self) -> list[str]:
+        """Labels of required fields left empty."""
+        return self._panel.missing_required()
+
+    def set_expanded(self, expanded: bool) -> None:
+        """Show or hide the setup fields."""
+        self._expanded = expanded
+        self._panel.setVisible(expanded)
+        self.reapply_theme()
+
+    def toggle_expanded(self) -> None:
+        """Flip the detail area's visibility."""
+        self.set_expanded(not self._expanded)
+
+    def reapply_theme(self) -> None:
+        """Re-render the themed icons for the current palette and expansion state."""
+        self._expander.setIcon(
+            themed_icon(
+                self._expander,
+                "chevron-down" if self._expanded else "chevron-right",
+                size=16,
+            )
+        )
+        self._delete.setIcon(themed_icon(self._delete, "trash", size=16))
+
+    def focus_alias(self) -> None:
+        """Put the cursor in the alias field, ready for renaming."""
+        self._alias.setFocus()
+        self._alias.selectAll()
+
+    def to_config(self) -> ProviderConfig:
+        """This row's state as a `ProviderConfig`, preserving the options mapping."""
+        alias = self.alias()
+        return ProviderConfig(
+            provider_id=self._descriptor.id,
+            alias=alias if alias != self._descriptor.id else None,
+            enabled=self.is_enabled(),
+            values=self._panel.values(),
+            options=self._panel.options,
+        )
+
+
+class ProviderSettingsDialog(QDialog):
+    """Add, configure, and remove provider instances.
+
+    Nothing here knows which providers exist: the dropdown is the registry, and each
+    row's fields are its engine's declared setup spec.
+    """
+
+    def __init__(
+        self,
+        registry: ProviderRegistry,
+        config: DemoConfig,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Provider settings")
+        self.setMinimumSize(620, 520)
+        self._registry = registry
+        self._config = config
+        self._rows: list[_ConfiguredEngineRow] = []
+
+        outer = QVBoxLayout(self)
+        intro = QLabel(
+            "Add an engine, then fill in the fields it declares. Every field below is "
+            "generated from the provider's <code>ProviderSetupSpec</code> — this dialog "
+            "contains no per-provider code. Add an engine twice to configure two "
+            "instances of it, each with its own alias."
+        )
+        intro.setWordWrap(True)
+        intro.setTextFormat(Qt.TextFormat.RichText)
+        outer.addWidget(intro)
+
+        outer.addLayout(self._build_add_row())
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        container = QWidget()
+        self._list_layout = QVBoxLayout(container)
+        self._list_layout.setContentsMargins(0, 0, 0, 0)
+        self._empty = QLabel(
+            "<i>No engines configured yet — pick one above and choose Add.</i>"
+        )
+        self._empty.setTextFormat(Qt.TextFormat.RichText)
+        self._list_layout.addWidget(self._empty)
+        self._list_layout.addStretch(1)
+        scroll.setWidget(container)
+        outer.addWidget(scroll, 1)
+
+        self._error = QLabel()
+        self._error.setObjectName("ErrorText")  # colored by the application stylesheet
+        self._error.setWordWrap(True)
+        outer.addWidget(self._error)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+        outer.addWidget(buttons)
+
+        for provider in config.providers:
+            self._add_row(provider)
+        self._refresh_empty_state()
+
+    # ---- construction ----------------------------------------------------------------
+
+    def _build_add_row(self) -> QHBoxLayout:
+        """The searchable engine dropdown and its Add button."""
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Add engine:"))
+
+        self._engines = QComboBox()
+        self._engines.setEditable(True)
+        self._engines.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._engines.setAccessibleName("Engine to add")
+        self._engines.setToolTip(
+            "Every registered provider, including third-party ones. Type to filter."
+        )
+        for descriptor in sorted(self._registry, key=lambda d: d.display_name.lower()):
+            # A derived descriptor is another instance's identity, not an engine anyone
+            # should add a *new* instance of — offer only real engines.
+            if descriptor.derived_from is None:
+                self._engines.addItem(descriptor.display_name, descriptor.id)
+
+        completer = self._engines.completer()
+        if completer is not None:
+            completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        # Enter in the dropdown adds, matching the Add button.
+        line = self._engines.lineEdit()
+        if line is not None:
+            line.returnPressed.connect(self._on_add_clicked)
+        row.addWidget(self._engines, 1)
+
+        add = QPushButton("Add")
+        add.setAccessibleName("Add engine")
+        add.setDefault(False)
+        add.setAutoDefault(False)
+        add.clicked.connect(self._on_add_clicked)
+        row.addWidget(add)
+        return row
+
+    def _on_add_clicked(self) -> None:
+        """Add the engine named in the dropdown, by data or by typed display name."""
+        descriptor = self._selected_descriptor()
+        if descriptor is None:
+            self._error.setText(
+                f"No engine matches {self._engines.currentText().strip()!r}."
+            )
+            return
+        self._error.clear()
+        alias = unique_alias(descriptor.id, {row.alias() for row in self._rows})
+        row = self._add_row(
+            ProviderConfig(
+                provider_id=descriptor.id,
+                alias=alias if alias != descriptor.id else None,
+                enabled=True,
+            )
+        )
+        self._refresh_empty_state()
+        row.set_expanded(True)
+        if alias != descriptor.id:
+            # The auto-suffixed alias is a guess; put the cursor there so renaming it is
+            # the obvious next keystroke rather than a discovery.
+            row.focus_alias()
+
+    def _selected_descriptor(self) -> ProviderDescriptor | None:
+        """Resolve the dropdown's current state to a descriptor, if it names one."""
+        text = self._engines.currentText().strip()
+        index = self._engines.findText(text)
+        if index >= 0:
+            data = self._engines.itemData(index)
+            if isinstance(data, str):
+                return self._registry.get(data)
+        if text and self._registry.has(text):
+            return self._registry.get(text)
+        return None
+
+    def _add_row(self, config: ProviderConfig) -> _ConfiguredEngineRow:
+        """Insert a configured-instance row for one provider configuration."""
+        descriptor = self._descriptor_for(config)
+        row = _ConfiguredEngineRow(descriptor, config)
+        row.delete_requested.connect(self._on_delete_row)
+        row.alias_changed.connect(self._error.clear)
+        # Before the trailing stretch, so rows stay top-aligned.
+        self._list_layout.insertWidget(self._list_layout.count() - 1, row)
+        self._rows.append(row)
+        return row
+
+    def _descriptor_for(self, config: ProviderConfig) -> ProviderDescriptor:
+        """The engine descriptor behind one configuration.
+
+        A configuration naming an engine that is no longer installed still has to render
+        — dropping it silently would delete the user's settings on the next save — so it
+        falls back to a minimal stand-in that declares no fields.
+        """
+        if self._registry.has(config.provider_id):
+            descriptor = self._registry.get(config.provider_id)
+            if descriptor.derived_from is None:
+                return descriptor
+            # A descriptor derived by a previous client run: report the engine it came
+            # from, so the row shows the engine rather than an instance of an instance.
+            if self._registry.has(descriptor.derived_from):
+                return self._registry.get(descriptor.derived_from)
+            return descriptor
+        return ProviderDescriptor(
+            id=config.provider_id,
+            display_name=f"{config.provider_id} (not installed)",
+            factory=_uninstalled_factory,
+        )
+
+    def _on_delete_row(self, row: object) -> None:
+        """Remove one configured instance."""
+        if not isinstance(row, _ConfiguredEngineRow):
+            return
+        self._rows.remove(row)
+        self._list_layout.removeWidget(row)
+        row.setParent(None)
+        row.deleteLater()
+        self._error.clear()
+        self._refresh_empty_state()
+
+    def _refresh_empty_state(self) -> None:
+        self._empty.setVisible(not self._rows)
+
+    # ---- save ------------------------------------------------------------------------
+
+    def _on_accept(self) -> None:
+        """Validate aliases and required fields before accepting, so errors surface here."""
+        problem = self._validate()
+        if problem:
+            self._error.setText(problem)
+            return
+        self.accept()
+
+    def _validate(self) -> str:
+        """The first problem preventing a save, or an empty string when there is none."""
+        seen: set[str] = set()
+        for row in self._rows:
+            alias = row.alias()
+            if not alias:
+                row.focus_alias()
+                return (
+                    f"{row.descriptor.display_name}: the alias is empty. Every configured "
+                    "engine needs an id."
+                )
+            if alias in seen:
+                row.focus_alias()
+                return f"Alias {alias!r} is used twice — each engine needs a unique alias."
+            seen.add(alias)
+
+        missing = [
+            f"{row.alias()}: {', '.join(row.missing_required())}"
+            for row in self._rows
+            if row.is_enabled() and row.missing_required()
+        ]
+        if missing:
+            for row in self._rows:
+                if row.is_enabled() and row.missing_required():
+                    row.set_expanded(True)
+            return "Required fields are empty — " + "; ".join(missing)
+        return ""
+
+    def result_config(self) -> DemoConfig:
+        """The configuration the user assembled.
+
+        Built by replacement rather than merge: the list is the whole truth about which
+        instances exist, so a deleted row has to disappear from the result.
+        """
+        return self._config.with_providers([row.to_config() for row in self._rows])
+
+
+def _uninstalled_factory(config: ProviderAdapterConfig) -> ProviderAdapter:
+    """Stand-in factory for a configuration whose provider is not installed.
+
+    Never called: the descriptor exists only so the dialog can render and re-save the
+    stored settings of a provider that has gone away.
+    """
+    raise RuntimeError(f"provider {config.provider_id!r} is not installed")
