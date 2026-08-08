@@ -77,4 +77,4 @@ is deployment-specific and cannot be defaulted.
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/azure-foundry.md](https://github.com/anthturner/anyinfer/blob/main/contracts/azure-foundry.md).
+[contracts/azure-foundry.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/azure-foundry.md).

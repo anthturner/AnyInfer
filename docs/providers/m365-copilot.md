@@ -96,4 +96,4 @@ through the same interface — not because it is a good default.
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/m365-copilot.md](https://github.com/anthturner/anyinfer/blob/main/contracts/m365-copilot.md).
+[contracts/m365-copilot.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/m365-copilot.md).

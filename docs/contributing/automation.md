@@ -1,7 +1,7 @@
 # Coding-agent instructions
 
 AnyInfer supports Codex, Claude Code, and GitHub Copilot with one authoritative instruction
-set. [`AGENTS.md`](https://github.com/anthturner/anyinfer/blob/main/AGENTS.md) is the source
+set. [`AGENTS.md`](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) is the source
 of truth for repository rules, architecture constraints, tests, and workstream ownership.
 
 The tool-specific files are discovery shims only:
@@ -14,7 +14,7 @@ The tool-specific files are discovery shims only:
 
 The shims point back to the canonical source and must not restate repository rules. This
 prevents one tool from operating under a stale or subtly different architecture. Provider
-drift works the same way: [`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/anyinfer/blob/main/contracts/DRIFT-CHECK.md)
+drift works the same way: [`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md)
 owns the procedure and report format; the Codex and Claude skills and Copilot prompt only
 make it discoverable in those tools.
 

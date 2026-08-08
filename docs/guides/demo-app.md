@@ -1,6 +1,6 @@
 # The pack-in demo application
 
-AnyInfer ships a PySide6 reference application in [`src/demo_app/`](https://github.com/anthturner/anyinfer/blob/main/src/demo_app). It
+AnyInfer ships a PySide6 reference application in [`src/demo_app/`](https://github.com/anthturner/AnyInfer/blob/main/src/demo_app). It
 is a *worked example of integration*, not part of the library's public API — nothing in
 `anyinfer` imports it, and nothing in it is importable from `anyinfer`.
 
@@ -50,6 +50,14 @@ provider's `ProviderSetupSpec` (see [Configuration](../reference/configuration.m
 Install a third-party adapter that advertises itself through the `anyinfer.providers`
 entry-point group and it appears in this dialog automatically, correctly rendered, with no
 change to the demo.
+
+The dialog also asks as little as it can. A provider marks the fields it already has a
+standard value for, and those go behind an **Advanced** disclosure instead of into the
+form — so adding OpenAI asks for a key rather than for a key, a base URL, and an API
+version, and adding Ollama or vLLM asks for nothing at all. Collapsed fields still show
+the value they will use, are still saved, and the disclosure opens by itself whenever a
+stored setting overrides one of them: hiding a setting that is in force would trade one
+confusion for a worse one.
 
 ### Streaming is the primitive
 
@@ -119,13 +127,13 @@ in place. Failed attempts appear inline in the transcript and in the telemetry t
 The demo follows the OS light/dark appearance by default and repaints live when it
 changes; *View → Theme* overrides it explicitly. The palette is the project's own
 deep-teal-and-amber brand palette (`docs/assets/anyinfer-palette.css`), rendered as a Qt
-stylesheet in [`demo_app/theme.py`](https://github.com/anthturner/anyinfer/blob/main/src/demo_app/theme.py). The choice is persisted with the rest of the
+stylesheet in [`demo_app/theme.py`](https://github.com/anthturner/AnyInfer/blob/main/src/demo_app/theme.py). The choice is persisted with the rest of the
 demo's settings.
 
 ## The integration pattern worth copying
 
 Qt owns the main thread; the `Client` owns a background loop thread.
-[`demo_app/engine.py`](https://github.com/anthturner/anyinfer/blob/main/src/demo_app/engine.py) keeps them
+[`demo_app/engine.py`](https://github.com/anthturner/AnyInfer/blob/main/src/demo_app/engine.py) keeps them
 apart:
 
 - Every call runs on a `QThreadPool` worker — never on the GUI thread.
@@ -141,7 +149,7 @@ any of them in an application is the mistake this demo exists to prevent.
 
 ## Tests
 
-The demo is covered by [`tests/demo_app/`](https://github.com/anthturner/anyinfer/blob/main/tests/demo_app), which runs headless
+The demo is covered by [`tests/demo_app/`](https://github.com/anthturner/AnyInfer/blob/main/tests/demo_app), which runs headless
 (`QT_QPA_PLATFORM=offscreen`) and drives real generations — streaming, retry, fallback, and
 structured output — through the offline provider:
 

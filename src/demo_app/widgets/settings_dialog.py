@@ -32,6 +32,13 @@ would stamp one provider's environment-variable convention onto all the others),
 mandatory field is marked with a red asterisk from its ``required`` flag, and a provider
 that accepts a *choice* of credential declares that as an ``any_of`` group with a
 ``requirement_note`` explaining it.
+
+Fields are also split by *prominence*, not just by kind. A provider marks the fields it
+already has a standard value for as ``advanced``, and those go behind a disclosure rather
+than into the form: an Ollama instance asks nothing at all, and an OpenAI one asks for a
+key rather than for a key, a base URL, and a version. The disclosure still opens on its
+own whenever a stored setting overrides one of those values, because the alternative —
+hiding a setting that is in force — trades one confusion for a worse one.
 """
 
 from __future__ import annotations
@@ -103,6 +110,88 @@ def unique_alias(preferred: str, taken: set[str]) -> str:
     return f"{preferred}-{suffix}"
 
 
+class _AdvancedFields(QWidget):
+    """A disclosure holding the fields a provider already has a standard value for.
+
+    Collapsed, it is one line; expanded, it is an ordinary form. The point is not to
+    hide anything — every field is still reachable and still saved — but to keep the
+    question a user is being asked ("what is your API key?") from arriving alongside four
+    settings that are already correct.
+    """
+
+    def __init__(self, fields: list[tuple[SetupField, QLabel, QWidget]]) -> None:
+        super().__init__()
+        self._editors = {f.key: editor for f, _, editor in fields}
+        self._expanded = False
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        count = len(fields)
+        self._toggle = QPushButton(
+            f"Advanced — {count} standard {'value' if count == 1 else 'values'}"
+        )
+        self._toggle.setObjectName("DisclosureButton")
+        self._toggle.setFlat(True)
+        self._toggle.setIconSize(QSize(14, 14))
+        self._toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._toggle.setToolTip(
+            "These already have working values. Change them only for a proxy, a mirror, "
+            "or a non-standard deployment."
+        )
+        self._toggle.setAutoDefault(False)
+        self._toggle.setDefault(False)
+        self._toggle.clicked.connect(self.toggle_expanded)
+        # Left-aligned like a link rather than centred like a command button.
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self._toggle)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        self._body = QWidget()
+        body_layout = QFormLayout(self._body)
+        body_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        body_layout.setContentsMargins(16, 2, 0, 2)
+        for _, label, editor in fields:
+            body_layout.addRow(label, editor)
+        self._body.setVisible(False)
+        layout.addWidget(self._body)
+
+        self._update_toggle()
+
+    @property
+    def editors(self) -> dict[str, QWidget]:
+        """The editors this section owns, keyed by setup-field key."""
+        return dict(self._editors)
+
+    @property
+    def expanded(self) -> bool:
+        """Whether the fields are currently shown."""
+        return self._expanded
+
+    def set_expanded(self, expanded: bool) -> None:
+        """Show or hide the advanced fields."""
+        self._expanded = expanded
+        self._body.setVisible(expanded)
+        self._update_toggle()
+
+    def toggle_expanded(self) -> None:
+        """Flip the disclosure."""
+        self.set_expanded(not self._expanded)
+
+    def reapply_theme(self) -> None:
+        """Re-render the chevron for the current palette."""
+        self._update_toggle()
+
+    def _update_toggle(self) -> None:
+        name = "chevron-down" if self._expanded else "chevron-right"
+        self._toggle.setIcon(themed_icon(self._toggle, name, size=14))
+        state = "Hide" if self._expanded else "Show"
+        self._toggle.setAccessibleName(f"{state} advanced settings")
+
+
 class _ProviderPanel(QWidget):
     """One instance's setup fields, rendered from its engine's setup spec.
 
@@ -119,37 +208,67 @@ class _ProviderPanel(QWidget):
         # unchanged so a save round-trip never silently drops it.
         self._options = dict(config.options)
 
-        layout = QFormLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(24, 4, 8, 8)
+        outer.setSpacing(4)
+
+        layout = self._form = QFormLayout()
         layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        layout.setContentsMargins(24, 4, 8, 8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        outer.addLayout(layout)
 
         locality = "local engine" if descriptor.locality == "local" else "hosted provider"
         subtitle = QLabel(f"<i>{locality} — engine <code>{descriptor.id}</code></i>")
         subtitle.setTextFormat(Qt.TextFormat.RichText)
         layout.addRow(subtitle)
 
-        for setup_field in descriptor.setup.fields:
+        setup = descriptor.setup
+        for setup_field in setup.essential_fields:
             label, editor = self._build_field(setup_field, config.values)
             self._editors[setup_field.key] = editor
             layout.addRow(label, editor)
 
-        if not descriptor.setup.fields:
+        if not setup.fields:
             layout.addRow(QLabel("<i>No configuration required.</i>"))
+        elif not setup.essential_fields:
+            # Every field this engine has already has a standard value, so there is
+            # nothing to ask. Say so, rather than showing a form that looks unfinished.
+            layout.addRow(
+                QLabel(
+                    "<i>Nothing to fill in — this engine runs on its standard "
+                    "settings.</i>"
+                )
+            )
 
-        if descriptor.setup.requirement_note:
-            note = QLabel(f"<i>{_REQUIRED_MARK} {descriptor.setup.requirement_note}</i>")
+        if setup.requirement_note:
+            note = QLabel(f"<i>{_REQUIRED_MARK} {setup.requirement_note}</i>")
             note.setTextFormat(Qt.TextFormat.RichText)
             note.setWordWrap(True)
             layout.addRow(note)
 
-        if descriptor.setup.host_shorthand is not None:
-            shorthand = descriptor.setup.host_shorthand
+        if setup.host_shorthand is not None:
+            shorthand = setup.host_shorthand
             layout.addRow(
                 QLabel(
                     f"<i>A bare hostname expands to "
                     f"{shorthand.scheme}://&lt;host&gt;:{shorthand.default_port}</i>"
                 )
             )
+
+        self._advanced: _AdvancedFields | None = None
+        if setup.advanced_fields:
+            self._advanced = _AdvancedFields(
+                [
+                    (f, *self._build_field(f, config.values))
+                    for f in setup.advanced_fields
+                ]
+            )
+            self._editors.update(self._advanced.editors)
+            outer.addWidget(self._advanced)
+            # An override already in force must not be hidden: a saved value here is the
+            # one case where the standard settings are *not* what this instance uses.
+            if any(config.values.get(f.key, "").strip() for f in setup.advanced_fields):
+                self._advanced.set_expanded(True)
 
     def _build_field(
         self, setup_field: SetupField, values: Mapping[str, str]
@@ -175,21 +294,39 @@ class _ProviderPanel(QWidget):
             line.setPlaceholderText(self._placeholder_for(setup_field))
             editor = line
 
-        if setup_field.help_text:
-            editor.setToolTip(setup_field.help_text)
+        tooltip = self._tooltip_for(setup_field)
+        if tooltip:
+            editor.setToolTip(tooltip)
 
         return _field_label(setup_field), editor
+
+    def _tooltip_for(self, setup_field: SetupField) -> str:
+        """The field's help text, with the value it falls back to when left blank.
+
+        Stating the standard value is what makes an empty editor readable: blank means
+        "use this", not "unset". It is only appended when the provider declared a
+        `SetupField.default_value` — a field with no default has nothing honest to say
+        here, and inventing one would be a guess presented as a fact.
+        """
+        parts = [setup_field.help_text] if setup_field.help_text else []
+        if setup_field.default_value:
+            parts.append(f"Left blank, this uses {setup_field.default_value}.")
+        return " ".join(parts)
 
     def _placeholder_for(self, setup_field: SetupField) -> str:
         """The example value to show in an empty editor.
 
         The provider's own `SetupField.placeholder` wins, because only it knows which
-        environment variable its credential conventionally lives in. The fallbacks are
-        deliberately generic: a kind-level default that named one provider's convention
-        would be wrong for every other provider that shares the kind.
+        environment variable its credential conventionally lives in, and its declared
+        `SetupField.default_value` comes next since a field with a default has a better
+        thing to show than an example: what will actually happen. The remaining fallbacks
+        are deliberately generic — a kind-level default that named one provider's
+        convention would be wrong for every other provider that shares the kind.
         """
         if setup_field.placeholder:
             return setup_field.placeholder
+        if setup_field.default_value:
+            return setup_field.default_value
         if setup_field.kind == "secret":
             return "env://VARIABLE_NAME or a literal key"
         if setup_field.kind == "endpoint":
@@ -227,6 +364,16 @@ class _ProviderPanel(QWidget):
     def options(self) -> dict[str, object]:
         """The options mapping this panel carries through untouched."""
         return dict(self._options)
+
+    @property
+    def advanced_section(self) -> _AdvancedFields | None:
+        """The disclosure holding this engine's standard-value fields, if it has any."""
+        return self._advanced
+
+    def reapply_theme(self) -> None:
+        """Re-render themed chrome inside the panel after a palette change."""
+        if self._advanced is not None:
+            self._advanced.reapply_theme()
 
 
 class _ConfiguredEngineRow(QFrame):
@@ -336,6 +483,12 @@ class _ConfiguredEngineRow(QFrame):
             )
         )
         self._delete.setIcon(themed_icon(self._delete, "trash", size=16))
+        self._panel.reapply_theme()
+
+    @property
+    def advanced_section(self) -> _AdvancedFields | None:
+        """This row's advanced-settings disclosure, if its engine declares one."""
+        return self._panel.advanced_section
 
     def focus_alias(self) -> None:
         """Put the cursor in the alias field, ready for renaming."""

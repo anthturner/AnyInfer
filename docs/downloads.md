@@ -8,9 +8,9 @@ hide:
 <span class="anyinfer-badge">v{{ extra.anyinfer_version }}</span>
 
 Every merge to `main` with a version bump produces a
-[GitHub Release](https://github.com/anthturner/anyinfer/releases) carrying the packages
+[GitHub Release](https://github.com/anthturner/AnyInfer/releases) carrying the packages
 below, built by the
-[release workflow](https://github.com/anthturner/anyinfer/blob/main/.github/workflows/release.yml).
+[release workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/release.yml).
 
 <div class="anyinfer-card-grid" markdown>
 
@@ -24,10 +24,10 @@ from the repository is byte-identical.
 ```bash
 pip install anyinfer
 # or, straight from the repository:
-pip install "anyinfer @ git+https://github.com/anthturner/anyinfer@main"
+pip install "anyinfer @ git+https://github.com/anthturner/AnyInfer@main"
 ```
 
-[Latest release :material-arrow-right:](https://github.com/anthturner/anyinfer/releases/latest)
+[Latest release :material-arrow-right:](https://github.com/anthturner/AnyInfer/releases/latest)
 { .anyinfer-button .anyinfer-button-secondary }
 
 </div>
@@ -38,9 +38,9 @@ pip install "anyinfer @ git+https://github.com/anthturner/anyinfer@main"
 
 Self-contained — unzip and run, no Python required. Fully offline, no credentials needed.
 
-:material-microsoft-windows: [Windows (x64)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-demo-windows-x64.zip)
-<br>:material-apple: [macOS (Apple silicon)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-demo-macos-arm64.zip) · [macOS (Intel)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-demo-macos-x64.zip)
-<br>:material-linux: [Linux (x64)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-demo-linux-x64.zip) · [Linux (arm64)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-demo-linux-arm64.zip)
+:material-microsoft-windows: [Windows (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-windows-x64.zip)
+<br>:material-apple: [macOS (Apple silicon)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-arm64.zip) · [macOS (Intel)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-x64.zip)
+<br>:material-linux: [Linux (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-linux-x64.zip) · [Linux (arm64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-linux-arm64.zip)
 
 Or with Python already installed:
 
@@ -56,9 +56,9 @@ pip install "anyinfer[demo]" && anyinfer-demo
 
 The OpenAI-compatible service, self-contained for integrations that do not use Python.
 
-:material-microsoft-windows: [Windows (x64)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-serve-windows-x64.zip)
-<br>:material-apple: [macOS (Apple silicon)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-serve-macos-arm64.zip) · [macOS (Intel)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-serve-macos-x64.zip)
-<br>:material-linux: [Linux (x64)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-serve-linux-x64.zip) · [Linux (arm64)](https://github.com/anthturner/anyinfer/releases/latest/download/anyinfer-serve-linux-arm64.zip)
+:material-microsoft-windows: [Windows (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-windows-x64.zip)
+<br>:material-apple: [macOS (Apple silicon)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-macos-arm64.zip) · [macOS (Intel)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-macos-x64.zip)
+<br>:material-linux: [Linux (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-linux-x64.zip) · [Linux (arm64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-serve-linux-arm64.zip)
 
 Or with Python already installed:
 
@@ -98,7 +98,7 @@ The core depends on only `httpx2` and `jsonschema`; everything else is an extra.
 
 ## Previous releases and checksums
 
-The [releases page](https://github.com/anthturner/anyinfer/releases) keeps every prior
+The [releases page](https://github.com/anthturner/AnyInfer/releases) keeps every prior
 version with its changelog, generated from the pull requests that landed between
 releases, plus the checksums for every attached asset. The versioning and branch policy
 is documented in the [release strategy](contributing/releasing.md).

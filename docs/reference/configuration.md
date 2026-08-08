@@ -131,6 +131,31 @@ setup.any_of                                 # (('api_key', 'oauth_token'),)
 setup.requirement_note                       # why, in one line
 ```
 
+### Which fields to actually ask for
+
+Not every declared field is a question. A provider knows its own endpoint, its API
+version, and where AWS keeps its credentials; what it cannot know is your key or your
+account. The spec draws that line itself, so an application prompting for setup does not
+have to infer it from help text:
+
+```python
+setup = ai.default_registry.get("openai").setup
+[f.key for f in setup.essential_fields]  # ['api_key']  — ask for these
+[f.key for f in setup.advanced_fields]   # ['base_url'] — offer these, folded away
+```
+
+An advanced field is never required and never part of an `any_of` group, so a form built
+from `essential_fields` alone can always be saved. Each one carries the value it falls
+back to in `SetupField.default_value` (`https://api.openai.com/v1` here), which is what
+lets a collapsed field still say what it will do. Render that value rather than
+pre-filling the editor with it: a saved copy of today's default keeps overriding the real
+default long after it has moved on.
+
+The two extremes are worth knowing. `ollama`, `vllm`, and the other local engines have no
+essential fields at all — there is nothing to fill in. `azure-foundry`, `runpod`, and
+anything else whose URL embeds an account or endpoint id keeps `base_url` essential,
+because no default could be right.
+
 ## Client settings
 
 ```python

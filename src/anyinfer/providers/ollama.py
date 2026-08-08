@@ -433,6 +433,8 @@ descriptor = ProviderDescriptor(
                 label="Server address",
                 kind="endpoint",
                 required=False,
+                advanced=True,
+                default_value=_DEFAULT_BASE_URL,
                 help_text="Defaults to http://127.0.0.1:11434. A bare hostname is expanded.",
             ),
             SetupField(
@@ -440,6 +442,7 @@ descriptor = ProviderDescriptor(
                 label="API key",
                 kind="secret",
                 required=False,
+                advanced=True,
                 help_text="Only needed for proxied deployments that require auth.",
                 placeholder="env://OLLAMA_API_KEY or a literal key",
             ),

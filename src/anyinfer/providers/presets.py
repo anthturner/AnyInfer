@@ -79,6 +79,13 @@ class CompatPreset:
         locality: ``hosted`` services need a key; ``local`` engines default to loopback.
         key_env: Conventional environment variable for the API key, used in help text.
         requires_api_key: Whether requests fail without a credential.
+        accepts_api_key: Whether a credential can be sent at all when one is not required.
+            True for the ordinary keyless local engine, which authenticates once its
+            operator starts it with ``--api-key`` or puts a reverse proxy in front of it.
+            False only where a credential provably would not travel in the header the
+            adapter sends: Lemonade documents an ``?api_key=`` query parameter, and Docker
+            Model Runner ignores ``Authorization`` outright. Offering a key field there
+            would take a value, send it, and still fail to authenticate.
         requires_base_url: Whether a base URL must be supplied (self-hosted, per-account).
         base_url_hint: Help text describing the expected base URL shape.
         models_listing: Whether ``GET /models`` exists. Without it, discovery returns
@@ -92,7 +99,7 @@ class CompatPreset:
             documented control (use ``provider_options`` for provider-specific spellings).
         default_port: Port used by the local host shorthand (``myhost`` →
             ``http://myhost:PORT``).
-        note: One-line quirk summary rendered into setup help text.
+        note: One-line quirk summary, rendered into the generated provider index.
     """
 
     id: str
@@ -102,6 +109,7 @@ class CompatPreset:
     locality: Literal["hosted", "local"] = "hosted"
     key_env: str = ""
     requires_api_key: bool = True
+    accepts_api_key: bool = True
     requires_base_url: bool = False
     base_url_hint: str = ""
     models_listing: bool = True
@@ -1117,6 +1125,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         base_url="http://127.0.0.1:13305/v1",
         locality="local",
         requires_api_key=False,
+        accepts_api_key=False,
         default_port=13305,
         note="AMD-sponsored server with Ryzen AI NPU backends. Note the credential is "
         "not a bearer token: when LEMONADE_API_KEY is set the server wants it as an "
@@ -1130,6 +1139,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         aliases=("dmr",),
         locality="local",
         requires_api_key=False,
+        accepts_api_key=False,
         default_port=12434,
         note="Built into Docker Desktop. The OpenAI routes live under /engines/v1, not "
         "/v1. From inside a container the host is model-runner.docker.internal. The "
@@ -1173,10 +1183,20 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
 
 
 def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
-    """Build the declarative config-UI spec for one preset."""
+    """Build the declarative config-UI spec for one preset.
+
+    Which of the two fields a user is actually asked for depends on the preset, and the
+    two cases are mirror images. A hosted service knows its endpoint and not your key, so
+    the key is the question and the URL folds away. A local engine knows neither — but its
+    address has a conventional default and its credential usually does not exist at all,
+    so *both* fold away and adding it asks nothing.
+    """
     fields: list[SetupField] = []
-    if preset.requires_api_key or preset.locality == "hosted":
+    if preset.requires_api_key or preset.locality == "hosted" or preset.accepts_api_key:
+        optional_local = not preset.requires_api_key and preset.locality == "local"
         hint = "Accepts a literal, env://VAR, or credential://system/name."
+        if optional_local:
+            hint = f"Only needed if this server was started with authentication. {hint}"
         if preset.key_env:
             hint = f"Conventionally env://{preset.key_env}. {hint}"
         fields.append(
@@ -1185,6 +1205,10 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
                 label="API key",
                 kind="secret",
                 required=preset.requires_api_key,
+                # A local engine's credential is the exception rather than the setup step:
+                # keyless is how these ship, and a key exists only once someone turned
+                # authentication on. Hosted keys stay in front of the user.
+                advanced=optional_local,
                 help_text=hint,
                 # The preset table already knows this provider's conventional variable,
                 # so the example in an empty editor can name it rather than leaving a UI
@@ -1205,6 +1229,11 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
             label="Base URL",
             kind="endpoint",
             required=preset.requires_base_url,
+            # A preset with a default endpoint has already answered this question; one
+            # whose URL embeds an account id, endpoint id, or cluster host has not, and
+            # that is exactly the set that declares ``requires_base_url``.
+            advanced=preset.base_url is not None and not preset.requires_base_url,
+            default_value=preset.base_url or "",
             help_text=url_help,
             placeholder=preset.base_url or "",
         )

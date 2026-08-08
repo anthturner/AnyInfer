@@ -98,4 +98,4 @@ See [the local subsystem](../concepts/local.md).
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/llama-cpp.md](https://github.com/anthturner/anyinfer/blob/main/contracts/llama-cpp.md).
+[contracts/llama-cpp.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/llama-cpp.md).

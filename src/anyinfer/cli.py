@@ -650,7 +650,15 @@ def _providers(args: argparse.Namespace) -> int:
                         "locality": d.locality,
                         "requires_base_url": d.requires_base_url,
                         "fields": [
-                            {"key": f.key, "kind": f.kind, "required": f.required}
+                            {
+                                "key": f.key,
+                                "kind": f.kind,
+                                "required": f.required,
+                                # What a consuming application needs to prompt well: which
+                                # fields to ask for, and what the rest already do.
+                                "advanced": f.advanced,
+                                "default": f.default_value,
+                            }
                             for f in d.setup.fields
                         ],
                     }
@@ -664,9 +672,18 @@ def _providers(args: argparse.Namespace) -> int:
     for descriptor in descriptors:
         aliases = f" (aliases: {', '.join(descriptor.aliases)})" if descriptor.aliases else ""
         print(f"{descriptor.id:<16} {descriptor.display_name}{aliases}")
-        required = [f.key for f in descriptor.setup.fields if f.required]
+        setup = descriptor.setup
+        required = [f.key for f in setup.fields if f.required]
         if required:
             print(f"{'':<16} requires: {', '.join(required)}")
+        optional = [f.key for f in setup.essential_fields if not f.required]
+        if optional:
+            print(f"{'':<16} accepts:  {', '.join(optional)}")
+        if setup.advanced_fields:
+            print(
+                f"{'':<16} standard: "
+                f"{', '.join(f.key for f in setup.advanced_fields)}"
+            )
     return 0
 
 

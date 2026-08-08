@@ -71,10 +71,10 @@ anyinfer = "anyinfer.cli:main"
 anyinfer-demo = "demo_app:main"
 
 [project.urls]
-Homepage = "https://github.com/anthturner/anyinfer"
-Documentation = "https://anthturner.github.io/anyinfer/"
-Changelog = "https://github.com/anthturner/anyinfer/releases"
-Issues = "https://github.com/anthturner/anyinfer/issues"
+Homepage = "https://github.com/anthturner/AnyInfer"
+Documentation = "https://anyinfer.dev/"
+Changelog = "https://github.com/anthturner/AnyInfer/releases"
+Issues = "https://github.com/anthturner/AnyInfer/issues"
 
 # The developer task runner (workspace.py) deliberately does NOT ship: a wheel that
 # installs a generic top-level `workspace` module would collide with unrelated

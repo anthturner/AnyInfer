@@ -155,6 +155,8 @@ def register_demo_provider(registry: ProviderRegistry) -> None:
                     label="Base URL",
                     kind="endpoint",
                     required=False,
+                    advanced=True,
+                    default_value="http://demo.invalid/v1",
                     help_text=(
                         "Ignored — requests are served in-process by "
                         "anyinfer.testing.fakes, never over a socket."

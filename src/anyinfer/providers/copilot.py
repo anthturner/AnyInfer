@@ -362,6 +362,9 @@ descriptor = ProviderDescriptor(
                 label="Copilot CLI path",
                 kind="endpoint",
                 required=False,
+                advanced=True,
+                # No ``default_value``: the fallback is the SDK's own CLI discovery
+                # rather than a fixed path this side could name.
                 help_text=f"Defaults to CLI discovery, or the {_CLI_PATH_ENV} environment "
                 "variable. Authentication is delegated to 'copilot login'.",
             ),

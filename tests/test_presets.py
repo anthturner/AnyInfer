@@ -52,6 +52,52 @@ def test_hosted_presets_declare_an_api_key_field() -> None:
         assert "base_url" in keys, f"{preset.id} must allow an endpoint override"
 
 
+def test_a_keyless_local_engine_can_still_be_given_a_key() -> None:
+    """Started with ``--api-key``, or put behind a proxy, and it needs one after all.
+
+    The original gap: a local preset declared no credential field at all, so a vLLM
+    server launched with authentication was unconfigurable from any UI driven by the
+    setup spec — the field existed on `ProviderSettings` and nowhere a user could reach.
+    """
+    for descriptor in preset_descriptors():
+        preset = PRESETS_BY_ID[descriptor.id]
+        if preset.locality != "local" or not preset.accepts_api_key:
+            continue
+        key_field = next(f for f in descriptor.setup.fields if f.key == "api_key")
+        assert not key_field.required, f"{preset.id} must still work keyless"
+        assert key_field.advanced, f"{preset.id} must not ask for a key it rarely needs"
+
+
+def test_a_preset_whose_key_would_not_authenticate_offers_no_key_field() -> None:
+    """Lemonade wants ``?api_key=``; Docker Model Runner ignores the header outright.
+
+    Taking a credential, sending it in a header neither of them reads, and then failing
+    to authenticate is worse than not offering the field.
+    """
+    for descriptor in preset_descriptors():
+        if PRESETS_BY_ID[descriptor.id].accepts_api_key:
+            continue
+        keys = {f.key for f in descriptor.setup.fields}
+        assert "api_key" not in keys, f"{descriptor.id} cannot use a bearer credential"
+
+
+def test_a_preset_with_a_default_endpoint_does_not_ask_for_one() -> None:
+    """The split a consuming app relies on: hosted asks for a key, local asks nothing."""
+    for descriptor in preset_descriptors():
+        preset = PRESETS_BY_ID[descriptor.id]
+        essential = {f.key for f in descriptor.setup.essential_fields}
+        if preset.requires_base_url:
+            assert "base_url" in essential, f"{preset.id} must prompt for its endpoint"
+        else:
+            assert "base_url" not in essential, f"{preset.id} already knows its endpoint"
+        if preset.locality == "local" and not preset.requires_api_key:
+            # Nothing at all to fill in, except for the two engines whose address cannot
+            # be guessed: KServe is a cluster service host, and Foundry Local picks its
+            # port at service start.
+            assert essential <= {"base_url"}, f"{preset.id} should need no setup at all"
+            assert bool(essential) == preset.requires_base_url
+
+
 def test_presets_without_a_default_base_url_require_one() -> None:
     for preset in COMPAT_PRESETS:
         if preset.base_url is None:

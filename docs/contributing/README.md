@@ -1,7 +1,7 @@
 # Contributing
 
 Security vulnerabilities do not belong in public issues. Follow the repository's
-[security policy](https://github.com/anthturner/anyinfer/security/policy) for private
+[security policy](https://github.com/anthturner/AnyInfer/security/policy) for private
 reporting.
 
 ## Setup
@@ -17,7 +17,7 @@ Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI
 
 ## The task runner
 
-[`workspace.py`](https://github.com/anthturner/anyinfer/blob/main/workspace.py) is the one entry point for routine commands. It works
+[`workspace.py`](https://github.com/anthturner/AnyInfer/blob/main/workspace.py) is the one entry point for routine commands. It works
 as `python workspace.py <verb>` in a fresh clone, and as `workspace <verb>` once installed.
 The repo also ships wrapper scripts — `./workspace` (sh) and `workspace.cmd` (Windows) —
 that run the checkout's `workspace.py` with a repo-local `.venv` when one exists, so
@@ -57,10 +57,16 @@ tells you everything that is broken:
 | `test` | `pytest -q`, the full suite, headless |
 | `conformance` | The provider conformance suite and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
+| `docs-build` | `mkdocs build --strict` — the exact artifact the Pages deploy publishes |
+
+That table is the whole pipeline: every step of every CI job is one of these phases,
+invoked as `python workspace.py check --only=<phase>`. A green `check` therefore means what
+a green CI run means, with one honest exception — CI also runs the `test` phase across
+Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners can cover.
 
 `--skip=a,b` leaves phases out; `--only=a,b` runs just those; the two are mutually
-exclusive. The published site's strict build is a gate too, but it is an *artifact*
-build, so it lives under `python workspace.py build docs` — CI runs it right after `docs-check`.
+exclusive. `python workspace.py build docs` runs the same strict site build as the
+`docs-build` phase, for when you want the artifact rather than the verdict.
 
 The formatter is deliberately **not** a default gate — it reflows argv-style flag/value
 pairs one per line, which makes the llama-server tuner and the provider payload builders
@@ -80,9 +86,9 @@ If one of these fails, the fix is almost always to move code, not to loosen the 
 
 ## Where to read first
 
-1. [DESIGN.md](https://github.com/anthturner/anyinfer/blob/main/DESIGN.md) — architecture and decision rationale. Start with §3 and §23.
-2. [IMPLEMENTATION.md](https://github.com/anthturner/anyinfer/blob/main/IMPLEMENTATION.md) — normative types and algorithms.
-3. [NOTES.md](https://github.com/anthturner/anyinfer/blob/main/NOTES.md) — decisions, open questions, and the competitive review that
+1. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture and decision rationale. Start with §3 and §23.
+2. [IMPLEMENTATION.md](https://github.com/anthturner/AnyInfer/blob/main/IMPLEMENTATION.md) — normative types and algorithms.
+3. [NOTES.md](https://github.com/anthturner/AnyInfer/blob/main/NOTES.md) — decisions, open questions, and the competitive review that
    shaped several behaviors.
 4. [Architecture](architecture.md) — the condensed version of the rules.
 
@@ -131,11 +137,11 @@ non-obvious constraints:
 A change touching an adapter's wire behavior includes:
 
 - the adapter change;
-- an updated [contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/README.md) in the same change set;
+- an updated [contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md) in the same change set;
 - conformance results;
 - its provider page, if behavior changed.
 
-Run the [drift check](https://github.com/anthturner/anyinfer/blob/main/contracts/DRIFT-CHECK.md) before starting adapter work, so you are
+Run the [drift check](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md) before starting adapter work, so you are
 coding against what the provider does *now*.
 
 ## More

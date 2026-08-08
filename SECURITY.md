@@ -8,7 +8,7 @@ the `main` branch; older pre-1.0 releases are not maintained in parallel.
 ## Report a vulnerability
 
 Do not open a public issue. Use
-[GitHub private vulnerability reporting](https://github.com/anthturner/anyinfer/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/anthturner/AnyInfer/security/advisories/new).
 If that form is unavailable, email `anthony@bitoblivion.com` with the subject
 `AnyInfer security report`.
 

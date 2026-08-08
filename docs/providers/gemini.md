@@ -140,7 +140,7 @@ empty successful answer — and a [`Route`](../concepts/routing.md) with
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/gemini.md)
+- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/gemini.md)
   — the exact wire details this adapter depends on.
 - [Capabilities and provenance](../concepts/capabilities.md) — how discovered limits are
   ranked.

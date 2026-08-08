@@ -273,10 +273,18 @@ output_per_1m: Decimal, currency="USD")`, `LocalModelInfo(artifact_size_bytes, p
 quantization, est_ram_bytes, est_vram_bytes, observed_vram_bytes)`) follow DESIGN.md §7
 verbatim. Descriptor/setup-spec types follow DESIGN.md §8 verbatim plus:
 `ProviderSetupSpec(fields: tuple[SetupField, ...], model_selection:
-Literal["discover-or-manual","manual-only"], host_shorthand: HostShorthand | None)`;
-`SetupField(key, label, kind, required, help_text)` with
-`kind ∈ {"endpoint","secret","api-version","model-list","reasoning-efforts","host-profile"}`;
-`HostShorthand(scheme: str, default_port: int)`.
+Literal["discover-or-manual","manual-only"], host_shorthand: HostShorthand | None,
+any_of: tuple[tuple[str, ...], ...], requirement_note: str)` exposing
+`essential_fields` / `advanced_fields`;
+`SetupField(key, label, kind, required, help_text, placeholder, advanced, default_value)`
+with `kind ∈ {"endpoint","secret","api-version","model-list","reasoning-efforts",
+"host-profile"}`; `HostShorthand(scheme: str, default_port: int)`.
+
+`advanced` splits the fields by *prominence*: a field the provider already has a working
+value for (`default_value`) folds behind a disclosure, leaving only what the user alone
+can answer in front of them. It is rejected at construction alongside `required` or
+`any_of` membership, since a UI that honors the disclosure would otherwise refuse a save
+naming a field that is not on screen.
 
 ## C. Normative algorithms
 

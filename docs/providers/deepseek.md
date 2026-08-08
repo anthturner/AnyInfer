@@ -107,7 +107,7 @@ behavior — the reasoning channel and cache accounting above are only wired the
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/deepseek.md)
+- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/deepseek.md)
 - [Presets](presets.md) — other OpenAI-compatible providers serving DeepSeek models.
 
 </div>

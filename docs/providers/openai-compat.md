@@ -69,4 +69,4 @@ code is unaffected.
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/openai-compat.md](https://github.com/anthturner/anyinfer/blob/main/contracts/openai-compat.md).
+[contracts/openai-compat.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai-compat.md).

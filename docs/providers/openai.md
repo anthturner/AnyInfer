@@ -65,4 +65,4 @@ provider_options={"openai": {"store": False, "service_tier": "flex"}}
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/openai.md](https://github.com/anthturner/anyinfer/blob/main/contracts/openai.md).
+[contracts/openai.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai.md).

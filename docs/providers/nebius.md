@@ -81,4 +81,4 @@ scale. Send those explicitly through `provider_options` when you need them.
 ## Wire contract
 
 For the exact fields this adapter sends and reads, see
-[contracts/nebius.md](https://github.com/anthturner/anyinfer/blob/main/contracts/nebius.md).
+[contracts/nebius.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/nebius.md).

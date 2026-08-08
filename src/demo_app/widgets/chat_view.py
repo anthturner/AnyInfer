@@ -13,9 +13,10 @@ part of the answer text.
 from __future__ import annotations
 
 import html
+import math
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
+from PySide6.QtGui import QFont, QResizeEvent, QTextOption
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
     QApplication,
@@ -44,6 +45,108 @@ __all__ = [
     "WelcomeView",
 ]
 
+#: How wide a bubble may grow before its text wraps, per role.
+USER_BUBBLE_MAX_WIDTH = 560
+ASSISTANT_BUBBLE_MAX_WIDTH = 720
+
+#: Horizontal space a bubble spends on its own border and padding.
+_BUBBLE_CHROME = 26
+
+
+class _MessageBody(QTextEdit):
+    """A read-only text view that is exactly as tall as the text it holds.
+
+    A body that scrolls hides the answer behind scrollbars even when the transcript has
+    room to spare, so this view never scrolls: it wraps at whatever width it is given and
+    reports the resulting document height as its own fixed height. Its width hint is the
+    text's unwrapped width, capped at ``maximum_width``, so short turns stay narrow and
+    long ones use the full bubble.
+    """
+
+    def __init__(self, maximum_width: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._maximum_width = maximum_width
+        self._measuring = False
+        self._width_cache: int | None = None
+        self._width_revision = -1
+        self.setObjectName("MessageBody")
+        self.setReadOnly(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Fenced code is the one block Qt will not wrap on its own, and a bubble is too
+        # narrow to lose the right half of a line to. Anything still too wide — a table —
+        # keeps a horizontal bar rather than being clipped away silently.
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.document().setDefaultStyleSheet("pre, code { white-space: pre-wrap; }")
+        self.document().setDocumentMargin(0)
+        self.document().documentLayout().documentSizeChanged.connect(self._on_document_resized)
+        self.sync_size()
+
+    def sizeHint(self) -> QSize:  # noqa: N802 — Qt's spelling
+        return QSize(self._natural_width(), self._content_height())
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 — Qt's spelling
+        return QSize(0, self._content_height())
+
+    def sync_size(self) -> None:
+        """Pin the height to the wrapped document and re-ask the layout for a width."""
+        height = self._content_height()
+        if self.minimumHeight() != height or self.maximumHeight() != height:
+            self.setFixedHeight(height)
+        self.updateGeometry()
+
+    # ---- internals -----------------------------------------------------------------
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 — Qt's spelling
+        """Re-fit the height whenever a new width changes how the text wraps."""
+        super().resizeEvent(event)
+        if not self._measuring:
+            self.sync_size()
+
+    def _on_document_resized(self, *_: object) -> None:
+        if not self._measuring:
+            self.sync_size()
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 — Qt's spelling
+        """Drop the cached width when the font or style changes its text metrics."""
+        if event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._width_revision = -1  # metrics moved; the cached width no longer holds
+        super().changeEvent(event)
+
+    def _content_height(self) -> int:
+        height = max(1, math.ceil(self.document().size().height()))
+        scrollbar = self.horizontalScrollBar()
+        if scrollbar.isVisible():
+            height += scrollbar.sizeHint().height()  # room for the bar, not under it
+        return height
+
+    def _natural_width(self) -> int:
+        """The width this text would need unwrapped, clamped to the bubble maximum.
+
+        Measuring lays the document out unwrapped and then back again — two extra layouts
+        — so the result is cached per document revision: streaming appends measure once per
+        delta no matter how often the layout asks for a size hint.
+        """
+        document = self.document()
+        if self._width_cache is not None and self._width_revision == document.revision():
+            return self._width_cache
+        self._width_revision = document.revision()
+        wrapped_width = document.textWidth()
+        # The unwrapped relayout re-emits documentSizeChanged; `_measuring` keeps that from
+        # being mistaken for real content growth before the wrapped width is restored.
+        self._measuring = True
+        try:
+            document.setTextWidth(-1)
+            ideal = document.idealWidth()
+        finally:
+            document.setTextWidth(wrapped_width)
+            self._measuring = False
+        self._width_cache = min(self._maximum_width, math.ceil(ideal) + 1)
+        return self._width_cache
+
 
 class ReasoningFold(QWidget):
     """A per-message collapsible area for reasoning text, hidden until first used."""
@@ -70,6 +173,9 @@ class ReasoningFold(QWidget):
         self._body.setReadOnly(True)
         self._body.setFont(QFont("Consolas", 9))
         self._body.setVisible(False)
+        self._body.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self._body.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Reasoning is an aside, not the answer: it stays a bounded, scrolling box.
         self._body.setMaximumHeight(160)
         layout.addWidget(self._body)
 
@@ -137,14 +243,9 @@ class MessageBubble(QFrame):
         header.addWidget(self._copy_button)
         outer.addLayout(header)
 
-        self._body = QTextEdit()
-        self._body.setReadOnly(True)
-        self._body.setFrameShape(QFrame.Shape.NoFrame)
+        max_width = USER_BUBBLE_MAX_WIDTH if role == "user" else ASSISTANT_BUBBLE_MAX_WIDTH
+        self._body = _MessageBody(max_width - _BUBBLE_CHROME)
         self._body.setFont(QFont("Segoe UI", 10))
-        self._body.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        self._body.document().documentLayout().documentSizeChanged.connect(
-            self._resize_to_content
-        )
         outer.addWidget(self._body)
 
         self._reasoning = ReasoningFold()
@@ -153,7 +254,6 @@ class MessageBubble(QFrame):
         self._buffer = ""
         self._plain_only = role == "user"
         self._reapply_icon()
-        self._resize_to_content()
 
     # ---- content -----------------------------------------------------------------
 
@@ -197,10 +297,6 @@ class MessageBubble(QFrame):
         return self._buffer
 
     # ---- internals -----------------------------------------------------------------
-
-    def _resize_to_content(self) -> None:
-        height = self._body.document().size().height()
-        self._body.setFixedHeight(max(24, int(height) + 8))
 
     def _copy(self) -> None:
         QApplication.clipboard().setText(self._buffer)
@@ -368,10 +464,10 @@ class MessageList(QScrollArea):
         row.setContentsMargins(0, 0, 0, 0)
         if align_right:
             row.addStretch(1)
-            widget.setMaximumWidth(560)
+            widget.setMaximumWidth(USER_BUBBLE_MAX_WIDTH)
             row.addWidget(widget)
         else:
-            widget.setMaximumWidth(720 if stretch else 16_777_215)
+            widget.setMaximumWidth(ASSISTANT_BUBBLE_MAX_WIDTH if stretch else 16_777_215)
             row.addWidget(widget)
             row.addStretch(1)
         container = QWidget()

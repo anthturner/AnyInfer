@@ -242,6 +242,8 @@ descriptor = ProviderDescriptor(
                 label="Base URL",
                 kind="endpoint",
                 required=False,
+                advanced=True,
+                default_value=_DEFAULT_BASE_URL,
                 help_text=f"Defaults to {_DEFAULT_BASE_URL}.",
             ),
         ),

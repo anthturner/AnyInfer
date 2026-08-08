@@ -15,6 +15,8 @@ from anyinfer.registry import (
     HostShorthand,
     ProviderDescriptor,
     ProviderRegistry,
+    ProviderSetupSpec,
+    SetupField,
     normalize_provider_id,
 )
 from anyinfer.types.requests import ReasoningEffort
@@ -420,6 +422,66 @@ class TestSetupSpecInvariants:
             for group in descriptor.setup.any_of:
                 assert set(group) <= keys, f"{descriptor.id}: {group} not in {keys}"
                 assert len(group) > 1, f"{descriptor.id}: a one-field group is just required"
+
+    def test_no_field_a_user_must_fill_in_is_hidden(self) -> None:
+        """A save that refuses, naming a field that is not on screen, is a dead end.
+
+        `ProviderSetupSpec` refuses the combination at construction, so this cannot
+        currently fire — it is here because the invariant is about the whole registry
+        rather than about one spec, and a future descriptor built some other way would
+        still have to satisfy it.
+        """
+        for descriptor in ai.default_registry:
+            blocking = {key for group in descriptor.setup.any_of for key in group}
+            for setup_field in descriptor.setup.advanced_fields:
+                assert not setup_field.required, f"{descriptor.id}.{setup_field.key}"
+                assert setup_field.key not in blocking, f"{descriptor.id}.{setup_field.key}"
+
+    def test_no_provider_asks_for_an_endpoint_it_already_knows(self) -> None:
+        """A default base URL is an answered question; asking it again is noise.
+
+        This is the defect the essential/advanced split exists to prevent: every hosted
+        provider showing "Base URL" beside its API key made four of five fields on screen
+        ones nobody was meant to touch.
+        """
+        for descriptor in ai.default_registry:
+            if not descriptor.default_base_url:
+                continue
+            for setup_field in descriptor.setup.essential_fields:
+                assert setup_field.kind != "endpoint", (
+                    f"{descriptor.id}.{setup_field.key} is prompted for despite "
+                    f"defaulting to {descriptor.default_base_url}"
+                )
+
+    def test_every_hidden_field_says_what_it_does(self) -> None:
+        """Folded away with no default, no example, and no help text, it is a mystery box."""
+        silent = [
+            f"{d.id}.{f.key}"
+            for d in ai.default_registry
+            for f in d.setup.advanced_fields
+            if not (f.default_value or f.placeholder or f.help_text)
+        ]
+        assert silent == []
+
+    def test_a_required_advanced_field_is_rejected_at_construction(self) -> None:
+        """Caught as a provider-authoring error rather than as a user's dead end."""
+        with pytest.raises(ai.ConfigError):
+            ProviderSetupSpec(
+                fields=(
+                    SetupField("api_key", "Key", "secret", required=True, advanced=True),
+                )
+            )
+
+    def test_an_advanced_field_inside_an_any_of_group_is_rejected(self) -> None:
+        """One of the group has to be filled in, so none of them may be hidden."""
+        with pytest.raises(ai.ConfigError):
+            ProviderSetupSpec(
+                fields=(
+                    SetupField("api_key", "Key", "secret"),
+                    SetupField("oauth_token", "Token", "secret", advanced=True),
+                ),
+                any_of=(("api_key", "oauth_token"),),
+            )
 
     def test_a_field_in_an_any_of_group_is_not_also_individually_required(self) -> None:
         """Marking both would demand both, contradicting the group's "either" meaning."""

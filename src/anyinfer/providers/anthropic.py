@@ -499,6 +499,8 @@ descriptor = ProviderDescriptor(
                 label="API version",
                 kind="api-version",
                 required=False,
+                advanced=True,
+                default_value=ANTHROPIC_VERSION,
                 help_text=(
                     f"Leave empty unless pinning a version. Defaults to {ANTHROPIC_VERSION}."
                 ),

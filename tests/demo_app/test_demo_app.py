@@ -762,7 +762,7 @@ class TestSettingsDialog:
             ),
         )
         panel = _ProviderPanel(descriptor, ProviderConfig("marked"))
-        layout = panel.layout()
+        layout = panel._form
         assert isinstance(layout, QFormLayout)
         labels = {
             layout.itemAt(row, QFormLayout.ItemRole.LabelRole)
@@ -878,6 +878,111 @@ class TestSettingsDialog:
         assert "not installed" in dialog._rows[0].descriptor.display_name
         assert dialog.result_config().for_provider("gone-away").provider_id == "gone-away"
 
+    def test_standard_value_fields_start_folded_away(self, qapp: object):
+        """The prompt is what the provider cannot know; the rest waits behind a chevron."""
+        from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
+        from demo_app.widgets.settings_dialog import _ProviderPanel
+
+        descriptor = ProviderDescriptor(
+            id="folded",
+            display_name="Folded",
+            factory=lambda config: None,
+            setup=ProviderSetupSpec(
+                fields=(
+                    SetupField("api_key", "Key", "secret", required=True),
+                    SetupField(
+                        "base_url",
+                        "Endpoint",
+                        "endpoint",
+                        advanced=True,
+                        default_value="https://api.folded.example/v1",
+                    ),
+                )
+            ),
+        )
+        panel = _ProviderPanel(descriptor, ProviderConfig("folded"))
+        section = panel.advanced_section
+        assert section is not None
+        assert not section.expanded
+        assert not section._body.isVisibleTo(panel)
+        # Folded away, never dropped: a save still round-trips the value.
+        assert set(panel.values()) == {"api_key", "base_url"}
+
+    def test_a_folded_field_shows_the_value_it_will_use(self, qapp: object):
+        """An empty editor has to read as "uses this", not as "unset"."""
+        from PySide6.QtWidgets import QLineEdit
+
+        from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
+        from demo_app.widgets.settings_dialog import _ProviderPanel
+
+        descriptor = ProviderDescriptor(
+            id="defaulted",
+            display_name="Defaulted",
+            factory=lambda config: None,
+            setup=ProviderSetupSpec(
+                fields=(
+                    SetupField(
+                        "base_url",
+                        "Endpoint",
+                        "endpoint",
+                        advanced=True,
+                        default_value="http://127.0.0.1:9999/v1",
+                    ),
+                )
+            ),
+        )
+        panel = _ProviderPanel(descriptor, ProviderConfig("defaulted"))
+
+        editor = panel._editors["base_url"]
+        assert isinstance(editor, QLineEdit)
+        assert editor.placeholderText() == "http://127.0.0.1:9999/v1"
+        assert "http://127.0.0.1:9999/v1" in editor.toolTip()
+
+    def test_a_stored_override_opens_the_disclosure(self, qapp: object):
+        """Hiding a setting that is in force is worse than showing one that is not."""
+        from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
+        from demo_app.widgets.settings_dialog import _ProviderPanel
+
+        descriptor = ProviderDescriptor(
+            id="overridden",
+            display_name="Overridden",
+            factory=lambda config: None,
+            setup=ProviderSetupSpec(
+                fields=(
+                    SetupField(
+                        "base_url",
+                        "Endpoint",
+                        "endpoint",
+                        advanced=True,
+                        default_value="https://api.overridden.example/v1",
+                    ),
+                )
+            ),
+        )
+        panel = _ProviderPanel(
+            descriptor,
+            ProviderConfig("overridden", values={"base_url": "https://proxy.internal/v1"}),
+        )
+        section = panel.advanced_section
+        assert section is not None and section.expanded
+
+    def test_an_engine_with_only_standard_values_asks_nothing(self, qapp: object):
+        """Ollama and every keyless local engine land here — install it and go."""
+        from demo_app.widgets.settings_dialog import _ProviderPanel
+
+        descriptor = self._dialog()._registry.get("ollama")
+        panel = _ProviderPanel(descriptor, ProviderConfig("ollama"))
+
+        assert descriptor.setup.essential_fields == ()
+        assert panel.missing_required() == []
+        assert panel.advanced_section is not None
+        texts = [
+            panel._form.itemAt(row, panel._form.ItemRole.SpanningRole).widget().text()
+            for row in range(panel._form.rowCount())
+            if panel._form.itemAt(row, panel._form.ItemRole.SpanningRole) is not None
+        ]
+        assert any("standard settings" in text for text in texts)
+
     def test_the_dropdown_offers_engines_not_configured_instances(self, qapp: object):
         """A derived instance descriptor must not be offered as a new engine to add."""
         from anyinfer.registry import ProviderDescriptor
@@ -974,6 +1079,45 @@ class TestChatView:
 
         assert "bold" in bubble._body.toHtml()
         assert "font-weight" in bubble._body.toHtml() or "<strong>" in bubble._body.toHtml()
+
+    def test_bubbles_grow_to_fit_their_text_instead_of_scrolling(self, qapp: object):
+        """A long answer must be readable in full, not boxed behind scrollbars."""
+        from demo_app.widgets.chat_view import MessageBubble
+
+        bubble = MessageBubble("assistant", "demo-fake:reliable")
+        bubble.set_plain_text("A long answer. " * 60)
+        bubble.show()
+        qapp.processEvents()  # type: ignore[attr-defined]
+
+        body = bubble._body
+        assert body.height() >= body.document().size().height()
+        assert not body.verticalScrollBar().isVisible()
+        assert not body.horizontalScrollBar().isVisible()
+
+    def test_fenced_code_wraps_inside_the_bubble(self, qapp: object):
+        """Qt leaves <pre> unwrapped by default, which pushes code off the bubble's edge."""
+        from demo_app.widgets.chat_view import MessageBubble
+
+        bubble = MessageBubble("assistant", "demo-fake:reliable")
+        code = " + ".join(f"value_{index}" for index in range(40))
+        bubble.append_delta(f"```python\nx = {code}\n```\n")
+        bubble.render_final()
+        bubble.show()
+        qapp.processEvents()  # type: ignore[attr-defined]
+
+        body = bubble._body
+        assert body.document().size().width() <= body.viewport().width()
+
+    def test_long_turns_use_the_full_bubble_width_and_short_ones_do_not(self, qapp: object):
+        from demo_app.widgets.chat_view import ASSISTANT_BUBBLE_MAX_WIDTH, MessageBubble
+
+        short = MessageBubble("assistant", "demo-fake:reliable")
+        short.set_plain_text("Hi.")
+        long = MessageBubble("assistant", "demo-fake:reliable")
+        long.set_plain_text("A long answer. " * 60)
+
+        assert long._body.sizeHint().width() > short._body.sizeHint().width()
+        assert long._body.sizeHint().width() <= ASSISTANT_BUBBLE_MAX_WIDTH
 
     def test_copy_button_copies_the_message_text(self, qapp: object):
         from PySide6.QtWidgets import QApplication

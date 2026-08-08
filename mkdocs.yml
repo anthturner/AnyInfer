@@ -2,9 +2,9 @@ site_name: AnyInfer
 site_description: >-
   An application-owned hybrid inference runtime for Python, spanning hosted APIs,
   routing hubs, existing local services, and supervised llama.cpp.
-site_url: https://anthturner.github.io/anyinfer/
-repo_url: https://github.com/anthturner/anyinfer
-repo_name: anthturner/anyinfer
+site_url: https://anyinfer.dev/
+repo_url: https://github.com/anthturner/AnyInfer
+repo_name: anthturner/AnyInfer
 edit_uri: edit/main/docs/
 
 # docs/README.md is the table of contents GitHub renders when browsing the repo; the

@@ -104,7 +104,7 @@ OpenAI-compatible server works through [`openai-compat`](openai-compat.md).
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/lm-studio.md)
+- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/lm-studio.md)
 - [Ollama](ollama.md) — the other local engine with native discovery.
 - [The local subsystem](../concepts/local.md) — hardware detection and supervision.
 

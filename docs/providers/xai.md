@@ -97,7 +97,7 @@ cost and discovered pricing above are only wired there.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/xai.md)
+- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/xai.md)
 - [Capabilities and provenance](../concepts/capabilities.md) — why discovered pricing
   outranks the bundled table.
 

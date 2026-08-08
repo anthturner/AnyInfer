@@ -14,7 +14,7 @@ result = client.generate("Say hello in one sentence.", target="ollama:qwen3:8b")
 print(result.text, result.timing.first_token_ms)
 ```
 
-See the [documentation](https://anthturner.github.io/anyinfer/) for concepts, how-to
+See the [documentation](https://anyinfer.dev/) for concepts, how-to
 guides, and per-provider pages.
 """
 

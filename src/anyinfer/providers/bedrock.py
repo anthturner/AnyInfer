@@ -688,6 +688,7 @@ descriptor = ProviderDescriptor(
                 label="AWS region",
                 kind="host-profile",
                 required=False,
+                default_value=_DEFAULT_REGION,
                 help_text=f"Defaults to {_DEFAULT_REGION}.",
                 placeholder=_DEFAULT_REGION,
             ),
@@ -696,6 +697,10 @@ descriptor = ProviderDescriptor(
                 label="Runtime endpoint",
                 kind="endpoint",
                 required=False,
+                advanced=True,
+                # No ``default_value``: the default endpoint follows whatever region is
+                # configured, so stating one region's host as *the* standard would be
+                # wrong for everybody who changed the field above it.
                 help_text="Defaults to the regional Bedrock runtime host.",
                 placeholder=f"https://bedrock-runtime.{_DEFAULT_REGION}.amazonaws.com",
             ),
@@ -704,6 +709,7 @@ descriptor = ProviderDescriptor(
                 label="AWS access key ID",
                 kind="host-profile",
                 required=False,
+                advanced=True,
                 help_text=(
                     "Sign with an explicit access key instead of the ambient credential "
                     "chain. Requires the secret access key too."
@@ -715,6 +721,7 @@ descriptor = ProviderDescriptor(
                 label="AWS secret access key",
                 kind="secret",
                 required=False,
+                advanced=True,
                 help_text=(
                     "The secret half of the access key above. Accepts env:// and "
                     "credential://."
@@ -726,6 +733,7 @@ descriptor = ProviderDescriptor(
                 label="AWS session token",
                 kind="secret",
                 required=False,
+                advanced=True,
                 help_text="Only for temporary (STS) credentials.",
                 placeholder="env://AWS_SESSION_TOKEN",
             ),
@@ -734,6 +742,7 @@ descriptor = ProviderDescriptor(
                 label="AWS profile",
                 kind="host-profile",
                 required=False,
+                advanced=True,
                 help_text=(
                     "A named profile to resolve through boto3, when it is installed."
                 ),

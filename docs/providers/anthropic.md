@@ -69,4 +69,4 @@ emulation is invisible except in `structured_mechanism`.
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/anthropic.md](https://github.com/anthturner/anyinfer/blob/main/contracts/anthropic.md).
+[contracts/anthropic.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/anthropic.md).

@@ -104,7 +104,7 @@ Only chat-capable models are listed.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/cohere.md)
+- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/cohere.md)
 - [Structured output](../concepts/structured-output.md) — how the schema mechanism is chosen.
 
 </div>

@@ -278,6 +278,16 @@ QPushButton:default:hover { background: $gold; border-color: $gold; }
 QPushButton:default:disabled { background: $surface; border-color: $border; color: $muted; }
 QPushButton#IconButton { padding: 2px; border: none; background: transparent; }
 QPushButton#IconButton:hover { background: $accent_bg; border-color: $accent_border; }
+/* A disclosure reads as a label you can click, not as a command: chrome here would give
+   "Advanced" the same weight as the fields it is there to keep out of the way. */
+QPushButton#DisclosureButton {
+    border: none;
+    background: transparent;
+    color: $muted;
+    padding: 2px 4px;
+    text-align: left;
+}
+QPushButton#DisclosureButton:hover { color: $text; background: transparent; }
 
 QGroupBox {
     border: 1px solid $border;
@@ -310,6 +320,13 @@ QToolTip {
     color: $text;
     border: 1px solid $accent_border;
     padding: 4px;
+}
+
+/* The message body is the bubble's content, not a field inside it. */
+QTextEdit#MessageBody {
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 
 QFrame#MessageBubbleUser {

@@ -197,6 +197,8 @@ descriptor = ProviderDescriptor(
                 label="Server URL",
                 kind="endpoint",
                 required=False,
+                advanced=True,
+                default_value=_DEFAULT_BASE_URL,
                 help_text=(
                     f"Defaults to {_DEFAULT_BASE_URL}. A bare hostname expands to "
                     f"http://<host>:{_DEFAULT_PORT}."
@@ -207,6 +209,7 @@ descriptor = ProviderDescriptor(
                 label="API token",
                 kind="secret",
                 required=False,
+                advanced=True,
                 help_text="Only needed when LM Studio's authentication is enabled.",
                 placeholder="env://LM_STUDIO_API_KEY or a literal key",
             ),

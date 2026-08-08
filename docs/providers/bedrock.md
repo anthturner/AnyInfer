@@ -143,7 +143,7 @@ Claude; use `capability_overrides` where your account's rates differ.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/bedrock.md)
+- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/bedrock.md)
 - [Anthropic](anthropic.md) — Claude direct, without the Bedrock layer.
 - [Routing](../concepts/routing.md) — retries and fallback across regions or providers.
 

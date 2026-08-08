@@ -235,5 +235,5 @@ Use the OpenAI-compatible preset unless you specifically need Messages-dialect b
 
 Endpoint, auth, and quirk data for every preset was verified against the provider's live
 documentation; the per-provider details, dates, and sources live in the
-[contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/openai-compat-presets.md),
+[contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai-compat-presets.md),
 which the provider drift check re-audits.

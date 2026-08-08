@@ -276,6 +276,10 @@ descriptor = ProviderDescriptor(
                 label="Tenant ID",
                 kind="endpoint",
                 required=False,
+                advanced=True,
+                # Left blank, the tenant and client below are azure-identity's own
+                # defaults rather than values this side chooses, so neither declares a
+                # ``default_value`` it would only be guessing at.
                 help_text="Entra tenant for the interactive sign-in.",
                 placeholder="common",
             ),
@@ -284,6 +288,7 @@ descriptor = ProviderDescriptor(
                 label="Client ID",
                 kind="endpoint",
                 required=False,
+                advanced=True,
                 help_text=(
                     "Application (client) ID for the interactive sign-in. Not a secret; "
                     "omit to use the default public client."

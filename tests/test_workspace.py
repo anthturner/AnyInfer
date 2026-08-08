@@ -8,6 +8,7 @@ patched out, so the suite stays fast and never actually runs pytest inside pytes
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -127,7 +128,8 @@ class TestVerbs:
                 and (subcommand is None or (len(cmd) > 1 and cmd[1] == subcommand))
             )
 
-        # Fastest-feedback-first: static analysis, types, contracts, then the suites.
+        # Fastest-feedback-first: static analysis, types, contracts, then the suites,
+        # then the docs gates and the artifact build the deploy publishes.
         # The docs gates are the in-process sentinels the `recorded` fixture plants.
         positions = [
             position("ruff", "check"),
@@ -136,11 +138,27 @@ class TestVerbs:
             position("pytest"),
             recorded.index(["<docstrings>"]),
             recorded.index(["<doc-links>"]),
+            position("mkdocs", "build"),
         ]
         assert positions == sorted(positions), "phases must run in the documented order"
-        # The formatter is opt-in and the site build belongs to `build docs`.
+        # The formatter is the one gate that stays opt-in.
         assert not any(len(cmd) > 1 and cmd[1] == "format" for cmd in recorded)
-        assert not any("mkdocs" in Path(cmd[0]).name.lower() for cmd in recorded)
+
+    def test_check_covers_every_gate_ci_enforces(self, recorded):
+        """`check` is the whole pipeline: no CI job may run a gate it cannot reproduce.
+
+        The workflow reaches every gate through `check --only=<phase>`, so the phases the
+        workflow names and the phases the runner knows must be the same set — otherwise a
+        contributor's green `check` is a weaker claim than a green CI run.
+        """
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        invoked = set(re.findall(r"workspace\.py check --only=(\S+)", workflow))
+        assert invoked, "CI must drive the gates through `workspace check`"
+        assert invoked <= set(workspace.GATE_ORDER), "CI names a phase the runner lacks"
+        assert set(workspace.DEFAULT_GATES) <= invoked, "a default gate is not enforced by CI"
+        assert not re.search(r"run: python workspace\.py (?!check|build docs)", workflow), (
+            "CI must not run a gate outside `workspace check`"
+        )
 
     def test_check_announces_each_phase_with_a_heading(self, recorded, capsys):
         assert workspace.main(["check"]) == 0
@@ -189,10 +207,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The six default phases comprise nine steps — seven subprocesses plus the two
+        # The seven default phases comprise ten steps — eight subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
         # (conformance has two steps, docs-check three).
-        assert len(calls) == 9
+        assert len(calls) == 10
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

@@ -566,8 +566,11 @@ through the existing overlay machinery, with no resolver changes.
   `format_version`; `load()/save()/validate()`; precedence **explicit args > env vars >
   config file > defaults** (Frisket's documented ladder, generalized); ModelFit's hygiene
   rules (size caps, unknown-credential-shaped-field rejection); per-provider sections driven
-  by `ProviderSetupSpec` so a config wizard/UI is generic across engines; `HostShorthand`
-  expansion (`myserver` → `http://myserver:11434`).
+  by `ProviderSetupSpec` so a config wizard/UI is generic across engines — including which
+  fields to *ask* for, since the spec marks the ones it already has a standard value for
+  (`SetupField.advanced` / `default_value`) rather than presenting all fields as equals and
+  leaving each consuming app to sort them out; `HostShorthand` expansion
+  (`myserver` → `http://myserver:11434`).
 - **Credentials:** config/API accept `"sk-literal"`, `"env://OPENAI_API_KEY"`, or
   `"credential://system/openai"`. `CredentialResolver` protocol; shipped resolvers: literal,
   env, keyring (`[keyring]` extra, Frisket's model). Apps register custom resolvers. Every

@@ -60,4 +60,4 @@ drops.
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/openrouter.md](https://github.com/anthturner/anyinfer/blob/main/contracts/openrouter.md).
+[contracts/openrouter.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openrouter.md).

@@ -50,6 +50,9 @@ descriptor = ProviderDescriptor(
         fields=(
             SetupField(key="api_key", label="API key", kind="secret", required=True,
                        help_text="Accepts env:// and credential:// references."),
+            SetupField(key="base_url", label="Base URL", kind="endpoint",
+                       advanced=True, default_value="https://api.example.com/v1",
+                       help_text="Defaults to https://api.example.com/v1."),
         ),
     ),
     reasoning_translator=lambda effort: {} if effort is None else {"effort": effort},
@@ -62,8 +65,14 @@ descriptor = ProviderDescriptor(
 `setup` is what lets config UIs stay generic — never add a per-engine branch to UI code when
 you can add a declarative field here.
 
-Two fields worth understanding:
+Three fields worth understanding:
 
+- **`SetupField.advanced`** — set it on every field you already have a working value for,
+  and put that value in `default_value`. It is what keeps a config UI down to the
+  questions only the user can answer: mark the endpoint you default to, the version you
+  pin, and the credential path that only a non-standard deployment uses. A required field
+  may not be advanced — hiding something that blocks saving is the failure this prevents —
+  and `ProviderSetupSpec` rejects that combination at import time.
 - **`grammar_needs_prompt_injection`** — set it when your engine compiles a schema to a
   decoding grammar *without* conditioning the model on it. A grammar guarantees well-formed
   JSON, not meaningful JSON.

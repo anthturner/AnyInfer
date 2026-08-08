@@ -114,9 +114,10 @@ jobs:
         run: python workspace.py check --only=docs-check
 
       # The site must build cleanly too — a docs change that renders fine on GitHub but
-      # breaks the published site should fail here, not after deploy.
+      # breaks the published site should fail here, not after deploy. It goes through
+      # `check` like every other gate, so `workspace check` alone reproduces this job.
       - name: site build (strict)
-        run: python workspace.py build docs
+        run: python workspace.py check --only=docs-build
 
   # Aggregate gate. Branch protection on `develop` and `main` requires exactly this check,
   # so adding or renaming upstream jobs (or matrix rows) never silently un-protects a

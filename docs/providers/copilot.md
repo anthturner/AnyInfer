@@ -86,4 +86,4 @@ first-attempt failure rate than grammar or json_schema modes.
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/copilot.md](https://github.com/anthturner/anyinfer/blob/main/contracts/copilot.md).
+[contracts/copilot.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/copilot.md).

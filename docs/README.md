@@ -2,7 +2,7 @@
 
 **Start here.** This page is the table of contents; everything else is one click away.
 These same pages are published, with a generated SDK reference, at
-**[anthturner.github.io/anyinfer](https://anthturner.github.io/anyinfer/)**.
+**[anyinfer.dev](https://anyinfer.dev/)**.
 
 If you are in a hurry: [Quickstart](guides/quickstart.md) gets you from `pip install` to a
 working `generate()` call in about five minutes.
@@ -99,8 +99,8 @@ You are changing AnyInfer itself, or writing an adapter for it.
 - [Writing a provider adapter](contributing/writing-an-adapter.md) — including how to
   certify it against the conformance suite.
 - [The conformance suite](contributing/conformance.md)
-- [Provider contract snapshots](https://github.com/anthturner/anyinfer/blob/main/contracts/README.md) and the
-  [drift check](https://github.com/anthturner/anyinfer/blob/main/contracts/DRIFT-CHECK.md).
+- [Provider contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md) and the
+  [drift check](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md).
 - [Testing guide](contributing/testing.md) — fakes, cassettes, and what to test where.
 - [Branching and releases](contributing/releasing.md) — how a change becomes a release.
 
@@ -109,7 +109,7 @@ You are changing AnyInfer itself, or writing an adapter for it.
 ## Reference
 
 - [SDK reference](reference/api/README.md) — every public symbol, generated from the
-  docstrings (best read on the [published site](https://anthturner.github.io/anyinfer/reference/api/)).
+  docstrings (best read on the [published site](https://anyinfer.dev/reference/api/)).
 - [Error catalog](reference/errors.md) — every exception, when it is raised, and what its
   `hint` will tell your user.
 - [Conformance matrix](reference/conformance-matrix.md) — what each provider actually
@@ -125,8 +125,8 @@ You are changing AnyInfer itself, or writing an adapter for it.
 The architecture is settled and written down. These are the sources of truth for *why*
 things are the way they are:
 
-- [DESIGN.md](https://github.com/anthturner/anyinfer/blob/main/DESIGN.md) — architecture, module responsibilities, and decision rationale.
-- [IMPLEMENTATION.md](https://github.com/anthturner/anyinfer/blob/main/IMPLEMENTATION.md) — normative types, algorithms, and the build plan.
-- [NOTES.md](https://github.com/anthturner/anyinfer/blob/main/NOTES.md) — decisions, assumptions, open questions, risks, and the
+- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture, module responsibilities, and decision rationale.
+- [IMPLEMENTATION.md](https://github.com/anthturner/AnyInfer/blob/main/IMPLEMENTATION.md) — normative types, algorithms, and the build plan.
+- [NOTES.md](https://github.com/anthturner/AnyInfer/blob/main/NOTES.md) — decisions, assumptions, open questions, risks, and the
   competitive review that shaped several behaviors.
-- [AGENTS.md](https://github.com/anthturner/anyinfer/blob/main/AGENTS.md) — canonical repository automation instructions.
+- [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) — canonical repository automation instructions.

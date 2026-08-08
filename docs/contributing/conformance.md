@@ -6,7 +6,7 @@ you change providers" a checked claim rather than an aspiration.
 ## Division of labor
 
 - **The conformance suite** proves *our code matches our claims.*
-- **The [drift check](https://github.com/anthturner/anyinfer/blob/main/contracts/DRIFT-CHECK.md)** proves *our claims still match
+- **The [drift check](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md)** proves *our claims still match
   upstream.*
 
 Both are needed. Passing tests against a protocol that changed last month proves nothing.

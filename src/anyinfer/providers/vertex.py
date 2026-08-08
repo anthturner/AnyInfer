@@ -129,6 +129,7 @@ descriptor = ProviderDescriptor(
                 label="Location",
                 kind="host-profile",
                 required=False,
+                default_value=_GLOBAL_LOCATION,
                 help_text=(
                     f"Defaults to {_GLOBAL_LOCATION}. Newer models are served only from "
                     "the global endpoint."
@@ -139,6 +140,7 @@ descriptor = ProviderDescriptor(
                 label="Access token",
                 kind="secret",
                 required=False,
+                advanced=True,
                 help_text=(
                     "A pre-acquired OAuth access token (gcloud auth print-access-token). "
                     "Leave empty to use application default credentials. This is not a "
@@ -151,6 +153,7 @@ descriptor = ProviderDescriptor(
                 label="Service-account key",
                 kind="endpoint",
                 required=False,
+                advanced=True,
                 help_text=(
                     "Path to a service-account JSON key. Defaults to "
                     "GOOGLE_APPLICATION_CREDENTIALS."

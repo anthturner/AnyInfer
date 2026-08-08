@@ -145,6 +145,7 @@ descriptor = ProviderDescriptor(
                 label="API version",
                 kind="api-version",
                 required=False,
+                advanced=True,
                 help_text="Only needed for deployments that still require it.",
             ),
         ),

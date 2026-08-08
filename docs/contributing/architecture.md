@@ -1,6 +1,6 @@
 # Architecture
 
-The condensed version. [DESIGN.md](https://github.com/anthturner/anyinfer/blob/main/DESIGN.md) §23 has the complete rationale.
+The condensed version. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) §23 has the complete rationale.
 
 ## The shape
 

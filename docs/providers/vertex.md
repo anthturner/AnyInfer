@@ -122,7 +122,7 @@ point the [Anthropic adapter](anthropic.md) at that endpoint instead.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/anyinfer/blob/main/contracts/vertex.md)
+- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/vertex.md)
 - [Google Gemini](gemini.md) — the same models with API-key auth.
 
 </div>

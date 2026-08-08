@@ -127,4 +127,4 @@ See the [provider guides](providers/README.md) and the
 
 Pre-1.0 and under active development. Python 3.11+; Windows, macOS, and Linux are all
 first-class. MIT licensed. Sources, design documents, and the issue tracker live at
-[github.com/anthturner/anyinfer](https://github.com/anthturner/anyinfer).
+[github.com/anthturner/AnyInfer](https://github.com/anthturner/AnyInfer).

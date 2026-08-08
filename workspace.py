@@ -490,10 +490,23 @@ def cmd_info(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------------------
 
 
-GATE_ORDER = ("lint", "format", "types", "contracts", "test", "conformance", "docs-check")
+GATE_ORDER = (
+    "lint",
+    "format",
+    "types",
+    "contracts",
+    "test",
+    "conformance",
+    "docs-check",
+    "docs-build",
+)
 """Every phase ``check`` knows, in execution order: fastest feedback first (static
 analysis, then the type checker, then the architecture contracts), the suite after the
-cheap gates, and the documentation gates last because they partly re-run suite tests."""
+cheap gates, and the documentation gates last because they partly re-run suite tests.
+
+The set is exhaustive by design: every gate CI enforces is one of these phases, so a green
+``check`` and a green CI run mean the same thing. Adding a gate to the pipeline means
+adding a phase here, not a bare command to the workflow."""
 
 DEFAULT_GATES = tuple(name for name in GATE_ORDER if name != "format")
 """What a bare ``check`` runs. ``format`` is opt-in (``--only=format``): the formatter is
@@ -773,6 +786,16 @@ def _check_doc_links() -> int:
     return 0
 
 
+def _build_docs_site() -> int:
+    """Build the published site with the strict build the Pages deploy runs.
+
+    One function behind both entry points — the ``docs-build`` gate phase and
+    ``workspace build docs`` — because a gate that runs a *different* build from the one
+    that publishes is a gate that can pass while the deploy breaks.
+    """
+    return tool("mkdocs", "build", "--strict")
+
+
 def _gate_phases(*, fix: bool) -> dict[str, Phase]:
     """The gate phases, keyed by the names ``--skip``/``--only`` accept.
 
@@ -818,13 +841,21 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                 (
                     "conformance suite",
                     lambda: tool(
-                        "pytest", "tests/test_conformance.py", "tests/test_ollama.py", "-q"
+                        "pytest",
+                        "tests/test_conformance.py",
+                        "tests/test_ollama.py",
+                        "-q",
+                        env=_headless_env(),
                     ),
                 ),
                 (
                     "serve invariants (ADR-009)",
                     lambda: tool(
-                        "pytest", "tests/test_openai_roundtrip.py", "tests/test_serve_app.py", "-q"
+                        "pytest",
+                        "tests/test_openai_roundtrip.py",
+                        "tests/test_serve_app.py",
+                        "-q",
+                        env=_headless_env(),
                     ),
                 ),
             ),
@@ -844,6 +875,11 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                     ),
                 ),
             ),
+        ),
+        Phase(
+            "docs-build",
+            "the strict site build the Pages deploy publishes",
+            (("mkdocs build --strict", _build_docs_site),),
         ),
     ]
     return {phase.name: phase for phase in phases}
@@ -886,12 +922,16 @@ def _check_arguments(p: argparse.ArgumentParser) -> object:
 
 @verb(
     "check",
-    "Run the quality gates: lint, types, contracts, test, conformance, docs-check.",
+    "Run every CI gate: lint, types, contracts, test, conformance, docs-check, docs-build.",
     group="Quality",
     arguments=_check_arguments,
 )
 def cmd_check(args: argparse.Namespace) -> int:
     """Run the quality gates, the same set CI enforces, as ordered phases.
+
+    The phase list is the whole of CI: every step of every `ci.yml` job is one of these
+    phases, so a green run here is a green run there (modulo the interpreter and OS
+    matrix, which only the runners can cover).
 
     Phases, in run order — fastest feedback first, and the suite before the doc gates
     that partly re-run it:
@@ -903,6 +943,7 @@ def cmd_check(args: argparse.Namespace) -> int:
       test         the full pytest suite, headless
       conformance  provider conformance + the serve invariants (ADR-009)
       docs-check   docstring coverage, doc links, runnable doc examples
+      docs-build   the strict site build the Pages deploy publishes
 
     Select phases with --skip=a,b or --only=a,b (mutually exclusive). Every selected
     phase runs even after one fails, so a single invocation tells you everything that is
@@ -923,7 +964,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     return run_phases(selected, fail_fast=args.fail_fast)
 
 
-_CONTRACTS_URL = "https://github.com/anthturner/anyinfer/blob/main/contracts/README.md"
+_CONTRACTS_URL = "https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md"
 """Absolute because the matrix page cannot link outside the mkdocs docs/ tree."""
 
 _MATRIX_HEADER = """# Conformance matrix
@@ -1125,7 +1166,7 @@ def cmd_web(args: argparse.Namespace) -> int:
     on a loopback stdlib server — what you see is byte-for-byte what lands on GitHub
     Pages. Stop it with Ctrl+C.
     """
-    tool("mkdocs", "build", "--strict")
+    _build_docs_site()
     print()
     print(
         green(f"Site built. Browse it at http://127.0.0.1:{args.port}/")
@@ -1314,7 +1355,7 @@ def _write_bundle_info(
     """Drop a provenance file beside a standalone executable."""
     (app_dir / "BUNDLE-INFO.txt").write_text(
         f"{product} {version} ({_bundle_platform_tag()})\n"
-        f"https://github.com/anthturner/anyinfer\n"
+        f"https://github.com/anthturner/AnyInfer\n"
         f"\n{instructions.rstrip()}\n",
         encoding="utf-8",
     )
@@ -1603,7 +1644,7 @@ def cmd_build(args: argparse.Namespace) -> int:
             Phase(
                 "docs",
                 "the documentation site, strict (the Pages artifact)",
-                (("mkdocs build --strict", lambda: tool("mkdocs", "build", "--strict")),),
+                (("mkdocs build --strict", _build_docs_site),),
             )
         )
     if not phases:

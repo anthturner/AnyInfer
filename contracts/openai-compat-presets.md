@@ -21,6 +21,14 @@ parameter name (`max_tokens` vs `max_completion_tokens`), whether `GET /models` 
 providers publishing only low/medium/high, or a `reasoning: {effort}` object). Everything
 else in each entry is context for the drift check.
 
+One further knob is declarative but *not* wire logic: `accepts_api_key` controls whether a
+preset offers a credential field at all. It exists because two entries below authenticate
+somewhere other than the header this adapter sends — **lemonade** documents an `?api_key=`
+query parameter, and **docker-model-runner** ignores `Authorization` outright — so both are
+declared `accepts_api_key=False`. Every other keyless local engine does accept a bearer
+credential once its operator enables auth (see each entry's Auth line, which records the
+flag or setting that turns it on), and offers the field as an optional one.
+
 A second batch of twenty-three presets was added on 2026-08-07 (`featherless` through `triton`
 below), each verified against live documentation the same way. Four candidates surveyed in
 that pass were deliberately **not** added, because a preset would have been wrong rather

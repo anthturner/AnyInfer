@@ -82,4 +82,4 @@ provider_options={"ollama": {"keep_alive": "10m", "num_ctx": 8192, "num_gpu": 99
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see
-[contracts/ollama.md](https://github.com/anthturner/anyinfer/blob/main/contracts/ollama.md).
+[contracts/ollama.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/ollama.md).

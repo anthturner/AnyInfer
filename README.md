@@ -1,15 +1,15 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/anthturner/anyinfer/main/docs/assets/anyinfer-horizontal-dark.svg">
-    <img src="https://raw.githubusercontent.com/anthturner/anyinfer/main/docs/assets/anyinfer-horizontal-light.svg" alt="AnyInfer" width="480" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/anthturner/AnyInfer/main/docs/assets/anyinfer-horizontal-dark.svg">
+    <img src="https://raw.githubusercontent.com/anthturner/AnyInfer/main/docs/assets/anyinfer-horizontal-light.svg" alt="AnyInfer" width="480" />
   </picture>
 </p>
 
 <p align="center">
-  <a href="https://github.com/anthturner/anyinfer/actions/workflows/ci.yml"><img src="https://github.com/anthturner/anyinfer/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
-  <a href="https://anthturner.github.io/anyinfer/"><img src="https://img.shields.io/badge/docs-anthturner.github.io-2C7A6F" alt="Documentation" /></a>
-  <a href="https://github.com/anthturner/anyinfer/releases/latest"><img src="https://img.shields.io/github/v/release/anthturner/anyinfer?include_prereleases&label=release&color=E8963C" alt="Latest release" /></a>
-  <a href="https://github.com/anthturner/anyinfer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-2C7A6F" alt="MIT license" /></a>
+  <a href="https://github.com/anthturner/AnyInfer/actions/workflows/ci.yml"><img src="https://github.com/anthturner/AnyInfer/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+  <a href="https://anyinfer.dev/"><img src="https://img.shields.io/badge/docs-anyinfer.dev-2C7A6F" alt="Documentation" /></a>
+  <a href="https://github.com/anthturner/AnyInfer/releases/latest"><img src="https://img.shields.io/github/v/release/anthturner/AnyInfer?include_prereleases&label=release&color=E8963C" alt="Latest release" /></a>
+  <a href="https://github.com/anthturner/AnyInfer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-2C7A6F" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-0B3B3C" alt="Python 3.11+" />
 </p>
 
@@ -44,7 +44,7 @@ result = client.generate(prompt, target="ollama:qwen3:8b")   # or "medium" — a
 There are already good libraries for switching between cloud providers, good gateways for
 centralizing model traffic, and good local-model servers. If one of those is your whole
 problem, you may not need AnyInfer. See
-[when AnyInfer is the right layer](https://anthturner.github.io/anyinfer/guides/when-to-use/).
+[when AnyInfer is the right layer](https://anyinfer.dev/guides/when-to-use/).
 
 AnyInfer is for applications that need those environments to behave as one runtime. It
 keeps provider translation, local process ownership, context preparation, routing, and
@@ -82,7 +82,7 @@ Use a simpler provider client when you only need cloud API switching. Use a gate
 you need organization-wide keys, quotas, spend controls, or an admin plane. Use Ollama,
 LM Studio, or LocalAI directly when a dedicated local-model service is the product boundary.
 
-The [decision guide](https://anthturner.github.io/anyinfer/guides/when-to-use/) compares
+The [decision guide](https://anyinfer.dev/guides/when-to-use/) compares
 those cases directly.
 
 ## Install
@@ -108,11 +108,11 @@ pip install "anyinfer[demo]"
 anyinfer-demo
 ```
 
-The [pack-in demo app](https://anthturner.github.io/anyinfer/guides/demo-app/) runs offline against in-process fakes, and
+The [pack-in demo app](https://anyinfer.dev/guides/demo-app/) runs offline against in-process fakes, and
 shows streaming, routing with retry and fallback, structured output, and the telemetry
 event stream. Standalone builds for Windows, macOS, and Linux — no Python required — are
-attached to [every release](https://github.com/anthturner/anyinfer/releases/latest); see the
-[downloads page](https://anthturner.github.io/anyinfer/downloads/).
+attached to [every release](https://github.com/anthturner/AnyInfer/releases/latest); see the
+[downloads page](https://anyinfer.dev/downloads/).
 
 ### Working on AnyInfer
 
@@ -123,13 +123,13 @@ python workspace.py demo     # launch the demo app
 ```
 
 `python workspace.py` with no arguments lists every verb. See
-[Contributing](https://anthturner.github.io/anyinfer/contributing/).
+[Contributing](https://anyinfer.dev/contributing/).
 
 ## Compatibility surface
 
 Provider breadth is compatibility inventory, not the product thesis. AnyInfer ships 17
 dedicated adapters plus 86 declarative OpenAI-compatible presets.
-**[See the complete inventory →](https://anthturner.github.io/anyinfer/providers/all/)**
+**[See the complete inventory →](https://anyinfer.dev/providers/all/)**
 
 The dedicated adapters, each handling provider-specific protocol or discovery behavior:
 
@@ -152,11 +152,11 @@ The dedicated adapters, each handling provider-specific protocol or discovery be
 | Nebius Token Factory | `nebius:` | Live pricing, context, and quantization discovery |
 | Ollama | `ollama:` | Native API, grammar-enforced schemas |
 | llama.cpp | `llama-cpp:` | Supervised `llama-server`, loopback-only |
-| 86 more, preconfigured | `groq:` `together:` `mistral:` `vllm:` … | [OpenAI-compatible presets](https://anthturner.github.io/anyinfer/providers/presets/) |
+| 86 more, preconfigured | `groq:` `together:` `mistral:` `vllm:` … | [OpenAI-compatible presets](https://anyinfer.dev/providers/presets/) |
 
-See the [complete provider list](https://anthturner.github.io/anyinfer/providers/all/),
-the [provider guides](https://anthturner.github.io/anyinfer/providers/) and the
-[conformance matrix](https://anthturner.github.io/anyinfer/reference/conformance-matrix/) for exactly what each supports.
+See the [complete provider list](https://anyinfer.dev/providers/all/),
+the [provider guides](https://anyinfer.dev/providers/) and the
+[conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
 
 ## Integration paths
 
@@ -177,42 +177,42 @@ All three use the same engine and the same versioned JSON configuration format:
 ```
 
 Load it with `ai.load_config("anyinfer.json")`, pass it to `anyinfer run --config`, or use
-it unchanged with the sidecar. See [choosing an integration path](https://anthturner.github.io/anyinfer/guides/integration-paths/)
-and [shared configuration](https://anthturner.github.io/anyinfer/reference/configuration/).
+it unchanged with the sidecar. See [choosing an integration path](https://anyinfer.dev/guides/integration-paths/)
+and [shared configuration](https://anyinfer.dev/reference/configuration/).
 
 ## Documentation
 
-**[anthturner.github.io/anyinfer](https://anthturner.github.io/anyinfer/)** — the published
-site, including the generated [SDK reference](https://anthturner.github.io/anyinfer/reference/api/)
-and [runnable examples](https://anthturner.github.io/anyinfer/examples/). The same pages are
-browsable in-repo from the **[documentation index](https://github.com/anthturner/anyinfer/blob/main/docs/README.md)**.
+**[anyinfer.dev](https://anyinfer.dev/)** — the published
+site, including the generated [SDK reference](https://anyinfer.dev/reference/api/)
+and [runnable examples](https://anyinfer.dev/examples/). The same pages are
+browsable in-repo from the **[documentation index](https://github.com/anthturner/AnyInfer/blob/main/docs/README.md)**.
 
 Quick links by role:
 
-- **Integrating the Python SDK?** → [Python SDK guide](https://anthturner.github.io/anyinfer/guides/python-sdk/) ·
-  [Quickstart](https://anthturner.github.io/anyinfer/guides/quickstart/) · [SDK reference](https://anthturner.github.io/anyinfer/reference/api/)
-- **Running the HTTP service?** → [OpenAI-compatible sidecar](https://anthturner.github.io/anyinfer/serve/)
-- **Working from a shell?** → [Run a prompt from the shell](https://anthturner.github.io/anyinfer/guides/cli/)
-- **Sharing provider and route settings?** → [Configuration](https://anthturner.github.io/anyinfer/reference/configuration/)
+- **Integrating the Python SDK?** → [Python SDK guide](https://anyinfer.dev/guides/python-sdk/) ·
+  [Quickstart](https://anyinfer.dev/guides/quickstart/) · [SDK reference](https://anyinfer.dev/reference/api/)
+- **Running the HTTP service?** → [OpenAI-compatible sidecar](https://anyinfer.dev/serve/)
+- **Working from a shell?** → [Run a prompt from the shell](https://anyinfer.dev/guides/cli/)
+- **Sharing provider and route settings?** → [Configuration](https://anyinfer.dev/reference/configuration/)
 - **Contributing or writing an adapter?** →
-  [Contributor guide](https://github.com/anthturner/anyinfer/blob/main/CONTRIBUTING.md) ·
-  [Provider contracts](https://github.com/anthturner/anyinfer/blob/main/contracts/README.md)
-- **Reporting a vulnerability?** → [Security policy](https://github.com/anthturner/anyinfer/security/policy)
+  [Contributor guide](https://github.com/anthturner/AnyInfer/blob/main/CONTRIBUTING.md) ·
+  [Provider contracts](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md)
+- **Reporting a vulnerability?** → [Security policy](https://github.com/anthturner/AnyInfer/security/policy)
 
 ## Project status
 
 Pre-1.0 and under active development: the public API is settled in shape but may still
 move before 1.0. Releases are published to
 [PyPI](https://pypi.org/project/anyinfer/) and
-[GitHub](https://github.com/anthturner/anyinfer/releases); the
-[release strategy](https://anthturner.github.io/anyinfer/contributing/releasing/) has the
+[GitHub](https://github.com/anthturner/AnyInfer/releases); the
+[release strategy](https://anyinfer.dev/contributing/releasing/) has the
 details. The architecture is settled and documented:
 
-- [DESIGN.md](https://github.com/anthturner/anyinfer/blob/main/DESIGN.md) — architecture and decision rationale
-- [IMPLEMENTATION.md](https://github.com/anthturner/anyinfer/blob/main/IMPLEMENTATION.md) — normative types, algorithms, and the build plan
-- [NOTES.md](https://github.com/anthturner/anyinfer/blob/main/NOTES.md) — decision record, assumptions, open questions, risks
-- [AGENTS.md](https://github.com/anthturner/anyinfer/blob/main/AGENTS.md) — canonical repository automation instructions
+- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture and decision rationale
+- [IMPLEMENTATION.md](https://github.com/anthturner/AnyInfer/blob/main/IMPLEMENTATION.md) — normative types, algorithms, and the build plan
+- [NOTES.md](https://github.com/anthturner/AnyInfer/blob/main/NOTES.md) — decision record, assumptions, open questions, risks
+- [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) — canonical repository automation instructions
 
 ## License
 
-[MIT](https://github.com/anthturner/anyinfer/blob/main/LICENSE).
+[MIT](https://github.com/anthturner/AnyInfer/blob/main/LICENSE).

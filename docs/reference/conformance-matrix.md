@@ -59,4 +59,4 @@ Adapters without a harness yet (`openai`, `anthropic`, `azure-foundry`, `openrou
 ## See also
 
 - [Provider pages](../providers/README.md) for the human-readable version.
-- [Contract snapshots](https://github.com/anthturner/anyinfer/blob/main/contracts/README.md) for the wire details each adapter depends on.
+- [Contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md) for the wire details each adapter depends on.

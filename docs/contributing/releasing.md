@@ -14,7 +14,7 @@ flowchart LR
 
 - **`feature/*`** — all work happens here, one topic per branch. Branched from `develop`.
 - **`develop`** — the integration branch. Feature branches merge in by pull request;
-  [CI](https://github.com/anthturner/anyinfer/blob/main/.github/workflows/ci.yml) must be
+  [CI](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/ci.yml) must be
   green before the merge button works.
 - **`main`** — always releasable. Receives only pull requests from `develop`, again
   gated on CI. Every merge to `main` rebuilds the release packages; a merge that bumps
@@ -45,7 +45,7 @@ done
 ```
 
 Also set **Settings → Pages → Source** to *GitHub Actions* so the
-[docs deploy workflow](https://github.com/anthturner/anyinfer/blob/main/.github/workflows/pages.yml)
+[docs deploy workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/pages.yml)
 can publish the site.
 
 Finally, set **Settings → Actions → General → Fork pull request workflows from outside
@@ -58,7 +58,7 @@ run is green. (Fork runs never receive secrets and get a read-only token regardl
 ## Versioning
 
 - The single source of truth is `project.version` in
-  [`pyproject.toml`](https://github.com/anthturner/anyinfer/blob/main/pyproject.toml);
+  [`pyproject.toml`](https://github.com/anthturner/AnyInfer/blob/main/pyproject.toml);
   `anyinfer.__version__` mirrors it and a test keeps them in agreement.
 - Pre-1.0, versions follow `0.MINOR.PATCH`: breaking changes bump MINOR, everything else
   bumps PATCH. From 1.0.0 on, plain [SemVer](https://semver.org/).
@@ -67,7 +67,7 @@ run is green. (Fork runs never receive secrets and get a read-only token regardl
 
 ## What a release is
 
-The [release workflow](https://github.com/anthturner/anyinfer/blob/main/.github/workflows/release.yml)
+The [release workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/release.yml)
 runs on every merge to `main`:
 
 1. It reads `project.version` and checks whether tag `v<version>` already exists.
@@ -122,6 +122,10 @@ deliberate act; the environment just adds a pause before the copy leaves the bui
 3. PR into `develop`; merge when green. PR `develop` into `main`; merge when green.
 4. Watch the release workflow attach `v<version>` and publish the wheel to PyPI.
 5. Verify the [downloads page](../downloads.md), checksum file, and PyPI project page.
+
+If a step fails — most often the first release, whose PyPI identity has never been
+exercised — [when a release goes wrong](repository-setup.md#when-a-release-goes-wrong)
+lists the recovery for each failure mode.
 
 Native beta bundles are not code-signed. macOS Gatekeeper and Windows SmartScreen may
 therefore require an explicit local approval. Signing and notarization require external

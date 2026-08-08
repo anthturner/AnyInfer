@@ -346,6 +346,8 @@ descriptor = ProviderDescriptor(
                 label="llama-server path",
                 kind="endpoint",
                 required=False,
+                advanced=True,
+                default_value="llama-server",
                 help_text="Defaults to 'llama-server' on PATH.",
             ),
             SetupField(
@@ -353,6 +355,8 @@ descriptor = ProviderDescriptor(
                 label="Resource posture",
                 kind="host-profile",
                 required=False,
+                advanced=True,
+                default_value="balanced",
                 help_text="conservative, balanced, or aggressive.",
             ),
             SetupField(
@@ -360,6 +364,7 @@ descriptor = ProviderDescriptor(
                 label="Model directory",
                 kind="endpoint",
                 required=False,
+                advanced=True,
                 help_text="Where GGUF artifacts are stored.",
             ),
         ),

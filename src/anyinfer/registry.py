@@ -88,6 +88,33 @@ class SetupField:
     Empty means the UI falls back to whatever generic hint suits the `kind`.
     """
 
+    advanced: bool = False
+    """Whether this field has a standard value that is right for almost every user.
+
+    The split this expresses is *prominence*, not optionality. ``required`` already says
+    "saving fails without a value"; plenty of fields are neither required nor worth
+    showing — an Ollama base URL, an Anthropic API version, a Bedrock signing profile.
+    Presented as equals they read as five questions where there is really one, and every
+    consuming application then has to rediscover which is which from prose help text.
+
+    So the provider says it here: ``advanced`` fields are the ones a UI may fold behind a
+    disclosure, leaving the fields a user genuinely has to answer in front of them. A
+    required field is never advanced — hiding something that blocks saving is exactly the
+    trap this exists to avoid — and `ProviderSetupSpec` rejects that combination.
+    """
+
+    default_value: str = ""
+    """The value the provider falls back to when this field is left blank.
+
+    What a UI shows as "standard: …" beside a hidden field, so folding one away never
+    hides *what it will do*. Empty when the field has no default — a credential has none,
+    and neither does an endpoint the user must supply.
+
+    A UI should render this rather than pre-filling the editor with it: a saved copy of
+    today's default is a value frozen at the moment someone opened a dialog, and it keeps
+    overriding the real default long after that default has moved on.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class HostShorthand:
@@ -141,6 +168,53 @@ class ProviderSetupSpec:
     ``any_of`` groups exist; a generated sentence would say what is required without ever
     saying what the alternatives mean.
     """
+
+    def __post_init__(self) -> None:
+        """Reject a spec that hides a field a user cannot skip.
+
+        Marking a field both mandatory and ``advanced`` asks a UI to do two contradictory
+        things, and the resolution it usually picks — honor the disclosure — produces the
+        one failure mode worth designing against: a save that refuses, naming a field that
+        is not on screen. Caught here, at import time, so it is a provider-authoring error
+        rather than a user's dead end.
+        """
+        blocking = {key for group in self.any_of for key in group}
+        for setup_field in self.fields:
+            if not setup_field.advanced:
+                continue
+            if setup_field.required:
+                raise ConfigError(
+                    f"setup field {setup_field.key!r} is both required and advanced",
+                    hint="a field that blocks saving must stay visible; drop advanced=True",
+                )
+            if setup_field.key in blocking:
+                raise ConfigError(
+                    f"setup field {setup_field.key!r} is in an any_of group and advanced",
+                    hint=(
+                        "one of the group has to be filled in, so none of them may be "
+                        "hidden behind a disclosure"
+                    ),
+                )
+
+    @property
+    def essential_fields(self) -> tuple[SetupField, ...]:
+        """The fields a UI should put in front of the user, in declared order.
+
+        Everything the provider cannot supply a sensible answer for: credentials, and the
+        endpoints and identifiers that vary per account. This is the short list an
+        application prompts for.
+        """
+        return tuple(f for f in self.fields if not f.advanced)
+
+    @property
+    def advanced_fields(self) -> tuple[SetupField, ...]:
+        """The fields that already have a standard value, in declared order.
+
+        Offer them — a base URL override is what makes a proxy or a mirror usable — but
+        offer them folded away, since changing one is the rare case rather than the setup
+        path.
+        """
+        return tuple(f for f in self.fields if f.advanced)
 
     def unsatisfied_groups(self, values: Mapping[str, str]) -> tuple[tuple[str, ...], ...]:
         """Return the `any_of` groups no value satisfies.
