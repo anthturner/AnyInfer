@@ -588,6 +588,34 @@ def test_a_local_path_is_registered_without_copying(tmp_path: Path) -> None:
     assert report.downloaded_bytes == 0
 
 
+def test_a_local_path_with_reserved_characters_is_registered(tmp_path: Path) -> None:
+    """The file:// round trip must survive a directory name that needs escaping.
+
+    Registration hands the resolver's path to acquisition as a ``file://`` URL, so the
+    two ends have to agree on the encoding. A space is the cheapest thing that disagrees:
+    ``Path.as_uri`` writes it as ``%20``, and any decoder that merely trims the scheme
+    hands back a path that does not exist. "My Models" is also what the directory is
+    actually called on a real desktop.
+    """
+    source = tmp_path / "My Models"
+    source.mkdir()
+    payload = b"escaped-path" * 100
+    (source / "model.gguf").write_bytes(payload)
+
+    store = ModelStore(tmp_path / "store")
+    request = _request(
+        ref=SourceRef(
+            resolver="local",
+            path=str(source),
+            digests={"model.gguf": _digest(payload)},
+        )
+    )
+    report = asyncio.run(acquire(request, store=store))
+    assert report.entry is not None
+    assert report.entry.files[0].verified
+    assert report.downloaded_bytes == 0
+
+
 def test_progress_callbacks_are_throttled_but_never_miss_a_phase(tmp_path: Path) -> None:
     events = []
     asyncio.run(_acquire(ModelStore(tmp_path), _hf_transport(), progress=events.append))

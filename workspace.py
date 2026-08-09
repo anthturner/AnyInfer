@@ -1293,8 +1293,13 @@ def _bundle_windows_icon(work_dir: Path) -> Path | None:
 
     Pillow is an optional build-time dependency; without it the executable simply keeps
     the default icon rather than failing the whole build.
+
+    The guard tests ``os.name`` rather than ``sys.platform`` on purpose. mypy narrows
+    ``sys.platform`` to the host it runs on, so under ``warn_unreachable`` the whole body
+    below reads as dead code whenever the type check runs off Windows — which it does in
+    CI. ``os.name`` is the same test at runtime and carries no such narrowing.
     """
-    if sys.platform != "win32":
+    if os.name != "nt":
         return None
     try:
         from PIL import Image

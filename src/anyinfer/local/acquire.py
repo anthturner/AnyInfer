@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 import httpx2
 
@@ -746,10 +747,13 @@ def _place_local(remote: RemoteFile) -> StoredFile:
 
     The local resolver's files are already where they belong; copying them would double a
     user's disk usage for no benefit.
+
+    The URL was built by ``Path.as_uri()``, so ``url2pathname`` is its exact inverse on
+    both platform shapes: it keeps the leading slash of a POSIX path while dropping the
+    one that precedes a Windows drive letter, and it undoes the percent-encoding that
+    ``as_uri`` applies to spaces and other reserved characters.
     """
-    source = Path(urlsplit(remote.url).path.lstrip("/"))
-    if not source.exists():
-        source = Path(remote.url.removeprefix("file:///"))
+    source = Path(url2pathname(urlsplit(remote.url).path))
     stat = source.stat()
     return StoredFile(
         path=remote.path,

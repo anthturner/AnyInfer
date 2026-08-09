@@ -61,7 +61,12 @@ def test_detection_never_raises_even_when_every_probe_fails(
 
 
 def test_no_accelerator_is_a_warning_not_a_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Stubbing `_run` alone does not describe an accelerator-less machine on every runner:
+    # Metal is inferred from the CPU architecture, not from a probe, so an Apple Silicon
+    # runner still reports one. Pin the architecture too, so the machine this test claims
+    # to be running on is the same one everywhere.
     monkeypatch.setattr(hw, "_run", lambda command: None)
+    monkeypatch.setattr(hw.platform, "machine", lambda: "x86_64")
     profile = detect(use_cache=False)
 
     assert profile.has_accelerator is False

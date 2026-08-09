@@ -349,7 +349,10 @@ def default_runtime_kind(hardware: HardwareProfile | None) -> AcceleratorKind:
     - Windows or Linux with any GPU → Vulkan, which drives NVIDIA, AMD, and Intel alike.
     - Anything else → CPU.
     """
-    if sys.platform == "darwin":
+    # `platform.system()` rather than `sys.platform`: mypy narrows the latter to whichever
+    # host the type check runs on, which makes everything past this branch read as dead
+    # code under `warn_unreachable` on a macOS checkout. Same test, no narrowing.
+    if platform.system() == "Darwin":
         return "metal" if platform.machine().lower() in ("arm64", "aarch64") else "cpu"
     if hardware is not None and hardware.has_accelerator:
         return "vulkan"
