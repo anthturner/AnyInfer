@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from ..types.capabilities import ModelCapabilities, Pricing, Sourced
+from ..types.capabilities import ModelCapabilities, Pricing, Sourced, TokenCalibration
 from ..types.requests import GenerationRequest
 from .estimate import RequestEstimate, TokenEstimator, estimate_request
 from .pricing import CostEstimate, estimate_cost
@@ -126,6 +126,7 @@ def build_context_budget(
     capabilities: ModelCapabilities | None,
     *,
     estimator: TokenEstimator | None = None,
+    calibration: TokenCalibration | None = None,
     output_reserve_tokens: int | None = None,
     headroom_tokens: int | None = None,
 ) -> ContextBudget:
@@ -136,6 +137,8 @@ def build_context_budget(
         capabilities: Assembled capabilities supplying the context window and maximum
             output size. ``None`` means nothing is known — the budget stays tri-state.
         estimator: Token counting strategy; defaults to the byte heuristic.
+        calibration: The target provider's declared envelope correction, from its
+            descriptor. ``None`` means the provider counts what it was sent.
         output_reserve_tokens: Overrides the derived output reserve.
         headroom_tokens: Overrides the default clamped headroom.
 
@@ -157,7 +160,7 @@ def build_context_budget(
 
     return ContextBudget(
         context_window=window,
-        estimate=estimate_request(request, estimator=estimator),
+        estimate=estimate_request(request, estimator=estimator, calibration=calibration),
         output_reserve_tokens=reserve,
         headroom_tokens=headroom,
         pricing=capabilities.pricing if capabilities is not None else None,

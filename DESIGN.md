@@ -367,6 +367,7 @@ class ProviderDescriptor:               # ModelFit's design, generalized
     setup: ProviderSetupSpec            # declarative fields → app UIs need no engine branches
     reasoning_translator: ReasoningTranslator
     static_capabilities: Mapping[str, ModelCapabilities]   # catalog layer seed
+    token_calibration: TokenCalibration = TokenCalibration()  # D34: envelope this provider bills for
     supports_sessions: bool = False
 ```
 

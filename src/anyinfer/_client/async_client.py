@@ -632,6 +632,7 @@ class AsyncClient:
             request,
             capabilities,
             estimator=self._estimator,
+            calibration=descriptor.token_calibration,
             output_reserve_tokens=output_reserve_tokens,
         )
 
@@ -870,6 +871,7 @@ class AsyncClient:
                 request,
                 capabilities,
                 estimator=self._estimator,
+                calibration=descriptor.token_calibration,
                 provider=resolved.provider_id,
                 model=resolved.model,
             )

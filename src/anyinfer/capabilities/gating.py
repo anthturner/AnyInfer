@@ -19,7 +19,7 @@ identically either way — just without the latency.
 from __future__ import annotations
 
 from ..errors import ContextLengthError
-from ..types.capabilities import ModelCapabilities
+from ..types.capabilities import ModelCapabilities, TokenCalibration
 from ..types.requests import GenerationRequest
 from .budget import ContextBudget, build_context_budget
 from .estimate import TokenEstimator
@@ -67,6 +67,7 @@ def check_context_fit(
     capabilities: ModelCapabilities | None,
     *,
     estimator: TokenEstimator | None = None,
+    calibration: TokenCalibration | None = None,
     output_reserve_tokens: int | None = None,
     provider: str | None = None,
     model: str | None = None,
@@ -77,6 +78,9 @@ def check_context_fit(
         request: The `GenerationRequest` to size.
         capabilities: The target's assembled capabilities.
         estimator: Token counting strategy; defaults to the byte heuristic.
+        calibration: The target provider's declared envelope correction. It never affects
+            the gate's decision — the gate reads the floor, which no calibration moves —
+            but it keeps the returned budget consistent with the one `budget()` reports.
         output_reserve_tokens: Overrides the derived output reserve.
         provider: Provider id, for the error's structured fields.
         model: Model id, for the error message.
@@ -93,6 +97,7 @@ def check_context_fit(
         request,
         capabilities,
         estimator=estimator,
+        calibration=calibration,
         output_reserve_tokens=output_reserve_tokens,
     )
     error = context_gate_error(budget, provider=provider, model=model)

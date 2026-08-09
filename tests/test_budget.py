@@ -23,7 +23,7 @@ from anyinfer.errors import ContextLengthError
 from anyinfer.registry import ProviderDescriptor, ProviderRegistry
 from anyinfer.routing.policy import never_retry_client_errors
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
-from anyinfer.types.capabilities import ModelCapabilities, Sourced
+from anyinfer.types.capabilities import ModelCapabilities, Sourced, TokenCalibration
 from anyinfer.types.messages import Message, Text, ToolCall, ToolResult, user
 from anyinfer.types.requests import GenerationRequest, Sampling, SchemaSpec, ToolSpec
 from support import make_client, make_multi_client
@@ -102,6 +102,42 @@ def test_estimate_request_counts_tools_and_schema() -> None:
     assert loaded.tools.tokens > 0
     assert loaded.schema.tokens > 0
     assert loaded.tokens == loaded.messages.tokens + loaded.tools.tokens + loaded.schema.tokens
+
+
+def test_estimate_request_envelope_is_zero_without_a_calibration() -> None:
+    estimate = estimate_request(_request("hi"))
+    assert estimate.envelope == TokenEstimate(0, 0)
+    assert estimate_request(_request("hi"), calibration=TokenCalibration()).envelope.tokens == 0
+
+
+def test_estimate_request_envelope_charges_multiplier_and_overhead() -> None:
+    plain = estimate_request(_request("x" * 300))
+    calibrated = estimate_request(
+        _request("x" * 300), calibration=TokenCalibration(multiplier=2.0, overhead_tokens=50)
+    )
+
+    content = plain.messages.tokens
+    assert calibrated.messages == plain.messages, "the components sent stay as sent"
+    assert calibrated.envelope.tokens == content + 50
+    assert calibrated.tokens == plain.tokens + content + 50
+
+
+def test_estimate_request_envelope_never_raises_the_floor() -> None:
+    plain = estimate_request(_request("x" * 3_000))
+    calibrated = estimate_request(
+        _request("x" * 3_000), calibration=TokenCalibration(multiplier=3.0, overhead_tokens=900)
+    )
+    assert calibrated.floor == plain.floor
+    assert calibrated.envelope.floor == 0
+
+
+@pytest.mark.parametrize(
+    ("multiplier", "overhead"),
+    [(0.0, 0), (-1.0, 0), (float("inf"), 0), (float("nan"), 0), (1.0, -1)],
+)
+def test_token_calibration_rejects_nonsense(multiplier: float, overhead: int) -> None:
+    with pytest.raises(ValueError):
+        TokenCalibration(multiplier=multiplier, overhead_tokens=overhead)
 
 
 def test_estimate_request_counts_tool_calls_and_results() -> None:
@@ -303,6 +339,74 @@ async def test_client_budget_is_a_pure_preflight() -> None:
     assert budget.input_allowance_tokens == 200_000 - 4_096 - 8_192
     assert budget.fits is True
     assert server.call_count == 0
+
+
+def _calibrated_registry(calibration: TokenCalibration) -> ProviderRegistry:
+    """One openai-compat registration that declares a transport envelope."""
+    from anyinfer.providers.openai_compat import OpenAICompatAdapter
+
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    registry.register(
+        ProviderDescriptor(
+            id="enveloped",
+            display_name="Fake enveloped",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+            token_calibration=calibration,
+            static_capabilities={
+                "m": ModelCapabilities(context_window=Sourced(100_000, "catalog"))
+            },
+        )
+    )
+    return registry
+
+
+async def test_client_budget_applies_the_descriptor_calibration() -> None:
+    server = FakeOpenAIServer()
+    prompt = "word " * 200
+    async with make_multi_client(
+        [("enveloped", server)],
+        registry=_calibrated_registry(TokenCalibration(multiplier=2.4, overhead_tokens=1_200)),
+    ) as calibrated_client:
+        calibrated = calibrated_client.budget(prompt, target="enveloped:m")
+    async with make_multi_client(
+        [("enveloped", server)], registry=_calibrated_registry(TokenCalibration())
+    ) as plain_client:
+        plain = plain_client.budget(prompt, target="enveloped:m")
+
+    assert calibrated.estimate.envelope.tokens > 1_200
+    assert calibrated.remaining_tokens < plain.remaining_tokens, (
+        "a provider that bills for its own harness must budget for it"
+    )
+    assert server.call_count == 0
+
+
+async def test_calibration_never_gates_a_request_the_floor_permits() -> None:
+    # A large multiplier pushes the planning estimate over a small window, but the gate
+    # reads the floor, which no calibration moves — so the provider still gets its say.
+    from anyinfer.providers.openai_compat import OpenAICompatAdapter
+
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    registry.register(
+        ProviderDescriptor(
+            id="enveloped",
+            display_name="Fake enveloped",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+            token_calibration=TokenCalibration(multiplier=8.0, overhead_tokens=4_000),
+            static_capabilities={
+                "m": ModelCapabilities(context_window=Sourced(2_000, "catalog"))
+            },
+        )
+    )
+    server = FakeOpenAIServer(FakeResponse(text="dispatched"))
+    async with make_multi_client([("enveloped", server)], registry=registry) as client:
+        budget = client.budget("word " * 100, target="enveloped:m")
+        assert budget.fits is False, "the planning figure is over the allowance"
+        result = await client.generate("word " * 100, target="enveloped:m")
+
+    assert result.text == "dispatched"
+    assert server.call_count == 1
 
 
 def test_sync_client_budget() -> None:

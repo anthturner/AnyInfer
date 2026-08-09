@@ -28,6 +28,7 @@ from ..types.capabilities import (
     Health,
     ModelCapabilities,
     Sourced,
+    TokenCalibration,
 )
 from ..types.events import TextDelta
 from ..types.messages import Text, ToolResult
@@ -346,6 +347,16 @@ _COPILOT_FEATURES = Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.CACHE_US
 the session API takes a prompt and options only, so caller-supplied tool specs have
 no wire form and are declared in ``ignored_parameters`` instead of being claimed."""
 
+_COPILOT_CALIBRATION = TokenCalibration(multiplier=2.4, overhead_tokens=1_200)
+"""The session harness this provider bills for on top of the prompt it is handed.
+
+The CLI runtime builds its own request around the prompt — an agent system preamble, its
+built-in tool declarations, workspace framing — none of which appears in the messages this
+side serializes. Prompt tokens as Copilot reports them therefore run far above the bytes
+sent, and consistently enough to correct for. The figures are the ones Frisket arrived at
+against the same SDK and are the reason budgets here were not quietly optimistic; they are
+a calibration, not a measurement, so they move the planning estimate only."""
+
 
 descriptor = ProviderDescriptor(
     id="copilot",
@@ -373,6 +384,7 @@ descriptor = ProviderDescriptor(
     ),
     reasoning_translator=_translate_reasoning,
     default_capabilities=ModelCapabilities(features=Sourced(_COPILOT_FEATURES, "default")),
+    token_calibration=_COPILOT_CALIBRATION,
     supports_sessions=True,
     ignored_parameters=("temperature", "top_p", "max_output_tokens", "stop", "tools"),
 )

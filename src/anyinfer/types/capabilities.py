@@ -10,6 +10,7 @@ because a user's explicit correction must never lose to data the library merely 
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Flag, auto
@@ -24,6 +25,7 @@ __all__ = [
     "Pricing",
     "Provenance",
     "Sourced",
+    "TokenCalibration",
     "conjunction",
 ]
 
@@ -54,6 +56,53 @@ class Sourced(Generic[_T]):
         if other is None:
             return True
         return _PROVENANCE_RANK[self.provenance] >= _PROVENANCE_RANK[other.provenance]
+
+
+@dataclass(frozen=True, slots=True)
+class TokenCalibration:
+    """How much a provider's own envelope inflates the prompt it is sent.
+
+    Serialized request bytes are not what every provider counts. Some wrap the caller's
+    messages in a transport of their own before the model ever sees them — a session API
+    that prepends its harness, a tool scaffold, a service-side system preamble — and then
+    bill (and window-check) the inflated total. Estimating such a provider from message
+    bytes alone under-counts every request, and the under-count is systematic rather than
+    noise, so budgets stay optimistic right up to the overflow.
+
+    A provider therefore declares its own correction, and only the planning figure moves:
+
+    - `multiplier` scales content that grows with the prompt.
+    - `overhead_tokens` adds what the envelope costs regardless of prompt size.
+
+    Neither touches the estimate's floor. The floor exists to *refuse* requests before
+    dispatch, and a lower bound may only claim tokens the provider certainly charges —
+    envelope overhead is a correction we believe, not one we can prove.
+
+    Attributes:
+        multiplier: Factor applied to the planning estimate of prompt-proportional
+            content. ``1.0`` means the provider counts what was sent.
+        overhead_tokens: Flat tokens the envelope adds per request, counted once.
+    """
+
+    multiplier: float = 1.0
+    overhead_tokens: int = 0
+
+    def __post_init__(self) -> None:
+        """Reject calibrations that would corrupt every estimate downstream.
+
+        Raises:
+            ValueError: If the multiplier is not a positive finite number, or the
+                overhead is negative.
+        """
+        if not math.isfinite(self.multiplier) or self.multiplier <= 0:
+            raise ValueError("token calibration multiplier must be a positive finite number")
+        if self.overhead_tokens < 0:
+            raise ValueError("token calibration overhead must not be negative")
+
+    @property
+    def is_identity(self) -> bool:
+        """Whether this calibration leaves an estimate unchanged."""
+        return self.multiplier == 1.0 and self.overhead_tokens == 0
 
 
 class Feature(Flag):

@@ -9,6 +9,7 @@ from .capabilities import (
     Pricing,
     Provenance,
     Sourced,
+    TokenCalibration,
     conjunction,
 )
 from .events import (
@@ -98,6 +99,7 @@ __all__ = [
     "Timing",
     "TimingMark",
     "TimingMarkName",
+    "TokenCalibration",
     "ToolCall",
     "ToolCallDelta",
     "ToolChoice",

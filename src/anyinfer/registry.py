@@ -18,7 +18,7 @@ from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, Literal
 
 from .errors import ConfigError
-from .types.capabilities import ModelCapabilities
+from .types.capabilities import ModelCapabilities, TokenCalibration
 from .types.requests import ReasoningEffort
 
 if TYPE_CHECKING:
@@ -290,6 +290,16 @@ class ProviderDescriptor:
 
     default_capabilities: ModelCapabilities = ModelCapabilities()
     """Capabilities assumed for any model without a more specific source."""
+
+    token_calibration: TokenCalibration = TokenCalibration()
+    """How much this provider's transport inflates the prompt it is billed for.
+
+    Declared here rather than measured per request because it is a property of the
+    provider's envelope, not of any one call: a session API that wraps the caller's
+    messages in its own harness charges that harness on every request. The default is the
+    identity — the provider counts what it was sent — and only a provider with evidence of
+    a systematic gap should declare otherwise.
+    """
 
     supports_sessions: bool = False
     """Whether the provider can keep state between requests — a session API, or keep-alive

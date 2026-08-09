@@ -97,6 +97,33 @@ class TiktokenEstimator:
 client = ai.Client(providers, estimator=TiktokenEstimator())
 ```
 
+## When the provider bills for more than you sent
+
+Some providers do not count the bytes they were handed. A session API wraps your messages
+in a harness of its own — an agent preamble, built-in tool declarations, workspace framing
+— before the model sees them, then bills and window-checks the inflated total. Estimating
+such a provider from message bytes alone under-counts *every* request, and it under-counts
+systematically, so budgets stay optimistic right up to the overflow.
+
+So a provider declares its own correction, and the budget reports it as its own component:
+
+```python
+budget = client.budget(messages, target="copilot:auto")
+
+budget.estimate.messages.tokens    # what you sent
+budget.estimate.envelope.tokens    # what the provider wraps around it
+```
+
+Seeing the envelope separately is the point: an app looking at a tight budget can tell that
+eleven hundred of its tokens belong to the provider's harness rather than to anything it
+wrote. GitHub Copilot is the case in the shipped registry.
+
+The correction moves the **planning figure only**. The floor is what the pre-dispatch gate
+refuses requests on, and a lower bound may only claim tokens the provider certainly
+charges — an envelope correction is one we believe, not one we can prove. A calibrated
+provider therefore packs more conservatively without ever refusing a request it might have
+served.
+
 ## Estimated cost
 
 When trustworthy pricing exists for the target — see

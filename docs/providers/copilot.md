@@ -57,6 +57,23 @@ See [capabilities](../concepts/capabilities.md#the-auto-sentinel).
 | Usage | Input, output, cache read/write, reasoning tokens |
 | Cost | Not reported |
 
+## Prompt tokens run ahead of what you send
+
+The CLI runtime builds its own request around your prompt — an agent system preamble, its
+built-in tool declarations, workspace framing — none of which appears in the messages this
+library serializes. Copilot's reported prompt tokens therefore run well above the bytes
+sent, and consistently enough to correct for, so the descriptor declares a
+[token calibration](../concepts/budgeting.md#when-the-provider-bills-for-more-than-you-sent):
+a 2.4× multiplier plus 1,200 flat tokens.
+
+```python
+budget = client.budget(messages, target="copilot:auto")
+budget.estimate.envelope.tokens    # the harness, counted separately from your prompt
+```
+
+It moves the planning figure only, so `budget()` packs conservatively here while the
+pre-dispatch gate stays as permissive as it is everywhere else.
+
 ## Structured output
 
 Copilot has no structured-output mode, so a schema is described in the prompt and validated
