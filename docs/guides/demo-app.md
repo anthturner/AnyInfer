@@ -132,7 +132,7 @@ Under the hood the bar still just produces the `provider:model` string that
 
 ### Routing, retry, and fallback
 
-The **If it fails, try:** dropdown adds an optional second target to the route, chosen
+The **Fallback** dropdown adds an optional second target to the route, chosen
 from everything discovery has reported. Four offline models make the behaviour
 reproducible without a real outage:
 
