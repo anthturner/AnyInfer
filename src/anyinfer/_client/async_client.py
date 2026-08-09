@@ -61,7 +61,7 @@ from ..providers.base import AdapterFinal, ProviderAdapter
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.attempts import AttemptBuffer
 from ..routing.health import HealthCache
-from ..routing.policy import Route, backoff_delay
+from ..routing.policy import Retry, Route, backoff_delay
 from ..schema.repair import build_repair_messages
 from ..schema.validate import extract_json, validate
 from ..types.capabilities import DiscoveredModel, Health, ModelCapabilities, Sourced
@@ -93,6 +93,14 @@ from ..types.results import (
     Mechanism,
     Outcome,
     Timing,
+)
+from ..verification import (
+    VERIFY_MAX_OUTPUT_TOKENS,
+    VERIFY_PROMPT,
+    VERIFY_SCHEMA,
+    Verification,
+    excerpt,
+    judge_reply,
 )
 from .models import (
     CatalogView,
@@ -304,6 +312,97 @@ class AsyncClient:
             catalog=self._catalog,
             configured_providers=self._pool.configured_ids,
         )
+
+    async def verify(
+        self,
+        target: Target,
+        *,
+        timeout_s: float = 60.0,
+    ) -> Verification:
+        """Prove a target works by asking it something, end to end.
+
+        `health()` answers "can I reach this endpoint", which is not the question behind a
+        *Test connection* button: a credential can be valid for a model listing and not for
+        inference, a model id can be a typo, a deployment can exist with no capacity, and a
+        provider can answer fluently while never holding a schema. Only a real request
+        distinguishes those, so this spends one — deliberately tiny, capped at
+        `VERIFY_MAX_OUTPUT_TOKENS`
+        output tokens.
+
+        Never raises for a provider problem: "this target is broken" is the answer to the
+        question, not a failure to answer it. A malformed *target*, on the other hand, is
+        the caller's mistake and still raises.
+
+        Args:
+            target: The target to verify. A catalog alias resolves as usual.
+            timeout_s: Wall clock for the probe.
+
+        Returns:
+            The `Verification`, whose ``reached``
+            and ``ok`` distinguish "unreachable" from "reachable but could not hold the
+            shape".
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved at all.
+        """
+        resolved = self.resolve(target)
+        started = time.monotonic()
+        try:
+            # No retries and no fallback: a probe reports what this target did, and a
+            # chain that quietly answered from somewhere else would report a working
+            # connection the operator does not have.
+            result = await self.generate(
+                VERIFY_PROMPT,
+                route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+                schema=VERIFY_SCHEMA,
+                sampling=Sampling(max_output_tokens=VERIFY_MAX_OUTPUT_TOKENS, temperature=0.0),
+                timeout_s=timeout_s,
+            )
+        except SchemaViolationError as error:
+            # It answered — just not in the shape asked for. That is a real and
+            # separately-actionable state, so it is reported as reached-but-not-ok
+            # rather than as a failure to connect.
+            return Verification(
+                target=resolved,
+                ok=False,
+                reached=True,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=f"the provider answered, but not in the requested shape: {error.detail}",
+                reply=excerpt(error.raw_text or ""),
+                diagnostics=await self._safe_diagnostics(resolved.provider_id),
+            )
+        except (AllTargetsFailedError, ProviderError) as error:
+            return Verification(
+                target=resolved,
+                ok=False,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=_verification_detail(error),
+                diagnostics=await self._safe_diagnostics(resolved.provider_id),
+            )
+
+        ok, detail, reply = judge_reply(result.structured, result.text)
+        return Verification(
+            # `result.target`, not the pre-request resolution: a provider that picks the
+            # model itself has now picked one, and which one is the useful answer.
+            target=result.target,
+            ok=ok,
+            reached=True,
+            latency_ms=(time.monotonic() - started) * 1000.0,
+            detail=detail,
+            reply=reply,
+            mechanism=result.structured_mechanism,
+            usage=result.usage,
+            diagnostics=await self._safe_diagnostics(result.target.provider_id),
+        )
+
+    async def _safe_diagnostics(self, provider_id: str) -> tuple[Diagnostic, ...]:
+        """Diagnostics for a verification report, tolerating an unconfigured provider."""
+        try:
+            return tuple(await self.diagnostics(provider_id))
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 — a probe must report, not raise
+            return ()
 
     # ---- local models ----------------------------------------------------------------
 
@@ -1129,6 +1228,24 @@ class AsyncClient:
         """Dispatch a telemetry event when anyone is listening."""
         if self._events.has_observers:
             self._events.emit(event)
+
+
+def _verification_detail(error: Exception) -> str:
+    """Explain a failed probe in the terms an operator can act on.
+
+    The router wraps a provider failure in `AllTargetsFailedError`, whose message is about
+    routing — accurate, and unhelpful when the route was one target long. The underlying
+    error's own detail and hint are what actually name the missing credential or the
+    mistyped model, so those are what surface here.
+    """
+    if isinstance(error, AllTargetsFailedError):
+        for attempt in reversed(error.attempts):
+            if attempt.error is not None:
+                return attempt.error.detail
+        return error.detail
+    detail = error.detail if isinstance(error, ProviderError) else str(error)
+    hint = getattr(error, "hint", None)
+    return f"{detail} ({hint})" if hint else detail
 
 
 async def _collect_diagnostics(

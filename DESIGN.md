@@ -678,7 +678,7 @@ src/anyinfer/
   context/               # (D28) corpus reduction: documents.py rank.py structure.py
                          # envelope.py select.py tiers.py pack.py distill.py
   testing/               # conformance.py fakes.py cassettes.py
-  cli.py                 # run, doctor, providers, models, runtime, and sidecar entry points
+  cli.py                 # run, verify, doctor, providers, models, runtime, sidecar entry points
   serve/                 # openai_codec.py app.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)

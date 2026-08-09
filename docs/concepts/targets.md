@@ -75,6 +75,37 @@ print(resolved.provider_id, resolved.model, resolved.via_alias)
 # ollama qwen3:4b medium
 ```
 
+## Proving a target actually works
+
+Resolving a target says it is *spelled* correctly. It says nothing about whether the
+credential behind it can generate, whether the model id exists at that endpoint, or whether
+the deployment has capacity — and a health probe does not either, because everything a
+health probe touches can be fine while inference still fails.
+
+`verify()` spends one deliberately tiny request to find out, and reports rather than raises:
+
+```python
+result = client.verify("openai:gpt-5")
+
+result.ok         # answered, in the shape asked for, with the expected content
+result.reached    # answered at all
+result.detail     # what went wrong, when something did
+result.target     # which model actually served it — meaningful for "auto"
+```
+
+The two booleans are separate on purpose, because the fixes are different:
+
+| `reached` | `ok` | What it means |
+|---|---|---|
+| `False` | `False` | Nothing answered. Wrong endpoint, bad credential, no capacity. |
+| `True` | `False` | The connection is fine; the model could not hold the requested shape. |
+| `True` | `True` | Good. |
+
+Verification also carries whatever the provider said about
+[its own runtime](capabilities.md#runtime-diagnostics), so a target that works *slowly*
+does not read as a target that simply works. The CLI wraps the same call as
+[`anyinfer verify`](../guides/cli.md#checking-a-target-actually-works).
+
 ## Overriding the catalog
 
 Applications overlay their own catalog; app entries win:

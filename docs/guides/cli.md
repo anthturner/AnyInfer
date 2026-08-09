@@ -147,12 +147,47 @@ anyinfer run "Write a haiku about latency." --config anyinfer.json \
 expose it. Parameters a provider does not support are dropped rather than rejected, and
 the drop is reported as a warning.
 
+## Checking a target actually works
+
+`anyinfer verify` sends one tiny request and reports what came back — the thing a health
+check cannot tell you, because a credential can be valid for a model listing and useless
+for inference:
+
+```bash
+anyinfer verify ollama:qwen3:8b --config anyinfer.json
+```
+
+```text
+ok        ollama:qwen3:8b
+          412 ms, schema via grammar
+```
+
+With no target it checks every target in the configured route, and it exits non-zero if
+any of them failed — so it works as a setup gate in a script:
+
+```bash
+anyinfer verify --config anyinfer.json || { echo "fix your config first"; exit 1; }
+```
+
+Failures distinguish *unreachable* from *reachable but wrong*, because those need
+different fixes:
+
+```text
+FAILED    openai:gpt-5
+          401 unauthorized (check the api_key for this provider)
+answered  ollama:qwen3:0.6b
+          the provider answered, but not in the requested shape: response was not JSON
+```
+
+`--json` emits the same information for scripts, including anything the provider reported
+about [its own runtime](../concepts/capabilities.md#runtime-diagnostics).
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | The request succeeded. |
-| `1` | The request failed; the error and its hint are on stderr. |
+| `1` | The request failed; the error and its hint are on stderr. For `verify`, at least one target did not pass. |
 | `2` | The command was used incorrectly — no prompt, no providers, bad flags. |
 | `130` | Interrupted with `Ctrl-C`. |
 

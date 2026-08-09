@@ -44,7 +44,7 @@ Keep these product surfaces distinct:
 |---|---|---|
 | Core SDK / inference engine | `src/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
 | Demo application | `src/demo_app/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
-| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `run`, `doctor`, and `providers`. It delegates inference and config semantics to public core APIs. |
+| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `run`, `verify`, `doctor`, and `providers`. It delegates inference and config semantics to public core APIs. |
 | OpenAI-compatible sidecar | `src/anyinfer/serve/`, sidecar tests | Owns only the OpenAI wire codec and ASGI lifecycle. It stays a projection over `AsyncClient`; no provider, routing, validation, or config policy belongs here. |
 | Shared configuration | `src/anyinfer/config/`, configuration docs and tests | One versioned format feeds Python SDK callers, the CLI, the sidecar, and compatible demo settings. Frontends may add flags, but they must not fork file semantics. |
 

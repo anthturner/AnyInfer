@@ -51,6 +51,7 @@ from ..types.requests import (
     ToolSpec,
 )
 from ..types.results import Diagnostic, Generation
+from ..verification import Verification
 from .async_client import AsyncClient, MessagesInput
 from .models import CatalogView
 from .providers import ProviderSettings
@@ -357,6 +358,14 @@ class Client:
         """Resolve a target string without issuing a request."""
         self._ensure_open()
         return self._async.resolve(target)
+
+    def verify(self, target: Target, *, timeout_s: float = 60.0) -> Verification:
+        """Prove a target works by asking it something, end to end.
+
+        See `AsyncClient.verify`.
+        """
+        self._ensure_open()
+        return self._loop.run(self._async.verify(target, timeout_s=timeout_s))
 
     # ---- local models ----------------------------------------------------------------
 

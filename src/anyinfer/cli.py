@@ -175,6 +175,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     doctor.add_argument("--json", action="store_true", help="emit machine-readable output")
 
+    verify = subcommands.add_parser(
+        "verify", help="prove a target works by sending it one tiny request"
+    )
+    verify.add_argument(
+        "target",
+        nargs="?",
+        help="a target or alias; defaults to every target in the configured route",
+    )
+    verify.add_argument("--config", type=Path, help="path to a configuration file")
+    verify.add_argument(
+        "--timeout", type=float, default=60.0, help="seconds to wait for each answer"
+    )
+    verify.add_argument("--json", action="store_true", help="emit machine-readable output")
+
     providers = subcommands.add_parser("providers", help="list registered providers")
     providers.add_argument("--json", action="store_true", help="emit machine-readable output")
 
@@ -247,6 +261,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run(args)
         if args.command == "doctor":
             return _doctor(args)
+        if args.command == "verify":
+            return _verify(args)
         if args.command == "providers":
             return _providers(args)
         if args.command == "models":
@@ -632,6 +648,85 @@ def _doctor(args: argparse.Namespace) -> int:
     for warning in profile.warnings:
         print(f"warning           {warning}")
     return 0
+
+
+# ---- verify --------------------------------------------------------------------------
+
+
+def _verify(args: argparse.Namespace) -> int:
+    """Send one tiny request to each named target and report what happened.
+
+    Exits non-zero when any target failed, so it is usable as a setup gate in a script.
+    """
+    from . import Client
+
+    config = _config(args.config)
+    settings = list(config.providers)
+    if not settings:
+        print(
+            "no providers configured: pass --config pointing at a JSON file with a "
+            "'providers' list (see `anyinfer providers` for what each one needs)",
+            file=sys.stderr,
+        )
+        return 2
+
+    targets = [args.target] if args.target else list(config.route.targets if config.route else ())
+    if not targets:
+        print(
+            "nothing to verify: name a target, or configure a route to check every "
+            "target in it",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = Client(settings)
+    try:
+        results = [client.verify(target, timeout_s=args.timeout) for target in targets]
+    finally:
+        client.close()
+
+    if args.json:
+        print(json.dumps([_verification_payload(r) for r in results], indent=2))
+    else:
+        for result in results:
+            _print_verification(result)
+    return 0 if all(result.ok for result in results) else 1
+
+
+def _verification_payload(result: Any) -> dict[str, Any]:
+    """Shape one verification as JSON."""
+    return {
+        "target": str(result.target) if result.target is not None else None,
+        "ok": result.ok,
+        "reached": result.reached,
+        "latency_ms": round(result.latency_ms, 1),
+        "detail": result.detail,
+        "reply": result.reply,
+        "mechanism": result.mechanism,
+        "usage": {
+            "input_tokens": result.usage.input_tokens,
+            "output_tokens": result.usage.output_tokens,
+        },
+        "diagnostics": [
+            {"code": d.code, "severity": d.severity, "message": d.message}
+            for d in result.diagnostics
+        ],
+    }
+
+
+def _print_verification(result: Any) -> None:
+    """Print one verification for a human."""
+    mark = "ok" if result.ok else ("answered" if result.reached else "FAILED")
+    print(f"{mark:<9} {result.target}")
+    if result.ok:
+        print(f"          {result.latency_ms:.0f} ms", end="")
+        if result.mechanism:
+            print(f", schema via {result.mechanism}", end="")
+        print()
+    if result.detail:
+        print(f"          {result.detail}")
+    for diagnostic in result.diagnostics:
+        print(f"          {diagnostic.severity}: {diagnostic.message}")
 
 
 def _providers(args: argparse.Namespace) -> int:

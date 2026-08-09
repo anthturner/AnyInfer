@@ -353,3 +353,65 @@ def test_route_overrides_target(
     assert code == 0
     # The first route entry is what actually got dispatched, not --target.
     assert transport.requests[-1]["model"] == "first"
+
+
+# ---- verify --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def ok_transport(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """A fake server that answers the verification probe correctly."""
+    import anyinfer
+
+    server = FakeOpenAIServer(FakeResponse(text=json.dumps({"reply": "OK"})))
+    original = anyinfer.ProviderSettings.of
+
+    def _with_transport(provider_id: str, **kwargs: Any) -> Any:
+        kwargs.setdefault("transport", server.transport())
+        return original(provider_id, **kwargs)
+
+    monkeypatch.setattr(anyinfer.ProviderSettings, "of", staticmethod(_with_transport))
+    return server
+
+
+def test_verify_reports_a_working_target(
+    config: Path, ok_transport: Any, capsys: pytest.CaptureFixture[str],
+) -> None:
+    code = main(["verify", "fake:m", "--config", str(config)])
+
+    assert code == 0
+    assert "ok" in capsys.readouterr().out
+    assert ok_transport.call_count == 1
+
+
+def test_verify_exits_nonzero_for_a_broken_target(
+    config: Path, transport: Any, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Usable as a setup gate: a failed probe is a failed command."""
+    code = main(["verify", "fake:m", "--config", str(config)])
+
+    assert code == 1, "the fake answers prose, not the probe's schema"
+    out = capsys.readouterr().out
+    assert "answered" in out, "reached, but could not hold the shape"
+    assert "not in the requested shape" in out
+
+
+def test_verify_json_is_machine_readable(
+    config: Path, ok_transport: Any, capsys: pytest.CaptureFixture[str],
+) -> None:
+    code = main(["verify", "fake:m", "--config", str(config), "--json"])
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload[0]["ok"] is True
+    assert payload[0]["target"] == "fake:m"
+    assert payload[0]["reached"] is True
+
+
+def test_verify_without_a_target_needs_a_route(
+    config: Path, ok_transport: Any, capsys: pytest.CaptureFixture[str],
+) -> None:
+    code = main(["verify", "--config", str(config)])
+
+    assert code == 2
+    assert "nothing to verify" in capsys.readouterr().err

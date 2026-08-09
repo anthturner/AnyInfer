@@ -157,6 +157,7 @@ from .types import (
     system,
     user,
 )
+from .verification import Verification
 
 __version__ = "0.1.1"
 
@@ -273,6 +274,7 @@ __all__ = [
     "Usage",
     "UsageEstimated",
     "UsageUpdate",
+    "Verification",
     "__version__",
     "assistant",
     "build_context_budget",
