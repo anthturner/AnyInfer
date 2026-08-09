@@ -1,5 +1,7 @@
 ---
-title: AnyInfer
+# No `title:` here on purpose. The theme renders a front-matter title as
+# "<title> - AnyInfer", which on the site's own homepage reads "AnyInfer - AnyInfer" --
+# in the browser tab and in every link unfurl (overrides/main.html).
 template: home.html
 hide:
   - navigation
