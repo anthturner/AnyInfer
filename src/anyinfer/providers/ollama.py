@@ -484,6 +484,18 @@ def _session_keep_alive(req: WireRequest) -> str | None:
     return SESSION_KEEP_ALIVE if req.session_state is not None else None
 
 
+async def _pull_model(request: Any) -> Any:
+    """Make a model available on this Ollama server.
+
+    Imported inside the call rather than at module scope: the local subsystem is not part
+    of an adapter's import surface, and a pull is a rare operation that should not cost
+    every client construction the import.
+    """
+    from ..local.services import pull_ollama_model
+
+    return await pull_ollama_model(request)
+
+
 def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """Map normalized effort onto Ollama's ``think`` parameter.
 
@@ -543,6 +555,9 @@ descriptor = ProviderDescriptor(
     reasoning_translator=_translate_reasoning,
     default_capabilities=ModelCapabilities(features=Sourced(_OLLAMA_FEATURES, "default")),
     supports_sessions=True,
+    # Ollama keeps its own store and downloader, so acquisition here means asking it to
+    # pull. The implementation lives in local/, never in this adapter.
+    model_puller=_pull_model,
     reports_diagnostics=True,
     grammar_needs_prompt_injection=True,
 )

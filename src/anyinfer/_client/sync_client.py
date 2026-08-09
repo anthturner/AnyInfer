@@ -39,6 +39,7 @@ from ..errors import ConfigError
 from ..events.observers import Observer
 from ..local.acquire import AcquisitionReport, ProgressSink
 from ..local.hardware import HardwareProfile
+from ..local.services import PULL_TIMEOUT_S, PullReport
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
@@ -366,6 +367,25 @@ class Client:
         """Resolve a target string without issuing a request."""
         self._ensure_open()
         return self._async.resolve(target)
+
+    def pull_model(
+        self,
+        provider_id: str,
+        model: str,
+        *,
+        progress: Any | None = None,
+        timeout_s: float = PULL_TIMEOUT_S,
+    ) -> PullReport:
+        """Tell an engine that keeps its own store to make a model available.
+
+        See `AsyncClient.pull_model`.
+        """
+        self._ensure_open()
+        return self._loop.run(
+            self._async.pull_model(
+                provider_id, model, progress=progress, timeout_s=timeout_s
+            )
+        )
 
     def session(self, target: Target) -> Session:
         """Open a handle that lets a provider keep what it already knows.

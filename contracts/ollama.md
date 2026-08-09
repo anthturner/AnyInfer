@@ -12,7 +12,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - `POST {base}/api/chat` — generation (default base `http://127.0.0.1:11434`)
 - `GET {base}/api/tags` — installed models (name, size, parameter_size, quantization, digest)
 - `GET {base}/api/ps` — loaded models incl. `size_vram` (observed VRAM residency)
-- `POST {base}/api/pull` — model download (used by tier provisioning)
+- `POST {base}/api/pull` — model download, streamed (D41; `local/services.py`)
 ### Auth
 - None by default; optional `Authorization: Bearer` for proxied deployments
 ### Version pins
@@ -22,6 +22,13 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   structured output, or `"json"`), `think` (bool or effort for reasoning models),
   `keep_alive` (session retention, e.g. `"10m"`), `options: {num_predict, temperature,
   top_p, stop, num_ctx, num_gpu}`
+### Pull request/response fields (D41)
+- Request: `{"model": "<name>", "stream": true}`
+- Response: NDJSON lines carrying `status` (phase text), and per **layer**
+  `digest` + `total` + `completed`; the counts are per layer, so the caller accumulates
+  them to report whole-acquisition progress
+- Failures arrive mid-stream as an `error` field on a 200 response, not as an HTTP
+  status; a missing model reads `pull model manifest: file does not exist`
 ### Response fields
 - `message.content`, `message.thinking`, `done`, `done_reason`,
   `prompt_eval_count` (input tokens), `eval_count` (output tokens),

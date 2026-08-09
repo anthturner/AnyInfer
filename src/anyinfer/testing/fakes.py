@@ -454,6 +454,8 @@ class FakeOllamaServer:
         self._chunk_size = chunk_size
         self._call_index = 0
         self.requests: list[dict[str, Any]] = []
+        self.pulled: list[str] = []
+        self.pull_lines: list[dict[str, Any]] | None = None
 
     @property
     def call_count(self) -> int:
@@ -493,9 +495,31 @@ class FakeOllamaServer:
                     ]
                 },
             )
+        if path.endswith("/api/pull"):
+            return self._handle_pull(request)
         if path.endswith("/api/chat"):
             return self._handle_chat(request)
         return httpx2.Response(404, json={"error": f"no such path: {path}"})
+
+    def _handle_pull(self, request: httpx2.Request) -> httpx2.Response:
+        """Serve the NDJSON progress stream ``POST /api/pull`` produces."""
+        body = json.loads(request.content or b"{}")
+        self.pulled.append(str(body.get("model") or body.get("name") or ""))
+        if self.pull_lines is not None:
+            lines = self.pull_lines
+        else:
+            digest = "sha256:layer-one"
+            lines = [
+                {"status": "pulling manifest"},
+                {"status": "pulling " + digest, "digest": digest,
+                 "total": 8_000_000, "completed": 4_000_000},
+                {"status": "pulling " + digest, "digest": digest,
+                 "total": 8_000_000, "completed": 8_000_000},
+                {"status": "verifying sha256 digest"},
+                {"status": "success"},
+            ]
+        payload = "".join(json.dumps(line) + chr(10) for line in lines)
+        return httpx2.Response(200, content=payload.encode("utf-8"))
 
     def _handle_chat(self, request: httpx2.Request) -> httpx2.Response:
         body = json.loads(request.content or b"{}")

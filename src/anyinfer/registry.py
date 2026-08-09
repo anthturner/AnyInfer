@@ -12,7 +12,7 @@ lazily so import cost stays flat regardless of how many providers are installed.
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, Literal
@@ -28,6 +28,7 @@ __all__ = [
     "ENTRY_POINT_GROUP",
     "AdapterFactory",
     "HostShorthand",
+    "ModelPuller",
     "ProviderDescriptor",
     "ProviderRegistry",
     "ProviderSetupSpec",
@@ -46,6 +47,15 @@ AdapterFactory = Callable[["ProviderConfig"], "ProviderAdapter"]
 
 ReasoningTranslator = Callable[[ReasoningEffort | None], Mapping[str, Any]]
 """Translates normalized reasoning effort into provider wire fields."""
+
+ModelPuller = Callable[[Any], Awaitable[Any]]
+"""Makes one model available on an engine that owns its own store.
+
+Typed loosely on purpose: the concrete request and report live in ``anyinfer.local``, and
+the registry must not import the local subsystem to name them — a descriptor is declarative
+data that every adapter imports, and dragging acquisition into that import graph is exactly
+what the layering forbids.
+"""
 
 SetupFieldKind = Literal[
     "endpoint", "secret", "api-version", "model-list", "reasoning-efforts", "host-profile"
@@ -304,6 +314,21 @@ class ProviderDescriptor:
     supports_sessions: bool = False
     """Whether the provider can keep state between requests — a session API, or keep-alive
     model residency — rather than treating every request as independent."""
+
+    model_puller: ModelPuller | None = None
+    """How this provider is told to make a model available, or ``None`` when it cannot be.
+
+    For engines that keep their own model store, registry, and downloader — Ollama — the
+    useful operation is not *download these weights* but *make yourself ready*. The
+    implementation lives in ``anyinfer.local.services`` and is merely pointed at from here,
+    both because acquisition never belongs in an adapter and because a declared hook keeps
+    "which providers can do this" answerable from the registry rather than from a chain of
+    engine checks in the core.
+
+    Weights fetched this way land in the *engine's* store under the engine's own name.
+    Nothing is written to AnyInfer's model store and nothing is indexed there, so
+    `locate_model()` will not find them — they are not ours to find.
+    """
 
     reports_diagnostics: bool = False
     """Whether this provider's adapter implements

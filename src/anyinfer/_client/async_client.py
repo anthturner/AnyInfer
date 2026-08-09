@@ -62,6 +62,7 @@ from ..events.observers import EventDispatcher, Observer
 from ..events.telemetry import (
     AttemptCompleted,
     AttemptStarted,
+    DownloadProgress,
     FallbackTriggered,
     FirstToken,
     ParameterDropped,
@@ -77,6 +78,7 @@ from ..events.telemetry import (
 )
 from ..local.acquire import AcquisitionReport, ProgressSink
 from ..local.hardware import HardwareProfile, probe_signature
+from ..local.services import PULL_TIMEOUT_S, PullReport, PullRequest
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
@@ -798,6 +800,82 @@ class AsyncClient:
             dry_run=dry_run,
             token=token,
         )
+
+    async def pull_model(
+        self,
+        provider_id: str,
+        model: str,
+        *,
+        progress: Callable[[TelemetryEvent], None] | None = None,
+        timeout_s: float = PULL_TIMEOUT_S,
+    ) -> PullReport:
+        """Tell an engine that keeps its own store to make a model available.
+
+        Distinct from `acquire_model()`, which fetches weights *this* library places and
+        indexes. Some local engines — Ollama — already have a store, a registry, and a
+        downloader; for those the useful operation is not "download these bytes" but "make
+        yourself ready", and the bytes land in the engine's store under the engine's own
+        name. Nothing is written to this client's model store and
+        `locate_model()` will not find it, because it is not ours to find.
+
+        Progress arrives as `DownloadProgress`
+        events on the client's observers, and additionally on ``progress`` when one is
+        given.
+
+        Args:
+            provider_id: The configured provider to pull on.
+            model: The model name in that engine's namespace, e.g. ``"qwen3:8b"``.
+            progress: An extra sink for progress events, for a caller that wants them
+                without registering an observer.
+            timeout_s: Wall clock for the whole transfer. Generous by default: a timeout
+                that fires mid-download turns a slow link into a failure the user cannot
+                act on.
+
+        Returns:
+            The `PullReport`, which distinguishes a
+            transfer from a model that was already present.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the provider is unknown, or cannot pull.
+            anyinfer.errors.ModelNotFoundError: If the engine's registry has no such model.
+            anyinfer.errors.LocalRuntimeError: If the engine is unreachable or the pull
+                fails.
+        """
+        descriptor = self._pool.descriptor_for(provider_id)
+        if descriptor.model_puller is None:
+            raise ConfigError(
+                f"{descriptor.id} does not manage its own model store",
+                provider=descriptor.id,
+                hint=(
+                    "use client.acquire_model() for engines whose weights this library "
+                    "downloads and places"
+                ),
+            )
+        base_url = self._pool.base_url_for(provider_id)
+        if not base_url:
+            raise ConfigError(
+                f"{descriptor.id} has no endpoint to pull from",
+                provider=descriptor.id,
+                hint="configure a base_url for this provider",
+            )
+
+        def sink(event: DownloadProgress) -> None:
+            self._emit(event)
+            if progress is not None:
+                progress(event)
+
+        report: PullReport = await descriptor.model_puller(
+            PullRequest(
+                model=model,
+                base_url=base_url,
+                timeout_s=timeout_s,
+                transport=self._pool.transport_for(provider_id),
+                progress=sink,
+            )
+        )
+        # What the engine can serve just changed, so any cached listing is now stale.
+        self._capabilities.invalidate(descriptor.id)
+        return report
 
     async def installed_models(self) -> Sequence[StoreEntry]:
         """Every model acquired into this client's store."""

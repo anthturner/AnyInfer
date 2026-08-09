@@ -171,6 +171,16 @@ class AdapterPool:
             base_url = descriptor.setup.host_shorthand.expand(base_url)
         return base_url
 
+    def transport_for(self, provider_id: str) -> Any | None:
+        """This instance's transport override, if it was given one.
+
+        Needed by operations that talk to a provider's endpoint without going through its
+        adapter — a model pull, for instance — so the fake-server and cassette test modes
+        intercept those the same way they intercept generation.
+        """
+        settings = self._settings.get(self._registry.resolve_alias(provider_id), None)
+        return settings.transport if settings is not None else None
+
     def locality_for(self, provider_id: str) -> Literal["hosted", "local", "remote"]:
         """Where this *instance* runs, which the descriptor alone cannot say.
 

@@ -188,6 +188,29 @@ Nothing here evicts anything. `disk_usage()` and `remove_model()` give an applic
 needs to build a policy; automatically deleting a forty-gigabyte download a user paid
 bandwidth for is not a decision a library should make.
 
+## Engines that keep their own store
+
+Everything above is about weights **this library** fetches, places, verifies, and indexes.
+Some local engines already have all of that — a store, a registry, a downloader — and for
+those the useful operation is not *download these bytes* but *make yourself ready*:
+
+```python
+report = client.pull_model("ollama", "qwen3:8b")
+
+report.already_present   # True when nothing had to move
+report.bytes_transferred
+```
+
+Progress arrives as the same `DownloadProgress` telemetry a catalog acquisition emits, with
+Ollama's per-layer counts accumulated into the whole-transfer figures that event promises.
+`anyinfer models pull ollama qwen3:8b` is the same call from a shell.
+
+The distinction is worth keeping in mind: those bytes land in **the engine's** store under
+the engine's own name. Nothing is written to AnyInfer's model store, nothing is indexed, and
+`locate_model()` will not find it — because it is not ours to find. Which providers work
+this way is declared on the descriptor, so a UI can ask the registry rather than
+special-casing engines.
+
 ## Next
 
 - [The model catalog](catalog.md) — what exists, and what fits.

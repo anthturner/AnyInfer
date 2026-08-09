@@ -110,6 +110,7 @@ from .events import (
     TelemetryEvent,
     UsageEstimated,
 )
+from .local.services import PullReport, PullRequest
 from .redaction import RedactionRegistry, redact, register_secret
 from .registry import (
     HostShorthand,
@@ -248,6 +249,8 @@ __all__ = [
     "ProviderSettings",
     "ProviderSetupSpec",
     "ProviderUnavailableError",
+    "PullReport",
+    "PullRequest",
     "RateLimitError",
     "ReasoningDelta",
     "ReasoningEffort",

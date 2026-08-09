@@ -239,3 +239,13 @@ Where weights come from. Adding an internal mirror is a resolver, not a dependen
 ::: anyinfer.local.TierSource
 
 </div>
+
+## Engine-managed models
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.PullRequest
+
+::: anyinfer.PullReport
+
+</div>

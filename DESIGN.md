@@ -674,6 +674,7 @@ src/anyinfer/
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
   local/                 # hardware.py backends.py runtimes.py runtimes.json tuning.py
+                         # services.py (D41) engine-managed model pulls
                          # fit.py variants.py artifacts.py downloads.py
                          # acquire.py store.py sources/ server.py recommend.py
   providers/             # base.py sse.py openai_compat.py openai.py anthropic.py

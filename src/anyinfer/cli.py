@@ -230,6 +230,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="permit quantizations below Q4_K_M when nothing better fits",
     )
 
+    pull = model_commands.add_parser(
+        "pull", help="ask an engine that owns its own store to fetch a model"
+    )
+    pull.add_argument("provider", help="a configured provider, e.g. 'ollama'")
+    pull.add_argument("model", help="the model name in that engine's namespace")
+    pull.add_argument("--config", type=Path, help="path to a configuration file")
+
     installed = model_commands.add_parser("installed", help="list downloaded models")
     installed.add_argument("--json", action="store_true", help="emit machine-readable output")
 
@@ -853,6 +860,8 @@ def _models(args: argparse.Namespace) -> int:
         return _models_list(args)
     if args.models_command == "add":
         return _models_add(args)
+    if args.models_command == "pull":
+        return _models_pull(args)
     if args.models_command == "installed":
         return _models_installed(args)
     if args.models_command == "where":
@@ -990,6 +999,64 @@ class _ProgressPrinter:
         """End the progress line, if one was started."""
         if self._wrote and self._tty:
             print(file=sys.stderr)
+
+
+class _DownloadReporter:
+    """Renders `DownloadProgress` telemetry, with a plain fallback off a TTY.
+
+    An observer rather than a callback because a pull's progress arrives as ordinary
+    telemetry — the same events any application observer already sees.
+    """
+
+    def __init__(self) -> None:
+        self._tty = sys.stderr.isatty()
+        self._wrote = False
+
+    def on_event(self, event: Any) -> None:
+        """Render one progress event, ignoring everything else."""
+        if type(event).__name__ != "DownloadProgress" or event.done:
+            return
+        total = f" / {_gib(event.total_bytes)}" if event.total_bytes else ""
+        line = f"{_gib(event.downloaded_bytes)}{total}  {event.phase}"
+        if self._tty:
+            print("\r" + f"{line:<80}", end="", file=sys.stderr, flush=True)
+        else:
+            print(line, file=sys.stderr, flush=True)
+        self._wrote = True
+
+    def finish(self) -> None:
+        """End the progress line, if one was started."""
+        if self._wrote and self._tty:
+            print(file=sys.stderr)
+
+
+def _models_pull(args: argparse.Namespace) -> int:
+    """Ask an engine that keeps its own store to make a model available."""
+    from . import Client
+
+    config = _config(getattr(args, "config", None))
+    settings = list(config.providers)
+    if not settings:
+        print(
+            "no providers configured: pass --config pointing at a JSON file with a "
+            "'providers' list",
+            file=sys.stderr,
+        )
+        return 2
+
+    reporter = _DownloadReporter()
+    client = Client(settings, observers=[reporter])
+    try:
+        report = client.pull_model(args.provider, args.model)
+    finally:
+        client.close()
+    reporter.finish()
+
+    if report.already_present:
+        print(f"{report.model} was already installed on {args.provider}")
+    else:
+        print(f"pulled {report.model} onto {args.provider} ({_gib(report.bytes_transferred)})")
+    return 0
 
 
 def _models_installed(args: argparse.Namespace) -> int:
