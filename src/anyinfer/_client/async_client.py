@@ -1432,7 +1432,9 @@ class AsyncClient:
                 session_state=session.state if session_applies and session else None,
             )
             if repair_attempts == 0:
-                for parameter, reason in dropped_parameters(current, descriptor):
+                for parameter, reason in dropped_parameters(
+                    current, descriptor, capabilities
+                ):
                     self._emit(ParameterDropped(request_id, resolved, parameter, reason))
 
             saw_usage_event = False

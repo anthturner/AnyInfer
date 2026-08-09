@@ -167,3 +167,75 @@ def test_sync_client_diagnostics() -> None:
         assert list(client.diagnostics("noisy")) == [SPILL]
     finally:
         client.close()
+
+
+# ---- capability-driven parameter dropping --------------------------------------------
+
+
+def _reasoning_registry(features: object, provenance: str) -> ai.ProviderRegistry:
+    """A registration whose model capabilities claim (or deny) reasoning support."""
+    from anyinfer.providers.openai_compat import OpenAICompatAdapter
+    from anyinfer.types.capabilities import ModelCapabilities, Sourced
+
+    registry = ai.ProviderRegistry(load_builtins=True, load_entry_points=False)
+    registry.register(
+        ai.ProviderDescriptor(
+            id="thinker",
+            display_name="Fake thinker",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+            reasoning_translator=lambda e: {} if e is None else {"reasoning_effort": e},
+            static_capabilities={
+                "m": ModelCapabilities(features=Sourced(features, provenance))  # type: ignore[arg-type]
+            },
+        )
+    )
+    return registry
+
+
+async def test_reasoning_is_withheld_from_a_model_known_not_to_have_it() -> None:
+    """Sending it anyway is the silently-ignored case the library exists to eliminate."""
+    from anyinfer.types.capabilities import Feature
+
+    recorder = _Recorder()
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    async with make_multi_client(
+        [("thinker", server)],
+        registry=_reasoning_registry(Feature.STREAMING, "discovered"),
+        observers=[recorder],
+    ) as client:
+        await client.generate("hi", target="thinker:m", reasoning="high")
+
+    assert "reasoning_effort" not in server.requests[0]
+    dropped = [
+        e for e in recorder.events
+        if isinstance(e, ai.ParameterDropped) and e.parameter == "reasoning"
+    ]
+    assert len(dropped) == 1
+
+
+async def test_reasoning_reaches_a_model_that_has_it() -> None:
+    from anyinfer.types.capabilities import Feature
+
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    async with make_multi_client(
+        [("thinker", server)],
+        registry=_reasoning_registry(Feature.STREAMING | Feature.REASONING, "discovered"),
+    ) as client:
+        await client.generate("hi", target="thinker:m", reasoning="high")
+
+    assert server.requests[0]["reasoning_effort"] == "high"
+
+
+async def test_a_guessed_absence_never_withholds_the_parameter() -> None:
+    """Dropping a caller's parameter on a descriptor-level guess is worse than sending it."""
+    from anyinfer.types.capabilities import Feature
+
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    async with make_multi_client(
+        [("thinker", server)],
+        registry=_reasoning_registry(Feature.STREAMING, "default"),
+    ) as client:
+        await client.generate("hi", target="thinker:m", reasoning="high")
+
+    assert server.requests[0]["reasoning_effort"] == "high"

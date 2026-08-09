@@ -144,8 +144,37 @@ anyinfer run "Write a haiku about latency." --config anyinfer.json \
 ```
 
 `--reasoning` (`minimal`, `low`, `medium`, `high`) sets reasoning effort on models that
-expose it. Parameters a provider does not support are dropped rather than rejected, and
-the drop is reported as a warning.
+expose it. Parameters a provider does not support are dropped rather than rejected, and so
+are parameters a *model* is known not to have — sending one that does nothing is the
+failure mode that looks exactly like success. Every drop is reported as a warning.
+
+## Costing a request before you send it
+
+`--dry-run` reports what a request would spend and whether it fits, using the same budget
+calculator the client holds the real request to — so this is not a second estimate of the
+same thing:
+
+```bash
+cat report.md | anyinfer run "Summarize:" --config anyinfer.json \
+  --target openai:gpt-4.1 --dry-run
+```
+
+```text
+target            openai:gpt-4.1
+input estimate    18432 tokens (floor 6912)
+  messages         18401
+  schema           31
+context window    128000 (catalog)
+output reserve    4096
+input allowance   115712
+remaining         97280
+fits              yes
+estimated cost    0.0138-0.0697 USD
+```
+
+Nothing is sent. Where a figure is not known it says so rather than guessing — an unknown
+context window prints `unknown`, never a plausible default. `--json` emits the same
+information for scripts.
 
 ## Checking a target actually works
 

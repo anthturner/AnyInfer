@@ -11,11 +11,12 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
+from ..capabilities.pricing import TRUSTED_PROVENANCE
 from ..providers.base import WireRequest
 from ..registry import ProviderDescriptor
 from ..schema.mechanism import choose_mechanism, system_prompt_for
 from ..schema.project import identity_projection
-from ..types.capabilities import ModelCapabilities
+from ..types.capabilities import Feature, ModelCapabilities
 from ..types.messages import Message, Text, system
 from ..types.requests import GenerationRequest, ResolvedTarget
 from ..types.results import Mechanism
@@ -72,7 +73,11 @@ def build_wire_request(
         model=target.model,
         messages=tuple(messages),
         sampling=request.sampling,
-        reasoning_wire=descriptor.reasoning_translator(request.reasoning),
+        reasoning_wire=(
+            descriptor.reasoning_translator(request.reasoning)
+            if _model_takes_reasoning(request, capabilities)
+            else {}
+        ),
         mechanism=mechanism,
         wire_schema=wire_schema,
         schema_name=schema_name,
@@ -86,6 +91,27 @@ def build_wire_request(
     )
 
 
+def _model_takes_reasoning(
+    request: GenerationRequest, capabilities: ModelCapabilities | None
+) -> bool:
+    """Whether a requested reasoning effort should be sent to this model.
+
+    A provider's descriptor knows how to *spell* reasoning effort; it does not know which
+    of that provider's models have one. Sending the field to a model without it is the
+    silently-ignored case this library exists to eliminate — the request succeeds, the
+    parameter does nothing, and nothing says so.
+
+    Withheld only on a *known* absence, following the same rule as the pre-dispatch gate:
+    a ``default``-provenance feature set is a descriptor-level guess, and dropping a
+    caller's parameter on a guess would be worse than sending one the model ignores.
+    """
+    if request.reasoning is None:
+        return False
+    if capabilities is None or capabilities.features.provenance not in TRUSTED_PROVENANCE:
+        return True
+    return Feature.REASONING in capabilities.features.value
+
+
 def _projector_for(descriptor: ProviderDescriptor) -> Any:
     """Find a descriptor's schema projector, defaulting to identity."""
     projector = getattr(descriptor.factory, "project_schema", None)
@@ -95,17 +121,32 @@ def _projector_for(descriptor: ProviderDescriptor) -> Any:
 
 
 def dropped_parameters(
-    request: GenerationRequest, descriptor: ProviderDescriptor
+    request: GenerationRequest,
+    descriptor: ProviderDescriptor,
+    capabilities: ModelCapabilities | None = None,
 ) -> tuple[tuple[str, str], ...]:
-    """Find requested parameters this provider will silently discard.
+    """Find requested parameters this target will not honor.
+
+    Two sources, because a parameter can go unhonored for two different reasons. The
+    *provider* may accept and discard it — declared on the descriptor — or this particular
+    *model* may not have the feature at all, which only the assembled capabilities know.
 
     Returns ``(parameter, reason)`` pairs so the caller can emit one
     `ParameterDropped` event per parameter. A parameter
     that is accepted and ignored is the worst failure mode available — it looks exactly
     like success — so it is surfaced rather than tolerated.
     """
+    dropped: list[tuple[str, str]] = []
+    if request.reasoning is not None and not _model_takes_reasoning(request, capabilities):
+        dropped.append(
+            (
+                "reasoning",
+                f"{descriptor.id}'s {'model' if capabilities else 'models'} does not "
+                "support reasoning effort, so it was not sent",
+            )
+        )
     if not descriptor.ignored_parameters:
-        return ()
+        return tuple(dropped)
 
     supplied: dict[str, object] = {
         "temperature": request.sampling.temperature,
@@ -115,11 +156,13 @@ def dropped_parameters(
         "reasoning": request.reasoning,
         "tools": request.tools or None,
     }
-    return tuple(
+    already = {name for name, _ in dropped}
+    dropped.extend(
         (name, f"{descriptor.id} accepts but ignores {name}")
         for name in descriptor.ignored_parameters
-        if supplied.get(name) is not None
+        if supplied.get(name) is not None and name not in already
     )
+    return tuple(dropped)
 
 
 def _needs_prompt_injection(mechanism: Mechanism, descriptor: ProviderDescriptor) -> bool:

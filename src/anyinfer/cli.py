@@ -165,6 +165,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="emit one JSON object with the text, usage, timing, and tool calls",
     )
     run.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="report what the request would cost and whether it fits, without sending it",
+    )
+    run.add_argument(
         "--stats",
         action="store_true",
         help="print timing, token, and cost figures to stderr when finished",
@@ -428,6 +433,9 @@ def _run(args: argparse.Namespace) -> int:
         "timeout_s": args.timeout,
     }
 
+    if args.dry_run:
+        return _dry_run(client, messages, call, args)
+
     # Streaming is the default because a one-off run is something a human watches; --json
     # and --schema force the buffered path, since neither can be emitted incrementally.
     streaming = not (args.no_stream or args.json or schema is not None)
@@ -445,6 +453,99 @@ def _run(args: argparse.Namespace) -> int:
         client.close()
 
     return _emit_result(generation, args, streamed=streaming)
+
+
+def _dry_run(
+    client: Any, messages: Any, call: dict[str, Any], args: argparse.Namespace
+) -> int:
+    """Report the size, fit, and cost of a request without sending it.
+
+    Answers the question a user asks *before* paying for a large prompt, using the same
+    budget calculator the client uses at dispatch — so what this prints is what the real
+    request would have been held to, not a second estimate of it.
+    """
+    target = call["target"] or (call["route"].targets[0] if call["route"] else None)
+    if target is None:
+        print(
+            "--dry-run needs a target: pass --target, or --route, or configure a route",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        budget = client.budget(
+            messages,
+            target=target,
+            schema=call["schema"],
+            tools=call["tools"],
+            sampling=call["sampling"],
+        )
+        resolved = client.resolve(target)
+    except AnyInferError as exc:
+        return _report_error(exc)
+    finally:
+        client.close()
+
+    estimate = budget.estimate
+    payload: dict[str, Any] = {
+        "target": str(resolved),
+        "estimate": {
+            "messages": estimate.messages.tokens,
+            "tools": estimate.tools.tokens,
+            "schema": estimate.schema.tokens,
+            "envelope": estimate.envelope.tokens,
+            "total": estimate.tokens,
+            "floor": estimate.floor,
+        },
+        "context_window": budget.context_window.value if budget.context_window else None,
+        "provenance": budget.context_window.provenance if budget.context_window else None,
+        "output_reserve_tokens": budget.output_reserve_tokens,
+        "input_allowance_tokens": budget.input_allowance_tokens,
+        "remaining_tokens": budget.remaining_tokens,
+        "fits": budget.fits,
+        "estimated_cost": (
+            {
+                "low": str(budget.estimated_cost.low),
+                "high": str(budget.estimated_cost.high),
+                "currency": budget.estimated_cost.currency,
+            }
+            if budget.estimated_cost is not None
+            else None
+        ),
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"target            {resolved}")
+    print(f"input estimate    {estimate.tokens} tokens (floor {estimate.floor})")
+    for name, value in (
+        ("messages", estimate.messages.tokens),
+        ("tools", estimate.tools.tokens),
+        ("schema", estimate.schema.tokens),
+        ("provider envelope", estimate.envelope.tokens),
+    ):
+        if value:
+            print(f"  {name:<16} {value}")
+    if budget.context_window is None:
+        # Tri-state, not a guess: an unknown window makes every figure below unknowable.
+        print("context window    unknown — no trustworthy figure for this model")
+        print("fits              unknown")
+        return 0
+    print(
+        f"context window    {budget.context_window.value} "
+        f"({budget.context_window.provenance})"
+    )
+    print(f"output reserve    {budget.output_reserve_tokens}")
+    print(f"input allowance   {budget.input_allowance_tokens}")
+    print(f"remaining         {budget.remaining_tokens}")
+    print(f"fits              {'yes' if budget.fits else 'NO'}")
+    cost = budget.estimated_cost
+    if cost is not None:
+        print(f"estimated cost    {cost.low}-{cost.high} {cost.currency}")
+    else:
+        print("estimated cost    unknown — no trustworthy pricing for this model")
+    return 0
 
 
 def _run_streaming(

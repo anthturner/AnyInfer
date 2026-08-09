@@ -415,3 +415,64 @@ def test_verify_without_a_target_needs_a_route(
 
     assert code == 2
     assert "nothing to verify" in capsys.readouterr().err
+
+
+# ---- dry run -------------------------------------------------------------------------
+
+
+def test_dry_run_reports_without_sending(
+    config: Path, transport: Any, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _stdin(monkeypatch, None)
+
+    code = main(["run", "summarize this", "--config", str(config), "--target", "fake:m",
+                 "--dry-run"])
+
+    assert code == 0
+    assert transport.call_count == 0, "a preflight never sends the request"
+    out = capsys.readouterr().out
+    assert "input estimate" in out
+    assert "fake:m" in out
+
+
+def test_dry_run_says_unknown_rather_than_guessing(
+    config: Path, transport: Any, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """openai-compat has no catalogued window, and a guess would look authoritative."""
+    _stdin(monkeypatch, None)
+
+    main(["run", "hi", "--config", str(config), "--target", "fake:m", "--dry-run"])
+
+    out = capsys.readouterr().out
+    assert "unknown" in out
+    assert "fits              unknown" in out
+
+
+def test_dry_run_json_is_machine_readable(
+    config: Path, transport: Any, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _stdin(monkeypatch, None)
+
+    code = main(["run", "hi", "--config", str(config), "--target", "fake:m",
+                 "--dry-run", "--json"])
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["target"] == "fake:m"
+    assert payload["estimate"]["total"] > 0
+    assert payload["fits"] is None
+
+
+def test_dry_run_needs_a_target(
+    config: Path, transport: Any, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _stdin(monkeypatch, None)
+
+    code = main(["run", "hi", "--config", str(config), "--dry-run"])
+
+    assert code == 2
+    assert "needs a target" in capsys.readouterr().err

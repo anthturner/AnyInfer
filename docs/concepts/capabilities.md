@@ -144,6 +144,16 @@ class Recorder:
             log.warning("%s ignored %s: %s", event.target, event.parameter, event.reason)
 ```
 
+Capabilities do the same job one level down. A descriptor knows how a provider *spells*
+reasoning effort; it does not know which of that provider's models have one, so a request
+carrying `reasoning="high"` to a model whose capabilities do not include
+`Feature.REASONING` withholds the field and reports it rather than sending a parameter
+that does nothing.
+
+That only happens on a **known** absence — a `default`-provenance feature set is a
+descriptor-level guess, and dropping a caller's parameter on a guess would be worse than
+sending one the model ignores. Same rule as the [pre-dispatch gate](budgeting.md#the-pre-dispatch-gate).
+
 ## Measuring instead of assuming
 
 The catalog says what a model *should* support; discovery says what a provider *claims*.
