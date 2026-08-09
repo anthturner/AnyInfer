@@ -107,8 +107,12 @@ class DemoFakeBackend:
         text, anything else gets the scripted call — and every other model falls through
         to the scripted provider unchanged. Stateless on purpose: the demonstration
         replays identically no matter how many loops have run.
+
+        The scripted provider is looked up per request rather than captured here: the
+        client keeps this transport for its whole lifetime, and `set_json_mode()` swaps
+        the provider underneath it — a captured reference would silently pin the mode
+        the client was built under.
         """
-        scripted = self._provider.transport()
 
         def handle(request: httpx2.Request) -> httpx2.Response:
             body = _chat_body(request)
@@ -128,7 +132,7 @@ class DemoFakeBackend:
                 rendered = server.transport().handler(request)
                 assert isinstance(rendered, httpx2.Response)
                 return rendered
-            fallthrough = scripted.handler(request)
+            fallthrough = self._provider.transport().handler(request)
             assert isinstance(fallthrough, httpx2.Response)
             return fallthrough
 

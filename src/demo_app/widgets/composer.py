@@ -1,8 +1,10 @@
-"""The message input area: auto-growing text box, token estimate, and quick-action chips.
+"""The message input area: token estimate, auto-growing text box, and one action button.
 
-The token estimate is read straight from `budget()`, the same public
-preflight calculator an application would use to decide how much more context to pack — this
-widget performs no estimation of its own.
+The token estimate sits immediately above the input because they are one instrument: the
+estimate is `budget()` run over exactly what the box holds. The single action button is
+Send until a request is in flight, then becomes Stop — there is never a dead button on
+screen, and the keyboard follows the same state (Ctrl+Enter sends only when idle, Esc
+cancels only when busy).
 """
 
 from __future__ import annotations
@@ -22,33 +24,9 @@ from .. import strings, theme
 from .icons import themed_icon
 from .sdk_help import SdkHelpButton
 
-__all__ = ["QUICK_ACTIONS", "Composer"]
+__all__ = ["Composer"]
 
 _MAX_LINES = 8
-
-
-class QuickAction:
-    """One quick-action chip: a label and the prompt it prefills."""
-
-    __slots__ = ("label", "prompt")
-
-    def __init__(self, label: str, prompt: str) -> None:
-        self.label = label
-        self.prompt = prompt
-
-
-QUICK_ACTIONS: tuple[QuickAction, ...] = (
-    QuickAction(
-        "Summarize JSON",
-        "Summarize the following JSON in one sentence: "
-        '{"library": "AnyInfer", "interface": "typed events", "providers": 7}',
-    ),
-    QuickAction(
-        "Run flaky→fallback demo",
-        "Try the flaky target and show the retry and fallback trail.",
-    ),
-    QuickAction("Structured output", "Analyze this product review: 'Fast shipping, great value.'"),
-)
 
 
 class _AutoGrowingTextEdit(QPlainTextEdit):
@@ -85,70 +63,46 @@ class _AutoGrowingTextEdit(QPlainTextEdit):
 
 
 class Composer(QWidget):
-    """The full input area: text box, token hint, send/cancel buttons, and quick chips."""
+    """The full input area: token hint, text box, and the morphing Send/Stop button."""
 
     send_requested = Signal()
     cancel_requested = Signal()
-    quick_action_chosen = Signal(str)
     text_changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._busy = False
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)  # the hint hugs the input — they are one instrument
 
-        chips = QHBoxLayout()
-        chips.setSpacing(8)
-        for action in QUICK_ACTIONS:
-            button = QPushButton(action.label)
-            button.setObjectName("ChipButton")
-            button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.setAccessibleName(f"Quick action: {action.label}")
-            button.clicked.connect(
-                lambda _checked=False, p=action.prompt: self.quick_action_chosen.emit(p)
-            )
-            chips.addWidget(button)
-        chips.addStretch(1)
-        layout.addLayout(chips)
-
-        row = QHBoxLayout()
-        self._text = _AutoGrowingTextEdit()
-        self._text.send_requested.connect(self.send_requested)
-        self._text.cancel_requested.connect(self.cancel_requested)
-        self._text.textChanged.connect(self.text_changed)
-        row.addWidget(self._text, 1)
-
-        buttons = QVBoxLayout()
-        self._send_button = QPushButton()
-        self._send_button.setObjectName("PrimaryButton")
-        self._send_button.setFixedSize(34, 34)
-        self._send_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._send_button.setToolTip(f"{strings.SEND} (Ctrl+Enter)")
-        self._send_button.setAccessibleName(strings.SEND)
-        self._send_button.clicked.connect(self.send_requested)
-        buttons.addWidget(self._send_button)
-
-        self._cancel_button = QPushButton()
-        self._cancel_button.setObjectName("IconButton")
-        self._cancel_button.setToolTip(f"{strings.CANCEL} (Esc)")
-        self._cancel_button.setAccessibleName(strings.CANCEL)
-        self._cancel_button.setEnabled(False)
-        self._cancel_button.clicked.connect(self.cancel_requested)
-        buttons.addWidget(self._cancel_button)
-        row.addLayout(buttons)
-        layout.addLayout(row)
-
-        hint_row = QHBoxLayout()
         self._hint = QLabel("—")
         self._hint.setObjectName("Muted")
         self._hint.setAccessibleName("Token estimate")
-        hint_row.addWidget(self._hint)
-        hint_row.addStretch(1)
-        hint_row.addWidget(SdkHelpButton("budget"))
-        layout.addLayout(hint_row)
+        layout.addWidget(self._hint)
 
-        self._reapply_icons()
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self._text = _AutoGrowingTextEdit()
+        self._text.send_requested.connect(self._on_send_key)
+        self._text.cancel_requested.connect(self._on_cancel_key)
+        self._text.textChanged.connect(self.text_changed)
+        row.addWidget(self._text, 1)
+
+        # One button that is Send when idle and Stop when busy. Never both, never a
+        # disabled ghost: the visible action is always the one that works right now.
+        self._action_button = QPushButton()
+        self._action_button.setObjectName("PrimaryButton")
+        self._action_button.setFixedSize(34, 34)
+        self._action_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._action_button.clicked.connect(self._on_action_clicked)
+        row.addWidget(self._action_button, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        row.addWidget(SdkHelpButton("budget"), 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(row)
+
+        self._apply_state()
 
     # ---- text ----------------------------------------------------------------------
 
@@ -157,7 +111,7 @@ class Composer(QWidget):
         return self._text.toPlainText()
 
     def set_text(self, text: str) -> None:
-        """Replace the composer text, e.g. from a quick-action chip."""
+        """Replace the composer text, e.g. from a welcome card."""
         self._text.setPlainText(text)
         cursor = self._text.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
@@ -168,11 +122,50 @@ class Composer(QWidget):
         """Empty the composer."""
         self._text.clear()
 
+    # ---- send / cancel state -----------------------------------------------------
+
+    @property
+    def busy(self) -> bool:
+        """Whether the composer is in its Stop state."""
+        return self._busy
+
     def set_busy(self, busy: bool) -> None:
-        """Toggle send/cancel availability while a request is in flight."""
-        self._send_button.setEnabled(not busy)
-        self._cancel_button.setEnabled(busy)
-        self._text.setReadOnly(busy)
+        """Morph between Send (idle) and Stop (a request is in flight)."""
+        if busy == self._busy:
+            return
+        self._busy = busy
+        self._apply_state()
+
+    def _on_action_clicked(self) -> None:
+        if self._busy:
+            self.cancel_requested.emit()
+        else:
+            self.send_requested.emit()
+
+    def _on_send_key(self) -> None:
+        """Ctrl+Enter sends only while idle; while busy the keystroke is inert."""
+        if not self._busy:
+            self.send_requested.emit()
+
+    def _on_cancel_key(self) -> None:
+        """Esc cancels only while busy; an idle Esc means nothing here."""
+        if self._busy:
+            self.cancel_requested.emit()
+
+    def _apply_state(self) -> None:
+        self._text.setReadOnly(self._busy)
+        if self._busy:
+            self._action_button.setIcon(
+                themed_icon(self._action_button, "stop", color=theme.color("on_accent"))
+            )
+            self._action_button.setToolTip(f"{strings.CANCEL} (Esc)")
+            self._action_button.setAccessibleName(strings.CANCEL)
+        else:
+            self._action_button.setIcon(
+                themed_icon(self._action_button, "send", color=theme.color("on_accent"))
+            )
+            self._action_button.setToolTip(f"{strings.SEND} (Ctrl+Enter)")
+            self._action_button.setAccessibleName(strings.SEND)
 
     # ---- token hint ------------------------------------------------------------------
 
@@ -208,11 +201,13 @@ class Composer(QWidget):
         self._hint.setStyleSheet("")
 
     def reapply_theme(self) -> None:
-        """Re-render themed icons after a theme change."""
-        self._reapply_icons()
+        """Re-render the themed action icon after a theme change."""
+        self._refresh_icon()
 
-    def _reapply_icons(self) -> None:
-        self._send_button.setIcon(
-            themed_icon(self._send_button, "send", color=theme.color("on_accent"))
+    def _refresh_icon(self) -> None:
+        # `_apply_state` short-circuits on unchanged state, so the icon refresh is
+        # spelled out for theme changes.
+        name = "stop" if self._busy else "send"
+        self._action_button.setIcon(
+            themed_icon(self._action_button, name, color=theme.color("on_accent"))
         )
-        self._cancel_button.setIcon(themed_icon(self._cancel_button, "cancel"))

@@ -68,6 +68,21 @@ the value they will use, are still saved, and the disclosure opens by itself whe
 stored setting overrides one of them: hiding a setting that is in force would trade one
 confusion for a worse one.
 
+### Conversations are tabs
+
+Each conversation lives in its own tab, titled from the gist of its first message
+("Build me a retro 486 that I can play Commander Keen on" becomes *Build Retro 486 Play
+Commander Keen* — a deterministic heuristic, because asking the model to name the chat
+would silently spend a request per conversation). Tabs close from a hover-revealed ×,
+and their context menu (New / Rename / Save As ▸ / Delete / Close / Close All) mirrors
+the sidebar's.
+
+Tabs are not cosmetic: generations are **keyed by conversation**, so two tabs can stream
+from two providers at the same time and every delta lands in the transcript that asked
+for it. The composer's single action button follows the *active tab's* state — Send when
+idle, Stop while that tab streams — and the sidebars snap shut when dragged below a
+usable width.
+
 ### Streaming is the primitive
 
 The transcript is written from `TextDelta` events as they arrive, never assembled at the
@@ -106,7 +121,7 @@ The bar at the top of the window replaces hand-typed `provider:model` target str
   engine has not listed yet can be typed in. The ↻ button re-runs discovery.
 - **Context window** shows the token budget with an auto-detect toggle (the wand button).
   While auto-detect is on, the disabled field shows the token count actually on file for
-  the current engine/model — e.g. *Auto-detected — 32,768 tokens* — and its tooltip names
+  the current engine/model — e.g. *Auto-Detected (32,768 tokens)* — and its tooltip names
   the value's provenance (`discovered`, `catalog`, or `default`), because capability data
   is provenance-tagged and an estimate is never presented as authoritative.
   Toggling auto-detect off frees the field for a manual override, which is remembered
@@ -197,7 +212,9 @@ prose lives in one registry (`demo_app/sdk_help.py`), and a test resolves every 
 symbol against the real package — so the help cannot silently drift from the API.
 
 **Help → Library map…** shows the wider picture: which public `anyinfer` symbols this
-demo exercises, surface by surface, and — honestly — the list it does not.
+demo exercises, surface by surface, and — honestly — the list it does not. The Help menu
+also links the documentation and SDK reference, lists the demo's third-party licenses
+(PySide6/Qt, Tabler Icons, Python-Markdown), and carries the About box.
 
 ### Appearance
 

@@ -349,7 +349,7 @@ class TestHistoryAndCachePolicies:
             window._history.setCurrentIndex(window._history.findData("last_resort"))
             window._cache.setCurrentIndex(window._cache.findData("explicit"))
             captured = {}
-            window._engine.generate = lambda spec: captured.setdefault("spec", spec)
+            window._engine.generate = lambda spec, key="": captured.setdefault("spec", spec)
             window._composer.set_text("hello")
             window._on_send()
             spec = captured["spec"]

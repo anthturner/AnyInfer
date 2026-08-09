@@ -122,9 +122,13 @@ class TelemetryView(QWidget):
         caption.setTextFormat(Qt.TextFormat.RichText)
         header.addWidget(caption, 1)
 
-        self._clear_button = QPushButton("Clear")
+        self._clear_button = QPushButton()
+        self._clear_button.setObjectName("IconButton")
+        self._clear_button.setFixedSize(28, 28)
+        self._clear_button.setToolTip("Clear telemetry")
         self._clear_button.setAccessibleName("Clear telemetry")
         self._clear_button.clicked.connect(self.clear)
+        self.reapply_theme()
         header.addWidget(self._clear_button)
         layout.addLayout(header)
 
@@ -143,6 +147,12 @@ class TelemetryView(QWidget):
 
         self._requests: dict[str, _RequestCard] = {}
         self._count = 0
+
+    def reapply_theme(self) -> None:
+        """Re-render the themed clear icon after a theme change."""
+        from .icons import themed_icon
+
+        self._clear_button.setIcon(themed_icon(self._clear_button, "eraser", size=16))
 
     def clear(self) -> None:
         """Drop every recorded event."""

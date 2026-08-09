@@ -15,7 +15,7 @@ from __future__ import annotations
 import html
 import math
 
-from PySide6.QtCore import QEvent, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
 from PySide6.QtGui import QFont, QKeyEvent, QMouseEvent, QResizeEvent, QTextOption
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
@@ -223,21 +223,27 @@ class MessageBubble(QFrame):
         self.setAccessibleName(f"{'Your' if role == 'user' else 'Assistant'} message")
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(14, 12, 14, 12)
-        outer.setSpacing(6)
+        outer.setContentsMargins(12, 6, 12, 10)
+        outer.setSpacing(4)
 
         header = QHBoxLayout()
+        header.setSpacing(4)
         label = "You" if role == "user" else (f"Assistant ({target})" if target else "Assistant")
         self.header_label = label
-        self._header_label = QLabel(f"<b>{html.escape(label)}</b>")
+        self._target = target
+        self._header_label = QLabel()
         self._header_label.setObjectName("BubbleHeader")
         self._header_label.setTextFormat(Qt.TextFormat.RichText)
+        # Hovering the speaker reveals which target actually answered; resting state
+        # stays quiet so a transcript is not a wall of provider ids.
+        self._header_label.installEventFilter(self)
+        self._render_header(hovered=False)
         header.addWidget(self._header_label)
         header.addStretch(1)
 
         self._copy_button = QPushButton()
         self._copy_button.setObjectName("IconButton")
-        self._copy_button.setFixedSize(24, 24)
+        self._copy_button.setFixedSize(22, 22)
         self._copy_button.setToolTip("Copy this message")
         self._copy_button.setAccessibleName("Copy message text")
         self._copy_button.clicked.connect(self._copy)
@@ -259,16 +265,39 @@ class MessageBubble(QFrame):
     # ---- content -----------------------------------------------------------------
 
     def set_target(self, target: str) -> None:
-        """Rename the header to the target that actually produced this turn.
+        """Adopt the target that actually produced this turn.
 
         The bubble opens under the route's primary target; once the result arrives, the
-        resolved target may differ — a fallback answered — and the header must say so.
+        resolved target may differ — a fallback answered — and the hover reveal must say
+        so.
         """
         if self.role != "assistant":
             return
-        label = f"Assistant ({target})" if target else "Assistant"
-        self.header_label = label
-        self._header_label.setText(f"<b>{html.escape(label)}</b>")
+        self._target = target
+        self.header_label = f"Assistant ({target})" if target else "Assistant"
+        self._render_header(hovered=self._header_label.underMouse())
+
+    def _render_header(self, *, hovered: bool) -> None:
+        if self.role == "user":
+            self._header_label.setText("<b>You</b>")
+            return
+        if hovered and self._target:
+            self._header_label.setText(
+                f"<b>Assistant</b> — {html.escape(self._target)}"
+            )
+        else:
+            self._header_label.setText("<b>Assistant</b>")
+        if self._target:
+            self._header_label.setToolTip(f"Answered by {self._target}")
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 — Qt's spelling
+        """Show the answering target while the pointer rests on the speaker label."""
+        if watched is self._header_label:
+            if event.type() == QEvent.Type.Enter:
+                self._render_header(hovered=True)
+            elif event.type() == QEvent.Type.Leave:
+                self._render_header(hovered=False)
+        return super().eventFilter(watched, event)
 
     def set_plain_text(self, text: str) -> None:
         """Set the body verbatim (user turns; never Markdown-rendered)."""
@@ -344,6 +373,10 @@ class MessageList(QScrollArea):
             widget.setVisible(True)
         elif widget is not None:
             widget.setVisible(False)
+
+    def empty_state(self) -> QWidget | None:
+        """The widget shown when the transcript is empty, if one was set."""
+        return self._empty_state
 
     def _refresh_empty_state(self) -> None:
         if self._empty_state is None:

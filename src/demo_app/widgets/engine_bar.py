@@ -132,9 +132,13 @@ class ContextWindowRow(QWidget):
         )
         self._input.setEnabled(not self._auto)
         if self._auto:
-            self._manual_tokens = self._input.text().strip() or self._manual_tokens
-            self._input.clear()
-            self._input.setPlaceholderText(self._auto_placeholder())
+            if self._input.text().strip().isdigit():
+                self._manual_tokens = self._input.text().strip()
+            # Shown as the field's actual (disabled) text, not a placeholder: the number
+            # is a real value in force, and placeholder gray reads as "nothing set".
+            self._input.blockSignals(True)
+            self._input.setText(self._auto_placeholder())
+            self._input.blockSignals(False)
             self._input.setToolTip(self._auto_tooltip())
         else:
             self._input.setPlaceholderText("Tokens (minimum 1024)")
@@ -143,8 +147,8 @@ class ContextWindowRow(QWidget):
 
     def _auto_placeholder(self) -> str:
         if self._detected is None:
-            return "Auto-detected"
-        return f"Auto-detected — {self._detected.value:,} tokens"
+            return "Auto-Detected"
+        return f"Auto-Detected ({self._detected.value:,} tokens)"
 
     def _auto_tooltip(self) -> str:
         if self._detected is None:
@@ -379,6 +383,26 @@ class EngineBar(QFrame):
 
     def _refresh_context_hint(self) -> None:
         self._context.set_detected(self._context_window())
+
+    def max_output_tokens_detected(self) -> Sourced[int] | None:
+        """What is known about the selection's output-token cap, provenance included.
+
+        Read by the window so the Max-tokens spinner's 'provider default' can show the
+        number actually on file rather than an unexplained blank.
+        """
+        provider, model = self.provider_id(), self.model()
+        for discovered in self._discovered.get(provider, []):
+            if (
+                discovered.id == model
+                and discovered.capabilities is not None
+                and discovered.capabilities.max_output_tokens is not None
+            ):
+                return discovered.capabilities.max_output_tokens
+        try:
+            defaults = self._registry.get(self._engine_for(provider)).default_capabilities
+        except AnyInferError:
+            return None
+        return defaults.max_output_tokens if defaults is not None else None
 
     def _context_window(self) -> Sourced[int] | None:
         """What is known about the current selection's context window, if anything.

@@ -276,12 +276,27 @@ class Engine(QObject):
     acquisition_progress = Signal(object)
     busy_changed = Signal(bool)
 
+    # Keyed twins of the generation signals, for callers running several conversations
+    # at once: the key is whatever the caller passed to `generate()` (the tabbed window
+    # passes the conversation id). The unkeyed signals above still fire for every
+    # generation — a caller that shows one conversation at a time never needs the keys.
+    gen_text_delta = Signal(str, str)  # (key, text)
+    gen_reasoning_delta = Signal(str, str)
+    gen_first_token = Signal(str, float)
+    gen_attempt_failed = Signal(str, object)
+    gen_usage_update = Signal(str, object)
+    gen_finished = Signal(str, object)
+    gen_failed = Signal(str, str, object)  # (key, message, error)
+    gen_cancelled = Signal(str)
+    gen_busy_changed = Signal(str, bool)
+
     def __init__(self, config: DemoConfig) -> None:
         super().__init__()
         self._pool = QThreadPool(self)
-        # Requests are serialized: the demo shows one conversation at a time, and a second
-        # concurrent stream would interleave deltas into the same transcript.
-        self._pool.setMaxThreadCount(1)
+        # A few generations may run at once — one per conversation tab — because each
+        # tab owns its own transcript; the keys keep their event streams apart. The cap
+        # stays small: this is a demo, not a load generator.
+        self._pool.setMaxThreadCount(4)
         # Local-model work gets a pool of its own. Downloading a few gigabytes of weights
         # takes minutes, and on the request pool it would sit in front of every discovery
         # probe and every chat turn until it finished — a model manager that freezes the
@@ -296,10 +311,9 @@ class Engine(QObject):
         self._relay.acquisition_progress.connect(self.acquisition_progress)
         self._config = config
         self._client: Client | None = None
-        self._active: _GenerateJob | None = None
+        self._active: dict[str, _GenerateJob] = {}
         self._session: Session | None = None
         self._session_target = ""
-        self._busy = False
 
     # ---- lifecycle -------------------------------------------------------------------
 
@@ -315,8 +329,12 @@ class Engine(QObject):
 
     @property
     def busy(self) -> bool:
-        """Whether a request is in flight."""
-        return self._busy
+        """Whether any generation is in flight."""
+        return bool(self._active)
+
+    def busy_for(self, key: str) -> bool:
+        """Whether the generation started under ``key`` is still in flight."""
+        return key in self._active
 
     def apply_config(self, config: DemoConfig) -> None:
         """Adopt new configuration, discarding the client built from the old one."""
@@ -394,26 +412,48 @@ class Engine(QObject):
 
     # ---- work ------------------------------------------------------------------------
 
-    def generate(self, spec: GenerationSpec) -> None:
-        """Start a generation on the pool. Ignored while another is running."""
-        if self._busy:
+    def generate(self, spec: GenerationSpec, key: str = "") -> None:
+        """Start a generation on the pool, identified by ``key``.
+
+        A second call under the *same* key is ignored while that generation runs — one
+        stream per conversation — but different keys run concurrently. ``key`` may stay
+        empty for callers with a single conversation; the empty string is a key like any
+        other.
+        """
+        if key in self._active:
             return
         # Rewind the fakes so the flaky model's scripted failure is reproducible on every
-        # run rather than only the first.
+        # run rather than only the first. Shared across concurrent generations: the
+        # offline backend has one mode, and two tabs racing it is an accepted limit of a
+        # scripted provider, not of the library.
         self._fake_backend.set_json_mode(spec.schema is not None)
+        was_busy = self.busy
         signals = _Signals()
         signals.text_delta.connect(self.text_delta)
+        signals.text_delta.connect(lambda text, k=key: self.gen_text_delta.emit(k, text))
         signals.reasoning_delta.connect(self.reasoning_delta)
+        signals.reasoning_delta.connect(
+            lambda text, k=key: self.gen_reasoning_delta.emit(k, text)
+        )
         signals.first_token.connect(self.first_token)
+        signals.first_token.connect(lambda ms, k=key: self.gen_first_token.emit(k, ms))
         signals.attempt_failed.connect(self.attempt_failed)
+        signals.attempt_failed.connect(
+            lambda record, k=key: self.gen_attempt_failed.emit(k, record)
+        )
         signals.usage_update.connect(self.usage_update)
-        signals.finished.connect(self._on_finished)
-        signals.failed.connect(self._on_failed)
-        signals.cancelled.connect(self._on_cancelled)
+        signals.usage_update.connect(lambda usage, k=key: self.gen_usage_update.emit(k, usage))
+        signals.finished.connect(lambda result, k=key: self._on_finished(k, result))
+        signals.failed.connect(
+            lambda message, error, k=key: self._on_failed(k, message, error)
+        )
+        signals.cancelled.connect(lambda k=key: self._on_cancelled(k))
 
         job = _GenerateJob(self.client(), spec, signals, self._session_for(spec))
-        self._active = job
-        self._set_busy(True)
+        self._active[key] = job
+        self.gen_busy_changed.emit(key, True)
+        if not was_busy:
+            self.busy_changed.emit(True)
         self._pool.start(job)
 
     def _session_for(self, spec: GenerationSpec) -> Session | None:
@@ -452,10 +492,16 @@ class Engine(QObject):
         """
         return self._session.reuse if self._session is not None else ""
 
-    def cancel(self) -> None:
-        """Cancel the in-flight generation, if any."""
-        if self._active is not None:
-            self._active.cancel()
+    def cancel(self, key: str | None = None) -> None:
+        """Cancel one keyed generation, or every in-flight generation when ``key`` is
+        ``None``."""
+        if key is None:
+            for job in self._active.values():
+                job.cancel()
+            return
+        active = self._active.get(key)
+        if active is not None:
+            active.cancel()
 
     def list_models(self, provider_id: str) -> None:
         """Discover a provider's models in the background.
@@ -599,22 +645,24 @@ class Engine(QObject):
             lambda: client.run_tools(prompt, tools=tools, target=target, max_rounds=max_rounds),
         )
 
-    def _on_finished(self, result: Generation) -> None:
-        self._active = None
-        self._set_busy(False)
+    def _on_finished(self, key: str, result: Generation) -> None:
+        self._settle(key)
         self.finished.emit(result)
+        self.gen_finished.emit(key, result)
 
-    def _on_failed(self, message: str, error: object) -> None:
-        self._active = None
-        self._set_busy(False)
+    def _on_failed(self, key: str, message: str, error: object) -> None:
+        self._settle(key)
         self.failed.emit(message, error)
+        self.gen_failed.emit(key, message, error)
 
-    def _on_cancelled(self) -> None:
-        self._active = None
-        self._set_busy(False)
+    def _on_cancelled(self, key: str) -> None:
+        self._settle(key)
         self.cancelled.emit()
+        self.gen_cancelled.emit(key)
 
-    def _set_busy(self, busy: bool) -> None:
-        if busy != self._busy:
-            self._busy = busy
-            self.busy_changed.emit(busy)
+    def _settle(self, key: str) -> None:
+        """Retire one job and report the busy transitions it caused."""
+        self._active.pop(key, None)
+        self.gen_busy_changed.emit(key, False)
+        if not self._active:
+            self.busy_changed.emit(False)

@@ -114,21 +114,23 @@ class ConversationSidebar(QWidget):
             return
         conversation_id = str(item.data(Qt.ItemDataRole.UserRole))
 
+        # The same shape as the tab context menu (minus New/Close, which are about tabs
+        # rather than conversations), so the two read as one vocabulary.
         menu = QMenu(self)
         rename_action = menu.addAction(strings.RENAME)
+        save_menu = menu.addMenu("Save As")
+        save_md_action = save_menu.addAction("Markdown")
+        save_json_action = save_menu.addAction("JSON")
         delete_action = menu.addAction(strings.DELETE)
-        menu.addSeparator()
-        export_json_action = menu.addAction(strings.EXPORT_JSON)
-        export_md_action = menu.addAction(strings.EXPORT_MARKDOWN)
 
         chosen = menu.exec(self._list.mapToGlobal(pos))
         if chosen is rename_action:
             self._prompt_rename(conversation_id, item.text())
         elif chosen is delete_action:
             self.delete_requested.emit(conversation_id)
-        elif chosen is export_json_action:
+        elif chosen is save_json_action:
             self.export_requested.emit(conversation_id, "json")
-        elif chosen is export_md_action:
+        elif chosen is save_md_action:
             self.export_requested.emit(conversation_id, "markdown")
 
     def _prompt_rename(self, conversation_id: str, current_title: str) -> None:

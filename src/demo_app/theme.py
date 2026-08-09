@@ -379,17 +379,16 @@ QListWidget#ConversationList::item:selected {
     color: $text;
 }
 
+/* Docked sections sit flush in a rectangular pane; rounding them reads as floating
+   cards that are not actually floating. */
 QFrame#CollapsibleSection {
     border: 1px solid $border;
-    border-radius: 10px;
+    border-radius: 0;
     background: $bg;
 }
 QFrame#CollapsibleSectionHeader {
     background: $surface;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+    border-radius: 0;
     border-bottom: 1px solid $border;
 }
 QLabel#CollapsibleSectionTitle {
@@ -532,6 +531,29 @@ QLabel#ApiList {
     border: 1px solid $border;
     border-radius: 8px;
     padding: 8px;
+}
+
+/* Tab close buttons: invisible until the tab is hovered or active; the icon itself
+   turns the danger color via its Active pixmap when the pointer reaches it. */
+QToolButton#TabClose {
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 1px;
+}
+QToolButton#TabClose:hover { background: $accent_bg; }
+
+/* The help dialog's code viewer and its gutter. */
+QPlainTextEdit#CodeView {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 8px;
+}
+QFrame#InsetSeparator {
+    background: $border;
+    border: none;
+    margin-left: 12px;
+    margin-right: 12px;
 }
 
 /* Welcome feature cards. */

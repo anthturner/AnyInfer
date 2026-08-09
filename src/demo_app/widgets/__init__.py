@@ -7,10 +7,12 @@ from .chat_view import (
     TypingIndicator,
     WelcomeView,
 )
+from .chat_tabs import ChatPage, ConversationTabs
 from .collapsible_section import CollapsibleSection
 from .composer import Composer
 from .conversation_sidebar import ConversationSidebar
 from .engine_bar import ContextWindowRow, EngineBar
+from .help_dialogs import AboutDialog, LicensesDialog
 from .metrics import StatusMetrics
 from .models_dialog import ModelsDialog
 from .schema_panel import EXAMPLE_SCHEMA, SchemaPanel
@@ -22,11 +24,15 @@ from .tools_panel import ToolsPanel
 
 __all__ = [
     "EXAMPLE_SCHEMA",
+    "AboutDialog",
+    "ChatPage",
     "CollapsibleSection",
     "Composer",
     "ContextWindowRow",
     "ConversationSidebar",
+    "ConversationTabs",
     "EngineBar",
+    "LicensesDialog",
     "LibraryMapDialog",
     "MessageBubble",
     "MessageList",

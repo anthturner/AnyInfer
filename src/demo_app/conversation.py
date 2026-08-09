@@ -18,7 +18,7 @@ from typing import Any
 from anyinfer.types.messages import ContentPart, Message, Role, Text, ToolCall, ToolResult
 from anyinfer.types.results import Generation
 
-__all__ = ["Conversation", "GenerationSummary", "conversations_dir"]
+__all__ = ["Conversation", "GenerationSummary", "conversations_dir", "gist_title"]
 
 _SCHEMA_VERSION = 1
 _TITLE_MAX_CHARS = 40
@@ -196,6 +196,49 @@ class Conversation:
             lines.append(message.text or "*(no text content)*")
             lines.append("")
         return "\n".join(lines)
+
+
+_FLUFF_WORDS = frozenset(
+    "please can could would you kindly hey hi hello i we want need like to me my "
+    "help just maybe some".split()
+)
+"""Leading filler that carries no topic. 'Build' and 'Spec' survive; 'please can you'
+does not."""
+
+_STOP_WORDS = frozenset(
+    "a an the that this those these i we you it is are was be been being of in on at "
+    "for with and or so then them they my your our me can could should would will "
+    "do does did have has had there here what which who how why when".split()
+)
+"""Grammar words dropped from the middle of a gist."""
+
+_GIST_MAX_WORDS = 6
+
+
+def gist_title(text: str, *, max_chars: int = 40) -> str:
+    """Condense a first message into a short tab title.
+
+    Deliberately a deterministic heuristic, not a model call: naming a chat by asking
+    the model would silently spend a request per conversation, and against the offline
+    fake every title would be the same canned sentence. The rules are simple — first
+    line only, leading filler dropped, grammar words removed, the first few content
+    words kept: "Build me a retro 486 that I can play Commander Keen on" becomes
+    "Build Retro 486 Play Commander Keen".
+    """
+    first_line = text.strip().splitlines()[0] if text.strip() else ""
+    words = [w.strip(".,!?;:\"'()") for w in first_line.split()]
+    words = [w for w in words if w]
+    while words and words[0].lower() in _FLUFF_WORDS:
+        words.pop(0)
+    content = [w for w in words if w.lower() not in _STOP_WORDS]
+    if not content:
+        content = words
+    picked = content[:_GIST_MAX_WORDS]
+    # Title-case plain lowercase words; leave anything with its own casing (486, JSON,
+    # McCarthy) alone.
+    shaped = [w if w != w.lower() or not w.isalpha() else w.capitalize() for w in picked]
+    title = " ".join(shaped) or "New chat"
+    return title if len(title) <= max_chars else title[: max_chars - 1] + "…"
 
 
 def _derive_title(messages: Sequence[Message]) -> str:

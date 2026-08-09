@@ -44,11 +44,13 @@ class CollapsibleSection(QFrame):
         parent: QWidget | None = None,
         *,
         help_topic: str | None = None,
+        icon: str | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("CollapsibleSection")
         self._content = content
         self._minimized = False
+        self._icon_name = icon
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -59,6 +61,13 @@ class CollapsibleSection(QFrame):
         header.setFixedHeight(HEADER_HEIGHT)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(12, 0, 8, 0)
+
+        self._icon_label: QLabel | None = None
+        if icon is not None:
+            self._icon_label = QLabel()
+            self._icon_label.setFixedSize(16, 16)
+            header_layout.addWidget(self._icon_label)
+            self._render_icon()
 
         self._title_label = QLabel(title)
         self._title_label.setObjectName("CollapsibleSectionTitle")
@@ -117,8 +126,15 @@ class CollapsibleSection(QFrame):
         self.minimized_changed.emit(minimized)
 
     def reapply_theme(self) -> None:
-        """Re-render the themed minimize/restore icon after a theme change."""
+        """Re-render the themed icons after a theme change."""
         self._update_toggle()
+        self._render_icon()
+
+    def _render_icon(self) -> None:
+        if self._icon_label is not None and self._icon_name is not None:
+            self._icon_label.setPixmap(
+                themed_icon(self, self._icon_name, size=16).pixmap(16, 16)
+            )
 
     def _update_toggle(self) -> None:
         """Sync the toggle's icon, tooltip, and accessible name to the current state.

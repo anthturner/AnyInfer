@@ -1485,8 +1485,9 @@ class TestEngineBar:
         row = bar._context
         assert row.auto_detect
         assert not row._input.isEnabled()
-        # The demo descriptor states a 32,768-token default, so auto-detect shows it.
-        assert row._input.placeholderText() == "Auto-detected — 32,768 tokens"
+        # The demo descriptor states a 32,768-token default, so auto-detect shows it —
+        # as the field's actual (disabled) text, not placeholder gray.
+        assert row._input.text() == "Auto-Detected (32,768 tokens)"
         assert bar.context_window_tokens() is None
 
     def test_discovery_outranks_the_descriptor_default(self, qapp: object):
@@ -1506,7 +1507,7 @@ class TestEngineBar:
                 )
             ],
         )
-        assert bar._context._input.placeholderText() == "Auto-detected — 9,000 tokens"
+        assert bar._context._input.text() == "Auto-Detected (9,000 tokens)"
 
     def test_manual_override_round_trips_and_survives_toggling(self, qapp: object):
         bar = self._bar()
@@ -1649,7 +1650,8 @@ class TestComposer:
         QTest.keyClick(composer._text, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
         assert sent
 
-    def test_escape_cancels(self, qapp: object):
+    def test_escape_cancels_only_while_busy(self, qapp: object):
+        """Esc maps to the Stop state; an idle Esc has nothing to cancel."""
         from PySide6.QtCore import Qt
         from PySide6.QtTest import QTest
 
@@ -1659,16 +1661,40 @@ class TestComposer:
         cancelled = []
         composer.cancel_requested.connect(lambda: cancelled.append(True))
         QTest.keyClick(composer._text, Qt.Key.Key_Escape)
-        assert cancelled
+        assert cancelled == []
+        composer.set_busy(True)
+        QTest.keyClick(composer._text, Qt.Key.Key_Escape)
+        assert cancelled == [True]
 
-    def test_quick_action_chosen_carries_the_prompt(self, qapp: object):
-        from demo_app.widgets.composer import QUICK_ACTIONS, Composer
+    def test_action_button_morphs_between_send_and_stop(self, qapp: object):
+        """One button: Send when idle, Stop when a request is in flight."""
+        from demo_app.widgets.composer import Composer
 
         composer = Composer()
-        received = []
-        composer.quick_action_chosen.connect(received.append)
-        composer.quick_action_chosen.emit(QUICK_ACTIONS[0].prompt)
-        assert received == [QUICK_ACTIONS[0].prompt]
+        sent, cancelled = [], []
+        composer.send_requested.connect(lambda: sent.append(True))
+        composer.cancel_requested.connect(lambda: cancelled.append(True))
+
+        assert composer._action_button.accessibleName() == "Send"
+        composer._action_button.click()
+        assert sent == [True] and cancelled == []
+
+        composer.set_busy(True)
+        assert composer._action_button.accessibleName() == "Cancel"
+        composer._action_button.click()
+        assert cancelled == [True]
+        # While busy, Ctrl+Enter must not queue a second send.
+        composer._on_send_key()
+        assert sent == [True]
+
+    def test_token_hint_sits_directly_above_the_input(self, qapp: object):
+        """The hint and the text box are one instrument; the layout keeps them adjacent."""
+        from demo_app.widgets.composer import Composer
+
+        composer = Composer()
+        layout = composer.layout()
+        assert layout is not None
+        assert layout.itemAt(0).widget() is composer._hint
 
     def test_set_token_hint_flags_when_it_does_not_fit(self, qapp: object):
         from demo_app.widgets.composer import Composer
