@@ -130,7 +130,8 @@ descriptor = ProviderDescriptor(
                 label="Resource endpoint",
                 kind="endpoint",
                 required=True,
-                help_text="https://<resource>.services.ai.azure.com/openai/v1",
+                help_text="The OpenAI-compatible root of your Foundry resource.",
+                placeholder="https://<resource>.services.ai.azure.com/openai/v1",
             ),
             SetupField(
                 key="api_key",
@@ -146,7 +147,11 @@ descriptor = ProviderDescriptor(
                 kind="api-version",
                 required=False,
                 advanced=True,
-                help_text="Only needed for deployments that still require it.",
+                help_text=(
+                    "Only needed for deployments that still require it; the v1 surface "
+                    "does not."
+                ),
+                placeholder="2024-10-21",
             ),
         ),
         model_selection="discover-or-manual",

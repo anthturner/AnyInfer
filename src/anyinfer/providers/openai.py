@@ -444,5 +444,8 @@ descriptor = ProviderDescriptor(
     ),
     reasoning_translator=_translate_reasoning,
     default_capabilities=ModelCapabilities(features=Sourced(_OPENAI_FEATURES, "default")),
+    # Prompt caching is automatic on a stable prefix — there is nothing to mark, so the
+    # core's only duty is to leave the prefix undisturbed. Recorded in contracts/openai.md.
+    cache_mechanism="implicit",
 )
 """Descriptor for the OpenAI provider."""

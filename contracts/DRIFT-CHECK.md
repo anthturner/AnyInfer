@@ -70,7 +70,7 @@ For each in-scope contract file:
 <diff-style or bullet proposals per file>
 ```
 
-## Pricing drift (D27)
+## Pricing drift
 
 ## Non-inference sources
 
@@ -106,7 +106,7 @@ covered by a manual run of this procedure. For reference, its rules mirror this 
 ## Cadence and hygiene
 
 - Intended cadence: before each milestone release, and ad hoc when a provider announces
-  changes. (Scheduled/CI automation is an open question — NOTES.md.)
+  changes. Scheduled CI automation remains an open question (DESIGN.md §20).
 - Local engines (Ollama, llama.cpp) drift via GitHub releases rather than API docs; check
   their release notes since the pinned version recorded in the snapshot.
 - Findings that require code changes become tracked work items; this procedure never edits

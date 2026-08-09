@@ -24,8 +24,19 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
-from anyinfer import Client, ContextBudget, ProviderSettings, Route
+from anyinfer import (
+    CachePolicy,
+    Client,
+    ContextBudget,
+    HistoryPolicy,
+    Measurement,
+    ProviderSettings,
+    Route,
+    Session,
+)
 from anyinfer.events.telemetry import TelemetryEvent
+from anyinfer.local.acquire import AcquisitionProgress
+from anyinfer.local.tuning import Posture
 from anyinfer.registry import ProviderRegistry
 from anyinfer.types.events import (
     AttemptFailed,
@@ -58,6 +69,14 @@ class GenerationSpec:
     sampling: Sampling
     schema: Mapping[str, Any] | None = None
     repair: Repair | None = None
+    reasoning: str | None = None
+    """Normalized reasoning effort, or ``None`` to send no reasoning field at all."""
+    use_session: bool = False
+    """Whether to thread this turn through the engine's provider-side session handle."""
+    history: HistoryPolicy | None = None
+    """Opt-in conversation compaction; ``None`` sends the full transcript untouched."""
+    cache: CachePolicy | None = None
+    """Opt-in prompt-cache placement; ``None`` caches exactly nothing."""
 
 
 class TelemetryRelay(QObject):
@@ -70,10 +89,22 @@ class TelemetryRelay(QObject):
     # Not named `event`: QObject.event() is a virtual method, and shadowing it with a
     # signal breaks Qt's event delivery for this object.
     telemetry = Signal(object)
+    acquisition_progress = Signal(object)
 
     def on_event(self, telemetry_event: TelemetryEvent) -> None:
         """Receive one telemetry event from the core."""
         self.telemetry.emit(telemetry_event)
+
+    def on_progress(self, progress: AcquisitionProgress) -> None:
+        """Receive one acquisition progress snapshot.
+
+        A separate channel from `on_event`, because acquisition progress is not
+        telemetry: it is reported through the sink the caller passed to
+        ``acquire_model()`` rather than to registered observers, and it describes a
+        download rather than a request. Crossing it into the telemetry stream would put
+        thousands of throttled byte counts into an inspector built to show request trees.
+        """
+        self.acquisition_progress.emit(progress)
 
 
 class _Signals(QObject):
@@ -94,16 +125,25 @@ class _Signals(QObject):
     call_failed = Signal(str, str, object)  # (provider_id, message, error)
     models_listed = Signal(str, object)
     health_checked = Signal(str, object)
+    task_done = Signal(str, object)  # (key, result)
+    task_failed = Signal(str, str, object)  # (key, message, error)
 
 
 class _GenerateJob(QRunnable):
     """Runs one generation on a pool thread, emitting events as they stream in."""
 
-    def __init__(self, client: Client, spec: GenerationSpec, signals: _Signals) -> None:
+    def __init__(
+        self,
+        client: Client,
+        spec: GenerationSpec,
+        signals: _Signals,
+        session: Session | None = None,
+    ) -> None:
         super().__init__()
         self._client = client
         self._spec = spec
         self._signals = signals
+        self._session = session
         self._cancelled = False
         self._terminal_emitted = False
 
@@ -124,6 +164,10 @@ class _GenerateJob(QRunnable):
                 schema=self._spec.schema,
                 sampling=self._spec.sampling,
                 repair=self._spec.repair,
+                reasoning=self._spec.reasoning,  # type: ignore[arg-type]
+                session=self._session,
+                history=self._spec.history,
+                cache=self._spec.cache,
             ) as stream:
                 for event in stream:
                     if self._cancelled:
@@ -180,6 +224,33 @@ class _CallJob(QRunnable):
             self._signals.call_failed.emit(self._provider_id, str(error), error)
 
 
+class _TaskJob(QRunnable):
+    """Runs one arbitrary client call off the GUI thread, tagged by a caller-chosen key.
+
+    `_CallJob` covers the ``fn(provider_id)`` shape that discovery and health share.
+    Everything else the library exposes — acquiring a model, probing a target, installing
+    a runtime — has its own signature and its own return type, so this job carries a
+    prepared zero-argument callable instead and lets the *key* say which request an answer
+    belongs to. Without that key a panel with two probes in flight cannot tell which one
+    just came back.
+    """
+
+    def __init__(self, key: str, fn: Any, signals: _Signals) -> None:
+        super().__init__()
+        self._key = key
+        self._fn = fn
+        self._signals = signals
+
+    def run(self) -> None:
+        """Call it, and report either outcome on a channel of its own."""
+        try:
+            result = self._fn()
+        except Exception as error:  # noqa: BLE001 — surfaced in the UI, not raised
+            self._signals.task_failed.emit(self._key, str(error), error)
+            return
+        self._signals.task_done.emit(self._key, result)
+
+
 class Engine(QObject):
     """Owns the AnyInfer client and runs every call off the GUI thread.
 
@@ -200,6 +271,9 @@ class Engine(QObject):
     models_listed = Signal(str, object)
     health_checked = Signal(str, object)
     discovery_failed = Signal(str, str, object)  # (provider_id, message, error)
+    task_done = Signal(str, object)  # (key, result)
+    task_failed = Signal(str, str, object)  # (key, message, error)
+    acquisition_progress = Signal(object)
     busy_changed = Signal(bool)
 
     def __init__(self, config: DemoConfig) -> None:
@@ -208,14 +282,23 @@ class Engine(QObject):
         # Requests are serialized: the demo shows one conversation at a time, and a second
         # concurrent stream would interleave deltas into the same transcript.
         self._pool.setMaxThreadCount(1)
+        # Local-model work gets a pool of its own. Downloading a few gigabytes of weights
+        # takes minutes, and on the request pool it would sit in front of every discovery
+        # probe and every chat turn until it finished — a model manager that freezes the
+        # conversation is worse than no model manager.
+        self._task_pool = QThreadPool(self)
+        self._task_pool.setMaxThreadCount(2)
         self._registry = ProviderRegistry()
         self._fake_backend = DemoFakeBackend()
         register_demo_provider(self._registry)
         self._relay = TelemetryRelay()
         self._relay.telemetry.connect(self.telemetry)
+        self._relay.acquisition_progress.connect(self.acquisition_progress)
         self._config = config
         self._client: Client | None = None
         self._active: _GenerateJob | None = None
+        self._session: Session | None = None
+        self._session_target = ""
         self._busy = False
 
     # ---- lifecycle -------------------------------------------------------------------
@@ -292,8 +375,19 @@ class Engine(QObject):
         instead.
         """
         self.cancel()
+        if self._session is not None:
+            # The handle refers to state on the client that is about to go away; closing
+            # it here stops a later turn resuming into a client that no longer exists.
+            self._session.close()
+            self._session = None
+        self._session_target = ""
         self._pool.clear()
+        self._task_pool.clear()
         self._pool.waitForDone(2_000)
+        # Bounded like the request pool, and for the same reason: a download that has
+        # already started cannot be interrupted, and blocking the close on it would hang
+        # the window for as long as the remaining gigabytes take.
+        self._task_pool.waitForDone(2_000)
         if self._client is not None:
             self._client.close()
             self._client = None
@@ -317,10 +411,46 @@ class Engine(QObject):
         signals.failed.connect(self._on_failed)
         signals.cancelled.connect(self._on_cancelled)
 
-        job = _GenerateJob(self.client(), spec, signals)
+        job = _GenerateJob(self.client(), spec, signals, self._session_for(spec))
         self._active = job
         self._set_busy(True)
         self._pool.start(job)
+
+    def _session_for(self, spec: GenerationSpec) -> Session | None:
+        """The session handle this turn should thread through, if any.
+
+        Opened once per target and kept, because that is the whole point: a handle
+        recreated per request carries no state forward and would report ``fresh`` every
+        time. Switching targets opens a new one — a provider's session is its own, and
+        handing Ollama's handle to Copilot would be meaningless.
+        """
+        if not spec.use_session:
+            return None
+        target = str(spec.route.targets[0]) if spec.route.targets else ""
+        if not target:
+            return None
+        # Compared as the string the user picked rather than through
+        # `Session.applies_to()`: that takes a resolved
+        # target, and resolving one here purely to decide whether to reuse a handle would
+        # spend a lookup to answer a question the bar's own selection already answers.
+        if self._session is not None and self._session_target != target:
+            self._session.close()
+            self._session = None
+        if self._session is None or self._session.closed:
+            self._session = self.client().session(target)
+            self._session_target = target
+        return self._session
+
+    @property
+    def session_reuse(self) -> str:
+        """How the last session-threaded turn was served, or an empty string.
+
+        ``resumed`` means the provider kept the conversation; ``fresh`` means it started
+        one; ``unsupported`` means the provider has no session concept and the transcript
+        was re-sent. Reported rather than hidden, since the three cost very different
+        amounts.
+        """
+        return self._session.reuse if self._session is not None else ""
 
     def cancel(self) -> None:
         """Cancel the in-flight generation, if any."""
@@ -351,6 +481,122 @@ class Engine(QObject):
         signals.call_failed.connect(self.discovery_failed)
         self._pool.start(
             _CallJob(self.client().health, provider_id, signals.health_checked.emit, signals)
+        )
+
+    # ---- library surfaces beyond generation ------------------------------------------
+
+    def run_task(self, key: str, fn: Any) -> None:
+        """Run one prepared client call on the local-work pool, reporting it under ``key``.
+
+        The single entry point every non-generation surface goes through: catalog browsing,
+        acquisition, removal, probes, benchmarks, runtime installs. Each is one library
+        call, so the demo's job is to get it off the GUI thread and label the answer — not
+        to wrap it in logic of its own.
+        """
+        signals = _Signals()
+        signals.task_done.connect(self.task_done)
+        signals.task_failed.connect(self.task_failed)
+        self._task_pool.start(_TaskJob(key, fn, signals))
+
+    def local_catalog(
+        self, key: str, provider_id: str | None, *, posture: Posture = "balanced"
+    ) -> None:
+        """Browse the local catalog, annotated with how each entry fits this machine."""
+        client = self.client()
+        self.run_task(key, lambda: client.local_catalog(provider_id, posture=posture))
+
+    def installed_models(self, key: str) -> None:
+        """List every model acquired into this client's store."""
+        client = self.client()
+        self.run_task(key, client.installed_models)
+
+    def acquire_model(
+        self, key: str, model_id: str, *, engine: str | None = None, dry_run: bool = False
+    ) -> None:
+        """Download a catalog model's weights, reporting progress as it goes.
+
+        ``dry_run`` resolves and plans the acquisition — which files, how many bytes, what
+        is already on disk — without fetching anything, so a UI can show the cost of a
+        download before committing to it.
+        """
+        client = self.client()
+        self.run_task(
+            key,
+            lambda: client.acquire_model(
+                model_id, engine=engine, dry_run=dry_run, progress=self._relay.on_progress
+            ),
+        )
+
+    def remove_model(self, key: str, entry_id: str) -> None:
+        """Delete an acquired model from the store."""
+        client = self.client()
+        self.run_task(key, lambda: client.remove_model(entry_id))
+
+    def pull_model(self, key: str, provider_id: str, model: str) -> None:
+        """Tell an engine that keeps its own store to make a model available."""
+        client = self.client()
+        self.run_task(key, lambda: client.pull_model(provider_id, model))
+
+    def resolve(self, key: str, target: str) -> None:
+        """Resolve a target to its provider, model, and capabilities without a request."""
+        client = self.client()
+        self.run_task(key, lambda: client.resolve(target))
+
+    def probe(self, key: str, target: str) -> None:
+        """Measure what a target actually supports, one request per feature."""
+        client = self.client()
+        self.run_task(key, lambda: client.probe(target))
+
+    def verify(self, key: str, target: str) -> None:
+        """Prove a target works end to end by asking it something."""
+        client = self.client()
+        self.run_task(key, lambda: client.verify(target))
+
+    def benchmark(self, key: str, target: str) -> None:
+        """Measure a target's latency and throughput with one deterministic request."""
+        client = self.client()
+        self.run_task(key, lambda: client.benchmark(target))
+
+    def benchmark_pair(self, key: str, target: str) -> None:
+        """Run two back-to-back benchmarks, so warm-up cost becomes observable.
+
+        The library does not (yet) report whether a local engine had the model in memory
+        when a benchmark ran, and this demo must not guess. What it *can* do is control
+        the protocol: the second run is warm by construction — it starts the moment the
+        first finishes — while the first inherits whatever state the engine was in. Equal
+        numbers mean the engine was already warm; a large first-run TTFT is the load cost
+        it absorbed. The pair is one task so nothing else can run between them.
+        """
+        client = self.client()
+
+        def run() -> tuple[Measurement, Measurement]:
+            return (client.benchmark(target), client.benchmark(target))
+
+        self.run_task(key, run)
+
+    def diagnostics(self, key: str, provider_id: str) -> None:
+        """Ask a provider what it has noticed about its own runtime."""
+        client = self.client()
+        self.run_task(key, lambda: client.diagnostics(provider_id))
+
+    def run_tools(
+        self, key: str, prompt: str, target: str, tools: Sequence[Any], *, max_rounds: int = 4
+    ) -> None:
+        """Generate with a tool loop, dispatching calls until the model answers.
+
+        The loop itself is `run_tools()`: it issues the request,
+        matches each returned call to a tool, runs it, feeds the result back, and repeats
+        until there is an answer or the round budget is spent. An application writing that
+        loop by hand is the mistake this demonstrates the absence of.
+        """
+        client = self.client()
+        # The fake backend scripts its tool call on the *first* request of a run, so the
+        # scripted servers are rewound here for the same reason a generation rewinds them:
+        # the demonstration has to be repeatable, not once per process.
+        self._fake_backend.set_json_mode(False)
+        self.run_task(
+            key,
+            lambda: client.run_tools(prompt, tools=tools, target=target, max_rounds=max_rounds),
         )
 
     def _on_finished(self, result: Generation) -> None:

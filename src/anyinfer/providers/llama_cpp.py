@@ -52,6 +52,98 @@ from .openai_compat import OpenAICompatAdapter
 __all__ = ["LlamaCppAdapter", "LlamaCppOptions", "descriptor"]
 
 
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+_FALSY = frozenset({"0", "false", "no", "off"})
+
+
+def _as_path(key: str, value: Any) -> Path | None:
+    """Read a directory option, treating a blank string as "unset"."""
+    if value is None or isinstance(value, Path):
+        return value
+    text = str(value).strip()
+    return Path(text).expanduser() if text else None
+
+
+def _as_optional_float(key: str, value: Any) -> float | None:
+    """Read a duration option, treating a blank string as "no limit"."""
+    if value is None or isinstance(value, float):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        raise ConfigError(
+            f"llama-cpp option {key!r} must be a number of seconds, not {text!r}",
+            provider="llama-cpp",
+            hint="use a number such as 900, or leave it blank to keep servers resident",
+        ) from None
+
+
+def _as_int(key: str, value: Any) -> int:
+    """Read a count option."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    text = str(value).strip()
+    try:
+        return int(text)
+    except ValueError:
+        raise ConfigError(
+            f"llama-cpp option {key!r} must be a whole number, not {text!r}",
+            provider="llama-cpp",
+            hint="use a positive integer such as 1",
+        ) from None
+
+
+def _as_bool(key: str, value: Any) -> bool:
+    """Read a yes/no option in either the Python or the settings-file spelling."""
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in _TRUTHY:
+        return True
+    if text in _FALSY:
+        return False
+    raise ConfigError(
+        f"llama-cpp option {key!r} must be yes or no, not {text!r}",
+        provider="llama-cpp",
+        hint="use 'yes' or 'no'",
+    )
+
+
+_POSTURES = ("conservative", "balanced", "aggressive")
+
+
+def _as_posture(key: str, value: Any) -> Posture:
+    """Read the tuning posture, rejecting a name the planner has no rule for."""
+    text = str(value).strip().lower()
+    if text not in _POSTURES:
+        raise ConfigError(
+            f"llama-cpp option {key!r} must be one of {', '.join(_POSTURES)}, not {text!r}",
+            provider="llama-cpp",
+            hint="pick a posture from the declared set",
+        )
+    return text  # type: ignore[return-value]
+
+
+_COERCIONS: Mapping[str, Any] = {
+    "model_dir": _as_path,
+    "posture": _as_posture,
+    "idle_ttl_s": _as_optional_float,
+    "max_resident": _as_int,
+    "auto_download": _as_bool,
+    "allow_remote_exposure": _as_bool,
+}
+"""Options whose settings-file spelling is a string but whose type is not.
+
+Keyed rather than branched so a new scalar option is one entry, and so the coercion a
+value gets is a property of the option instead of of the call site that read it.
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class LlamaCppOptions:
     """Adapter configuration, supplied through ``ProviderSettings.options``.
@@ -82,11 +174,23 @@ class LlamaCppOptions:
 
     @classmethod
     def from_mapping(cls, options: Mapping[str, Any]) -> LlamaCppOptions:
-        """Build options from a provider settings mapping, ignoring unknown keys."""
+        """Build options from a provider settings mapping, ignoring unknown keys.
+
+        Scalars are coerced, because the same options reach here from two directions: a
+        Python caller passing real ``Path``/``float``/``bool`` values, and a config file or
+        settings UI whose setup-spec values are strings by construction. Rejecting the
+        latter would make every declared field unusable from the very config format the
+        setup spec exists to drive; coercing an unreadable value would be worse, so a
+        malformed one raises rather than silently reverting to the default.
+        """
         import dataclasses
 
         known = {f.name for f in dataclasses.fields(cls)}
-        return cls(**{k: v for k, v in options.items() if k in known})
+        supplied = {k: v for k, v in options.items() if k in known}
+        for key, coerce in _COERCIONS.items():
+            if key in supplied:
+                supplied[key] = coerce(key, supplied[key])
+        return cls(**supplied)
 
 
 class LlamaCppAdapter:
@@ -385,28 +489,75 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="binary",
                 label="llama-server path",
-                kind="endpoint",
+                kind="path",
                 required=False,
                 advanced=True,
                 default_value="llama-server",
-                help_text="Defaults to 'llama-server' on PATH.",
+                help_text=(
+                    "The llama-server executable. A bare name is looked up on PATH; a "
+                    "full path pins one build."
+                ),
             ),
             SetupField(
                 key="posture",
                 label="Resource posture",
-                kind="host-profile",
+                kind="choice",
                 required=False,
                 advanced=True,
                 default_value="balanced",
-                help_text="conservative, balanced, or aggressive.",
+                choices=("conservative", "balanced", "aggressive"),
+                help_text=(
+                    "How much of this machine a server may claim: 'conservative' leaves "
+                    "the most headroom for everything else, 'aggressive' the least."
+                ),
             ),
             SetupField(
                 key="model_dir",
                 label="Model directory",
-                kind="endpoint",
+                kind="directory",
                 required=False,
                 advanced=True,
-                help_text="Where GGUF artifacts are stored.",
+                help_text=(
+                    "Where GGUF artifacts are stored. Defaults to the per-user model "
+                    "store, shared with every other AnyInfer tool on this machine."
+                ),
+            ),
+            SetupField(
+                key="idle_ttl_s",
+                label="Idle unload (seconds)",
+                kind="text",
+                required=False,
+                advanced=True,
+                default_value="900",
+                help_text=(
+                    "Stop a server after this long with no active stream, returning its "
+                    "memory. Blank keeps a loaded model resident indefinitely."
+                ),
+            ),
+            SetupField(
+                key="max_resident",
+                label="Concurrent servers",
+                kind="text",
+                required=False,
+                advanced=True,
+                default_value="1",
+                help_text=(
+                    "How many models may stay loaded at once. Raise it only if this "
+                    "machine has memory for every one of them simultaneously."
+                ),
+            ),
+            SetupField(
+                key="auto_download",
+                label="Download missing models",
+                kind="choice",
+                required=False,
+                advanced=True,
+                default_value="yes",
+                choices=("yes", "no"),
+                help_text=(
+                    "Fetch a catalog artifact on first use. Set to 'no' to require an "
+                    "explicit download before a model can be served."
+                ),
             ),
         ),
         model_selection="manual-only",

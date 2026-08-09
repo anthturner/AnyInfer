@@ -153,3 +153,60 @@ def test_load_config_wraps_file_errors(tmp_path) -> None:
     with pytest.raises(ai.ConfigError, match="cannot read file") as caught:
         ai.load_config(missing)
     assert caught.value.phase == "configure"
+
+
+# ---- advanced context-reduction settings ---------------------------------------------
+
+
+def test_a_file_without_a_context_block_gets_the_shipped_defaults() -> None:
+    from anyinfer.context import ContextTuning
+
+    assert ai.loads_config("{}").context == ContextTuning()
+
+
+def test_the_context_block_parses_into_tuning() -> None:
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "context": {
+                    "selection_order": "density",
+                    "diversity": 0.25,
+                    "query_expansion": True,
+                    "near_duplicate_threshold": 0.9,
+                }
+            }
+        )
+    )
+    assert config.context.selection_order == "density"
+    assert config.context.diversity == 0.25
+    assert config.context.query_expansion
+    assert config.context.near_duplicate_threshold == 0.9
+
+
+def test_a_misspelled_context_setting_is_an_error_not_a_silent_no_op() -> None:
+    with pytest.raises(ai.ConfigError, match="unknown context setting"):
+        ai.loads_config(json.dumps({"context": {"diversty": 0.5}}))
+
+
+def test_an_out_of_range_context_setting_is_rejected() -> None:
+    with pytest.raises(ai.ConfigError, match="diversity") as caught:
+        ai.loads_config(json.dumps({"context": {"diversity": 5}}))
+    assert "configuration guide" in (caught.value.hint or "")
+
+
+def test_the_context_block_must_be_an_object() -> None:
+    with pytest.raises(ai.ConfigError, match="'context' must be an object"):
+        ai.loads_config(json.dumps({"context": ["density"]}))
+
+
+def test_context_settings_reach_a_reduction() -> None:
+    from anyinfer.context import ContextDocument, select
+
+    config = ai.loads_config(json.dumps({"context": {"collapse_duplicates": False}}))
+    documents = [
+        ContextDocument.of("a.py", "same\n"),
+        ContextDocument.of("b.py", "same\n"),
+    ]
+    reduction = select(documents, "same", max_tokens=1_000, tuning=config.context)
+    assert reduction.collapsed_exact == 0
+    assert reduction.text.count("same") == 2

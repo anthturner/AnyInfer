@@ -91,7 +91,7 @@ def _model(tmp_path: Path, name: str = "model.gguf") -> Path:
 
 
 def test_non_loopback_binding_is_refused_by_default() -> None:
-    """Local servers must not be exposed to the network by accident (D20)."""
+    """Local servers must not be exposed to the network by accident."""
     with pytest.raises(LocalRuntimeError, match="refusing to bind"):
         ServerSupervisor(host="0.0.0.0")
 

@@ -46,7 +46,7 @@ PUBLIC_DATACLASSES = [
 
 @pytest.mark.parametrize("cls", PUBLIC_DATACLASSES, ids=lambda c: c.__name__)
 def test_public_dataclasses_are_frozen_and_slotted(cls: type) -> None:
-    """Public types are frozen with slots (IMPLEMENTATION.md §A)."""
+    """Public types are frozen with slots (AGENTS.md coding conventions)."""
     assert dataclasses.is_dataclass(cls)
     params = cls.__dataclass_params__  # type: ignore[attr-defined]
     assert params.frozen, f"{cls.__name__} must be frozen"

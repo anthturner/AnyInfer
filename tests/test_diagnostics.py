@@ -1,4 +1,4 @@
-"""Provider runtime diagnostics: declaration, collection, and failure tolerance (D36)."""
+"""Provider runtime diagnostics: declaration, collection, and failure tolerance."""
 
 from __future__ import annotations
 

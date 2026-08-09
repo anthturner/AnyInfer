@@ -1,4 +1,4 @@
-"""End-to-end target verification: the probe behind a Test connection button (D37)."""
+"""End-to-end target verification: the probe behind a Test connection button."""
 
 from __future__ import annotations
 

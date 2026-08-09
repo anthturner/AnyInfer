@@ -1,4 +1,4 @@
-"""Session reuse: the handle, the routing rules, and per-provider behaviour (D40)."""
+"""Session reuse: the handle, the routing rules, and per-provider behaviour."""
 
 from __future__ import annotations
 

@@ -205,7 +205,7 @@ def test_bedrock_declares_the_credentials_its_adapter_reads() -> None:
     assert declared["aws_session_token"] == "secret"
     # Not secrets — masking them in a UI would help nobody and resolving them would break
     # any literal value shaped like a reference.
-    assert declared["aws_access_key_id"] == "host-profile"
+    assert declared["aws_access_key_id"] == "text"
     assert declared["profile"] == "host-profile"
 
 

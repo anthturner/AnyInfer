@@ -21,7 +21,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   sentinel (provider-side model delegation); no native structured-output mode — schema is
   prompt-injected (mechanism `prompt`); reasoning effort sent as `reasoning_effort` in the
   session options
-### Session lifetime (D40)
+### Session lifetime
 - Without an open `Session`, one SDK session is created and closed per request, and prior
   turns are folded into the user prompt with role markers
 - With one, the SDK session object is **held across turns** and closed when the adapter
@@ -48,4 +48,4 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - `auto` sentinel semantics + the model set it may delegate to (capability conjunction
   inputs, DESIGN.md §7)
 - Model catalog changes (ids like gpt-4.1 availability), per-model quotas/billing signals
-- Session resume support (mote's token-cache path) — verify per SDK release
+- Session resume support (the token-cache path) — verify per SDK release

@@ -98,6 +98,12 @@ class WireRequest:
         stream: Whether to request streaming. A hint — the core handles both shapes.
         timeout_s: Per-attempt wall clock.
         max_response_bytes: Cap on total streamed bytes.
+        cache_marks: Where the core decided the prompt cache should be engaged, as segment
+            indices — ``-2`` for the tool declarations, ``-1`` for the system block, and
+            zero-based message indices otherwise. Empty for every request without a cache
+            policy, and for every provider whose cache needs no marks. An adapter's whole
+            duty here is to spell each mark in its own wire format; deciding *where* they
+            go is the core's, and belongs to `anyinfer.capabilities.cache`.
         extra_options: ``provider_options[this_provider]``, passed through verbatim.
         session_state: Opaque continuation data from an open
             `Session`, or ``None`` for an
@@ -120,6 +126,7 @@ class WireRequest:
     stream: bool = True
     timeout_s: float = 120.0
     max_response_bytes: int = 1_048_576
+    cache_marks: tuple[int, ...] = ()
     extra_options: Mapping[str, Any] = field(default_factory=dict)
     session_state: Mapping[str, Any] | None = None
 

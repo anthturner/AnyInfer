@@ -45,7 +45,16 @@ provider's `ProviderSetupSpec` (see [Configuration](../reference/configuration.m
 | `api-version` | Line edit |
 | `model-list` | Editable combo box |
 | `reasoning-efforts` | Combo box over the normalized effort levels |
+| `choice` | Combo box over the field's declared `choices` |
+| `path` | Line edit with a file picker |
+| `directory` | Line edit with a directory picker |
 | `host-profile` | Line edit |
+| `text` | Line edit |
+
+The kind decides the *hint* as much as the widget. A field a provider declares as an
+`endpoint` may reasonably be offered `https://…` in an empty editor; a model directory, a
+resource posture, and a tenant id may not, and a UI has no way to tell them apart unless
+the descriptor says so.
 
 Install a third-party adapter that advertises itself through the `anyinfer.providers`
 entry-point group and it appears in this dialog automatically, correctly rendered, with no
@@ -109,7 +118,7 @@ Under the hood the bar still just produces the `provider:model` string that
 ### Routing, retry, and fallback
 
 The **If it fails, try:** dropdown adds an optional second target to the route, chosen
-from everything discovery has reported. Three offline models make the behaviour
+from everything discovery has reported. Four offline models make the behaviour
 reproducible without a real outage:
 
 | Model | Behaviour |
@@ -117,10 +126,78 @@ reproducible without a real outage:
 | `reliable` | Answers immediately. |
 | `flaky` | Fails its first call with a retryable 503, then succeeds. |
 | `slow` | Streams in smaller fragments. |
+| `tools` | Answers a plain request with a tool call, and a request carrying a tool result with text — the whole shape of a tool loop, offline. |
 
 Pick the `flaky` model with **Max attempts/target** at 1 and `demo-fake:reliable` as the
 fallback to watch the router fall back, or set attempts to 2 to watch it retry and recover
 in place. Failed attempts appear inline in the transcript and in the telemetry tree.
+
+### Request options beyond sampling
+
+The controls row under the composer also carries:
+
+- **Reasoning** — the normalized effort levels (`minimal` … `high`). The blank entry
+  means the field is omitted entirely; a provider without the control drops it and
+  reports the drop as telemetry rather than failing.
+- **Reuse session** — threads turns through one `Session` handle per target. The status
+  line reports what actually happened after each turn — `resumed`, `fresh`, or
+  `unsupported` — because the provider decides, never the client. Against a local Ollama
+  the effect is visible immediately: the second turn's time-to-first-token collapses once
+  the provider resumes.
+- **History** — opt-in conversation compaction via `HistoryPolicy`: trim only when the
+  request would not fit, or proactively on every turn. Trimming is never silent — each
+  reduction emits a `ContextReduced` telemetry event with the kept/omitted counts and
+  the token arithmetic behind them.
+- **Prompt cache** — opt-in placement via `CachePolicy`. No policy means cached exactly
+  as before: not at all. With one, the plan (mechanism and mark placement) arrives as a
+  `CachePlanned` telemetry event; a target with no cache mechanism reports a
+  `ParameterDropped` instead of pretending.
+- The token hint under the composer comes from `Client.budget()` and appends a **cost
+  range** when the pricing table has an entry for the target — and shows nothing at all
+  when it does not, because an absent price is not a free request.
+
+### The target inspector and the tool loop
+
+Two right-hand sections go a level deeper than the Providers panel:
+
+- **Target inspector** — four library calls against the selected `provider:model`, with
+  their price tags on the buttons: **Capabilities** (`resolve()`, free, provenance-tagged
+  values), **Verify** (one request), **Probe** (one request per feature), and
+  **Benchmark ×2** (two identical deterministic requests, back to back). These are the
+  demo's only buttons that spend real tokens, and they say so.
+
+    The benchmark runs as a *pair* on purpose. Whether a local engine (Ollama,
+    llama.cpp, vLLM) already had the model in memory is not knowable from outside, so
+    the demo controls the protocol instead of guessing: run 2 is warm by construction —
+    it starts the moment run 1 finishes — and the report compares the two. Matching
+    numbers mean the engine was already warm; a large first-run gap is the load cost
+    run 1 absorbed.
+- **Tool loop** — two ordinary Python functions declared with `@tool`, handed to
+  `Client.run_tools()`. The panel lists the functions that *actually executed*, because a
+  model claiming it called something is not evidence that it did. Pick
+  `demo-fake:tools` to watch the full round trip offline.
+
+### Local models (Tools → Local models…)
+
+The model manager is one library call per button: **Catalog** (`local_catalog()`, every
+entry annotated with how it fits *this* machine at the chosen posture, reasons included),
+**Installed** (`installed_models()` / `remove_model()` over AnyInfer's own store),
+**Runtimes** (the llama.cpp builds present and the accelerator backends this machine can
+drive — nothing is bundled in the wheel), and **Engine pull** (`pull_model()`, for engines
+like Ollama that keep their own store; AnyInfer asks, it does not fetch). Downloads show
+the library's own progress snapshots, and *What would this download?* is a dry run that
+prices the fetch before committing to it.
+
+### How is this built? — the `</>` chips
+
+Every major surface carries a small `</>` chip. Clicking one opens the SDK story for that
+surface: what it shows, the public `anyinfer` calls that implement it, a copyable
+plain-Python snippet doing the same thing, and where in the demo source it is wired. The
+prose lives in one registry (`demo_app/sdk_help.py`), and a test resolves every named
+symbol against the real package — so the help cannot silently drift from the API.
+
+**Help → Library map…** shows the wider picture: which public `anyinfer` symbols this
+demo exercises, surface by surface, and — honestly — the list it does not.
 
 ### Appearance
 

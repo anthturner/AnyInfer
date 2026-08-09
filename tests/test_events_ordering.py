@@ -1,4 +1,4 @@
-"""The binding event-ordering guarantees (IMPLEMENTATION.md §B).
+"""The binding event-ordering guarantees (DESIGN.md §6).
 
 These are a public contract, not an implementation detail: consumers rely on them to
 measure TTFT, render deltas, and reconstruct OpenAI chunk sequences (ADR-009 invariant 2).

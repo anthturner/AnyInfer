@@ -23,8 +23,18 @@ Field kind           Rendered as
 ``api-version``      Line edit
 ``model-list``       Editable combo box, populated by discovery when available
 ``reasoning-efforts``Combo box over the normalized effort levels
+``choice``           Combo box over the field's declared ``choices``
+``path``             Line edit with a file picker
+``directory``        Line edit with a directory picker
 ``host-profile``     Line edit
+``text``             Line edit
 ===================  =========================================================
+
+The last four are what stop a field being rendered as something it is not. Before they
+existed a llama.cpp model *directory* was declared an ``endpoint``, and this file — having
+nothing else to go on — offered it the example value an endpoint deserves: ``https://…``.
+The lesson generalizes past that one field: a UI cannot recover semantics the descriptor
+did not state, so the fix belongs in the kind, not in a special case here.
 
 Everything *else* about a field comes from the descriptor rather than from this file: the
 example value in an empty editor is the field's own ``placeholder`` (guessing it here
@@ -52,6 +62,7 @@ from PySide6.QtWidgets import (
     QCompleter,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -110,6 +121,58 @@ def unique_alias(preferred: str, taken: set[str]) -> str:
     return f"{preferred}-{suffix}"
 
 
+class _PathField(QWidget):
+    """A line edit for a filesystem location, with a picker beside it.
+
+    Typing stays possible — a path may not exist yet, and ``llama-server`` resolved off
+    PATH is a bare name rather than a location at all — so the browser fills the editor
+    instead of replacing it.
+    """
+
+    def __init__(self, setup_field: SetupField, current: str, placeholder: str) -> None:
+        super().__init__()
+        self._directory = setup_field.kind == "directory"
+        self._label = setup_field.label
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self._edit = QLineEdit(current)
+        self._edit.setPlaceholderText(placeholder)
+        self._edit.setAccessibleName(setup_field.label)
+        layout.addWidget(self._edit, 1)
+
+        browse = QPushButton("Browse…")
+        browse.setAccessibleName(f"Browse for {setup_field.label}")
+        browse.setAutoDefault(False)
+        browse.setDefault(False)
+        browse.clicked.connect(self._on_browse)
+        layout.addWidget(browse)
+
+    def text(self) -> str:
+        """The path as typed or picked."""
+        return self._edit.text()
+
+    def setToolTip(self, tip: str) -> None:  # noqa: N802 — Qt's spelling
+        """Put the field's help on the editor as well as the container.
+
+        A tooltip on a composite widget is easy to miss, since the cursor spends its time
+        over the child that accepts text rather than over the layout around it.
+        """
+        super().setToolTip(tip)
+        self._edit.setToolTip(tip)
+
+    def _on_browse(self) -> None:
+        start = self._edit.text().strip()
+        if self._directory:
+            chosen = QFileDialog.getExistingDirectory(self, f"Choose {self._label}", start)
+        else:
+            chosen, _ = QFileDialog.getOpenFileName(self, f"Choose {self._label}", start)
+        if chosen:
+            self._edit.setText(chosen)
+
+
 class _AdvancedFields(QWidget):
     """A disclosure holding the fields a provider already has a standard value for.
 
@@ -126,7 +189,7 @@ class _AdvancedFields(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        layout.setSpacing(4)
 
         count = len(fields)
         self._toggle = QPushButton(
@@ -153,7 +216,8 @@ class _AdvancedFields(QWidget):
         self._body = QWidget()
         body_layout = QFormLayout(self._body)
         body_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        body_layout.setContentsMargins(16, 2, 0, 2)
+        body_layout.setContentsMargins(16, 8, 8, 8)
+        body_layout.setSpacing(8)
         for _, label, editor in fields:
             body_layout.addRow(label, editor)
         self._body.setVisible(False)
@@ -209,12 +273,13 @@ class _ProviderPanel(QWidget):
         self._options = dict(config.options)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 4, 8, 8)
-        outer.setSpacing(4)
+        outer.setContentsMargins(16, 12, 16, 12)
+        outer.setSpacing(8)
 
         layout = self._form = QFormLayout()
         layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
         outer.addLayout(layout)
 
         locality = "local engine" if descriptor.locality == "local" else "hosted provider"
@@ -282,11 +347,22 @@ class _ProviderPanel(QWidget):
             combo.addItems(_REASONING_EFFORTS)
             combo.setCurrentText(current)
             editor = combo
+        elif setup_field.kind == "choice":
+            combo = QComboBox()
+            # A leading blank is the "use the default" entry: a bounded set still has to
+            # be leaveable, or saving would force a value onto a field the provider is
+            # perfectly able to answer itself.
+            combo.addItem("")
+            combo.addItems(setup_field.choices)
+            combo.setCurrentText(current)
+            editor = combo
         elif setup_field.kind == "model-list":
             combo = QComboBox()
             combo.setEditable(True)
             combo.setCurrentText(current)
             editor = combo
+        elif setup_field.kind in ("path", "directory"):
+            editor = _PathField(setup_field, current, self._placeholder_for(setup_field))
         else:
             line = QLineEdit(current)
             if setup_field.kind == "secret":
@@ -322,6 +398,12 @@ class _ProviderPanel(QWidget):
         thing to show than an example: what will actually happen. The remaining fallbacks
         are deliberately generic — a kind-level default that named one provider's
         convention would be wrong for every other provider that shares the kind.
+
+        The endpoint fallback is the descriptor's *own* base URL, and only for the field
+        that holds one. It used to apply to every ``endpoint``-kind field, which is how a
+        model directory came to suggest an HTTPS URL; the kinds now separate those, and
+        the key check keeps a third-party descriptor that still conflates them from
+        reintroducing the same nonsense.
         """
         if setup_field.placeholder:
             return setup_field.placeholder
@@ -329,7 +411,7 @@ class _ProviderPanel(QWidget):
             return setup_field.default_value
         if setup_field.kind == "secret":
             return "env://VARIABLE_NAME or a literal key"
-        if setup_field.kind == "endpoint":
+        if setup_field.kind == "endpoint" and setup_field.key == "base_url":
             return self._descriptor.default_base_url or "https://…"
         return ""
 
@@ -339,7 +421,7 @@ class _ProviderPanel(QWidget):
         for key, editor in self._editors.items():
             if isinstance(editor, QComboBox):
                 result[key] = editor.currentText().strip()
-            elif isinstance(editor, QLineEdit):
+            elif isinstance(editor, QLineEdit | _PathField):
                 result[key] = editor.text().strip()
         return result
 
@@ -385,13 +467,15 @@ class _ConfiguredEngineRow(QFrame):
     def __init__(self, descriptor: ProviderDescriptor, config: ProviderConfig) -> None:
         super().__init__()
         self._descriptor = descriptor
+        self.setObjectName("ProviderCard")
         self.setFrameShape(QFrame.Shape.StyledPanel)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(8, 6, 8, 6)
-        outer.setSpacing(4)
+        outer.setContentsMargins(12, 10, 12, 10)
+        outer.setSpacing(8)
 
         header = QHBoxLayout()
+        header.setSpacing(8)
 
         self._expander = QPushButton()
         self._expander.setObjectName("IconButton")
@@ -528,12 +612,16 @@ class ProviderSettingsDialog(QDialog):
         self._rows: list[_ConfiguredEngineRow] = []
 
         outer = QVBoxLayout(self)
+        outer.setContentsMargins(16, 16, 16, 16)
+        outer.setSpacing(12)
+
         intro = QLabel(
             "Add an engine, then fill in the fields it declares. Every field below is "
             "generated from the provider's <code>ProviderSetupSpec</code> — this dialog "
             "contains no per-provider code. Add an engine twice to configure two "
             "instances of it, each with its own alias."
         )
+        intro.setObjectName("Caption")
         intro.setWordWrap(True)
         intro.setTextFormat(Qt.TextFormat.RichText)
         outer.addWidget(intro)
@@ -544,7 +632,8 @@ class ProviderSettingsDialog(QDialog):
         scroll.setWidgetResizable(True)
         container = QWidget()
         self._list_layout = QVBoxLayout(container)
-        self._list_layout.setContentsMargins(0, 0, 0, 0)
+        self._list_layout.setContentsMargins(4, 4, 4, 4)
+        self._list_layout.setSpacing(10)
         self._empty = QLabel(
             "<i>No engines configured yet — pick one above and choose Add.</i>"
         )

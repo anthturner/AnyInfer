@@ -184,4 +184,4 @@ packaging — those are fully described by the workflow files and
 [`workspace.py`](https://github.com/anthturner/AnyInfer/blob/main/workspace.py), and
 work in any fork with no setup beyond the items above. Live-provider conformance runs
 and cassette recording use real provider credentials, but those are operator tasks run
-locally, never CI secrets (NOTES.md, remaining work).
+locally, never CI secrets.

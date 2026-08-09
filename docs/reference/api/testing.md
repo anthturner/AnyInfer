@@ -1,8 +1,39 @@
 # Testing utilities
 
-The `anyinfer.testing` package is public on purpose: a third-party adapter certifies
-itself by running the same conformance suite the built-in adapters run. Guide:
+The `anyinfer.testing` package is public on purpose, for two audiences. An **application**
+tests its own routing, repair, and reduction logic against a scripted provider — guide:
+[test your application offline](../../guides/testing-your-app.md). A **third-party adapter**
+certifies itself by running the same conformance suite the built-in adapters run — guide:
 [the conformance suite](../../contributing/conformance.md).
+
+## Scripted providers
+
+A provider whose behaviour is declared per model, including the failures that are otherwise
+unreachable without a real outage.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.testing.ScriptedProvider
+
+::: anyinfer.testing.ScriptedModel
+
+::: anyinfer.testing.ScriptedFailure
+
+::: anyinfer.testing.FailureKind
+
+::: anyinfer.testing.DEFAULT_SCRIPTED_CAPABILITIES
+
+</div>
+
+## pytest fixtures
+
+Registered automatically when `anyinfer` is installed; see the guide for the full table.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.testing.plugin.EventCollector
+
+</div>
 
 ## Fake providers
 

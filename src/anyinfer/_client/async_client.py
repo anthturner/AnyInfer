@@ -28,6 +28,7 @@ from ..benchmark import (
 )
 from ..capabilities.assemble import CapabilityStore
 from ..capabilities.budget import ContextBudget, build_context_budget
+from ..capabilities.cache import CachePlan, plan_cache
 from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
 from ..capabilities.gating import check_context_fit
 from ..capabilities.pricing import with_cost
@@ -51,6 +52,7 @@ from ..credentials import ResolverChain
 from ..errors import (
     AllTargetsFailedError,
     ConfigError,
+    ContextLengthError,
     ProviderError,
     ProviderUnavailableError,
     SchemaViolationError,
@@ -62,6 +64,7 @@ from ..events.observers import EventDispatcher, Observer
 from ..events.telemetry import (
     AttemptCompleted,
     AttemptStarted,
+    CachePlanned,
     DownloadProgress,
     FallbackTriggered,
     FirstToken,
@@ -96,6 +99,7 @@ from ..types.capabilities import (
     Health,
     ModelCapabilities,
     Sourced,
+    TokenCalibration,
 )
 from ..types.events import (
     AttemptFailed,
@@ -109,7 +113,9 @@ from ..types.events import (
 )
 from ..types.messages import Message, user
 from ..types.requests import (
+    CachePolicy,
     GenerationRequest,
+    HistoryPolicy,
     ReasoningEffort,
     Repair,
     ResolvedTarget,
@@ -201,6 +207,15 @@ class AsyncClient:
             fit its known context window. Only trusted-provenance windows gate,
             and only on the estimate's floor, so a heuristic never refuses a request
             that might have fit.
+        history: Conversation-compaction policy applied when a request outgrows its
+            target's window. ``None`` — the default — never compacts. This is the
+            client's half of the overflow answer; ``Route.context_window_targets`` is
+            the other half, and the policy's ``mode`` decides which is tried first.
+        cache: Prompt-cache placement applied to every request that does not carry its
+            own. ``None`` — the default — never engages a provider's cache, because
+            caching changes what a provider bills and how long it keeps a copy of the
+            prompt. A request's own ``cache`` overrides this.
+            Every frontend built on this client inherits it.
         pricing_table: Model pricing supplying the ``catalog`` layer of capability
             assembly. Defaults to the table bundled with this release; pass the
             result of `fetch_pricing()` for newer numbers.
@@ -226,6 +241,8 @@ class AsyncClient:
         use_default_catalog: bool = True,
         estimator: TokenEstimator | None = None,
         context_gate: bool = True,
+        history: HistoryPolicy | None = None,
+        cache: CachePolicy | None = None,
         pricing_table: PricingTable | None = None,
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
@@ -253,6 +270,11 @@ class AsyncClient:
         self._default_repair = repair
         self._estimator: TokenEstimator = estimator or HeuristicTokenEstimator()
         self._context_gate = context_gate
+        self._history = history
+        self._cache = cache
+        # Last cacheable-prefix signature per target, for the implicit-mode guard.
+        # Bounded by the number of targets a client talks to, and content-free.
+        self._cache_prefixes: dict[str, str] = {}
         self._store = ModelStore(model_dir)
         self._closed = False
 
@@ -927,6 +949,8 @@ class AsyncClient:
         reasoning: ReasoningEffort | None = None,
         timeout_s: float | None = None,
         repair: Repair | None = None,
+        history: HistoryPolicy | None = None,
+        cache: CachePolicy | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -950,6 +974,8 @@ class AsyncClient:
             reasoning=reasoning,
             timeout_s=timeout_s,
             repair=repair,
+            history=history,
+            cache=cache,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -975,6 +1001,8 @@ class AsyncClient:
         reasoning: ReasoningEffort | None = None,
         timeout_s: float | None = None,
         repair: Repair | None = None,
+        history: HistoryPolicy | None = None,
+        cache: CachePolicy | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -996,6 +1024,8 @@ class AsyncClient:
             reasoning=reasoning,
             timeout_s=timeout_s,
             repair=repair,
+            history=history,
+            cache=cache,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1069,6 +1099,8 @@ class AsyncClient:
         reasoning: ReasoningEffort | None,
         timeout_s: float | None,
         repair: Repair | None,
+        history: HistoryPolicy | None,
+        cache: CachePolicy | None,
         provider_options: Mapping[str, Mapping[str, Any]] | None,
         metadata: Mapping[str, str] | None,
         max_response_bytes: int | None,
@@ -1083,6 +1115,8 @@ class AsyncClient:
             reasoning=reasoning,
             timeout_s=timeout_s,
             repair=repair or self._default_repair,
+            history=history,
+            cache=cache,
             provider_options=dict(provider_options or {}),
             metadata=dict(metadata or {}),
         )
@@ -1131,6 +1165,8 @@ class AsyncClient:
             reasoning=None,
             timeout_s=None,
             repair=None,
+            history=None,
+            cache=None,
             provider_options=None,
             metadata=None,
             max_response_bytes=None,
@@ -1226,6 +1262,8 @@ class AsyncClient:
         pending: list[Target] = list(route.targets)
         visited: set[str] = set()
         content_redirected = False
+        active = request
+        compacted = False
 
         def unvisited_content_chain() -> list[Target]:
             return [
@@ -1256,7 +1294,7 @@ class AsyncClient:
 
                 try:
                     async for event in self._run_attempt(
-                        request=request,
+                        request=active,
                         resolved=resolved,
                         adapter=adapter,
                         descriptor=descriptor,
@@ -1353,6 +1391,21 @@ class AsyncClient:
                     )
                 )
 
+            if not pending and not compacted and isinstance(last_error, ContextLengthError):
+                # Every target — including the overflow chain — is exhausted and the
+                # request still does not fit anywhere. Only now is losing history the
+                # better answer than failing, which is what `last_resort` means. One
+                # pass only: a second would be compacting an already-compacted request.
+                policy = self._history_policy(active)
+                if policy is not None and policy.mode == "last_resort":
+                    retry = await self._compact_for_route(active, route, policy)
+                    if retry is not None:
+                        compacted = True
+                        active = retry
+                        pending = list(route.targets)
+                        visited.clear()
+                        last_error = None
+
         failure = AllTargetsFailedError(
             _failure_detail(attempts, last_error),
             attempts=tuple(attempts),
@@ -1360,6 +1413,78 @@ class AsyncClient:
         )
         self._emit(RequestFailed(request_id, failure.snapshot()))
         raise failure
+
+    async def _compact_for_route(
+        self, request: GenerationRequest, route: Route, policy: HistoryPolicy
+    ) -> GenerationRequest | None:
+        """Shrink a conversation to fit the route's first target, for a retry pass.
+
+        The first target is the one the retry will actually try first, so it is the
+        window worth fitting. A route whose later targets are smaller may still overflow
+        on those, and will simply fail there as it would have anyway.
+        """
+        resolved = self.resolve(route.targets[0])
+        await self._pool.get(resolved.provider_id)
+        descriptor = self._pool.descriptor_for(resolved.provider_id)
+        return self._compact_to_fit(
+            request,
+            capabilities=self._capabilities_for(descriptor, resolved),
+            calibration=descriptor.token_calibration,
+            policy=policy,
+        )
+
+    def _history_policy(self, request: GenerationRequest) -> HistoryPolicy | None:
+        """The compaction policy in force, request override beating the client default."""
+        policy = request.history if request.history is not None else self._history
+        return policy if policy is not None and policy.active else None
+
+    def _compact_to_fit(
+        self,
+        request: GenerationRequest,
+        *,
+        capabilities: ModelCapabilities,
+        calibration: TokenCalibration | None,
+        policy: HistoryPolicy,
+    ) -> GenerationRequest | None:
+        """Shrink a request's conversation to fit one target, or return ``None``.
+
+        ``None`` means "nothing to do, or nothing that can be done": the request already
+        fits, the window is unknown (unknown stays unknown — the client will not invent one
+        to justify discarding a conversation), or compaction found nothing it was allowed
+        to drop.
+
+        Only the *messages* are compacted, so the budget compaction is held to is the
+        allowance minus what tools, schema, and transport envelope already claim. The
+        envelope component is treated as fixed even though it shrinks with the content,
+        which compacts marginally harder than strictly necessary — the safe direction.
+        """
+        budget = build_context_budget(
+            request, capabilities, estimator=self._estimator, calibration=calibration
+        )
+        allowance = budget.input_allowance_tokens
+        if allowance is None or budget.fits is not False:
+            return None
+
+        overhead = budget.estimate.tokens - budget.estimate.messages.tokens
+        target_tokens = allowance - overhead
+        if target_tokens < 1:
+            # The tools and schema alone exceed the window; dropping the conversation
+            # would not save the request, and would lose it for nothing.
+            return None
+
+        from ..context.history import compact_history
+
+        compaction = compact_history(
+            request.messages,
+            max_tokens=target_tokens,
+            estimator=self._estimator,
+            keep_recent=policy.keep_recent,
+            keep_system=policy.keep_system,
+        )
+        if not compaction.changed:
+            return None
+        self._emit(compaction.event())
+        return request.with_messages(compaction.messages)
 
     async def _run_attempt(
         self,
@@ -1385,10 +1510,24 @@ class AsyncClient:
         finish: a non-empty chain raises `_ContentPolicyRedirect` instead of
         completing, and the router re-dispatches to that chain.
         """
+        policy = self._history_policy(request)
+        if policy is not None and policy.mode == "proactive":
+            # Shrink to fit *this* target before the gate can refuse it. The tradeoff is
+            # stated on HistoryPolicy: a larger-window target further down the route will
+            # never be reached, because there is no longer an overflow to redirect.
+            fitted = self._compact_to_fit(
+                request,
+                capabilities=capabilities,
+                calibration=descriptor.token_calibration,
+                policy=policy,
+            )
+            if fitted is not None:
+                request = fitted
+
         if self._context_gate:
             # A ContextLengthError raised here follows the exact path a provider-reported
             # overflow would: the default retry predicate declines it, and the route
-            # redirects to context_window_targets — minus the round trip (L6).
+            # redirects to context_window_targets — minus the round trip.
             check_context_fit(
                 request,
                 capabilities,
@@ -1415,6 +1554,9 @@ class AsyncClient:
         repair_attempts = 0
         yielded_content = False
 
+        cache_plan = self._plan_cache(current, resolved, descriptor, capabilities, request_id)
+        buffer.cache_mechanism = cache_plan.mechanism
+
         while True:
             active_buffer = buffer if repair_attempts == 0 else AttemptBuffer(target=resolved)
             yield TimingMark("attempt_start", 0.0)
@@ -1430,6 +1572,7 @@ class AsyncClient:
                 # A session's state is only offered to the target it belongs to: after a
                 # fallback, one provider's handle means nothing to another.
                 session_state=session.state if session_applies and session else None,
+                cache_marks=tuple(mark.segment for mark in cache_plan.marks),
             )
             if repair_attempts == 0:
                 for parameter, reason in dropped_parameters(
@@ -1616,11 +1759,107 @@ class AsyncClient:
             usage=buffer.usage.normalized(),
             timing=timing,
             structured_mechanism=mechanism if request.schema is not None else None,
+            cache_mechanism=buffer.cache_mechanism,
             repair_attempts=repair_attempts,
             attempts=attempts,
             warnings=tuple(buffer.warnings),
             raw=buffer.raw,
         )
+
+    def _plan_cache(
+        self,
+        request: GenerationRequest,
+        resolved: ResolvedTarget,
+        descriptor: ProviderDescriptor,
+        capabilities: ModelCapabilities | None,
+        request_id: str,
+    ) -> CachePlan:
+        """Decide how to engage this target's prompt cache, and say so out loud.
+
+        A policy that cannot be honored produces a `ParameterDropped` rather than silence:
+        a caller who asked for caching and got none has a cost expectation that is now
+        wrong, and finding out from a bill is not acceptable.
+        """
+        policy = request.cache if request.cache is not None else self._cache
+        if policy is None or not policy.active:
+            return CachePlan()
+
+        plan = plan_cache(
+            request,
+            policy,
+            capabilities or ModelCapabilities(),
+            descriptor,
+            self._estimator,
+        )
+
+        if plan.mechanism == "implicit":
+            self._check_prefix_stability(request, plan, resolved)
+
+        if not plan.active:
+            self._emit(
+                ParameterDropped(
+                    request_id,
+                    resolved,
+                    "cache.mode",
+                    plan.reasons[0] if plan.reasons else "no cacheable segment",
+                )
+            )
+            return plan
+
+        if policy.mode == "explicit" and plan.mechanism != "explicit":
+            # The caller asked for marks specifically. Getting prefix caching instead is a
+            # weaker guarantee, and the difference is theirs to know about.
+            self._emit(
+                ParameterDropped(
+                    request_id,
+                    resolved,
+                    "cache.mode",
+                    f"the target offers {plan.mechanism} caching, not explicit marks",
+                )
+            )
+
+        self._emit(
+            CachePlanned(
+                request_id,
+                resolved,
+                plan.mechanism or "",
+                len(plan.marks),
+                plan.estimated_cacheable_tokens,
+            )
+        )
+        return plan
+
+    def _check_prefix_stability(
+        self, request: GenerationRequest, plan: CachePlan, resolved: ResolvedTarget
+    ) -> None:
+        """Warn when a caller's own prompt is defeating the cache they asked for.
+
+        An implicit-caching provider only helps if the prefix is identical between turns.
+        A timestamp in the system block, or tools serialized in a different order each
+        time, silently produces a hit rate of zero — and the only evidence is a
+        ``cache_read_tokens`` that never rises, which nobody is watching. Comparing the
+        prefix signature across requests to the same target turns that into a diagnostic.
+
+        Advisory only: nothing is rewritten, and the request proceeds either way.
+        """
+        signature = plan.prefix_signature(request)
+        key = str(resolved)
+        previous = self._cache_prefixes.get(key)
+        self._cache_prefixes[key] = signature
+        if previous is not None and previous != signature:
+            self._emit(
+                ProviderDiagnostic(
+                    resolved,
+                    Diagnostic(
+                        code="cache.prefix-unstable",
+                        severity="info",
+                        message=(
+                            "the cacheable prefix changed since the last request to this "
+                            "target, so the provider's prompt cache will not be hit"
+                        ),
+                    ),
+                )
+            )
 
     def _emit(self, event: TelemetryEvent) -> None:
         """Dispatch a telemetry event when anyone is listening."""

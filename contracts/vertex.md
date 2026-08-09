@@ -54,6 +54,24 @@ As `contracts/gemini.md` — `contents` and `parts`, `systemInstruction`,
 `usageMetadata`. The per-field schema pages were JS-rendered and could not be diffed field
 by field this session; the method surface and types were confirmed.
 
+### Request fields
+- Identical to the Gemini native dialect — `VertexAdapter` subclasses `GeminiAdapter` and
+  overrides endpoint construction and authentication only. See
+  [gemini.md](gemini.md) for the authoritative field list.
+
+### Response fields
+- Identical to the Gemini native dialect; see [gemini.md](gemini.md).
+
+### Streaming
+- Identical to the Gemini native dialect (`streamGenerateContent` with SSE framing); see
+  [gemini.md](gemini.md).
+
+### Errors
+- Google API error envelope shared with Gemini (`{"error": {"code", "message", "status"}}`),
+  plus the OAuth failures specific to this surface: an expired or wrongly-scoped
+  service-account token surfaces as 401/403 and maps to an auth error rather than a
+  retryable one.
+
 ### Discovery
 **Not offered.** Vertex exposes no listing endpoint comparable to the AI Studio one, so
 `list_models()` returns empty rather than inventing a hardcoded table. Name models

@@ -1,9 +1,7 @@
 # AnyInfer — Design Foundation
 
-> Status: v0.1 draft, produced from the architecture interview on 2026-08-05.
-> Companions: [NOTES.md](NOTES.md) — running record of decisions/assumptions/risks;
-> [IMPLEMENTATION.md](IMPLEMENTATION.md) — normative types, algorithms, and the ordered
-> build plan (implementers work from there); [AGENTS.md](AGENTS.md) — repository automation rules;
+> Status: v0.1.
+> Companions: [AGENTS.md](AGENTS.md) — repository automation rules;
 > [contracts/](contracts/) — per-provider wire-protocol snapshots.
 
 ---
@@ -13,10 +11,6 @@
 **AnyInfer** is an application-owned hybrid inference runtime for Python. It provides one
 normalized inference contract across hosted AI providers, routing hubs, existing local
 services, and a supervised `llama.cpp` process owned by the application.
-
-It is the single AI substrate for Frisket, ModelFit, and mote-cli — replacing their three
-independent provider layers — and is designed from day one as if public, to be published once
-those migrations prove the API.
 
 Provider breadth is compatibility inventory, not the product definition. The public boundary
 is the combination of application-owned local lifecycle, portable behavior with explicit
@@ -65,29 +59,52 @@ requests in, typed event streams or validated results out, across cloud and loca
   v1 core ships without it; the invariants that make it a thin projection are enforced
   from M0.
 - **Not an agent framework.** A tool-execution loop is provided (late in v1), but no planning,
-  memory, or multi-agent constructs. *Clarified (D28, 2026-08-07):*
+  memory, or multi-agent constructs. *Clarified:*
   `anyinfer.context.distill` is a bounded, deterministic map/reduce fan-out — fixed
   two-phase shape, no planning — permitted on the same grounds as the schema-repair
-  loop's bounded extra calls.
+  loop's bounded extra calls. *Clarified again:* `anyinfer.context.compact_history` is a
+  pure `Sequence[Message] → HistoryCompaction` function that elides and drops by fixed
+  rules. It is *not* conversation memory: nothing is stored, summarized, or recalled, no
+  call is issued, and the client never applies it — the app decides whether to send the
+  result. It is the same class of mechanical size arithmetic as the token estimator, and
+  it lives here because every consumer was otherwise rebuilding it, tool-call pairing bugs
+  and all. *Amended (§27):* the client may apply it on the request path when a
+  `HistoryPolicy` is configured. That is opt-in, emits a typed event, and is the second
+  half of an overflow answer the router already owned — not memory, and not a planner.
 - **No load balancing or cost/latency-adaptive routing** (deferred; the router's policy
-  interface must not preclude them).
+  interface must not preclude them). *Clarified:* `anyinfer.routing.limits` paces **this
+  process's own requests** to a provider it is already going to call — a semaphore and a
+  token bucket, seeded from the rate-limit headers the provider sends back. It shares no
+  state with any other process, enforces no quota the provider did not state, and never
+  chooses a *different* target because one is busy. That last clause is the boundary: the
+  moment pacing informs target selection it has become load balancing, and that is a
+  reversal to argue, not a config option. Defaults are inert — an unconfigured client
+  behaves exactly as it did before pacing existed.
 - **No embeddings, images, audio, or fine-tuning APIs.** Text generation only. (Multimodal
   *inputs* are structurally reserved in the message model but not implemented.)
-- **No prompt templating.** Frisket/mote keep their own prompt construction. *Amended
-  (D28, 2026-08-07):* the optional `anyinfer.context` subsystem renders a mechanical,
-  documented context envelope (file/extract/rollup blocks) as reducer output — a data
-  format like the C3/C4 injection prompts, not a template engine. Apps still own all
-  surrounding prompt text, and the core client never constructs prompts on their behalf.
+- **No prompt templating.** Applications keep their own prompt construction. *Amended:*
+  the optional `anyinfer.context` subsystem renders a mechanical,
+  documented context envelope (file/extract/compact/duplicate/rollup blocks) as reducer
+  output — a data format like the C3/C4 injection prompts, not a template engine. Apps
+  still own all surrounding prompt text, and the core client never constructs prompts on
+  their behalf.
 - **Not an OpenAI-API clone.** OpenAI-compatible is one dialect among several, not the core
   abstraction (see ADR-001).
 - **Not an organization gateway or control plane.** Virtual keys, multi-tenancy, RBAC,
   organization spend limits, distributed rate accounting, guardrails, and an admin UI belong
-  in a deployment around AnyInfer, not in the library.
+  in a deployment around AnyInfer, not in the library. *Clarified:* `SpendLedger` and
+  `SpendPolicy` are neither. A ledger observes the client it was subscribed to and totals
+  what that client already spent; a policy is a ceiling the same caller set on the same
+  object, enforced before dispatch beside the context gate. Nothing is shared across
+  processes, nothing is authorized, no identity is known, and no other consumer of the same
+  API key is visible. It is accounting policy handed to a client — the same category as
+  `Retry` — not an admin plane. A requirement for limits enforced *elsewhere*, or shared
+  between workers, remains the deployment's job, unchanged.
 
 ## 3. Architecture overview
 
 ```
-                        Application (Frisket / ModelFit / mote-cli)
+                                   Application
                                         │
             ┌───────────────────────────┼────────────────────────────┐
             │ sync facade (Client)      │ async core (AsyncClient)   │
@@ -194,7 +211,7 @@ class GenerationRequest:
     sampling: Sampling = Sampling()
     reasoning: ReasoningEffort | None = None
     timeout_s: float | None = None
-    max_response_bytes: int = 1 << 20         # ModelFit's cap, generalized
+    max_response_bytes: int = 1 << 20         # hard cap on a single response body
     provider_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     # ^ escape hatch, namespaced by provider id: {"ollama": {"keep_alive": "10m"}}
     #   Never consulted by the core; passed verbatim to the matching adapter only.
@@ -204,7 +221,7 @@ class GenerationRequest:
 
 ```python
 Target = str            # "anthropic:claude-sonnet-5" | "ollama:qwen3:8b" | alias "medium"
-                        # engine aliases normalize (ModelFit rules): "claude:..." → "anthropic:..."
+                        # engine aliases normalize: "claude:..." → "anthropic:..."
 
 @dataclass(frozen=True, slots=True)
 class ResolvedTarget:
@@ -282,11 +299,12 @@ StreamEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate \
             | TimingMark | AttemptFailed | StreamEnded
 ```
 
-Consumption patterns this must serve (all verified against current app behavior):
-- **mote**: iterate, print `TextDelta.text`, done.
-- **ModelFit**: iterate for `TimingMark("first_token")`, then read `StreamEnded.result` —
-  the "stream for timing, one authoritative buffered result" pattern, now free.
-- **Frisket**: never iterates; calls the non-streaming method, which drains internally.
+Consumption patterns this must serve:
+- **Interactive CLI**: iterate, print `TextDelta.text`, done.
+- **Instrumented harness**: iterate for `TimingMark("first_token")`, then read
+  `StreamEnded.result` — the "stream for timing, one authoritative buffered result" pattern.
+- **Batch document filler**: never iterates; calls the non-streaming method, which drains
+  internally.
 
 SSE parsing lives in one shared module used by all httpx2 adapters; adapters map wire deltas to
 events. Providers without streaming (or when the transport refuses) degrade to a single
@@ -312,24 +330,24 @@ class ModelCapabilities:
     max_output_tokens: Sourced[int] | None
     features: Sourced[Feature]
     pricing: Sourced[Pricing] | None
-    local: LocalModelInfo | None    # artifact size, quantization, est. RAM/VRAM (ModelFit's
-                                    # ModelDiscoveryMetadata), observed VRAM residency
+    local: LocalModelInfo | None    # artifact size, quantization, est. RAM/VRAM,
+                                    # observed VRAM residency
 ```
 
 Assembly is layered, later layers overriding earlier, every field provenance-tagged:
 1. **Static catalog** — bundled data: pricing, known context windows for hosted models.
 2. **Live discovery** — `list_models()`, Ollama `/api/tags`/`/api/ps`, Anthropic paginated
    `/v1/models`, Copilot SDK model list.
-3. **Active probes** (opt-in, costs a request) — `capabilities/probes.py` (D38): one
+3. **Active probes** (opt-in, costs a request) — `capabilities/probes.py`: one
    forced-mechanism request per feature, recording only conclusive outcomes.
 
 **The `auto` problem (Copilot):** when `model == "auto"`, capabilities are the *conjunction*
-(tightest bound per field) across the models the provider might pick — Frisket's
-`_copilot_capacity` approach, promoted to a general rule for any delegating provider.
+(tightest bound per field) across the models the provider might pick. This is the general
+rule for any delegating provider.
 
 **Structured-output mechanism selection** reads `features`: `GRAMMAR > JSON_SCHEMA >
 JSON_MODE > prompt injection`. The chosen mechanism is recorded on the result. Per-provider
-wire projection (e.g. Frisket's Ollama schema stripping of `minLength`/huge `maxItems`) lives
+wire projection (e.g. the Ollama schema stripping of `minLength`/huge `maxItems`) lives
 in the adapter; the *original* schema always validates the response client-side.
 
 ## 8. Provider-adapter contract
@@ -352,12 +370,12 @@ class ProviderAdapter(Protocol):
   providers yield one delta + end. The core drains for non-streaming calls.
 - Adapters raise only `ProviderError` subclasses with `retryable`/`retry_after` set; they never
   retry internally.
-- Optional capabilities (e.g. session reuse for mote's token cache, runtime diagnostics) are
-  declared on the descriptor, not duck-typed via `getattr` (improves on Frisket).
+- Optional capabilities (e.g. session reuse, runtime diagnostics) are declared on the
+  descriptor, not duck-typed via `getattr`.
 
 ```python
 @dataclass(frozen=True, slots=True)
-class ProviderDescriptor:               # ModelFit's design, generalized
+class ProviderDescriptor:
     id: str                             # "anthropic"
     aliases: tuple[str, ...]            # ("claude",)
     display_name: str
@@ -368,22 +386,22 @@ class ProviderDescriptor:               # ModelFit's design, generalized
     setup: ProviderSetupSpec            # declarative fields → app UIs need no engine branches
     reasoning_translator: ReasoningTranslator
     static_capabilities: Mapping[str, ModelCapabilities]   # catalog layer seed
-    token_calibration: TokenCalibration = TokenCalibration()  # D34: envelope this provider bills for
-    max_repair_attempts: int | None = None                    # D35: ceiling on schema-repair round trips
+    token_calibration: TokenCalibration = TokenCalibration()  # envelope this provider bills for
+    max_repair_attempts: int | None = None                    # ceiling on schema-repair round trips
     supports_sessions: bool = False
-    reports_diagnostics: bool = False                         # D36: adapter implements diagnostics()
+    reports_diagnostics: bool = False                         # adapter implements diagnostics()
 ```
 
 Registration: built-ins pre-registered; third parties via entry points
 (`[project.entry-points."anyinfer.providers"]`), loaded lazily, collision-safe (duplicate
-id/alias rejection at registration, ModelFit rules).
+id/alias rejection at registration).
 
 ### v1 adapters and their dialects
 
 | Adapter | Transport | Notes |
 |---|---|---|
 | `openai-compat` | httpx2, chat completions + SSE | Base class for several below |
-| `openai` | httpx2, **Responses API** | ModelFit's adapter modernized |
+| `openai` | httpx2, **Responses API** | reasoning items and tool calls off the item stream |
 | `anthropic` | httpx2, Messages API | thinking deltas excluded from text, counted for TTFT |
 | `ollama` | httpx2, native `/api/chat`, `/api/tags`, `/api/ps` | GPU-spill warning; `keep_alive` sessions |
 | `openrouter` | openai-compat subclass | + model metadata from `/models` (rich pricing/context data) |
@@ -398,8 +416,8 @@ id/alias rejection at registration, ModelFit rules).
 2. Core selects the mechanism from capabilities; adapter projects the schema to its wire form.
 3. Response text is parsed and validated against the **original** schema with `jsonschema`.
 4. On violation: if `repair=Repair(max_attempts=N)` was set, the core re-prompts with the
-   validation errors appended (Frisket's `_repair_prompt`, generalized), within the same
-   routing budget; otherwise raises `SchemaViolationError` carrying the raw text and errors.
+   validation errors appended, within the same routing budget; otherwise raises
+   `SchemaViolationError` carrying the raw text and errors.
 5. `Generation.structured` is the parsed value; `structured_mechanism` and `repair_attempts`
    record how it was obtained.
 
@@ -408,7 +426,7 @@ id/alias rejection at registration, ModelFit rules).
 Shallow tree, rich fields. Every error carries: `provider`, `phase`
 (`configure|discover|generate|stream|validate|cleanup`), `retryable: bool`,
 `retry_after_s: float | None`, `http_status: int | None`, `detail: str` (bounded, redacted),
-`hint: str | None` (mote's UX split — actionable next step).
+`hint: str | None` (an actionable next step, kept separate from the diagnostic detail).
 
 ```
 AnyInferError
@@ -428,7 +446,7 @@ AnyInferError
 └── LocalRuntimeError            # llama-server lifecycle, runtime/model integrity
 ```
 
-Retryable status classification follows ModelFit: `{408, 409, 425, 429} ∪ ≥500`.
+Retryable status classification: `{408, 409, 425, 429} ∪ ≥500`.
 All `detail` strings pass the redaction registry before construction.
 
 ## 11. Routing
@@ -458,53 +476,51 @@ a policy object so richer policies can be added without new client methods.
 
 ## 12. Local subsystem
 
-All four components are v1 core (interview decision), generalized from the best existing
-implementation of each:
+All four components are v1 core:
 
-- **`local.hardware`** — one detector to replace three: RAM (`GlobalMemoryStatusEx`/`sysconf`),
-  GPU (nvidia-smi, ROCm, Vulkan, lspci, CIM, system_profiler — mote has the widest coverage),
-  CPU topology, unified-memory detection. Disk-cached, keyed by probe-executable signatures
-  (mote), invalidation env vars. **Advisory-only semantics** (ModelFit's philosophy): detection
-  proposes; callers/apps decide.
+- **`local.hardware`** — one detector for every platform: RAM (`GlobalMemoryStatusEx`/`sysconf`),
+  GPU (nvidia-smi, ROCm, Vulkan, lspci, CIM, system_profiler), CPU topology, unified-memory
+  detection. Disk-cached, keyed by probe-executable signatures, with invalidation env vars.
+  **Advisory-only semantics**: detection proposes; callers/apps decide.
 - **`local.backends`** — which llama-server runtime variants are available/installed:
-  CPU/CUDA/ROCm/Vulkan/Metal, ranked (Frisket's `{"cuda":30,"metal":25,"vulkan":20,"cpu":10}`),
+  CPU/CUDA/ROCm/Vulkan/Metal, ranked (`{"cuda":30,"metal":25,"vulkan":20,"cpu":10}`),
   manifest-validated, pinned llama.cpp build, architecture and path-containment checks.
-- **`local.tuning`** — Frisket's tuner generalized: posture (`conservative|balanced|aggressive`)
+- **`local.tuning`** — posture (`conservative|balanced|aggressive`)
   × hardware profile × per-model KV-bytes/token table → `ServerPlan` (threads, batch/ubatch,
   gpu layers, KV cache type, largest context that fits the memory budget).
 - **`local.gguf`** — catalog schema: SHA-256 + size + revision-pinned URL + license per
   artifact, sharded-file support; atomic downloads (`.download` → rename), file locking,
-  resume, progress callbacks (merging Frisket's catalog and mote's downloader).
+  resume, progress callbacks.
 - **`local.server`** — llama-server supervisor: spawn, readiness poll, crash detection,
   graceful shutdown; **binds 127.0.0.1 with ephemeral port only**; non-loopback requires an
   explicit `allow_remote_exposure=True`.
-- **`local.recommend`** — hardware→tier: mote's `get_recommended_model_key` generalized and
-  driven by the alias catalog rather than hardcoded thresholds.
-- **`local.runtimes`** (D30) — the acquisition side of `backends`: a pinned per-platform,
+- **`local.recommend`** — hardware→tier, driven by the alias catalog rather than hardcoded
+  thresholds.
+- **`local.runtimes`** — the acquisition side of `backends`: a pinned per-platform,
   per-backend artifact table (`runtimes.json`, written from the upstream release API by
   `scripts/pin_runtimes.py`), `runtime.json` manifest validation, and `install_runtime()`.
   CUDA is an explicit opt-in gated on driver major and compute capability; the default path
   installs Metal on Apple Silicon, Vulkan on any other GPU machine, CPU otherwise.
-- **`local.fit`** (D30) — catalog entry × hardware → `gpu | cpu | tight | no | unknown`, with
+- **`local.fit`** — catalog entry × hardware → `gpu | cpu | tight | no | unknown`, with
   reasons. Consumes catalog entries structurally, the same protocol trick `recommend` uses,
   so the `catalog → local` dependency stays one-directional.
-- **`local.variants`** (D31) — which quantization to acquire: the highest-quality rung whose
+- **`local.variants`** — which quantization to acquire: the highest-quality rung whose
   weights *and* KV cache fit, with per-engine gates (vLLM kernels on compute capability) and
   a stated quality floor at Q4_K_M.
-- **`local.sources`** (D31) — `SourceRef` → `ResolvedArtifact` behind a resolver protocol:
+- **`local.sources`** — `SourceRef` → `ResolvedArtifact` behind a resolver protocol:
   `huggingface` (spoken directly, ADR-007; `contracts/huggingface.md`), `url`, `local`.
-- **`local.acquire` / `local.store`** (D31) — plan → preflight → concurrent fetch → verify →
+- **`local.acquire` / `local.store`** — plan → preflight → concurrent fetch → verify →
   place → register, and a revision-scoped store with a rebuildable index. Model acquisition
   lives here, never in an adapter: fetching forty gigabytes is not protocol translation.
 
 The `llama-cpp` adapter composes these: resolve GGUF via catalog → locate in the store (or
 acquire) → plan → supervise server → speak openai-compat over loopback. In-process
-`llama-cpp-python` is explicitly **not** supported (ADR-004); mote accepts the subprocess
-model.
+`llama-cpp-python` is explicitly **not** supported (ADR-004); the subprocess model is the
+only supported shape.
 
 ## 13. Alias catalog
 
-Schema (evolved from mote's `models.lock.json`):
+Schema:
 
 ```jsonc
 {
@@ -526,7 +542,7 @@ Schema (evolved from mote's `models.lock.json`):
 }
 ```
 
-Since D30 the bundle is **two documents with different cadences**, overlaid at load:
+The bundle is **two documents with different cadences**, overlaid at load:
 `default.json` is the hand-edited alias policy above, and `models.json` is the
 machine-maintained logical model table — one row per browsable local model, with a
 quantization ladder (`variants[]`), per-channel sources (pinned GGUF artifacts and an Ollama
@@ -536,8 +552,8 @@ space the alias targets use, so the two shapes reference one body of data.
 `Catalog.with_alias_target()` bridges them: a user's catalog pick becomes a tier target
 through the existing overlay machinery, with no resolver changes.
 
-- AnyInfer **bundles a maintained default catalog** (interview decision — accepted curation
-  burden, tracked as risk R6); apps may replace or overlay it (merge: app entries win).
+- AnyInfer **bundles a maintained default catalog** (an accepted curation burden, tracked as
+  risk R6); apps may replace or overlay it (merge: app entries win).
 - Resolution: `alias × provider → concrete target`; unresolvable combinations are
   `ConfigError`s at resolve time, not silent fallbacks.
 - `local.recommend` picks a default alias from hardware; apps surface it as the novice default.
@@ -545,20 +561,19 @@ through the existing overlay machinery, with no resolver changes.
 ## 14. Telemetry and events
 
 - **Contract:** typed lifecycle events → registered in-process observers. Nothing is written
-  anywhere by default (mote's zero-telemetry policy holds).
+  anywhere by default.
 - Event set: `RequestStarted`, `TargetResolved`, `AttemptStarted`, `FirstToken`,
   `AttemptCompleted` (usage/timing), `RetryScheduled`, `FallbackTriggered`, `RepairAttempted`,
   `RequestCompleted`, `RequestFailed`, `ParameterDropped`, `UsageEstimated`,
   `ContextReduced`, `ServerLifecycle` (local), `DownloadProgress`.
 - **Privacy levels:** events are payload-free by default (ids, counts, timings, model names).
-  An observer must be registered with `payloads=True` to receive prompt/response text
-  (Frisket's `hide_report_data`, inverted into an opt-in).
+  An observer must be registered with `payloads=True` to receive prompt/response text.
 - **Redaction:** every secret resolved through `anyinfer.credentials` is auto-registered; all
   `detail` strings, event fields, and log lines pass redaction before emission.
 - **OTel bridge** (`anyinfer.otel`): maps events to spans/metrics; imports
   `opentelemetry-api` lazily and only when enabled; recommended packaging is the `[otel]`
-  extra. Frisket's JSONL-trail sink and ModelFit's evidence writer become observers in *their*
-  codebases (or a shared `anyinfer.sinks` contrib module later).
+  extra. Application-side sinks (JSONL trails, SQLite evidence stores) are observers in
+  *their* codebases, or a shared `anyinfer.sinks` contrib module later.
 - **Cost:** `Usage.cost_usd` computed from capability-layer pricing when provenance is
   `catalog` or `discovered` (OpenRouter reports pricing); `None` otherwise — never guessed.
 
@@ -568,8 +583,8 @@ through the existing overlay machinery, with no resolver changes.
   plain typed objects. No file I/O in the core path.
 - **`anyinfer.config` (optional layer):** canonical JSON schema versioned with
   `format_version`; `load()/save()/validate()`; precedence **explicit args > env vars >
-  config file > defaults** (Frisket's documented ladder, generalized); ModelFit's hygiene
-  rules (size caps, unknown-credential-shaped-field rejection); per-provider sections driven
+  config file > defaults**; hygiene rules (size caps, unknown-credential-shaped-field
+  rejection); per-provider sections driven
   by `ProviderSetupSpec` so a config wizard/UI is generic across engines — including which
   fields to *ask* for, since the spec marks the ones it already has a standard value for
   (`SetupField.advanced` / `default_value`) rather than presenting all fields as equals and
@@ -577,8 +592,18 @@ through the existing overlay machinery, with no resolver changes.
   (`myserver` → `http://myserver:11434`).
 - **Credentials:** config/API accept `"sk-literal"`, `"env://OPENAI_API_KEY"`, or
   `"credential://system/openai"`. `CredentialResolver` protocol; shipped resolvers: literal,
-  env, keyring (`[keyring]` extra, Frisket's model). Apps register custom resolvers. Every
+  env, keyring (`[keyring]` extra). Apps register custom resolvers. Every
   resolved secret feeds the redaction registry. Env-var naming: `ANYINFER_*`.
+- **`history` block:** optional conversation-compaction policy, parsed into
+  `HistoryPolicy` (§27) and handed to the client by every frontend, so one file makes
+  the SDK, the CLI, and the sidecar agree. Absent means no compaction.
+- **`context` block:** optional advanced context-reduction settings, parsed into
+  `anyinfer.context.ContextTuning` (§26). Keys are the dataclass field names, so one
+  vocabulary spans the file, the `--context-*` CLI flags, and the `tuning=` keyword
+  argument. Unknown keys are an error rather than being ignored, since a misspelled tuning
+  setting that silently does nothing is worse than one that fails loudly. The sidecar reads
+  the same file — so one config serves every frontend — but does not reduce: that would
+  make it a second core (ADR-009).
 
 ## 16. Sync and async surfaces
 
@@ -588,8 +613,8 @@ through the existing overlay machinery, with no resolver changes.
   supervised-server lifetimes). Sync `stream()` returns a thread-safe blocking iterator fed
   from the loop. `Client` is safe to call from multiple threads; one loop, serialized I/O
   scheduling, concurrent requests still overlap on the loop.
-- Frisket's loop-churn workaround (`client_lock_for_loop`) becomes unnecessary: the facade
-  owns its loop; async consumers use `AsyncClient` bound to their loop as usual.
+- No per-call loop churn and no cross-loop client locking: the facade owns its loop, and
+  async consumers use `AsyncClient` bound to their own loop as usual.
 
 ## 17. Example public API
 
@@ -601,14 +626,14 @@ client = ai.Client()                       # default registry, bundled catalog
 result = client.generate("Summarize:\n" + text, target="medium")
 print(result.text, result.usage.output_tokens, result.timing.first_token_ms)
 
-# --- streaming (mote) ---
+# --- streaming ---
 with client.stream(messages, target="ollama:qwen3:8b") as stream:
     for ev in stream:
         match ev:
             case ai.TextDelta(text=t): print(t, end="", flush=True)
     final = stream.result                    # Generation
 
-# --- structured contract with repair (Frisket) ---
+# --- structured contract with repair ---
 result = client.generate(
     messages, target="copilot:auto",
     schema=ANSWER_SCHEMA, repair=ai.Repair(max_attempts=1),
@@ -623,8 +648,8 @@ route = ai.Route(
 result = client.generate(messages, route=route)
 for a in result.attempts: print(a.target, a.outcome)
 
-# --- instrumented benchmarking (ModelFit) ---
-async with ai.AsyncClient(observers=[evidence_writer]) as ac:
+# --- instrumented benchmarking ---
+async with ai.AsyncClient(observers=[metrics_writer]) as ac:
     async with ac.stream(messages, target=t) as s:
         async for ev in s:
             if isinstance(ev, ai.TimingMark) and ev.name == "first_token":
@@ -667,23 +692,25 @@ src/anyinfer/
   events/                # observers.py dispatch.py redaction.py privacy.py
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
-  session.py             # (D40) the session handle
-  benchmark.py           # (D39) throughput measurement + caller-owned store
-  verification.py        # (D37) the end-to-end target probe
+  session.py             # the session handle
+  benchmark.py           # throughput measurement + caller-owned store
+  verification.py        # the end-to-end target probe
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
   local/                 # hardware.py backends.py runtimes.py runtimes.json tuning.py
-                         # services.py (D41) engine-managed model pulls
+                         # services.py engine-managed model pulls
                          # fit.py variants.py artifacts.py downloads.py
                          # acquire.py store.py sources/ server.py recommend.py
   providers/             # base.py sse.py openai_compat.py openai.py anthropic.py
                          # ollama.py openrouter.py azure_foundry.py copilot.py
                          # m365_copilot.py llama_cpp.py
-  context/               # (D28) corpus reduction: documents.py rank.py structure.py
+  context/               # corpus reduction: documents.py rank.py structure.py
                          # envelope.py select.py tiers.py pack.py distill.py
+                         # settings.py dedup.py compact.py history.py
   testing/               # conformance.py fakes.py cassettes.py
-  cli.py                 # run, verify, benchmark, doctor, providers, models, runtime, sidecar
+  cli.py                 # run, verify, benchmark, doctor, providers, models, runtime,
+                         # context, sidecar
   serve/                 # openai_codec.py app.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
@@ -706,15 +733,13 @@ provider breadth expanded through dedicated adapters and compatibility presets.
   subsystem, router (retry+fallback+health), `AsyncClient` + sync facade, `openai-compat`
   adapter, conformance harness + fake SSE server + cassette tooling. *Tool types exist in the
   message/event model from day one; no loop yet.*
-- **M1 — core four + pilot migration:** `ollama`, `copilot`, `llama-cpp` (with the full local
+- **M1 — core four + local subsystem:** `ollama`, `copilot`, `llama-cpp` (with the full local
   subsystem: hardware, backends, tuning, gguf, server, recommend), alias catalog + bundled
-  default. **Migrate mote-cli** — it exercises aliases, local inference, streaming, and the
-  sync facade at once.
-- **M2 — hosted breadth + Frisket:** `openai` (Responses), `anthropic`, `azure-foundry`;
-  repair loop hardening; OTel bridge; **migrate Frisket** (schema contract, keyring
-  credentials, telemetry observers as its JSONL trail).
-- **M3 — long tail + ModelFit:** `openrouter`, `m365-copilot`; active capability probes;
-  **migrate ModelFit** (evidence pipeline as observer; its 7 adapters deleted).
+  default. This tier exercises aliases, local inference, streaming, and the sync facade at
+  once.
+- **M2 — hosted breadth:** `openai` (Responses), `anthropic`, `azure-foundry`;
+  repair loop hardening; OTel bridge.
+- **M3 — long tail:** `openrouter`, `m365-copilot`; active capability probes.
 - **M4 — tool loop + stabilization:** `run_tools` executor, conformance matrix complete for
   the dedicated adapters, API freeze review, docs, publish publicly.
 - **M5 — sidecar + binaries:** delivered in the 0.1 beta: `anyinfer.serve`
@@ -725,19 +750,19 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 
 ## 20. Major unresolved decisions
 
-1. **Token estimation / prompt budgeting.** *Resolved 2026-08-07 as D25.* Pluggable
+1. **Token estimation / prompt budgeting.** *Resolved.* Pluggable
    `TokenEstimator` protocol with a dependency-free byte-heuristic default
    (`capabilities/estimate.py`); every estimate carries a conservative-high planning figure
    *and* a defensible floor. The provider-neutral budget calculator
    (`capabilities/budget.py`) computes input allowance = context window − derived output
    reserve − clamped 5% headroom, tri-state per ADR-005: an unknown window yields an unknown
-   budget, never a guessed default. Pre-dispatch gating (`capabilities/gating.py`, L6) raises
+   budget, never a guessed default. Pre-dispatch gating (`capabilities/gating.py`) raises
    `ContextLengthError` only when the estimate's *floor* exceeds a trusted-provenance window,
    feeding `Route.context_window_targets`; `default`-provenance windows never gate. Exposed as
-   `Client.budget()` / `AsyncClient.budget()` for app preflight (Frisket's consumer). Exact
+   `Client.budget()` / `AsyncClient.budget()` for app preflight. Exact
    tokenizers (tiktoken, llama-server `/tokenize`) plug in via the protocol; none ship.
-2. ~~**Session/conversation reuse** (mote's token-cache: Copilot session resume, Ollama
-   keep_alive).~~ *Resolved 2026-08-08 as D40:* `client.session(target)` returns an opaque,
+2. ~~**Session/conversation reuse** (Copilot session resume, Ollama
+   keep_alive).~~ *Resolved:* `client.session(target)` returns an opaque,
    target-bound handle threaded through `generate()`/`stream()`; it never changes an answer,
    and the three capable providers each exploit it differently behind one shape.
 3. **Cancellation semantics** across the sync facade (KeyboardInterrupt → loop-thread task
@@ -746,8 +771,8 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    catalog update constitute a library release? (Risk R6.)
 5. **M365 Copilot headless story** — interactive-only auth may make it conformance-exempt for
    CI; degraded-mode contract TBD in M3.
-6. ~~**Frisket's Ollama GPU-spill warning + observed-VRAM checks** — capability layer or
-   Ollama-adapter warnings?~~ *Resolved 2026-08-08 as D36:* adapter-reported runtime
+6. ~~**Ollama GPU-spill warning + observed-VRAM checks** — capability layer or
+   Ollama-adapter warnings?~~ *Resolved:* adapter-reported runtime
    diagnostics, declared on the descriptor and surfaced on `Generation.warnings` plus a
    `ProviderDiagnostic` event.
 
@@ -760,19 +785,32 @@ provider breadth expanded through dedicated adapters and compatibility presets.
   of truth for "native vs emulated vs unsupported", and presets are covered by
   representatives per quirk axis rather than one row each.
 - **R3 — llama-server supervision on Windows** (process trees, GPU runtime DLLs, antivirus
-  interference). Frisket has prior art; port its supervisor patterns, not fresh code.
+  interference). Mitigate: process-tree termination, reader-thread stream ownership, and
+  bounded waits, each covered by a dedicated Windows test.
 - **R4 — structured-output mechanism divergence** (grammar limits, schema projection edge
   cases). Mitigate: original-schema client validation is always authoritative; projections
   are provider-quirk code with dedicated conformance cases.
-- **R5 — tool loop with zero current consumers** (decision: in v1 anyway). Mitigate: last
-  milestone, types proven earlier, keep the executor minimal (no parallel calls in v1).
+- **R5 — tool loop shipped ahead of demand.** Mitigate: last milestone, types proven
+  earlier, keep the executor minimal (no parallel calls in v1).
 - **R8 — retrieval-quality expectations creep** — a lexical ranker invites "why didn't it
   find X" reports and pressure toward embeddings/rerankers the slim core forbids.
   Mitigate: docs state the ranking model plainly (ASCII-alphanumeric lexical matching with
   path boosting); the ranker sits behind a protocol so exact or semantic implementations
-  can be supplied by apps; open question 8 owns the embeddings decision. The structural-
-  extract language table is a staleness surface like the catalog (R6) — languages are added
-  by one suffix-map entry plus one extract branch, covered by tests.
+  can be supplied by apps; open question 8 owns the embeddings decision. Identifier
+  splitting and pseudo-relevance feedback (§26) close part of the gap *within* the lexical
+  model and are off by default, so they narrow the pressure without changing what the
+  default ranker is. The structural-extract language table is a staleness surface like the
+  catalog (R6) — languages are added by one suffix-map entry plus one extract branch,
+  covered by tests. The commentary-syntax table behind `compact_fallback` is the same kind
+  of surface, and degrades to "no compaction" rather than to mangled source.
+- **R9 — advanced-settings sprawl.** `ContextTuning` is sixteen knobs, and every one of
+  them is a way for two deployments to behave differently while reading the same
+  documentation. Mitigate: defaults reproduce the unconfigured behaviour exactly, so a
+  setting only matters once someone changes it; `recommended()` is a named preset rather
+  than a scattering of "you probably want" advice; the CLI generates its flags from the
+  dataclass, so the config block, the flag, and the keyword argument cannot name different
+  things; and every reduction reports which of them changed the outcome
+  (`collapsed_*`, `compacted_count`, `partial_count`, `carried_over`).
 - **R6 — bundled catalog staleness** (decision: bundle anyway). Mitigate: catalog is data
   with its own `format_version`; overlay mechanism lets apps pin; consider a separate
   release cadence.
@@ -782,7 +820,7 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 
 ## 22. Serve frontend: OpenAI-compatible loopback federation
 
-**Requirement (confirmed 2026-08-05):** as an optional batteries-included module, AnyInfer
+**Requirement:** as an optional batteries-included module, AnyInfer
 must be able to "snap on" a frontend — an OpenAI-compatible HTTP service on loopback that
 federates incoming requests to **any** backend the library abstracts, local or hosted. Any
 tool that can talk to an OpenAI base URL (IDE plugins, existing apps, third-party clients)
@@ -826,7 +864,7 @@ frontend is a wire codec plus an ASGI app around an `AsyncClient`.
 4. `AsyncClient` supports many concurrent independent streams (it must anyway; the server
    makes it load-bearing).
 
-**Security posture (inherits the D20 security decisions: redaction §14, loopback-only §12,
+**Security posture (inherits the core security rules: redaction §14, loopback-only §12,
 payload privacy §14, config hygiene §15):** binds `127.0.0.1` on an explicit or ephemeral
 port; non-loopback binding requires `allow_remote_exposure=True` *and* a configured bearer
 token; loopback token optional. Standard redaction applies to logs; payload retention off by
@@ -861,17 +899,17 @@ message/chat convenience layers sit on top, not underneath.
 
 ### ADR-002 — Async core, sync facade over a background loop thread
 **Decision.** One async implementation; `Client` wraps it with a dedicated event-loop thread.
-**Why.** Frisket/ModelFit are async-native; maintaining dual implementations ≈ doubles test
-surface; per-call `asyncio.run()` breaks streaming and pooling. **Consequences.** mote
-migrates to the facade; cancellation semantics must be explicitly designed (open decision 3);
-Frisket's per-loop lock hack becomes obsolete.
+**Why.** Maintaining dual implementations ≈ doubles test surface; per-call `asyncio.run()`
+breaks streaming and pooling. **Consequences.** Sync consumers go through the facade;
+cancellation semantics must be explicitly designed (open decision 3); no cross-loop client
+locking is needed.
 
 ### ADR-003 — Adapters translate; the core orchestrates
 **Decision.** Adapters expose exactly `list_models / health / generate(→events) / aclose` and
 never retry, validate, or measure. Retry, fallback, schema validation/repair, timing, usage
 normalization, telemetry, redaction live in the core. **Why.** Nine thin adapters are
-testable by one conformance suite; today's projects each smear orchestration into provider
-code (Frisket's 944-line runner) and pay for it three times. **Consequences.** `WireRequest`
+testable by one conformance suite, whereas orchestration smeared into provider code has to
+be re-proven per adapter. **Consequences.** `WireRequest`
 must carry everything pre-resolved; provider quirks surface as declarative descriptor data or
 small projection hooks, not control flow.
 
@@ -879,10 +917,9 @@ small projection hooks, not control flow.
 **Decision.** No in-process `llama-cpp-python`; the library supervises `llama-server`
 (loopback-only) and speaks the OpenAI-compatible dialect. External servers are just
 openai-compat targets. **Why.** One wire protocol for all engines, crash isolation, no
-GPU-wheel/DLL build matrix in the dependency tree; Frisket's tuner and supervisor already
-prove the model. **Consequences.** mote loses in-process embedding (accepted); subprocess
-lifecycle on Windows is a named risk (R3); server startup latency is mitigated by keep-alive
-supervision.
+GPU-wheel/DLL build matrix in the dependency tree. **Consequences.** In-process embedding
+of the runtime is given up (accepted); subprocess lifecycle on Windows is a named risk (R3);
+server startup latency is mitigated by keep-alive supervision.
 
 ### ADR-005 — Layered, provenance-tagged capability metadata
 **Decision.** `ModelCapabilities` assembled from static catalog → live discovery → optional
@@ -891,7 +928,7 @@ conjunction-of-candidates bounds. **Why.** Providers omit or misreport; consumer
 schema mechanism selection, context budgeting, pricing) need to know *how much to trust* a
 number. **Consequences.** A `Sourced[T]` wrapper appears in public types; probe cost is
 opt-in; the static layer creates catalog-maintenance work.
-**Amended by D27 (2026-08-07):** a fifth provenance, `override` (rank above `probed`), for
+**Amended:** a fifth provenance, `override` (rank above `probed`), for
 values the integrating application set deliberately — a user's explicit correction must
 never lose to data the library merely collected. The static layer now includes the bundled
 per-provider pricing table (`capabilities/pricing.json`), keyed by provider *and* model
@@ -900,9 +937,9 @@ weekly `pricing-refresh` workflow.
 
 ### ADR-006 — Typed in-process events; OTel as a bridge
 **Decision.** The telemetry contract is typed Python events to registered observers,
-payload-free by default; an optional bridge maps them to OpenTelemetry. **Why.** Frisket and
-ModelFit consume telemetry in-process as structured data (JSONL trails, SQLite evidence) —
-round-tripping through OTel spans is awkward; mote requires zero telemetry and zero deps;
+payload-free by default; an optional bridge maps them to OpenTelemetry. **Why.** Applications
+that consume telemetry in-process as structured data (JSONL trails, SQLite evidence stores)
+find round-tripping through OTel spans awkward, and a CLI wants zero telemetry and zero deps;
 OTel-api-only bridging gives export standardization without a mandatory SDK. **Consequences.**
 Two representations to keep mapped; OTel semantics (GenAI semconv) tracked in the bridge only.
 The bridge must map *every* member of the `TelemetryEvent` union — it dispatches by method
@@ -914,13 +951,13 @@ an unrelated in-flight request.
 ### ADR-007 — Slim core (`httpx2` + `jsonschema`) with per-provider extras
 **Decision.** Mandatory deps are httpx2 and jsonschema; copilot-sdk, azure-identity, keyring,
 otel-api are extras; llama-server binaries are runtime-fetched artifacts, never pip deps.
-**Why.** mote's CLI install must stay light; all current projects already standardize on raw
-httpx (of which httpx2 is the drop-in continuation — see the note below); official provider
-SDKs add churn without coverage gains (ModelFit proves raw dialects work). **Consequences.**
+**Why.** A CLI install must stay light; raw httpx (of which httpx2 is the drop-in
+continuation — see the note below) covers every hosted dialect, and official provider SDKs
+add churn without coverage gains. **Consequences.**
 SSE/NDJSON parsing is first-party code (shared module); missing-extra UX must be excellent
 (actionable `ConfigError`s).
 
-> **httpx → httpx2 (2026-08-07, D26).** The HTTP dependency was originally `httpx`. Upstream
+> **httpx → httpx2.** The HTTP dependency was originally `httpx`. Upstream
 > httpx stagnated (last release 2024-12) and stewardship moved to Pydantic Services under the
 > `httpx2` name (same BSD-3-Clause license, original author credited, API-compatible);
 > starlette ≥ 1.0 deprecates plain httpx in its test client in favor of httpx2. The core
@@ -929,8 +966,8 @@ SSE/NDJSON parsing is first-party code (shared module); missing-extra UX must be
 ### ADR-008 — Descriptor registry with entry-point discovery
 **Decision.** Frozen `ProviderDescriptor`s in a collision-safe registry; declarative
 `ProviderSetupSpec` per provider; third-party adapters register via the `anyinfer.providers`
-entry-point group. **Why.** ModelFit's registry already eliminated per-engine branches across
-CLI *and* GUI; entry points let future engines (and experiments) plug in without core
+entry-point group. **Why.** A descriptor registry eliminates per-engine branches across CLI
+*and* GUI consumers; entry points let future engines (and experiments) plug in without core
 releases. **Consequences.** Descriptor schema becomes a public compatibility surface;
 lazy loading required so import cost stays flat.
 
@@ -946,7 +983,7 @@ concurrent multi-stream support in `AsyncClient`. **Why.** Federation to every b
 would fork behavior between library callers and HTTP callers and double the conformance
 surface. **Consequences.** Round-trip codec tests join the conformance suite; any future
 core-type change is checked against the OpenAI projection;
-the frontend inherits the loopback-only and redaction rules (D20; §12, §14, §15).
+the frontend inherits the loopback-only and redaction rules (§12, §14, §15).
 
 ### ADR-010 — Standalone service binaries via PyInstaller (onedir)
 **Decision.** `anyinfer-serve` ships as self-contained per-platform executables built with
@@ -959,11 +996,10 @@ but require a system interpreter; **PyApp** (Rust launcher that fetches a Python
 run) is attractive but reintroduces a first-run network dependency, which is wrong for a
 tool whose selling point includes air-gapped local inference; **Nuitka** adds long compile
 times and a C toolchain per platform for no needed speedup; **PyOxidizer** is unmaintained.
-PyInstaller is also the in-house standard — Frisket (`frisket.spec`, cuda-addon packaging
-boundary) and ModelFit (`packaging/`, macOS universal2 + Windows installers) already solved
-its platform quirks, including the Windows AV-heuristics problem that motivates **onedir
-over onefile** (onefile's self-extraction both slows startup and trips AV scanners; risk R3
-adjacency). **Consequences.** A native CI build matrix performs a binary `--help` smoke test,
+PyInstaller also has the best-documented answers to the platform quirks, including the
+Windows AV-heuristics problem that motivates **onedir over onefile** (onefile's
+self-extraction both slows startup and trips AV scanners; risk R3 adjacency).
+**Consequences.** A native CI build matrix performs a binary `--help` smoke test,
 while the package suite covers `/v1/models` and fake-provider round trips; macOS signing +
 notarization and Windows Authenticode become release-pipeline concerns (open question 9);
 the canonical config layer (§15) is mandatory in binary mode since there is no Python API
@@ -974,10 +1010,10 @@ do have Python, without changing the contract.
 **Decision.** Ship an optional `anyinfer.context` subpackage implementing corpus reduction
 (rank / select / represent / distill) against an explicit token budget, with collection
 (filesystem traversal, approval, secret exclusion) permanently app-side. Reduction composes
-the D25 estimator/budget surfaces; it never performs I/O and adds no dependencies.
-**Why.** Two of the three v1 customers independently built and now maintain divergent copies
-of this layer (Frisket's selector/tiers, mote's chunker); both already depend on the same
-byte-heuristic arithmetic D25 centralized. Collection stays out because it is where the
+the estimator/budget surfaces of §20 #1; it never performs I/O and adds no dependencies.
+**Why.** Applications otherwise build and maintain divergent copies of this layer — ranked
+selectors, tiered rollups, chunkers — all on top of the same byte-heuristic arithmetic the
+estimator already centralizes. Collection stays out because it is where the
 security policy lives (what exists, what is safe to send) and where every app differs;
 reduction is where the apps converge. **Consequences.** The §2 "No prompt templating"
 non-goal is narrowed: the library owns one mechanical envelope format, apps own all prompt
@@ -986,6 +1022,51 @@ language around it. `distill` spends inference calls, so it is separated by cons
 from the pure strategies. Lexical ranking sets retrieval-quality expectations the docs must
 manage (risk R8); embeddings stay out until open question 8 reopens.
 
+### ADR-012 — Prompt-cache placement is core policy; adapters only spell it
+**Decision.** A request may carry a `CachePolicy`. The core segments the prompt, decides
+which segments are worth marking, and picks the strongest mechanism the target offers —
+`explicit` (per-segment marks, e.g. Anthropic `cache_control`), `implicit` (the provider
+caches stable prefixes on its own, so the core's duty is to leave the prefix undisturbed),
+or nothing. Adapters translate marks onto their wire format and do nothing else. Providers
+declare `cache_mechanism`, `cache_max_marks`, and `cache_min_tokens` on their descriptor.
+Off by default: `GenerationRequest.cache` is `None` unless a caller or client asks.
+**Why.** The library already reads cache accounting (`Usage.cache_read_tokens` /
+`cache_write_tokens`) and prices it, and had no way to *cause* it — so an application
+wanting a cached prefix wrote per-provider `provider_options` branches, which is the
+per-engine `if/elif` this project exists to delete (§2 goal 1). The mechanism ladder is the
+same shape structured output already uses, and for the same reason: the caller states an
+intent, the core picks the strongest available implementation, and losing a rung is
+observable rather than silent. **Consequences.** Degradation emits `ParameterDropped`; a
+plan emits `CachePlanned`; realized savings are attributed **only** from provider-reported
+usage, never from the plan, so an intention is never billed as a fact. Cache floors and
+TTLs are wire facts, recorded in `contracts/<id>.md` and audited by the drift check.
+Response caching remains out of scope permanently — this caches the prefix a provider is
+sent, on the provider's side, and never skips a call.
+
+### ADR-013 — MCP is a tool *source*, spoken directly
+**Decision.** Ship an optional `anyinfer.mcp` subpackage (`[mcp]` extra) that connects to
+Model Context Protocol servers, discovers their tools, and exposes them as ordinary
+`ToolSpec`/`Tool` values for the existing loop. Scope is `tools/list` and `tools/call`
+over stdio and streamable HTTP. `prompts/*`, `resources/*`, `roots/*`, and `sampling/*` are
+excluded. The protocol is spoken directly against `httpx2` and the stdlib; the `mcp` SDK is
+not a dependency, and the pinned protocol version lives in `contracts/mcp.md`.
+**Why.** MCP has become how tools are *distributed*, and the bridge from a server's
+`inputSchema` to a `ToolSpec` is identical for every consumer — including the protocol
+details (handshake, version negotiation, content-block flattening, error semantics) that
+are quietly easy to get wrong. Supplying tool definitions and an execution transport for
+tools the application already chose to trust is the same category as a Python function
+passed to `run_tools`: it adds no planning, no memory, and no loop semantics, so the "not
+an agent framework" non-goal holds. Speaking the protocol directly is ADR-007's rule
+applied unchanged — the same call made for provider SDKs and for the Hugging Face API.
+**Consequences.** `sampling/*` stays excluded on a security ground, not a scheduling one:
+honoring it would let a remote server drive generations through the caller's credentials,
+which is a capability to grant deliberately, not a convenience to inherit. stdio servers
+are child processes and reuse `local/server.py`'s supervision shape (sole stream ownership,
+process-tree termination, bounded waits) rather than growing a second one. Tool results are
+attacker-influenceable text entering a model's context; that trust decision is the
+application's and the documentation says so. This ships ahead of a named consumer — risk R5
+knowingly accepted, bounded by living entirely behind an extra.
+
 
 ## 24. Provider conformance test matrix (draft)
 
@@ -993,20 +1074,19 @@ manage (risk R8); embeddings stay out until open question 8 reopens.
 (endpoints, auth headers, version pins, fields sent/read, streaming framing, error shapes)
 are recorded in `contracts/<provider>.md` — updated in the same change as any adapter
 wire-behavior change. A semi-automated **drift check** (procedure:
-`contracts/DRIFT-CHECK.md`; invocable as the Claude Code skill `check-provider-drift`
-and the Copilot prompt of the same name; Codex and other agents follow the procedure via
-`AGENTS.md`) audits these snapshots against live provider documentation and classifies
+`contracts/DRIFT-CHECK.md`, with the tool-specific entry points listed in `AGENTS.md`)
+audits these snapshots against live provider documentation and classifies
 findings as `OK / DRIFT / DEPRECATION / NEW-CAPABILITY / UNVERIFIABLE`, proposing contract,
 adapter, and matrix updates. Division of labor: the conformance suite proves *our code
-matches our claims*; the drift check proves *our claims still match upstream*. Repo-level
-AI instructions live in `AGENTS.md` (canonical), with `CLAUDE.md` and
+matches our claims*; the drift check proves *our claims still match upstream*. Repo-level automation
+instructions live in `AGENTS.md` (canonical), with `CLAUDE.md` and
 `.github/copilot-instructions.md` as thin adapters.
 
 Legend: ✅ native · Ⓔ emulated by core/adapter · ➖ unsupported (documented) · ? verify in
 milestone. Every cell backed by a parametrized conformance case run in cassette, fake-server,
 and (nightly, where auth permits) live modes.
 
-> **Implementation status (2026-08-07).** Seventeen dedicated adapters are implemented
+> **Implementation status.** Seventeen dedicated adapters are implemented
 > (the original nine plus Gemini, DeepSeek, xAI, Vertex AI, Bedrock, Cohere, and LM
 > Studio), alongside a preset registry of eighty-six OpenAI-compatible providers
 > sharing the `openai_compat` adapter. The
@@ -1091,29 +1171,26 @@ versioned docs (mike) so published SDK versions keep matching docs; docs build i
 6. **Provider guides** — one page per adapter: auth setup (with each provider's quirks —
    Copilot CLI login, Entra flows, M365 interactive-only), supported features, known
    limitations, provider-specific `provider_options`.
-7. **Cookbook** — complete runnable programs mirroring the three proven consumption shapes:
-   an interactive streaming CLI (mote shape), a schema-contract document filler (Frisket
-   shape), an instrumented benchmark harness (ModelFit shape) — plus a serve-binary
-   federation setup with an off-the-shelf OpenAI client.
+7. **Cookbook** — complete runnable programs mirroring the three consumption shapes: an
+   interactive streaming CLI, a schema-contract document filler, and an instrumented
+   benchmark harness — plus a serve-binary federation setup with an off-the-shelf OpenAI
+   client.
 8. **API reference** — generated; grouped by module per §4.
 9. **Error catalog** — every exception class: when it's raised, its fields, whether it
    retries, and the `hint` text a user will see.
 10. **Serve binary manual** — download/verify, config file reference (§15 canonical layer),
     ports and tokens, running as a service (launchd/systemd/Windows service), upgrade path.
-11. **Migration guides** — written *while* migrating Frisket/ModelFit/mote in M1–M3; they
+11. **Migration guides** — for applications replacing a hand-rolled provider layer; they
     double as real-world integration tutorials and stay in the published docs.
 
 **Milestone obligations:** M0 — site skeleton, quickstart, concepts for whatever exists,
 reference generation wired into CI. M1–M3 — provider page lands in the same PR as each
-adapter; migration guide per app migration. M4 — cookbook complete, error catalog complete,
+adapter. M4 — cookbook complete, error catalog complete,
 site published publicly with the API freeze. M5 — integration-path decision page and serve
 binary manual.
 
 
 ## 26. Context reduction subsystem (`anyinfer.context`)
-
-*Added by D28 (2026-08-07); see plans/TOKEN_REDUCTION_ALGS.md for algorithms and port
-provenance.*
 
 An optional, dependency-free subpackage that answers one question: **given documents the
 app has already collected and approved, what should actually be sent to fit a token
@@ -1129,17 +1206,110 @@ invents a window (the same tri-state rule as §7 and cost).
 
 Strategies: `whole` (send everything when it fits), `ranked` (lexical relevance-ranked
 whole documents, greedy skip-and-continue), `tiered` (full corpus coverage at decreasing
-fidelity: module rollup → structural extracts → verbatim files, with optional app-supplied
-module digests), `packed` (chunk-level rank-and-pack for sub-document granularity), and
-`distill` (map/reduce through the client itself — the only strategy that spends inference
-calls, async-first). `auto` dispatches `whole` when the corpus fits, else `tiered`.
+fidelity: module rollup → structural extracts → compact or verbatim files, with optional
+app-supplied module digests), `packed` (chunk-level rank-and-pack for sub-document
+granularity), and `distill` (map/reduce through the client itself — the only strategy that
+spends inference calls, async-first). `auto` dispatches `whole` when the corpus fits, else
+`tiered`. `plan()` runs every deterministic strategy and reports what each *would* produce,
+discarding the text — a dry run for context preparation, the counterpart to the D42
+pre-dispatch preflight, spending nothing.
 
 Reduction is emulation of a larger context window, and emulation announces itself: every
 reduction returns full metadata plus a content-free summary, and emits a `ContextReduced`
 telemetry event when an observer is supplied. Rendering is deterministic and path-ordered
 by default so repeated turns over the same corpus keep a stable prompt prefix (provider
-prompt caches, llama-server slot reuse).
+prompt caches, llama-server slot reuse). Passing the previous turn's `ReductionState` back
+in as `previous=` gives unchanged documents a rank bonus, so the selected *set* — and
+therefore that prefix — stays put unless the corpus actually moved.
 
-Ranking is lexical (a BM25-style scorer ported from Frisket, with path-match boosting and
-anchor-file bonuses). Embeddings-based ranking remains out of scope (a §2 non-goal; open
-question 8) — the ranker protocol accepts a replacement when that changes.
+**Advanced settings (`ContextTuning`).** Everything algorithmic is a setting on one frozen
+record rather than a constant: duplicate collapse, selection order, diversity, query
+expansion, corpus centrality, compact fallback, chunk size, rollup share, carry-over bonus.
+The same record is the `context` block of the shared configuration file (§15) and the
+`--context-*` flags of `anyinfer context`, and the CLI generates its flags from the
+dataclass so the three cannot drift. **Defaults reproduce the previous behaviour exactly**;
+`ContextTuning.recommended()` is the named preset that turns on the set worth having for a
+source-code corpus. The one default that is *on* is exact-duplicate collapse, which is
+lossless and announced in the envelope.
+
+**Duplicate collapse.** Byte-identical documents render once with the rest as `<duplicate
+identical="true"/>` pointers — lossless, so completeness is preserved. Above
+`near_duplicate_threshold`, MinHash-over-banded-signatures grouping collapses merely
+*similar* documents too; that loses their differences, so it is opt-in, forfeits
+`Reduction.complete`, and never touches a pinned document. Hashing is `hashlib`-based, not
+`hash()`-based, because the grouping must be identical across processes.
+
+**Fidelity between extract and verbatim.** With `compact_fallback`, a document that will
+not fit whole is retried with comments, docstrings, and blank runs removed
+(`<file-compact elided_lines="N">`) before it is dropped. Only whole-line comments are
+removed: stripping a trailing `//` needs a parser this subpackage deliberately does not
+have, and getting it wrong corrupts code rather than shortening it.
+
+**Ranking** is lexical (a BM25-style scorer with path-match boosting and anchor-file
+bonuses). Three settings narrow the vocabulary-mismatch gap without an index or a model:
+identifier splitting (`resolveCredentials` → also `resolve`, `credentials`),
+pseudo-relevance feedback (rank, harvest distinctive terms from the top documents, re-rank),
+and import-graph centrality — a query-*independent* signal, and therefore what orders a
+corpus when the query is weak or absent, where the plain ranker falls through to the path
+tie-break. Embeddings-based ranking remains out of scope (a §2 non-goal; open question 8) —
+the ranker protocol accepts a replacement when that changes.
+
+**Envelope versioning.** Both wrappers carry `format="1"`. Version 1 is the first to declare
+itself; an envelope with no `format` attribute predates the duplicate and compact elements.
+The version is bumped when an existing element's meaning changes, not when one is added,
+since a reader that ignores unknown elements survives additions. Selection charges the
+wrapper's cost in tokens as well as bytes — counting it in bytes alone let a reduction
+render a handful of tokens over the budget it had just checked.
+
+**History compaction (`compact_history`).** The corpus strategies reduce what an app
+*collected*; this reduces what it *produced*. In an agentic loop the window goes to tool
+results, and a transcript past the budget is the most common way a working application
+starts failing. Three passes over the unprotected middle, cheapest loss first: tool-result
+payloads elided, then text payloads, then plain messages dropped. Each pass stops the
+moment the request fits, so the least-recent turns are elided and whatever is still
+affordable is left whole. System messages and the recent window are never touched, and a
+message carrying a `ToolCall` or `ToolResult` is never dropped — only emptied — because
+half a pairing turns an oversized request into a rejected one. A conversation whose
+protected messages alone exceed the budget comes back with `fits=False` rather than
+mutilated: giving up a system prompt is the application's decision. It is a pure
+`Sequence[Message] → HistoryCompaction` function that issues no calls; placement stays with
+the caller, exactly as the envelope's does.
+
+## 27. Context policy is the client's, not a frontend's
+
+*Amends §26 and the §2 non-goal clarification.*
+
+The overflow question — "this prompt does not fit" — has exactly two answers: send it
+somewhere with a bigger window, or make it smaller. The router has always owned the first
+(`context_gate` → `ContextLengthError` → `Route.context_window_targets`), and it owns it at
+the **client** layer, which is why the Python API, the CLI, and the sidecar have always
+behaved identically about it: all three are the same `AsyncClient` wearing different skins.
+
+`HistoryPolicy` puts the second answer at that same layer, for the same reason. It is a
+field on `AsyncClient`/`Client` and, per request, on `GenerationRequest.history`. The
+sidecar implements none of it: it decodes an `anyinfer_history` object into that field and
+hands the request to the client, staying the codec ADR-009 requires. `anyinfer run` and the
+tool loop inherit it with no wiring of their own.
+
+- **`last_resort`** (the default shape) changes nothing until every target, including the
+  overflow chain, is exhausted; only then is one compaction pass attempted and the route
+  retried once. Losing history is worse than using a bigger model, so it is the floor
+  rather than the first move.
+- **`proactive`** compacts to fit the resolved target before the gate can refuse it. One
+  fewer failed preflight, at the documented cost that a larger-window target further down
+  the route is never reached — there is no longer an overflow to redirect.
+
+Two rules keep it from being a silent truncation. It is **off unless configured**: no
+policy means today's behaviour, which is to reroute or fail. And it **announces itself** —
+every compaction emits `ContextReduced(strategy="history")`, content-free like every other
+event. Two guards keep it from being pointless: an unknown context window is never
+compacted against (unknown stays unknown — the client will not invent a window to justify
+discarding a conversation), and neither is a window whose output reserve leaves no input
+allowance, since there is nothing to compact *into*.
+
+**Corpus reduction is deliberately not unified this way.** `anyinfer.context.select` needs
+a corpus, and the gateway receives `messages`. Carrying documents over the wire would make
+the sidecar decide what is safe to send about material it never collected — the exact
+boundary §26 exists to draw — so collection-shaped frontends (`anyinfer context`, an
+application) reduce, and message-shaped frontends do not. The asymmetry is corpus-versus-
+conversation, not SDK-versus-gateway.

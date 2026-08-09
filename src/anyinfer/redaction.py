@@ -1,4 +1,4 @@
-"""Secret redaction (D20).
+"""Secret redaction.
 
 Every credential resolved through `anyinfer.credentials` is registered here. All error
 ``detail`` strings, event string fields, and log lines pass through `redact()` before

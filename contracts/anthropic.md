@@ -30,8 +30,26 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
 - `model`, `max_tokens` (required), `system` (top-level, not a message role),
   `messages[{role: user|assistant, content}]`, `stream`, `temperature`, `top_p`,
   `stop_sequences`, `tools`, `tool_choice`; reasoning-effort wire form recorded in
-  ModelFit as `output_config: {"effort": e}` — VERIFY on first drift run (extended
+  `output_config: {"effort": e}` — VERIFY on first drift run (extended
   thinking may instead use `thinking: {"type":"enabled","budget_tokens":N}`)
+### Prompt caching (placement)
+- Mechanism: **explicit**. `cache_control: {"type": "ephemeral"}` attaches to a content
+  block, a `system` content block, or a tool declaration, and marks everything *before and
+  including* it as the cacheable prefix.
+- The adapter sends a mark only when the core's cache planner placed one; a request with no
+  cache policy is byte-identical to what shipped before placement existed.
+- A marked `system` field is sent as a one-element content-block list rather than a bare
+  string, because `cache_control` cannot attach to a string.
+- A tools mark attaches to the **last** tool declaration, since the tool block precedes the
+  messages and a mark covers the prefix up to itself.
+- Declared on the descriptor as `cache_mechanism="explicit"`, `cache_max_marks=4`,
+  `cache_min_tokens=1024`. **VERIFY on the next drift run**: the breakpoint ceiling and the
+  minimum cacheable prefix are the values recorded here, and both are the kind of limit
+  that moves; the minimum also varies by model on this API.
+- Retention window is whatever the API's default for `ephemeral` is; AnyInfer does not
+  select a TTL. If a longer window becomes selectable per request, that is a new field to
+  record here before the adapter sends it.
+
 ### Response fields
 - `content[]` blocks (`text`, `tool_use`, `thinking`), `stop_reason`
   (`end_turn|max_tokens|stop_sequence|tool_use`), `usage.input_tokens`,

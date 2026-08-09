@@ -1,4 +1,4 @@
-"""The shared provider conformance suite (D18).
+"""The shared provider conformance suite.
 
 Every adapter — built-in or third-party — proves it satisfies the contract by running this
 suite. The conformance matrix in the documentation is generated from its results, so a

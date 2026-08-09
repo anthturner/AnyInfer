@@ -31,8 +31,8 @@ class StatusMetrics(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 0, 4, 0)
-        layout.setSpacing(10)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(12)
 
         self._values: dict[str, QLabel] = {}
         for key, label in _FIELDS:
@@ -44,6 +44,10 @@ class StatusMetrics(QWidget):
             layout.addWidget(caption)
             layout.addWidget(value)
             self._values[key] = value
+
+        from .sdk_help import SdkHelpButton
+
+        layout.addWidget(SdkHelpButton("metrics"))
 
     def reset(self) -> None:
         """Blank every field back to 'not reported'."""

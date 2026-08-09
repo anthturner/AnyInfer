@@ -22,7 +22,7 @@ def test_agents_file_owns_every_workstream() -> None:
         "Shared configuration",
     ):
         assert phrase in canonical
-    assert "D1" in canonical and "D32" in canonical
+    assert "DESIGN.md" in canonical
 
 
 def test_tool_bootstraps_defer_to_agents_without_copying_policy() -> None:

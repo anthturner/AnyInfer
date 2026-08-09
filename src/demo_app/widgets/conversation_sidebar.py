@@ -42,9 +42,11 @@ class ConversationSidebar(QWidget):
         self.setAccessibleName(strings.CONVERSATIONS_TITLE)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         top = QHBoxLayout()
+        top.setSpacing(8)
         self._new_button = QPushButton(strings.NEW_CHAT)
         self._new_button.setAccessibleName(strings.NEW_CHAT)
         self._new_button.clicked.connect(self.new_chat_requested)

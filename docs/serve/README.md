@@ -148,6 +148,35 @@ The app sets `X-Accel-Buffering: no` on streaming responses. Without it, reverse
 buffer the whole response and streaming silently stops being streaming — a failure that only
 appears in deployment, never in local testing.
 
+## Oversized conversations
+
+The sidecar applies whatever context policy its client was built with, because it is a
+codec over a normal client rather than a second core. Give the shared config a
+[`history` block](../reference/configuration.md#the-history-block) and a conversation that
+outgrows its target's window is compacted instead of refused — the same rules, and the same
+`ContextReduced` telemetry, an SDK caller gets.
+
+A caller with a different tolerance can say so per request. The request body is a documented
+superset of OpenAI chat completions, and this is what that superset is for:
+
+```json
+{
+  "model": "openai:gpt-4o",
+  "messages": [...],
+  "anyinfer_history": {"mode": "proactive", "keep_recent": 2}
+}
+```
+
+`false` refuses compaction for that request — you get the overflow error instead of a
+quietly shortened conversation. `true` accepts the defaults. A malformed value is a `400`
+rather than a silent fallback to the gateway's setting, because a caller that asked for
+something specific should learn it did not get it.
+
+Note what the sidecar does *not* do: reduce a document corpus. It receives messages, not
+documents, and deciding what is safe to send about material it never collected is not a
+gateway's call. That stays with the application — see
+[context reduction](../concepts/context-reduction.md).
+
 ## Configuration
 
 The sidecar, CLI, and Python SDK use the same

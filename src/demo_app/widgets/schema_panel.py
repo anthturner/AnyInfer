@@ -54,17 +54,20 @@ class SchemaPanel(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         caption = QLabel(
-            f"<b>{STRUCTURED_TITLE}</b> — when enabled, responses are validated against this "
-            "JSON Schema. AnyInfer picks the strongest mechanism the target supports — "
-            "grammar, native json_schema, JSON mode, or a prompt instruction."
+            f"<b>{STRUCTURED_TITLE}</b> — responses are validated against this JSON "
+            "Schema; AnyInfer picks the strongest mechanism the target supports."
         )
+        caption.setObjectName("Caption")
         caption.setWordWrap(True)
         caption.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(caption)
 
         controls = QHBoxLayout()
+        controls.setSpacing(10)
         self._enabled = QCheckBox("Enforce schema")
         self._enabled.setAccessibleName("Enforce schema")
         controls.addWidget(self._enabled)
@@ -99,6 +102,7 @@ class SchemaPanel(QWidget):
         result_side = QWidget()
         result_layout = QVBoxLayout(result_side)
         result_layout.setContentsMargins(0, 0, 0, 0)
+        result_layout.setSpacing(8)
 
         self._result_tree = QTreeWidget()
         self._result_tree.setHeaderLabels(["Field", "Value"])

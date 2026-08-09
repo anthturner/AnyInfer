@@ -15,7 +15,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ### Auth
 - None; loopback-only binding enforced by the supervisor (DESIGN.md §12, §20)
 ### Version pins
-- llama.cpp build pinned per runtime manifest (Frisket pins `b10199` at snapshot time);
+- llama.cpp build pinned per runtime manifest (`b10199` at snapshot time);
   AnyInfer re-pins at M1 and records the tag here
 - Backend runtime variants: cpu / cuda / rocm / vulkan / metal, ranked
   {cuda:30, metal:25, vulkan:20, cpu:10}
@@ -23,7 +23,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - openai-compat plus server-side structured output: `response_format.json_schema`
   compiles to GBNF grammar (true grammar enforcement — mechanism `grammar`);
   schema projection quirks: repetition-limit constraints (strip minLength/maxLength,
-  huge minItems/maxItems) as in Frisket's Ollama projection
+  huge minItems/maxItems) as in the Ollama projection
 ### Response fields
 - As openai-compat; `timings` object (prompt_n, predicted_n, per-phase ms) when enabled
 ### Streaming

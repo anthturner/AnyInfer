@@ -225,27 +225,28 @@ QWidget {
 }
 QMenuBar, QMenu { background: $surface; }
 QMenuBar { border-bottom: 1px solid $border; }
-QMenu { border: 1px solid $border; }
-QMenu::item { padding: 5px 24px; }
+QMenu { border: 1px solid $border; border-radius: 8px; padding: 4px; }
+QMenu::item { padding: 6px 20px; border-radius: 6px; }
 QMenu::item:selected, QMenuBar::item:selected { background: $accent_bg; color: $accent; }
-QMenu::separator { height: 1px; background: $border; margin: 4px 8px; }
+QMenu::separator { height: 1px; background: $border; margin: 6px 12px; }
 
 QLabel { background: transparent; }
 QLabel#Muted { color: $muted; }
 QLabel#ErrorText { color: $danger; }
+QLabel#Caption { color: $muted; padding: 6px 0; }
 
 QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox,
 QTreeWidget, QListWidget {
     background: $surface;
     border: 1px solid $border;
-    border-radius: 6px;
-    padding: 2px 6px;
+    border-radius: 8px;
+    padding: 4px 8px;
     selection-background-color: $accent;
     selection-color: $on_accent;
 }
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus,
-QSpinBox:focus, QDoubleSpinBox:focus {
-    border-color: $accent;
+QSpinBox:focus, QDoubleSpinBox:focus, QListWidget:focus, QTreeWidget:focus {
+    border: 1px solid $accent;
 }
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled,
 QPlainTextEdit:disabled {
@@ -255,18 +256,21 @@ QPlainTextEdit:disabled {
 QComboBox QAbstractItemView {
     background: $surface;
     border: 1px solid $border;
+    border-radius: 8px;
     selection-background-color: $accent_bg;
     selection-color: $text;
+    padding: 4px;
 }
 
 QPushButton {
     background: $surface;
     border: 1px solid $border;
-    border-radius: 6px;
-    min-height: 26px;
-    padding: 2px 14px;
+    border-radius: 8px;
+    min-height: 30px;
+    padding: 6px 16px;
 }
 QPushButton:hover { border-color: $accent; background: $accent_bg; }
+QPushButton:pressed { background: $accent_border; }
 QPushButton:disabled { color: $muted; background: $bg; }
 QPushButton:default {
     background: $amber;
@@ -276,31 +280,32 @@ QPushButton:default {
 }
 QPushButton:default:hover { background: $gold; border-color: $gold; }
 QPushButton:default:disabled { background: $surface; border-color: $border; color: $muted; }
-QPushButton#IconButton { padding: 2px; border: none; background: transparent; }
-QPushButton#IconButton:hover { background: $accent_bg; border-color: $accent_border; }
+QPushButton#IconButton { padding: 4px; border-radius: 6px; border: none; background: transparent; }
+QPushButton#IconButton:hover { background: $accent_bg; border: 1px solid $accent_border; }
 /* A disclosure reads as a label you can click, not as a command: chrome here would give
    "Advanced" the same weight as the fields it is there to keep out of the way. */
 QPushButton#DisclosureButton {
     border: none;
     background: transparent;
     color: $muted;
-    padding: 2px 4px;
+    padding: 4px 6px;
     text-align: left;
 }
 QPushButton#DisclosureButton:hover { color: $text; background: transparent; }
 
 QGroupBox {
     border: 1px solid $border;
-    border-radius: 8px;
-    margin-top: 8px;
-    background: transparent;
+    border-radius: 10px;
+    margin-top: 12px;
+    padding-top: 8px;
+    background: $bg;
+    font-weight: 600;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
-    left: 10px;
-    padding: 0 4px;
+    left: 12px;
+    padding: 0 6px;
     color: $accent;
-    font-weight: 600;
 }
 
 QHeaderView::section {
@@ -308,18 +313,31 @@ QHeaderView::section {
     color: $muted;
     border: none;
     border-bottom: 1px solid $border;
-    padding: 4px 6px;
+    padding: 6px 8px;
 }
 QTreeWidget::item:selected { background: $accent_bg; color: $text; }
 
 QSplitter::handle { background: $border; }
-QStatusBar { background: $surface; border-top: 1px solid $border; color: $muted; }
-QScrollArea { border: 1px solid $border; border-radius: 6px; }
+QSplitter::handle:horizontal { width: 2px; }
+QSplitter::handle:vertical { height: 2px; }
+QStatusBar {
+    background: $surface;
+    border-top: 1px solid $border;
+    color: $muted;
+    padding: 4px 10px;
+}
+QScrollArea { border: none; background: transparent; }
+QScrollArea#TelemetryScroll {
+    border: 1px solid $border;
+    border-radius: 8px;
+    background: $surface;
+}
 QToolTip {
     background: $surface;
     color: $text;
     border: 1px solid $accent_border;
-    padding: 4px;
+    border-radius: 6px;
+    padding: 6px;
 }
 
 /* The message body is the bubble's content, not a field inside it. */
@@ -332,23 +350,29 @@ QTextEdit#MessageBody {
 QFrame#MessageBubbleUser {
     background: $accent_bg;
     border: 1px solid $accent_border;
-    border-radius: 12px;
+    border-radius: 16px;
 }
 QFrame#MessageBubbleAssistant {
     background: $surface;
     border: 1px solid $border;
-    border-radius: 12px;
+    border-radius: 16px;
 }
 QFrame#TelemetryCard {
     background: $surface;
     border: 1px solid $border;
-    border-radius: 8px;
+    border-radius: 10px;
 }
+QFrame#TelemetryCard:hover { border-color: $accent_border; }
 QLabel#NoticeBar { color: $muted; font-style: italic; }
+QListWidget#ConversationList {
+    background: transparent;
+    border: none;
+    outline: none;
+}
 QListWidget#ConversationList::item {
-    border-radius: 6px;
-    padding: 6px;
-    margin: 2px 0;
+    border-radius: 8px;
+    padding: 8px;
+    margin: 3px 0;
 }
 QListWidget#ConversationList::item:selected {
     background: $accent_bg;
@@ -357,18 +381,168 @@ QListWidget#ConversationList::item:selected {
 
 QFrame#CollapsibleSection {
     border: 1px solid $border;
-    border-radius: 8px;
+    border-radius: 10px;
     background: $bg;
 }
 QFrame#CollapsibleSectionHeader {
     background: $surface;
-    border-radius: 8px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
     border-bottom: 1px solid $border;
 }
 QLabel#CollapsibleSectionTitle {
     color: $accent;
     font-weight: 600;
 }
+
+/* Generic surfaced cards used by the demo's newer layouts. */
+QFrame#SectionCard {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 10px;
+}
+QFrame#ProviderCard {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 10px;
+}
+
+/* Slim, rounded scrollbars that match the palette instead of the platform default. */
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 2px;
+}
+QScrollBar:horizontal {
+    background: transparent;
+    height: 10px;
+    margin: 2px;
+}
+QScrollBar::handle {
+    background: $border;
+    border-radius: 4px;
+    min-height: 24px;
+    min-width: 24px;
+}
+QScrollBar::handle:hover { background: $accent_border; }
+QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+
+/* Tabs (the Local models dialog). */
+QTabWidget::pane {
+    border: 1px solid $border;
+    border-radius: 8px;
+    top: -1px;
+}
+QTabBar::tab {
+    background: transparent;
+    color: $muted;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 7px 16px;
+    margin-right: 2px;
+}
+QTabBar::tab:hover { color: $text; background: $accent_bg; }
+QTabBar::tab:selected {
+    background: $surface;
+    color: $accent;
+    border-color: $border;
+    font-weight: 600;
+}
+
+QProgressBar {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 7px;
+    height: 14px;
+    text-align: center;
+    color: $text;
+}
+QProgressBar::chunk {
+    background: $accent;
+    border-radius: 6px;
+}
+
+QCheckBox { spacing: 6px; }
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid $border;
+    border-radius: 5px;
+    background: $surface;
+}
+QCheckBox::indicator:hover { border-color: $accent; }
+QCheckBox::indicator:checked {
+    background: $accent;
+    border-color: $accent;
+}
+
+QToolButton {
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 3px 6px;
+    color: $muted;
+}
+QToolButton:hover { background: $accent_bg; color: $text; }
+
+/* Quick-action chips under the composer: pill-shaped invitations, not commands. */
+QPushButton#ChipButton {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 14px;
+    padding: 4px 14px;
+    min-height: 0;
+    color: $muted;
+}
+QPushButton#ChipButton:hover {
+    border-color: $accent;
+    color: $accent;
+    background: $accent_bg;
+}
+
+/* The send button: the one filled, unmistakable action on the screen. */
+QPushButton#PrimaryButton {
+    background: $accent;
+    border: 1px solid $accent;
+    border-radius: 17px;
+    color: $on_accent;
+    padding: 4px;
+}
+QPushButton#PrimaryButton:hover { background: $accent_hover; border-color: $accent_hover; }
+QPushButton#PrimaryButton:disabled { background: $surface; border-color: $border; }
+
+/* "How is this built?" chips: quiet until you look for them. */
+QPushButton#HelpChip {
+    background: transparent;
+    border: 1px solid $accent_border;
+    border-radius: 10px;
+    color: $accent;
+    padding: 0 8px;
+    min-height: 0;
+    font-size: 8pt;
+}
+QPushButton#HelpChip:hover { background: $accent_bg; border-color: $accent; }
+QLabel#ApiList {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+/* Welcome feature cards. */
+QFrame#WelcomeCard {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 12px;
+}
+QFrame#WelcomeCard:hover { border-color: $accent; background: $accent_bg; }
+QLabel#WelcomeCardTitle { font-weight: 600; color: $accent; }
+QLabel#BubbleHeader { color: $muted; font-size: 8.5pt; }
 """)
 
 

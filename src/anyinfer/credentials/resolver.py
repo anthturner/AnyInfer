@@ -1,4 +1,4 @@
-"""Credential resolution (D8).
+"""Credential resolution.
 
 A credential *reference* is a string a user can safely put in a config file. Three forms ship
 in v1:

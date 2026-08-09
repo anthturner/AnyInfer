@@ -1,4 +1,4 @@
-"""Token estimation, context budgets, and pre-dispatch gating (D25, L6)."""
+"""Token estimation, context budgets, and pre-dispatch gating."""
 
 from __future__ import annotations
 

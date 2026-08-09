@@ -18,9 +18,11 @@ from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -36,7 +38,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from anyinfer import Retry, Route
+from anyinfer import CachePolicy, CostEstimate, HistoryPolicy, Retry, Route
 from anyinfer.errors import AnyInferError
 from anyinfer.types.capabilities import Health
 from anyinfer.types.messages import Message, Text, system, user
@@ -53,16 +55,36 @@ from .widgets import (
     Composer,
     ConversationSidebar,
     EngineBar,
+    LibraryMapDialog,
+    ModelsDialog,
     ProviderSettingsDialog,
     SchemaPanel,
+    SdkHelpButton,
     StatusMetrics,
+    TargetInspector,
     TelemetryView,
+    ToolsPanel,
     WelcomeView,
 )
 from .widgets.chat_view import MessageList
 from .widgets.icons import themed_icon
 
 __all__ = ["MainWindow"]
+
+
+def _cost_hint(cost: CostEstimate | None) -> str:
+    """Render a preflight cost range, or nothing when there is no pricing to render.
+
+    A *range* rather than a figure, because that is what the library returns: the output
+    length is not known before the request, so the low end assumes none of the reserve is
+    spent and the high end assumes all of it is. Collapsing that to one number would
+    present a bound as a prediction.
+    """
+    if cost is None:
+        return ""
+    if cost.low == cost.high:
+        return f"~{cost.low:.4f} {cost.currency}"
+    return f"~{cost.low:.4f}-{cost.high:.4f} {cost.currency}"
 
 
 class MainWindow(QMainWindow):
@@ -75,6 +97,7 @@ class MainWindow(QMainWindow):
 
         self._engine = Engine(config)
         self._conversation: list[Message] = []
+        self._models_dialog: ModelsDialog | None = None
         self._pending_target = ""
         self._streaming_started = False
         self._theme = config.theme
@@ -104,6 +127,7 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self, config: DemoConfig) -> None:
         outer = QSplitter(Qt.Orientation.Horizontal)
+        outer.setHandleWidth(4)
 
         self._sidebar = ConversationSidebar()
         self._sidebar.new_chat_requested.connect(self._on_new_chat)
@@ -116,6 +140,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(self._sidebar)
 
         self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter.setHandleWidth(4)
         self._main_splitter.addWidget(self._build_center_pane(config))
         self._main_splitter.addWidget(self._build_inspector())
         self._main_splitter.setStretchFactor(0, 3)
@@ -132,9 +157,15 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._status_metrics)
         self.statusBar().showMessage("Ready — offline fake provider, no credentials needed.")
 
+        self._outer_splitter = outer
+        self._main_splitter_ref = self._main_splitter
+        self._sidebar_width_before_hide = 220
+
     def _build_center_pane(self, config: DemoConfig) -> QWidget:
         pane = QWidget()
         layout = QVBoxLayout(pane)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(14)
 
         self._engine_bar = EngineBar(self._engine.registry, config)
         self._engine_bar.refresh_requested.connect(self._engine.list_models)
@@ -145,6 +176,7 @@ class MainWindow(QMainWindow):
         self._welcome.new_chat_requested.connect(self._on_new_chat)
         self._welcome.structured_output_requested.connect(self._on_welcome_structured)
         self._welcome.fallback_demo_requested.connect(self._on_welcome_fallback)
+        self._welcome.tool_loop_requested.connect(self._on_welcome_tools)
         self._chat.set_empty_state(self._welcome)
         layout.addWidget(self._chat, 1)
 
@@ -155,11 +187,23 @@ class MainWindow(QMainWindow):
         self._composer.text_changed.connect(self._schedule_token_hint)
         layout.addWidget(self._composer)
 
-        layout.addLayout(self._build_controls())
+        layout.addWidget(self._build_controls())
         return pane
 
-    def _build_controls(self) -> QHBoxLayout:
+    def _build_controls(self) -> QGroupBox:
+        # "&&": QGroupBox treats a lone ampersand as a mnemonic marker and eats it.
+        group = QGroupBox("Request options — sampling && routing")
+        # Two rows: sampling knobs above, routing/state below. One row held them all
+        # until reasoning, history, and caching arrived; ten controls in a line is a
+        # ribbon, not a form.
+        outer = QVBoxLayout(group)
+        outer.setSpacing(6)
         controls = QHBoxLayout()
+        controls.setSpacing(12)
+        routing = QHBoxLayout()
+        routing.setSpacing(12)
+        outer.addLayout(controls)
+        outer.addLayout(routing)
 
         controls.addWidget(QLabel("Temperature:"))
         self._temperature = QDoubleSpinBox()
@@ -174,15 +218,57 @@ class MainWindow(QMainWindow):
         )
         controls.addWidget(self._temperature)
 
-        controls.addWidget(QLabel("Max attempts/target:"))
+        controls.addWidget(QLabel("Top-p:"))
+        self._top_p = QDoubleSpinBox()
+        self._top_p.setRange(0.0, 1.0)
+        self._top_p.setSingleStep(0.05)
+        self._top_p.setSpecialValueText("provider default")
+        self._top_p.setValue(0.0)
+        self._top_p.setAccessibleName("Top-p")
+        self._top_p.setToolTip(
+            "Nucleus-sampling cutoff. At the minimum the value is omitted from the wire "
+            "request, so the provider's default is used."
+        )
+        controls.addWidget(self._top_p)
+
+        controls.addWidget(QLabel("Max tokens:"))
+        self._max_output_tokens = QSpinBox()
+        self._max_output_tokens.setRange(0, 4096)
+        self._max_output_tokens.setSingleStep(1)
+        self._max_output_tokens.setSpecialValueText("provider default")
+        self._max_output_tokens.setValue(0)
+        self._max_output_tokens.setAccessibleName("Max output tokens")
+        self._max_output_tokens.setToolTip(
+            "Upper bound on tokens the model may generate. Zero omits the field from the "
+            "wire request."
+        )
+        controls.addWidget(self._max_output_tokens)
+
+        controls.addWidget(QLabel("Reasoning:"))
+        self._reasoning = QComboBox()
+        # The blank entry is "say nothing", not "minimal": a request that omits the field
+        # lets each provider apply its own default, and the normalized levels below are
+        # translated per provider by its descriptor rather than sent verbatim.
+        self._reasoning.addItem("provider default", "")
+        for level in ("minimal", "low", "medium", "high"):
+            self._reasoning.addItem(level, level)
+        self._reasoning.setAccessibleName("Reasoning effort")
+        self._reasoning.setToolTip(
+            "Normalized reasoning effort. Each provider's descriptor translates it into "
+            "that provider's own spelling; a provider without the control drops it and "
+            "reports the drop as telemetry rather than failing."
+        )
+        controls.addWidget(self._reasoning)
+
+        routing.addWidget(QLabel("Attempts:"))
         self._max_attempts = QSpinBox()
         self._max_attempts.setRange(1, 5)
         self._max_attempts.setValue(2)
         self._max_attempts.setAccessibleName("Max attempts per target")
         self._max_attempts.setToolTip("Retry budget per target, before falling back.")
-        controls.addWidget(self._max_attempts)
+        routing.addWidget(self._max_attempts)
 
-        controls.addWidget(QLabel("If it fails, try:"))
+        routing.addWidget(QLabel("Fallback:"))
         self._fallback = QComboBox()
         self._fallback.addItem("Nothing (no fallback)", "")
         self._fallback.setAccessibleName("Fallback target")
@@ -190,7 +276,48 @@ class MainWindow(QMainWindow):
             "Optional fallback target the router moves to once the retry budget is spent. "
             "Pick the flaky demo model above with 1 attempt to watch it happen."
         )
-        controls.addWidget(self._fallback)
+        routing.addWidget(self._fallback)
+
+        routing.addWidget(QLabel("History:"))
+        self._history = QComboBox()
+        self._history.addItem("Send everything (default)", "")
+        self._history.addItem("Trim only when it will not fit", "last_resort")
+        self._history.addItem("Trim proactively", "proactive")
+        self._history.setAccessibleName("History policy")
+        self._history.setToolTip(
+            "Opt-in conversation compaction, applied by the client on the request path. "
+            "Off by default — with no policy the full transcript is sent untouched. "
+            "Trimming is never silent: it emits a ContextReduced telemetry event."
+        )
+        routing.addWidget(self._history)
+        routing.addWidget(SdkHelpButton("history"))
+
+        routing.addWidget(QLabel("Prompt cache:"))
+        self._cache = QComboBox()
+        self._cache.addItem("Off (default)", "")
+        self._cache.addItem("Auto placement", "auto")
+        self._cache.addItem("Explicit marks", "explicit")
+        self._cache.setAccessibleName("Prompt cache policy")
+        self._cache.setToolTip(
+            "Opt-in prompt-cache placement. Caching changes what a provider bills and how "
+            "long it retains the prompt, so no policy means cached exactly as before: not "
+            "at all. The plan — mechanism and marks — arrives as a CachePlanned event."
+        )
+        routing.addWidget(self._cache)
+        routing.addWidget(SdkHelpButton("prompt-cache"))
+
+        self._reuse_session = QCheckBox("Reuse session")
+        self._reuse_session.setAccessibleName("Reuse provider session")
+        self._reuse_session.setToolTip(
+            "Thread turns through one provider-side session, so a provider that keeps "
+            "conversations can resume instead of re-reading the whole transcript. The "
+            "status line reports what actually happened: resumed, fresh, or unsupported "
+            "— the provider decides, never the client."
+        )
+        routing.addWidget(self._reuse_session)
+
+        self._controls_help = SdkHelpButton("routing")
+
         saved = self._engine.config.targets
         if len(saved) > 1:
             self._fallback.addItem(saved[1], saved[1])
@@ -199,45 +326,82 @@ class MainWindow(QMainWindow):
         self._engine_bar.changed.connect(self._refresh_token_hint)
 
         controls.addStretch(1)
-        return controls
+        routing.addStretch(1)
+        routing.addWidget(self._controls_help)
+        return group
 
     def _build_inspector(self) -> QWidget:
         pane = QWidget()
         layout = QVBoxLayout(pane)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
 
         self._inspector_splitter = QSplitter(Qt.Orientation.Vertical)
+        self._inspector_splitter.setHandleWidth(4)
 
         self._telemetry = TelemetryView()
-        self._telemetry_section = CollapsibleSection(strings.TELEMETRY_TITLE, self._telemetry)
+        self._telemetry_section = CollapsibleSection(
+            strings.TELEMETRY_TITLE, self._telemetry, help_topic="telemetry"
+        )
         self._inspector_splitter.addWidget(self._telemetry_section)
 
         self._schema = SchemaPanel()
-        self._schema_section = CollapsibleSection(strings.STRUCTURED_TITLE, self._schema)
+        self._schema_section = CollapsibleSection(
+            strings.STRUCTURED_TITLE, self._schema, help_topic="structured"
+        )
         self._inspector_splitter.addWidget(self._schema_section)
 
         self._providers_section = CollapsibleSection(
-            strings.PROVIDERS_TITLE, self._build_providers_tab()
+            strings.PROVIDERS_TITLE, self._build_providers_tab(), help_topic="providers"
         )
         self._inspector_splitter.addWidget(self._providers_section)
-        self._inspector_splitter.setSizes([300, 300, 260])
+
+        self._target_inspector = TargetInspector(self._engine)
+        self._target_section = CollapsibleSection(
+            strings.TARGET_TITLE, self._target_inspector, help_topic="target-inspection"
+        )
+        self._target_section.set_minimized(True)
+        self._inspector_splitter.addWidget(self._target_section)
+
+        self._tools = ToolsPanel(self._engine)
+        self._tools_section = CollapsibleSection(
+            strings.TOOLS_TITLE, self._tools, help_topic="tools"
+        )
+        self._tools_section.set_minimized(True)
+        self._inspector_splitter.addWidget(self._tools_section)
+
+        self._inspector_splitter.setSizes([280, 280, 220, 40, 40])
         layout.addWidget(self._inspector_splitter, 1)
 
         self._inspector_sections: dict[str, CollapsibleSection] = {
             "telemetry": self._telemetry_section,
             "structured": self._schema_section,
             "providers": self._providers_section,
+            "target": self._target_section,
+            "tools": self._tools_section,
         }
+        # Both panels act on whatever engine/model the bar currently points at.
+        self._engine_bar.changed.connect(self._sync_inspector_targets)
+        self._sync_inspector_targets()
         return pane
+
+    def _sync_inspector_targets(self) -> None:
+        """Point the target inspector and tools panel at the bar's current selection."""
+        target = self._engine_bar.target()
+        self._target_inspector.set_target(target)
+        self._tools.set_target(target)
 
     def _build_providers_tab(self) -> QWidget:
         pane = QWidget()
         layout = QVBoxLayout(pane)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         caption = QLabel(
             "Discovery and health probes go through the same adapter contract for every "
             "provider: <code>list_models()</code> and <code>health()</code>."
         )
+        caption.setObjectName("Caption")
         caption.setWordWrap(True)
         caption.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(caption)
@@ -287,16 +451,33 @@ class MainWindow(QMainWindow):
         new_chat_action.triggered.connect(self._on_new_chat)
         file_menu.addAction(new_chat_action)
 
+        system_prompt_action = QAction("System &prompt…", self)
+        system_prompt_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        system_prompt_action.triggered.connect(self._on_system_prompt)
+        file_menu.addAction(system_prompt_action)
+
         file_menu.addSeparator()
         quit_action = QAction("&Quit", self)
         quit_action.setShortcut(QKeySequence.StandardKey.Quit)
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
 
+        tools_menu = self.menuBar().addMenu("&Tools")
+        models_action = QAction(strings.LOCAL_MODELS, self)
+        models_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        models_action.triggered.connect(self._on_local_models)
+        tools_menu.addAction(models_action)
+
         view_menu = self.menuBar().addMenu("&View")
         self._build_sidebar_menu(view_menu)
         view_menu.addSeparator()
         self._build_theme_menu(view_menu)
+
+        help_menu = self.menuBar().addMenu("&Help")
+        map_action = QAction("&Library map — what this demo exercises…", self)
+        map_action.setShortcut(QKeySequence.StandardKey.HelpContents)
+        map_action.triggered.connect(self._on_library_map)
+        help_menu.addAction(map_action)
 
         send_action = QAction("Send", self)
         send_action.setShortcut(QKeySequence("Ctrl+Return"))
@@ -336,6 +517,8 @@ class MainWindow(QMainWindow):
             ("telemetry", strings.SHOW_TELEMETRY),
             ("structured", strings.SHOW_STRUCTURED),
             ("providers", strings.SHOW_PROVIDERS),
+            ("target", strings.SHOW_TARGET),
+            ("tools", strings.SHOW_TOOLS),
         )
         for key, label in section_labels:
             action = QAction(label, self, checkable=True)
@@ -460,8 +643,26 @@ class MainWindow(QMainWindow):
             sampling=self._build_sampling(),
             schema=schema,
             repair=Repair(max_attempts=self._schema.repair_attempts()) if schema else None,
+            reasoning=self._reasoning.currentData() or None,
+            use_session=self._reuse_session.isChecked(),
+            history=self._history_policy(),
+            cache=self._cache_policy(),
         )
         self._engine.generate(spec)
+
+    def _history_policy(self) -> HistoryPolicy | None:
+        """The selected compaction policy, or ``None`` for the untouched default."""
+        mode = self._history.currentData()
+        if mode not in ("last_resort", "proactive"):
+            return None
+        return HistoryPolicy(mode=mode)
+
+    def _cache_policy(self) -> CachePolicy | None:
+        """The selected prompt-cache policy, or ``None`` to cache nothing."""
+        mode = self._cache.currentData()
+        if mode not in ("auto", "explicit"):
+            return None
+        return CachePolicy(mode=mode)
 
     def _on_first_text_delta(self, _text: str) -> None:
         """Open the real assistant bubble on first content, replacing the typing indicator."""
@@ -472,7 +673,13 @@ class MainWindow(QMainWindow):
     def _build_sampling(self) -> Sampling:
         """Read sampling knobs, leaving unset ones genuinely unset."""
         temperature = self._temperature.value()
-        return Sampling(temperature=None if temperature == 0.0 else temperature)
+        top_p = self._top_p.value()
+        max_output_tokens = self._max_output_tokens.value()
+        return Sampling(
+            temperature=None if temperature == 0.0 else temperature,
+            top_p=None if top_p == 0.0 else top_p,
+            max_output_tokens=max_output_tokens if max_output_tokens > 0 else None,
+        )
 
     def _route_targets(self) -> tuple[str, ...]:
         """The routing chain: the picked engine/model, then the optional fallback."""
@@ -513,6 +720,10 @@ class MainWindow(QMainWindow):
         config = self._with_ui_state(dialog.result_config())
         self._engine.apply_config(config)
         self._engine_bar.set_providers(config)
+        if self._models_dialog is not None:
+            # The pull panel offers configured engines; a settings change can add or
+            # remove one while the dialog is open.
+            self._models_dialog.set_providers(config)
         self._discover_enabled_providers()
         try:
             config.save(self._config_path)
@@ -520,6 +731,37 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Settings applied but not saved: {error}")
             return
         self.statusBar().showMessage("Settings saved; the client will rebuild on next use.")
+
+    def _on_system_prompt(self) -> None:
+        """Edit the system prompt stored in the demo config."""
+        from PySide6.QtWidgets import QInputDialog
+
+        current = self._engine.config.system_prompt
+        text, ok = QInputDialog.getMultiLineText(
+            self, "System prompt", "Sent as the first system message in new chats:", current
+        )
+        if not ok:
+            return
+        config = replace(self._engine.config, system_prompt=text)
+        self._engine.update_preferences(config)
+        with contextlib.suppress(OSError):
+            config.save(self._config_path)
+        self.statusBar().showMessage("System prompt updated.")
+
+    def _on_library_map(self) -> None:
+        """Open the live map of which public SDK symbols this demo exercises."""
+        dialog = LibraryMapDialog(self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.show()
+
+    def _on_local_models(self) -> None:
+        """Open (or focus) the local-model manager."""
+        if self._models_dialog is not None and self._models_dialog.isVisible():
+            self._models_dialog.raise_()
+            self._models_dialog.activateWindow()
+            return
+        self._models_dialog = ModelsDialog(self._engine, self._engine.config, self)
+        self._models_dialog.show()
 
     def _on_refresh_providers(self) -> None:
         self._provider_table.setRowCount(0)
@@ -537,13 +779,19 @@ class MainWindow(QMainWindow):
             self._engine.list_models(provider.instance_id)
 
     def _set_right_sidebar_visible(self, visible: bool) -> None:
-        """Show or fully hide the inspector pane (Telemetry/Structured output/Providers)."""
-        sizes = self._main_splitter.sizes()
+        """Collapse or restore the inspector pane while keeping it resizable."""
+        splitter = self._main_splitter_ref
+        sizes = splitter.sizes()
         if visible:
-            if len(sizes) >= 2 and sizes[1] == 0:
-                self._main_splitter.setSizes([3, 2])
+            total = sum(sizes) if sizes else 1
+            restored = getattr(self, "_right_sidebar_width_before_hide", 360)
+            left = max(total - restored, int(total * 0.55))
+            splitter.setSizes([left, total - left])
         else:
-            self._main_splitter.setSizes([sum(sizes) if sizes else 1, 0])
+            if len(sizes) >= 2:
+                self._right_sidebar_width_before_hide = max(sizes[1], 200)
+            total = sum(sizes) if sizes else 1
+            splitter.setSizes([total, 0])
         self._right_sidebar_action.setChecked(visible)
 
     def _toggle_right_sidebar(self) -> None:
@@ -552,9 +800,21 @@ class MainWindow(QMainWindow):
         self._set_right_sidebar_visible(collapsed)
 
     def _set_left_sidebar_visible(self, visible: bool) -> None:
-        """Show or fully hide the conversation history sidebar."""
-        self._sidebar.setVisible(visible)
+        """Collapse or restore the conversation history sidebar while keeping it resizable."""
+        splitter = self._outer_splitter
+        sizes = splitter.sizes()
+        if visible:
+            total = sum(sizes) if sizes else 1
+            restored = getattr(self, "_sidebar_width_before_hide", 220)
+            right = max(total - restored, int(total * 0.6))
+            splitter.setSizes([total - right, right])
+        else:
+            if len(sizes) >= 2:
+                self._sidebar_width_before_hide = max(sizes[0], 160)
+            total = sum(sizes) if sizes else 1
+            splitter.setSizes([0, total])
         self._left_sidebar_action.setChecked(visible)
+        self._sidebar.setVisible(visible)
 
     def _set_inspector_section_visible(self, key: str, visible: bool) -> None:
         """Show or fully hide one inspector section (distinct from minimize)."""
@@ -573,6 +833,17 @@ class MainWindow(QMainWindow):
         self._engine_bar.set_target("demo-fake:flaky")
         self._max_attempts.setValue(1)
         self._composer.set_text("Try the flaky target and show the retry and fallback trail.")
+
+    def _on_welcome_tools(self) -> None:
+        """Aim the tool-loop panel at the offline tools model and bring it into view."""
+        self._engine_bar.set_target("demo-fake:tools")
+        self._sync_inspector_targets()
+        self._set_right_sidebar_visible(True)
+        self._tools_section.setVisible(True)
+        self._tools_section.set_minimized(False)
+        self.statusBar().showMessage(
+            "Tool loop ready — press 'Run tool loop' in the right sidebar."
+        )
 
     # ---- conversation persistence ------------------------------------------------------
 
@@ -773,6 +1044,7 @@ class MainWindow(QMainWindow):
             budget.estimate.tokens,
             budget.remaining_tokens,
             budget.fits if window is not None else None,
+            _cost_hint(budget.estimated_cost),
         )
 
     # ---- engine callbacks ------------------------------------------------------------
@@ -802,8 +1074,13 @@ class MainWindow(QMainWindow):
         self._current_conversation = self._current_conversation.with_result(result)
         self._save_current_conversation()
         self._reload_sidebar()
+        # What the provider actually did with the session — resumed, fresh, or
+        # unsupported — is the library's answer, and the honest thing is to show it.
+        reuse = self._engine.session_reuse if self._reuse_session.isChecked() else ""
+        session_note = f" — session {reuse}" if reuse else ""
         self.statusBar().showMessage(
-            f"Completed via {result.target} — {self._telemetry.event_count} telemetry events."
+            f"Completed via {result.target} — "
+            f"{self._telemetry.event_count} telemetry events{session_note}."
         )
 
     def _on_failed(self, message: str, error: object) -> None:
@@ -897,6 +1174,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: object) -> None:  # noqa: N802 — Qt's spelling
         """Close the AnyInfer client before the window goes away."""
         self._save_current_conversation()
+        if self._models_dialog is not None:
+            # Closed first: its panels listen to engine signals, and a straggling
+            # download callback into a dead dialog is a crash on exit.
+            self._models_dialog.close()
         self._engine.cancel()
         with contextlib.suppress(AnyInferError):
             self._engine.close()

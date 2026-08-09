@@ -3,10 +3,10 @@
 This replaces typing raw ``provider:model`` target strings: the engines the user has
 enabled appear in a dropdown, the models an engine reports appear next to it (with their
 size, when the engine says — Ollama reports parameter count and quantization), and the
-context window sits at the end with an auto-detect toggle, matching Frisket's
-``ContextWindowOverrideRow``: while auto-detect is on the field is disabled and shows the
-actual token count on file for the current engine/model, so the user can see the budget
-that will really apply; toggling it off frees the field for a manual value.
+context window sits at the end with an auto-detect toggle: while auto-detect is on the
+field is disabled and shows the actual token count on file for the current engine/model,
+so the user can see the budget that will really apply; toggling it off frees the field for
+a manual value.
 
 The bar still *produces* a target string — ``provider:model`` is exactly what
 `Route` consumes — it just stops making humans write one.
@@ -20,7 +20,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QWidget,
+)
 
 from anyinfer.errors import AnyInferError
 from anyinfer.registry import ProviderRegistry
@@ -28,6 +36,7 @@ from anyinfer.types.capabilities import DiscoveredModel, Sourced
 
 from ..config import DemoConfig
 from .icons import themed_icon
+from .sdk_help import SdkHelpButton
 
 __all__ = ["ContextWindowRow", "EngineBar"]
 
@@ -45,7 +54,7 @@ _PROVENANCE_NOTE = {
 
 
 class ContextWindowRow(QWidget):
-    """Auto-detect/manual context-window control, as in Frisket.
+    """Auto-detect/manual context-window control.
 
     In auto-detect mode the field is disabled and shows the token count actually on file
     for the current engine/model rather than a generic "Auto-detected" label; the tooltip
@@ -65,6 +74,7 @@ class ContextWindowRow(QWidget):
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
         self._input = QLineEdit(self)
         self._input.setAccessibleDescription(_BASE_TOOLTIP)
         self._toggle = QPushButton(self)
@@ -146,8 +156,8 @@ class ContextWindowRow(QWidget):
         )
 
 
-class EngineBar(QWidget):
-    """One row: engine dropdown, model-and-size dropdown, context window with auto-detect."""
+class EngineBar(QFrame):
+    """One card: engine dropdown, model-and-size dropdown, context window with auto-detect."""
 
     changed = Signal()
     refresh_requested = Signal(str)
@@ -160,6 +170,8 @@ class EngineBar(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setObjectName("SectionCard")
+        self.setFrameShape(QFrame.Shape.StyledPanel)
         self._registry = registry
         self._discovered: dict[str, list[DiscoveredModel]] = {}
         self._model_drafts: dict[str, str] = {}
@@ -168,7 +180,8 @@ class EngineBar(QWidget):
         self._engine_of: dict[str, str] = {}
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(10)
 
         layout.addWidget(QLabel("Engine:"))
         self._engine = QComboBox()
@@ -195,6 +208,8 @@ class EngineBar(QWidget):
         layout.addWidget(QLabel("Context window:"))
         self._context = ContextWindowRow(self, initial_tokens=config.context_window_tokens)
         layout.addWidget(self._context, 2)
+
+        layout.addWidget(SdkHelpButton("providers"), 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.set_providers(config)
         if config.targets:

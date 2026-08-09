@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from .errors import ConfigError
 from .types.capabilities import ModelCapabilities, TokenCalibration
-from .types.requests import ReasoningEffort
+from .types.requests import CacheMechanism, ReasoningEffort
 
 if TYPE_CHECKING:
     from .providers.base import ProviderAdapter, ProviderConfig
@@ -29,6 +29,8 @@ __all__ = [
     "AdapterFactory",
     "HostShorthand",
     "ModelPuller",
+    "PluginLoadIssue",
+    "PluginLoadReason",
     "ProviderDescriptor",
     "ProviderRegistry",
     "ProviderSetupSpec",
@@ -58,14 +60,67 @@ what the layering forbids.
 """
 
 SetupFieldKind = Literal[
-    "endpoint", "secret", "api-version", "model-list", "reasoning-efforts", "host-profile"
+    "endpoint",
+    "secret",
+    "api-version",
+    "model-list",
+    "reasoning-efforts",
+    "host-profile",
+    "text",
+    "choice",
+    "path",
+    "directory",
 ]
-"""What a setup field means, so UIs can render it appropriately without provider knowledge."""
+"""What a setup field means, so UIs can render it appropriately without provider knowledge.
+
+The kind is what a UI keys its widget *and its empty-editor hint* off, so it has to
+distinguish things a single "line of text" would flatten. ``endpoint`` means a URL and a UI
+may legitimately hint one; a filesystem path, a bounded enum, and a bare identifier are not
+URLs, and rendering them as though they were is how a model directory ends up prompting for
+``https://…``. Hence ``path``/``directory`` (offer a file picker), ``choice`` (offer the
+declared `SetupField.choices`), and ``text`` (a plain identifier with no shape a UI can
+guess).
+
+``host-profile`` predates that split and stays for the credential-chain selectors it was
+introduced for — an AWS profile or region names a *provider-side* configuration rather than
+a value with a shape.
+"""
 
 
 def normalize_provider_id(value: str) -> str:
     """Normalize a provider id or alias: lowercase, stripped, underscores to hyphens."""
     return value.strip().lower().replace("_", "-")
+
+
+PluginLoadReason = Literal["import-failed", "not-a-descriptor", "id-taken", "alias-taken"]
+"""Why a third-party entry point did not become a usable provider."""
+
+
+@dataclass(frozen=True, slots=True)
+class PluginLoadIssue:
+    """An ``anyinfer.providers`` entry point that did not become a usable descriptor.
+
+    A broken third-party package must never take down the registry, so loading failures are
+    swallowed. Swallowed silently, though, they produce the worst diagnostic this library
+    can offer: the user's provider simply does not exist, and the only symptom is an
+    "unknown provider" error listing every provider except theirs. Recording the failure
+    here keeps the isolation and removes the silence.
+
+    Attributes:
+        entry_point: Name of the entry point that failed.
+        reason: What went wrong; see `PluginLoadReason`.
+        detail: Bounded, redacted explanation — an import error can name filesystem paths.
+    """
+
+    entry_point: str
+    reason: PluginLoadReason
+    detail: str = ""
+
+    @property
+    def summary(self) -> str:
+        """One line naming the entry point and what happened to it."""
+        text = f"{self.entry_point}: {self.reason}"
+        return f"{text} ({self.detail})" if self.detail else text
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +179,36 @@ class SetupField:
     today's default is a value frozen at the moment someone opened a dialog, and it keeps
     overriding the real default long after that default has moved on.
     """
+
+    choices: tuple[str, ...] = ()
+    """The accepted values, for a ``choice`` field.
+
+    A bounded enum typed into a free-text box is a value that validates at request time
+    rather than at configuration time, which turns a typo into a runtime error somewhere
+    else entirely. Declaring the set here lets a UI offer it and lets a non-UI caller check
+    a stored value without knowing which provider it belongs to.
+
+    Empty for every other kind — a field whose values a provider cannot enumerate has
+    nothing to put here, and `SetupField` rejects the two contradictory combinations.
+    """
+
+    def __post_init__(self) -> None:
+        """Reject a field whose declared choices and kind disagree.
+
+        A ``choice`` with no alternatives renders as an empty dropdown, and choices on a
+        free-text field are a constraint no UI will apply. Both are provider-authoring
+        errors, caught at import time rather than at the moment someone opens a dialog.
+        """
+        if self.kind == "choice" and not self.choices:
+            raise ConfigError(
+                f"setup field {self.key!r} is a choice with no choices",
+                hint="declare choices=(…), or use kind='text' for a free-form value",
+            )
+        if self.kind != "choice" and self.choices:
+            raise ConfigError(
+                f"setup field {self.key!r} declares choices but its kind is {self.kind!r}",
+                hint="only kind='choice' fields are rendered as a fixed set of values",
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,6 +424,29 @@ class ProviderDescriptor:
     provider that advertises it here.
     """
 
+    cache_mechanism: CacheMechanism | None = None
+    """How this provider's prompt cache is engaged, or ``None`` when it offers nothing.
+
+    ``explicit`` means the wire format accepts per-segment cache marks and the adapter
+    knows how to spell one. ``implicit`` means the provider caches stable prefixes by
+    itself, so there is nothing to send and the core's whole duty is to leave the prefix
+    alone. Declared here rather than inferred, because "does this provider cache" is a
+    protocol fact recorded in its contract snapshot, not something to probe for.
+    """
+
+    cache_max_marks: int = 0
+    """Most explicit cache marks this provider accepts per request; ``0`` when it takes
+    none. Exceeding a provider's ceiling is an error on some APIs and silently ignored on
+    others, so the core clamps to this and reports the clamp."""
+
+    cache_min_tokens: int = 0
+    """Smallest segment this provider will actually cache, in tokens.
+
+    Below its own floor a provider bills a cache *write* and then never serves a read from
+    it, so a mark placed there costs money and saves none. ``0`` means the provider states
+    no floor.
+    """
+
     grammar_needs_prompt_injection: bool = False
     """Whether ``grammar`` mode also requires the schema in the prompt.
 
@@ -406,6 +514,7 @@ class ProviderRegistry:
         self._load_entry_points = load_entry_points
         self._builtins_loaded = False
         self._entry_points_loaded = False
+        self._issues: list[PluginLoadIssue] = []
 
     def register(self, descriptor: ProviderDescriptor, *, replace: bool = False) -> None:
         """Register a descriptor.
@@ -453,7 +562,22 @@ class ProviderRegistry:
         with self._lock:
             self._ensure_loaded()
             provider_id = self._aliases.get(key)
+            issues = tuple(self._issues)
         if provider_id is None:
+            # A provider that failed to load looks identical to one that was never
+            # installed. Saying which happened is the difference between a five-minute
+            # fix and an abandoned integration.
+            blamed = next(
+                (i for i in issues if key in i.entry_point or key in i.detail), None
+            )
+            if blamed is not None:
+                raise ConfigError(
+                    f"unknown provider {name!r}",
+                    hint=(
+                        f"a provider plugin matching it failed to load — {blamed.summary}; "
+                        "reinstall or fix that package, then retry"
+                    ),
+                )
             known = ", ".join(sorted(self.known_ids()))
             raise ConfigError(
                 f"unknown provider {name!r}",
@@ -508,12 +632,24 @@ class ProviderRegistry:
         for alias in descriptor.identifiers:
             self._aliases.setdefault(alias, provider_id)
 
+    def plugin_issues(self) -> tuple[PluginLoadIssue, ...]:
+        """Third-party entry points that did not become usable providers.
+
+        Empty when every installed provider package loaded, which is the ordinary case.
+        Populated only once discovery has run, so callers that want a complete answer
+        should touch the registry first (any lookup does).
+        """
+        with self._lock:
+            self._ensure_loaded()
+            return tuple(self._issues)
+
     def _load_from_entry_points(self) -> None:
         """Discover third-party providers.
 
         A provider package that fails to import or yields a bad object must not take down
-        every other provider, so broken entries are skipped; requesting one later fails
-        with the ordinary "unknown provider" `ConfigError`.
+        every other provider, so broken entries are skipped — but each skip is recorded on
+        `plugin_issues`, because a provider that vanishes without explanation is the worst
+        failure mode this registry has.
         """
         try:
             points = entry_points(group=ENTRY_POINT_GROUP)
@@ -527,15 +663,36 @@ class ProviderRegistry:
                     descriptors = [descriptors]
                 for descriptor in descriptors:
                     if not isinstance(descriptor, ProviderDescriptor):
+                        self._record_issue(
+                            point.name,
+                            "not-a-descriptor",
+                            f"yielded {type(descriptor).__name__}",
+                        )
                         continue
                     pid = normalize_provider_id(descriptor.id)
                     if pid in self._descriptors:
+                        self._record_issue(point.name, "id-taken", f"provider id {pid!r}")
                         continue
-                    if any(a in self._aliases for a in descriptor.identifiers):
+                    taken = [a for a in descriptor.identifiers if a in self._aliases]
+                    if taken:
+                        self._record_issue(
+                            point.name, "alias-taken", f"alias {taken[0]!r}"
+                        )
                         continue
                     self._register_locked(descriptor)
-            except Exception:  # noqa: BLE001 — a broken plugin must not break the registry
+            except Exception as exc:  # noqa: BLE001 — a broken plugin must not break us
+                self._record_issue(point.name, "import-failed", f"{type(exc).__name__}: {exc}")
                 continue
+
+    def _record_issue(self, entry_point: str, reason: PluginLoadReason, detail: str) -> None:
+        """Note a skipped entry point. Caller must hold the lock."""
+        from .redaction import redact
+        from .types.results import DETAIL_MAX_CHARS
+
+        bounded = redact(detail)[:DETAIL_MAX_CHARS]
+        self._issues.append(
+            PluginLoadIssue(entry_point=entry_point, reason=reason, detail=bounded)
+        )
 
 
 default_registry = ProviderRegistry()

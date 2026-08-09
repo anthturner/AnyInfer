@@ -1,7 +1,7 @@
 name: Catalog refresh
 
 # Weekly semi-automated refresh of the bundled local-model catalog and llama-server runtime
-# table (D30). Same two-stage shape as the pricing refresh, and for the same reason:
+# table. Same two-stage shape as the pricing refresh, and for the same reason:
 #
 #   1. `check` — deterministic, stdlib-only: HEADs every pinned GGUF file at its pinned
 #      revision, compares every recorded Ollama manifest digest against the registry, and

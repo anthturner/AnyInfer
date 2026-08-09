@@ -15,7 +15,7 @@ from typing import Any
 
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta
 from ..types.messages import ToolCall
-from ..types.requests import ResolvedTarget
+from ..types.requests import CacheMechanism, ResolvedTarget
 from ..types.results import FinishReason, Timing, Usage
 
 __all__ = ["AttemptBuffer", "ToolCallBuffer"]
@@ -88,6 +88,12 @@ class AttemptBuffer:
     warnings: list[str] = field(default_factory=list)
     first_token_ms: float | None = None
     raw: Any | None = None
+    cache_mechanism: CacheMechanism | None = None
+    """Which prompt-cache mechanism was engaged for this attempt, when any was.
+
+    Carried on the buffer rather than derived at assembly time because the decision is made
+    once, before dispatch, and a repair round trip reuses it.
+    """
 
     def absorb(self, event: TextDelta | ReasoningDelta | ToolCallDelta) -> None:
         """Accumulate one content event."""

@@ -13,6 +13,7 @@ import pytest
 
 import anyinfer as ai
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
+from anyinfer.types.capabilities import ModelCapabilities, Sourced
 
 starlette = pytest.importorskip("starlette", reason="requires the [serve] extra")
 from starlette.testclient import TestClient  # noqa: E402
@@ -472,3 +473,98 @@ def test_exposed_targets_may_be_written_in_instance_terms() -> None:
 
     ids = {entry["id"] for entry in http.get("/v1/models").json()["data"]}
     assert "work-azure:gpt-4o" in ids
+
+
+# ---- conversation compaction, inherited from the client ------------------------------
+
+
+def _compaction_client(
+    server: FakeOpenAIServer, **client_kwargs: object
+) -> tuple[TestClient, object]:
+    """A gateway whose client has a small window and, optionally, a compaction policy."""
+    async_client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "openai-compat",
+                base_url="https://fake.invalid/v1",
+                transport=server.transport(),
+            )
+        ],
+        capability_overrides={
+            "openai-compat:fake-model-small": ModelCapabilities(
+                context_window=Sourced(8_192, "catalog")
+            )
+        },
+        **client_kwargs,  # type: ignore[arg-type]
+    )
+    return TestClient(create_app(async_client)), async_client
+
+
+def _oversized_body(**extra: object) -> dict:
+    filler = "x" * 10_000
+    messages = [{"role": "system", "content": "Be brief."}]
+    for index in range(5):
+        messages.append({"role": "user", "content": f"Q{index}. {filler}"})
+        messages.append({"role": "assistant", "content": f"A{index}. {filler}"})
+    messages.append({"role": "user", "content": "And finally?"})
+    return {"model": "openai-compat:fake-model-small", "messages": messages, **extra}
+
+
+def test_the_gateway_inherits_the_clients_compaction_policy() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    client, _ = _compaction_client(
+        server, history=ai.HistoryPolicy(mode="proactive", keep_recent=1)
+    )
+    response = client.post("/v1/chat/completions", json=_oversized_body())
+
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["content"] == "hi"
+    assert server.requests, "the gateway dispatched rather than failing on overflow"
+
+
+def test_without_a_policy_the_gateway_still_reports_the_overflow() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    client, _ = _compaction_client(server)
+    response = client.post("/v1/chat/completions", json=_oversized_body())
+
+    assert response.status_code >= 400
+    assert not server.requests
+
+
+def test_a_request_can_ask_for_compaction_the_gateway_did_not_configure() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    client, _ = _compaction_client(server)
+    response = client.post(
+        "/v1/chat/completions",
+        json=_oversized_body(
+            anyinfer_history={"mode": "proactive", "keep_recent": 1}
+        ),
+    )
+
+    assert response.status_code == 200
+    assert server.requests
+
+
+def test_a_request_can_refuse_the_gateways_policy() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    client, _ = _compaction_client(
+        server, history=ai.HistoryPolicy(mode="proactive", keep_recent=1)
+    )
+    response = client.post(
+        "/v1/chat/completions", json=_oversized_body(anyinfer_history=False)
+    )
+
+    assert response.status_code >= 400, "the caller chose the error over a shortened history"
+    assert not server.requests
+
+
+def test_a_malformed_history_extension_is_a_400() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    client, _ = _compaction_client(server)
+    response = client.post(
+        "/v1/chat/completions",
+        json=_oversized_body(anyinfer_history={"mode": "whenever"}),
+    )
+
+    assert response.status_code == 400
+    assert "anyinfer_history" in response.text

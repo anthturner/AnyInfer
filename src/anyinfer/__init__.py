@@ -93,6 +93,7 @@ from .errors import (
 from .events import (
     AttemptCompleted,
     AttemptStarted,
+    CachePlanned,
     ContextReduced,
     DownloadProgress,
     FallbackTriggered,
@@ -125,6 +126,9 @@ from .session import Session, SessionReuse
 from .types import (
     AttemptFailed,
     AttemptRecord,
+    CacheMechanism,
+    CacheMode,
+    CachePolicy,
     ContentPart,
     Diagnostic,
     DiagnosticSeverity,
@@ -135,6 +139,7 @@ from .types import (
     Generation,
     GenerationRequest,
     Health,
+    HistoryPolicy,
     LocalModelInfo,
     Mechanism,
     Message,
@@ -173,7 +178,7 @@ from .types import (
 )
 from .verification import Verification
 
-__version__ = "0.1.1"
+__version__ = "0.1.0"
 
 __all__ = [
     "BENCHMARK_OUTPUT_TOKENS",
@@ -193,6 +198,10 @@ __all__ = [
     "AttemptRecord",
     "AttemptStarted",
     "AuthError",
+    "CacheMechanism",
+    "CacheMode",
+    "CachePlanned",
+    "CachePolicy",
     "Catalog",
     "CatalogEntryFit",
     "CatalogView",
@@ -219,6 +228,7 @@ __all__ = [
     "GenerationRequest",
     "Health",
     "HeuristicTokenEstimator",
+    "HistoryPolicy",
     "HostShorthand",
     "LocalModelInfo",
     "LocalRuntimeError",

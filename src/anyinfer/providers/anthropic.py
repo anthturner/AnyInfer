@@ -51,6 +51,20 @@ OAuth path rather than left to the caller to remember.
 """
 
 _DEFAULT_MAX_TOKENS = 4096
+
+_EPHEMERAL = {"type": "ephemeral"}
+"""The only ``cache_control`` type this API defines. Sent verbatim on a marked block."""
+
+_SYSTEM_SEGMENT = -1
+"""Mirror of `anyinfer.capabilities.cache.SYSTEM_SEGMENT`.
+
+Repeated rather than imported: an adapter importing from the capability layer would invert
+the dependency the layering forbids, and these two integers are part of the adapter
+contract documented on ``WireRequest.cache_marks``.
+"""
+
+_TOOLS_SEGMENT = -2
+"""Mirror of `anyinfer.capabilities.cache.TOOLS_SEGMENT`; see `_SYSTEM_SEGMENT`."""
 """Used when the caller sets none, because the API rejects a request without it."""
 
 _STOP_REASONS: Mapping[str, FinishReason] = {
@@ -193,6 +207,7 @@ class AnthropicAdapter:
     def build_payload(self, req: WireRequest) -> dict[str, Any]:
         """Translate a wire request into a Messages API body."""
         system_text, messages = _split_system(req.messages)
+        marks = set(req.cache_marks)
 
         payload: dict[str, Any] = {
             "model": req.model,
@@ -201,7 +216,15 @@ class AnthropicAdapter:
             "stream": True,
         }
         if system_text:
-            payload["system"] = system_text
+            # A marked system block becomes a content-block list, which is the only form
+            # `cache_control` may be attached to; unmarked it stays a plain string.
+            payload["system"] = (
+                [{"type": "text", "text": system_text, "cache_control": _EPHEMERAL}]
+                if _SYSTEM_SEGMENT in marks
+                else system_text
+            )
+        if marks:
+            self._mark_messages(payload["messages"], req, marks)
 
         self._apply_sampling(payload, req.sampling)
 
@@ -221,11 +244,44 @@ class AnthropicAdapter:
             payload["tool_choice"] = self._encode_tool_choice(req.tool_choice)
 
         if tools:
+            if _TOOLS_SEGMENT in marks:
+                # Anthropic caches tool declarations by marking the *last* one: a mark
+                # covers everything before it, and the tool block precedes the messages.
+                tools[-1] = {**tools[-1], "cache_control": _EPHEMERAL}
             payload["tools"] = tools
 
         payload.update(req.reasoning_wire)
         payload.update(req.extra_options)
         return payload
+
+    def _mark_messages(
+        self,
+        encoded: list[dict[str, Any]],
+        req: WireRequest,
+        marks: set[int],
+    ) -> None:
+        """Attach ``cache_control`` to the last content block of each marked message.
+
+        Marks arrive as indices into the *request's* messages, which include the system
+        turns this dialect hoists into a top-level field. They are translated to indices
+        into the encoded list here rather than in the core, because which messages survive
+        encoding is a fact about this dialect.
+        """
+        offsets: dict[int, int] = {}
+        encoded_index = 0
+        for index, message in enumerate(req.messages):
+            if message.role == "system":
+                continue
+            offsets[index] = encoded_index
+            encoded_index += 1
+
+        for mark in sorted(m for m in marks if m >= 0):
+            position = offsets.get(mark)
+            if position is None or position >= len(encoded):
+                continue
+            blocks = encoded[position]["content"]
+            if blocks:
+                blocks[-1] = {**blocks[-1], "cache_control": _EPHEMERAL}
 
     def _apply_sampling(self, payload: dict[str, Any], sampling: Sampling) -> None:
         """Add only the sampling fields the caller actually set."""
@@ -457,6 +513,7 @@ _ANTHROPIC_FEATURES = (
     | Feature.REASONING
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
+    | Feature.CACHE_PLACEMENT
 )
 
 
@@ -516,5 +573,10 @@ descriptor = ProviderDescriptor(
     ),
     reasoning_translator=_translate_reasoning,
     default_capabilities=ModelCapabilities(features=Sourced(_ANTHROPIC_FEATURES, "default")),
+    # Per-segment `cache_control` marks, up to four breakpoints, with a documented
+    # minimum cacheable prefix. Recorded in contracts/anthropic.md.
+    cache_mechanism="explicit",
+    cache_max_marks=4,
+    cache_min_tokens=1024,
 )
 """Descriptor for the Anthropic provider."""

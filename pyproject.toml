@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "anyinfer"
-version = "0.1.1"
+version = "0.1.0"
 description = "An application-owned hybrid inference runtime for Python, spanning hosted APIs and managed local models."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "Anthony Turner", email = "anthony@bitoblivion.com" }]
+authors = [{ name = "Anthony Turner", email = "github@anthturner.com" }]
 keywords = ["llm", "inference", "openai", "anthropic", "ollama", "llama.cpp", "routing"]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -70,6 +70,12 @@ dev = [
 anyinfer = "anyinfer.cli:main"
 anyinfer-demo = "demo_app:main"
 
+# The application-facing test kit. Registering here means `pip install anyinfer` is enough
+# to get the fixtures; the plugin module itself imports nothing from `anyinfer` until a
+# fixture is actually requested, so a suite that never uses them pays no import cost.
+[project.entry-points.pytest11]
+anyinfer = "anyinfer.testing.plugin"
+
 [project.urls]
 Homepage = "https://github.com/anthturner/AnyInfer"
 Documentation = "https://anyinfer.dev/"
@@ -124,8 +130,11 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "SIM117"]
 # The conformance matrix uses ✅/➖/❌ deliberately; they are the published symbols.
-# workspace.py renders the matrix page, so its template strings carry them too.
+# workspace.py renders the matrix page, so its template strings carry them too, as do the
+# certification command and the provider scaffold that quote the same matrix vocabulary.
 "src/anyinfer/testing/conformance.py" = ["RUF001", "RUF002"]
+"src/anyinfer/testing/certify.py" = ["RUF001", "RUF002"]
+"src/anyinfer/testing/scaffold.py" = ["RUF001", "RUF002"]
 "workspace.py" = ["RUF001", "RUF002"]
 # Raw SVG path data — splitting it across lines would fragment the "d" attribute string.
 "src/demo_app/widgets/icons.py" = ["E501"]

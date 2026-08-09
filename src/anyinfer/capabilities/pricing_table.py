@@ -1,8 +1,8 @@
-"""The bundled model-pricing table and its loaders (D27).
+"""The bundled model-pricing table and its loaders.
 
 A versioned data file (``pricing.json``, beside this module) records per-million-token
 prices for hosted models, each entry carrying a ``last_verified`` date and the source it
-was verified against — the same discipline as the ``contracts/`` protocol snapshots (D24):
+was verified against — the same discipline as the ``contracts/`` protocol snapshots:
 a date is never fabricated. The table feeds capability assembly as the ``catalog`` layer,
 so every existing trust rule applies unchanged: ``discovered`` pricing (OpenRouter) beats
 it, an application's ``override`` beats everything, and a model with no entry keeps

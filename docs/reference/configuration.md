@@ -171,6 +171,7 @@ ai.Client(
     use_default_catalog=True,   # False disables alias resolution entirely
     estimator=None,             # token counting; defaults to the byte heuristic
     context_gate=True,          # refuse requests that provably cannot fit pre-dispatch
+    history=None,               # conversation compaction when a request overflows
     pricing_table=None,         # defaults to the bundled table; see fetch_pricing()
     capability_overrides=None,  # "provider:model"-keyed corrections, strongest layer
     model_dir=None,             # where acquired model weights are stored
@@ -275,6 +276,69 @@ engine behind it, which is what lets one engine be configured more than once:
 Omitting `adapter` keeps the single-instance spelling exactly as before: the `id` is both
 the engine selector and the instance id. A duplicate `id` fails fast with a `ConfigError`.
 
+### The `context` block
+
+Advanced settings for [context reduction](../concepts/context-reduction.md), parsed into a
+`ContextTuning`. Every key is a field of that record, so a setting is spelled the same way
+in the file, on the command line, and in Python:
+
+```json
+{
+  "context": {
+    "selection_order": "density",
+    "diversity": 0.25,
+    "split_identifiers": true,
+    "query_expansion": true,
+    "near_duplicate_threshold": 0.9,
+    "compact_fallback": true,
+    "salience_weight": 0.5,
+    "carry_over_bonus": 0.5
+  }
+}
+```
+
+The block is optional, and every field defaults to the behaviour AnyInfer has always had —
+a file without it reduces exactly as before. The values above are what
+`ContextTuning.recommended()` sets, which `anyinfer context --preset recommended` applies
+without a file.
+
+Read it back with `config.context` and pass it straight through:
+
+```python
+config = ai.load_config("anyinfer.json")
+reduction = context.select(docs, query, max_tokens=8_000, tuning=config.context)
+```
+
+A misspelled setting is a `ConfigError`, not a silent no-op — a tuning key that quietly
+does nothing is worse than one that fails loudly. The sidecar reads the same file so one
+config serves every frontend, but it does not reduce context itself: it is a wire codec
+over a normal client, and reduction is the application's call about its own material.
+
+The full field list is on [`ContextTuning`](api/context.md#advanced-settings).
+
+### The `history` block
+
+Conversation compaction, applied by the client when a request outgrows its target's
+window. Because it is a client setting rather than a frontend one, this block makes the
+SDK, `anyinfer run`, and the sidecar behave identically:
+
+```json
+{
+  "history": {"mode": "last_resort", "keep_recent": 6, "keep_system": true}
+}
+```
+
+`last_resort` compacts only after the route's `context_window_targets` chain is exhausted,
+so a larger-window model is always preferred to losing history. `proactive` compacts to fit
+the resolved target before dispatch, which avoids a refused preflight but never reaches a
+larger-window target further down the route.
+
+Omitting the block means no compaction: an oversized request is rerouted or fails, exactly
+as before. Set `"enabled": false` to keep a tuned block switched off.
+
+Sidecar callers can override it per request with the `anyinfer_history` field — see
+[the sidecar](../serve/README.md).
+
 The sidecar can advertise instance-scoped targets from `/v1/models` by writing them in
 instance terms:
 
@@ -290,6 +354,8 @@ anyinfer serve --token SECRET --host 0.0.0.0 --allow-remote-exposure
 anyinfer run "PROMPT" --config anyinfer.json   # one prompt, then exit
 anyinfer doctor [--json]        # detected hardware, recommended tier
 anyinfer providers [--json]     # every registered provider and what it needs
+anyinfer context src/ --query "how does auth work?" --max-tokens 8000
+anyinfer context src/ --query "…" --max-tokens 8000 --plan   # cost every strategy
 ```
 
 `run` reads the same config file as `serve`, so one file drives both. See

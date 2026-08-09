@@ -1,4 +1,4 @@
-"""Model acquisition for engines that own their own store (D41)."""
+"""Model acquisition for engines that own their own store."""
 
 from __future__ import annotations
 

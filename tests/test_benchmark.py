@@ -1,4 +1,4 @@
-"""Throughput measurement and the caller-owned measurement store (D39)."""
+"""Throughput measurement and the caller-owned measurement store."""
 
 from __future__ import annotations
 

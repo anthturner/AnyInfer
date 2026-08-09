@@ -1,4 +1,4 @@
-"""Active capability probes: the third assembly layer, paid for in requests (D38)."""
+"""Active capability probes: the third assembly layer, paid for in requests."""
 
 from __future__ import annotations
 

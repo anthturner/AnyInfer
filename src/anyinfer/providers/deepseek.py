@@ -169,6 +169,9 @@ descriptor = ProviderDescriptor(
     ),
     reasoning_translator=_translate_reasoning,
     default_capabilities=ModelCapabilities(features=Sourced(_DEEPSEEK_FEATURES, "default")),
+    # Context caching happens on the provider's side against a stable prefix, and its hits
+    # and misses are billed separately. Recorded in contracts/deepseek.md.
+    cache_mechanism="implicit",
     ignored_parameters=("temperature", "top_p"),
 )
 """Descriptor for the DeepSeek provider.

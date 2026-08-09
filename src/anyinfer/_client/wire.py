@@ -32,6 +32,7 @@ def build_wire_request(
     capabilities: ModelCapabilities | None = None,
     stream: bool = True,
     session_state: Mapping[str, Any] | None = None,
+    cache_marks: tuple[int, ...] = (),
 ) -> WireRequest:
     """Resolve a generation request for one provider.
 
@@ -44,6 +45,8 @@ def build_wire_request(
         session_state: Continuation data from an open session covering this target, or
             ``None`` when no session applies. An empty mapping is meaningful — it is a
             session's first turn.
+        cache_marks: Segment indices the cache planner chose, passed through for the
+            adapter to spell. Empty when no cache policy is in force.
 
     Returns:
         A fully-resolved wire request.
@@ -83,6 +86,7 @@ def build_wire_request(
         schema_name=schema_name,
         tools=request.tools,
         tool_choice=request.tool_choice,
+        cache_marks=cache_marks,
         stream=stream,
         timeout_s=request.effective_timeout_s,
         max_response_bytes=request.max_response_bytes,

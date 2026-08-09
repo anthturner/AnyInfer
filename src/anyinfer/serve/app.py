@@ -5,7 +5,7 @@ A thin HTTP shell around `anyinfer.serve.openai_codec` and a normal
 or provider logic — all of that is the core's, reached through the same public API any SDK
 caller uses. If a feature seems to belong here, it belongs in the core instead.
 
-Security posture (D20):
+Security posture:
 
 - binds loopback by default; a non-loopback bind requires ``allow_remote_exposure=True``
   *and* a bearer token, because an unauthenticated LLM gateway on a LAN is a credential
@@ -81,7 +81,12 @@ def create_app(
         if not isinstance(body, Mapping):
             return _error(starlette, 400, "request body must be a JSON object")
 
-        target, generation_request, wants_stream = request_from_openai(body)
+        try:
+            target, generation_request, wants_stream = request_from_openai(body)
+        except ValueError as exc:
+            # A malformed AnyInfer extension field is the client's mistake, and telling it
+            # so beats silently applying the gateway's default instead of what it asked for.
+            return _error(starlette, 400, str(exc))
         if not target:
             return _error(starlette, 400, "the 'model' field is required")
 
@@ -172,6 +177,8 @@ async def _generate(client: Any, target: str, request: Any) -> Any:
         tools=request.tools,
         tool_choice=request.tool_choice,
         sampling=request.sampling,
+        history=request.history,
+        cache=request.cache,
         provider_options=request.provider_options,
         metadata=request.metadata,
     )
@@ -199,6 +206,8 @@ async def _stream_chunks(
         tools=request.tools,
         tool_choice=request.tool_choice,
         sampling=request.sampling,
+        history=request.history,
+        cache=request.cache,
         provider_options=request.provider_options,
         metadata=request.metadata,
     )

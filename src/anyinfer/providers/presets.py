@@ -88,6 +88,9 @@ class CompatPreset:
             would take a value, send it, and still fail to authenticate.
         requires_base_url: Whether a base URL must be supplied (self-hosted, per-account).
         base_url_hint: Help text describing the expected base URL shape.
+        base_url_example: The templated URL a UI shows in an empty base-URL editor.
+            Only needed when `base_url_hint` says more than the shape; otherwise the hint
+            is the example, since for a per-account endpoint the shape *is* the guidance.
         models_listing: Whether ``GET /models`` exists. Without it, discovery returns
             empty and the health probe reports optimistically rather than always-failing.
         auth_header: ``bearer`` (``Authorization: Bearer``) or ``x-api-key``.
@@ -112,6 +115,7 @@ class CompatPreset:
     accepts_api_key: bool = True
     requires_base_url: bool = False
     base_url_hint: str = ""
+    base_url_example: str = ""
     models_listing: bool = True
     auth_header: Literal["bearer", "x-api-key"] = "bearer"
     output_tokens_field: str = "max_tokens"
@@ -1167,7 +1171,11 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         locality="local",
         requires_api_key=False,
         requires_base_url=True,
-        base_url_hint="http://127.0.0.1:<port>/v1 — see `foundry service status`",
+        base_url_hint=(
+            "http://127.0.0.1:<port>/v1 — the port is assigned at service start, so "
+            "read it from `foundry service status`."
+        ),
+        base_url_example="http://127.0.0.1:<port>/v1",
         # Its listing lives at /openai/models and returns a bare array of names rather
         # than an OpenAI {"object": "list", "data": [...]} envelope, so pointing
         # discovery at /v1/models would 404 and parsing the real route would fail.
@@ -1235,7 +1243,11 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
             advanced=preset.base_url is not None and not preset.requires_base_url,
             default_value=preset.base_url or "",
             help_text=url_help,
-            placeholder=preset.base_url or "",
+            # A preset with no default endpoint still knows the *shape* of the one it
+            # wants, and that shape is the only useful thing an empty editor can say.
+            # Left to a generic fallback it would read "https://…", which tells a user
+            # nothing they did not already know about a field labelled Base URL.
+            placeholder=preset.base_url or preset.base_url_example or preset.base_url_hint,
         )
     )
     shorthand = None

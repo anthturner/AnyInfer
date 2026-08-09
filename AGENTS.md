@@ -10,8 +10,8 @@ hosted providers, routing hubs, existing local services, and a supervised `llama
 process; it also owns structured-output enforcement, context budgeting and reduction,
 routing, telemetry, and capability provenance. Provider breadth is compatibility inventory,
 not the product definition. A preset registry (`providers/presets.py`) covers eighty-six
-OpenAI-compatible services and engines through one adapter. AnyInfer replaces the bespoke
-provider layers of three sibling projects: `../Frisket`, `../ModelFit`, `../mote-cli`.
+OpenAI-compatible services and engines through one adapter. It is intended to replace the
+bespoke provider layer an application would otherwise hand-roll.
 
 Adding a provider: if it needs real protocol translation, write a dedicated adapter with a
 `contracts/<id>.md` snapshot. If it only differs by endpoint, auth spelling, and quirks, add
@@ -19,10 +19,9 @@ a `CompatPreset` entry instead — and record its verification in
 `contracts/openai-compat-presets.md`.
 
 **Current status: implemented, pre-1.0.** [DESIGN.md](DESIGN.md) is the authoritative
-architecture document; [NOTES.md](NOTES.md) is the running record of decisions (D1–D32),
-assumptions, open questions, and risks. Read both before proposing or writing code. Do not
-contradict a numbered decision or an ADR without flagging it explicitly as a proposed
-reversal.
+architecture document — it carries the goals and non-goals, the ADRs, the open questions,
+and the risk register. Read it before proposing or writing code. Do not contradict an ADR
+or a stated non-goal without flagging it explicitly as a proposed reversal.
 
 **Branch model:** `feature/*` → `develop` → `main`, both protected branches gated on the
 aggregate `ci-ok` check. Merges to `main` rebuild release packages; a version bump cuts a
@@ -44,7 +43,7 @@ Keep these product surfaces distinct:
 |---|---|---|
 | Core SDK / inference engine | `src/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
 | Demo application | `src/demo_app/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
-| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `run`, `verify`, `doctor`, and `providers`. It delegates inference and config semantics to public core APIs. |
+| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `run`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, and `context`. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`. |
 | OpenAI-compatible sidecar | `src/anyinfer/serve/`, sidecar tests | Owns only the OpenAI wire codec and ASGI lifecycle. It stays a projection over `AsyncClient`; no provider, routing, validation, or config policy belongs here. |
 | Shared configuration | `src/anyinfer/config/`, configuration docs and tests | One versioned format feeds Python SDK callers, the CLI, the sidecar, and compatible demo settings. Frontends may add flags, but they must not fork file semantics. |
 
@@ -103,8 +102,8 @@ changes require the generated reference and runnable examples.
 - **No ADR mentions in user-facing text.** `ADR-NNN` numbers are internal shorthand: they
   must not appear anywhere under `docs/`, in the root `README.md`, or in any public
   docstring (mkdocstrings renders those onto the published site). State the rule in plain
-  words instead. ADR citations belong only in DESIGN.md, NOTES.md, AGENTS.md, and internal
-  code comments that never render.
+  words instead. ADR citations belong only in DESIGN.md, AGENTS.md, and internal code
+  comments that never render.
 
 ## Provider contract snapshots and drift checking
 

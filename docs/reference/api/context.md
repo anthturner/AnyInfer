@@ -19,11 +19,29 @@ from anyinfer import context
 
 ::: anyinfer.context.Reduction
 
+::: anyinfer.context.ReductionState
+
 ::: anyinfer.context.Strategy
 
 ::: anyinfer.context.RenderOrder
 
 ::: anyinfer.context.RankCache
+
+</div>
+
+## Advanced settings
+
+One record carries every algorithmic choice. The same field names are the `context` block
+of the [configuration file](../configuration.md) and the `--context-*` flags of
+[`anyinfer context`](../../guides/cli.md).
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.context.ContextTuning
+
+::: anyinfer.context.SelectionOrder
+
+::: anyinfer.context.SELECTION_ORDERS
 
 </div>
 
@@ -43,6 +61,48 @@ from anyinfer import context
 
 </div>
 
+## Planning
+
+Cost every strategy before committing to one. Spends no inference and performs no I/O.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.context.plan
+
+::: anyinfer.context.ReductionPlan
+
+::: anyinfer.context.StrategyOutlook
+
+</div>
+
+## Duplicate collapse
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.context.find_duplicates
+
+::: anyinfer.context.DuplicateMap
+
+</div>
+
+## History compaction
+
+Reduce a conversation rather than a corpus, without breaking tool-call pairing. Call it
+yourself, or hand `anyinfer.HistoryPolicy` to a client and let every frontend built on that
+client apply the same rules on the request path.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.context.compact_history
+
+::: anyinfer.context.HistoryCompaction
+
+::: anyinfer.context.DEFAULT_KEEP_RECENT
+
+::: anyinfer.HistoryPolicy
+
+</div>
+
 ## Ranking
 
 Public so it can be replaced: the shipped ranker is lexical, and an application needing
@@ -56,6 +116,10 @@ semantic retrieval ranks its own documents and passes the result through.
 
 ::: anyinfer.context.tokenize
 
+::: anyinfer.context.expand_query
+
+::: anyinfer.context.salience
+
 </div>
 
 ## Structure and tiers
@@ -66,11 +130,27 @@ semantic retrieval ranks its own documents and passes the result through.
 
 ::: anyinfer.context.structural_extract
 
+::: anyinfer.context.imported_names
+
 ::: anyinfer.context.is_generated_path
 
 ::: anyinfer.context.module_surfaces
 
 ::: anyinfer.context.DEFAULT_ROLLUP_SHARE
+
+</div>
+
+## Compaction
+
+The fidelity between a structural extract and a whole file.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.context.compact_source
+
+::: anyinfer.context.CompactSource
+
+::: anyinfer.context.supports_compaction
 
 </div>
 
@@ -117,5 +197,11 @@ stored transcripts.
 ::: anyinfer.context.render_extract_block
 
 ::: anyinfer.context.render_chunk_block
+
+::: anyinfer.context.render_compact_block
+
+::: anyinfer.context.render_duplicate_block
+
+::: anyinfer.context.ENVELOPE_FORMAT
 
 </div>

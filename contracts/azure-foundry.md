@@ -16,7 +16,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ### Auth
 - Entra: `Authorization: Bearer <token>` via `azure-identity`
   (`DefaultAzureCredential`; interactive-broker variant supported); Foundry token scope as
-  recorded in Frisket `entra.py::FOUNDRY_SCOPE`; static `api-key` header supported as
+  recorded in `credentials/entra.py`; static `api-key` header supported as
   alternative
 ### Version pins
 - `api-version` per deployment (configured, not hardcoded); recorded per-app

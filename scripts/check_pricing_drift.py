@@ -1,4 +1,4 @@
-"""Deterministic pricing drift check against OpenRouter's public model listing (D27).
+"""Deterministic pricing drift check against OpenRouter's public model listing.
 
 The cheap, machine-readable half of the weekly pricing refresh: every bundled entry that
 declares an ``openrouter_id`` is compared against OpenRouter's current per-token rates.

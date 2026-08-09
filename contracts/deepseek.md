@@ -45,6 +45,13 @@ Last verified: 2026-08-07 — against the live DeepSeek API documentation (sourc
 - `frequency_penalty` and `presence_penalty` are documented as deprecated no-ops;
   AnyInfer does not model them, so no drop event is needed.
 
+### Prompt caching (placement)
+- Mechanism: **implicit**. Context caching happens on the provider's side against a stable
+  prefix; nothing is sent to request it. Declared as `cache_mechanism="implicit"`.
+- Hits and misses are billed separately and reported separately (see Response fields), which
+  is why this adapter's split cache accounting exists. **VERIFY on the next drift run**:
+  whether the hit/miss token fields remain a partition of the prompt total.
+
 ### Response fields read
 - openai-compat shapes, plus **`reasoning_content`** beside `content`
   (`delta.reasoning_content` when streaming) → `ReasoningDelta`, excluded from the

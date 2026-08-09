@@ -22,6 +22,7 @@ __all__ = [
     "PAYLOAD_FIELDS",
     "AttemptCompleted",
     "AttemptStarted",
+    "CachePlanned",
     "ContextReduced",
     "DownloadProgress",
     "FallbackTriggered",
@@ -287,19 +288,22 @@ class UsageEstimated:
 
 @dataclass(frozen=True, slots=True)
 class ContextReduced:
-    """A context corpus was reduced to fit a budget.
+    """Context was reduced to fit a budget.
 
-    Reduction emulates a larger context window, and emulation is observable rather than
-    silent. Content-free by construction: counts and ceilings only, never paths or
-    document text — a path name can itself be sensitive.
+    Emitted for a reduced document corpus and for a compacted message history alike —
+    both emulate a larger context window, and emulation is observable rather than silent.
+    Content-free by construction: counts and ceilings only, never paths, document text, or
+    message text — a path name can itself be sensitive.
 
     Attributes:
-        strategy: The strategy requested (``auto`` stays ``auto``).
+        strategy: The strategy requested (``auto`` stays ``auto``), or ``history`` for a
+            compacted conversation.
         representation: The strategy actually applied.
-        candidate_count: Documents offered to the reducer.
-        selected_count: Documents represented at detail fidelity.
-        omitted_count: Documents not represented in detail.
-        estimated_tokens: Planning-side estimate of the rendered envelope.
+        candidate_count: Documents — or messages — offered to the reducer.
+        selected_count: Documents represented at detail fidelity, or messages kept.
+        omitted_count: Documents not represented in detail, or messages dropped.
+        estimated_tokens: Planning-side estimate of the rendered envelope, or of the
+            compacted conversation.
         max_tokens: The budget the reduction was held to.
         binding_constraints: Which ceilings excluded at least one document.
         calls: Generation calls spent; non-zero only for ``distill``.
@@ -314,6 +318,33 @@ class ContextReduced:
     max_tokens: int
     binding_constraints: tuple[str, ...] = ()
     calls: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class CachePlanned:
+    """The core decided how to engage a target's prompt cache.
+
+    Emitted only when a policy was in force *and* the target offered a mechanism. A policy
+    that found nothing to use reports a `ParameterDropped` instead, because the interesting
+    fact there is the degradation, not the plan.
+
+    Content-free: counts and mechanism only. What was marked is a position, never text.
+
+    Attributes:
+        request_id: Correlation id shared by every event this request emits.
+        target: The resolved target the plan applies to.
+        mechanism: ``explicit`` for per-segment marks, ``implicit`` for prefix stability.
+        mark_count: How many marks were placed; always zero for ``implicit``.
+        estimated_cacheable_tokens: Planning-side size of what the plan tries to cache.
+            An intention, not a saving — realized savings come only from the provider's own
+            reported usage.
+    """
+
+    request_id: str
+    target: ResolvedTarget
+    mechanism: str
+    mark_count: int
+    estimated_cacheable_tokens: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,7 +401,7 @@ TelemetryEvent = (
     RequestStarted | TargetResolved | AttemptStarted | FirstToken | AttemptCompleted
     | RetryScheduled | FallbackTriggered | RepairAttempted | RequestCompleted | RequestFailed
     | ParameterDropped | UsageEstimated | ServerLifecycle | DownloadProgress
-    | ContextReduced | ProviderDiagnostic
+    | ContextReduced | ProviderDiagnostic | CachePlanned
 )
 """Any event an observer may receive."""
 

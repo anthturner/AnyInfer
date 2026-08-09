@@ -69,6 +69,10 @@ result validation inside one testable boundary:
 - **Portability is verified behavior, not a provider count.** Contract snapshots and a
   shared conformance suite document what each adapter actually supports and surface dropped
   parameters or degraded mechanisms instead of hiding them.
+- **Your integration is testable.** A scripted provider and pytest fixtures ship with the
+  library, so your fallback chain, repair budget, and reduction settings have offline tests
+  that run in CI with no credentials — including the failures you cannot provoke on demand:
+  rate limits, truncated streams, malformed structured answers, refusals, timeouts.
 - **Slim by construction.** Mandatory dependencies are `httpx2` and `jsonschema`. Everything
   else is an extra.
 
@@ -208,9 +212,7 @@ move before 1.0. Releases are published to
 [release strategy](https://anyinfer.dev/contributing/releasing/) has the
 details. The architecture is settled and documented:
 
-- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture and decision rationale
-- [IMPLEMENTATION.md](https://github.com/anthturner/AnyInfer/blob/main/IMPLEMENTATION.md) — normative types, algorithms, and the build plan
-- [NOTES.md](https://github.com/anthturner/AnyInfer/blob/main/NOTES.md) — decision record, assumptions, open questions, risks
+- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture, module responsibilities, decision rationale, open questions, and risks
 - [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) — canonical repository automation instructions
 
 ## License

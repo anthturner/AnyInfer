@@ -211,6 +211,76 @@ answered  ollama:qwen3:0.6b
 `--json` emits the same information for scripts, including anything the provider reported
 about [its own runtime](../concepts/capabilities.md#runtime-diagnostics).
 
+## Fitting a directory into a prompt
+
+`anyinfer context` collects files, reduces them to a budget, and prints the envelope. The
+collection happens here, in the CLI — walking a filesystem and deciding what is safe to
+send is an application's job, and the library only reduces what it is handed.
+
+```bash
+anyinfer context src/ --query "how does credential resolution work?" --max-tokens 8000
+```
+
+The envelope goes to stdout so it can be piped; the account of what was dropped goes to
+stderr so piping it does not silently discard that:
+
+```text
+tiered: 46 of 340 document(s); ~7900 of 8000 tokens; 12 collapsed; 282 omitted; limited by tokens
+```
+
+Vendored, generated, binary, and oversized files are skipped; pass `--include-generated` to
+offer them anyway, and `--pin PATH` to force a file in ahead of the ranked candidates.
+
+Give the budget with `--max-tokens`, or with `--target` to take it from that model's
+context window. An unknown window is refused rather than guessed:
+
+```text
+the context window of 'openai-compat:mystery' is unknown, so there is no budget to reduce
+against; pass --max-tokens to choose one yourself
+```
+
+### Choosing a strategy from measurements
+
+`--plan` runs every deterministic strategy and reports what each *would* produce. It spends
+no inference:
+
+```bash
+anyinfer context src/ --query "…" --max-tokens 3000 --plan
+```
+
+```text
+corpus            13 document(s)
+budget            3000 tokens
+
+strategy          kept  omitted   tokens  complete  limited by
+ whole>ranked        2       11     2192        no  tokens
+ ranked              2       11     2192        no  tokens
+*tiered              6        7     2893        no  tokens
+ packed              4        9     2884        no  tokens
+
+distill           141 chunk(s), 142+ generation call(s); the only strategy that spends money
+```
+
+`*` marks the recommendation. `whole>ranked` means the strategy could not do what was asked
+and reports what it did instead — the same way `auto` does.
+
+### Tuning
+
+Every [advanced setting](../concepts/context-reduction.md#advanced-settings-in-one-place)
+has a flag, and they read the `context` block of `--config` as their baseline:
+
+```bash
+anyinfer context src/ --query "…" --max-tokens 8000 --preset recommended
+anyinfer context src/ --query "…" --max-tokens 8000 \
+  --context-selection-order density --context-diversity 0.3 --context-query-expansion
+```
+
+Precedence is config file, then `--preset`, then individual flags. Boolean settings take a
+`--no-` form, so `--no-context-collapse-duplicates` turns one off that the file or preset
+turned on.
+
+`--json` prints the machine-readable record instead of the envelope, for both modes.
+
 ## Exit codes
 
 | Code | Meaning |

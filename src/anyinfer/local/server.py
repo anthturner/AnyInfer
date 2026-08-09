@@ -57,7 +57,7 @@ __all__ = [
 ]
 
 LOOPBACK_HOST = "127.0.0.1"
-"""Local servers bind loopback only, unless the caller explicitly opts out (D20)."""
+"""Local servers bind loopback only, unless the caller explicitly opts out."""
 
 _LOOPBACK_NAMES = frozenset({"localhost", "::1", "[::1]", "0:0:0:0:0:0:0:1"})
 

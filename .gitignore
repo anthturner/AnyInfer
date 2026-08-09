@@ -28,3 +28,7 @@ venv/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Local working notes and drafts
+plans/
+.claude/worktrees/

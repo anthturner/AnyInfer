@@ -24,7 +24,9 @@ from typing import Any
 from ..types.events import StreamEvent, TextDelta, ToolCallDelta
 from ..types.messages import Message, Text, ToolCall, ToolResult
 from ..types.requests import (
+    CachePolicy,
     GenerationRequest,
+    HistoryPolicy,
     Sampling,
     SchemaSpec,
     ToolSpec,
@@ -32,6 +34,8 @@ from ..types.requests import (
 from ..types.results import FinishReason, Generation, Usage
 
 __all__ = [
+    "CACHE_FIELD",
+    "HISTORY_FIELD",
     "OPENAI_FINISH_REASONS",
     "chunk_from_event",
     "completion_from_generation",
@@ -51,11 +55,30 @@ OPENAI_FINISH_REASONS: Mapping[FinishReason, str] = {
 }
 """AnyInfer finish reasons rendered back into OpenAI's closed set."""
 
+HISTORY_FIELD = "anyinfer_history"
+"""Request-body extension carrying a per-request conversation-compaction policy.
+
+The request surface is a documented *superset* of OpenAI chat completions, and this is
+what that superset is for: a caller with a different tolerance for losing history says so
+per request, instead of every deployment needing its own gateway. The field decodes into
+`GenerationRequest.history` — the codec chooses nothing and applies nothing; the client
+it fronts owns the behaviour, exactly as it does for the Python API.
+"""
+
+CACHE_FIELD = "anyinfer_cache"
+"""Request-body extension carrying a per-request prompt-cache policy.
+
+The same superset argument as `HISTORY_FIELD`, for a decision with a cost attached: a
+caller who does not want their prompt held on the provider's side, or who wants it held
+when the gateway does not ask for that by default, says so per request. Decodes into
+`GenerationRequest.cache`.
+"""
+
 _RESERVED_FIELDS = frozenset(
     {
         "model", "messages", "stream", "stream_options", "temperature", "top_p",
         "max_tokens", "max_completion_tokens", "stop", "tools", "tool_choice",
-        "response_format", "metadata", "n", "user",
+        "response_format", "metadata", "n", "user", HISTORY_FIELD, CACHE_FIELD,
     }
 )
 
@@ -168,10 +191,87 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
         tools=tools,
         tool_choice=_decode_tool_choice(body.get("tool_choice")),
         sampling=sampling,
+        history=_decode_history(body.get(HISTORY_FIELD)),
+        cache=_decode_cache(body.get(CACHE_FIELD)),
         provider_options=_decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
     )
     return target, request, bool(body.get("stream"))
+
+
+def _decode_cache(raw: Any) -> CachePolicy | None:
+    """Decode the ``anyinfer_cache`` extension into a typed policy.
+
+    Absent means "whatever the gateway was configured with", which is normally nothing.
+    ``false`` means "not for this request" — a caller who does not want their prompt held
+    on the provider's side can say so without the deployment changing.
+
+    Raises:
+        ValueError: On a malformed policy, so a client learns its request was wrong instead
+            of silently getting the gateway's default.
+    """
+    if raw is None:
+        return None
+    if raw is False:
+        return CachePolicy(mode="off")
+    if raw is True:
+        return CachePolicy()
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{CACHE_FIELD} must be an object, true, or false")
+
+    known = {"mode", "min_segment_tokens", "max_marks", "include_tools", "include_system"}
+    unknown = set(raw) - known
+    if unknown:
+        raise ValueError(f"{CACHE_FIELD} has unknown key(s): {', '.join(sorted(unknown))}")
+
+    try:
+        return CachePolicy(**dict(raw))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{CACHE_FIELD} is invalid: {exc}") from exc
+
+
+def _decode_history(raw: Any) -> HistoryPolicy | None:
+    """Decode the ``anyinfer_history`` extension into a typed policy.
+
+    Absent means "whatever the gateway was configured with". ``false`` means "not for this
+    request" — a caller who would rather see the overflow error than a quietly shortened
+    conversation can say so without the deployment changing.
+
+    Raises:
+        ValueError: On a malformed policy, so a client learns its request was wrong
+            instead of silently getting the gateway's default.
+    """
+    if raw is None:
+        return None
+    if raw is False:
+        return HistoryPolicy(enabled=False)
+    if raw is True:
+        return HistoryPolicy()
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{HISTORY_FIELD} must be an object, true, or false")
+
+    unknown = set(raw) - {"enabled", "mode", "keep_recent", "keep_system"}
+    if unknown:
+        raise ValueError(
+            f"{HISTORY_FIELD} has unknown key(s): {', '.join(sorted(unknown))}"
+        )
+    fields: dict[str, Any] = {}
+    for key in ("enabled", "keep_system"):
+        if key in raw:
+            if not isinstance(raw[key], bool):
+                raise ValueError(f"{HISTORY_FIELD}.{key} must be true or false")
+            fields[key] = raw[key]
+    if "keep_recent" in raw:
+        value = raw["keep_recent"]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{HISTORY_FIELD}.keep_recent must be an integer")
+        fields["keep_recent"] = value
+    if "mode" in raw:
+        fields["mode"] = str(raw["mode"])
+    try:
+        return HistoryPolicy(**fields)
+    except ValueError as exc:
+        raise ValueError(f"{HISTORY_FIELD}: {exc}") from exc
 
 
 def _decode_stop(raw: Any) -> tuple[str, ...]:
@@ -317,6 +417,14 @@ def request_to_openai(
             if request.tool_choice in ("auto", "none", "required")
             else {"type": "function", "function": {"name": request.tool_choice}}
         )
+
+    if request.history is not None:
+        body[HISTORY_FIELD] = {
+            "enabled": request.history.enabled,
+            "mode": request.history.mode,
+            "keep_recent": request.history.keep_recent,
+            "keep_system": request.history.keep_system,
+        }
 
     if request.schema is not None:
         body["response_format"] = {

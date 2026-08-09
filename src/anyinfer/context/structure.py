@@ -22,6 +22,7 @@ __all__ = [
     "SMALL_FILE_VERBATIM_BYTES",
     "TRUNCATION_MARKER",
     "detect_language",
+    "imported_names",
     "is_generated_path",
     "structural_extract",
 ]
@@ -184,6 +185,80 @@ def is_generated_path(path: str) -> bool:
     if any(name.endswith(suffix) for suffix in _GENERATED_SUFFIXES):
         return True
     return any(name.startswith(prefix) for prefix in _GENERATED_PREFIXES)
+
+
+_IMPORT_LINE = re.compile(
+    r"^\s*(?:#include|from|import|export\s+\*\s+from|require|use|using|package)\b(?P<rest>.*)$"
+)
+"""Lines that name another unit of the corpus, across the languages the table covers.
+
+Deliberately one pattern rather than a per-language table: an import line is the most
+uniform construct in programming languages, and the consumers of this — corpus centrality
+— degrade gracefully when a line is missed. A parser per language would be a poor trade.
+"""
+
+_QUOTED = re.compile(r"""["'<]([^"'<>]+)[\"'>]""")
+_SEGMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+_IMPORT_NOISE = frozenset(
+    {
+        "as",
+        "const",
+        "crate",
+        "default",
+        "extern",
+        "from",
+        "func",
+        "import",
+        "include",
+        "let",
+        "mod",
+        "package",
+        "pub",
+        "require",
+        "self",
+        "static",
+        "super",
+        "type",
+        "use",
+        "using",
+        "var",
+    }
+)
+"""Words that appear on import lines without naming anything importable."""
+
+
+def imported_names(content: str, *, language: str | None = None) -> tuple[str, ...]:
+    """Names a document imports, as bare identifiers.
+
+    The corpus's own dependency graph is derivable from this: a name here that matches
+    another document's filename stem is an edge. Used for query-independent centrality
+    ranking, where "which files does everything else depend on?" is the whole question.
+
+    Args:
+        content: The document text.
+        language: Accepted for symmetry with the rest of this module and to allow future
+            per-language refinement; the current extraction is language-agnostic.
+
+    Returns:
+        Distinct identifiers, in first-appearance order. Path separators, dots, and
+        ``::`` are all split, so ``from ..context.rank import score`` yields
+        ``context``, ``rank``, and ``score``.
+    """
+    del language  # Uniform across the covered languages; see the pattern's docstring.
+    seen: dict[str, None] = {}
+    for line in content.splitlines():
+        match = _IMPORT_LINE.match(line)
+        if match is None:
+            continue
+        rest = match.group("rest")
+        pieces = _QUOTED.findall(rest) or [rest]
+        for piece in pieces:
+            for segment in _SEGMENT.findall(piece):
+                lowered = segment.lower()
+                if lowered not in _IMPORT_NOISE and len(lowered) > 1:
+                    seen.setdefault(lowered, None)
+    return tuple(seen)
 
 
 def structural_extract(content: str, *, language: str | None) -> str:

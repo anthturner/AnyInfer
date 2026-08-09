@@ -485,7 +485,7 @@ def test_fitting_context_guide_shape() -> None:
         result = client.generate(messages, target="openai-compat:fake-model-small")
 
     assert result.text == "An answer."
-    assert "<context>" in reduction.text
+    assert reduction.text.startswith("<context format=")
     assert reduction.summary()
     assert isinstance(reduction.metadata(), dict)
 
@@ -627,3 +627,145 @@ def test_local_models_locate_returns_none_before_acquisition(tmp_path) -> None:
     """docs/concepts/models.md — locate() is a lookup, not a download."""
     with ai.Client(model_dir=tmp_path) as client:
         assert client.locate_model("qwen2.5-7b-instruct") is None
+
+
+def test_fitting_context_guide_planning_and_tuning() -> None:
+    """docs/guides/fitting-context.md — plan, the recommended preset, carry-over."""
+    from anyinfer import context
+
+    documents = [
+        context.ContextDocument.of(
+            f"src/mod{i}/file.py", f"def resolve_{i}(ref):\n    return ref\n" * 20
+        )
+        for i in range(6)
+    ]
+    query = "how does credential resolution work?"
+    max_tokens = 1_200
+
+    outcome = context.plan(documents, query, max_tokens=max_tokens)
+    for option in outcome.options:
+        assert isinstance(option.selected_count, int)
+        assert isinstance(option.complete, bool)
+
+    best = outcome.best()
+    reduction = context.select(
+        documents, query, max_tokens=max_tokens, strategy=best.strategy if best else "auto"
+    )
+    assert reduction.estimated_tokens <= max_tokens
+
+    recommended = context.select(
+        documents, query, max_tokens=max_tokens, tuning=context.ContextTuning.recommended()
+    )
+    assert recommended.estimated_tokens <= max_tokens
+
+    tuning = context.ContextTuning(carry_over_bonus=0.5)
+    first = context.select(documents, query, max_tokens=max_tokens, tuning=tuning)
+    second = context.select(
+        documents, query, max_tokens=max_tokens, tuning=tuning, previous=first.state()
+    )
+    assert second.carried_over == len(first.documents)
+
+
+def test_fitting_context_guide_history_compaction() -> None:
+    """docs/guides/fitting-context.md — compact the conversation, then send it."""
+    from anyinfer import context
+
+    server = FakeOpenAIServer(FakeResponse(text="An answer."))
+    messages = [ai.system("Be brief.")]
+    for index in range(10):
+        messages.append(ai.user(f"Question {index}. {'x' * 2_000}"))
+        messages.append(ai.assistant(f"Answer {index}. {'y' * 2_000}"))
+    messages.append(ai.user("And finally?"))
+
+    with make_sync_client(server) as client:
+        compaction = context.compact_history(messages, max_tokens=4_000, keep_recent=2)
+        assert compaction.fits
+        result = client.generate(
+            list(compaction.messages), target="openai-compat:fake-model-small"
+        )
+
+    assert result.text == "An answer."
+    assert compaction.summary()
+    assert compaction.messages[0].role == "system"
+
+
+def test_context_reduction_client_policy_shape() -> None:
+    """docs/concepts/context-reduction.md — hand the policy to the client."""
+    server = FakeOpenAIServer(FakeResponse(text="An answer."))
+    messages = [ai.system("Be brief.")]
+    for index in range(5):
+        messages.append(ai.user(f"Q{index}. " + "x" * 10_000))
+        messages.append(ai.assistant(f"A{index}. " + "y" * 10_000))
+    messages.append(ai.user("And finally?"))
+
+    overrides = {
+        "openai-compat:fake-model-small": ai.ModelCapabilities(
+            context_window=ai.Sourced(8_192, "catalog")
+        )
+    }
+    with make_sync_client(
+        server,
+        capability_overrides=overrides,
+        history=ai.HistoryPolicy(mode="proactive", keep_recent=1),
+    ) as client:
+        result = client.generate(messages, target="openai-compat:fake-model-small")
+
+    assert result.text == "An answer."
+
+
+# ---- testing your application --------------------------------------------------------
+
+
+def test_docs_testing_guide_scripted_provider() -> None:
+    """docs/guides/testing-your-app.md — declare a provider, get a real client."""
+    from anyinfer.registry import ProviderRegistry
+    from anyinfer.testing import ScriptedModel, ScriptedProvider
+
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    provider = ScriptedProvider("acme", [ScriptedModel("small", text="A one-sentence summary.")])
+    provider.register(registry)
+
+    client = ai.Client(
+        [provider.settings()], registry=registry, use_default_catalog=False
+    )
+    with client:
+        result = client.generate("Summarize this", target=provider.target("small"))
+    assert result.text == "A one-sentence summary."
+
+
+def test_docs_testing_guide_fallback_and_repair() -> None:
+    """docs/guides/testing-your-app.md — scripted failures drive retry and repair."""
+    from anyinfer.registry import ProviderRegistry
+    from anyinfer.testing import ScriptedFailure, ScriptedModel, ScriptedProvider
+
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    provider = ScriptedProvider(
+        "acme",
+        [
+            ScriptedModel("flaky", failures=(ScriptedFailure(status=503, retry_after_s=0.0),)),
+            ScriptedModel(
+                "structured",
+                structured={"answer": "valid on the second try"},
+                failures=(ScriptedFailure(kind="malformed-json"),),
+            ),
+        ],
+    )
+    provider.register(registry)
+
+    client = ai.Client([provider.settings()], registry=registry, use_default_catalog=False)
+    with client:
+        retried = client.generate("hi", target=provider.target("flaky"))
+        repaired = client.generate(
+            "extract",
+            target=provider.target("structured"),
+            schema={
+                "type": "object",
+                "properties": {"answer": {"type": "string"}},
+                "required": ["answer"],
+            },
+            repair=ai.Repair(max_attempts=1),
+        )
+
+    assert [attempt.outcome for attempt in retried.attempts] == ["retried", "ok"]
+    assert repaired.structured == {"answer": "valid on the second try"}
+    assert repaired.repair_attempts == 1

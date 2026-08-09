@@ -104,9 +104,13 @@ class RankCache:
         document_frequency: How many documents contain each term.
         document_lengths: Total token count per document, for length normalization.
         total_documents: Corpus size, for the inverse-document-frequency term.
+        split_identifiers: Which tokenization produced these counts. Ranking checks it
+            and rebuilds rather than scoring a query tokenized one way against statistics
+            gathered the other — a mismatch there produces plausible, wrong ordering.
     """
 
     term_counts: dict[str, Counter[str]] = field(default_factory=dict)
     document_frequency: Counter[str] = field(default_factory=Counter)
     document_lengths: dict[str, int] = field(default_factory=dict)
     total_documents: int = 0
+    split_identifiers: bool = False

@@ -1,4 +1,4 @@
-"""The pricing table, estimated cost, and override provenance (D27)."""
+"""The pricing table, estimated cost, and override provenance."""
 
 from __future__ import annotations
 

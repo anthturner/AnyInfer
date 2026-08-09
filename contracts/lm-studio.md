@@ -54,6 +54,19 @@ are *loaded*.
 
 All of these arrive with `discovered` provenance.
 
+### Streaming
+- Inherited unchanged from the openai-compat dialect: SSE `data:` frames carrying
+  `chat.completion.chunk` objects, terminated by `data: [DONE]`, with usage arriving in a
+  trailing choice-less chunk when requested. `LMStudioAdapter` subclasses
+  `OpenAICompatAdapter` and overrides discovery and health only, so
+  [openai-compat.md](openai-compat.md) is authoritative for the generation stream.
+
+### Errors
+- Inherited unchanged from the openai-compat dialect: non-2xx bodies shaped
+  `{"error": {"message", "type"}}`, `retry-after` honored on 429, `>= 500` retryable. The
+  one local-engine difference is a connection refusal when LM Studio's server is not
+  running, which maps to the ordinary transport error.
+
 ### Health
 Probes the model listing, then reports **which models are resident** — the difference
 between a fast request and a cold load on a local engine.

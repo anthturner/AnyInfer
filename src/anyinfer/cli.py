@@ -12,7 +12,7 @@ from typing import Any
 
 from . import __version__
 from .config import AnyInferConfig, load_config
-from .errors import AnyInferError
+from .errors import AnyInferError, ConfigError
 
 __all__ = ["build_parser", "main"]
 
@@ -170,6 +170,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="report what the request would cost and whether it fits, without sending it",
     )
     run.add_argument(
+        "--cache",
+        choices=("off", "auto", "explicit"),
+        help=(
+            "engage the target's prompt cache; off unless asked for, because caching "
+            "changes what a provider bills"
+        ),
+    )
+    run.add_argument(
         "--stats",
         action="store_true",
         help="print timing, token, and cost figures to stderr when finished",
@@ -209,6 +217,102 @@ def build_parser() -> argparse.ArgumentParser:
         "--store", type=Path, help="record the measurement in this JSON file"
     )
     bench.add_argument("--json", action="store_true", help="emit machine-readable output")
+
+    context = subcommands.add_parser(
+        "context",
+        help="reduce a set of files to fit a token budget",
+        description=(
+            "Collect the given files, reduce them to fit a budget, and print the "
+            "envelope. Collection happens here, in the frontend, because deciding what "
+            "is safe to send is an application's job — the library only reduces what it "
+            "is handed. Use --plan to see what every strategy would produce before "
+            "committing to one."
+        ),
+    )
+    context.add_argument("paths", nargs="+", type=Path, help="files or directories to offer")
+    context.add_argument(
+        "--query", default="", help="what the request is about; drives relevance ranking"
+    )
+    context.add_argument("--config", type=Path, help="JSON config file (supplies 'context')")
+    context.add_argument(
+        "--target", help="derive the budget from this target's context window"
+    )
+    context.add_argument("--max-tokens", type=int, help="token budget; overrides --target")
+    context.add_argument(
+        "--strategy",
+        default="auto",
+        choices=_context_strategies(),
+        help="reduction strategy (default: auto)",
+    )
+    context.add_argument("--max-documents", type=int, default=None, help="document ceiling")
+    context.add_argument("--max-bytes", type=int, default=None, help="envelope byte ceiling")
+    context.add_argument(
+        "--pin",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="always include this path, ahead of ranked candidates (repeatable)",
+    )
+    context.add_argument(
+        "--include-generated",
+        action="store_true",
+        help="offer vendored and generated files, which are skipped by default",
+    )
+    context.add_argument(
+        "--plan",
+        action="store_true",
+        help="cost every strategy instead of rendering one; spends no inference",
+    )
+    context.add_argument(
+        "--json", action="store_true", dest="as_json", help="print the record as JSON"
+    )
+    context.add_argument(
+        "--preset",
+        choices=("default", "recommended"),
+        default=None,
+        help="start from a named settings preset before applying --context-* flags",
+    )
+    _add_tuning_flags(context)
+
+    conform = subcommands.add_parser(
+        "conform",
+        help="run the conformance suite against an adapter and report what it supports",
+    )
+    conform.add_argument("provider", help="registered provider id of the adapter under test")
+    conform.add_argument("--model", help="model id to send during the run")
+    conform.add_argument(
+        "--scaffold",
+        type=Path,
+        metavar="DIR",
+        help="write a working provider package skeleton into DIR instead of running",
+    )
+    conform.add_argument(
+        "--force", action="store_true", help="overwrite existing files when scaffolding"
+    )
+    conform.add_argument(
+        "--config", type=Path, help="JSON config file describing providers and routes"
+    )
+    conform.add_argument(
+        "--project",
+        type=Path,
+        help=(
+            "directory holding the adapter's pyproject.toml, read for its "
+            "[tool.anyinfer.conformance] declarations (default: the current directory)"
+        ),
+    )
+    conform.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="CASE",
+        help="restrict the run to one case (repeatable)",
+    )
+    conform.add_argument("--json", action="store_true", help="emit machine-readable results")
+    conform.add_argument(
+        "--markdown-row",
+        action="store_true",
+        help="emit one conformance-matrix row instead of a report",
+    )
 
     providers = subcommands.add_parser("providers", help="list registered providers")
     providers.add_argument("--json", action="store_true", help="emit machine-readable output")
@@ -293,8 +397,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _verify(args)
         if args.command == "benchmark":
             return _benchmark(args)
+        if args.command == "context":
+            return _context(args)
         if args.command == "providers":
             return _providers(args)
+        if args.command == "conform":
+            return _conform(args)
         if args.command == "models":
             return _models(args)
         if args.command == "runtime":
@@ -339,7 +447,9 @@ def _serve(args: argparse.Namespace) -> int:
 
     config = _config(args.config)
     settings, route = list(config.providers), config.route
-    client = AsyncClient(settings, route=route)
+    # The gateway inherits the compaction policy rather than implementing one: it is a
+    # codec over a normal client, and that client is where context policy lives.
+    client = AsyncClient(settings, route=route, history=config.history, cache=config.cache)
     app = create_app(client, auth_token=token, expose_targets=tuple(args.expose))
 
     print(f"anyinfer {__version__} serving on http://{args.host}:{args.port}")
@@ -421,6 +531,8 @@ def _run(args: argparse.Namespace) -> int:
         settings,
         route=route,
         repair=Repair(max_attempts=args.repair) if args.repair is not None else None,
+        history=config.history,
+        cache=config.cache,
     )
     call: dict[str, Any] = {
         "target": target,
@@ -432,6 +544,12 @@ def _run(args: argparse.Namespace) -> int:
         "reasoning": args.reasoning,
         "timeout_s": args.timeout,
     }
+    if args.cache:
+        # A flag overrides the configured policy for this one invocation; without either,
+        # nothing is cached, which is the library's default and the shell's expectation.
+        from .types.requests import CachePolicy
+
+        call["cache"] = CachePolicy(mode=args.cache)
 
     if args.dry_run:
         return _dry_run(client, messages, call, args)
@@ -773,6 +891,14 @@ def _doctor(args: argparse.Namespace) -> int:
 
     for warning in profile.warnings:
         print(f"warning           {warning}")
+
+    # A provider plugin that failed to load is otherwise invisible: the provider simply
+    # does not exist, and the only symptom is an "unknown provider" error listing every
+    # provider except theirs. No section at all when every plugin loaded.
+    from . import default_registry
+
+    for issue in default_registry.plugin_issues():
+        print(f"plugin            {issue.summary}")
     return 0
 
 
@@ -899,6 +1025,235 @@ def _benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---- context -------------------------------------------------------------------------
+
+_CONTEXT_MAX_FILE_BYTES = 2 * 1024 * 1024
+"""Per-file ceiling for CLI collection. A file larger than this is a database, not source."""
+
+
+def _context_strategies() -> tuple[str, ...]:
+    """Strategy names, read from the library so the CLI cannot drift from it."""
+    from .context import VALID_STRATEGIES
+
+    return VALID_STRATEGIES
+
+
+def _add_tuning_flags(parser: argparse.ArgumentParser) -> None:
+    """Add one ``--context-<setting>`` flag per advanced setting.
+
+    Generated from the dataclass rather than written out, so a setting added to
+    `anyinfer.context.ContextTuning` reaches the config file, the CLI, and the Python
+    keyword argument as one name with no third place to update.
+    """
+    import dataclasses
+
+    from .context import ContextTuning
+
+    group = parser.add_argument_group(
+        "advanced context settings",
+        "Override the 'context' block of the config file. Unset flags leave it alone.",
+    )
+    for field in dataclasses.fields(ContextTuning):
+        flag = f"--context-{field.name.replace('_', '-')}"
+        annotation = str(field.type)
+        if "bool" in annotation:
+            group.add_argument(
+                flag,
+                dest=f"context_{field.name}",
+                action=argparse.BooleanOptionalAction,
+                default=None,
+            )
+        elif "SelectionOrder" in annotation:
+            from .context import SELECTION_ORDERS
+
+            group.add_argument(
+                flag, dest=f"context_{field.name}", choices=SELECTION_ORDERS, default=None
+            )
+        elif "int" in annotation:
+            group.add_argument(flag, dest=f"context_{field.name}", type=int, default=None)
+        else:
+            group.add_argument(flag, dest=f"context_{field.name}", type=float, default=None)
+
+
+def _resolve_tuning(args: argparse.Namespace, config: AnyInferConfig) -> Any:
+    """Layer the settings: config file, then preset, then explicit flags."""
+    import dataclasses
+
+    from .context import ContextTuning
+
+    tuning = config.context
+    if args.preset == "recommended":
+        tuning = ContextTuning.recommended()
+    elif args.preset == "default":
+        tuning = ContextTuning()
+
+    overrides = {
+        field.name: getattr(args, f"context_{field.name}", None)
+        for field in dataclasses.fields(ContextTuning)
+    }
+    return tuning.merged(**overrides)
+
+
+def _context(args: argparse.Namespace) -> int:
+    """Reduce a collected corpus and print the envelope, or cost every strategy.
+
+    Returns:
+        A process exit code.
+    """
+    from .context import DEFAULT_MAX_BYTES, DEFAULT_MAX_DOCUMENTS, plan, select
+
+    config = _config(args.config)
+    try:
+        tuning = _resolve_tuning(args, config)
+    except ValueError as exc:
+        print(f"invalid context setting: {exc}", file=sys.stderr)
+        return 2
+
+    documents = _collect_documents(args)
+    if not documents:
+        print("no readable text files were found in the given paths", file=sys.stderr)
+        return 2
+
+    budget = _context_budget(args, config)
+    if budget is None:
+        return 2
+
+    common: dict[str, Any] = {
+        "max_tokens": budget,
+        "max_documents": args.max_documents or DEFAULT_MAX_DOCUMENTS,
+        "max_bytes": args.max_bytes or DEFAULT_MAX_BYTES,
+        "tuning": tuning,
+    }
+
+    if args.plan:
+        outcome = plan(documents, args.query, **common)
+        if args.as_json:
+            print(json.dumps(outcome.metadata(), indent=2))
+        else:
+            _print_plan(outcome)
+        return 0
+
+    reduction = select(documents, args.query, strategy=args.strategy, **common)
+    if args.as_json:
+        print(json.dumps(reduction.metadata(), indent=2))
+    else:
+        # The envelope goes to stdout so it can be piped; the account goes to stderr so
+        # piping it does not silently discard what was dropped.
+        print(reduction.text)
+        print(reduction.summary(), file=sys.stderr)
+    return 0
+
+
+def _context_budget(args: argparse.Namespace, config: AnyInferConfig) -> int | None:
+    """Resolve the token budget, or explain why it could not be.
+
+    An unknown context window stays unknown: the CLI will not invent one any more than
+    the library will.
+    """
+    if args.max_tokens is not None:
+        if args.max_tokens < 1:
+            print("--max-tokens must be positive", file=sys.stderr)
+            return None
+        return int(args.max_tokens)
+
+    if not args.target:
+        print(
+            "give a budget: pass --max-tokens, or --target to derive it from a model's "
+            "context window",
+            file=sys.stderr,
+        )
+        return None
+
+    from . import Client
+
+    with Client(list(config.providers), route=config.route) as client:
+        computed = client.budget([], target=args.target)
+    remaining = computed.remaining_tokens
+    if remaining is None or remaining < 1:
+        print(
+            f"the context window of {args.target!r} is unknown, so there is no budget to "
+            "reduce against; pass --max-tokens to choose one yourself",
+            file=sys.stderr,
+        )
+        return None
+    return remaining
+
+
+def _collect_documents(args: argparse.Namespace) -> list[Any]:
+    """Read the given paths into context documents.
+
+    Collection lives here rather than in the library on purpose: walking a filesystem and
+    deciding what is safe to send is application policy, and this command is an
+    application. Unreadable, oversized, and non-text files are skipped silently, and
+    vendored or generated paths are skipped unless asked for.
+    """
+    from .context import ContextDocument, is_generated_path
+
+    pinned = {_posix(Path(value)) for value in args.pin}
+    seen: dict[str, ContextDocument] = {}
+
+    for root in args.paths:
+        candidates = sorted(root.rglob("*")) if root.is_dir() else [root]
+        for candidate in candidates:
+            if not candidate.is_file():
+                continue
+            relative = _posix(candidate)
+            if relative in seen:
+                continue
+            if not args.include_generated and is_generated_path(relative):
+                continue
+            try:
+                if candidate.stat().st_size > _CONTEXT_MAX_FILE_BYTES:
+                    continue
+                text = candidate.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue
+            if "\x00" in text:
+                continue
+            seen[relative] = ContextDocument.of(
+                relative, text, pinned=relative in pinned
+            )
+
+    return [seen[path] for path in sorted(seen)]
+
+
+def _posix(path: Path) -> str:
+    """A stable POSIX-style path, relative to the working directory when it is below it."""
+    try:
+        return path.resolve().relative_to(Path.cwd()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _print_plan(outcome: Any) -> None:
+    """Print the plan as a table."""
+    best = outcome.best()
+    print(f"corpus            {outcome.candidate_count} document(s)")
+    print(f"budget            {outcome.max_tokens} tokens")
+    print()
+    print(f"{'strategy':<16}{'kept':>6}{'omitted':>9}{'tokens':>9}{'complete':>10}  limited by")
+    for option in outcome.options:
+        marker = "*" if best is not None and option.strategy == best.strategy else " "
+        limits = ", ".join(option.binding_constraints) or "-"
+        # A strategy that could not do what was asked reports what it did instead, the
+        # same way `auto` does: `whole` on a corpus that does not fit becomes `ranked`.
+        name = (
+            option.strategy
+            if option.representation == option.strategy
+            else f"{option.strategy}>{option.representation}"
+        )
+        print(
+            f"{marker}{name:<15}{option.selected_count:>6}"
+            f"{option.omitted_count:>9}{option.estimated_tokens:>9}"
+            f"{'yes' if option.complete else 'no':>10}  {limits}"
+        )
+    print()
+    print(
+        f"distill           {outcome.distill_chunks} chunk(s), "
+        f"{outcome.distill_calls}+ generation call(s); the only strategy that spends money"
+    )
+
+
 def _providers(args: argparse.Namespace) -> int:
     """List every registered provider and what it needs to be configured."""
     from . import default_registry
@@ -949,7 +1304,92 @@ def _providers(args: argparse.Namespace) -> int:
                 f"{'':<16} standard: "
                 f"{', '.join(f.key for f in setup.advanced_fields)}"
             )
+
+    issues = default_registry.plugin_issues()
+    if issues:
+        print("\nprovider plugins that failed to load:")
+        for issue in issues:
+            print(f"  {issue.summary}")
     return 0
+
+
+# ---- conform -------------------------------------------------------------------------
+
+
+def _conform(args: argparse.Namespace) -> int:
+    """Run the conformance suite against one adapter and report what it supports."""
+    import asyncio
+
+    from . import AsyncClient, default_registry
+    from .providers.presets import COMPAT_PRESETS
+    from .testing.certify import certify, load_declared_capabilities, render_report
+    from .testing.conformance import matrix_row, results_to_json
+    from .testing.scaffold import scaffold_provider
+
+    if args.scaffold is not None:
+        # Scaffolding names a provider that does not exist yet, so it runs before the
+        # registry lookup rather than after it.
+        written = scaffold_provider(args.provider, args.scaffold, force=args.force)
+        for path in written:
+            print(f"wrote  {path}")
+        print(
+            f"\nnext   pip install -e {args.scaffold}"
+            f"\n       implement generate() in the adapter"
+            f"\n       anyinfer conform {args.provider} --model <model>"
+        )
+        return 0
+
+    if not args.model:
+        raise ConfigError(
+            "--model is required when running the suite",
+            hint="name a model this provider serves, e.g. --model gpt-4o-mini",
+        )
+
+    provider_id = default_registry.resolve_alias(args.provider)
+
+    # Presets are verified against their own record in contracts/openai-compat-presets.md.
+    # Two paths to one answer is how two accounts of "what this preset supports" start
+    # disagreeing, so this refuses rather than quietly producing an untracked matrix row.
+    if any(provider_id == preset.id for preset in COMPAT_PRESETS):
+        raise ConfigError(
+            f"{provider_id!r} is an OpenAI-compatible preset, not a dedicated adapter",
+            hint=(
+                "presets are verified through the preset process recorded in "
+                "contracts/openai-compat-presets.md; this command certifies adapters"
+            ),
+        )
+
+    config = _config(args.config)
+    supports = load_declared_capabilities(args.project)
+
+    async def build_client(_scenario: str) -> AsyncClient:
+        # A fresh client per case: the runner closes what it is given.
+        return AsyncClient(
+            list(config.providers),
+            route=config.route,
+            history=config.history,
+        cache=config.cache,
+        )
+
+    results = asyncio.run(
+        certify(
+            provider_id,
+            args.model,
+            build_client,
+            supports=supports,
+            only=args.only or None,
+        )
+    )
+
+    if args.json:
+        print(results_to_json(provider_id, results))
+    elif args.markdown_row:
+        print(matrix_row(provider_id, results))
+    else:
+        print(render_report(provider_id, results))
+
+    failed = any(not r.passed and not r.skipped for r in results)
+    return 1 if failed else 0
 
 
 # ---- models --------------------------------------------------------------------------

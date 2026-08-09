@@ -19,6 +19,7 @@ from typing import Any
 from .events.telemetry import (
     AttemptCompleted,
     AttemptStarted,
+    CachePlanned,
     ContextReduced,
     DownloadProgress,
     FallbackTriggered,
@@ -220,6 +221,20 @@ class OTelObserver:
                 attributes={
                     f"{GEN_AI}.anyinfer.parameter": event.parameter,
                     f"{GEN_AI}.anyinfer.reason": event.reason,
+                },
+            )
+
+    def _on_CachePlanned(self, event: CachePlanned) -> None:  # noqa: N802
+        span = self._spans.get(event.request_id)
+        if span is not None:
+            span.add_event(
+                "cache.planned",
+                attributes={
+                    f"{GEN_AI}.anyinfer.cache_mechanism": event.mechanism,
+                    f"{GEN_AI}.anyinfer.cache_mark_count": event.mark_count,
+                    f"{GEN_AI}.anyinfer.cache_estimated_tokens": (
+                        event.estimated_cacheable_tokens
+                    ),
                 },
             )
 

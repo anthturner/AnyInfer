@@ -686,7 +686,7 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="region",
                 label="AWS region",
-                kind="host-profile",
+                kind="text",
                 required=False,
                 default_value=_DEFAULT_REGION,
                 help_text=f"Defaults to {_DEFAULT_REGION}.",
@@ -707,7 +707,7 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="aws_access_key_id",
                 label="AWS access key ID",
-                kind="host-profile",
+                kind="text",
                 required=False,
                 advanced=True,
                 help_text=(

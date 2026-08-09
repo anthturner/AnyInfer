@@ -21,6 +21,17 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   `max_output_tokens`, `temperature`, `top_p`,
   `reasoning: {"effort": <minimal|low|medium|high>}` (normalized effort translated here),
   `text.format` for structured output (json_schema), `tools`
+### Prompt caching (placement)
+- Mechanism: **implicit**. Caching is applied automatically to a sufficiently long, stable
+  prompt prefix; there is no field to send and AnyInfer sends none. The core's only duty is
+  to leave the prefix undisturbed, and to warn a caller whose own prompt changes its prefix
+  between turns.
+- Declared on the descriptor as `cache_mechanism="implicit"`, with no mark budget.
+- Cache hits are reported in the usage block (see Response fields) and are counted inside
+  the reported prompt-token total on this API — which is why cache-aware pricing reprices
+  rather than adds. **VERIFY on the next drift run**: both the automatic-caching threshold
+  and whether cached tokens remain included in `prompt_tokens`.
+
 ### Response fields
 - `output_text` aggregate; `output[]` items (message / reasoning / tool call),
   `status`, `usage.input_tokens`, `usage.output_tokens`, `usage.total_tokens`,

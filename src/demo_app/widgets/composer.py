@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from .. import strings, theme
 from .icons import themed_icon
+from .sdk_help import SdkHelpButton
 
 __all__ = ["QUICK_ACTIONS", "Composer"]
 
@@ -94,11 +95,15 @@ class Composer(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         chips = QHBoxLayout()
+        chips.setSpacing(8)
         for action in QUICK_ACTIONS:
             button = QPushButton(action.label)
+            button.setObjectName("ChipButton")
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setAccessibleName(f"Quick action: {action.label}")
             button.clicked.connect(
                 lambda _checked=False, p=action.prompt: self.quick_action_chosen.emit(p)
@@ -116,7 +121,9 @@ class Composer(QWidget):
 
         buttons = QVBoxLayout()
         self._send_button = QPushButton()
-        self._send_button.setObjectName("IconButton")
+        self._send_button.setObjectName("PrimaryButton")
+        self._send_button.setFixedSize(34, 34)
+        self._send_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._send_button.setToolTip(f"{strings.SEND} (Ctrl+Enter)")
         self._send_button.setAccessibleName(strings.SEND)
         self._send_button.clicked.connect(self.send_requested)
@@ -132,10 +139,14 @@ class Composer(QWidget):
         row.addLayout(buttons)
         layout.addLayout(row)
 
+        hint_row = QHBoxLayout()
         self._hint = QLabel("—")
         self._hint.setObjectName("Muted")
         self._hint.setAccessibleName("Token estimate")
-        layout.addWidget(self._hint)
+        hint_row.addWidget(self._hint)
+        hint_row.addStretch(1)
+        hint_row.addWidget(SdkHelpButton("budget"))
+        layout.addLayout(hint_row)
 
         self._reapply_icons()
 
@@ -166,14 +177,25 @@ class Composer(QWidget):
     # ---- token hint ------------------------------------------------------------------
 
     def set_token_hint(
-        self, estimate_tokens: int, remaining_tokens: int | None, fits: bool | None
+        self,
+        estimate_tokens: int,
+        remaining_tokens: int | None,
+        fits: bool | None,
+        cost: str = "",
     ) -> None:
-        """Show the token estimate, in the same tri-state shape as `ContextBudget`."""
+        """Show the token estimate, in the same tri-state shape as `ContextBudget`.
+
+        ``cost`` is appended only when the library had pricing on file for the target.
+        An absent price is shown as nothing at all rather than as ``$0.00``: a local model
+        genuinely costs nothing, and a hosted model with no pricing entry costs *something
+        unknown*, and the two must not read the same.
+        """
+        suffix = f" · {cost}" if cost else ""
         if remaining_tokens is None:
-            self._hint.setText(f"~{estimate_tokens:,} tokens")
+            self._hint.setText(f"~{estimate_tokens:,} tokens{suffix}")
             self._hint.setStyleSheet("")
             return
-        text = f"~{estimate_tokens:,} tokens / {remaining_tokens:,} remaining"
+        text = f"~{estimate_tokens:,} tokens / {remaining_tokens:,} remaining{suffix}"
         self._hint.setText(text)
         if fits is False:
             self._hint.setStyleSheet(f"color: {theme.color('warn')};")
@@ -190,5 +212,7 @@ class Composer(QWidget):
         self._reapply_icons()
 
     def _reapply_icons(self) -> None:
-        self._send_button.setIcon(themed_icon(self._send_button, "send"))
+        self._send_button.setIcon(
+            themed_icon(self._send_button, "send", color=theme.color("on_accent"))
+        )
         self._cancel_button.setIcon(themed_icon(self._cancel_button, "cancel"))

@@ -30,6 +30,8 @@ from anyinfer.events.telemetry import (
     PAYLOAD_FIELDS,
     AttemptCompleted,
     AttemptStarted,
+    CachePlanned,
+    ContextReduced,
     FallbackTriggered,
     FirstToken,
     ParameterDropped,
@@ -52,6 +54,9 @@ _SEVERITY: dict[type, str] = {
     FallbackTriggered: "warn",
     RepairAttempted: "warn",
     ParameterDropped: "warn",
+    # Trimming is legal but consequential — content was dropped, and that deserves the
+    # same visual weight as any other "something gave way" event.
+    ContextReduced: "warn",
     RequestCompleted: "ok",
     AttemptCompleted: "ok",
     FirstToken: "ok",
@@ -70,7 +75,8 @@ class _RequestCard(QFrame):
         self.request_id = request_id
 
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(10, 8, 10, 8)
+        self._layout.setContentsMargins(14, 12, 14, 12)
+        self._layout.setSpacing(8)
 
         target_chain = " → ".join(targets) or "(no targets)"
         header = QLabel(f"<b>{target_chain}</b> <code>{request_id[:8]}</code>")
@@ -79,7 +85,8 @@ class _RequestCard(QFrame):
         self._layout.addWidget(header)
 
         self._events = QVBoxLayout()
-        self._events.setContentsMargins(12, 2, 0, 0)
+        self._events.setContentsMargins(12, 4, 0, 4)
+        self._events.setSpacing(4)
         self._layout.addLayout(self._events)
 
     def add_event(self, event: Any) -> None:
@@ -101,13 +108,16 @@ class TelemetryView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         header = QHBoxLayout()
+        header.setSpacing(10)
         caption = QLabel(
             f"<b>{TELEMETRY_TITLE}</b> — typed, in-process events. Registered "
             "<b>without</b> payloads, so prompt and response text are withheld."
         )
+        caption.setObjectName("Caption")
         caption.setWordWrap(True)
         caption.setTextFormat(Qt.TextFormat.RichText)
         header.addWidget(caption, 1)
@@ -119,12 +129,14 @@ class TelemetryView(QWidget):
         layout.addLayout(header)
 
         self._scroll = QScrollArea()
+        self._scroll.setObjectName("TelemetryScroll")
         self._scroll.setWidgetResizable(True)
         self._scroll.setAccessibleName("Telemetry timeline")
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         container = QWidget()
         self._cards_layout = QVBoxLayout(container)
-        self._cards_layout.setContentsMargins(4, 4, 4, 4)
-        self._cards_layout.setSpacing(6)
+        self._cards_layout.setContentsMargins(10, 10, 10, 10)
+        self._cards_layout.setSpacing(10)
         self._cards_layout.addStretch(1)
         self._scroll.setWidget(container)
         layout.addWidget(self._scroll, 1)
@@ -198,6 +210,17 @@ def _details_of(event: Any) -> str:
         return f"{event.error.type_name}: {event.error.detail}"
     if isinstance(event, ParameterDropped):
         return f"dropped {event.parameter!r} — {event.reason}"
+    if isinstance(event, CachePlanned):
+        return (
+            f"{event.mechanism or 'no'} caching, {event.mark_count} mark(s), "
+            f"~{event.estimated_cacheable_tokens:,} cacheable tokens"
+        )
+    if isinstance(event, ContextReduced):
+        return (
+            f"{event.strategy}: kept {event.selected_count} of {event.candidate_count}, "
+            f"omitted {event.omitted_count} — ~{event.estimated_tokens:,} of "
+            f"{event.max_tokens:,} tokens"
+        )
     return _generic_details(event)
 
 

@@ -121,6 +121,83 @@ would rather have strongest-first ordering:
 context.select(documents, query, max_tokens=max_tokens, render_order="rank")
 ```
 
+That makes a *given* selection stable. To keep the selection itself stable across turns,
+hand back the previous reduction's state:
+
+```python
+tuning = context.ContextTuning(carry_over_bonus=0.5)
+first = context.select(documents, query, max_tokens=max_tokens, tuning=tuning)
+...
+second = context.select(
+    documents, query, max_tokens=max_tokens, tuning=tuning, previous=first.state()
+)
+print(second.carried_over)
+```
+
+Unchanged documents get the bonus, so a corpus that barely moved produces the same
+selection — and therefore the same prefix — rather than swapping one equally ranked file
+for another.
+
+## Choose a strategy from measurements
+
+If you are unsure which strategy suits a corpus, cost all four. `plan()` runs each one,
+measures the envelope it would render, and discards the text. It spends no inference:
+
+```python
+outcome = context.plan(documents, query, max_tokens=max_tokens)
+for option in outcome.options:
+    print(option.strategy, option.selected_count, option.estimated_tokens, option.complete)
+
+best = outcome.best()
+reduction = context.select(
+    documents, query, max_tokens=max_tokens, strategy=best.strategy if best else "auto"
+)
+```
+
+## Turn on the settings that suit your corpus
+
+Every algorithmic choice is a field on `ContextTuning`, and the defaults reproduce the
+plain behaviour exactly. For a source-code corpus, the shipped preset is a good starting
+point:
+
+```python
+reduction = context.select(
+    documents, query, max_tokens=max_tokens, tuning=context.ContextTuning.recommended()
+)
+```
+
+That collapses duplicates, orders by relevance per token, penalizes near-identical
+candidates, splits compound identifiers, expands the query, blends in import-graph
+centrality, and shortens a file rather than dropping it. Each is [explained
+here](../concepts/context-reduction.md#advanced-settings-in-one-place), and each can be set
+in your [config file](../reference/configuration.md) instead.
+
+## Compact the conversation, not just the corpus
+
+Reduction is not only about material you collected. In an agentic loop the window fills
+with tool results, and those compact well:
+
+```python
+compaction = context.compact_history(messages, max_tokens=max_tokens)
+if not compaction.fits:
+    ...  # the system prompt and recent turns alone exceed the budget; your call
+result = client.generate(list(compaction.messages), target=target)
+```
+
+Tool-call pairing survives, system messages survive, and the recent window survives — the
+three things naive truncation breaks.
+
+Or hand the policy to the client and stop thinking about it. Every frontend built on that
+client — including `anyinfer run` and the sidecar — then behaves the same way:
+
+```python
+client = ai.Client(providers, history=ai.HistoryPolicy())
+```
+
+By default that only acts once the route's larger-window targets are exhausted, so a bigger
+model is always preferred to losing history. See
+[the concept page](../concepts/context-reduction.md#or-let-the-client-do-it).
+
 ## When it will never fit
 
 At some size no fidelity reduction is enough, and the answer is more requests rather than

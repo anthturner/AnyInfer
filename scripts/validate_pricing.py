@@ -1,4 +1,4 @@
-"""Validate the bundled pricing table (D27).
+"""Validate the bundled pricing table.
 
 Gate for the pricing-refresh workflow and for CI: the file must parse through the same
 code path the library uses, and every entry must satisfy the sanity rules that keep a

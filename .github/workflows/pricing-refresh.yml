@@ -1,6 +1,6 @@
 name: Pricing refresh
 
-# Weekly semi-automated refresh of the bundled model-pricing table (D27).
+# Weekly semi-automated refresh of the bundled model-pricing table.
 #
 # Two stages, deliberately split by trust level:
 #

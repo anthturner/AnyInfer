@@ -120,14 +120,15 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="project",
                 label="GCP project",
-                kind="host-profile",
+                kind="text",
                 required=True,
                 help_text="The project that owns the Vertex endpoint.",
+                placeholder="my-project-id",
             ),
             SetupField(
                 key="location",
                 label="Location",
-                kind="host-profile",
+                kind="text",
                 required=False,
                 default_value=_GLOBAL_LOCATION,
                 help_text=(
@@ -151,7 +152,7 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="credentials_file",
                 label="Service-account key",
-                kind="endpoint",
+                kind="path",
                 required=False,
                 advanced=True,
                 help_text=(

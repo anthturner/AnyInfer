@@ -33,7 +33,7 @@ TRUSTED_PROVENANCE: frozenset[Provenance] = frozenset(
 ``default`` is excluded on purpose: a descriptor-level fallback is a placeholder, not a
 price, and computing money from it would manufacture authority the number does not have.
 ``override`` is included: an application's deliberate correction is the most trusted
-number there is (D27).
+number there is.
 """
 
 _PER_MILLION = Decimal(1_000_000)
@@ -58,9 +58,45 @@ def compute_cost(usage: Usage, capabilities: ModelCapabilities | None) -> Decima
         return None
 
     pricing: Pricing = capabilities.pricing.value
-    input_cost = (Decimal(usage.input_tokens) / _PER_MILLION) * pricing.input_per_1m
     output_cost = (Decimal(usage.output_tokens) / _PER_MILLION) * pricing.output_per_1m
-    return input_cost + output_cost
+    return _input_cost(usage, pricing) + output_cost
+
+
+def _input_cost(usage: Usage, pricing: Pricing) -> Decimal:
+    """Price the prompt side, discounting cache reads only when the rate is known.
+
+    Providers disagree about whether ``input_tokens`` already includes tokens served from
+    the cache — some report the total and break the cached part out separately, others
+    report only what was newly processed. Repricing on that assumption without knowing it
+    would be a wrong number in a place nobody checks, so cached tokens are repriced only
+    when the pricing entry carries a cache rate *and* the reported figures make the split
+    unambiguous.
+
+    With no recorded cache rate, this is exactly the arithmetic that shipped before caching
+    existed: reported prompt tokens at the prompt rate.
+    """
+    input_tokens = usage.input_tokens or 0
+    full_rate = pricing.input_per_1m
+
+    read_tokens = usage.cache_read_tokens or 0
+    write_tokens = usage.cache_write_tokens or 0
+
+    if pricing.cache_read_per_1m is None or read_tokens <= 0:
+        base = Decimal(input_tokens) / _PER_MILLION * full_rate
+    else:
+        # Cached reads are billed at their own rate; the remainder at the full one. A
+        # provider that excludes cache reads from `input_tokens` reports a remainder equal
+        # to `input_tokens`, so clamping at zero keeps both conventions correct.
+        uncached = input_tokens - read_tokens if input_tokens > read_tokens else input_tokens
+        base = (
+            Decimal(uncached) / _PER_MILLION * full_rate
+            + Decimal(read_tokens) / _PER_MILLION * pricing.cache_read_per_1m
+        )
+
+    if pricing.cache_write_per_1m is not None and write_tokens > 0:
+        base += Decimal(write_tokens) / _PER_MILLION * pricing.cache_write_per_1m
+
+    return base
 
 
 @dataclass(frozen=True, slots=True)

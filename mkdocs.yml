@@ -131,6 +131,8 @@ nav:
           - Add a fallback chain: guides/fallback.md
           - Run the tool loop: guides/tool-loop.md
           - Fit a corpus to a budget: guides/fitting-context.md
+          - Test your application offline: guides/testing-your-app.md
+          - Add your own provider: guides/custom-providers.md
       - Operations:
           - Run a model locally: guides/local-inference.md
           - Choose and download a local model: guides/local-models.md
@@ -146,6 +148,7 @@ nav:
       - Sessions: concepts/sessions.md
       - Capabilities and provenance: concepts/capabilities.md
       - Token estimation and context budgets: concepts/budgeting.md
+      - Prompt caching: concepts/caching.md
       - Context reduction: concepts/context-reduction.md
       - Credentials and redaction: concepts/credentials.md
       - Telemetry: concepts/telemetry.md

@@ -9,9 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from .._client.providers import ProviderSettings
+from ..context.settings import DEFAULT_TUNING, ContextTuning
 from ..errors import ConfigError
 from ..registry import ProviderRegistry, default_registry, normalize_provider_id
 from ..routing import Route
+from ..types.requests import CACHE_MODES, HISTORY_MODES, CachePolicy, HistoryPolicy
 
 __all__ = [
     "CONFIG_FORMAT_VERSION",
@@ -32,6 +34,9 @@ _ROOT_KEYS = frozenset(
         "format_version",
         "providers",
         "default_route",
+        "context",
+        "history",
+        "cache",
         # Settings owned by the bundled demo. They are accepted so one file can be
         # shared with the SDK, CLI, and sidecar; this loader intentionally ignores them.
         "targets",
@@ -58,11 +63,24 @@ class AnyInferConfig:
         providers: Configured provider instances, in declaration order.
         route: Default fallback route, when one was configured.
         format_version: Parsed file-format version.
+        context: Advanced context-reduction settings from the optional ``context`` block.
+            Pass to `anyinfer.context.select` as ``tuning=``. Defaults reproduce the
+            library's plain behaviour, so a file without the block behaves as before.
+        history: Conversation-compaction policy from the optional ``history`` block, or
+            ``None`` when the file does not ask for one. Pass to `Client` or `AsyncClient`
+            as ``history=``; every frontend built on that client then behaves identically.
+        cache: Prompt-cache placement from the optional ``cache`` block, or ``None`` when
+            the file does not ask for one. Pass to `Client` or `AsyncClient` as ``cache=``.
+            Absent means no placement — caching changes what a provider bills, so it is
+            never turned on by a file that did not name it.
     """
 
     providers: tuple[ProviderSettings, ...] = ()
     route: Route | None = None
     format_version: int = CONFIG_FORMAT_VERSION
+    context: ContextTuning = DEFAULT_TUNING
+    history: HistoryPolicy | None = None
+    cache: CachePolicy | None = None
 
 
 def load_config(
@@ -163,7 +181,10 @@ def loads_config(
         providers.append(setting)
 
     route = _parse_route(data.get("default_route"), source)
-    return AnyInferConfig(tuple(providers), route, version)
+    context = _parse_context(data.get("context"), source)
+    history = _parse_history(data.get("history"), source)
+    cache = _parse_cache(data.get("cache"), source)
+    return AnyInferConfig(tuple(providers), route, version, context, history, cache)
 
 
 def _parse_provider(
@@ -271,6 +292,114 @@ def _parse_provider(
         timeout_s=float(timeout),
         **direct,
     )
+
+
+def _parse_context(value: Any, source: str) -> ContextTuning:
+    """Validate the optional advanced context-reduction block.
+
+    The block names `anyinfer.context.ContextTuning` fields directly rather than
+    inventing a second vocabulary, so a setting means the same thing in a config file, a
+    ``--context-*`` flag, and a Python keyword argument.
+    """
+    if value is None:
+        return DEFAULT_TUNING
+    if not isinstance(value, dict):
+        raise _error(source, "'context' must be an object")
+    try:
+        return ContextTuning.from_mapping(value)
+    except ValueError as exc:
+        raise _error(
+            source,
+            f"'context' is invalid: {exc}",
+            hint="see the context reduction settings in the shared configuration guide",
+        ) from exc
+
+
+def _parse_history(value: Any, source: str) -> HistoryPolicy | None:
+    """Validate the optional conversation-compaction block.
+
+    Absent means no compaction, which is the shipped behaviour: a request that outgrows
+    its window is rerouted or fails, and nothing is discarded without being asked for.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise _error(source, "'history' must be an object")
+
+    unknown = set(value) - {"enabled", "mode", "keep_recent", "keep_system"}
+    if unknown:
+        raise _unknown_keys(source, "'history'", unknown)
+
+    fields: dict[str, Any] = {}
+    for key in ("enabled", "keep_system"):
+        if key in value:
+            if not isinstance(value[key], bool):
+                raise _error(source, f"history.{key} must be true or false")
+            fields[key] = value[key]
+    if "keep_recent" in value:
+        raw = value["keep_recent"]
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            raise _error(source, "history.keep_recent must be an integer")
+        fields["keep_recent"] = raw
+    if "mode" in value:
+        mode = value["mode"]
+        if not isinstance(mode, str) or mode not in HISTORY_MODES:
+            raise _error(
+                source,
+                f"history.mode must be one of {', '.join(HISTORY_MODES)}",
+                hint="'last_resort' prefers a larger-window target; 'proactive' shrinks first",
+            )
+        fields["mode"] = mode
+
+    try:
+        return HistoryPolicy(**fields)
+    except ValueError as exc:
+        raise _error(source, f"'history' is invalid: {exc}") from exc
+
+
+def _parse_cache(value: Any, source: str) -> CachePolicy | None:
+    """Validate the optional prompt-cache block.
+
+    Absent means no placement, which is the shipped behaviour: caching changes what a
+    provider bills and how long it keeps a copy of the prompt, so a file that does not ask
+    for it does not get it.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise _error(source, "'cache' must be an object")
+
+    known = {"mode", "min_segment_tokens", "max_marks", "include_tools", "include_system"}
+    unknown = set(value) - known
+    if unknown:
+        raise _unknown_keys(source, "'cache'", unknown)
+
+    fields: dict[str, Any] = {}
+    for key in ("include_tools", "include_system"):
+        if key in value:
+            if not isinstance(value[key], bool):
+                raise _error(source, f"cache.{key} must be true or false")
+            fields[key] = value[key]
+    for key in ("min_segment_tokens", "max_marks"):
+        if key in value:
+            raw = value[key]
+            if isinstance(raw, bool) or not isinstance(raw, int):
+                raise _error(source, f"cache.{key} must be an integer")
+            fields[key] = raw
+    if "mode" in value:
+        mode = value["mode"]
+        if not isinstance(mode, str) or mode not in CACHE_MODES:
+            raise _error(
+                source,
+                f"cache.mode must be one of {', '.join(CACHE_MODES)}",
+                hint="'auto' uses the strongest mechanism the target offers",
+            )
+        fields["mode"] = mode
+
+    try:
+        return CachePolicy(**fields)
+    except ValueError as exc:
+        raise _error(source, f"'cache' is invalid: {exc}") from exc
 
 
 def _parse_route(value: Any, source: str) -> Route | None:

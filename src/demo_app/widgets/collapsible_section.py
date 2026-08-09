@@ -37,7 +37,14 @@ class CollapsibleSection(QFrame):
 
     minimized_changed = Signal(bool)
 
-    def __init__(self, title: str, content: QWidget, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        content: QWidget,
+        parent: QWidget | None = None,
+        *,
+        help_topic: str | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("CollapsibleSection")
         self._content = content
@@ -51,16 +58,25 @@ class CollapsibleSection(QFrame):
         header.setObjectName("CollapsibleSectionHeader")
         header.setFixedHeight(HEADER_HEIGHT)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 0, 6, 0)
+        header_layout.setContentsMargins(12, 0, 8, 0)
 
         self._title_label = QLabel(title)
         self._title_label.setObjectName("CollapsibleSectionTitle")
         header_layout.addWidget(self._title_label)
         header_layout.addStretch(1)
 
+        self.help_button = None
+        if help_topic is not None:
+            # Imported here so the section stays usable without the help registry in
+            # minimal harnesses and tests.
+            from .sdk_help import SdkHelpButton
+
+            self.help_button = SdkHelpButton(help_topic)
+            header_layout.addWidget(self.help_button)
+
         self._toggle = QPushButton()
         self._toggle.setObjectName("IconButton")
-        self._toggle.setFixedSize(24, 24)
+        self._toggle.setFixedSize(26, 26)
         self._toggle.clicked.connect(self.toggle_minimized)
         header_layout.addWidget(self._toggle)
 

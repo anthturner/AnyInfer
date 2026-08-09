@@ -461,7 +461,8 @@ descriptor = ProviderDescriptor(
                 label="Base URL",
                 kind="endpoint",
                 required=True,
-                help_text="Root of the API, e.g. http://localhost:8080/v1",
+                help_text="Root of the API, up to and including any version segment.",
+                placeholder="http://localhost:8080/v1",
             ),
             SetupField(
                 key="api_key",

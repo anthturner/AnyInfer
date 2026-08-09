@@ -274,7 +274,7 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="tenant_id",
                 label="Tenant ID",
-                kind="endpoint",
+                kind="text",
                 required=False,
                 advanced=True,
                 # Left blank, the tenant and client below are azure-identity's own
@@ -286,13 +286,14 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="client_id",
                 label="Client ID",
-                kind="endpoint",
+                kind="text",
                 required=False,
                 advanced=True,
                 help_text=(
                     "Application (client) ID for the interactive sign-in. Not a secret; "
                     "omit to use the default public client."
                 ),
+                placeholder="00000000-0000-0000-0000-000000000000",
             ),
         ),
         model_selection="manual-only",

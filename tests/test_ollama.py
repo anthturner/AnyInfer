@@ -128,7 +128,7 @@ async def test_schema_is_sent_as_format_and_injected_into_the_prompt() -> None:
     """Ollama's ``format`` constrains decoding but does not tell the model the shape.
 
     Without prompt injection the model emits schema-shaped nonsense, so the core must do
-    both (NOTES.md F1).
+    both.
     """
     schema = {
         "type": "object",

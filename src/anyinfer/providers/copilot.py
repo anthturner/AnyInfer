@@ -416,9 +416,9 @@ _COPILOT_CALIBRATION = TokenCalibration(multiplier=2.4, overhead_tokens=1_200)
 The CLI runtime builds its own request around the prompt — an agent system preamble, its
 built-in tool declarations, workspace framing — none of which appears in the messages this
 side serializes. Prompt tokens as Copilot reports them therefore run far above the bytes
-sent, and consistently enough to correct for. The figures are the ones Frisket arrived at
-against the same SDK and are the reason budgets here were not quietly optimistic; they are
-a calibration, not a measurement, so they move the planning estimate only."""
+sent, and consistently enough to correct for. The figures were arrived at empirically
+against this SDK and are the reason budgets here are not quietly optimistic; they are a
+calibration, not a measurement, so they move the planning estimate only."""
 
 
 descriptor = ProviderDescriptor(
@@ -434,7 +434,7 @@ descriptor = ProviderDescriptor(
             SetupField(
                 key="cli_path",
                 label="Copilot CLI path",
-                kind="endpoint",
+                kind="path",
                 required=False,
                 advanced=True,
                 # No ``default_value``: the fallback is the SDK's own CLI discovery

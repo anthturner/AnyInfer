@@ -110,6 +110,10 @@ class Feature(Flag):
 
     Structured-output mechanism selection reads these in the order
     ``GRAMMAR > JSON_SCHEMA > JSON_MODE > prompt injection``.
+
+    ``CACHE_USAGE`` and ``CACHE_PLACEMENT`` are deliberately separate facts: reporting what
+    the prompt cache did is not the same as accepting instructions about where it should
+    apply, and a provider may do either without the other.
     """
 
     STREAMING = auto()
@@ -120,20 +124,35 @@ class Feature(Flag):
     REASONING = auto()
     SYSTEM_PROMPT = auto()
     CACHE_USAGE = auto()
+    CACHE_PLACEMENT = auto()
 
 
 @dataclass(frozen=True, slots=True)
 class Pricing:
     """Per-million-token pricing used to compute `cost_usd`.
 
+    Cache rates are optional and default to unknown rather than to the input rate. A
+    provider that discounts cached prompt tokens but whose discount we have not recorded
+    must not be billed as though the discount were zero *or* as though it were free — an
+    unknown rate leaves cached tokens priced as ordinary input, which is the same answer
+    this library gave before cache accounting existed, and is wrong in only one direction
+    that a caller can reason about.
+
     Attributes:
         input_per_1m: Price per one million prompt tokens.
         output_per_1m: Price per one million generated tokens.
+        cache_read_per_1m: Price per one million prompt tokens served from the provider's
+            cache, or ``None`` when the rate is not recorded.
+        cache_write_per_1m: Price per one million prompt tokens written into the cache, or
+            ``None`` when the rate is not recorded. Several providers charge a *premium*
+            for a write, so this is not assumed to be a discount.
         currency: Currency code the prices are quoted in.
     """
 
     input_per_1m: Decimal
     output_per_1m: Decimal
+    cache_read_per_1m: Decimal | None = None
+    cache_write_per_1m: Decimal | None = None
     currency: str = "USD"
 
 

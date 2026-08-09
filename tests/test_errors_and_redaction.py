@@ -1,4 +1,4 @@
-"""Error hierarchy, snapshots, and the redaction guarantee (D20)."""
+"""Error hierarchy, snapshots, and the redaction guarantee."""
 
 from __future__ import annotations
 

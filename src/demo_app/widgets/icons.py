@@ -88,12 +88,15 @@ _ICONS: dict[str, str] = {
 }
 
 
-def themed_icon(widget: QWidget, name: str, *, size: int = 18) -> QIcon:
+def themed_icon(widget: QWidget, name: str, *, size: int = 18, color: str | None = None) -> QIcon:
     """Render one named icon tinted with ``widget``'s current text color.
+
+    ``color`` overrides the palette lookup — a filled accent button needs its icon in the
+    on-accent color, which is not any widget's windowText.
 
     Re-call after a theme change — the returned icon is a fixed rendering, not live.
     """
-    tint = widget.palette().windowText().color().name()
+    tint = color or widget.palette().windowText().color().name()
     svg = f"{_SVG_HEADER}{_ICONS[name]}</svg>".replace("currentColor", tint)
     renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
 

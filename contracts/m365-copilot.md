@@ -9,16 +9,14 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 
 ## Wire contract
 ### Endpoints
-- Copilot chat/interaction endpoint(s) as implemented in Frisket
-  `microsoft_365_copilot.py` (httpx2; exact routes to be transcribed verbatim when the M3
-  adapter is ported — VERIFY against live docs at that time)
+- Copilot chat/interaction endpoint(s) reached over httpx2; exact routes transcribed from
+  the adapter — VERIFY against live docs on the next drift run
 ### Auth
-- Entra **interactive-only** (`azure-identity` / `azure-identity-broker`); scopes recorded
-  in Frisket `entra.py::M365_COPILOT_CHAT_SCOPES`; no client-credential/headless flow
-  available → CI live-testing exempt (conformance matrix), degraded headless story
-  documented (NOTES.md open question 5)
+- Entra **interactive-only** (`azure-identity` / `azure-identity-broker`); no
+  client-credential/headless flow available → CI live-testing exempt (conformance matrix),
+  degraded headless story documented (DESIGN.md §20 #5)
 ### Version pins
-- Graph/Copilot API version segment as used by Frisket
+- Graph/Copilot API version segment as sent by the adapter
 ### Request fields
 - Prompt/conversation payload; no native structured output → schema is prompt-injected
   (mechanism `prompt`); no temperature/sampling controls exposed
@@ -26,7 +24,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - Message text; attributions/citations metadata (retained in `raw`, not normalized in v1);
   usage generally absent → Usage fields None
 ### Streaming
-- Verify: Frisket uses non-streaming; if live API offers streaming, mark NEW-CAPABILITY
+- Verify: the adapter is non-streaming; if the live API offers streaming, mark NEW-CAPABILITY
 ### Errors
 - 401/403 → AuthError with interactive-login hint; throttling 429 + Retry-After; tenant
   licensing errors → ConfigError (hint: M365 Copilot license required)

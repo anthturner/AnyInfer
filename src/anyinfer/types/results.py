@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Any, Literal, TypeVar
 
 from .messages import ToolCall
-from .requests import ResolvedTarget
+from .requests import CacheMechanism, ResolvedTarget
 
 __all__ = [
     "DETAIL_MAX_CHARS",
@@ -221,6 +221,10 @@ class Generation:
         structured_mechanism: How structured output was enforced for this result
             (``grammar``, ``json_schema``, ``json_mode``, or ``prompt``); ``None``
             when no schema was requested.
+        cache_mechanism: How prompt caching was engaged (``explicit`` marks, or
+            ``implicit`` prefix stability); ``None`` when no policy was in force or the
+            target offered nothing. Distinct from ``usage.cache_read_tokens``, which is
+            what the provider *reported* — this is what was asked of it.
         repair_attempts: How many schema-repair round-trips were needed before
             ``structured`` validated. ``0`` means the first response validated.
         attempts: The full routing trail, including failed and retried attempts.
@@ -239,6 +243,7 @@ class Generation:
     usage: Usage
     timing: Timing
     structured_mechanism: Mechanism | None = None
+    cache_mechanism: CacheMechanism | None = None
     repair_attempts: int = 0
     attempts: tuple[AttemptRecord, ...] = ()
     warnings: tuple[str, ...] = ()

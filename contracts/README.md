@@ -10,9 +10,9 @@ code against (with DESIGN.md §8 as the behavioral contract).
 - **Update the snapshot in the same change** whenever an adapter's wire behavior changes.
 - `Last verified` records a real verification event (date + against what). Never backdate,
   never bump without checking (see AGENTS.md warnings).
-- Initial snapshots (2026-08-05) are derived from the code survey of Frisket/ModelFit/
-  mote-cli, **not** from live documentation — each is marked accordingly. The first
-  `check-provider-drift` run establishes the true baseline for those.
+- Initial snapshots (2026-08-05) are derived from a survey of working adapter code, **not**
+  from live documentation — each is marked accordingly. The first `check-provider-drift`
+  run establishes the true baseline for those.
 - Snapshots added from 2026-08-07 onward (`gemini`, `deepseek`, `xai`, `nebius`, and
   `openai-compat-presets`) *were*
   verified against live documentation, with per-assertion sources recorded. The one

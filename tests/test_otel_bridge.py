@@ -1,4 +1,4 @@
-"""The OTel bridge maps every event in the contract (ADR-006, IMPLEMENTATION.md T2.4).
+"""The OTel bridge maps every event in the contract (ADR-006).
 
 The bridge is a *consumer* of the event contract, so it may present events differently
 (span events vs. standalone spans) — but it must not silently drop them. `OTelObserver`
@@ -124,6 +124,7 @@ ALL_EVENTS: tuple[TelemetryEvent, ...] = (
     ai.UsageEstimated("r1", TARGET, "input_tokens", "heuristic"),
     ai.ProviderDiagnostic(TARGET, DIAGNOSTIC, "r1"),
     ai.ContextReduced("auto", "select", 10, 4, 6, 900, 1000, ("max_tokens",), 0),
+    ai.CachePlanned("r1", TARGET, "explicit", 2, 4096),
     ai.ServerLifecycle("llama-1", "ready"),
     ai.DownloadProgress("artifact-1", 1024, 1024, done=True),
 )

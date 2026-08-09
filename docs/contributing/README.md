@@ -87,18 +87,14 @@ If one of these fails, the fix is almost always to move code, not to loosen the 
 ## Where to read first
 
 1. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture and decision rationale. Start with §3 and §23.
-2. [IMPLEMENTATION.md](https://github.com/anthturner/AnyInfer/blob/main/IMPLEMENTATION.md) — normative types and algorithms.
-3. [NOTES.md](https://github.com/anthturner/AnyInfer/blob/main/NOTES.md) — decisions, open questions, and the competitive review that
-   shaped several behaviors.
-4. [Architecture](architecture.md) — the condensed version of the rules.
+2. [Architecture](architecture.md) — the condensed version of the rules.
 
 ## Choose the owning workstream
 
 Core engine, shared configuration, CLI, sidecar, and demo code have separate ownership
 boundaries. The [coding-agent instructions](automation.md) page maps each workstream to its
-paths and explains the canonical-instructions model used by Codex, Claude Code, and GitHub
-Copilot. The same boundaries apply whether the contributor is using an agent or editing by
-hand.
+paths and explains the canonical-instructions model the tool-specific files defer to. The
+same boundaries apply whether the contributor is using an agent or editing by hand.
 
 ## The one rule
 

@@ -1,8 +1,8 @@
 """Hardware → tier recommendation.
 
-Generalizes mote's ``get_recommended_model_key``: instead of hardcoded thresholds, the
-requirements live in the alias catalog (``min_ram_bytes`` / ``min_vram_bytes``), so
-updating the recommendation is a data change rather than a code change.
+Instead of hardcoded thresholds, the requirements live in the alias catalog
+(``min_ram_bytes`` / ``min_vram_bytes``), so updating the recommendation is a data change
+rather than a code change.
 
 Advisory, like everything else in this subsystem: it proposes a tier and explains why, and
 the caller is free to ignore it.

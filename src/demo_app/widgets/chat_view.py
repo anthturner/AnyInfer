@@ -16,7 +16,7 @@ import html
 import math
 
 from PySide6.QtCore import QEvent, QSize, Qt, Signal
-from PySide6.QtGui import QFont, QResizeEvent, QTextOption
+from PySide6.QtGui import QFont, QKeyEvent, QMouseEvent, QResizeEvent, QTextOption
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
     QApplication,
@@ -223,13 +223,14 @@ class MessageBubble(QFrame):
         self.setAccessibleName(f"{'Your' if role == 'user' else 'Assistant'} message")
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(12, 10, 12, 10)
-        outer.setSpacing(4)
+        outer.setContentsMargins(14, 12, 14, 12)
+        outer.setSpacing(6)
 
         header = QHBoxLayout()
         label = "You" if role == "user" else (f"Assistant ({target})" if target else "Assistant")
         self.header_label = label
         self._header_label = QLabel(f"<b>{html.escape(label)}</b>")
+        self._header_label.setObjectName("BubbleHeader")
         self._header_label.setTextFormat(Qt.TextFormat.RichText)
         header.addWidget(self._header_label)
         header.addStretch(1)
@@ -316,11 +317,12 @@ class MessageList(QScrollArea):
         super().__init__(parent)
         self.setWidgetResizable(True)
         self.setAccessibleName("Conversation transcript")
+        self.setFrameShape(QFrame.Shape.NoFrame)
 
         container = QWidget()
         self._layout = QVBoxLayout(container)
-        self._layout.setContentsMargins(8, 8, 8, 8)
-        self._layout.setSpacing(10)
+        self._layout.setContentsMargins(12, 12, 12, 12)
+        self._layout.setSpacing(12)
         self._layout.addStretch(1)
         self.setWidget(container)
 
@@ -491,18 +493,66 @@ class MessageList(QScrollArea):
         bar.setValue(bar.maximum())
 
 
+class _WelcomeCard(QFrame):
+    """One clickable feature card on the welcome screen."""
+
+    clicked = Signal()
+
+    def __init__(self, title: str, description: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("WelcomeCard")
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedWidth(190)
+        self.setAccessibleName(title)
+        self.setAccessibleDescription(description)
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(6)
+
+        title_label = QLabel(title)
+        title_label.setObjectName("WelcomeCardTitle")
+        title_label.setWordWrap(True)
+        layout.addWidget(title_label)
+
+        body = QLabel(description)
+        body.setObjectName("Muted")
+        body.setWordWrap(True)
+        layout.addWidget(body)
+        layout.addStretch(1)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802 — Qt's spelling
+        """Treat a click anywhere on the card as choosing it."""
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(
+            event.position().toPoint()
+        ):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 — Qt's spelling
+        """Activate with Enter/Space, so the card works from the keyboard too."""
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.clicked.emit()
+            return
+        super().keyPressEvent(event)
+
+
 class WelcomeView(QWidget):
-    """The centered empty state shown when a conversation has no messages yet."""
+    """The centered empty state: wordmark, tagline, and four guided-tour cards."""
 
     new_chat_requested = Signal()
     structured_output_requested = Signal()
     fallback_demo_requested = Signal()
+    tool_loop_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(12)
+        layout.setSpacing(18)
+        layout.setContentsMargins(24, 24, 24, 24)
 
         self._logo = QSvgWidget()
         self._logo.setFixedSize(300, 65)
@@ -515,27 +565,42 @@ class WelcomeView(QWidget):
         tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(tagline)
 
-        buttons = QHBoxLayout()
-        buttons.setSpacing(8)
+        cards = QHBoxLayout()
+        cards.setSpacing(10)
+        for title, description, signal in (
+            (
+                strings.WELCOME_NEW_CHAT,
+                "Stream an answer from the offline provider — no key, no network.",
+                self.new_chat_requested,
+            ),
+            (
+                strings.WELCOME_STRUCTURED,
+                "Enforce a JSON Schema and watch the mechanism and repairs report in.",
+                self.structured_output_requested,
+            ),
+            (
+                strings.WELCOME_FALLBACK,
+                "Point at the flaky model and watch retry, fallback, and the attempt trail.",
+                self.fallback_demo_requested,
+            ),
+            (
+                strings.WELCOME_TOOLS,
+                "Hand the model two Python functions and let run_tools() drive the loop.",
+                self.tool_loop_requested,
+            ),
+        ):
+            card = _WelcomeCard(title, description)
+            card.clicked.connect(signal)
+            cards.addWidget(card)
 
-        new_chat = QPushButton(strings.WELCOME_NEW_CHAT)
-        new_chat.setAccessibleName(strings.WELCOME_NEW_CHAT)
-        new_chat.clicked.connect(self.new_chat_requested)
-        buttons.addWidget(new_chat)
+        card_row = QWidget()
+        card_row.setLayout(cards)
+        layout.addWidget(card_row, 0, Qt.AlignmentFlag.AlignCenter)
 
-        structured = QPushButton(strings.WELCOME_STRUCTURED)
-        structured.setAccessibleName(strings.WELCOME_STRUCTURED)
-        structured.clicked.connect(self.structured_output_requested)
-        buttons.addWidget(structured)
-
-        fallback = QPushButton(strings.WELCOME_FALLBACK)
-        fallback.setAccessibleName(strings.WELCOME_FALLBACK)
-        fallback.clicked.connect(self.fallback_demo_requested)
-        buttons.addWidget(fallback)
-
-        button_row = QWidget()
-        button_row.setLayout(buttons)
-        layout.addWidget(button_row, 0, Qt.AlignmentFlag.AlignCenter)
+        hint = QLabel("Every surface here carries a  </>  chip — click one to see the SDK call behind it.")
+        hint.setObjectName("Muted")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(hint)
 
     def reapply_theme(self) -> None:
         """Swap the wordmark for the light/dark variant matching the active theme."""

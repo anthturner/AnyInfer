@@ -23,18 +23,24 @@ __all__ = [
     "RENAME",
     "SEND",
     "SETTINGS",
+    "LOCAL_MODELS",
     "SHOW_CONVERSATIONS",
     "SHOW_LEFT_SIDEBAR",
     "SHOW_PROVIDERS",
     "SHOW_RIGHT_SIDEBAR",
     "SHOW_STRUCTURED",
+    "SHOW_TARGET",
     "SHOW_TELEMETRY",
+    "SHOW_TOOLS",
     "STRUCTURED_TITLE",
+    "TARGET_TITLE",
     "TELEMETRY_TITLE",
+    "TOOLS_TITLE",
     "WELCOME_FALLBACK",
     "WELCOME_NEW_CHAT",
     "WELCOME_STRUCTURED",
     "WELCOME_TAGLINE",
+    "WELCOME_TOOLS",
 ]
 
 COMPOSER_PLACEHOLDER = "Ask something… (Ctrl+Enter to send, Shift+Enter for a new line)"
@@ -52,10 +58,14 @@ WELCOME_TAGLINE = "A faithful, offline worked example of AnyInfer integration."
 WELCOME_NEW_CHAT = "New chat"
 WELCOME_STRUCTURED = "Try structured output"
 WELCOME_FALLBACK = "See fallback demo"
+WELCOME_TOOLS = "Run the tool loop"
 
 TELEMETRY_TITLE = "Telemetry"
 STRUCTURED_TITLE = "Structured output"
 PROVIDERS_TITLE = "Providers"
+TARGET_TITLE = "Target inspector"
+TOOLS_TITLE = "Tool loop"
+LOCAL_MODELS = "Local models…"
 REFRESH = "Refresh"
 SETTINGS = "Provider settings…"
 CONVERSATIONS_TITLE = "Conversations"
@@ -66,3 +76,5 @@ SHOW_CONVERSATIONS = "Conversation History"
 SHOW_TELEMETRY = "Telemetry"
 SHOW_STRUCTURED = "Structured Output"
 SHOW_PROVIDERS = "Providers"
+SHOW_TARGET = "Target Inspector"
+SHOW_TOOLS = "Tool Loop"

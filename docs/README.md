@@ -125,8 +125,6 @@ You are changing AnyInfer itself, or writing an adapter for it.
 The architecture is settled and written down. These are the sources of truth for *why*
 things are the way they are:
 
-- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture, module responsibilities, and decision rationale.
-- [IMPLEMENTATION.md](https://github.com/anthturner/AnyInfer/blob/main/IMPLEMENTATION.md) — normative types, algorithms, and the build plan.
-- [NOTES.md](https://github.com/anthturner/AnyInfer/blob/main/NOTES.md) — decisions, assumptions, open questions, risks, and the
-  competitive review that shaped several behaviors.
+- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture, module responsibilities, decision
+  rationale, open questions, and the risk register.
 - [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) — canonical repository automation instructions.

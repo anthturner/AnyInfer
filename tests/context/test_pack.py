@@ -126,8 +126,12 @@ def test_pinned_documents_are_sent_whole_and_first():
 
 
 def test_relevant_chunks_outrank_irrelevant_ones():
-    reduction = select(CORPUS, "credential", max_tokens=300, strategy="packed")
+    # Budgeted to admit roughly one chunk, so what lands is decided by ranking rather
+    # than by how much happens to fit. It must clear the envelope wrapper's own cost,
+    # which selection charges in tokens as well as bytes.
+    reduction = select(CORPUS, "credential", max_tokens=600, strategy="packed")
     assert "credential" in reduction.text
+    assert "slug_" not in reduction.text, "the irrelevant document should not win a slot"
 
 
 def test_packed_output_is_deterministic_under_corpus_reversal():

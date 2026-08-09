@@ -20,23 +20,34 @@ from collections.abc import Mapping, Sequence
 from pathlib import PurePosixPath
 
 from ..capabilities.estimate import TokenEstimator
+from .dedup import DuplicateMap
 from .documents import ContextDocument
 from .envelope import (
     TIERS_TAG,
     block_bytes,
     render_digest_block,
     render_extract_block,
-    render_file_block,
     render_module_block,
     render_tiers,
     wrapper_bytes,
+    wrapper_text,
 )
-from .select import Reduction, _order_constraints
+from .select import (
+    Reduction,
+    _blocks_for,
+    _collapse_counts,
+    _compact_block,
+    _order_constraints,
+)
+from .settings import DEFAULT_TUNING, ContextTuning
 
 __all__ = ["DEFAULT_ROLLUP_SHARE", "module_surfaces", "reduce_tiered"]
 
 DEFAULT_ROLLUP_SHARE = 0.45
-"""Share of the token and byte budget reserved for the module rollup."""
+"""Share of the token and byte budget reserved for the module rollup.
+
+The default for `ContextTuning.rollup_share`, which is what actually applies.
+"""
 
 _ROLLUP_MIN_BYTES = 256
 """Floor on the rollup's byte share, so a tiny budget still gets a map of the corpus."""
@@ -78,13 +89,15 @@ def reduce_tiered(
     estimator: TokenEstimator,
     render_order: str,
     module_digests: Mapping[str, str] | None = None,
+    tuning: ContextTuning = DEFAULT_TUNING,
+    duplicates: DuplicateMap = DuplicateMap(),
 ) -> Reduction:
     """Build a tiered envelope: rollup, then extracts, then verbatim files.
 
     Args:
         strategy: The requested strategy name, preserved on the result.
         candidates: Every offered document.
-        ordered: The same documents in rank order.
+        ordered: The documents that survived duplicate collapse, in rank order.
         max_tokens: Token budget.
         max_bytes: Byte ceiling.
         max_documents: Ceiling on documents rendered at detail fidelity.
@@ -93,14 +106,19 @@ def reduce_tiered(
         module_digests: App-supplied module summaries; rendered when they fit. The
             library never generates these — spending inference to summarize is an
             application's decision.
+        tuning: Supplies ``rollup_share`` and ``compact_fallback``. With compaction on,
+            the verbatim tier gains a step: a file that will not fit whole is sent
+            without its commentary rather than left at extract fidelity.
+        duplicates: Documents collapsed into others, rendered as pointers beside their
+            representative.
 
     Returns:
         The `Reduction`. Coverage is total by construction: every document appears in
         the rollup even when no budget remained for its content.
     """
     constraints: set[str] = set()
-    rollup_token_share = max(1, int(max_tokens * DEFAULT_ROLLUP_SHARE))
-    rollup_byte_share = max(_ROLLUP_MIN_BYTES, int(max_bytes * DEFAULT_ROLLUP_SHARE))
+    rollup_token_share = max(1, int(max_tokens * tuning.rollup_share))
+    rollup_byte_share = max(_ROLLUP_MIN_BYTES, int(max_bytes * tuning.rollup_share))
 
     rollup, rollup_tokens, rollup_bytes = _render_rollup(
         candidates,
@@ -109,7 +127,7 @@ def reduce_tiered(
         estimator=estimator,
     )
 
-    used_tokens = rollup_tokens + estimator.estimate("").tokens
+    used_tokens = rollup_tokens + estimator.estimate(wrapper_text(TIERS_TAG)).tokens
     used_bytes = rollup_bytes + wrapper_bytes(TIERS_TAG)
 
     digest_block = ""
@@ -147,27 +165,44 @@ def reduce_tiered(
         used_bytes += cost_bytes
 
     verbatim_blocks: list[tuple[ContextDocument, str]] = []
+    compacted = 0
     for document in ordered:
         if document.path in extracted:
             continue
         if len(extracted) + len(verbatim_blocks) >= max_documents:
             constraints.add("document count")
             break
-        block = render_file_block(document)
+
+        block = _blocks_for(document, duplicates)
         cost_tokens = estimator.estimate(block).tokens
         cost_bytes = block_bytes(block)
-        if used_tokens + cost_tokens > max_tokens:
-            constraints.add("tokens")
-            continue
-        if used_bytes + cost_bytes > max_bytes:
-            constraints.add("bytes")
-            continue
+        overflow = _overflowing(
+            used_tokens + cost_tokens, max_tokens, used_bytes + cost_bytes, max_bytes
+        )
+
+        if overflow is not None:
+            fallback = _compact_block(document, duplicates, tuning)
+            if fallback is None:
+                constraints.add(overflow)
+                continue
+            block = fallback
+            cost_tokens = estimator.estimate(block).tokens
+            cost_bytes = block_bytes(block)
+            overflow = _overflowing(
+                used_tokens + cost_tokens, max_tokens, used_bytes + cost_bytes, max_bytes
+            )
+            if overflow is not None:
+                constraints.add(overflow)
+                continue
+            compacted += 1
+
         verbatim_blocks.append((document, block))
         used_tokens += cost_tokens
         used_bytes += cost_bytes
 
     detailed = [document for document, _ in (*extract_blocks, *verbatim_blocks)]
     text = _assemble(rollup, digest_block, extract_blocks, verbatim_blocks, render_order)
+    exact, near = _collapse_counts(duplicates)
 
     return Reduction(
         strategy=strategy,
@@ -181,15 +216,35 @@ def reduce_tiered(
         max_documents=max_documents,
         total_bytes=len(text.encode("utf-8")),
         binding_constraints=_order_constraints(constraints),
+        collapsed_exact=exact,
+        collapsed_near=near,
+        compacted_count=compacted,
         tier_metadata={
             "rollup_modules": rollup.count("<module "),
             "extract_count": len(extract_blocks),
             "verbatim_count": len(verbatim_blocks),
+            "compact_count": compacted,
             "digests_rendered": bool(digest_block),
             # Every document is named in the rollup, whatever else fit.
             "coverage_fraction": 1.0 if candidates else 0.0,
         },
     )
+
+
+def _overflowing(
+    used_tokens: int, max_tokens: int, used_bytes: int, max_bytes: int
+) -> str | None:
+    """Which ceiling a prospective admission would breach, if any.
+
+    Tokens are checked first here, matching the order this strategy has always reported
+    them in — the constraint set is order-independent, but which one gets recorded when
+    both would bind is not.
+    """
+    if used_tokens > max_tokens:
+        return "tokens"
+    if used_bytes > max_bytes:
+        return "bytes"
+    return None
 
 
 def _assemble(
