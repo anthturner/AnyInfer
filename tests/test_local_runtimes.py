@@ -263,13 +263,18 @@ def test_the_default_variant_is_never_cuda() -> None:
     assert default_runtime_kind(_profile(cuda=True)) != "cuda"
 
 
+# Both cases below describe a non-macOS machine, and `default_runtime_kind` asks
+# `platform.system()` rather than `sys.platform` for that (see the note on the function:
+# `sys.platform` is narrowed by mypy and makes the branch below it read as dead code).
+# Patch the call the function actually makes, or these silently assert nothing on Linux
+# and Windows while failing outright on a macOS runner.
 def test_a_gpu_machine_defaults_to_the_vendor_neutral_build(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("anyinfer.local.runtimes.sys.platform", "linux")
+    monkeypatch.setattr("anyinfer.local.runtimes.platform.system", lambda: "Linux")
     assert default_runtime_kind(_profile(cuda=True)) == "vulkan"
 
 
 def test_a_cpu_only_machine_defaults_to_cpu(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("anyinfer.local.runtimes.sys.platform", "linux")
+    monkeypatch.setattr("anyinfer.local.runtimes.platform.system", lambda: "Linux")
     assert default_runtime_kind(_profile()) == "cpu"
 
 
