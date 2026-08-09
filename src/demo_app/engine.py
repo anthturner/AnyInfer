@@ -423,9 +423,8 @@ class Engine(QObject):
         if key in self._active:
             return
         # Rewind the fakes so the flaky model's scripted failure is reproducible on every
-        # run rather than only the first. Shared across concurrent generations: the
-        # offline backend has one mode, and two tabs racing it is an accepted limit of a
-        # scripted provider, not of the library.
+        # run rather than only the first. The answer *shape* is decided per request by
+        # the fake transport, so concurrent generations cannot reshape each other.
         self._fake_backend.set_json_mode(spec.schema is not None)
         was_busy = self.busy
         signals = _Signals()

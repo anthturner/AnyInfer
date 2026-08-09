@@ -82,36 +82,43 @@ _CANNED_STRUCTURED = {
 
 
 class DemoFakeBackend:
-    """The demo's offline provider, rebuilt when the answer shape changes."""
+    """The demo's offline provider.
+
+    Two providers are kept — one answering prose, one answering the canned structured
+    object — and *each request* is routed to the right one by reading its own body. A
+    single mutable "json mode" flag would be a global for something that is per request,
+    and with several conversations streaming at once the last caller to set it would
+    decide what the others got back.
+    """
 
     def __init__(self) -> None:
-        self._provider = _build(json_mode=False)
+        self._prose = _build(json_mode=False)
+        self._structured = _build(json_mode=True)
 
     def set_json_mode(self, enabled: bool) -> None:
-        """Serve schema-shaped answers, so the structured-output panel has valid input.
+        """Rewind the scripted failure scripts.
 
-        A fake that always returned prose would make every structured request fail
-        validation, which would demonstrate the repair loop and nothing else.
-
-        Rebuilding unconditionally also rewinds the scripted failures, so the flaky model
-        fails on its first call of *every* run rather than only the first of the session.
+        Kept as the demo's "start a fresh run" hook — the flaky model fails on the first
+        call of *every* run rather than only the first of the session. The ``enabled``
+        argument no longer selects an answer shape: that is decided per request from the
+        wire body, so a structured turn in one tab cannot reshape a plain turn in
+        another.
         """
-        self._provider = _build(json_mode=enabled)
+        self._prose.reset()
+        self._structured.reset()
 
     def transport(self) -> httpx2.MockTransport:
-        """A transport that dispatches to the scripted model the request names.
+        """A transport that answers each request in the shape that request asked for.
 
-        The ``tools`` model needs one behaviour `ScriptedModel` cannot declare: a
-        *different* answer depending on where the loop is. It is intercepted here with a
-        stateless rule — a request already carrying a ``tool``-role message gets the final
-        text, anything else gets the scripted call — and every other model falls through
-        to the scripted provider unchanged. Stateless on purpose: the demonstration
-        replays identically no matter how many loops have run.
+        Two behaviours live here rather than in `ScriptedModel`, both because they depend
+        on the request:
 
-        The scripted provider is looked up per request rather than captured here: the
-        client keeps this transport for its whole lifetime, and `set_json_mode()` swaps
-        the provider underneath it — a captured reference would silently pin the mode
-        the client was built under.
+        - The ``tools`` model answers a plain request with a tool call and a request
+          already carrying a ``tool``-role message with text — the two halves of a tool
+          loop.
+        - Any request carrying a ``response_format`` is served the structured provider;
+          everything else gets prose. That is the same decision the caller's schema
+          makes, read back off the wire.
         """
 
         def handle(request: httpx2.Request) -> httpx2.Response:
@@ -132,11 +139,24 @@ class DemoFakeBackend:
                 rendered = server.transport().handler(request)
                 assert isinstance(rendered, httpx2.Response)
                 return rendered
-            fallthrough = self._provider.transport().handler(request)
+            provider = self._structured if _wants_structured(body) else self._prose
+            fallthrough = provider.transport().handler(request)
             assert isinstance(fallthrough, httpx2.Response)
             return fallthrough
 
         return httpx2.MockTransport(handle)
+
+
+def _wants_structured(body: dict[str, Any] | None) -> bool:
+    """Whether this request asked for a schema-shaped answer.
+
+    ``response_format`` is how every structured-output mechanism the OpenAI dialect
+    carries announces itself — ``json_schema`` and plain ``json_object`` alike — so one
+    check covers both. A prompt-injected schema (the last-resort mechanism) sends no
+    such field and legitimately gets prose, which is exactly the case the repair loop
+    exists for.
+    """
+    return body is not None and body.get("response_format") is not None
 
 
 def _chat_body(request: httpx2.Request) -> dict[str, Any] | None:

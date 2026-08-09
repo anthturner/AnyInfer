@@ -266,3 +266,46 @@ class TestHelpDialogPolish:
             assert any("Demonstration Application" in t for t in texts)
         finally:
             dialog.close()
+
+
+class TestConcurrentFakeShapes:
+    """The offline fake answers each request in the shape that request asked for.
+
+    A single mutable "json mode" on the backend used to decide this, which meant the
+    last tab to start a generation chose the answer shape for every tab still running.
+    """
+
+    def test_structured_and_plain_tabs_do_not_reshape_each_other(self, window):
+        import json
+
+        from demo_app.widgets.schema_panel import EXAMPLE_SCHEMA
+
+        # Tab 1: structured. Enable the schema before sending.
+        window._schema.set_enabled(True)
+        window._schema._editor.setPlainText(json.dumps(EXAMPLE_SCHEMA))
+        window._composer.set_text("Analyze this review: great value")
+        window._on_send()
+        structured_page = window._tabs.current_page()
+
+        # Tab 2: plain prose, started while the first is still settling, and with the
+        # schema switched off — the state the old global flag would have leaked.
+        window._on_new_chat()
+        window._schema.set_enabled(False)
+        window._composer.set_text("Just answer in prose")
+        window._on_send()
+        prose_page = window._tabs.current_page()
+
+        _drain_keys(window, {structured_page.key, prose_page.key})
+
+        structured_text = structured_page.view.transcript_text()
+        prose_text = prose_page.view.transcript_text()
+        assert "sentiment" in structured_text  # got the JSON object
+        assert "sentiment" not in prose_text  # and the prose tab did not
+        assert "fake provider" in prose_text
+
+    def test_a_plain_request_alone_still_gets_prose(self, window):
+        window._composer.set_text("hello")
+        window._on_send()
+        page = window._tabs.current_page()
+        _drain_keys(window, {page.key})
+        assert "fake provider" in page.view.transcript_text()
