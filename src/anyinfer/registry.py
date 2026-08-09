@@ -312,6 +312,22 @@ class ProviderDescriptor:
     well-formed JSON but not *meaningful* JSON unless the model was told the shape.
     """
 
+    max_repair_attempts: int | None = None
+    """The most schema-repair round trips this provider may be asked for, or ``None`` for
+    no provider-imposed ceiling.
+
+    The repair budget is the caller's to set, and for almost every provider it should
+    stay that way. A few cannot honor it: a provider whose every request is slow,
+    interactively authenticated, or metered per conversation turn makes a second repair
+    attempt cost far more than the malformed answer is worth, and one that keeps
+    server-side conversation state is unlikely to answer a re-ask differently anyway.
+
+    Such a provider says so here, and the core clamps to it — visibly, as a
+    `ParameterDropped` event, since a
+    budget quietly reduced from three to one is exactly the kind of degradation this
+    library refuses to perform in silence.
+    """
+
     ignored_parameters: tuple[str, ...] = ()
     """Request parameters this provider accepts and silently discards.
 

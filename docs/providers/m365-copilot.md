@@ -61,6 +61,7 @@ This is the only workable path for automated use.
 | Tools | No |
 | Sampling controls | **Ignored by the service** |
 | Usage | Generally absent |
+| Schema repair | Capped at **one** round trip |
 
 ## Ignored parameters are reported
 
@@ -77,6 +78,27 @@ class Watch:
 
 This is the whole point of that event: a `temperature=0` that had no effect is otherwise
 indistinguishable from one that worked.
+
+## One repair attempt, never a loop
+
+The descriptor caps schema repair at a single round trip. Every request here is a Graph
+call against a conversation the service keeps state for, behind an interactively-acquired
+token — the most expensive request shape in the registry, and the least likely to answer a
+repeated question differently.
+
+Asking for more is clamped rather than refused, and the clamp is reported the same way an
+ignored parameter is:
+
+```python
+result = client.generate(
+    prompt, target="m365-copilot:default", schema=PERSON, repair=ai.Repair(max_attempts=3),
+)
+# ParameterDropped(parameter="repair.max_attempts", reason="... at most 1 ... 3 requested")
+```
+
+Prompt-only schema enforcement plus one repair is a real failure rate. Validate
+`result.structured` defensively, and prefer a provider with a native structured-output mode
+when the shape matters more than the M365 grounding does.
 
 ## Notes
 

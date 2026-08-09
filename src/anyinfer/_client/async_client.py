@@ -882,7 +882,13 @@ class AsyncClient:
             )
 
         current = request
-        repair_budget = request.repair.max_attempts if request.repair else 0
+        repair_budget, repair_clamp_reason = _repair_budget(request, descriptor)
+        if repair_clamp_reason is not None:
+            self._emit(
+                ParameterDropped(
+                    request_id, resolved, "repair.max_attempts", repair_clamp_reason
+                )
+            )
         repair_attempts = 0
         yielded_content = False
 
@@ -1086,6 +1092,25 @@ class AsyncClient:
         """Dispatch a telemetry event when anyone is listening."""
         if self._events.has_observers:
             self._events.emit(event)
+
+
+def _repair_budget(
+    request: GenerationRequest, descriptor: ProviderDescriptor
+) -> tuple[int, str | None]:
+    """Resolve how many repair round trips this target may actually be asked for.
+
+    Returns:
+        The budget in force, and an explanation when the provider's ceiling reduced the
+        caller's request — ``None`` when the caller got exactly what they asked for.
+    """
+    requested = request.repair.max_attempts if request.repair else 0
+    ceiling = descriptor.max_repair_attempts
+    if ceiling is None or requested <= ceiling:
+        return requested, None
+    return ceiling, (
+        f"{descriptor.id} allows at most {ceiling} schema-repair round trip(s); "
+        f"{requested} requested"
+    )
 
 
 def _structured_candidate(

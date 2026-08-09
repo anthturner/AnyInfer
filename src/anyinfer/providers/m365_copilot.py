@@ -302,6 +302,11 @@ descriptor = ProviderDescriptor(
         ),
     ),
     default_capabilities=ModelCapabilities(features=Sourced(_M365_FEATURES, "default")),
+    # One re-ask, never a loop. Every request here is a Graph round trip against a
+    # conversation the service keeps state for, behind an interactively-acquired token —
+    # the most expensive request shape in the registry, and the least likely to answer a
+    # repeated question differently.
+    max_repair_attempts=1,
     ignored_parameters=(
         "temperature", "top_p", "max_output_tokens", "stop", "tools", "reasoning",
     ),

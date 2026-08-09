@@ -368,6 +368,7 @@ class ProviderDescriptor:               # ModelFit's design, generalized
     reasoning_translator: ReasoningTranslator
     static_capabilities: Mapping[str, ModelCapabilities]   # catalog layer seed
     token_calibration: TokenCalibration = TokenCalibration()  # D34: envelope this provider bills for
+    max_repair_attempts: int | None = None                    # D35: ceiling on schema-repair round trips
     supports_sessions: bool = False
 ```
 

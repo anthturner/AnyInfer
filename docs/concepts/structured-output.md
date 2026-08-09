@@ -124,6 +124,25 @@ except ai.SchemaViolationError as error:
 
 You get both the validation errors and the raw output, so you can salvage or debug.
 
+### Some providers cap the budget
+
+The budget is the caller's to set, and for almost every provider it stays that way. A few
+declare a ceiling, because a repair round trip costs them far more than a malformed answer
+is worth: Microsoft 365 Copilot allows one, since every request is a Graph call against a
+service-held conversation behind an interactively-acquired token.
+
+The clamp is never silent. Asking for three where the provider allows one emits a
+[`ParameterDropped`](telemetry.md) event naming `repair.max_attempts`, so a budget reduced
+behind your back is as discoverable as a parameter ignored outright:
+
+```python
+ai.ParameterDropped(
+    parameter="repair.max_attempts",
+    reason="m365-copilot allows at most 1 schema-repair round trip(s); 3 requested",
+    ...
+)
+```
+
 ## Extraction is forgiving; validation is not
 
 Models wrap JSON in code fences and prose even when told not to. Extraction handles that —

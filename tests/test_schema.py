@@ -13,7 +13,7 @@ from anyinfer.schema.repair import REPAIR_PROMPT, build_repair_messages
 from anyinfer.schema.validate import extract_json, format_errors, validate
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse, sse_lines
 from anyinfer.types.capabilities import Feature, ModelCapabilities, Sourced
-from support import make_client
+from support import make_client, make_multi_client
 
 PERSON_SCHEMA = {
     "type": "object",
@@ -258,6 +258,112 @@ async def test_repair_budget_is_bounded() -> None:
             )
 
     assert server.call_count == 3, "the original attempt plus two repairs"
+
+
+class _Recorder:
+    """Collects telemetry events for assertions."""
+
+    def __init__(self) -> None:
+        self.events: list[ai.TelemetryEvent] = []
+
+    def on_event(self, event: ai.TelemetryEvent) -> None:
+        self.events.append(event)
+
+
+def _capped_registry(ceiling: int | None) -> ai.ProviderRegistry:
+    """An openai-compat registration that caps how often it may be asked to self-repair."""
+    from anyinfer.providers.openai_compat import OpenAICompatAdapter
+
+    registry = ai.ProviderRegistry(load_builtins=True, load_entry_points=False)
+    registry.register(
+        ai.ProviderDescriptor(
+            id="capped",
+            display_name="Fake capped",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+            max_repair_attempts=ceiling,
+        )
+    )
+    return registry
+
+
+async def test_provider_repair_ceiling_clamps_the_caller_budget() -> None:
+    server = FakeOpenAIServer(FakeResponse(text=json.dumps({"name": "Ada"})))
+    async with make_multi_client(
+        [("capped", server)], registry=_capped_registry(1)
+    ) as client:
+        with pytest.raises(ai.SchemaViolationError):
+            await client.generate(
+                "who?",
+                target="capped:m",
+                schema=PERSON_SCHEMA,
+                repair=ai.Repair(max_attempts=3),
+            )
+
+    assert server.call_count == 2, "the original attempt plus the one repair allowed"
+
+
+async def test_provider_repair_ceiling_is_reported_not_silent() -> None:
+    recorder = _Recorder()
+    server = FakeOpenAIServer(FakeResponse(text=json.dumps({"name": "Ada"})))
+    async with make_multi_client(
+        [("capped", server)], registry=_capped_registry(1), observers=[recorder]
+    ) as client:
+        with pytest.raises(ai.SchemaViolationError):
+            await client.generate(
+                "who?",
+                target="capped:m",
+                schema=PERSON_SCHEMA,
+                repair=ai.Repair(max_attempts=3),
+            )
+
+    clamps = [
+        e
+        for e in recorder.events
+        if isinstance(e, ai.ParameterDropped) and e.parameter == "repair.max_attempts"
+    ]
+    assert len(clamps) == 1
+    assert "at most 1" in clamps[0].reason
+    assert "3 requested" in clamps[0].reason
+
+
+async def test_repair_budget_under_the_ceiling_is_left_alone() -> None:
+    recorder = _Recorder()
+    server = FakeOpenAIServer(
+        [
+            FakeResponse(text=json.dumps({"name": "Ada"})),
+            FakeResponse(text=json.dumps({"name": "Ada", "age": 36})),
+        ]
+    )
+    async with make_multi_client(
+        [("capped", server)], registry=_capped_registry(2), observers=[recorder]
+    ) as client:
+        result = await client.generate(
+            "who?", target="capped:m", schema=PERSON_SCHEMA, repair=ai.Repair(max_attempts=1)
+        )
+
+    assert result.repair_attempts == 1
+    assert not [
+        e
+        for e in recorder.events
+        if isinstance(e, ai.ParameterDropped) and e.parameter == "repair.max_attempts"
+    ], "a budget the provider can honor is not a degradation"
+
+
+async def test_no_ceiling_means_the_caller_decides() -> None:
+    server = FakeOpenAIServer(FakeResponse(text=json.dumps({"name": "Ada"})))
+    async with make_multi_client(
+        [("capped", server)], registry=_capped_registry(None)
+    ) as client:
+        with pytest.raises(ai.SchemaViolationError):
+            await client.generate(
+                "who?",
+                target="capped:m",
+                schema=PERSON_SCHEMA,
+                repair=ai.Repair(max_attempts=2),
+            )
+
+    assert server.call_count == 3
 
 
 async def test_prompt_mechanism_injects_the_schema_into_a_system_message() -> None:

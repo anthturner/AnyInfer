@@ -219,16 +219,20 @@ class RequestFailed:
 
 @dataclass(frozen=True, slots=True)
 class ParameterDropped:
-    """A requested parameter was not sent, because the target cannot accept it.
+    """A requested parameter was not honored as asked, because the target cannot.
 
     Dropping a parameter silently is how a caller ends up debugging why ``temperature=0``
-    had no effect. Every drop is observable instead.
+    had no effect. Every drop is observable instead. The same applies to a parameter
+    honored only in part — a repair budget clamped to a provider's ceiling is reported
+    here too, since a budget quietly reduced from three to one is no more discoverable
+    than one ignored outright.
 
     Attributes:
         request_id: Correlation id shared by every event this request emits.
         target: The resolved target the parameter was withheld from.
-        parameter: Name of the request parameter that was not sent.
-        reason: Human-readable explanation of why the target cannot accept it.
+        parameter: Name of the request parameter that was not honored, dotted for a field
+            of a compound one (``repair.max_attempts``).
+        reason: Human-readable explanation of what the target did instead.
     """
 
     request_id: str
