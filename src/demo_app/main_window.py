@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
@@ -236,7 +237,17 @@ class MainWindow(QMainWindow):
         self._tabs.close_requested.connect(self._on_tab_close)
         self._tabs.close_all_requested.connect(self._on_tab_close_all)
         self._tabs.currentChanged.connect(self._on_tab_changed)
-        layout.addWidget(self._tabs, 1)
+
+        # A plain frame carries the box border: QTabWidget's own frame only ever
+        # outlines the pane below the tab bar, not the tab bar itself, so a border set
+        # on the tab widget can't start level with the leftmost tab's top edge.
+        tabs_frame = QFrame()
+        tabs_frame.setObjectName("ConversationTabsFrame")
+        tabs_frame_layout = QVBoxLayout(tabs_frame)
+        tabs_frame_layout.setContentsMargins(0, 0, 0, 0)
+        tabs_frame_layout.setSpacing(0)
+        tabs_frame_layout.addWidget(self._tabs)
+        layout.addWidget(tabs_frame, 1)
 
         self._composer = Composer()
         self._composer.send_requested.connect(self._on_send)
@@ -250,7 +261,7 @@ class MainWindow(QMainWindow):
     def _make_welcome(self) -> WelcomeView:
         """A welcome view for one new tab; every empty tab gets its own."""
         welcome = WelcomeView()
-        welcome.new_chat_requested.connect(self._on_new_chat)
+        welcome.quick_question_requested.connect(self._on_welcome_quick_question)
         welcome.structured_output_requested.connect(self._on_welcome_structured)
         welcome.fallback_demo_requested.connect(self._on_welcome_fallback)
         welcome.tool_loop_requested.connect(self._on_welcome_tools)
@@ -1110,6 +1121,11 @@ class MainWindow(QMainWindow):
         self._inspector_sections[key].setVisible(visible)
 
     # ---- welcome / quick actions -------------------------------------------------------
+
+    def _on_welcome_quick_question(self, question: str) -> None:
+        """Pre-fill and immediately send a random trivia question."""
+        self._composer.set_text(question)
+        self._on_send()
 
     def _on_welcome_structured(self) -> None:
         self._schema.set_enabled(True)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from decimal import Decimal
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from .messages import Message
@@ -24,13 +25,16 @@ __all__ = [
     "GenerationRequest",
     "HistoryMode",
     "HistoryPolicy",
+    "RateLimits",
     "ReasoningEffort",
     "Repair",
     "ResolvedTarget",
     "Sampling",
     "SchemaSpec",
+    "SpendPolicy",
     "SupportsJSONSchema",
     "Target",
+    "ToolAnnotations",
     "ToolChoice",
     "ToolSpec",
 ]
@@ -118,6 +122,48 @@ class SchemaSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolAnnotations:
+    """Behavioural hints a tool source advertises about a tool.
+
+    **Untrusted by construction.** These arrive from whatever declared the tool — a Model
+    Context Protocol server, most often — and the protocol that defines them says plainly
+    that a client must not treat them as guarantees. AnyInfer honours that: a hint may gate
+    an *optimization*, and it may never gate a security decision. Nothing is granted more
+    access, skipped, or auto-approved because a server called it read-only.
+
+    Every field is ``None`` when the source said nothing, which is different from ``False``
+    — "not stated" and "stated not to be" are not the same claim.
+
+    Attributes:
+        title: A human-readable name, when the source offers one distinct from ``name``.
+        read_only: The tool does not modify its environment.
+        destructive: The tool may perform irreversible updates.
+        idempotent: Repeating the call with identical arguments changes nothing further.
+        open_world: The tool touches systems outside a closed, predictable set.
+    """
+
+    title: str | None = None
+    read_only: bool | None = None
+    destructive: bool | None = None
+    idempotent: bool | None = None
+    open_world: bool | None = None
+
+    @property
+    def stated(self) -> bool:
+        """Whether the source said anything at all."""
+        return any(
+            value is not None
+            for value in (
+                self.title,
+                self.read_only,
+                self.destructive,
+                self.idempotent,
+                self.open_world,
+            )
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ToolSpec:
     """A tool the model may call.
 
@@ -125,11 +171,14 @@ class ToolSpec:
         name: Identifier the model uses to invoke the tool.
         description: What the tool does, shown to the model to guide when to call it.
         parameters: JSON Schema describing the tool's arguments.
+        annotations: Untrusted behavioural hints from whatever declared the tool. Empty for
+            tools declared in Python, where the code is its own description.
     """
 
     name: str
     description: str
     parameters: Mapping[str, Any]
+    annotations: ToolAnnotations = ToolAnnotations()
 
 
 ToolChoice = Literal["auto", "none", "required"] | str
@@ -282,6 +331,133 @@ class CachePolicy:
     def active(self) -> bool:
         """Whether this policy will attempt any placement."""
         return self.mode != "off"
+
+
+@dataclass(frozen=True, slots=True)
+class SpendPolicy:
+    """A ceiling on what one client may spend. Off unless supplied.
+
+    Checked before dispatch, beside the context gate, so a refusal costs nothing. This is
+    the caller's own policy on their own client — it shares no state with any other
+    process and enforces no organization quota, which this library deliberately leaves to
+    the deployment around it.
+
+    Attributes:
+        max_total_usd: Ceiling on this client's cumulative spend. ``None`` means no ceiling.
+        max_request_usd: Ceiling on any single request's *estimated* cost.
+        on_unknown: What to do when a target's cost cannot be estimated, because its
+            pricing is missing or untrusted. ``allow`` preserves today's behaviour;
+            ``refuse`` is for callers who would rather fail than spend blind. There is no
+            third option that treats unknown as zero — a guard that does that enforces
+            nothing while appearing to.
+    """
+
+    max_total_usd: Decimal | None = None
+    max_request_usd: Decimal | None = None
+    on_unknown: Literal["allow", "refuse"] = "allow"
+
+    def __post_init__(self) -> None:
+        """Reject a ceiling that cannot be enforced.
+
+        Raises:
+            ValueError: On a negative ceiling or an unknown ``on_unknown`` value.
+        """
+        for name in ("max_total_usd", "max_request_usd"):
+            value = getattr(self, name)
+            if value is not None and value < 0:
+                raise ValueError(f"{name} must not be negative; got {value!r}")
+        if self.on_unknown not in ("allow", "refuse"):
+            raise ValueError(
+                f"on_unknown must be 'allow' or 'refuse'; got {self.on_unknown!r}"
+            )
+
+    @property
+    def active(self) -> bool:
+        """Whether this policy can refuse anything."""
+        return (
+            self.max_total_usd is not None
+            or self.max_request_usd is not None
+            or self.on_unknown == "refuse"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RateLimits:
+    """Client-side pacing for one provider instance. Inert unless configured.
+
+    This paces *this process's own* requests to one provider so an application that fans
+    out does not discover the provider's limits by being throttled by them. It shares no
+    state with any other process, enforces no quota the provider did not state, and never
+    influences which target is chosen — a limiter that picked a different provider because
+    this one was busy would be load balancing, which this library deliberately does not do.
+
+    With every field left at its default, a request is dispatched exactly as it was before
+    this existed: no permit, no delay, no bookkeeping.
+
+    Attributes:
+        max_concurrent: Most requests in flight at once for this instance. ``None`` means
+            unbounded, which is today's behaviour.
+        requests_per_minute: Sustained request rate. Enforced as a token bucket, so a burst
+            up to the per-minute allowance is permitted and then paced.
+        min_interval_s: Smallest gap between two dispatches, for providers that object to
+            bursts regardless of the rate.
+        respect_headers: Whether to slow down when the provider's own rate-limit headers
+            say its window is nearly exhausted. Inert when the provider declares no header
+            dialect, since there is nothing to read.
+        reserve_fraction: Fraction of the provider's stated remaining allowance to leave
+            untouched, between 0 and 1. Matters whenever this process is not the only
+            consumer of the key: stopping at the last request in the window means the other
+            consumer is the one that gets throttled.
+    """
+
+    max_concurrent: int | None = None
+    requests_per_minute: float | None = None
+    min_interval_s: float = 0.0
+    respect_headers: bool = True
+    reserve_fraction: float = 0.0
+
+    def __post_init__(self) -> None:
+        """Reject a limit that cannot be honoured.
+
+        Raises:
+            ValueError: On a non-positive bound, a negative interval, or a reserve
+                fraction outside the unit interval.
+        """
+        if self.max_concurrent is not None and self.max_concurrent < 1:
+            raise ValueError(
+                f"max_concurrent must be at least one; got {self.max_concurrent!r}"
+            )
+        if self.requests_per_minute is not None and self.requests_per_minute <= 0:
+            raise ValueError(
+                f"requests_per_minute must be greater than zero; "
+                f"got {self.requests_per_minute!r}"
+            )
+        if self.min_interval_s < 0:
+            raise ValueError(
+                f"min_interval_s must be zero or greater; got {self.min_interval_s!r}"
+            )
+        if not 0.0 <= self.reserve_fraction < 1.0:
+            raise ValueError(
+                "reserve_fraction must be at least zero and less than one; "
+                f"got {self.reserve_fraction!r}"
+            )
+
+    @property
+    def active(self) -> bool:
+        """Whether this policy can delay anything.
+
+        A bare `RateLimits()` *is* active: it means "pace me by what the provider reports",
+        which is the least a caller who asked for governance at all can mean. Opting out is
+        spelled by supplying no limits, not by supplying empty ones — so
+        `RateLimits(respect_headers=False)` with no bounds is the one inert instance, and
+        it is inert honestly rather than by accident.
+        """
+        return (
+            self.max_concurrent is not None
+            or self.requests_per_minute is not None
+            or self.min_interval_s > 0
+            or self.respect_headers
+        )
 
 
 DEFAULT_TIMEOUT_S = 120.0

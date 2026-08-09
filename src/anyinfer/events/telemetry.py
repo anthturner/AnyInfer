@@ -29,6 +29,8 @@ __all__ = [
     "FirstToken",
     "ParameterDropped",
     "ProviderDiagnostic",
+    "RateLimitObserved",
+    "RateLimitWaited",
     "RepairAttempted",
     "RequestCompleted",
     "RequestFailed",
@@ -348,6 +350,54 @@ class CachePlanned:
 
 
 @dataclass(frozen=True, slots=True)
+class RateLimitWaited:
+    """A request was held back by client-side pacing before it was dispatched.
+
+    Emitted so a paced request never looks like a slow provider. The same wait also lands
+    in the attempt's ``timing.phases["queued_ms"]``, because latency a caller cannot
+    attribute is a support ticket.
+
+    Attributes:
+        request_id: Correlation id of the waiting request; empty when the wait happened
+            outside a tracked generation, as on a model listing.
+        provider_id: The provider instance whose limiter did the waiting.
+        waited_s: How long the request was held.
+        reason: ``concurrency`` for an in-flight bound, ``interval`` for a configured rate
+            or minimum gap, ``provider-headers`` for a window the provider itself reported.
+        target: The resolved target, when the wait belongs to a generation attempt.
+    """
+
+    request_id: str
+    provider_id: str
+    waited_s: float
+    reason: Literal["concurrency", "interval", "provider-headers"]
+    target: ResolvedTarget | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RateLimitObserved:
+    """A provider reported its rate-limit state on a response.
+
+    Emitted at most once per response, and only when the provider declared a header dialect
+    and actually populated it. Purely what the provider said — this library adds no estimate
+    of its own, and a field the provider left out stays ``None`` rather than becoming a
+    guess.
+
+    Attributes:
+        provider_id: The provider instance that reported.
+        requests_remaining: Requests left in the current window, when stated.
+        tokens_remaining: Tokens left in the current window, when stated.
+        resets_in_s: Seconds until the window resets, when stated in a form that can be
+            read as a duration.
+    """
+
+    provider_id: str
+    requests_remaining: int | None = None
+    tokens_remaining: int | None = None
+    resets_in_s: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ServerLifecycle:
     """A supervised local server changed state.
 
@@ -402,6 +452,7 @@ TelemetryEvent = (
     | RetryScheduled | FallbackTriggered | RepairAttempted | RequestCompleted | RequestFailed
     | ParameterDropped | UsageEstimated | ServerLifecycle | DownloadProgress
     | ContextReduced | ProviderDiagnostic | CachePlanned
+    | RateLimitWaited | RateLimitObserved
 )
 """Any event an observer may receive."""
 

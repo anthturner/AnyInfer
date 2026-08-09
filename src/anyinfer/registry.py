@@ -18,7 +18,7 @@ from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, Literal
 
 from .errors import ConfigError
-from .types.capabilities import ModelCapabilities, TokenCalibration
+from .types.capabilities import ModelCapabilities, RateLimitHeaders, TokenCalibration
 from .types.requests import CacheMechanism, ReasoningEffort
 
 if TYPE_CHECKING:
@@ -394,6 +394,24 @@ class ProviderDescriptor:
     messages in its own harness charges that harness on every request. The default is the
     identity — the provider counts what it was sent — and only a provider with evidence of
     a systematic gap should declare otherwise.
+    """
+
+    rate_limit_headers: RateLimitHeaders = RateLimitHeaders()
+    """Which response headers this provider reports its rate-limit state in.
+
+    Empty by default, which means client-side pacing for this provider can only honour the
+    bounds its caller configured. Declaring a dialect is what lets pacing anticipate the
+    provider's own window instead — and, like every other wire fact here, it belongs in the
+    provider's contract snapshot with a verified date.
+    """
+
+    governs_own_transport: bool = False
+    """Whether this provider builds its own transport rather than taking the core's.
+
+    True for adapters that talk through a vendor SDK or an interactive session instead of
+    an ``httpx2`` client the core constructed. The core cannot wrap what it did not build,
+    so such a provider gets concurrency pacing only, applied around the call, and reports a
+    dropped parameter if the caller asked for header-driven pacing it cannot perform.
     """
 
     supports_sessions: bool = False

@@ -13,9 +13,10 @@ a context menu mirroring the conversation sidebar's actions.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QPoint, Qt, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QIcon, QResizeEvent
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QMenu,
     QTabBar,
     QTabWidget,
@@ -34,6 +35,7 @@ from .icons import themed_icon
 __all__ = ["ChatPage", "ConversationTabs"]
 
 _CLOSE_ICON_SIZE = 12
+_STRIP_BUTTON_SIZE = 28
 
 
 class ChatPage(QWidget):
@@ -91,6 +93,24 @@ class _TabBar(QTabBar):
         return super().event(event)
 
 
+class _CornerBox(QWidget):
+    """A fixed-size corner-widget container with a `sizeHint()` that is right immediately.
+
+    `QTabWidget` reads a corner widget's `sizeHint()` synchronously, at the moment it is
+    installed, to place it — a plain `QWidget` with a freshly attached layout can't answer
+    that yet (a layout's size hint isn't valid until the event loop has run once), which
+    left this container pinned at (0, 0) instead of at the tab strip's right edge.
+    """
+
+    def __init__(self, size: QSize, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._size = size
+        self.setFixedSize(size)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 — Qt's spelling
+        return self._size
+
+
 class ConversationTabs(QTabWidget):
     """The tabbed chat area. Emits intents; the window owns what they mean."""
 
@@ -103,16 +123,68 @@ class ConversationTabs(QTabWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("ConversationTabs")
         self._bar = _TabBar()
         self.setTabBar(self._bar)
         self.setDocumentMode(True)
         self.setMovable(True)
         self.setElideMode(Qt.TextElideMode.ElideRight)
+        # Qt's own scroll buttons still do the scrolling (there is no public API for tab
+        # bar scroll offset), but they render huddled together off to one side. The
+        # corner-widget pair below stands in for them visually, at the strip's true ends,
+        # driven by clicking the real (now invisible) buttons underneath.
         self.setUsesScrollButtons(True)
         self._bar.hovered_changed.connect(lambda _i: self._refresh_close_buttons())
         self.currentChanged.connect(lambda _i: self._refresh_close_buttons())
         self._bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._bar.customContextMenuRequested.connect(self._on_context_menu)
+        self._bar.tabMoved.connect(lambda *_: self._schedule_scroll_refresh())
+
+        self._new_tab_button = QToolButton()
+        self._new_tab_button.setObjectName("NewTabButton")
+        self._new_tab_button.setAccessibleName("New chat")
+        self._new_tab_button.setToolTip("New chat")
+        self._new_tab_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._new_tab_button.setAutoRaise(True)
+        self._new_tab_button.setFixedSize(_STRIP_BUTTON_SIZE, _STRIP_BUTTON_SIZE)
+        self._new_tab_button.setIconSize(QSize(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE))
+        self._new_tab_button.clicked.connect(self.new_requested)
+
+        self._scroll_left = QToolButton()
+        self._scroll_left.setObjectName("TabScrollButton")
+        self._scroll_left.setAccessibleName("Scroll tabs left")
+        self._scroll_left.setToolTip("Scroll tabs left")
+        self._scroll_left.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._scroll_left.setAutoRaise(True)
+        self._scroll_left.setFixedSize(_STRIP_BUTTON_SIZE, _STRIP_BUTTON_SIZE)
+        self._scroll_left.setIconSize(QSize(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE))
+        self._scroll_left.clicked.connect(lambda: self._click_native_scroll_button(-1))
+
+        self._scroll_right = QToolButton()
+        self._scroll_right.setObjectName("TabScrollButton")
+        self._scroll_right.setAccessibleName("Scroll tabs right")
+        self._scroll_right.setToolTip("Scroll tabs right")
+        self._scroll_right.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._scroll_right.setAutoRaise(True)
+        self._scroll_right.setFixedSize(_STRIP_BUTTON_SIZE, _STRIP_BUTTON_SIZE)
+        self._scroll_right.setIconSize(QSize(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE))
+        self._scroll_right.clicked.connect(lambda: self._click_native_scroll_button(1))
+
+        right_corner = _CornerBox(QSize(_STRIP_BUTTON_SIZE * 2, _STRIP_BUTTON_SIZE))
+        right_layout = QHBoxLayout(right_corner)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
+        right_layout.addWidget(self._new_tab_button)
+        right_layout.addWidget(self._scroll_right)
+        self.setCornerWidget(self._scroll_left, Qt.Corner.TopLeftCorner)
+        self.setCornerWidget(right_corner, Qt.Corner.TopRightCorner)
+
+        self._scroll_refresh_timer = QTimer(self)
+        self._scroll_refresh_timer.setSingleShot(True)
+        self._scroll_refresh_timer.setInterval(0)
+        self._scroll_refresh_timer.timeout.connect(self._refresh_scroll_buttons)
+        self._schedule_scroll_refresh()
+        self.reapply_theme()
 
     # ---- pages -------------------------------------------------------------------
 
@@ -160,12 +232,62 @@ class ConversationTabs(QTabWidget):
         self.setTabToolTip(index, title)
 
     def reapply_theme(self) -> None:
-        """Re-render the themed close icons after a theme change."""
+        """Re-render the themed close, new-tab, and scroll icons after a theme change."""
         icon = self._close_icon()
         for i in range(self.count()):
             button = self._bar.tabButton(i, QTabBar.ButtonPosition.RightSide)
             if isinstance(button, QToolButton):
                 button.setIcon(icon)
+        self._new_tab_button.setIcon(themed_icon(self, "plus", size=_CLOSE_ICON_SIZE))
+        self._scroll_left.setIcon(themed_icon(self, "chevron-left", size=_CLOSE_ICON_SIZE))
+        self._scroll_right.setIcon(themed_icon(self, "chevron-right", size=_CLOSE_ICON_SIZE))
+
+    # ---- tab strip scrolling ------------------------------------------------------
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 — Qt's spelling
+        super().resizeEvent(event)
+        self._schedule_scroll_refresh()
+
+    def tabInserted(self, index: int) -> None:  # noqa: N802 — Qt's spelling
+        super().tabInserted(index)
+        self._schedule_scroll_refresh()
+
+    def tabRemoved(self, index: int) -> None:  # noqa: N802 — Qt's spelling
+        super().tabRemoved(index)
+        self._schedule_scroll_refresh()
+
+    def _native_scroll_buttons(self) -> tuple[QToolButton | None, QToolButton | None]:
+        """Qt's own (undocumented, but stable) scroll buttons, left-to-right.
+
+        `setUsesScrollButtons` gives the tab bar a real pair of scroll buttons with no
+        public accessor and no public way to trigger a scroll otherwise; the corner-widget
+        buttons above stand in for them visually and click these underneath, so the
+        scrolling itself stays exactly what Qt does natively.
+        """
+        left = self._bar.findChild(QToolButton, "ScrollLeftButton")
+        right = self._bar.findChild(QToolButton, "ScrollRightButton")
+        return left, right
+
+    def _click_native_scroll_button(self, direction: int) -> None:
+        left, right = self._native_scroll_buttons()
+        button = left if direction < 0 else right
+        if button is not None and button.isEnabled():
+            button.click()
+        self._schedule_scroll_refresh()
+
+    def _schedule_scroll_refresh(self) -> None:
+        self._scroll_refresh_timer.start()
+
+    def _refresh_scroll_buttons(self) -> None:
+        """Show each custom scroll button only while its native counterpart can act.
+
+        Mirroring `isVisible()` hides both when every tab already fits; mirroring
+        `isEnabled()` hides one at a time once scrolled to that end, rather than merely
+        graying it out.
+        """
+        left, right = self._native_scroll_buttons()
+        self._scroll_left.setVisible(bool(left and left.isVisible() and left.isEnabled()))
+        self._scroll_right.setVisible(bool(right and right.isVisible() and right.isEnabled()))
 
     # ---- internals ---------------------------------------------------------------
 

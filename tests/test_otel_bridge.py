@@ -125,6 +125,8 @@ ALL_EVENTS: tuple[TelemetryEvent, ...] = (
     ai.ProviderDiagnostic(TARGET, DIAGNOSTIC, "r1"),
     ai.ContextReduced("auto", "select", 10, 4, 6, 900, 1000, ("max_tokens",), 0),
     ai.CachePlanned("r1", TARGET, "explicit", 2, 4096),
+    ai.RateLimitWaited("r1", "openai", 1.5, "provider-headers", TARGET),
+    ai.RateLimitObserved("openai", requests_remaining=3, resets_in_s=12.0),
     ai.ServerLifecycle("llama-1", "ready"),
     ai.DownloadProgress("artifact-1", 1024, 1024, done=True),
 )

@@ -41,8 +41,21 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   `response.completed` (carries final usage); tool-call and reasoning events per event type
 ### Errors
 - Non-2xx `{"error": {...}}`; retryable statuses {408, 409, 425, 429} ∪ ≥500; `Retry-After`
+### Rate-limit headers
+Verified 2026-08-09 against https://developers.openai.com/api/docs/guides/rate-limits (the
+`platform.openai.com` guide URL now 301s there).
+- Read by the descriptor's dialect: `x-ratelimit-remaining-requests`,
+  `x-ratelimit-reset-requests`, `x-ratelimit-remaining-tokens`, `x-ratelimit-reset-tokens`,
+  `x-ratelimit-limit-requests`, `x-ratelimit-limit-tokens`.
+- Reset values are **durations** in Go's compound form — `1s`, `6m0s` — not instants and
+  not bare seconds.
+- Not read: `x-ratelimit-*-project-tokens`. The project-scoped bucket is a different
+  allowance than the one a single client's requests draw from, and pacing against it would
+  hold back requests the key itself could still make.
+- 429 responses also carry `Retry-After`, which the router already honours on the way down.
 
 ## Watchlist
+- Rate-limit header names and the duration format of the reset values
 - Responses API evolves quickly: new event types, `text.format` schema-mode changes
 - Chat-completions deprecation posture for first-party API
 - Model catalog churn (gpt-5 family) affecting bundled capability catalog + pricing

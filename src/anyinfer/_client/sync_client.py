@@ -31,6 +31,7 @@ from ..benchmark import (
 )
 from ..capabilities.budget import ContextBudget
 from ..capabilities.estimate import TokenEstimator
+from ..capabilities.ledger import SpendLedger, SpendTotals
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import ProbeReport
 from ..catalog.model import Catalog
@@ -56,6 +57,7 @@ from ..types.requests import (
     ResolvedTarget,
     Sampling,
     SchemaSpec,
+    SpendPolicy,
     SupportsJSONSchema,
     Target,
     ToolChoice,
@@ -277,6 +279,8 @@ class Client:
         context_gate: bool = True,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        spend: SpendPolicy | None = None,
+        ledger: SpendLedger | None = None,
         pricing_table: PricingTable | None = None,
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
@@ -296,7 +300,9 @@ class Client:
                 estimator=estimator,
                 context_gate=context_gate,
                 history=history,
-            cache=cache,
+                cache=cache,
+                spend=spend,
+                ledger=ledger,
                 pricing_table=pricing_table,
                 capability_overrides=capability_overrides,
                 model_dir=model_dir,
@@ -532,6 +538,11 @@ class Client:
         """Delete an acquired model. See `AsyncClient.remove_model`."""
         self._ensure_open()
         return self._loop.run(self._async.remove_model(entry_id))
+
+    def spend(self) -> SpendTotals:
+        """What this client has spent so far. See `AsyncClient.spend`."""
+        totals: SpendTotals = self._async.spend()
+        return totals
 
     def budget(
         self,

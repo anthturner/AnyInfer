@@ -27,6 +27,7 @@ from ..types.capabilities import (
     Feature,
     Health,
     ModelCapabilities,
+    RateLimitHeaders,
     Sourced,
 )
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
@@ -517,6 +518,22 @@ _ANTHROPIC_FEATURES = (
 )
 
 
+_RATE_LIMIT_HEADERS = RateLimitHeaders(
+    requests_remaining="anthropic-ratelimit-requests-remaining",
+    requests_reset="anthropic-ratelimit-requests-reset",
+    tokens_remaining="anthropic-ratelimit-tokens-remaining",
+    tokens_reset="anthropic-ratelimit-tokens-reset",
+    limit_requests="anthropic-ratelimit-requests-limit",
+    limit_tokens="anthropic-ratelimit-tokens-limit",
+)
+"""Anthropic's rate-limit dialect. Resets are RFC 3339 instants, not durations.
+
+Recorded in ``contracts/anthropic.md``. The ``tokens`` pair is read rather than the
+separate ``input-tokens`` and ``output-tokens`` pairs because Anthropic documents it as the
+*most restrictive* limit currently in effect — which is the one a client about to send a
+request needs, and the only one whose meaning does not change with the tier.
+"""
+
 descriptor = ProviderDescriptor(
     id="anthropic",
     display_name="Anthropic",
@@ -578,5 +595,6 @@ descriptor = ProviderDescriptor(
     cache_mechanism="explicit",
     cache_max_marks=4,
     cache_min_tokens=1024,
+    rate_limit_headers=_RATE_LIMIT_HEADERS,
 )
 """Descriptor for the Anthropic provider."""

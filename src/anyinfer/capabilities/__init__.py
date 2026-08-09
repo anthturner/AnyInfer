@@ -15,6 +15,7 @@ from .estimate import (
     estimate_request,
 )
 from .gating import check_context_fit, context_gate_error
+from .ledger import SpendLedger, SpendStore, SpendTotals
 from .pricing import TRUSTED_PROVENANCE, CostEstimate, compute_cost, estimate_cost, with_cost
 from .pricing_table import (
     DEFAULT_PRICING_URL,
@@ -48,6 +49,9 @@ __all__ = [
     "ProbeOutcome",
     "ProbeReport",
     "RequestEstimate",
+    "SpendLedger",
+    "SpendStore",
+    "SpendTotals",
     "TokenEstimate",
     "TokenEstimator",
     "build_context_budget",

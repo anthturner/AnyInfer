@@ -30,5 +30,5 @@ venv/
 Thumbs.db
 
 # Local working notes and drafts
-plans/
+#plans/
 .claude/worktrees/

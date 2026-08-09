@@ -29,6 +29,7 @@ from .fakes import (
     ndjson_lines,
     sse_lines,
 )
+from .mcp_fake import FakeMCPServer, FakeMCPTool
 from .scripted import (
     DEFAULT_SCRIPTED_CAPABILITIES,
     FailureKind,
@@ -48,6 +49,8 @@ __all__ = [
     "ConformanceHarness",
     "FailureKind",
     "FakeGeminiServer",
+    "FakeMCPServer",
+    "FakeMCPTool",
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",

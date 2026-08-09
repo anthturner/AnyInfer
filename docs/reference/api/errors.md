@@ -33,6 +33,8 @@ actionable next step. The prose catalog with examples lives in
 
 ::: anyinfer.SchemaViolationError
 
+::: anyinfer.SpendLimitError
+
 ::: anyinfer.ToolLoopError
 
 ::: anyinfer.AllTargetsFailedError

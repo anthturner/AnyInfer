@@ -42,6 +42,10 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 
 ::: anyinfer.CachePlanned
 
+::: anyinfer.RateLimitWaited
+
+::: anyinfer.RateLimitObserved
+
 ::: anyinfer.UsageEstimated
 
 ::: anyinfer.RequestCompleted

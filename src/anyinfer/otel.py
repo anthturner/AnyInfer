@@ -26,6 +26,8 @@ from .events.telemetry import (
     FirstToken,
     ParameterDropped,
     ProviderDiagnostic,
+    RateLimitObserved,
+    RateLimitWaited,
     RepairAttempted,
     RequestCompleted,
     RequestFailed,
@@ -254,6 +256,32 @@ class OTelObserver:
             attributes[f"{GEN_AI}.system"] = event.target.provider_id
             attributes[f"{GEN_AI}.request.model"] = event.target.model
         self._standalone("provider.diagnostic", attributes).end()
+
+    def _on_RateLimitWaited(self, event: RateLimitWaited) -> None:  # noqa: N802
+        # Belongs on the request's span when there is one; a wait during a model listing
+        # has no owning request, and dropping it would hide the very latency it explains.
+        attributes: dict[str, Any] = {
+            f"{GEN_AI}.system": event.provider_id,
+            f"{GEN_AI}.anyinfer.wait_reason": event.reason,
+            f"{GEN_AI}.anyinfer.waited_ms": event.waited_s * 1000.0,
+        }
+        span = self._spans.get(event.request_id) if event.request_id else None
+        if span is not None:
+            span.add_event("rate_limit.waited", attributes=attributes)
+            return
+        self._standalone("rate_limit.waited", attributes).end()
+
+    def _on_RateLimitObserved(self, event: RateLimitObserved) -> None:  # noqa: N802
+        # A provider's report of its own window, which belongs to the provider rather than
+        # to whichever request happened to carry it back.
+        attributes: dict[str, Any] = {f"{GEN_AI}.system": event.provider_id}
+        if event.requests_remaining is not None:
+            attributes[f"{GEN_AI}.anyinfer.requests_remaining"] = event.requests_remaining
+        if event.tokens_remaining is not None:
+            attributes[f"{GEN_AI}.anyinfer.tokens_remaining"] = event.tokens_remaining
+        if event.resets_in_s is not None:
+            attributes[f"{GEN_AI}.anyinfer.resets_in_s"] = event.resets_in_s
+        self._standalone("rate_limit.observed", attributes).end()
 
     def _on_UsageEstimated(self, event: UsageEstimated) -> None:  # noqa: N802
         span = self._spans.get(event.request_id)

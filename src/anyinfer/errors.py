@@ -9,6 +9,7 @@ credential, no matter where it is logged.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Literal
 
 from .redaction import redact
@@ -29,6 +30,7 @@ __all__ = [
     "ProviderUnavailableError",
     "RateLimitError",
     "SchemaViolationError",
+    "SpendLimitError",
     "StreamProtocolError",
     "ToolLoopError",
     "TransportError",
@@ -191,6 +193,37 @@ class ModelNotFoundError(ProviderError):
 
 class ContextLengthError(ProviderError):
     """The prompt exceeds the resolved model's context window."""
+
+
+class SpendLimitError(AnyInferError):
+    """A request was refused because it would cross a caller-set spending ceiling.
+
+    Raised before dispatch, so nothing was sent and nothing was billed. Deterministic by
+    construction: the identical request refused once will be refused again, which is why
+    the default retry predicate declines it alongside auth and context-length failures.
+
+    A ceiling is the caller's own policy on their own client — not an organization quota,
+    which this library deliberately does not implement.
+
+    Attributes:
+        limit_usd: The ceiling that was crossed.
+        spent_usd: What this client had already spent when the request arrived.
+        estimated_usd: The high end of the refused request's estimated cost.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        limit_usd: Decimal | None = None,
+        spent_usd: Decimal | None = None,
+        estimated_usd: Decimal | None = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, hint=hint)
+        self.limit_usd = limit_usd
+        self.spent_usd = spent_usd
+        self.estimated_usd = estimated_usd
 
 
 class TransportError(_RetryableProviderError):

@@ -63,6 +63,10 @@ Exponential from `backoff_base_s`, raised to the server's `Retry-After` when tha
 capped by `backoff_max_s`. Honoring the server's advice is the difference between backing
 off and getting banned.
 
+This is the *recovery* half of a rate limit. The avoidance half — pacing a fan-out so the
+429 never arrives — is opt-in and configured per provider instance:
+[rate limits](rate-limits.md).
+
 ## Failure-specific fallback chains
 
 The right *next* target depends on why the last one failed. A context overflow needs a

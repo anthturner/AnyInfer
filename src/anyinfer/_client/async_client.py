@@ -8,11 +8,14 @@ schema repair happen—never in an adapter.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
 from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from types import TracebackType
 from typing import Any
@@ -31,6 +34,7 @@ from ..capabilities.budget import ContextBudget, build_context_budget
 from ..capabilities.cache import CachePlan, plan_cache
 from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
 from ..capabilities.gating import check_context_fit
+from ..capabilities.ledger import SpendLedger, SpendTotals
 from ..capabilities.pricing import with_cost
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import (
@@ -56,6 +60,7 @@ from ..errors import (
     ProviderError,
     ProviderUnavailableError,
     SchemaViolationError,
+    SpendLimitError,
     StreamProtocolError,
     ToolLoopError,
     TransportError,
@@ -89,6 +94,7 @@ from ..providers.base import AdapterFinal, ProviderAdapter
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.attempts import AttemptBuffer
 from ..routing.health import HealthCache
+from ..routing.limits import AttemptPacing, RateLimiter
 from ..routing.policy import Retry, Route, backoff_delay
 from ..schema.repair import build_repair_messages
 from ..schema.validate import extract_json, validate
@@ -121,6 +127,7 @@ from ..types.requests import (
     ResolvedTarget,
     Sampling,
     SchemaSpec,
+    SpendPolicy,
     SupportsJSONSchema,
     Target,
     ToolChoice,
@@ -211,6 +218,12 @@ class AsyncClient:
             target's window. ``None`` — the default — never compacts. This is the
             client's half of the overflow answer; ``Route.context_window_targets`` is
             the other half, and the policy's ``mode`` decides which is tried first.
+        spend: Ceiling on what this client may spend, checked before dispatch.
+            ``None`` — the default — never refuses anything. Not an organization
+            quota: it governs this client object in this process and nothing else.
+        ledger: Spend rollup to record into. One is created automatically when
+            ``spend`` is set; supply your own to share a total between clients or to
+            read it without a policy in force.
         cache: Prompt-cache placement applied to every request that does not carry its
             own. ``None`` — the default — never engages a provider's cache, because
             caching changes what a provider bills and how long it keeps a copy of the
@@ -243,6 +256,8 @@ class AsyncClient:
         context_gate: bool = True,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        spend: SpendPolicy | None = None,
+        ledger: SpendLedger | None = None,
         pricing_table: PricingTable | None = None,
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
@@ -272,6 +287,12 @@ class AsyncClient:
         self._context_gate = context_gate
         self._history = history
         self._cache = cache
+        self._spend_policy = spend
+        # A policy needs a running total to enforce a cumulative ceiling, so one is
+        # created on demand; a caller who supplied their own keeps theirs.
+        self._ledger = ledger or (SpendLedger() if spend is not None else None)
+        if self._ledger is not None:
+            self._events.subscribe(self._ledger)
         # Last cacheable-prefix signature per target, for the implicit-mode guard.
         # Bounded by the number of targets a client talks to, and content-free.
         self._cache_prefixes: dict[str, str] = {}
@@ -1125,6 +1146,17 @@ class AsyncClient:
             request = replace(request, max_response_bytes=max_response_bytes)
         return request
 
+    def spend(self) -> SpendTotals:
+        """What this client has spent so far.
+
+        Returns zeros — never ``None`` — when no ledger is attached, so a caller reading
+        this never has to branch on whether accounting was switched on. Check
+        `SpendTotals.unknown_requests` before treating the figure as complete: requests
+        against a target with no trusted pricing are counted there rather than being
+        silently priced at zero.
+        """
+        return self._ledger.totals() if self._ledger is not None else SpendTotals()
+
     def budget(
         self,
         messages: MessagesInput,
@@ -1486,6 +1518,20 @@ class AsyncClient:
         self._emit(compaction.event())
         return request.with_messages(compaction.messages)
 
+    def _client_side_pacing(
+        self, limiter: RateLimiter | None, descriptor: ProviderDescriptor
+    ) -> AbstractAsyncContextManager[None]:
+        """Pace a provider whose transport the core did not build.
+
+        An adapter that talks through a vendor SDK has no transport of ours to wrap, so its
+        concurrency bound is applied here instead — around the call rather than under it.
+        Every other provider is already governed at the transport, and taking the permit
+        twice would halve its configured concurrency, so this yields nothing for them.
+        """
+        if limiter is None or not descriptor.governs_own_transport:
+            return contextlib.nullcontext()
+        return limiter.slot()
+
     async def _run_attempt(
         self,
         *,
@@ -1523,6 +1569,10 @@ class AsyncClient:
             )
             if fitted is not None:
                 request = fitted
+
+        # Money is checked in the same place as size, and for the same reason: a refusal
+        # that costs a round trip is a refusal that already spent something.
+        self._check_spend(request, resolved, capabilities)
 
         if self._context_gate:
             # A ContextLengthError raised here follows the exact path a provider-reported
@@ -1574,16 +1624,34 @@ class AsyncClient:
                 session_state=session.state if session_applies and session else None,
                 cache_marks=tuple(mark.segment for mark in cache_plan.marks),
             )
+            limiter = self._pool.limiter_for(resolved.provider_id)
             if repair_attempts == 0:
                 for parameter, reason in dropped_parameters(
                     current, descriptor, capabilities
                 ):
                     self._emit(ParameterDropped(request_id, resolved, parameter, reason))
+                if limiter is not None and limiter.unsupported_headers_reason:
+                    self._emit(
+                        ParameterDropped(
+                            request_id,
+                            resolved,
+                            "limits.respect_headers",
+                            limiter.unsupported_headers_reason,
+                        )
+                    )
 
             saw_usage_event = False
+            pacing = AttemptPacing(request_id, resolved)
             try:
-                async with asyncio.timeout(current.effective_timeout_s):
+                async with (
+                    self._client_side_pacing(limiter, descriptor),
+                    asyncio.timeout(current.effective_timeout_s),
+                ):
                     async for event in adapter.generate(wire):
+                        # Pacing is over once anything comes back, and the marker must not
+                        # outlive it: this is an async generator, so a marker still set at a
+                        # yield would follow the consumer into whatever it does next.
+                        pacing.detach()
                         if isinstance(event, AdapterFinal):
                             final = event
                             continue
@@ -1612,6 +1680,12 @@ class AsyncClient:
                     phase="stream" if stream else "generate",
                     hint="raise timeout_s, or choose a faster model",
                 ) from None
+            finally:
+                # A failed attempt queued just as long as a successful one, and its record
+                # should say so — otherwise a paced fan-out reads as a slow provider.
+                pacing.detach()
+                if pacing.waited:
+                    active_buffer.phases["queued_ms"] = pacing.waited_ms
 
             if final is not None and session is not None:
                 session._record(final.session_state, applied=session_applies)
@@ -1828,6 +1902,77 @@ class AsyncClient:
             )
         )
         return plan
+
+    def _check_spend(
+        self,
+        request: GenerationRequest,
+        resolved: ResolvedTarget,
+        capabilities: ModelCapabilities | None,
+    ) -> None:
+        """Refuse a request that would cross this client's spending ceiling.
+
+        Runs before dispatch, so a refusal costs nothing. The estimate is the *high* end of
+        the preflight range and is reported in the error, so a caller can see the arithmetic
+        rather than being told only that they were declined.
+
+        Raises:
+            SpendLimitError: When a ceiling would be crossed, or when the cost cannot be
+                known and the policy says not to spend blind.
+        """
+        policy = self._spend_policy
+        if policy is None or not policy.active:
+            return
+
+        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
+        estimate = self._estimate_request_cost(request, capabilities)
+
+        if estimate is None:
+            if policy.on_unknown == "refuse":
+                raise SpendLimitError(
+                    f"the cost of a request to {resolved} cannot be estimated",
+                    limit_usd=policy.max_request_usd or policy.max_total_usd,
+                    spent_usd=spent,
+                    hint=(
+                        "this target has no trusted pricing; set on_unknown='allow' to "
+                        "send it anyway, or supply pricing as a capability override"
+                    ),
+                )
+            return
+
+        if policy.max_request_usd is not None and estimate > policy.max_request_usd:
+            raise SpendLimitError(
+                f"a request to {resolved} could cost {estimate}, above the per-request "
+                f"ceiling of {policy.max_request_usd}",
+                limit_usd=policy.max_request_usd,
+                spent_usd=spent,
+                estimated_usd=estimate,
+                hint="shorten the prompt, cap max_output_tokens, or raise max_request_usd",
+            )
+
+        if policy.max_total_usd is not None and spent + estimate > policy.max_total_usd:
+            raise SpendLimitError(
+                f"this client has spent {spent} and the next request could cost "
+                f"{estimate}, above the ceiling of {policy.max_total_usd}",
+                limit_usd=policy.max_total_usd,
+                spent_usd=spent,
+                estimated_usd=estimate,
+                hint="raise max_total_usd, or reset the ledger to start a new budget",
+            )
+
+    def _estimate_request_cost(
+        self, request: GenerationRequest, capabilities: ModelCapabilities | None
+    ) -> Decimal | None:
+        """The high end of a request's preflight cost range, or ``None`` when unknowable."""
+        if capabilities is None or capabilities.pricing is None:
+            return None
+        budget = build_context_budget(
+            request,
+            capabilities,
+            estimator=self._estimator,
+            calibration=TokenCalibration(),
+        )
+        estimated = budget.estimated_cost
+        return estimated.high if estimated is not None else None
 
     def _check_prefix_stability(
         self, request: GenerationRequest, plan: CachePlan, resolved: ResolvedTarget

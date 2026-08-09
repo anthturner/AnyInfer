@@ -11,12 +11,16 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
+import httpx2
+
 from ..credentials import ResolverChain, default_resolver
 from ..errors import ConfigError
 from ..events.telemetry import TelemetryEvent
 from ..local.server import is_loopback
 from ..providers.base import ProviderAdapter, ProviderConfig
 from ..registry import ProviderDescriptor, ProviderRegistry, normalize_provider_id
+from ..routing.limits import GoverningTransport, RateLimiter
+from ..types.requests import RateLimits
 
 __all__ = ["AdapterPool", "ProviderSettings"]
 
@@ -48,6 +52,9 @@ class ProviderSettings:
         timeout_s: Default per-request timeout for this provider.
         transport: Test seam — an ``httpx2`` transport that intercepts this provider's
             traffic (used by the fake-server and cassette modes).
+        limits: Client-side pacing for this instance, or ``None`` for none. Rate limits
+            belong to *an account at a provider* rather than to the application, which is
+            why they are configured here and not as a client-wide policy.
     """
 
     provider_id: str
@@ -59,6 +66,7 @@ class ProviderSettings:
     timeout_s: float = 120.0
     transport: Any | None = None
     alias: str | None = None
+    limits: RateLimits | None = None
 
     @property
     def instance_id(self) -> str:
@@ -112,6 +120,7 @@ class AdapterPool:
             self._order.append(instance_id)
             self._register_alias(setting)
         self._adapters: dict[str, ProviderAdapter] = {}
+        self._limiters: dict[str, RateLimiter] = {}
         self._lock = asyncio.Lock()
 
     def _register_alias(self, settings: ProviderSettings) -> None:
@@ -247,10 +256,52 @@ class AdapterPool:
             headers=settings.headers,
             options=options,
             timeout_s=settings.timeout_s,
-            transport=settings.transport,
+            transport=self._govern(provider_id, descriptor, settings),
             events=self._events,
         )
         return descriptor.factory(config)
+
+    def _govern(
+        self,
+        provider_id: str,
+        descriptor: ProviderDescriptor,
+        settings: ProviderSettings,
+    ) -> Any | None:
+        """Wrap this instance's transport in its limiter, when it has one.
+
+        Pacing is installed here rather than in the adapter because an adapter translates
+        and must not carry policy. Wrapping composes with the test seams: a fake or cassette
+        transport ends up *inside* the governor, so pacing can be proven with no network.
+
+        A provider that builds its own transport gets its limiter registered anyway — the
+        client applies concurrency around the call — and the limiter is skipped here because
+        there is nothing of ours to wrap.
+        """
+        limits = settings.limits
+        if limits is None or not limits.active:
+            return settings.transport
+        limiter = RateLimiter(
+            limits,
+            dialect=descriptor.rate_limit_headers,
+            provider_id=provider_id,
+            events=self._events,
+            sees_responses=not descriptor.governs_own_transport,
+        )
+        self._limiters[provider_id] = limiter
+        if descriptor.governs_own_transport:
+            return settings.transport
+        inner = settings.transport
+        if inner is None:
+            inner = httpx2.AsyncHTTPTransport()
+        return GoverningTransport(inner, limiter)
+
+    def limiter_for(self, provider_id: str) -> RateLimiter | None:
+        """This instance's limiter, once its adapter has been built.
+
+        Built lazily with the adapter, so a client that never used a provider never
+        allocated its limiter either.
+        """
+        return self._limiters.get(self._registry.resolve_alias(provider_id))
 
     def _resolve_secret_options(
         self, descriptor: ProviderDescriptor, options: Mapping[str, Any]

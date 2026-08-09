@@ -187,6 +187,11 @@ def build_parser() -> argparse.ArgumentParser:
         "doctor", help="report detected hardware and the recommended local tier"
     )
     doctor.add_argument("--json", action="store_true", help="emit machine-readable output")
+    doctor.add_argument(
+        "--config",
+        type=Path,
+        help="path to a configuration file; its configured rate limits are reported too",
+    )
 
     verify = subcommands.add_parser(
         "verify", help="prove a target works by sending it one tiny request"
@@ -314,6 +319,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="emit one conformance-matrix row instead of a report",
     )
 
+    mcp = subcommands.add_parser(
+        "mcp", help="inspect the Model Context Protocol servers a config file describes"
+    )
+    mcp_commands = mcp.add_subparsers(dest="mcp_command", required=True)
+    mcp_list = mcp_commands.add_parser(
+        "list", help="connect to each configured server and print the tools it exposes"
+    )
+    mcp_list.add_argument("--config", type=Path, help="path to a configuration file")
+    mcp_list.add_argument("--server", help="only this server, by name")
+    mcp_list.add_argument("--json", action="store_true", help="emit machine-readable output")
+
     providers = subcommands.add_parser("providers", help="list registered providers")
     providers.add_argument("--json", action="store_true", help="emit machine-readable output")
 
@@ -403,6 +419,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _providers(args)
         if args.command == "conform":
             return _conform(args)
+        if args.command == "mcp":
+            return _mcp(args)
         if args.command == "models":
             return _models(args)
         if args.command == "runtime":
@@ -760,9 +778,18 @@ def _print_stats(generation: Any) -> None:
     if timing.output_tokens_per_s is not None:
         print(f"throughput        {timing.output_tokens_per_s:.1f} tok/s", file=sys.stderr)
     tokens = f"{usage.input_tokens or '?'} in / {usage.output_tokens or '?'} out"
+    if usage.cache_read_tokens:
+        tokens = f"{tokens} ({usage.cache_read_tokens} cached)"
     print(f"tokens            {tokens}", file=sys.stderr)
     if usage.cost_usd is not None:
         print(f"cost              ${usage.cost_usd:.6f}", file=sys.stderr)
+    else:
+        # Never print $0.00 for an unpriced call. A cost that reads as free when it is
+        # merely unknown is the accounting mistake this library refuses to make, and the
+        # terminal is where a user is most likely to believe it.
+        print("cost              unknown (no trusted pricing)", file=sys.stderr)
+    if generation.cache_mechanism:
+        print(f"cache             {generation.cache_mechanism}", file=sys.stderr)
 
 
 def _report_error(exc: Any) -> int:
@@ -839,6 +866,40 @@ def _read_json(path: Path, label: str) -> Any:
 # ---- doctor --------------------------------------------------------------------------
 
 
+def _configured_limits(config_path: Path | None) -> dict[str, str]:
+    """Summarize each provider instance's configured pacing, keyed by instance id.
+
+    Empty when no file was given or no instance asked for pacing, which is the ordinary
+    case: limits are opt-in, and a report that invented a line for every provider would
+    suggest bounds nobody set.
+    """
+    if config_path is None:
+        return {}
+    from .config import load_config
+
+    summaries: dict[str, str] = {}
+    for settings in load_config(config_path).providers:
+        limits = settings.limits
+        if limits is None or not limits.active:
+            continue
+        parts: list[str] = []
+        if limits.max_concurrent is not None:
+            parts.append(f"{limits.max_concurrent} concurrent")
+        if limits.requests_per_minute is not None:
+            parts.append(f"{limits.requests_per_minute:g}/min")
+        if limits.min_interval_s > 0:
+            parts.append(f"{limits.min_interval_s:g}s apart")
+        if limits.respect_headers:
+            reserve = (
+                f", reserving {limits.reserve_fraction:.0%}"
+                if limits.reserve_fraction
+                else ""
+            )
+            parts.append(f"provider headers{reserve}")
+        summaries[settings.instance_id] = ", ".join(parts)
+    return summaries
+
+
 def _doctor(args: argparse.Namespace) -> int:
     """Report detected hardware and the recommended tier."""
     from . import load_default_catalog
@@ -846,6 +907,7 @@ def _doctor(args: argparse.Namespace) -> int:
 
     profile = detect()
     recommendation = recommend_alias(profile, load_default_catalog())
+    limits = _configured_limits(getattr(args, "config", None))
 
     if args.json:
         print(
@@ -857,6 +919,7 @@ def _doctor(args: argparse.Namespace) -> int:
                         "reason": recommendation.reason,
                         "confident": recommendation.confident,
                     },
+                    "rate_limits": limits,
                 },
                 indent=2,
             )
@@ -891,6 +954,11 @@ def _doctor(args: argparse.Namespace) -> int:
 
     for warning in profile.warnings:
         print(f"warning           {warning}")
+
+    # Pacing is invisible from the outside — a governed request just looks slow — so an
+    # operator asking "why is this slow" should be able to see the bounds in one place.
+    for instance_id, summary in limits.items():
+        print(f"rate limit        {instance_id}: {summary}")
 
     # A provider plugin that failed to load is otherwise invisible: the provider simply
     # does not exist, and the only symptom is an "unknown provider" error listing every
@@ -1390,6 +1458,75 @@ def _conform(args: argparse.Namespace) -> int:
 
     failed = any(not r.passed and not r.skipped for r in results)
     return 1 if failed else 0
+
+
+def _mcp(args: argparse.Namespace) -> int:
+    """Dispatch the ``mcp`` subcommands."""
+    if args.mcp_command == "list":
+        return _mcp_list(args)
+    return 2
+
+
+def _mcp_list(args: argparse.Namespace) -> int:
+    """Connect to each configured MCP server and report what it exposes.
+
+    Discovery only. The command-line runner never executes tools — requested calls are
+    reported so a caller can run them — and connecting a tool source does not change that.
+    What this answers is the question an operator actually has: is my server reachable, and
+    what does it claim to offer?
+    """
+    import asyncio
+
+    from .mcp import MCPToolset
+
+    config = _config(args.config)
+    servers = [s for s in config.mcp if not args.server or s.name == args.server]
+    if not servers:
+        print(
+            "no MCP servers configured"
+            if not config.mcp
+            else f"no configured MCP server named {args.server!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    async def collect() -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for server in servers:
+            toolset = await MCPToolset.connect(server)
+            try:
+                rows.extend(
+                    {
+                        "server": server.name,
+                        "name": tool.spec.name,
+                        "description": tool.spec.description,
+                        "read_only": tool.spec.annotations.read_only,
+                        "destructive": tool.spec.annotations.destructive,
+                    }
+                    for tool in toolset.tools
+                )
+            finally:
+                await toolset.aclose()
+        return rows
+
+    tools = asyncio.run(collect())
+
+    if args.json:
+        print(json.dumps(tools, indent=2))
+        return 0
+
+    if not tools:
+        print("no tools exposed")
+        return 0
+
+    width = max(len(row["name"]) for row in tools)
+    for row in tools:
+        # Annotations are the server's own claims; shown as such, never acted on.
+        claims = (("read-only", row["read_only"]), ("destructive", row["destructive"]))
+        hints = [label for label, value in claims if value]
+        suffix = f"  [{', '.join(hints)} — server's claim]" if hints else ""
+        print(f"{row['name'].ljust(width)}  {row['description']}{suffix}")
+    return 0
 
 
 # ---- models --------------------------------------------------------------------------

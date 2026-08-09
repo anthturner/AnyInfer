@@ -63,3 +63,34 @@ budget calculator are explained in
 ::: anyinfer.fetch_pricing
 
 </div>
+
+## Spend accounting
+
+An in-process rollup of what a client spent, and an optional ceiling checked before
+dispatch. Concepts: [cost and spending](../../concepts/cost.md).
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.SpendLedger
+
+::: anyinfer.SpendTotals
+
+::: anyinfer.SpendStore
+
+::: anyinfer.SpendPolicy
+
+</div>
+
+## Rate governance
+
+Client-side pacing for one provider instance, and the header dialect a provider reports its
+window in. Both are inert until configured. Concepts:
+[rate limits](../../concepts/rate-limits.md).
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.RateLimits
+
+::: anyinfer.RateLimitHeaders
+
+</div>

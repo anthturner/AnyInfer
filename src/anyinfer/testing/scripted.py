@@ -121,6 +121,11 @@ class ScriptedModel:
         usage: Usage block to report, or ``None`` to report none at all — which is how a
             test reaches the estimated-usage path.
         chunk_size: Characters per streamed delta. Smaller values produce more events.
+        answer_after_tools: Text to answer with once the conversation already carries a
+            tool result. Without it, a model scripted to call a tool calls it on every
+            round and the loop never converges — which is a test that only ever proves the
+            round budget works. Set it and the model behaves like a real one: ask, then
+            answer.
         failures: Failures consumed in order before any success. A model with two failures
             and a retry budget of one will exhaust the budget; that is the point.
         capabilities: What this model claims to support. Defaults to
@@ -141,6 +146,7 @@ class ScriptedModel:
         }
     )
     chunk_size: int = 4
+    answer_after_tools: str | None = None
     failures: tuple[ScriptedFailure, ...] = ()
     capabilities: ModelCapabilities = DEFAULT_SCRIPTED_CAPABILITIES
 
@@ -299,7 +305,7 @@ class ScriptedProvider:
 
         if consumed < len(model.failures):
             return self._fail(model, model.failures[consumed], request)
-        return self._succeed(model, request)
+        return self._succeed(model, request, body)
 
     def _fail(
         self,
@@ -344,8 +350,28 @@ class ScriptedProvider:
             request,
         )
 
-    def _succeed(self, model: ScriptedModel, request: httpx2.Request) -> httpx2.Response:
-        """Produce this model's ordinary answer."""
+    def _succeed(
+        self,
+        model: ScriptedModel,
+        request: httpx2.Request,
+        body: Mapping[str, Any],
+    ) -> httpx2.Response:
+        """Produce this model's ordinary answer.
+
+        A model with ``answer_after_tools`` set stops calling tools once the
+        conversation carries a tool result, which is what a real model does and what
+        lets a tool-loop test converge.
+        """
+        if model.answer_after_tools is not None and _carries_tool_result(body):
+            return self._render(
+                model,
+                FakeResponse(
+                    text=model.answer_after_tools,
+                    finish_reason="stop",
+                    usage=model.usage,
+                ),
+                request,
+            )
         return self._render(
             model,
             FakeResponse(
@@ -412,6 +438,17 @@ class ScriptedProvider:
             base_url=self.base_url,
             display_name=self.display_name,
         )
+
+
+def _carries_tool_result(body: Mapping[str, Any]) -> bool:
+    """Whether the request already contains an answered tool call."""
+    messages = body.get("messages")
+    if not isinstance(messages, list):
+        return False
+    return any(
+        isinstance(message, dict) and message.get("role") == "tool"
+        for message in messages
+    )
 
 
 def _format_retry_after(seconds: float) -> str:

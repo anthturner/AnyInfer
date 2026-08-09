@@ -25,6 +25,7 @@ from ..types.capabilities import (
     Feature,
     Health,
     ModelCapabilities,
+    RateLimitHeaders,
     Sourced,
 )
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
@@ -413,6 +414,21 @@ _OPENAI_FEATURES = (
 )
 
 
+_RATE_LIMIT_HEADERS = RateLimitHeaders(
+    requests_remaining="x-ratelimit-remaining-requests",
+    requests_reset="x-ratelimit-reset-requests",
+    tokens_remaining="x-ratelimit-remaining-tokens",
+    tokens_reset="x-ratelimit-reset-tokens",
+    limit_requests="x-ratelimit-limit-requests",
+    limit_tokens="x-ratelimit-limit-tokens",
+)
+"""OpenAI's rate-limit dialect. Resets are durations (``1s``, ``6m0s``), not instants.
+
+Recorded in ``contracts/openai.md``. The project-scoped variants
+(``x-ratelimit-*-project-tokens``) are deliberately not read: they describe a different
+bucket than the one a single client's requests draw from.
+"""
+
 descriptor = ProviderDescriptor(
     id="openai",
     display_name="OpenAI",
@@ -447,5 +463,6 @@ descriptor = ProviderDescriptor(
     # Prompt caching is automatic on a stable prefix — there is nothing to mark, so the
     # core's only duty is to leave the prefix undisturbed. Recorded in contracts/openai.md.
     cache_mechanism="implicit",
+    rate_limit_headers=_RATE_LIMIT_HEADERS,
 )
 """Descriptor for the OpenAI provider."""

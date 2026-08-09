@@ -63,8 +63,28 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
 ### Errors
 - Non-2xx `{"type":"error","error":{"type","message"}}`; 429 + `retry-after`;
   529 `overloaded_error` treated retryable
+### Rate-limit headers
+Verified 2026-08-09 against https://platform.claude.com/docs/en/api/rate-limits (the
+`docs.anthropic.com` URL now 301s there).
+- Read by the descriptor's dialect: `anthropic-ratelimit-requests-remaining`,
+  `anthropic-ratelimit-requests-reset`, `anthropic-ratelimit-tokens-remaining`,
+  `anthropic-ratelimit-tokens-reset`, `anthropic-ratelimit-requests-limit`,
+  `anthropic-ratelimit-tokens-limit`.
+- Reset values are **RFC 3339 instants**, not durations. Every derived wait is clamped
+  before it is taken, so a skewed clock costs a bounded pause rather than a hang.
+- The `tokens` pair is documented as reporting *the most restrictive limit currently in
+  effect*, which is why it is read in preference to the `input-tokens` / `output-tokens`
+  pairs. Remaining token counts are rounded to the nearest thousand.
+- Not read: `anthropic-ratelimit-input-tokens-*`, `anthropic-ratelimit-output-tokens-*`,
+  `anthropic-priority-*-tokens-*` (Priority Tier only), and `anthropic-fast-*` (fast mode).
+  Each describes a different bucket than the one an ordinary request draws from.
+- Only uncached input tokens count toward the ITPM limit on most models, so a cached prefix
+  raises effective throughput without raising the limit. AnyInfer does not model this: it
+  paces on what the headers report, which already reflects it.
 
 ## Watchlist
+- Rate-limit header names and the RFC 3339 reset format; whether the `tokens` pair keeps
+  its "most restrictive limit in effect" meaning
 - `anthropic-version` header updates / new required beta headers
 - `oauth-2025-04-20` beta flag: whether it graduates to GA (making it droppable) or is
   superseded, and whether the endpoint set it gates widens beyond `/v1/messages`

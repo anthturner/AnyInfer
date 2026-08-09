@@ -25,6 +25,19 @@ unreachable without a real outage.
 
 </div>
 
+## Fake MCP server
+
+An in-process Model Context Protocol server, for testing a tool loop fed by
+[MCP tool sources](../../guides/tool-loop.md).
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.testing.FakeMCPServer
+
+::: anyinfer.testing.FakeMCPTool
+
+</div>
+
 ## pytest fixtures
 
 Registered automatically when `anyinfer` is installed; see the guide for the full table.

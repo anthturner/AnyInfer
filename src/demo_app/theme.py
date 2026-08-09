@@ -453,6 +453,40 @@ QTabBar::tab:selected {
     font-weight: 600;
 }
 
+/* Qt's own tab-bar scroll buttons still do the actual scrolling (there is no public API
+   for tab-bar scroll offset), but collapsed to nothing: the corner-widget pair stands in
+   for them visually, at the strip's true ends, and drives them by proxy. */
+QTabBar::scroller { width: 0px; }
+
+/* The faux "+" tab and the tab-strip scroll buttons: same padding rhythm as a real tab,
+   but a plain hover instead of the selected look, since neither is ever "current". */
+QToolButton#NewTabButton, QToolButton#TabScrollButton {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    margin: 2px 2px 4px 2px;
+}
+QToolButton#NewTabButton:hover, QToolButton#TabScrollButton:hover {
+    background: $accent_bg;
+    border-color: $accent_border;
+}
+
+/* Conversation tabs: the frame wraps the tab bar and the pane below it in one border,
+   open at the top so the tabs read as growing out of the box rather than being cut off
+   from it. QTabWidget's own frame only ever outlines the pane, not the tab bar, so the
+   border lives on the plain frame around it instead of on QTabWidget::pane. */
+QFrame#ConversationTabsFrame {
+    border-left: 1px solid $border;
+    border-right: 1px solid $border;
+    border-bottom: 1px solid $border;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+QTabWidget#ConversationTabs::pane {
+    border: none;
+    top: 0px;
+}
+
 QProgressBar {
     background: $surface;
     border: 1px solid $border;
@@ -515,7 +549,10 @@ QPushButton#PrimaryButton {
 QPushButton#PrimaryButton:hover { background: $accent_hover; border-color: $accent_hover; }
 QPushButton#PrimaryButton:disabled { background: $surface; border-color: $border; }
 
-/* "How is this built?" chips: quiet until you look for them. */
+/* "How is this built?" chips: quiet until you look for them.
+   The app-wide QWidget rule sets font-family for everything, so a widget's own
+   programmatic setFont() monospace choice is silently overridden unless the stylesheet
+   repeats it here — every code-styled surface below does. */
 QPushButton#HelpChip {
     background: transparent;
     border: 1px solid $accent_border;
@@ -524,6 +561,7 @@ QPushButton#HelpChip {
     padding: 0 8px;
     min-height: 0;
     font-size: 8pt;
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
 }
 QPushButton#HelpChip:hover { background: $accent_bg; border-color: $accent; }
 QLabel#ApiList {
@@ -531,6 +569,7 @@ QLabel#ApiList {
     border: 1px solid $border;
     border-radius: 8px;
     padding: 8px;
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
 }
 
 /* Tab close buttons: invisible until the tab is hovered or active; the icon itself
@@ -548,6 +587,7 @@ QPlainTextEdit#CodeView {
     background: $surface;
     border: 1px solid $border;
     border-radius: 8px;
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
 }
 QFrame#InsetSeparator {
     background: $border;

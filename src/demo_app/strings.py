@@ -37,7 +37,7 @@ __all__ = [
     "TELEMETRY_TITLE",
     "TOOLS_TITLE",
     "WELCOME_FALLBACK",
-    "WELCOME_NEW_CHAT",
+    "WELCOME_QUICK_QUESTION",
     "WELCOME_STRUCTURED",
     "WELCOME_TAGLINE",
     "WELCOME_TOOLS",
@@ -55,7 +55,7 @@ EXPORT_JSON = "Export as JSON"
 EXPORT_MARKDOWN = "Export as Markdown"
 
 WELCOME_TAGLINE = "A faithful, offline worked example of AnyInfer integration."
-WELCOME_NEW_CHAT = "New chat"
+WELCOME_QUICK_QUESTION = "Ask a quick question"
 WELCOME_STRUCTURED = "Try structured output"
 WELCOME_FALLBACK = "See fallback demo"
 WELCOME_TOOLS = "Run the tool loop"

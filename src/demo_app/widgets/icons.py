@@ -75,8 +75,13 @@ _ICONS: dict[str, str] = {
     "chevron-up": '<path d="M6 15l6 -6l6 6" />',
     # tabler:chevron-down — shown when the section is minimized (click to restore it).
     "chevron-down": '<path d="M6 9l6 6l6 -6" />',
-    # tabler:chevron-right — a collapsed row in the configured-engine list.
+    # tabler:chevron-right — a collapsed row in the configured-engine list, and scrolling
+    # the conversation tab strip rightward.
     "chevron-right": '<path d="M9 6l6 6l-6 6" />',
+    # tabler:chevron-left — scrolling the conversation tab strip leftward.
+    "chevron-left": '<path d="M15 6l-6 6l6 6" />',
+    # tabler:plus — the faux "new tab" tab at the end of the conversation tab strip.
+    "plus": '<path d="M12 5l0 14" /><path d="M5 12l14 0" />',
     # tabler:x — close a tab or dismiss something.
     "x": '<path d="M18 6l-12 12" /><path d="M6 6l12 12" />',
     # tabler:player-stop-filled — cancel a running generation (filled square reads as

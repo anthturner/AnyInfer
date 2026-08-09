@@ -17,12 +17,15 @@ import html
 
 from PySide6.QtCore import QEvent, QRect, QSize, Qt, QUrl
 from PySide6.QtGui import (
+    QColor,
     QDesktopServices,
     QFont,
     QFontDatabase,
     QPaintEvent,
     QPainter,
     QResizeEvent,
+    QTextCursor,
+    QTextFormat,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -33,6 +36,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QPushButton,
+    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -53,6 +57,23 @@ def _monospace() -> QFont:
     font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
     font.setPointSize(9)
     return font
+
+
+def _stripe_color() -> QColor:
+    """A zebra-stripe tint derived from the active theme, not a hardcoded color.
+
+    Blended from the live `surface`/`border` tokens rather than a fixed palette entry, so
+    every custom theme gets a stripe that reads as "this theme, slightly recessed" instead
+    of a mismatched gray.
+    """
+    surface = QColor(theme.color("surface"))
+    border = QColor(theme.color("border"))
+    mix = 0.35
+    return QColor(
+        round(surface.red() + (border.red() - surface.red()) * mix),
+        round(surface.green() + (border.green() - surface.green()) * mix),
+        round(surface.blue() + (border.blue() - surface.blue()) * mix),
+    )
 
 
 def _inset_separator() -> QFrame:
@@ -108,12 +129,38 @@ class _CodeView(QPlainTextEdit):
         self._copy_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._copy_button.clicked.connect(self._copy)
         self._copy_button.setVisible(False)
+        self._apply_stripes()
         self.reapply_theme()
 
     def reapply_theme(self) -> None:
-        """Re-render the themed copy icon after a theme change."""
+        """Re-render the themed copy icon and zebra stripes after a theme change."""
         self._copy_button.setIcon(themed_icon(self._copy_button, "copy", size=16))
+        self._apply_stripes()
         self._gutter.update()
+
+    # ---- zebra striping ------------------------------------------------------------
+
+    def _apply_stripes(self) -> None:
+        """Tint every other line so a long snippet is easier to track by eye.
+
+        `QTextEdit.ExtraSelection` with `FullWidthSelection` paints the highlight across
+        the whole line regardless of its text length — the built-in mechanism for a
+        current-line highlight, reused here for every odd line instead of just one. The
+        gutter is a separate sibling widget with no selections of its own, so `paint_gutter`
+        below fills the matching rects by hand to keep the stripes continuous under it.
+        """
+        stripe = _stripe_color()
+        selections = []
+        block = self.document().firstBlock()
+        while block.isValid():
+            if block.blockNumber() % 2 == 1:
+                selection = QTextEdit.ExtraSelection()
+                selection.format.setBackground(stripe)
+                selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                selection.cursor = QTextCursor(block)
+                selections.append(selection)
+            block = block.next()
+        self.setExtraSelections(selections)
 
     # ---- gutter --------------------------------------------------------------------
 
@@ -123,10 +170,10 @@ class _CodeView(QPlainTextEdit):
         return 12 + self.fontMetrics().horizontalAdvance("9") * digits
 
     def paint_gutter(self, event: QPaintEvent) -> None:
-        """Paint visible block numbers, muted, right-aligned."""
+        """Paint the zebra stripes and visible block numbers, muted, right-aligned."""
         painter = QPainter(self._gutter)
         painter.setFont(self.font())
-        painter.setPen(theme.color("muted"))
+        stripe = _stripe_color()
         block = self.firstVisibleBlock()
         top = round(
             self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
@@ -134,6 +181,9 @@ class _CodeView(QPlainTextEdit):
         bottom = top + round(self.blockBoundingRect(block).height())
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
+                if block.blockNumber() % 2 == 1:
+                    painter.fillRect(0, top, self._gutter.width(), bottom - top, stripe)
+                painter.setPen(theme.color("muted"))
                 painter.drawText(
                     0,
                     top,

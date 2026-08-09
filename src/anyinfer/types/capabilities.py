@@ -24,6 +24,7 @@ __all__ = [
     "ModelCapabilities",
     "Pricing",
     "Provenance",
+    "RateLimitHeaders",
     "Sourced",
     "TokenCalibration",
     "conjunction",
@@ -103,6 +104,48 @@ class TokenCalibration:
     def is_identity(self) -> bool:
         """Whether this calibration leaves an estimate unchanged."""
         return self.multiplier == 1.0 and self.overhead_tokens == 0
+
+
+@dataclass(frozen=True, slots=True)
+class RateLimitHeaders:
+    """Which response headers a provider reports its rate-limit state in.
+
+    Header names are wire facts and differ per provider, so they are declared on the
+    descriptor and recorded in that provider's contract snapshot — never branched on by
+    provider id in the core.
+
+    A provider whose dialect cannot be verified from its documentation declares nothing.
+    An empty dialect is not a failure: pacing falls back to whatever bounds the caller
+    configured, which is a smaller promise honestly kept rather than a guessed header name
+    that silently reads `None` forever.
+
+    Attributes:
+        requests_remaining: Requests left in the current window.
+        requests_reset: When the request window resets. Read as seconds, or as a duration
+            like ``"1m30s"`` for the providers that spell it that way.
+        tokens_remaining: Tokens left in the current window.
+        tokens_reset: When the token window resets, in the same two spellings.
+        limit_requests: The window's full request allowance, when the provider states it.
+            Only needed to turn ``reserve_fraction`` into an absolute floor.
+        limit_tokens: The window's full token allowance, for the same reason.
+    """
+
+    requests_remaining: str = ""
+    requests_reset: str = ""
+    tokens_remaining: str = ""
+    tokens_reset: str = ""
+    limit_requests: str = ""
+    limit_tokens: str = ""
+
+    @property
+    def declared(self) -> bool:
+        """Whether this provider reports anything worth reading."""
+        return bool(
+            self.requests_remaining
+            or self.requests_reset
+            or self.tokens_remaining
+            or self.tokens_reset
+        )
 
 
 class Feature(Flag):

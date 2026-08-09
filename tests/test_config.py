@@ -210,3 +210,79 @@ def test_context_settings_reach_a_reduction() -> None:
     reduction = select(documents, "same", max_tokens=1_000, tuning=config.context)
     assert reduction.collapsed_exact == 0
     assert reduction.text.count("same") == 2
+
+
+def test_a_provider_without_a_limits_block_is_paced_by_nothing() -> None:
+    config = ai.loads_config(json.dumps({"providers": [{"id": "openai"}]}))
+    assert config.providers[0].limits is None
+
+
+def test_the_limits_block_parses_into_rate_limits() -> None:
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "providers": [
+                    {
+                        "id": "openai",
+                        "limits": {
+                            "max_concurrent": 4,
+                            "requests_per_minute": 120,
+                            "min_interval_s": 0.25,
+                            "reserve_fraction": 0.1,
+                            "respect_headers": False,
+                        },
+                    }
+                ]
+            }
+        )
+    )
+    limits = config.providers[0].limits
+    assert limits == ai.RateLimits(
+        max_concurrent=4,
+        requests_per_minute=120.0,
+        min_interval_s=0.25,
+        reserve_fraction=0.1,
+        respect_headers=False,
+    )
+
+
+def test_limits_belong_to_the_instance_not_the_engine() -> None:
+    """Two instances of one engine on two keys have two independent allowances."""
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "providers": [
+                    {"id": "fast", "adapter": "openai", "limits": {"max_concurrent": 10}},
+                    {"id": "slow", "adapter": "openai", "limits": {"max_concurrent": 1}},
+                ]
+            }
+        )
+    )
+    assert [p.limits.max_concurrent for p in config.providers] == [10, 1]  # type: ignore[union-attr]
+
+
+def test_a_misspelled_limit_is_an_error_not_a_silent_no_op() -> None:
+    with pytest.raises(ai.ConfigError, match="limits"):
+        ai.loads_config(
+            json.dumps({"providers": [{"id": "openai", "limits": {"max_concurent": 4}}]})
+        )
+
+
+@pytest.mark.parametrize(
+    "limits",
+    [
+        {"max_concurrent": 0},
+        {"max_concurrent": "four"},
+        {"requests_per_minute": -1},
+        {"reserve_fraction": 1.5},
+        {"respect_headers": "yes"},
+    ],
+)
+def test_unenforceable_limits_are_rejected_at_load(limits: dict[str, object]) -> None:
+    with pytest.raises(ai.ConfigError):
+        ai.loads_config(json.dumps({"providers": [{"id": "openai", "limits": limits}]}))
+
+
+def test_the_limits_block_must_be_an_object() -> None:
+    with pytest.raises(ai.ConfigError, match="limits must be an object"):
+        ai.loads_config(json.dumps({"providers": [{"id": "openai", "limits": [4]}]}))

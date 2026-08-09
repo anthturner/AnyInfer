@@ -149,6 +149,8 @@ nav:
       - Capabilities and provenance: concepts/capabilities.md
       - Token estimation and context budgets: concepts/budgeting.md
       - Prompt caching: concepts/caching.md
+      - Cost and spending: concepts/cost.md
+      - Rate limits: concepts/rate-limits.md
       - Context reduction: concepts/context-reduction.md
       - Credentials and redaction: concepts/credentials.md
       - Telemetry: concepts/telemetry.md

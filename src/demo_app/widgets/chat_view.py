@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import html
 import math
+import random
 
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
 from PySide6.QtGui import QFont, QKeyEvent, QMouseEvent, QResizeEvent, QTextOption
@@ -572,10 +573,22 @@ class _WelcomeCard(QFrame):
         super().keyPressEvent(event)
 
 
+_QUICK_QUESTIONS = (
+    "Explain E=mc^2 as if I were a child.",
+    "What are the five most populated cities in the United States?",
+    "Why is the sky blue?",
+    "What's the difference between a crocodile and an alligator?",
+    "Give me a fun fact about octopuses.",
+    "How many moons does Jupiter have?",
+    "What year did the Berlin Wall fall?",
+    "What's the tallest mountain in the world?",
+)
+
+
 class WelcomeView(QWidget):
     """The centered empty state: wordmark, tagline, and four guided-tour cards."""
 
-    new_chat_requested = Signal()
+    quick_question_requested = Signal(str)
     structured_output_requested = Signal()
     fallback_demo_requested = Signal()
     tool_loop_requested = Signal()
@@ -600,12 +613,17 @@ class WelcomeView(QWidget):
 
         cards = QHBoxLayout()
         cards.setSpacing(10)
+
+        quick_question_card = _WelcomeCard(
+            strings.WELCOME_QUICK_QUESTION,
+            "Send a random trivia question to the selected engine and watch it answer.",
+        )
+        quick_question_card.clicked.connect(
+            lambda: self.quick_question_requested.emit(random.choice(_QUICK_QUESTIONS))
+        )
+        cards.addWidget(quick_question_card)
+
         for title, description, signal in (
-            (
-                strings.WELCOME_NEW_CHAT,
-                "Stream an answer from the offline provider — no key, no network.",
-                self.new_chat_requested,
-            ),
             (
                 strings.WELCOME_STRUCTURED,
                 "Enforce a JSON Schema and watch the mechanism and repairs report in.",

@@ -42,6 +42,11 @@ class DegradationWatch:
 `ParameterDropped` fires when a provider accepts a parameter and discards it — the failure
 mode where `temperature=0` silently does nothing and looks exactly like success.
 
+`RateLimitWaited` belongs to the same family. A request held back by
+[client-side pacing](../concepts/rate-limits.md) is indistinguishable from a slow provider
+unless something says so, which is why the wait also lands in
+`result.timing.phases["queued_ms"]`.
+
 ## Payload privacy
 
 Prompt and response text are `None` unless an observer opts in, and stripping happens per

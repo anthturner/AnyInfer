@@ -10,10 +10,17 @@ from typing import Any
 
 from .._client.providers import ProviderSettings
 from ..context.settings import DEFAULT_TUNING, ContextTuning
-from ..errors import ConfigError
+from ..errors import AnyInferError, ConfigError
+from ..mcp import MCPServer
 from ..registry import ProviderRegistry, default_registry, normalize_provider_id
 from ..routing import Route
-from ..types.requests import CACHE_MODES, HISTORY_MODES, CachePolicy, HistoryPolicy
+from ..types.requests import (
+    CACHE_MODES,
+    HISTORY_MODES,
+    CachePolicy,
+    HistoryPolicy,
+    RateLimits,
+)
 
 __all__ = [
     "CONFIG_FORMAT_VERSION",
@@ -37,6 +44,7 @@ _ROOT_KEYS = frozenset(
         "context",
         "history",
         "cache",
+        "mcp",
         # Settings owned by the bundled demo. They are accepted so one file can be
         # shared with the SDK, CLI, and sidecar; this loader intentionally ignores them.
         "targets",
@@ -47,7 +55,16 @@ _ROOT_KEYS = frozenset(
 )
 _IDENTITY_KEYS = frozenset({"id", "adapter", "provider_id", "alias", "enabled"})
 _SETTING_KEYS = frozenset(
-    {"base_url", "api_key", "api_version", "headers", "options", "timeout_s", "values"}
+    {
+        "base_url",
+        "api_key",
+        "api_version",
+        "headers",
+        "options",
+        "timeout_s",
+        "values",
+        "limits",
+    }
 )
 _DIRECT_SETTING_KEYS = frozenset({"base_url", "api_key", "api_version"})
 
@@ -73,6 +90,9 @@ class AnyInferConfig:
             the file does not ask for one. Pass to `Client` or `AsyncClient` as ``cache=``.
             Absent means no placement — caching changes what a provider bills, so it is
             never turned on by a file that did not name it.
+        mcp: Model Context Protocol servers described by the optional ``mcp`` block. These
+            are inert descriptions: loading a file never spawns a process or opens a
+            socket. Pass them to `anyinfer.mcp.MCPToolset.connect` when tools are wanted.
     """
 
     providers: tuple[ProviderSettings, ...] = ()
@@ -81,6 +101,7 @@ class AnyInferConfig:
     context: ContextTuning = DEFAULT_TUNING
     history: HistoryPolicy | None = None
     cache: CachePolicy | None = None
+    mcp: tuple[MCPServer, ...] = ()
 
 
 def load_config(
@@ -184,7 +205,8 @@ def loads_config(
     context = _parse_context(data.get("context"), source)
     history = _parse_history(data.get("history"), source)
     cache = _parse_cache(data.get("cache"), source)
-    return AnyInferConfig(tuple(providers), route, version, context, history, cache)
+    mcp = _parse_mcp(data.get("mcp"), source)
+    return AnyInferConfig(tuple(providers), route, version, context, history, cache, mcp)
 
 
 def _parse_provider(
@@ -290,8 +312,60 @@ def _parse_provider(
         headers=headers,
         options=merged_options,
         timeout_s=float(timeout),
+        limits=_parse_limits(raw.get("limits"), source, location),
         **direct,
     )
+
+
+def _parse_limits(value: Any, source: str, location: str) -> RateLimits | None:
+    """Validate a provider entry's optional ``limits`` block.
+
+    Nested inside the provider rather than declared at the root, because a rate limit is a
+    property of an account at a provider: two instances of the same engine on two keys have
+    two independent allowances, and a single top-level number could not say which it meant.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise _error(source, f"{location}.limits must be an object")
+
+    known = {
+        "max_concurrent",
+        "requests_per_minute",
+        "min_interval_s",
+        "respect_headers",
+        "reserve_fraction",
+    }
+    unknown = set(value) - known
+    if unknown:
+        raise _unknown_keys(source, f"{location}.limits", unknown)
+
+    fields: dict[str, Any] = {}
+    if "max_concurrent" in value:
+        raw_value = value["max_concurrent"]
+        if isinstance(raw_value, bool) or not isinstance(raw_value, int):
+            raise _error(source, f"{location}.limits.max_concurrent must be an integer")
+        fields["max_concurrent"] = raw_value
+    for key in ("requests_per_minute", "min_interval_s", "reserve_fraction"):
+        if key in value:
+            raw_value = value[key]
+            if isinstance(raw_value, bool) or not isinstance(raw_value, int | float):
+                raise _error(source, f"{location}.limits.{key} must be a number")
+            fields[key] = float(raw_value)
+    if "respect_headers" in value:
+        raw_value = value["respect_headers"]
+        if not isinstance(raw_value, bool):
+            raise _error(source, f"{location}.limits.respect_headers must be true or false")
+        fields["respect_headers"] = raw_value
+
+    try:
+        return RateLimits(**fields)
+    except ValueError as exc:
+        raise _error(
+            source,
+            f"{location}.limits is invalid: {exc}",
+            hint="pacing is opt-in; omit the block entirely to dispatch without it",
+        ) from exc
 
 
 def _parse_context(value: Any, source: str) -> ContextTuning:
@@ -400,6 +474,68 @@ def _parse_cache(value: Any, source: str) -> CachePolicy | None:
         return CachePolicy(**fields)
     except ValueError as exc:
         raise _error(source, f"'cache' is invalid: {exc}") from exc
+
+
+def _parse_mcp(value: Any, source: str) -> tuple[MCPServer, ...]:
+    """Validate the optional Model Context Protocol server list.
+
+    Absent means no tool sources, which is the shipped behaviour. Servers are *described*
+    here, never connected: loading a configuration file must not spawn a process or open a
+    socket, so the descriptions are inert until an application asks for them.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise _error(source, "'mcp' must be a list of server objects")
+
+    known = {
+        "name", "command", "url", "env", "headers", "cwd", "timeout_s",
+        "allow_tools", "deny_tools",
+    }
+    servers: list[MCPServer] = []
+    for index, raw in enumerate(value):
+        location = f"mcp[{index}]"
+        if not isinstance(raw, dict):
+            raise _error(source, f"{location} must be an object")
+        unknown = set(raw) - known
+        if unknown:
+            raise _unknown_keys(source, f"'{location}'", unknown)
+
+        fields: dict[str, Any] = {"name": str(raw.get("name", ""))}
+        if "command" in raw:
+            command = raw["command"]
+            if not isinstance(command, list) or not all(isinstance(p, str) for p in command):
+                raise _error(source, f"{location}.command must be a list of strings")
+            fields["command"] = tuple(command)
+        for key in ("url", "cwd"):
+            if key in raw:
+                if not isinstance(raw[key], str):
+                    raise _error(source, f"{location}.{key} must be a string")
+                fields[key] = raw[key]
+        for key in ("env", "headers"):
+            if key in raw:
+                mapping = raw[key]
+                if not isinstance(mapping, dict):
+                    raise _error(source, f"{location}.{key} must be an object")
+                fields[key] = {str(k): str(v) for k, v in mapping.items()}
+        if "timeout_s" in raw:
+            timeout = raw["timeout_s"]
+            if isinstance(timeout, bool) or not isinstance(timeout, int | float):
+                raise _error(source, f"{location}.timeout_s must be a number")
+            fields["timeout_s"] = float(timeout)
+        for key in ("allow_tools", "deny_tools"):
+            if key in raw:
+                names = raw[key]
+                if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+                    raise _error(source, f"{location}.{key} must be a list of strings")
+                fields[key] = tuple(names)
+
+        try:
+            servers.append(MCPServer(**fields))
+        except AnyInferError as exc:
+            raise _error(source, f"{location} is invalid: {exc.detail}") from exc
+
+    return tuple(servers)
 
 
 def _parse_route(value: Any, source: str) -> Route | None:
