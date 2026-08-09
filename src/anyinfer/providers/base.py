@@ -19,7 +19,7 @@ from ..types.capabilities import DiscoveredModel, Health
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
 from ..types.messages import Message
 from ..types.requests import Sampling, ToolSpec
-from ..types.results import FinishReason, Mechanism, Usage
+from ..types.results import Diagnostic, FinishReason, Mechanism, Usage
 
 if TYPE_CHECKING:
     from ..events.telemetry import TelemetryEvent
@@ -29,6 +29,7 @@ __all__ = [
     "AdapterFinal",
     "ProviderAdapter",
     "ProviderConfig",
+    "SupportsDiagnostics",
     "WireRequest",
 ]
 
@@ -168,4 +169,24 @@ class ProviderAdapter(Protocol):
 
     async def aclose(self) -> None:
         """Release transports and any supervised resources."""
+        ...
+
+
+@runtime_checkable
+class SupportsDiagnostics(Protocol):
+    """An adapter that can report on the state of its own runtime.
+
+    Optional, and declared on the descriptor
+    (``reports_diagnostics=True``) rather than discovered by probing for the method: the
+    core asks providers that advertise the ability, so which providers can do this is
+    readable from the registry instead of from a dozen ``hasattr`` calls.
+
+    Implementations must be cheap and must not raise. A diagnostic that costs a
+    round trip on every request is worse than the condition it reports, and the core
+    treats collection failures as "nothing to report" — advisory data must never turn a
+    successful generation into a failed one.
+    """
+
+    async def diagnostics(self) -> Sequence[Diagnostic]:
+        """Report anything notable about this provider's current runtime state."""
         ...

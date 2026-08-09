@@ -36,6 +36,8 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 
 ::: anyinfer.ParameterDropped
 
+::: anyinfer.ProviderDiagnostic
+
 ::: anyinfer.ContextReduced
 
 ::: anyinfer.UsageEstimated

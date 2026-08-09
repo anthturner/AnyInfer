@@ -37,7 +37,7 @@ from ..types.capabilities import (
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta
 from ..types.messages import Message, Text, ToolCall, ToolResult
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
+from ..types.results import Diagnostic, FinishReason, Usage
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_ndjson
@@ -53,6 +53,14 @@ _DONE_REASONS: Mapping[str, FinishReason] = {
 }
 
 _NS_PER_MS = 1_000_000.0
+
+_SPILL_THRESHOLD = 0.95
+"""VRAM residency below which a loaded model is reported as spilled.
+
+Not 1.0: Ollama's own reported sizes wobble by a few megabytes between the weights it
+counts and the allocation it makes, and a diagnostic that fires on every healthy load is
+one every caller learns to ignore.
+"""
 
 
 class OllamaAdapter:
@@ -157,7 +165,52 @@ class OllamaAdapter:
         A provider-specific extension beyond the four-method adapter contract, for
         applications that want residency detail. GPU spill is the signal to watch — a
         model loaded with ``size_vram`` well below its total size is running partly on
-        the CPU and will be dramatically slower than expected.
+        the CPU and will be dramatically slower than expected. `diagnostics()` reports
+        exactly that condition without the caller having to do the arithmetic.
+        """
+        return {name: vram for name, (_total, vram) in (await self._residency()).items()}
+
+    async def diagnostics(self) -> Sequence[Diagnostic]:
+        """Report resident models that spilled out of VRAM.
+
+        The failure this exists for is not a failure at all from the wire's point of
+        view: the request succeeds, the answer is correct, and it took thirty times as
+        long as the same model took yesterday because it no longer fits alongside
+        whatever else the GPU is holding. Nothing in a `Generation` explains that. This
+        does.
+
+        Reads ``/api/ps`` only — the same endpoint `loaded_models()` uses, no generation
+        cost — and reports nothing at all when the server is unreachable or too old to
+        answer, because an advisory that guesses is worse than one that stays quiet.
+        """
+        reports: list[Diagnostic] = []
+        for name, (total, vram) in sorted((await self._residency()).items()):
+            if total is None or vram is None or total <= 0:
+                continue
+            if vram >= total:
+                continue
+            resident = vram / total
+            if resident >= _SPILL_THRESHOLD:
+                continue
+            reports.append(
+                Diagnostic(
+                    code="ollama.gpu-spill",
+                    severity="warning",
+                    message=(
+                        f"{name} is only {resident:.0%} resident in VRAM; the rest runs on "
+                        "the CPU, which is far slower. Free GPU memory, or choose a "
+                        "smaller model or quantization."
+                    ),
+                )
+            )
+        return tuple(reports)
+
+    async def _residency(self) -> Mapping[str, tuple[int | None, int | None]]:
+        """Read ``/api/ps`` into ``model -> (total_bytes, vram_bytes)``.
+
+        Every failure resolves to "nothing is known": an unreachable server, an error
+        status, or a payload shape this does not recognize all mean the caller learns
+        nothing, never that the caller learns something wrong.
         """
         try:
             response = await self._client.get("/api/ps")
@@ -169,15 +222,19 @@ class OllamaAdapter:
         entries = payload.get("models") if isinstance(payload, Mapping) else None
         if not isinstance(entries, list):
             return {}
-        loaded: dict[str, int | None] = {}
+        loaded: dict[str, tuple[int | None, int | None]] = {}
         for entry in entries:
             if not isinstance(entry, Mapping):
                 continue
             name = str(entry.get("name") or entry.get("model") or "")
             if not name:
                 continue
+            total = entry.get("size")
             vram = entry.get("size_vram")
-            loaded[name] = vram if isinstance(vram, int) else None
+            loaded[name] = (
+                total if isinstance(total, int) else None,
+                vram if isinstance(vram, int) else None,
+            )
         return loaded
 
     # ---- generation ------------------------------------------------------------------
@@ -453,6 +510,7 @@ descriptor = ProviderDescriptor(
     reasoning_translator=_translate_reasoning,
     default_capabilities=ModelCapabilities(features=Sourced(_OLLAMA_FEATURES, "default")),
     supports_sessions=True,
+    reports_diagnostics=True,
     grammar_needs_prompt_injection=True,
 )
 """Descriptor for the Ollama provider."""

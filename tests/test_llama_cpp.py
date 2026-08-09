@@ -64,6 +64,7 @@ class _StubSupervisor:
         self.acquisitions: list[tuple[str, Path, ServerPlan]] = []
         self.closed = False
         self.resident_models: tuple[str, ...] = ()
+        self.resident_plans: dict[str, ServerPlan] = {}
 
     async def acquire(
         self, model_key: str, model_path: Path, plan: ServerPlan, *, persist: bool = False
@@ -300,6 +301,66 @@ async def test_health_reports_binary_availability(tmp_path: Path) -> None:
         await adapter.aclose()
 
     assert health.ok is True
+
+
+# ---- runtime diagnostics -------------------------------------------------------------
+
+
+async def test_diagnostics_report_a_gpu_machine_serving_on_the_cpu(tmp_path: Path) -> None:
+    adapter, supervisor = _adapter(tmp_path, FakeOpenAIServer())
+    supervisor.resident_plans = {"test-model": ServerPlan(context_size=4096, gpu_layers=0)}
+    try:
+        reported = tuple(await adapter.diagnostics())
+    finally:
+        await adapter.aclose()
+
+    assert len(reported) == 1
+    assert reported[0].code == "llama-cpp.cpu-only"
+    assert reported[0].severity == "warning"
+    assert "cuda" in reported[0].message
+
+
+async def test_diagnostics_stay_quiet_when_layers_are_offloaded(tmp_path: Path) -> None:
+    adapter, supervisor = _adapter(tmp_path, FakeOpenAIServer())
+    supervisor.resident_plans = {"test-model": ServerPlan(context_size=4096, gpu_layers=999)}
+    try:
+        assert tuple(await adapter.diagnostics()) == ()
+    finally:
+        await adapter.aclose()
+
+
+async def test_diagnostics_stay_quiet_on_a_cpu_only_machine(tmp_path: Path) -> None:
+    """Running on the CPU there is the plan working, not the plan degrading."""
+    adapter, supervisor = _adapter(
+        tmp_path,
+        FakeOpenAIServer(),
+        options={"hardware": HardwareProfile(os_name="linux", arch="x86_64")},
+    )
+    supervisor.resident_plans = {"test-model": ServerPlan(context_size=4096, gpu_layers=0)}
+    try:
+        assert tuple(await adapter.diagnostics()) == ()
+    finally:
+        await adapter.aclose()
+
+
+async def test_diagnostics_never_trigger_hardware_detection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An advisory must not be the thing that probes the machine."""
+    import anyinfer.providers.llama_cpp as module
+
+    def explode() -> HardwareProfile:
+        raise AssertionError("diagnostics must not detect hardware")
+
+    monkeypatch.setattr(module, "detect", explode)
+    adapter, supervisor = _adapter(
+        tmp_path, FakeOpenAIServer(), options={"hardware": None}
+    )
+    supervisor.resident_plans = {"test-model": ServerPlan(context_size=4096, gpu_layers=0)}
+    try:
+        assert tuple(await adapter.diagnostics()) == ()
+    finally:
+        await adapter.aclose()
 
 
 # ---- structured output ---------------------------------------------------------------

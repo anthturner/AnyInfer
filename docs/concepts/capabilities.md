@@ -144,6 +144,40 @@ class Recorder:
             log.warning("%s ignored %s: %s", event.target, event.parameter, event.reason)
 ```
 
+## Runtime diagnostics
+
+A capability says what a model *can* do. It says nothing about the state the engine is
+actually in right now — and that state is where local inference's worst surprise lives:
+
+> The request succeeded. The answer is correct. It took ninety seconds, because the model
+> no longer fits in VRAM alongside whatever else the GPU is holding, and half of it is
+> running on the CPU.
+
+Nothing in a `Generation` explains that, and no health probe catches it — the server is
+perfectly reachable. So providers that can inspect their own runtime report it:
+
+```python
+for note in client.diagnostics("ollama"):
+    print(note.code, note.message)
+# ollama.gpu-spill  qwen3:8b is only 45% resident in VRAM; the rest runs on the CPU ...
+```
+
+The same notes arrive automatically on every result that hit the condition, and as
+`ProviderDiagnostic` telemetry:
+
+```python
+result = client.generate(prompt, target="ollama:qwen3:8b")
+result.warnings    # ("qwen3:8b is only 45% resident in VRAM; ...",)
+```
+
+Which providers can answer is declared on the descriptor (`reports_diagnostics`), not
+discovered by probing — so it is readable from the registry. Today that is
+[Ollama](../providers/ollama.md) (VRAM spill) and [llama.cpp](../providers/llama-cpp.md)
+(a GPU machine serving on the CPU). Everything else reports nothing.
+
+Diagnostics are advisory by construction: they never fail a request, never gate routing,
+and a provider that cannot answer says nothing rather than guessing.
+
 ## Inspecting capabilities
 
 ```python

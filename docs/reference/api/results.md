@@ -20,6 +20,10 @@ stream yields on the way there. Ordering guarantees are documented in
 
 ::: anyinfer.ErrorInfo
 
+::: anyinfer.Diagnostic
+
+::: anyinfer.DiagnosticSeverity
+
 ::: anyinfer.FinishReason
 
 </div>

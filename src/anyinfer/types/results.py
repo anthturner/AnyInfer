@@ -13,6 +13,8 @@ from .requests import ResolvedTarget
 __all__ = [
     "DETAIL_MAX_CHARS",
     "AttemptRecord",
+    "Diagnostic",
+    "DiagnosticSeverity",
     "ErrorInfo",
     "FinishReason",
     "Generation",
@@ -24,6 +26,37 @@ __all__ = [
 
 DETAIL_MAX_CHARS = 512
 """Upper bound on `ErrorInfo.detail`, applied after redaction."""
+
+DiagnosticSeverity = Literal["info", "warning"]
+"""How much a runtime diagnostic should worry the caller. Never an error: a condition that
+should fail a request is an exception, not a note attached to a successful one."""
+
+
+@dataclass(frozen=True, slots=True)
+class Diagnostic:
+    """Something a provider noticed about *itself* while serving requests.
+
+    Not an error and not a capability: an error stops a request, and a capability is a
+    fact about a model. This is the third thing — the request worked, and something about
+    how it worked is worth saying out loud. A model that spilled out of VRAM and is now
+    running at a tenth of its expected speed answers perfectly; the caller simply has no
+    way to know why it took ninety seconds unless the provider says so.
+
+    Diagnostics are advisory by construction: collecting them never fails a request, a
+    provider that cannot answer reports nothing, and nothing here is load-bearing for
+    routing. Content-free — a diagnostic describes the runtime, never the prompt.
+
+    Attributes:
+        code: Stable machine-readable identifier, e.g. ``"ollama.gpu-spill"``. Callers
+            match on this; the message is for people.
+        severity: ``"warning"`` for a condition degrading this request, ``"info"`` for
+            context that merely explains it.
+        message: One human-readable sentence, already bounded and redacted.
+    """
+
+    code: str
+    severity: DiagnosticSeverity
+    message: str
 
 
 @dataclass(frozen=True, slots=True)

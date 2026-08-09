@@ -34,7 +34,7 @@ import sys
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -523,6 +523,16 @@ class ServerSupervisor:
     def resident_models(self) -> tuple[str, ...]:
         """Model keys with a running server."""
         return tuple(k for k, h in self._servers.items() if h.is_running)
+
+    @property
+    def resident_plans(self) -> Mapping[str, ServerPlan]:
+        """The launch plan each running server was started with.
+
+        What the tuner *decided*, which is not always what the caller assumed: a plan that
+        offloaded no layers explains a local model running an order of magnitude slower
+        than the same weights did on the same machine last week.
+        """
+        return {k: h.plan for k, h in self._servers.items() if h.is_running}
 
     async def aclose(self) -> None:
         """Stop every supervised server."""

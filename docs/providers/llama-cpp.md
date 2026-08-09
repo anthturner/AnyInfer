@@ -95,6 +95,24 @@ template and tool calling silently does not work at all.
 
 See [the local subsystem](../concepts/local.md).
 
+## When the tuner falls back to the CPU
+
+VRAM admission control refuses a model that cannot fit, but it also does something quieter:
+on a machine where the weights plus KV cache leave no room, the plan offloads **no** layers
+and the model is served entirely on the CPU. That is the right call — a slow answer beats no
+answer — and it is invisible from the result.
+
+```python
+for note in client.diagnostics("llama-cpp"):
+    print(note.code, note.message)
+# llama-cpp.cpu-only  qwen3-8b is being served with no layers offloaded, so it runs on
+#                     the CPU despite this machine having a cuda accelerator. ...
+```
+
+Reported only when an accelerator was actually detected — on a CPU-only machine this is the
+plan working, not the plan degrading — and read from the supervisor's own state, so it costs
+nothing and never triggers hardware detection on its own.
+
 ## Wire contract
 
 For the exact request/response fields this adapter depends on, see

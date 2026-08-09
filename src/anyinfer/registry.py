@@ -304,6 +304,16 @@ class ProviderDescriptor:
     supports_sessions: bool = False
     """Whether the provider can keep state between requests — a session API, or keep-alive
     model residency — rather than treating every request as independent."""
+
+    reports_diagnostics: bool = False
+    """Whether this provider's adapter implements
+    `SupportsDiagnostics`.
+
+    Declared rather than probed for, so "which providers can tell me about their runtime"
+    is answerable from the registry alone. The core only calls ``diagnostics()`` on a
+    provider that advertises it here.
+    """
+
     grammar_needs_prompt_injection: bool = False
     """Whether ``grammar`` mode also requires the schema in the prompt.
 

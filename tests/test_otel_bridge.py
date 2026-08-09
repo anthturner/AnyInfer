@@ -100,6 +100,12 @@ ERROR = ErrorInfo(
     detail="upstream is down",
 )
 
+DIAGNOSTIC = ai.Diagnostic(
+    code="ollama.gpu-spill",
+    severity="warning",
+    message="qwen3:8b is only 45% resident in VRAM",
+)
+
 # One instance of every member of the TelemetryEvent union.
 ALL_EVENTS: tuple[TelemetryEvent, ...] = (
     ai.RequestStarted("r1", ("openai:gpt-5",)),
@@ -116,6 +122,7 @@ ALL_EVENTS: tuple[TelemetryEvent, ...] = (
     ai.RequestFailed("r1", ERROR),
     ai.ParameterDropped("r1", TARGET, "temperature", "target ignores sampling"),
     ai.UsageEstimated("r1", TARGET, "input_tokens", "heuristic"),
+    ai.ProviderDiagnostic(TARGET, DIAGNOSTIC, "r1"),
     ai.ContextReduced("auto", "select", 10, 4, 6, 900, 1000, ("max_tokens",), 0),
     ai.ServerLifecycle("llama-1", "ready"),
     ai.DownloadProgress("artifact-1", 1024, 1024, done=True),
@@ -264,6 +271,32 @@ def test_context_reduced_span_carries_no_document_content(
 
     for value in tracer.spans[0].attributes.values():
         assert not isinstance(value, str) or "/" not in value
+
+
+def test_a_diagnostic_in_a_request_lands_on_that_request_span(
+    observer: OTelObserver, tracer: FakeTracer
+) -> None:
+    observer.on_event(ai.RequestStarted("r1", ("openai:gpt-5",)))
+    spans_before = len(tracer.spans)
+    observer.on_event(ai.ProviderDiagnostic(TARGET, DIAGNOSTIC, "r1"))
+
+    assert len(tracer.spans) == spans_before, "no standalone span while a request owns it"
+    name, attributes = tracer.spans[0].events[-1]
+    assert name == "provider.diagnostic"
+    assert attributes["gen_ai.anyinfer.code"] == "ollama.gpu-spill"
+    assert attributes["gen_ai.anyinfer.severity"] == "warning"
+
+
+def test_a_diagnostic_outside_a_request_becomes_a_standalone_span(
+    observer: OTelObserver, tracer: FakeTracer
+) -> None:
+    observer.on_event(ai.ProviderDiagnostic(TARGET, DIAGNOSTIC))
+
+    span = tracer.spans[0]
+    assert span.name == "provider.diagnostic"
+    assert span.ended
+    assert span.attributes["gen_ai.system"] == "openai"
+    assert span.attributes["gen_ai.anyinfer.code"] == "ollama.gpu-spill"
 
 
 def test_server_lifecycle_becomes_a_standalone_span(

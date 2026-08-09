@@ -305,6 +305,57 @@ async def test_loaded_models_reports_vram_residency() -> None:
     assert loaded == {"qwen3:8b": 2_000_000_000}
 
 
+async def _ollama_diagnostics(loaded: dict[str, int]) -> tuple[ai.Diagnostic, ...]:
+    server = FakeOllamaServer(loaded=loaded)
+    adapter = OllamaAdapter(
+        ProviderConfig(provider_id="ollama", base_url="http://127.0.0.1:11434",
+                       transport=server.transport())
+    )
+    try:
+        return tuple(await adapter.diagnostics())
+    finally:
+        await adapter.aclose()
+
+
+async def test_diagnostics_report_a_spilled_model() -> None:
+    """The fake reports 4.4 GB of weights; 2 GB resident is 45% on the GPU."""
+    reported = await _ollama_diagnostics({"qwen3:8b": 2_000_000_000})
+
+    assert len(reported) == 1
+    assert reported[0].code == "ollama.gpu-spill"
+    assert reported[0].severity == "warning"
+    assert "45%" in reported[0].message
+
+
+async def test_diagnostics_stay_quiet_for_a_fully_resident_model() -> None:
+    assert await _ollama_diagnostics({"qwen3:8b": 4_400_000_000}) == ()
+
+
+async def test_diagnostics_tolerate_a_near_miss() -> None:
+    """Reported sizes wobble by a few megabytes; a warning on every load is noise."""
+    assert await _ollama_diagnostics({"qwen3:8b": 4_390_000_000}) == ()
+
+
+async def test_diagnostics_stay_quiet_when_nothing_is_loaded() -> None:
+    assert await _ollama_diagnostics({}) == ()
+
+
+async def test_diagnostics_stay_quiet_when_the_server_is_unreachable() -> None:
+    import httpx2
+
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("connection refused", request=request)
+
+    adapter = OllamaAdapter(
+        ProviderConfig(provider_id="ollama", base_url="http://127.0.0.1:11434",
+                       transport=httpx2.MockTransport(refuse))
+    )
+    try:
+        assert tuple(await adapter.diagnostics()) == ()
+    finally:
+        await adapter.aclose()
+
+
 # ---- errors --------------------------------------------------------------------------
 
 

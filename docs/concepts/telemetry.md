@@ -48,11 +48,16 @@ because a broken telemetry sink must never fail a generation.
 
 | Event | Emitted when |
 |---|---|
-| `ParameterDropped` | A provider accepts a parameter and discards it. |
+| `ParameterDropped` | A provider accepts a parameter and discards it, or honors it only in part. |
 | `UsageEstimated` | A usage figure was derived rather than reported. |
+| `ProviderDiagnostic` | A provider reported something about its own runtime. |
 
 Anything AnyInfer drops or estimates is observable. That is a deliberate inversion of the
 common `drop_params=True`-style design, where the whole point is that you *do not* find out.
+
+`ProviderDiagnostic` covers the case the other two cannot: the request worked, nothing was
+dropped or estimated, and it still took thirty seconds because the model had spilled out of
+VRAM since yesterday. See [runtime diagnostics](capabilities.md#runtime-diagnostics).
 
 **Context reduction:** `ContextReduced` — counts and ceilings only, never content.
 

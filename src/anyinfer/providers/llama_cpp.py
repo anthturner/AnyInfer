@@ -45,6 +45,7 @@ from ..types.capabilities import (
     ModelCapabilities,
     Sourced,
 )
+from ..types.results import Diagnostic
 from .base import AdapterEvent, ProviderConfig, WireRequest
 from .openai_compat import OpenAICompatAdapter
 
@@ -291,6 +292,38 @@ class LlamaCppAdapter:
             return Health(ok=False, detail=exc.detail)
         return Health(ok=True, detail=f"resident: {', '.join(self._supervisor.resident_models)}")
 
+    async def diagnostics(self) -> Sequence[Diagnostic]:
+        """Report supervised servers whose launch plan is not what the machine can do.
+
+        The case worth catching is a GPU machine running a model entirely on the CPU.
+        That happens for ordinary reasons — the weights plus KV cache did not fit
+        alongside something else already resident — and it is invisible from the result:
+        the answer is correct and arrives an order of magnitude late.
+
+        Reads the supervisor's own state, so it costs nothing and never touches the
+        network.
+        """
+        if self._hardware is None or not self._hardware.has_accelerator:
+            # Nothing to report on a CPU-only machine: running on the CPU there is the
+            # plan working, not the plan degrading. Hardware is not *detected* here
+            # either — an advisory must never be the thing that triggers a probe.
+            return ()
+        accelerator = self._hardware.primary_accelerator
+        kind = accelerator.kind if accelerator is not None else "gpu"
+        return tuple(
+            Diagnostic(
+                code="llama-cpp.cpu-only",
+                severity="warning",
+                message=(
+                    f"{model} is being served with no layers offloaded, so it runs on the "
+                    f"CPU despite this machine having a {kind} accelerator. Free memory by "
+                    "unloading another model, or pick a smaller quantization."
+                ),
+            )
+            for model, plan in sorted(self._supervisor.resident_plans.items())
+            if plan.gpu_layers == 0
+        )
+
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
         """Ensure a server is running for this model, then delegate to the OpenAI dialect."""
         artifact = self._artifact_for(req.model)
@@ -372,6 +405,7 @@ descriptor = ProviderDescriptor(
     ),
     default_capabilities=ModelCapabilities(features=Sourced(_LLAMA_FEATURES, "default")),
     supports_sessions=True,
+    reports_diagnostics=True,
     grammar_needs_prompt_injection=True,
 )
 """Descriptor for the supervised llama.cpp provider."""

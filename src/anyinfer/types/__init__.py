@@ -52,6 +52,8 @@ from .requests import (
 from .results import (
     DETAIL_MAX_CHARS,
     AttemptRecord,
+    Diagnostic,
+    DiagnosticSeverity,
     ErrorInfo,
     FinishReason,
     Generation,
@@ -68,6 +70,8 @@ __all__ = [
     "AttemptFailed",
     "AttemptRecord",
     "ContentPart",
+    "Diagnostic",
+    "DiagnosticSeverity",
     "DiscoveredModel",
     "ErrorInfo",
     "Feature",

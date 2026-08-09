@@ -16,7 +16,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Literal, cast
 
 from ..types.requests import ResolvedTarget, Target
-from ..types.results import ErrorInfo, Mechanism, Timing, Usage
+from ..types.results import Diagnostic, ErrorInfo, Mechanism, Timing, Usage
 
 __all__ = [
     "PAYLOAD_FIELDS",
@@ -27,6 +27,7 @@ __all__ = [
     "FallbackTriggered",
     "FirstToken",
     "ParameterDropped",
+    "ProviderDiagnostic",
     "RepairAttempted",
     "RequestCompleted",
     "RequestFailed",
@@ -242,6 +243,29 @@ class ParameterDropped:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderDiagnostic:
+    """A provider reported something about its own runtime.
+
+    Emitted after an attempt for providers that declare ``reports_diagnostics``, and
+    whenever ``diagnostics()`` is called directly. The same text also lands on
+    `Generation.warnings`, so a caller
+    reading only results still sees it; this event is for observers that want it
+    correlated with the request that hit it.
+
+    Attributes:
+        target: The resolved target whose runtime is being described, or ``None`` when the
+            diagnostic was collected outside a request.
+        diagnostic: What the provider reported.
+        request_id: Correlation id, or ``None`` when collected outside a request — in
+            which case the OTel bridge records it as a standalone span.
+    """
+
+    target: ResolvedTarget | None
+    diagnostic: Diagnostic
+    request_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class UsageEstimated:
     """A usage figure was derived rather than reported by the provider.
 
@@ -346,7 +370,7 @@ TelemetryEvent = (
     RequestStarted | TargetResolved | AttemptStarted | FirstToken | AttemptCompleted
     | RetryScheduled | FallbackTriggered | RepairAttempted | RequestCompleted | RequestFailed
     | ParameterDropped | UsageEstimated | ServerLifecycle | DownloadProgress
-    | ContextReduced
+    | ContextReduced | ProviderDiagnostic
 )
 """Any event an observer may receive."""
 

@@ -24,6 +24,7 @@ from .events.telemetry import (
     FallbackTriggered,
     FirstToken,
     ParameterDropped,
+    ProviderDiagnostic,
     RepairAttempted,
     RequestCompleted,
     RequestFailed,
@@ -221,6 +222,23 @@ class OTelObserver:
                     f"{GEN_AI}.anyinfer.reason": event.reason,
                 },
             )
+
+    def _on_ProviderDiagnostic(self, event: ProviderDiagnostic) -> None:  # noqa: N802
+        # Straddles both halves of this bridge: collected during a request it belongs on
+        # that span, and collected directly it has no owning request at all.
+        attributes = {
+            f"{GEN_AI}.anyinfer.code": event.diagnostic.code,
+            f"{GEN_AI}.anyinfer.severity": event.diagnostic.severity,
+            f"{GEN_AI}.anyinfer.message": event.diagnostic.message,
+        }
+        span = self._spans.get(event.request_id) if event.request_id else None
+        if span is not None:
+            span.add_event("provider.diagnostic", attributes=attributes)
+            return
+        if event.target is not None:
+            attributes[f"{GEN_AI}.system"] = event.target.provider_id
+            attributes[f"{GEN_AI}.request.model"] = event.target.model
+        self._standalone("provider.diagnostic", attributes).end()
 
     def _on_UsageEstimated(self, event: UsageEstimated) -> None:  # noqa: N802
         span = self._spans.get(event.request_id)

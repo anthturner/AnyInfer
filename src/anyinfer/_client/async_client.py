@@ -42,6 +42,7 @@ from ..events.telemetry import (
     FallbackTriggered,
     FirstToken,
     ParameterDropped,
+    ProviderDiagnostic,
     RepairAttempted,
     RequestCompleted,
     RequestFailed,
@@ -85,7 +86,14 @@ from ..types.requests import (
     ToolChoice,
     ToolSpec,
 )
-from ..types.results import AttemptRecord, Generation, Mechanism, Outcome, Timing
+from ..types.results import (
+    AttemptRecord,
+    Diagnostic,
+    Generation,
+    Mechanism,
+    Outcome,
+    Timing,
+)
 from .models import (
     CatalogView,
     acquire_catalog_model,
@@ -262,6 +270,31 @@ class AsyncClient:
         """Probe a provider's readiness."""
         adapter = await self._pool.get(provider_id)
         return await adapter.health()
+
+    async def diagnostics(self, provider_id: str) -> Sequence[Diagnostic]:
+        """Ask a provider what it has noticed about its own runtime.
+
+        Answers the question a health probe cannot: not "can I reach it" but "is it in
+        good shape" — a model that spilled out of VRAM, a runtime that fell back to the
+        CPU, a supervised server nearing its memory ceiling. Requests to such a provider
+        succeed; they are simply much slower than the caller expects, with nothing in the
+        result to explain why.
+
+        Providers that declare ``reports_diagnostics`` answer; the rest return nothing,
+        as does one that fails to answer — this is advisory data and never raises.
+
+        Args:
+            provider_id: The configured provider to ask.
+
+        Returns:
+            What the provider reported, most likely empty.
+        """
+        adapter = await self._pool.get(provider_id)
+        descriptor = self._pool.descriptor_for(provider_id)
+        reported = await _collect_diagnostics(adapter, descriptor)
+        for diagnostic in reported:
+            self._emit(ProviderDiagnostic(None, diagnostic))
+        return reported
 
     def resolve(self, target: Target) -> ResolvedTarget:
         """Resolve a target string without issuing a request."""
@@ -1007,6 +1040,10 @@ class AsyncClient:
             # stays None when pricing is unknown rather than becoming a misleading zero.
             active_buffer.usage = with_cost(active_buffer.usage, capabilities)
 
+            for diagnostic in await _collect_diagnostics(adapter, descriptor):
+                active_buffer.warnings.append(diagnostic.message)
+                self._emit(ProviderDiagnostic(resolved, diagnostic, request_id))
+
             timing = active_buffer.build_timing()
             record = AttemptRecord(resolved, "ok", timing=timing)
             attempts.append(record)
@@ -1092,6 +1129,32 @@ class AsyncClient:
         """Dispatch a telemetry event when anyone is listening."""
         if self._events.has_observers:
             self._events.emit(event)
+
+
+async def _collect_diagnostics(
+    adapter: ProviderAdapter, descriptor: ProviderDescriptor
+) -> Sequence[Diagnostic]:
+    """Ask a provider what it noticed about itself, tolerating anything it does.
+
+    Advisory data must never turn a successful generation into a failed one, so every
+    failure mode here — a provider that declares the capability but does not implement
+    it, one that raises, one that returns nonsense — resolves to "nothing to report".
+    Cancellation is the one exception: it is the caller leaving, not a provider fault.
+    """
+    if not descriptor.reports_diagnostics:
+        return ()
+    collect = getattr(adapter, "diagnostics", None)
+    if not callable(collect):
+        return ()
+    try:
+        reported = await collect()
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001 — a diagnostic must never fail the request it annotates
+        return ()
+    if not isinstance(reported, Sequence):
+        return ()
+    return tuple(item for item in reported if isinstance(item, Diagnostic))
 
 
 def _repair_budget(

@@ -66,6 +66,29 @@ result.timing.phases
 
 A large `model_load_ms` on a first request is the model being read from disk.
 
+## GPU spill is reported, not left to guesswork
+
+The slowest failure Ollama has is not a failure. A model that no longer fits in VRAM
+alongside whatever else the GPU is holding is loaded anyway, with the overflow served from
+system memory — the request succeeds, the answer is correct, and it takes an order of
+magnitude longer than the same model took yesterday. The wire says nothing about it.
+
+`/api/ps` reports how much of each resident model is actually in VRAM, so the adapter reads
+it and says so:
+
+```python
+for note in client.diagnostics("ollama"):
+    print(note.code, note.message)
+# ollama.gpu-spill  qwen3:8b is only 45% resident in VRAM; the rest runs on the CPU,
+#                   which is far slower. Free GPU memory, or choose a smaller model
+#                   or quantization.
+```
+
+The same text lands on `result.warnings` for any request that hit it, and as a
+`ProviderDiagnostic` event. Costs nothing: `/api/ps` is a local read, never a generation.
+A model within 5% of full residency is not reported — Ollama's own sizes wobble by a few
+megabytes, and a warning on every healthy load is one nobody reads.
+
 ## Provider options
 
 ```python
@@ -77,7 +100,6 @@ provider_options={"ollama": {"keep_alive": "10m", "num_ctx": 8192, "num_gpu": 99
 - A missing model produces `ModelNotFoundError` hinting `ollama pull <model>`.
 - Usage arrives only on the terminal object; the core synthesizes a `UsageUpdate` event so
   streaming consumers see it exactly as they would from any other provider.
-- `/api/ps` exposes VRAM residency, which is how GPU spill is detected.
 
 ## Wire contract
 

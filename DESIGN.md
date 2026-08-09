@@ -370,6 +370,7 @@ class ProviderDescriptor:               # ModelFit's design, generalized
     token_calibration: TokenCalibration = TokenCalibration()  # D34: envelope this provider bills for
     max_repair_attempts: int | None = None                    # D35: ceiling on schema-repair round trips
     supports_sessions: bool = False
+    reports_diagnostics: bool = False                         # D36: adapter implements diagnostics()
 ```
 
 Registration: built-ins pre-registered; third parties via entry points
@@ -739,8 +740,10 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    catalog update constitute a library release? (Risk R6.)
 5. **M365 Copilot headless story** — interactive-only auth may make it conformance-exempt for
    CI; degraded-mode contract TBD in M3.
-6. **Frisket's Ollama GPU-spill warning + observed-VRAM checks** — capability layer or
-   Ollama-adapter warnings? (Currently: adapter warnings, revisit.)
+6. ~~**Frisket's Ollama GPU-spill warning + observed-VRAM checks** — capability layer or
+   Ollama-adapter warnings?~~ *Resolved 2026-08-08 as D36:* adapter-reported runtime
+   diagnostics, declared on the descriptor and surfaced on `Generation.warnings` plus a
+   `ProviderDiagnostic` event.
 
 ## 21. Risks and complexity traps
 

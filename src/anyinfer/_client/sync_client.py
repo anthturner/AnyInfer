@@ -50,7 +50,7 @@ from ..types.requests import (
     ToolChoice,
     ToolSpec,
 )
-from ..types.results import Generation
+from ..types.results import Diagnostic, Generation
 from .async_client import AsyncClient, MessagesInput
 from .models import CatalogView
 from .providers import ProviderSettings
@@ -344,6 +344,14 @@ class Client:
         """Probe a provider's readiness."""
         self._ensure_open()
         return self._loop.run(self._async.health(provider_id))
+
+    def diagnostics(self, provider_id: str) -> Sequence[Diagnostic]:
+        """Ask a provider what it has noticed about its own runtime.
+
+        See `AsyncClient.diagnostics`.
+        """
+        self._ensure_open()
+        return self._loop.run(self._async.diagnostics(provider_id))
 
     def resolve(self, target: Target) -> ResolvedTarget:
         """Resolve a target string without issuing a request."""
