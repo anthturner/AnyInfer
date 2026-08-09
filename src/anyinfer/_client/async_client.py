@@ -22,6 +22,19 @@ from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
 from ..capabilities.gating import check_context_fit
 from ..capabilities.pricing import with_cost
 from ..capabilities.pricing_table import PricingTable
+from ..capabilities.probes import (
+    DEFAULT_PROBE_FEATURES,
+    PROBE_MAX_OUTPUT_TOKENS,
+    PROBE_SCHEMA,
+    PROBE_TOOL,
+    PROBEABLE_FEATURES,
+    FeatureProbe,
+    ProbeOutcome,
+    ProbeReport,
+    mechanism_for,
+    probe_prompt,
+    probed_features,
+)
 from ..catalog.model import Catalog, TargetEntry
 from ..catalog.resolve import load_default_catalog, resolve_target
 from ..credentials import ResolverChain
@@ -64,12 +77,20 @@ from ..routing.health import HealthCache
 from ..routing.policy import Retry, Route, backoff_delay
 from ..schema.repair import build_repair_messages
 from ..schema.validate import extract_json, validate
-from ..types.capabilities import DiscoveredModel, Health, ModelCapabilities, Sourced
+from ..types.capabilities import (
+    DiscoveredModel,
+    Feature,
+    Health,
+    ModelCapabilities,
+    Sourced,
+)
 from ..types.events import (
     AttemptFailed,
     StreamEnded,
     StreamEvent,
+    TextDelta,
     TimingMark,
+    ToolCallDelta,
     UsageUpdate,
     is_content_event,
 )
@@ -93,6 +114,7 @@ from ..types.results import (
     Mechanism,
     Outcome,
     Timing,
+    Usage,
 )
 from ..verification import (
     VERIFY_MAX_OUTPUT_TOKENS,
@@ -394,6 +416,149 @@ class AsyncClient:
             usage=result.usage,
             diagnostics=await self._safe_diagnostics(result.target.provider_id),
         )
+
+    async def probe(
+        self,
+        target: Target,
+        *,
+        features: Sequence[Feature] | None = None,
+        timeout_s: float = 30.0,
+        record: bool = True,
+    ) -> ProbeReport:
+        """Measure what a target actually supports, one tiny request per feature.
+
+        The capability layer's third tier, and the only one that is a *measurement*. The
+        catalog says what a model should support and discovery says what a provider
+        claims; for the compatibility surface — every preset endpoint, every self-hosted
+        OpenAI-compatible server — both are educated guesses, and a server that accepts
+        ``response_format`` while ignoring it is indistinguishable from one that honors it
+        until a schema silently stops being enforced.
+
+        **This costs money and time**: one round trip per feature, four by default. It is
+        opt-in for that reason, and normally run once when an application first configures
+        an endpoint rather than on every start.
+
+        A probe that settles nothing records nothing. A provider that accepts the request
+        and answers something unexpected is `inconclusive`, because a weak model and an
+        ignored parameter look identical in one reply.
+
+        Args:
+            target: The target to measure.
+            features: Which features to test; defaults to
+                `DEFAULT_PROBE_FEATURES`.
+            timeout_s: Wall clock for each individual probe.
+            record: Store the findings at ``probed`` provenance, so later requests choose
+                mechanisms from measurement rather than assumption. Pass ``False`` to look
+                without committing.
+
+        Returns:
+            The `ProbeReport`: per-feature outcomes,
+            what was recorded, and what it cost.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved, or a feature was
+                named that no probe can settle.
+        """
+        resolved = self.resolve(target)
+        selected = tuple(features) if features is not None else DEFAULT_PROBE_FEATURES
+        unknown = [f for f in selected if f not in PROBEABLE_FEATURES]
+        if unknown:
+            names = ", ".join(str(f.name) for f in unknown)
+            raise ConfigError(
+                f"no probe can settle {names}",
+                hint=(
+                    "probeable features are "
+                    f"{', '.join(str(f.name) for f in PROBEABLE_FEATURES)}"
+                ),
+            )
+
+        adapter = await self._pool.get(resolved.provider_id)
+        descriptor = self._pool.descriptor_for(resolved.provider_id)
+        results: list[FeatureProbe] = []
+        usage = Usage()
+        for feature in selected:
+            probe, spent = await self._probe_feature(
+                adapter, descriptor, resolved, feature, timeout_s
+            )
+            results.append(probe)
+            usage = usage.merge(spent)
+
+        known = self._capabilities_for(descriptor, resolved).features
+        merged = probed_features(known, tuple(results))
+        capabilities = ModelCapabilities(features=merged) if merged is not None else None
+        if record and capabilities is not None:
+            self._capabilities.record_probe(descriptor.id, resolved.model, capabilities)
+        return ProbeReport(
+            target=resolved,
+            probes=tuple(results),
+            capabilities=capabilities,
+            requests=len(results),
+            usage=usage.normalized(),
+        )
+
+    async def _probe_feature(
+        self,
+        adapter: ProviderAdapter,
+        descriptor: ProviderDescriptor,
+        resolved: ResolvedTarget,
+        feature: Feature,
+        timeout_s: float,
+    ) -> tuple[FeatureProbe, Usage]:
+        """Run one probe against the adapter directly, bypassing the router.
+
+        Deliberately not routed: a probe asks what *this* target does, so a retry or a
+        fallback answering from somewhere else would record a measurement of the wrong
+        model. It also has to force a mechanism the capability ladder would not choose —
+        that is the entire point — which it does by handing the wire builder a synthetic
+        capability set claiming exactly the feature under test.
+        """
+        wanted = Feature.STREAMING if feature is Feature.STREAMING else feature
+        request = GenerationRequest(
+            messages=(user(probe_prompt(feature)),),
+            schema=SchemaSpec.coerce(PROBE_SCHEMA) if mechanism_for(feature) else None,
+            tools=(PROBE_TOOL,) if feature is Feature.TOOLS else (),
+            tool_choice="required" if feature is Feature.TOOLS else "auto",
+            sampling=Sampling(max_output_tokens=PROBE_MAX_OUTPUT_TOKENS, temperature=0.0),
+            timeout_s=timeout_s,
+        )
+        wire = build_wire_request(
+            request,
+            resolved,
+            descriptor,
+            capabilities=ModelCapabilities(features=Sourced(wanted, "probed")),
+            stream=feature is Feature.STREAMING,
+        )
+
+        text_parts: list[str] = []
+        content_events = 0
+        tool_called = False
+        usage = Usage()
+        try:
+            async with asyncio.timeout(timeout_s):
+                async for event in adapter.generate(wire):
+                    if isinstance(event, AdapterFinal):
+                        if event.usage is not None:
+                            usage = usage.merge(event.usage)
+                        continue
+                    if isinstance(event, UsageUpdate):
+                        usage = usage.merge(event.usage)
+                        continue
+                    if is_content_event(event):
+                        content_events += 1
+                    if isinstance(event, TextDelta):
+                        text_parts.append(event.text)
+                    elif isinstance(event, ToolCallDelta):
+                        tool_called = True
+        except (ProviderError, TimeoutError) as error:
+            # A rejection is the most informative answer a probe can get: the provider
+            # said, in its own words, that it will not do this.
+            detail = error.detail if isinstance(error, ProviderError) else "the probe timed out"
+            outcome: ProbeOutcome = (
+                "unsupported" if isinstance(error, ProviderError) else "inconclusive"
+            )
+            return FeatureProbe(feature, outcome, detail), usage
+
+        return _judge_probe(feature, "".join(text_parts), content_events, tool_called), usage
 
     async def _safe_diagnostics(self, provider_id: str) -> tuple[Diagnostic, ...]:
         """Diagnostics for a verification report, tolerating an unconfigured provider."""
@@ -1228,6 +1393,56 @@ class AsyncClient:
         """Dispatch a telemetry event when anyone is listening."""
         if self._events.has_observers:
             self._events.emit(event)
+
+
+def _judge_probe(
+    feature: Feature, text: str, content_events: int, tool_called: bool
+) -> FeatureProbe:
+    """Read what came back from a probe the provider accepted.
+
+    Acceptance alone proves nothing — the failure this whole layer exists to catch is a
+    server that takes ``response_format`` and ignores it — so each feature is judged on
+    whether the *answer* shows the mechanism worked. Anything short of that is
+    inconclusive rather than a verdict, because one reply cannot separate a weak model
+    from an ignored parameter.
+    """
+    if feature is Feature.TOOLS:
+        if tool_called:
+            return FeatureProbe(feature, "supported", "the model called the offered tool")
+        return FeatureProbe(
+            feature,
+            "inconclusive",
+            "the request was accepted but answered with text instead of a tool call",
+        )
+
+    if feature is Feature.STREAMING:
+        if content_events > 1:
+            return FeatureProbe(
+                feature, "supported", f"the answer arrived in {content_events} deltas"
+            )
+        return FeatureProbe(
+            feature,
+            "inconclusive",
+            "the answer arrived in one delta, which a buffered provider and a fast one "
+            "both produce",
+        )
+
+    parsed, error = extract_json(text)
+    if error is not None:
+        return FeatureProbe(
+            feature, "inconclusive", f"the request was accepted but {error}"
+        )
+    if feature is Feature.JSON_MODE:
+        # JSON mode promises well-formed JSON and nothing about its shape, so parsing is
+        # the whole test. Holding it to the schema would fail a provider doing its job.
+        return FeatureProbe(feature, "supported", "the answer was well-formed JSON")
+    if validate(parsed, PROBE_SCHEMA):
+        return FeatureProbe(
+            feature,
+            "inconclusive",
+            "the request was accepted and answered with JSON that ignored the schema",
+        )
+    return FeatureProbe(feature, "supported", "the answer matched the requested schema")
 
 
 def _verification_detail(error: Exception) -> str:

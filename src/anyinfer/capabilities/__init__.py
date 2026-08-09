@@ -23,18 +23,30 @@ from .pricing_table import (
     fetch_pricing,
     load_default_pricing,
 )
+from .probes import (
+    DEFAULT_PROBE_FEATURES,
+    PROBEABLE_FEATURES,
+    FeatureProbe,
+    ProbeOutcome,
+    ProbeReport,
+)
 
 __all__ = [
     "AUTO_SENTINELS",
     "DEFAULT_OUTPUT_RESERVE_TOKENS",
     "DEFAULT_PRICING_URL",
+    "DEFAULT_PROBE_FEATURES",
+    "PROBEABLE_FEATURES",
     "TRUSTED_PROVENANCE",
     "CapabilityStore",
     "ContextBudget",
     "CostEstimate",
+    "FeatureProbe",
     "HeuristicTokenEstimator",
     "PricingEntry",
     "PricingTable",
+    "ProbeOutcome",
+    "ProbeReport",
     "RequestEstimate",
     "TokenEstimate",
     "TokenEstimator",

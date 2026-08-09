@@ -30,7 +30,7 @@ Weakest to strongest:
 | `default` | A descriptor-level fallback. A placeholder, not a fact. |
 | `catalog` | From bundled static data we maintain (including the pricing table). |
 | `discovered` | Reported by the provider's own model listing. |
-| `probed` | Measured by an opt-in probe that spent a real request. |
+| `probed` | Measured by an [opt-in probe](#measuring-instead-of-assuming) that spent a real request. |
 | `override` | Set deliberately by the integrating application. Outranks everything. |
 
 Assembly layers them in that order, field by field. A weaker value never displaces a
@@ -143,6 +143,42 @@ class Recorder:
         if isinstance(event, ai.ParameterDropped):
             log.warning("%s ignored %s: %s", event.target, event.parameter, event.reason)
 ```
+
+## Measuring instead of assuming
+
+The catalog says what a model *should* support; discovery says what a provider *claims*.
+Neither is a measurement, and on the compatibility surface — every preset endpoint, every
+self-hosted OpenAI-compatible server — both are educated guesses. A server that accepts
+`response_format` and quietly ignores it is indistinguishable from one that honors it,
+right up until a schema silently stops being enforced.
+
+`probe()` settles it by trying, one deliberately tiny request per feature:
+
+```python
+report = client.probe("openai-compat:m")          # four requests by default
+
+report.summary
+# 'openai-compat:m: supports JSON_MODE, STREAMING; does not support JSON_SCHEMA'
+```
+
+Findings record at `probed` provenance, so the **next** request stops guessing — a measured
+absence downgrades the mechanism ladder, a measured presence upgrades it. Pass `record=False`
+to look without committing.
+
+Three outcomes, not two:
+
+| Outcome | What happened | Recorded? |
+|---|---|---|
+| `supported` | The provider honored the mechanism and the answer proves it. | Yes |
+| `unsupported` | The provider rejected the request outright. | Yes |
+| `inconclusive` | It accepted the request and answered something else. | **No** |
+
+The third exists because one reply cannot separate a weak model from an ignored parameter,
+and guessing between them is exactly what provenance exists to prevent.
+
+!!! warning "Probing costs requests"
+    Four round trips for the default feature set, billed like any other. Run it once when
+    an application first configures an endpoint — not on every start.
 
 ## Runtime diagnostics
 

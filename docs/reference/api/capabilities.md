@@ -44,6 +44,16 @@ budget calculator are explained in
 
 ::: anyinfer.check_context_fit
 
+::: anyinfer.ProbeReport
+
+::: anyinfer.FeatureProbe
+
+::: anyinfer.ProbeOutcome
+
+::: anyinfer.PROBEABLE_FEATURES
+
+::: anyinfer.DEFAULT_PROBE_FEATURES
+
 ::: anyinfer.CostEstimate
 
 ::: anyinfer.PricingTable

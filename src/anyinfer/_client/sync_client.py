@@ -26,6 +26,7 @@ from typing import Any, TypeVar
 from ..capabilities.budget import ContextBudget
 from ..capabilities.estimate import TokenEstimator
 from ..capabilities.pricing_table import PricingTable
+from ..capabilities.probes import ProbeReport
 from ..catalog.model import Catalog
 from ..credentials import ResolverChain
 from ..errors import ConfigError
@@ -37,7 +38,7 @@ from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
 from ..registry import ProviderRegistry
 from ..routing.policy import Route
-from ..types.capabilities import DiscoveredModel, Health, ModelCapabilities
+from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
 from ..types.requests import (
     ReasoningEffort,
@@ -358,6 +359,23 @@ class Client:
         """Resolve a target string without issuing a request."""
         self._ensure_open()
         return self._async.resolve(target)
+
+    def probe(
+        self,
+        target: Target,
+        *,
+        features: Sequence[Feature] | None = None,
+        timeout_s: float = 30.0,
+        record: bool = True,
+    ) -> ProbeReport:
+        """Measure what a target actually supports, one request per feature.
+
+        See `AsyncClient.probe`.
+        """
+        self._ensure_open()
+        return self._loop.run(
+            self._async.probe(target, features=features, timeout_s=timeout_s, record=record)
+        )
 
     def verify(self, target: Target, *, timeout_s: float = 60.0) -> Verification:
         """Prove a target works by asking it something, end to end.

@@ -320,7 +320,8 @@ Assembly is layered, later layers overriding earlier, every field provenance-tag
 1. **Static catalog** — bundled data: pricing, known context windows for hosted models.
 2. **Live discovery** — `list_models()`, Ollama `/api/tags`/`/api/ps`, Anthropic paginated
    `/v1/models`, Copilot SDK model list.
-3. **Active probes** (opt-in, costs a request) — Frisket-style capacity checks.
+3. **Active probes** (opt-in, costs a request) — `capabilities/probes.py` (D38): one
+   forced-mechanism request per feature, recording only conclusive outcomes.
 
 **The `auto` problem (Copilot):** when `model == "auto"`, capabilities are the *conjunction*
 (tightest bound per field) across the models the provider might pick — Frisket's
