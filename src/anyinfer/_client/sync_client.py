@@ -44,6 +44,7 @@ from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
 from ..registry import ProviderRegistry
 from ..routing.policy import Route
+from ..session import Session
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
 from ..types.requests import (
@@ -366,6 +367,14 @@ class Client:
         self._ensure_open()
         return self._async.resolve(target)
 
+    def session(self, target: Target) -> Session:
+        """Open a handle that lets a provider keep what it already knows.
+
+        See `AsyncClient.session`.
+        """
+        self._ensure_open()
+        return self._async.session(target)
+
     def benchmark(
         self,
         target: Target,
@@ -541,6 +550,7 @@ class Client:
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        session: Session | None = None,
     ) -> Generation:
         """Generate a single result. See `AsyncClient.generate()`."""
         self._ensure_open()
@@ -559,6 +569,7 @@ class Client:
                 provider_options=provider_options,
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
+                session=session,
             )
         )
 
@@ -604,6 +615,7 @@ class Client:
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        session: Session | None = None,
     ) -> SyncStream:
         """Start a streaming generation, returning a blocking iterator.
 
@@ -627,6 +639,7 @@ class Client:
                 provider_options=provider_options,
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
+                session=session,
             )
 
         return SyncStream(self._loop, factory)

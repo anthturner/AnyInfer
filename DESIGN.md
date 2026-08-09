@@ -667,6 +667,7 @@ src/anyinfer/
   events/                # observers.py dispatch.py redaction.py privacy.py
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
+  session.py             # (D40) the session handle
   benchmark.py           # (D39) throughput measurement + caller-owned store
   verification.py        # (D37) the end-to-end target probe
   config/                # shared, versioned JSON configuration
@@ -734,9 +735,10 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    feeding `Route.context_window_targets`; `default`-provenance windows never gate. Exposed as
    `Client.budget()` / `AsyncClient.budget()` for app preflight (Frisket's consumer). Exact
    tokenizers (tiktoken, llama-server `/tokenize`) plug in via the protocol; none ship.
-2. **Session/conversation reuse** (mote's token-cache: Copilot session resume, Ollama
-   keep_alive). Descriptor flag exists (`supports_sessions`); the session API itself is
-   unspecified. Needed by M1 (mote) — design during M0.
+2. ~~**Session/conversation reuse** (mote's token-cache: Copilot session resume, Ollama
+   keep_alive).~~ *Resolved 2026-08-08 as D40:* `client.session(target)` returns an opaque,
+   target-bound handle threaded through `generate()`/`stream()`; it never changes an answer,
+   and the three capable providers each exploit it differently behind one shape.
 3. **Cancellation semantics** across the sync facade (KeyboardInterrupt → loop-thread task
    cancellation → httpx2 stream close → llama-server survival). Must be specified in M0.
 4. **Default catalog contents and update cadence** — which models, who bumps them, does a

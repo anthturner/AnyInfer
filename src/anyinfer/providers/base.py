@@ -99,6 +99,13 @@ class WireRequest:
         timeout_s: Per-attempt wall clock.
         max_response_bytes: Cap on total streamed bytes.
         extra_options: ``provider_options[this_provider]``, passed through verbatim.
+        session_state: Opaque continuation data from an open
+            `Session`, or ``None`` for an
+            independent request. The distinction matters: ``{}`` means *a session is open
+            and has nothing stored yet* — the first turn — while ``None`` means there is
+            no session at all. Only providers declaring ``supports_sessions`` ever receive
+            a value, and only they interpret it; the core stores and forwards it without
+            reading it.
     """
 
     model: str
@@ -114,6 +121,7 @@ class WireRequest:
     timeout_s: float = 120.0
     max_response_bytes: int = 1_048_576
     extra_options: Mapping[str, Any] = field(default_factory=dict)
+    session_state: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,12 +134,15 @@ class AdapterFinal:
         phases: Provider-reported phase timings in milliseconds (e.g. model load).
         raw: The provider payload. Adapters attach it unconditionally; the core keeps it
             on the result only when the client opted in via ``retain_raw``.
+        session_state: Continuation data to remember for the next turn of an open
+            session, or ``None`` when there is none. Opaque to the core.
     """
 
     finish_reason: FinishReason
     usage: Usage | None = None
     phases: Mapping[str, float] = field(default_factory=dict)
     raw: Any | None = None
+    session_state: Mapping[str, Any] | None = None
 
 
 AdapterEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate | AdapterFinal

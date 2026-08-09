@@ -120,6 +120,7 @@ from .registry import (
     default_registry,
 )
 from .routing import Retry, Route
+from .session import Session, SessionReuse
 from .types import (
     AttemptFailed,
     AttemptRecord,
@@ -267,6 +268,8 @@ __all__ = [
     "SchemaSpec",
     "SchemaViolationError",
     "ServerLifecycle",
+    "Session",
+    "SessionReuse",
     "SetupField",
     "Sourced",
     "StreamEnded",

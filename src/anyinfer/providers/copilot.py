@@ -55,6 +55,11 @@ class CopilotAdapter:
     def __init__(self, config: ProviderConfig) -> None:
         self._config = config
         self._client: Any = None
+        self._sessions: dict[str, Any] = {}
+        """SDK sessions held open for `Session` handles, keyed by the id handed back to
+        the core. Holding a transport-level object across requests is the same kind of
+        state as holding an HTTP client; no orchestration lives here."""
+        self._session_counter = 0
 
     # ---- SDK plumbing ----------------------------------------------------------------
 
@@ -165,9 +170,18 @@ class CopilotAdapter:
     # ---- generation ------------------------------------------------------------------
 
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
-        """Run one turn through a Copilot session, mapping SDK events to ours."""
+        """Run one turn through a Copilot session, mapping SDK events to ours.
+
+        This is the one provider where a session is the *native* shape: the SDK keeps the
+        conversation, so a resumed session does not re-send prior turns at all. Without an
+        open session each request still creates and closes its own, which is what makes
+        every request independent by default.
+        """
         client = await self._ensure_client()
-        system_prompt, user_prompt = _split_prompt(req)
+
+        session_key = _session_key(req)
+        held = self._sessions.get(session_key) if session_key else None
+        system_prompt, user_prompt = _split_prompt(req, resumed=held is not None)
 
         session_options: dict[str, Any] = {"model": req.model}
         if system_prompt:
@@ -178,10 +192,15 @@ class CopilotAdapter:
         usage = Usage()
         emitted_any = False
 
-        try:
-            session = await _maybe_await(client.create_session(**session_options))
-        except Exception as exc:
-            raise self._map_error(exc) from exc
+        session = held
+        if session is None:
+            try:
+                session = await _maybe_await(client.create_session(**session_options))
+            except Exception as exc:
+                raise self._map_error(exc) from exc
+            if req.session_state is not None:
+                session_key = session_key or self._next_session_key()
+                self._sessions[session_key] = session
 
         try:
             stream = session.send(user_prompt)
@@ -196,19 +215,37 @@ class CopilotAdapter:
         except Exception as exc:
             raise self._map_error(exc) from exc
         finally:
-            close = getattr(session, "close", None) or getattr(session, "aclose", None)
-            if close is not None:
-                # Teardown must never mask the failure that brought us here.
-                with contextlib.suppress(Exception):
-                    await _maybe_await(close())
+            if req.session_state is None:
+                # No session: this one existed for this request and is closed with it.
+                # A held session stays open until the adapter does, since closing it is
+                # exactly what the caller asked not to happen.
+                close = getattr(session, "close", None) or getattr(session, "aclose", None)
+                if close is not None:
+                    # Teardown must never mask the failure that brought us here.
+                    with contextlib.suppress(Exception):
+                        await _maybe_await(close())
 
         yield AdapterFinal(
             finish_reason="stop" if emitted_any else "other",
             usage=usage.normalized() if _has_counts(usage) else None,
+            session_state=(
+                None if session_key is None else {"session_id": session_key}
+            ),
         )
 
+    def _next_session_key(self) -> str:
+        """Mint a key for a session this adapter is about to hold open."""
+        self._session_counter += 1
+        return f"copilot-session-{self._session_counter}"
+
     async def aclose(self) -> None:
-        """Shut down the SDK client and its CLI runtime."""
+        """Shut down held sessions, the SDK client, and its CLI runtime."""
+        for session in self._sessions.values():
+            close = getattr(session, "close", None) or getattr(session, "aclose", None)
+            if close is not None:
+                with contextlib.suppress(Exception):
+                    await _maybe_await(close())
+        self._sessions.clear()
         if self._client is None:
             return
         close = getattr(self._client, "close", None) or getattr(self._client, "aclose", None)
@@ -219,6 +256,19 @@ class CopilotAdapter:
 
 
 # ---- helpers -------------------------------------------------------------------------
+
+
+def _session_key(req: WireRequest) -> str | None:
+    """The held-session key this request continues, if any.
+
+    ``None`` for a request with no session, and for a session's first turn — which has an
+    open handle but nothing stored in it yet.
+    """
+    state = req.session_state
+    if not state:
+        return None
+    key = state.get("session_id")
+    return str(key) if key else None
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -243,16 +293,29 @@ async def _aiter(stream: Any) -> AsyncIterator[Any]:
         yield item
 
 
-def _split_prompt(req: WireRequest) -> tuple[str, str]:
+def _split_prompt(req: WireRequest, *, resumed: bool = False) -> tuple[str, str]:
     """Flatten the conversation into Copilot's system-plus-turn shape.
 
-    The session API takes a system prompt and one user turn, so prior turns are folded into
-    the user prompt with role markers rather than being silently dropped.
+    The session API takes a system prompt and one user turn, so prior turns are normally
+    folded into the user prompt with role markers rather than being silently dropped.
+
+    A **resumed** session is the exception, and the reason sessions are worth having here:
+    the service still holds the conversation, so re-sending it would both pay for those
+    tokens again and show the model every earlier turn twice. Only the newest user turn
+    goes out.
     """
     system_parts: list[str] = []
     conversation: list[str] = []
 
-    for message in req.messages:
+    messages = req.messages
+    if resumed:
+        # Everything before the last user message is already on the service's side.
+        for index in range(len(messages) - 1, -1, -1):
+            if messages[index].role == "user":
+                messages = messages[index:]
+                break
+
+    for message in messages:
         text = "".join(p.text for p in message.content if isinstance(p, Text))
         results = [p for p in message.content if isinstance(p, ToolResult)]
         if results:

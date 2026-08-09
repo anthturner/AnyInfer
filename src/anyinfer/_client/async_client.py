@@ -87,6 +87,7 @@ from ..routing.health import HealthCache
 from ..routing.policy import Retry, Route, backoff_delay
 from ..schema.repair import build_repair_messages
 from ..schema.validate import extract_json, validate
+from ..session import Session
 from ..types.capabilities import (
     DiscoveredModel,
     Feature,
@@ -344,6 +345,41 @@ class AsyncClient:
             catalog=self._catalog,
             configured_providers=self._pool.configured_ids,
         )
+
+    def session(self, target: Target) -> Session:
+        """Open a handle that lets a provider keep what it already knows.
+
+        Every request is independent by default, which is right for one-shot work and
+        wrong for a conversation. Providers that can carry state between turns each save
+        something different — Copilot keeps the conversation server-side, llama.cpp keeps
+        the model and its KV cache resident, Ollama keeps the model loaded — and a session
+        is how a caller says "these requests belong together" without having to know which.
+
+        A session never changes an answer; it is a performance and cost optimization.
+        Opening one against a provider that cannot keep state is therefore allowed and
+        merely inert: every request behaves exactly as it would have, and
+        `Session.supported` and
+        `Session.reuse` say so.
+
+        ```python
+        with client.session("copilot:auto") as chat:
+            await client.generate("Summarize this report.", session=chat)
+            await client.generate("Now list the risks.", session=chat)
+        ```
+
+        Args:
+            target: The target this session's state belongs to. State is not portable, so
+                a turn routed anywhere else runs without it.
+
+        Returns:
+            The `Session` handle.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved.
+        """
+        resolved = self.resolve(target)
+        descriptor = self._pool.descriptor_for(resolved.provider_id)
+        return Session(resolved, supported=descriptor.supports_sessions)
 
     async def verify(
         self,
@@ -816,6 +852,7 @@ class AsyncClient:
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        session: Session | None = None,
     ) -> Generation:
         """Generate a single result, draining the event stream internally.
 
@@ -839,8 +876,10 @@ class AsyncClient:
             metadata=metadata,
             max_response_bytes=max_response_bytes,
         )
-        resolved_route = self._resolve_route(target, route)
-        async for event in self._routed_stream(request, resolved_route, stream=False):
+        resolved_route = self._resolve_route(target, route, session)
+        async for event in self._routed_stream(
+            request, resolved_route, stream=False, session=session
+        ):
             if isinstance(event, StreamEnded):
                 return event.result
         raise AllTargetsFailedError(hint="the router produced no result and no error")
@@ -861,6 +900,7 @@ class AsyncClient:
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        session: Session | None = None,
     ) -> AsyncStream:
         """Start a streaming generation.
 
@@ -882,8 +922,10 @@ class AsyncClient:
             metadata=metadata,
             max_response_bytes=max_response_bytes,
         )
-        resolved_route = self._resolve_route(target, route)
-        return AsyncStream(self._routed_stream(request, resolved_route, stream=True))
+        resolved_route = self._resolve_route(target, route, session)
+        return AsyncStream(
+            self._routed_stream(request, resolved_route, stream=True, session=session)
+        )
 
     async def run_tools(
         self,
@@ -1052,16 +1094,23 @@ class AsyncClient:
         self,
         target: Target | None,
         route: Route | Target | Sequence[Target] | None,
+        session: Session | None = None,
     ) -> Route:
-        """Pick the route in force: explicit route, explicit target, then the default.
+        """Pick the route in force: explicit route, explicit target, session, then default.
 
         ``route`` accepts the flexible spellings `Route.coerce()` understands — a
         `Route`, one target string, or a sequence of targets forming a fallback chain.
+
+        An open session names a target of its own, and a caller who has one rarely wants to
+        repeat it on every turn — so it stands in when nothing more specific was given. It
+        never *overrides* anything: a session is about reuse, not routing.
         """
         if route is not None:
             return Route.coerce(route)
         if target is not None:
             return Route(targets=(target,))
+        if session is not None:
+            return Route(targets=(str(session.target),))
         if self._default_route is not None:
             return self._default_route
         raise _missing_target_error(self._pool.configured_ids)
@@ -1074,8 +1123,11 @@ class AsyncClient:
         route: Route,
         *,
         stream: bool,
+        session: Session | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run the route and yield its events."""
+        if session is not None:
+            session._ensure_usable()
         request_id = uuid.uuid4().hex
         attempts: list[AttemptRecord] = []
         self._emit(
@@ -1135,6 +1187,7 @@ class AsyncClient:
                         request_id=request_id,
                         stream=stream,
                         attempts=attempts,
+                        session=session,
                         content_chain=(
                             unvisited_content_chain
                             if route.content_policy_targets and not content_redirected
@@ -1242,6 +1295,7 @@ class AsyncClient:
         request_id: str,
         stream: bool,
         attempts: list[AttemptRecord],
+        session: Session | None = None,
         content_chain: Callable[[], list[Target]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run one attempt against one target, including the schema repair loop.
@@ -1271,6 +1325,7 @@ class AsyncClient:
                 )
             )
 
+        session_applies = session is not None and session.applies_to(resolved)
         current = request
         repair_budget, repair_clamp_reason = _repair_budget(request, descriptor)
         if repair_clamp_reason is not None:
@@ -1294,6 +1349,9 @@ class AsyncClient:
                 descriptor,
                 capabilities=capabilities,
                 stream=stream,
+                # A session's state is only offered to the target it belongs to: after a
+                # fallback, one provider's handle means nothing to another.
+                session_state=session.state if session_applies and session else None,
             )
             if repair_attempts == 0:
                 for parameter, reason in dropped_parameters(current, descriptor):
@@ -1332,6 +1390,8 @@ class AsyncClient:
                     hint="raise timeout_s, or choose a faster model",
                 ) from None
 
+            if final is not None and session is not None:
+                session._record(final.session_state, applied=session_applies)
             if final is not None:
                 active_buffer.finish_reason = final.finish_reason
                 if final.usage is not None:

@@ -30,6 +30,7 @@ def build_wire_request(
     *,
     capabilities: ModelCapabilities | None = None,
     stream: bool = True,
+    session_state: Mapping[str, Any] | None = None,
 ) -> WireRequest:
     """Resolve a generation request for one provider.
 
@@ -39,6 +40,9 @@ def build_wire_request(
         descriptor: The provider's descriptor, supplying translators and projection.
         capabilities: Assembled capabilities, driving mechanism choice.
         stream: Whether to ask the adapter to stream.
+        session_state: Continuation data from an open session covering this target, or
+            ``None`` when no session applies. An empty mapping is meaningful — it is a
+            session's first turn.
 
     Returns:
         A fully-resolved wire request.
@@ -78,6 +82,7 @@ def build_wire_request(
         timeout_s=request.effective_timeout_s,
         max_response_bytes=request.max_response_bytes,
         extra_options=dict(provider_options),
+        session_state=None if session_state is None else dict(session_state),
     )
 
 

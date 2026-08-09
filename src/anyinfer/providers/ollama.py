@@ -42,7 +42,7 @@ from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_ndjson
 
-__all__ = ["OllamaAdapter", "descriptor"]
+__all__ = ["SESSION_KEEP_ALIVE", "OllamaAdapter", "descriptor"]
 
 _DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 
@@ -53,6 +53,16 @@ _DONE_REASONS: Mapping[str, FinishReason] = {
 }
 
 _NS_PER_MS = 1_000_000.0
+
+SESSION_KEEP_ALIVE = "10m"
+"""How long an open session asks Ollama to keep the model resident.
+
+What a session buys here is residency, not conversation: Ollama holds no chat state, but
+it does unload an idle model, and reloading eight gigabytes of weights between two turns of
+one conversation is the cost worth removing. Ten minutes is long enough to cover a person
+thinking and short enough that an abandoned session releases the memory on its own — which
+is also why closing a session sends nothing: the timer is the release mechanism.
+"""
 
 _SPILL_THRESHOLD = 0.95
 """VRAM residency below which a loaded model is reported as spilled.
@@ -258,7 +268,7 @@ class OllamaAdapter:
                 ):
                     for event in self._events_from_message(message, state):
                         yield event
-                yield state.finalize()
+                yield state.finalize(session_state=req.session_state)
         except (ProviderError, StreamProtocolError):
             raise
         except httpx2.HTTPError as exc:
@@ -304,7 +314,13 @@ class OllamaAdapter:
         if req.tools:
             payload["tools"] = [self._encode_tool(t) for t in req.tools]
 
+        keep_alive = _session_keep_alive(req)
+        if keep_alive is not None:
+            payload["keep_alive"] = keep_alive
+
         payload.update(req.reasoning_wire)
+        # The caller's own options win: an explicit keep_alive is a deliberate choice
+        # about *their* machine's memory, and a session must not quietly override it.
         payload.update(req.extra_options)
         return payload
 
@@ -442,13 +458,30 @@ class _StreamState:
             if isinstance(value, int | float):
                 self.phases[phase_name] = float(value) / _NS_PER_MS
 
-    def finalize(self) -> AdapterFinal:
-        """Build the terminal adapter event."""
+    def finalize(self, *, session_state: Mapping[str, Any] | None = None) -> AdapterFinal:
+        """Build the terminal adapter event.
+
+        Ollama keeps no conversation, so an open session's state records only that this
+        adapter is holding the model resident — enough for the core to report the session
+        as resumed on the turns that follow.
+        """
         return AdapterFinal(
             finish_reason=self.finish_reason,
             usage=self.usage,
             phases=dict(self.phases),
+            session_state=(
+                None if session_state is None else {"keep_alive": SESSION_KEEP_ALIVE}
+            ),
         )
+
+
+def _session_keep_alive(req: WireRequest) -> str | None:
+    """The ``keep_alive`` an open session implies, or ``None`` for an ordinary request.
+
+    ``session_state`` distinguishes the two cases an empty mapping cannot: ``None`` is a
+    request with no session, ``{}`` is a session's first turn.
+    """
+    return SESSION_KEEP_ALIVE if req.session_state is not None else None
 
 
 def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:

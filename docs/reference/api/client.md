@@ -18,6 +18,10 @@ surface; the sync client is a facade over the async core (see the
 
 ::: anyinfer.ProviderSettings
 
+::: anyinfer.Session
+
+::: anyinfer.SessionReuse
+
 ::: anyinfer.Verification
 
 ::: anyinfer.Measurement

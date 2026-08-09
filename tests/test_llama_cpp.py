@@ -65,11 +65,13 @@ class _StubSupervisor:
         self.closed = False
         self.resident_models: tuple[str, ...] = ()
         self.resident_plans: dict[str, ServerPlan] = {}
+        self.persisted: list[bool] = []
 
     async def acquire(
         self, model_key: str, model_path: Path, plan: ServerPlan, *, persist: bool = False
     ) -> ManagedServer:
         self.acquisitions.append((model_key, model_path, plan))
+        self.persisted.append(persist)
         handle = ServerHandle(
             model_key=model_key,
             model_path=model_path,

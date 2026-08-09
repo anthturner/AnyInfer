@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -46,7 +46,7 @@ from ..types.capabilities import (
     Sourced,
 )
 from ..types.results import Diagnostic
-from .base import AdapterEvent, ProviderConfig, WireRequest
+from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .openai_compat import OpenAICompatAdapter
 
 __all__ = ["LlamaCppAdapter", "LlamaCppOptions", "descriptor"]
@@ -333,12 +333,20 @@ class LlamaCppAdapter:
         # Opportunistic TTL sweep: with no background task, each request is the moment
         # servers idle beyond idle_ttl_s get unloaded and their memory returned.
         await self._supervisor.collect_idle()
-        managed = await self._supervisor.acquire(req.model, model_path, plan)
+        # An open session pins the server: unloading a model between two turns of one
+        # conversation throws away the KV cache the next turn was about to reuse, and
+        # pays a full model load to do it. What a session buys here is exactly that.
+        managed = await self._supervisor.acquire(
+            req.model, model_path, plan, persist=req.session_state is not None
+        )
         with managed:
             delegate = await self._delegate_for(managed.base_url)
             # The supervised server is a plain OpenAI-compatible endpoint, so the whole
             # generation path is the base adapter's — no duplicated wire logic.
             async for event in delegate.generate(req):
+                if isinstance(event, AdapterFinal) and req.session_state is not None:
+                    yield replace(event, session_state={"model_key": req.model})
+                    continue
                 yield event
 
     async def aclose(self) -> None:

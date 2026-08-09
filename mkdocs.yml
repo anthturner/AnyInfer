@@ -30,8 +30,9 @@ watch:
 
 theme:
   name: material
-  # Template overrides — currently just partials/header.html, which adds the download
-  # button. Re-sync that copy when bumping the mkdocs-material pin.
+  # Template overrides: main.html (link-preview and icon tags in <head>), home.html and
+  # 404.html (custom layouts), and partials/header.html (the download button).
+  # Re-sync those copies when bumping the mkdocs-material pin.
   custom_dir: overrides
   # The icon art is background-independent (see docs/assets/anyinfer-palette.css), so one
   # header logo serves both schemes; the wordmark SVGs on the landing page and README
@@ -142,6 +143,7 @@ nav:
       - The event stream: concepts/events.md
       - Routing: concepts/routing.md
       - Structured output: concepts/structured-output.md
+      - Sessions: concepts/sessions.md
       - Capabilities and provenance: concepts/capabilities.md
       - Token estimation and context budgets: concepts/budgeting.md
       - Context reduction: concepts/context-reduction.md
