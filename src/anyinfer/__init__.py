@@ -30,6 +30,13 @@ from ._client import (
     Tool,
     tool,
 )
+from .benchmark import (
+    BENCHMARK_OUTPUT_TOKENS,
+    BENCHMARK_PROMPT_TOKENS,
+    Measurement,
+    MeasurementIdentity,
+    MeasurementStore,
+)
 from .capabilities import (
     DEFAULT_PROBE_FEATURES,
     PROBEABLE_FEATURES,
@@ -167,6 +174,8 @@ from .verification import Verification
 __version__ = "0.1.1"
 
 __all__ = [
+    "BENCHMARK_OUTPUT_TOKENS",
+    "BENCHMARK_PROMPT_TOKENS",
     "BEST_AT",
     "CONFIG_FORMAT_VERSION",
     "DEFAULT_PROBE_FEATURES",
@@ -211,6 +220,9 @@ __all__ = [
     "HostShorthand",
     "LocalModelInfo",
     "LocalRuntimeError",
+    "Measurement",
+    "MeasurementIdentity",
+    "MeasurementStore",
     "Mechanism",
     "Message",
     "MessagesInput",

@@ -189,6 +189,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify.add_argument("--json", action="store_true", help="emit machine-readable output")
 
+    bench = subcommands.add_parser(
+        "benchmark", help="measure a target's prefill and decode throughput"
+    )
+    bench.add_argument("target", help="a target or alias")
+    bench.add_argument("--config", type=Path, help="path to a configuration file")
+    bench.add_argument(
+        "--prompt-tokens", type=int, default=None, help="approximate prompt size"
+    )
+    bench.add_argument(
+        "--output-tokens", type=int, default=None, help="how many tokens to generate"
+    )
+    bench.add_argument(
+        "--store", type=Path, help="record the measurement in this JSON file"
+    )
+    bench.add_argument("--json", action="store_true", help="emit machine-readable output")
+
     providers = subcommands.add_parser("providers", help="list registered providers")
     providers.add_argument("--json", action="store_true", help="emit machine-readable output")
 
@@ -263,6 +279,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _doctor(args)
         if args.command == "verify":
             return _verify(args)
+        if args.command == "benchmark":
+            return _benchmark(args)
         if args.command == "providers":
             return _providers(args)
         if args.command == "models":
@@ -727,6 +745,50 @@ def _print_verification(result: Any) -> None:
         print(f"          {result.detail}")
     for diagnostic in result.diagnostics:
         print(f"          {diagnostic.severity}: {diagnostic.message}")
+
+
+def _benchmark(args: argparse.Namespace) -> int:
+    """Measure one target and print what it does."""
+    from . import BENCHMARK_OUTPUT_TOKENS, BENCHMARK_PROMPT_TOKENS, Client, MeasurementStore
+
+    config = _config(args.config)
+    settings = list(config.providers)
+    if not settings:
+        print(
+            "no providers configured: pass --config pointing at a JSON file with a "
+            "'providers' list (see `anyinfer providers` for what each one needs)",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = Client(settings)
+    try:
+        measurement = client.benchmark(
+            args.target,
+            prompt_tokens=args.prompt_tokens or BENCHMARK_PROMPT_TOKENS,
+            output_tokens=args.output_tokens or BENCHMARK_OUTPUT_TOKENS,
+            store=MeasurementStore(args.store) if args.store else None,
+        )
+    finally:
+        client.close()
+
+    if args.json:
+        print(json.dumps(measurement.to_json(), indent=2))
+        return 0
+
+    print(f"target            {measurement.identity.provider_id}:{measurement.identity.model}")
+    print(f"prompt tokens     {measurement.input_tokens if measurement.input_tokens else '?'}")
+    print(f"output tokens     {measurement.output_tokens if measurement.output_tokens else '?'}")
+    if measurement.ttft_ms is not None:
+        print(f"time to first     {measurement.ttft_ms:.0f} ms")
+    print(f"total             {measurement.total_ms:.0f} ms")
+    if measurement.prefill_tokens_per_s is not None:
+        print(f"prefill           {measurement.prefill_tokens_per_s:.0f} tok/s")
+    else:
+        print("prefill           not reported by this provider")
+    if measurement.decode_tokens_per_s is not None:
+        print(f"decode            {measurement.decode_tokens_per_s:.1f} tok/s")
+    return 0
 
 
 def _providers(args: argparse.Namespace) -> int:

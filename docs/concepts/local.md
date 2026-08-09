@@ -117,6 +117,38 @@ recommendation.confident    # False when memory could not be determined
 Requirements live in the catalog as data, so updating a recommendation is a catalog change
 rather than a code change. Unknowns never inflate the recommendation.
 
+## Measuring what a model actually does here
+
+A tier recommendation predicts; it does not measure. On the same GPU the same weights can
+differ by an order of magnitude depending on what else is resident and how many layers ended
+up offloaded, so an application choosing a default — or explaining a slow session — needs a
+number from this machine, not from a table.
+
+```python
+measurement = client.benchmark("llama-cpp:qwen3-8b-q4-k-m")
+
+measurement.prefill_tokens_per_s   # compute-bound: sets time to first token
+measurement.decode_tokens_per_s    # bandwidth-bound: sets the rest of the wait
+measurement.summary
+# 'llama-cpp:qwen3-8b-q4-k-m: prefill 1840 tok/s, ttft 1120 ms, decode 38.4 tok/s'
+```
+
+The two rates are separate because a machine can be fast at one and slow at the other, and
+`prefill_tokens_per_s` is `None` unless the provider timed its own prefill phase — deriving
+it from time-to-first-token would fold queueing and network latency into a figure labelled
+*compute*. Ollama reports the phase; most hosted providers do not.
+
+Nothing is written anywhere unless you ask:
+
+```python
+store = ai.MeasurementStore(app_data_dir / "throughput.json")
+client.benchmark("llama-cpp:qwen3-8b-q4-k-m", store=store)
+```
+
+Entries are keyed by a fingerprint over the provider, model, endpoint, machine, and runtime,
+so a measurement taken somewhere else never masquerades as a fresher version of this one.
+The CLI wraps the same call as `anyinfer benchmark`.
+
 ## What is *not* here
 
 No bundled binaries or weights, ever — llama-server runtimes and GGUF files are

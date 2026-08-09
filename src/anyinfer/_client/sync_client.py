@@ -23,6 +23,12 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, TypeVar
 
+from ..benchmark import (
+    BENCHMARK_OUTPUT_TOKENS,
+    BENCHMARK_PROMPT_TOKENS,
+    Measurement,
+    MeasurementStore,
+)
 from ..capabilities.budget import ContextBudget
 from ..capabilities.estimate import TokenEstimator
 from ..capabilities.pricing_table import PricingTable
@@ -359,6 +365,30 @@ class Client:
         """Resolve a target string without issuing a request."""
         self._ensure_open()
         return self._async.resolve(target)
+
+    def benchmark(
+        self,
+        target: Target,
+        *,
+        prompt_tokens: int = BENCHMARK_PROMPT_TOKENS,
+        output_tokens: int = BENCHMARK_OUTPUT_TOKENS,
+        timeout_s: float = 120.0,
+        store: MeasurementStore | None = None,
+    ) -> Measurement:
+        """Measure what a target actually does, with one deterministic request.
+
+        See `AsyncClient.benchmark`.
+        """
+        self._ensure_open()
+        return self._loop.run(
+            self._async.benchmark(
+                target,
+                prompt_tokens=prompt_tokens,
+                output_tokens=output_tokens,
+                timeout_s=timeout_s,
+                store=store,
+            )
+        )
 
     def probe(
         self,

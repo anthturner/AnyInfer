@@ -20,6 +20,16 @@ surface; the sync client is a facade over the async core (see the
 
 ::: anyinfer.Verification
 
+::: anyinfer.Measurement
+
+::: anyinfer.MeasurementIdentity
+
+::: anyinfer.MeasurementStore
+
+::: anyinfer.BENCHMARK_PROMPT_TOKENS
+
+::: anyinfer.BENCHMARK_OUTPUT_TOKENS
+
 ::: anyinfer.tool
 
 ::: anyinfer.Tool

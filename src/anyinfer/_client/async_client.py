@@ -12,10 +12,20 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import Any
 
+from ..benchmark import (
+    BENCHMARK_OUTPUT_TOKENS,
+    BENCHMARK_PROMPT_TOKENS,
+    Measurement,
+    MeasurementStore,
+    benchmark_prompt,
+    identity_for,
+    measurement_from,
+)
 from ..capabilities.assemble import CapabilityStore
 from ..capabilities.budget import ContextBudget, build_context_budget
 from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
@@ -66,7 +76,7 @@ from ..events.telemetry import (
     UsageEstimated,
 )
 from ..local.acquire import AcquisitionReport, ProgressSink
-from ..local.hardware import HardwareProfile
+from ..local.hardware import HardwareProfile, probe_signature
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
@@ -559,6 +569,89 @@ class AsyncClient:
             return FeatureProbe(feature, outcome, detail), usage
 
         return _judge_probe(feature, "".join(text_parts), content_events, tool_called), usage
+
+    async def benchmark(
+        self,
+        target: Target,
+        *,
+        prompt_tokens: int = BENCHMARK_PROMPT_TOKENS,
+        output_tokens: int = BENCHMARK_OUTPUT_TOKENS,
+        timeout_s: float = 120.0,
+        store: MeasurementStore | None = None,
+    ) -> Measurement:
+        """Measure what a target actually does, with one deterministic request.
+
+        Capabilities describe a model; none of them says how fast it is *here*. For local
+        inference that is the number that decides everything — the same weights on the same
+        GPU differ by an order of magnitude depending on what else is resident and how many
+        layers ended up offloaded — and it is the number an application needs to pick a
+        default model or explain a slow session.
+
+        Prefill and decode are reported separately, because a machine can be fast at one
+        and slow at the other, and prefill throughput is reported *only* when the provider
+        timed its own prefill phase. Deriving it from time-to-first-token would fold
+        queueing and network latency into a figure labelled compute.
+
+        **This costs one real request** of roughly ``prompt_tokens`` in and
+        ``output_tokens`` out. Nothing is written anywhere unless ``store`` is passed.
+
+        Args:
+            target: The target to measure.
+            prompt_tokens: Approximate prompt size. Large enough that prefill is a real
+                phase rather than rounding error.
+            output_tokens: Output cap. Decode throughput needs enough tokens to average
+                over.
+            timeout_s: Wall clock for the request.
+            store: An application-owned store to record the result in. Omitted, the
+                measurement is returned and forgotten.
+
+        Returns:
+            The `Measurement`, whose rates are
+            ``None`` where nothing could be measured rather than zero.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved.
+            anyinfer.errors.AllTargetsFailedError: If the request itself failed — an
+                unmeasurable target is a failure, unlike an unverifiable one.
+        """
+        resolved = self.resolve(target)
+        result = await self.generate(
+            benchmark_prompt(prompt_tokens),
+            route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+            sampling=Sampling(max_output_tokens=output_tokens, temperature=0.0),
+            timeout_s=timeout_s,
+        )
+        measurement = measurement_from(
+            identity_for(
+                result.target,
+                endpoint=self._pool.base_url_for(resolved.provider_id),
+                host=self._host_signature(resolved.provider_id),
+            ),
+            input_tokens=result.usage.input_tokens,
+            output_tokens=result.usage.output_tokens,
+            ttft_ms=result.timing.first_token_ms,
+            total_ms=result.timing.total_ms,
+            decode_tokens_per_s=result.timing.output_tokens_per_s,
+            prefill_ms=result.timing.phases.get("prefill_ms"),
+            measured_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        )
+        if store is not None:
+            store.record(measurement)
+        return measurement
+
+    def _host_signature(self, provider_id: str) -> str | None:
+        """A machine signature for locally-executed targets, and nothing for the rest.
+
+        A hosted provider's throughput has nothing to do with this computer, so recording
+        this machine's specs beside it would invite a comparison that means nothing. Local
+        detection is cached, and never triggered from here for a target it cannot describe.
+        """
+        if self._pool.locality_for(provider_id) != "local":
+            return None
+        try:
+            return probe_signature()
+        except Exception:  # noqa: BLE001 — an identity detail, never a reason to fail
+            return None
 
     async def _safe_diagnostics(self, provider_id: str) -> tuple[Diagnostic, ...]:
         """Diagnostics for a verification report, tolerating an unconfigured provider."""

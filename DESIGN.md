@@ -667,6 +667,8 @@ src/anyinfer/
   events/                # observers.py dispatch.py redaction.py privacy.py
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
+  benchmark.py           # (D39) throughput measurement + caller-owned store
+  verification.py        # (D37) the end-to-end target probe
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
@@ -679,7 +681,7 @@ src/anyinfer/
   context/               # (D28) corpus reduction: documents.py rank.py structure.py
                          # envelope.py select.py tiers.py pack.py distill.py
   testing/               # conformance.py fakes.py cassettes.py
-  cli.py                 # run, verify, doctor, providers, models, runtime, sidecar entry points
+  cli.py                 # run, verify, benchmark, doctor, providers, models, runtime, sidecar
   serve/                 # openai_codec.py app.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
