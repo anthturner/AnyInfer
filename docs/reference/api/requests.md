@@ -15,6 +15,12 @@ The request side of the one primitive: everything a `GenerationRequest` can carr
 
 ::: anyinfer.Text
 
+::: anyinfer.ImagePart
+
+::: anyinfer.DocumentPart
+
+::: anyinfer.AudioPart
+
 ::: anyinfer.system
 
 ::: anyinfer.user
@@ -30,6 +36,10 @@ The request side of the one primitive: everything a `GenerationRequest` can carr
 ::: anyinfer.SupportsJSONSchema
 
 ::: anyinfer.Repair
+
+::: anyinfer.ArenaPolicy
+
+::: anyinfer.ContextRequest
 
 ::: anyinfer.ToolSpec
 

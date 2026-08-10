@@ -45,7 +45,9 @@ from ..types.capabilities import (
     ModelCapabilities,
     Sourced,
 )
+from ..types.messages import AudioPart, DocumentPart, ImagePart
 from ..types.results import Diagnostic
+from ._multimodal import unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .openai_compat import OpenAICompatAdapter
 
@@ -323,9 +325,11 @@ class LlamaCppAdapter:
 
         return bridge
 
-    def _plan_for(self, artifact: GgufArtifact, req: WireRequest) -> ServerPlan:
+    def _plan_for(
+        self, artifact: GgufArtifact, req: WireRequest, *, model_path: Path
+    ) -> ServerPlan:
         """Tune a server plan for this artifact on this machine."""
-        return plan_server(
+        plan = plan_server(
             self._hardware_profile(),
             TuningInputs(
                 artifact_size_bytes=artifact.total_size_bytes,
@@ -334,6 +338,12 @@ class LlamaCppAdapter:
             ),
             posture=self._options.posture,
         )
+        if artifact.projector is not None:
+            plan = replace(
+                plan,
+                projector_path=str(model_path.parent / artifact.projector.filename),
+            )
+        return plan
 
     async def _delegate_for(self, base_url: str) -> OpenAICompatAdapter:
         """Reuse one HTTP client per supervised server."""
@@ -370,7 +380,11 @@ class LlamaCppAdapter:
                 DiscoveredModel(
                     id=artifact_id,
                     capabilities=ModelCapabilities(
-                        features=Sourced(_LLAMA_FEATURES, "catalog"),
+                        features=Sourced(
+                            _LLAMA_FEATURES
+                            | (Feature.VISION if artifact.projector is not None else Feature(0)),
+                            "catalog",
+                        ),
                         local=LocalModelInfo(
                             artifact_size_bytes=artifact.total_size_bytes,
                             parameter_size=artifact.parameter_size,
@@ -431,8 +445,23 @@ class LlamaCppAdapter:
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
         """Ensure a server is running for this model, then delegate to the OpenAI dialect."""
         artifact = self._artifact_for(req.model)
+        image_input = False
+        for message in req.messages:
+            for part in message.content:
+                if isinstance(part, ImagePart):
+                    image_input = True
+                elif isinstance(part, DocumentPart):
+                    raise unsupported(self.provider_id, "document")
+                elif isinstance(part, AudioPart):
+                    raise unsupported(self.provider_id, "audio")
+        if image_input and artifact.projector is None:
+            raise unsupported(
+                self.provider_id,
+                "image",
+                "the pinned catalog artifact has no verified projector",
+            )
         model_path = await self._ensure_downloaded(artifact)
-        plan = self._plan_for(artifact, req)
+        plan = self._plan_for(artifact, req, model_path=model_path)
 
         # Opportunistic TTL sweep: with no background task, each request is the moment
         # servers idle beyond idle_ttl_s get unloaded and their memory returned.

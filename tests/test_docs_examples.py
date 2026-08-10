@@ -352,6 +352,60 @@ async def test_example_summarizer_shape() -> None:
     assert len(result.attempts) == 2, "the failed target stays on the trail"
 
 
+def test_example_golden_manifest_shape(
+    anyinfer_client, anyinfer_scripted, anyinfer_golden_manifest
+) -> None:
+    """docs/examples/golden-manifest.md — assert routing behaviour, not prose."""
+    from anyinfer.testing import ScriptedFailure, ScriptedModel
+
+    provider = anyinfer_scripted([
+        ScriptedModel(
+            "primary",
+            failures=(ScriptedFailure(status=503, retry_after_s=0.0),),
+        ),
+        ScriptedModel("fallback", structured={"answer": "stable"}),
+    ])
+    client = anyinfer_client(provider)
+    result = client.generate(
+        "answer",
+        route=ai.Route(
+            targets=(provider.target("primary"), provider.target("fallback")),
+            retry=ai.Retry(max_attempts=1, backoff_base_s=0.0),
+        ),
+        schema={
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        },
+    )
+
+    anyinfer_golden_manifest(result.manifest, "documented_fallback")
+    assert result.structured == {"answer": "stable"}
+
+
+def test_example_compare_targets_spends_nothing() -> None:
+    """docs/examples/compare-targets.md — two records and zero calls."""
+    from anyinfer.testing import ScriptedModel, ScriptedProvider
+
+    provider = ScriptedProvider(
+        "offline", [ScriptedModel("small"), ScriptedModel("large")]
+    )
+    registry = provider.register(
+        ai.ProviderRegistry(load_builtins=False, load_entry_points=False)
+    )
+    with ai.Client(
+        [provider.settings()], registry=registry, use_default_catalog=False
+    ) as client:
+        results = client.compare(
+            "Return an object",
+            targets=[provider.target("small"), provider.target("large")],
+            schema={"type": "object"},
+        )
+
+    assert [item.resolvable for item in results] == [True, True]
+    assert provider.requests == []
+
+
 async def test_example_tool_agent_shape() -> None:
     """docs/examples/local-tool-agent.md — a tool with a defaulted parameter."""
 

@@ -99,8 +99,13 @@ def create_app(
         if wants_stream:
             return starlette.StreamingResponse(
                 _stream_chunks(
-                    client, target, generation_request, body,
-                    completion_id=completion_id, created=created, model=target,
+                    client,
+                    target,
+                    generation_request,
+                    body,
+                    completion_id=completion_id,
+                    created=created,
+                    model=target,
                 ),
                 headers=_SSE_HEADERS,
             )
@@ -153,6 +158,40 @@ def create_app(
             add(target)
         return starlette.JSONResponse({"object": "list", "data": entries})
 
+    async def compare_targets(request: Any) -> Any:
+        """Serve ``POST /v1/anyinfer/compare`` as a client-API projection."""
+        guard = _check_auth(request, auth_token, starlette)
+        if guard is not None:
+            return guard
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            return _error(starlette, 400, "request body must be valid JSON")
+        if not isinstance(body, Mapping):
+            return _error(starlette, 400, "request body must be a JSON object")
+        raw_targets = body.get("targets")
+        if (
+            not isinstance(raw_targets, list)
+            or not raw_targets
+            or not all(isinstance(item, str) and item.strip() for item in raw_targets)
+        ):
+            return _error(starlette, 400, "'targets' must be a non-empty array of strings")
+        targets = tuple(str(item) for item in raw_targets)
+        shaped = dict(body)
+        shaped.pop("targets", None)
+        shaped.setdefault("model", targets[0])
+        try:
+            _, generation_request, _ = request_from_openai(shaped)
+            comparisons = await client.compare(generation_request, targets=targets)
+        except (AnyInferError, ValueError) as exc:
+            return _error(starlette, 400, str(exc), type(exc).__name__)
+        return starlette.JSONResponse(
+            {
+                "object": "anyinfer.target_comparison.list",
+                "data": [item.to_dict() for item in comparisons],
+            }
+        )
+
     async def health(request: Any) -> Any:
         """Serve ``GET /health``: liveness only, requiring no authentication."""
         return starlette.JSONResponse({"status": "ok"})
@@ -170,6 +209,7 @@ def create_app(
         starlette.Route("/health", health, methods=["GET"]),
         starlette.Route("/v1/chat/completions", chat_completions, methods=["POST"]),
         starlette.Route("/v1/models", models, methods=["GET"]),
+        starlette.Route("/v1/anyinfer/compare", compare_targets, methods=["POST"]),
         starlette.Route("/v1/{rest:path}", unsupported, methods=["GET", "POST"]),
     ]
     return starlette.Starlette(routes=routes)
@@ -186,6 +226,8 @@ async def _generate(client: Any, target: str, request: Any) -> Any:
         sampling=request.sampling,
         history=request.history,
         cache=request.cache,
+        arena=request.arena,
+        context=request.context,
         provider_options=request.provider_options,
         metadata=request.metadata,
     )
@@ -215,6 +257,8 @@ async def _stream_chunks(
         sampling=request.sampling,
         history=request.history,
         cache=request.cache,
+        arena=request.arena,
+        context=request.context,
         provider_options=request.provider_options,
         metadata=request.metadata,
     )
@@ -292,8 +336,7 @@ def _check_auth(request: Any, auth_token: str | None, starlette: Any) -> Any:
     header = request.headers.get("authorization", "")
     presented = header[7:] if header.lower().startswith("bearer ") else ""
     if not secrets.compare_digest(presented, auth_token):
-        return _error(starlette, 401, "invalid or missing bearer token",
-                      "invalid_api_key")
+        return _error(starlette, 401, "invalid or missing bearer token", "invalid_api_key")
     return None
 
 

@@ -23,6 +23,7 @@ If you are still deciding, read [choosing an integration path](integration-paths
 - [Add a fallback chain](fallback.md)
 - [Run the tool loop](tool-loop.md)
 - [Fit a corpus to a budget](fitting-context.md)
+- [Reduce an explicit corpus through the sidecar](sidecar-corpus-context.md)
 
 ## Operations
 
@@ -30,6 +31,7 @@ If you are still deciding, read [choosing an integration path](integration-paths
 - [Run a local model end to end](local-inference.md)
 - [Keep the sidecar running across reboots](../serve/running-as-a-service.md)
 - [Observe requests and bridge to OpenTelemetry](observability.md)
+- [Compare request portability across targets](comparing-targets.md)
 - [Store credentials in the OS keyring](credentials.md)
 
 ## Letting a coding agent write the integration

@@ -9,8 +9,9 @@ credential, no matter where it is logged.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from .redaction import redact
 from .types.results import DETAIL_MAX_CHARS, AttemptRecord, ErrorInfo
@@ -34,6 +35,7 @@ __all__ = [
     "StreamProtocolError",
     "ToolLoopError",
     "TransportError",
+    "UnsupportedInputError",
     "is_retryable_status",
 ]
 
@@ -259,12 +261,18 @@ class ProviderUnavailableError(_RetryableProviderError):
     """The provider is down, unreachable, or failed its health probe."""
 
 
+class UnsupportedInputError(ProviderError):
+    """A trusted model capability proves it cannot accept an attached input modality."""
+
+
 class SchemaViolationError(AnyInferError):
     """The response did not satisfy the requested schema, and the repair budget is spent.
 
     Attributes:
         raw_text: The model's raw output, so callers can inspect or salvage it.
         errors: Human-readable validation error messages.
+        partial: Complete top-level members recovered without inference, or ``None``.
+        missing_required: Required field names that were not completely received.
     """
 
     def __init__(
@@ -273,6 +281,8 @@ class SchemaViolationError(AnyInferError):
         *,
         raw_text: str = "",
         errors: tuple[str, ...] = (),
+        partial: Mapping[str, Any] | None = None,
+        missing_required: tuple[str, ...] = (),
         provider: str | None = None,
         phase: Phase = "validate",
         hint: str | None = None,
@@ -280,6 +290,8 @@ class SchemaViolationError(AnyInferError):
         super().__init__(detail, provider=provider, phase=phase, hint=hint)
         self.raw_text = redact(raw_text)
         self.errors = errors
+        self.partial = partial
+        self.missing_required = missing_required
 
 
 class ToolLoopError(AnyInferError):

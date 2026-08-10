@@ -58,6 +58,54 @@ def test_chat_completion_returns_an_openai_shaped_body() -> None:
     assert body["usage"]["completion_tokens"] == 7
 
 
+def test_manifest_extension_is_opt_in_and_stock_body_is_unchanged() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    http, _ = _client(server)
+    base = {
+        "model": "openai-compat:m",
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+
+    stock = http.post("/v1/chat/completions", json=base).json()
+    extended = http.post(
+        "/v1/chat/completions", json={**base, "anyinfer_manifest": True}
+    ).json()
+
+    assert "anyinfer_manifest" not in stock
+    manifest = extended.pop("anyinfer_manifest")
+    extended.pop("id", None)
+    stock.pop("id", None)
+    extended.pop("created", None)
+    stock.pop("created", None)
+    assert extended == stock
+    assert manifest["route"]["resolved"] == "openai-compat:m"
+
+
+def test_arena_extension_keeps_a_stock_chat_completion_and_all_candidates() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="candidate"))
+    http, _ = _client(server)
+
+    response = http.post(
+        "/v1/chat/completions",
+        json={
+            "model": "ignored-when-arena-is-present",
+            "messages": [{"role": "user", "content": "compare"}],
+            "anyinfer_arena": {
+                "targets": ["openai-compat:a", "openai-compat:b"],
+                "strategy": "first_valid",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["object"] == "chat.completion"
+    assert body["choices"][0]["message"]["content"] == "candidate"
+    arena = body["anyinfer_arena"]
+    assert len(arena["candidates"]) == 2
+    assert arena["winner"] == 0
+
+
 def test_target_grammar_works_as_a_model_string() -> None:
     """Federation is free precisely because a Target *is* an OpenAI model string."""
     server = FakeOpenAIServer(FakeResponse(text="ok"))
@@ -230,6 +278,29 @@ def test_streaming_includes_a_terminal_usage_chunk() -> None:
     assert usage_chunks[0]["usage"]["completion_tokens"] == 7  # type: ignore[index]
 
 
+def test_streaming_manifest_frame_precedes_done() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="hi"))
+    http, _ = _client(server)
+
+    with http.stream(
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "openai-compat:m",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+            "anyinfer_manifest": True,
+        },
+    ) as response:
+        body = "".join(response.iter_text())
+
+    assert body.index('\"anyinfer_manifest\"') < body.index("data: [DONE]")
+    frames = _parse_sse(body)
+    manifest_frames = [frame for frame in frames if "anyinfer_manifest" in frame]
+    assert len(manifest_frames) == 1
+    assert manifest_frames[0]["anyinfer_manifest"]["complete"] is True  # type: ignore[index]
+
+
 def test_usage_can_be_suppressed() -> None:
     server = FakeOpenAIServer(FakeResponse(text="hi"))
     http, _ = _client(server)
@@ -269,6 +340,25 @@ def test_models_includes_exposed_targets() -> None:
 
     ids = {entry["id"] for entry in http.get("/v1/models").json()["data"]}
     assert "openai-compat:fake-model-small" in ids
+
+
+def test_namespaced_compare_projects_the_public_client_api() -> None:
+    server = FakeOpenAIServer()
+    http, _ = _client(server)
+    response = http.post(
+        "/v1/anyinfer/compare",
+        json={
+            "messages": [{"role": "user", "content": "hi"}],
+            "targets": ["openai-compat:m", "missing:m"],
+            "temperature": 0.2,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["object"] == "anyinfer.target_comparison.list"
+    assert [item["resolvable"] for item in body["data"]] == [True, False]
+    assert server.requests == []
 
 
 def test_health_needs_no_authentication() -> None:

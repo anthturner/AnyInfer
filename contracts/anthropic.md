@@ -8,6 +8,8 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - https://docs.anthropic.com/en/api/models-list
 - https://docs.anthropic.com/en/api/versioning
 - https://docs.anthropic.com/en/release-notes/api
+- https://platform.claude.com/docs/en/build-with-claude/vision
+- https://platform.claude.com/docs/en/build-with-claude/pdf-support
 
 ## Wire contract
 ### Endpoints
@@ -32,6 +34,12 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
   `stop_sequences`, `tools`, `tool_choice`; reasoning-effort wire form recorded in
   `output_config: {"effort": e}` — VERIFY on first drift run (extended
   thinking may instead use `thinking: {"type":"enabled","budget_tokens":N}`)
+
+### Multimodal inputs
+Verified 2026-08-10 against the provider-owned vision and PDF guides. Images use `image`
+content blocks and documents use `document` blocks. Their `source` is either `base64` with
+`media_type` and `data`, or `url` with `url`. Audio content is not projected by this
+Messages adapter and is refused before transport.
 ### Prompt caching (placement)
 - Mechanism: **explicit**. `cache_control: {"type": "ephemeral"}` attaches to a content
   block, a `system` content block, or a tool declaration, and marks everything *before and

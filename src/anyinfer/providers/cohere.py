@@ -31,6 +31,7 @@ from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
 from ..types.messages import Message, Text, ToolCall, ToolResult
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
+from ._multimodal import has_multimodal, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
@@ -177,6 +178,8 @@ class CohereAdapter:
 
     def _encode_message(self, message: Message) -> dict[str, Any]:
         """Encode one message, splitting tool results into their own role."""
+        if has_multimodal((message,)):
+            raise unsupported(self.provider_id, "multimodal")
         results = [p for p in message.content if isinstance(p, ToolResult)]
         if results:
             result = results[0]
@@ -189,17 +192,20 @@ class CohereAdapter:
         text = "".join(p.text for p in message.content if isinstance(p, Text))
         calls = [p for p in message.content if isinstance(p, ToolCall)]
         if calls:
-            encoded: dict[str, Any] = {"role": "assistant", "tool_calls": [
-                {
-                    "id": call.id,
-                    "type": "function",
-                    "function": {
-                        "name": call.name,
-                        "arguments": json.dumps(dict(call.arguments)),
-                    },
-                }
-                for call in calls
-            ]}
+            encoded: dict[str, Any] = {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": call.id,
+                        "type": "function",
+                        "function": {
+                            "name": call.name,
+                            "arguments": json.dumps(dict(call.arguments)),
+                        },
+                    }
+                    for call in calls
+                ],
+            }
             if text:
                 encoded["content"] = text
             return encoded
@@ -333,9 +339,7 @@ class CohereAdapter:
         except httpx2.HTTPError as exc:
             raise map_transport_error(exc, provider=self.provider_id, phase="stream") from exc
 
-    def _events_from_chunk(
-        self, chunk: Any, state: _StreamState
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Translate one typed stream event into adapter events."""
         if not isinstance(chunk, Mapping):
             return
@@ -471,7 +475,8 @@ def _parse_usage(payload: Any) -> Usage | None:
     usage = Usage(
         input_tokens=field(source, "input_tokens"),
         output_tokens=field(source, "output_tokens"),
-        cache_read_tokens=cached if isinstance(cached, int) and not isinstance(cached, bool)
+        cache_read_tokens=cached
+        if isinstance(cached, int) and not isinstance(cached, bool)
         else None,
     )
     return usage if usage != Usage() else None
@@ -540,9 +545,7 @@ descriptor = ProviderDescriptor(
                 label="API key",
                 kind="secret",
                 required=True,
-                help_text=(
-                    "Conventionally env://CO_API_KEY. Accepts env:// and credential://."
-                ),
+                help_text=("Conventionally env://CO_API_KEY. Accepts env:// and credential://."),
                 placeholder="env://CO_API_KEY or a literal key",
                 env_var="CO_API_KEY",
             ),

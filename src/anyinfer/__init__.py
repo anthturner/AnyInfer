@@ -30,6 +30,7 @@ from ._client import (
     Tool,
     tool,
 )
+from .arena import ArenaResult, Candidate
 from .benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
@@ -67,6 +68,7 @@ from .catalog import (
     OllamaChannel,
     load_default_catalog,
 )
+from .compare import TargetComparison
 from .config import (
     CONFIG_FORMAT_VERSION,
     MAX_CONFIG_BYTES,
@@ -76,6 +78,7 @@ from .config import (
     load_config,
     loads_config,
 )
+from .context_request import ContextRequest, ContextSummary
 from .credentials import CredentialResolver, ResolverChain, default_resolver
 from .errors import (
     AllTargetsFailedError,
@@ -95,8 +98,10 @@ from .errors import (
     StreamProtocolError,
     ToolLoopError,
     TransportError,
+    UnsupportedInputError,
 )
 from .events import (
+    ArenaCompleted,
     AttemptCompleted,
     AttemptStarted,
     CachePlanned,
@@ -153,8 +158,10 @@ from .registry import (
 from .routing import Retry, Route
 from .session import Session, SessionReuse
 from .types import (
+    ArenaPolicy,
     AttemptFailed,
     AttemptRecord,
+    AudioPart,
     CacheMechanism,
     CacheMode,
     CachePolicy,
@@ -162,6 +169,7 @@ from .types import (
     Diagnostic,
     DiagnosticSeverity,
     DiscoveredModel,
+    DocumentPart,
     ErrorInfo,
     Feature,
     FinishReason,
@@ -169,6 +177,7 @@ from .types import (
     GenerationRequest,
     Health,
     HistoryPolicy,
+    ImagePart,
     LocalModelInfo,
     Mechanism,
     Message,
@@ -224,6 +233,9 @@ __all__ = [
     "AllTargetsFailedError",
     "AnyInferConfig",
     "AnyInferError",
+    "ArenaCompleted",
+    "ArenaPolicy",
+    "ArenaResult",
     "AsyncClient",
     "AsyncStream",
     "AttemptCompleted",
@@ -231,12 +243,14 @@ __all__ = [
     "AttemptFailed",
     "AttemptRecord",
     "AttemptStarted",
+    "AudioPart",
     "AuthError",
     "CacheFacet",
     "CacheMechanism",
     "CacheMode",
     "CachePlanned",
     "CachePolicy",
+    "Candidate",
     "CapabilityFacet",
     "Catalog",
     "CatalogEntryFit",
@@ -248,12 +262,15 @@ __all__ = [
     "ContextFacet",
     "ContextLengthError",
     "ContextReduced",
+    "ContextRequest",
+    "ContextSummary",
     "CostEstimate",
     "CredentialError",
     "CredentialResolver",
     "Diagnostic",
     "DiagnosticSeverity",
     "DiscoveredModel",
+    "DocumentPart",
     "DownloadProgress",
     "DroppedParameter",
     "ErrorInfo",
@@ -268,6 +285,7 @@ __all__ = [
     "HeuristicTokenEstimator",
     "HistoryPolicy",
     "HostShorthand",
+    "ImagePart",
     "LocalModelInfo",
     "LocalRuntimeError",
     "Measurement",
@@ -348,6 +366,7 @@ __all__ = [
     "SupportsJSONSchema",
     "SyncStream",
     "Target",
+    "TargetComparison",
     "TargetResolved",
     "TelemetryEvent",
     "Text",
@@ -367,6 +386,7 @@ __all__ = [
     "ToolResult",
     "ToolSpec",
     "TransportError",
+    "UnsupportedInputError",
     "Usage",
     "UsageEstimated",
     "UsageFacet",

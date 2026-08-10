@@ -80,8 +80,9 @@ architecture test enforces that it stays one.
 | `GET /health` | Liveness. Requires no authentication. |
 | Anything else under `/v1` | 404 with a clear explanation. |
 
-Embeddings, images, and audio are out of scope — AnyInfer models text generation only, and
-says so rather than half-implementing them.
+Embeddings and generated image/audio outputs are out of scope. Typed image, document, and
+audio *inputs* are accepted in OpenAI content arrays and capability-gated before dispatch;
+see [multimodal inputs](../concepts/multimodal-inputs.md).
 
 ## Model strings are targets
 
@@ -99,13 +100,26 @@ field cannot.
 
 ## What survives the wire, and what does not
 
-**Survives:** messages, tools, `tool_choice`, `response_format.json_schema`, temperature,
-top-p, max tokens, stop sequences, the stream flag, usage, and finish reasons. Unrecognized
-extra-body fields reach `provider_options`, so the escape hatch survives too.
+**Survives:** text and multimodal message parts, tools, `tool_choice`,
+`response_format.json_schema`, temperature, top-p, max tokens, stop sequences, the stream
+flag, usage, and finish reasons. Unrecognized extra-body fields reach `provider_options`,
+so the escape hatch survives too.
 
-**Does not:** timing marks and attempt records. They have no `chat.completion.chunk`
-representation, so AnyInfer-native observability is SDK-only. Everything the OpenAI format
-*can* express, it does.
+**Does not in the stock shape:** timing marks and attempt records. They have no
+`chat.completion.chunk` representation. An AnyInfer-aware caller can request the complete
+run manifest without changing what a stock OpenAI client receives:
+
+```json
+{
+  "model": "medium",
+  "messages": [{"role": "user", "content": "hi"}],
+  "anyinfer_manifest": true
+}
+```
+
+For a buffered response, `anyinfer_manifest` is a top-level response property. For a stream,
+it is one terminal SSE frame immediately before `[DONE]`. Absence of the request field means
+absence of both response forms. See [run manifests](../concepts/run-manifests.md).
 
 ## Security
 
@@ -178,10 +192,21 @@ quietly shortened conversation. `true` accepts the defaults. A malformed value i
 rather than a silent fallback to the gateway's setting, because a caller that asked for
 something specific should learn it did not get it.
 
-Note what the sidecar does *not* do: reduce a document corpus. It receives messages, not
-documents, and deciding what is safe to send about material it never collected is not a
-gateway's call. That stays with the application — see
-[context reduction](../concepts/context-reduction.md).
+An application may also supply an explicit, caller-approved corpus in
+`anyinfer_context`. This is a stateless envelope: the sidecar stores nothing, never collects
+files, forbids the inference-spending `distill` strategy, and delegates reduction to the
+normal core client. The response reports selected and omitted counts without echoing
+content. See [reduce an explicit corpus through the sidecar](../guides/sidecar-corpus-context.md)
+for the complete shape, ceilings, and bandwidth tradeoff.
+
+## Fixed-target arena requests
+
+An AnyInfer-aware caller can add `anyinfer_arena` with the complete `ArenaPolicy` field set,
+or use a configured arena name as `model`. The response stays a valid single-choice OpenAI
+completion and adds candidate evidence under the same extension name. Streams buffer the
+branches and expose only the winner, so candidate events never interleave. Orchestration
+still lives in `AsyncClient`; the sidecar only translates the extension. See
+[arena runs](../concepts/arena.md).
 
 ## Configuration
 

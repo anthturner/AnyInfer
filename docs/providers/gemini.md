@@ -136,6 +136,11 @@ A prompt Gemini blocks returns **no candidates at all**, with the reason on
 empty successful answer — and a [`Route`](../concepts/routing.md) with
 `content_policy_targets` can redirect it to a differently-governed provider.
 
+## Multimodal inputs
+
+Images, documents, and audio use native `inlineData` blocks for bytes and `fileData` for
+remote references. Support and limits remain model-specific.
+
 ## See also
 
 <div class="anyinfer-see-also" markdown>

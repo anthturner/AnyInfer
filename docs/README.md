@@ -56,6 +56,8 @@ You are embedding AnyInfer in an application.
   omissions.
 - [Credentials and redaction](concepts/credentials.md)
 - [Telemetry and observers](concepts/telemetry.md)
+- [Run manifests](concepts/run-manifests.md) — hold, diff, and regression-test one call's decisions.
+- [Multimodal inputs](concepts/multimodal-inputs.md) — typed images, documents, and audio.
 - [The local subsystem](concepts/local.md) — hardware detection through supervised servers.
 
 **How-to guides** — task-shaped, copy-pasteable.
@@ -65,6 +67,7 @@ You are embedding AnyInfer in an application.
 - [Add a fallback chain](guides/fallback.md)
 - [Run a model locally, end to end](guides/local-inference.md)
 - [Observe requests and bridge to OpenTelemetry](guides/observability.md)
+- [Compare request portability across targets](guides/comparing-targets.md)
 - [Store credentials in the OS keyring](guides/credentials.md)
 - [Run the tool loop](guides/tool-loop.md)
 - [Fit a corpus to a context budget](guides/fitting-context.md)

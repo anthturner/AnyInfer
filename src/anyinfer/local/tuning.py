@@ -122,6 +122,7 @@ class ServerPlan:
     estimated_total_bytes: int = 0
     posture: Posture = "balanced"
     rationale: tuple[str, ...] = ()
+    projector_path: str | None = None
 
     def server_arguments(self, model_path: str, *, host: str, port: int) -> list[str]:
         """Render the plan as llama-server CLI arguments.
@@ -130,21 +131,34 @@ class ServerPlan:
         template, and tool calling silently does not work at all.
         """
         args = [
-            "--model", model_path,
-            "--host", host,
-            "--port", str(port),
-            "--ctx-size", str(self.context_size),
-            "--parallel", str(self.parallel),
-            "--threads", str(self.threads),
-            "--batch-size", str(self.batch_size),
-            "--ubatch-size", str(self.ubatch_size),
-            "--n-gpu-layers", str(self.gpu_layers),
-            "--cache-type-k", self.cache_type_k,
-            "--cache-type-v", self.cache_type_v,
+            "--model",
+            model_path,
+            "--host",
+            host,
+            "--port",
+            str(port),
+            "--ctx-size",
+            str(self.context_size),
+            "--parallel",
+            str(self.parallel),
+            "--threads",
+            str(self.threads),
+            "--batch-size",
+            str(self.batch_size),
+            "--ubatch-size",
+            str(self.ubatch_size),
+            "--n-gpu-layers",
+            str(self.gpu_layers),
+            "--cache-type-k",
+            self.cache_type_k,
+            "--cache-type-v",
+            self.cache_type_v,
             "--jinja",
         ]
         if self.flash_attention:
             args.append("--flash-attn")
+        if self.projector_path is not None:
+            args.extend(("--mmproj", self.projector_path))
         return args
 
     @property

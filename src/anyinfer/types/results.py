@@ -11,6 +11,8 @@ from .messages import ToolCall
 from .requests import CacheMechanism, ResolvedTarget
 
 if TYPE_CHECKING:  # pragma: no cover — imported for the annotation only
+    from ..arena import ArenaResult
+    from ..context_request import ContextSummary
     from ..manifest import RunManifest
 
 __all__ = [
@@ -241,6 +243,9 @@ class Generation:
             when the client was built with manifests switched off. It is a *projection* of
             this call's telemetry events and this result, never an independent account of
             them.
+        arena: Every arena candidate and the terminal selection, or ``None`` for an
+            ordinary generation.
+        context_reduction: Content-free account of per-request corpus reduction.
     """
 
     text: str
@@ -257,3 +262,5 @@ class Generation:
     warnings: tuple[str, ...] = ()
     raw: Any | None = None
     manifest: RunManifest | None = None
+    arena: ArenaResult | None = None
+    context_reduction: ContextSummary | None = None

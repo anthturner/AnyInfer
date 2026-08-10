@@ -38,9 +38,18 @@ from ..types.capabilities import (
     Sourced,
 )
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
+from ._multimodal import base64_data
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
@@ -68,9 +77,24 @@ _FINISH_REASONS: Mapping[str, FinishReason] = {
 
 _SCHEMA_KEYWORDS = frozenset(
     {
-        "type", "format", "description", "nullable", "enum", "properties", "required",
-        "items", "minItems", "maxItems", "minimum", "maximum", "propertyOrdering",
-        "anyOf", "prefixItems", "additionalProperties", "title", "default",
+        "type",
+        "format",
+        "description",
+        "nullable",
+        "enum",
+        "properties",
+        "required",
+        "items",
+        "minItems",
+        "maxItems",
+        "minimum",
+        "maximum",
+        "propertyOrdering",
+        "anyOf",
+        "prefixItems",
+        "additionalProperties",
+        "title",
+        "default",
     }
 )
 """Keywords Gemini's response-schema subset accepts; anything else is dropped."""
@@ -151,9 +175,7 @@ class GeminiAdapter:
             entries = payload.get("models") if isinstance(payload, Mapping) else None
             if not isinstance(entries, list):
                 break
-            models.extend(
-                self._parse_model(e) for e in entries if isinstance(e, Mapping)
-            )
+            models.extend(self._parse_model(e) for e in entries if isinstance(e, Mapping))
 
             token = payload.get("nextPageToken")
             if not isinstance(token, str) or not token:
@@ -276,6 +298,14 @@ class GeminiAdapter:
                         }
                     }
                 )
+            elif isinstance(part, ImagePart | DocumentPart | AudioPart):
+                if isinstance(part, AudioPart) or part.data is not None:
+                    data = part.data if part.data is not None else b""
+                    parts.append(
+                        {"inlineData": {"mimeType": part.media_type, "data": base64_data(data)}}
+                    )
+                else:
+                    parts.append({"fileData": {"mimeType": part.media_type, "fileUri": part.url}})
 
         # Tool results ride on a user turn in this dialect; only the model speaks "model".
         role = "model" if message.role == "assistant" else "user"
@@ -382,9 +412,7 @@ class GeminiAdapter:
             raw=body,
         )
 
-    def _events_from_chunk(
-        self, chunk: Any, state: _StreamState
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Translate one ``GenerateContentResponse`` into zero or more adapter events."""
         if not isinstance(chunk, Mapping):
             return

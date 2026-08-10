@@ -133,7 +133,9 @@ nav:
           - Add a fallback chain: guides/fallback.md
           - Run the tool loop: guides/tool-loop.md
           - Fit a corpus to a budget: guides/fitting-context.md
+          - Reduce a corpus through the sidecar: guides/sidecar-corpus-context.md
           - Test your application offline: guides/testing-your-app.md
+          - Compare targets without spending: guides/comparing-targets.md
           - Add your own provider: guides/custom-providers.md
       - Operations:
           - Run a model locally: guides/local-inference.md
@@ -158,6 +160,9 @@ nav:
       - Context reduction: concepts/context-reduction.md
       - Credentials and redaction: concepts/credentials.md
       - Telemetry: concepts/telemetry.md
+      - Run manifests: concepts/run-manifests.md
+      - Multimodal inputs: concepts/multimodal-inputs.md
+      - Arena runs: concepts/arena.md
       - The local subsystem: concepts/local.md
       - The model catalog: concepts/catalog.md
       - Acquiring models: concepts/models.md
@@ -166,6 +171,8 @@ nav:
       - Structured summaries with fallback: examples/summarize-with-fallback.md
       - A local tool-calling assistant: examples/local-tool-agent.md
       - Distill a corpus: examples/distill-a-corpus.md
+      - Regression-test fallback and repair: examples/golden-manifest.md
+      - Compare targets without spending: examples/compare-targets.md
   - Providers:
       - providers/README.md
       - Every provider: providers/all.md
@@ -205,6 +212,7 @@ nav:
           - Testing utilities: reference/api/testing.md
           - Errors: reference/api/errors.md
       - Error catalog: reference/errors.md
+      - Run manifest format: reference/run-manifest.md
       - Conformance matrix: reference/conformance-matrix.md
       - Glossary: reference/glossary.md
   - Contributing:

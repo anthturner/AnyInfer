@@ -1,0 +1,141 @@
+{
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "error": {
+        "detail": "scripted failure",
+        "http_status": 503,
+        "phase": "generate",
+        "provider": "scripted",
+        "retryable": true,
+        "type_name": "ProviderUnavailableError"
+      },
+      "outcome": "failed",
+      "retry_reason": null,
+      "target": "scripted:primary"
+    },
+    {
+      "attempt_number": 1,
+      "error": null,
+      "outcome": "ok",
+      "retry_reason": null,
+      "target": "scripted:fallback"
+    }
+  ],
+  "cache": {
+    "estimated_cacheable_tokens": 0,
+    "mark_count": 0,
+    "mechanism": null,
+    "policy_mode": null,
+    "read_tokens": null,
+    "write_tokens": null
+  },
+  "capability": {
+    "facts": [
+      {
+        "name": "context_window",
+        "provenance": "default",
+        "value": 32768
+      },
+      {
+        "name": "features",
+        "provenance": "default",
+        "value": [
+          "JSON_MODE",
+          "STREAMING",
+          "SYSTEM_PROMPT",
+          "TOOLS"
+        ]
+      }
+    ],
+    "target": "scripted:fallback"
+  },
+  "complete": true,
+  "context": {
+    "reductions": []
+  },
+  "dropped": [],
+  "format": "1",
+  "notes": [],
+  "payloads": null,
+  "request": {
+    "char_count": 6,
+    "estimated_tokens": 36,
+    "message_count": 1,
+    "metadata_keys": [],
+    "reasoning": null,
+    "repair_budget": 0,
+    "role_counts": {
+      "user": 1
+    },
+    "sampling": {},
+    "schema_digest": "sha256:b9c62f6f1b3d843482109e48e44e89ad4ebfff58c59664200ce3200faddcb6e4",
+    "schema_name": "response",
+    "schema_present": true,
+    "timeout_s": null,
+    "tool_choice": "auto",
+    "tool_names": []
+  },
+  "route": {
+    "considered": [
+      {
+        "outcome": "abandoned",
+        "reason": "scripted failure",
+        "target": "scripted:primary"
+      },
+      {
+        "outcome": "ok",
+        "reason": "",
+        "target": "scripted:fallback"
+      }
+    ],
+    "requested": [
+      "scripted:primary",
+      "scripted:fallback"
+    ],
+    "resolved": "scripted:fallback"
+  },
+  "structured": {
+    "chosen": "json_mode",
+    "ladder": [
+      {
+        "available": false,
+        "mechanism": "grammar",
+        "reason": "the target is not known to support grammar (capability provenance: default)"
+      },
+      {
+        "available": false,
+        "mechanism": "json_schema",
+        "reason": "the target is not known to support json_schema (capability provenance: default)"
+      },
+      {
+        "available": true,
+        "mechanism": "json_mode",
+        "reason": ""
+      },
+      {
+        "available": true,
+        "mechanism": "prompt",
+        "reason": "a native mechanism was available"
+      }
+    ],
+    "repair_attempts": 0,
+    "repairs": [],
+    "requested": true,
+    "used": "json_mode",
+    "validated": true
+  },
+  "timing": {},
+  "usage": {
+    "cache_read_tokens": null,
+    "cache_write_tokens": null,
+    "cost_usd": null,
+    "estimated_fields": {
+      "input_tokens": "pre-dispatch context-gate estimate"
+    },
+    "input_tokens": 11,
+    "output_tokens": 7,
+    "reasoning_tokens": null,
+    "total_tokens": 18
+  }
+}

@@ -1,5 +1,9 @@
 # Conformance matrix
 
+This matrix says what an adapter supports in general. To see what your own messages,
+schema, tools, and sampling controls become on several concrete targets, use
+[`client.compare()`](../guides/comparing-targets.md); it spends no generation calls.
+
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
 

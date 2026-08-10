@@ -122,7 +122,11 @@ except ai.SchemaViolationError as error:
     print(error.raw_text)   # what the model actually said
 ```
 
-You get both the validation errors and the raw output, so you can salvage or debug.
+You get the validation errors, bounded raw output, and—when a truncated top-level JSON
+object contains delimiter-confirmed complete members—`error.partial` plus
+`error.missing_fields`. Partial members are evidence, not a valid result: AnyInfer never
+guesses a cut-off scalar, asks another provider to continue it, or treats recovered fields
+as schema-validated.
 
 ### Some providers cap the budget
 

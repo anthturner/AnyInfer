@@ -13,6 +13,8 @@ unreachable without a real outage.
 
 <div class="anyinfer-api-block" markdown>
 
+::: anyinfer.testing.assert_manifest_matches
+
 ::: anyinfer.testing.ScriptedProvider
 
 ::: anyinfer.testing.ScriptedModel
@@ -22,6 +24,10 @@ unreachable without a real outage.
 ::: anyinfer.testing.FailureKind
 
 ::: anyinfer.testing.DEFAULT_SCRIPTED_CAPABILITIES
+
+::: anyinfer.testing.VOLATILE_FIELDS
+
+::: anyinfer.testing.normalize
 
 </div>
 

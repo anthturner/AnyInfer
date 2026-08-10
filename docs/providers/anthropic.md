@@ -70,3 +70,9 @@ emulation is invisible except in `structured_mechanism`.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/anthropic.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/anthropic.md).
+
+## Multimodal inputs
+
+Images and PDF documents accept inline bytes or provider-fetchable URLs. The adapter emits
+native image/document content blocks. Audio input is not part of this Messages projection
+and fails explicitly.

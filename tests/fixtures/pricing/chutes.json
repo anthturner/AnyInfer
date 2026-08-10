@@ -1,0 +1,19 @@
+{
+  "data": [
+    {"id": "Qwen/Qwen3-32B-TEE", "pricing": {"prompt": 0.104, "completion": 0.416}, "price": {"input": {"usd": 0.104, "tao": 999}, "output": {"usd": 0.416, "tao": 999}}},
+    {"id": "Qwen/Qwen3.5-397B-A17B-TEE", "pricing": {"prompt": 0.45, "completion": 3.0}},
+    {"id": "google/gemma-4-31B-turbo-TEE", "pricing": {"prompt": 0.12, "completion": 0.37}},
+    {"id": "zai-org/GLM-5.1-TEE", "pricing": {"prompt": 0.98, "completion": 3.08}},
+    {"id": "deepseek-ai/DeepSeek-V3.2-TEE", "pricing": {"prompt": 1.0, "completion": 1.0}},
+    {"id": "Qwen/Qwen3.6-27B-TEE", "pricing": {"prompt": 0.3, "completion": 2.0}},
+    {"id": "moonshotai/Kimi-K2.6-TEE", "pricing": {"prompt": 0.58, "completion": 3.4}},
+    {"id": "moonshotai/Kimi-K3-TEE", "pricing": {"prompt": 3.0, "completion": 15.0}},
+    {"id": "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE", "pricing": {"prompt": 0.2989, "completion": 1.1957}},
+    {"id": "deepseek-ai/DeepSeek-V4-Flash-0731-TEE", "pricing": {"prompt": 0.14, "completion": 0.28}},
+    {"id": "unsloth/Mistral-Nemo-Instruct-2407-TEE", "pricing": {"prompt": 0.0245, "completion": 0.0978}},
+    {"id": "zai-org/GLM-5.2-TEE", "pricing": {"prompt": 1.25, "completion": 3.95}},
+    {"id": "Nemotron-3-Nano-Omni-30B-TEE", "pricing": {"prompt": 0.0245, "completion": 0.0978}},
+    {"id": "unrelated/free", "pricing": {"prompt": 0, "completion": 0}, "price": {"input": {"tao": 50}}},
+    {"id": "malformed/no-output", "pricing": {"prompt": 1}}
+  ]
+}

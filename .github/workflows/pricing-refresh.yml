@@ -2,23 +2,11 @@ name: Pricing refresh
 
 # Weekly semi-automated refresh of the bundled model-pricing table.
 #
-# Two stages, deliberately split by trust level:
-#
-#   1. `check` — deterministic: validates the table through the installed library, then
-#      cross-checks every bundled entry that has an `openrouter_id` against OpenRouter's
-#      public listing. Cheap, machine-readable, and immune to hallucination — but it only
-#      *detects* drift.
-#   2. `propose` — runs only when drift was detected (or on manual dispatch): a
-#      web-search-capable Claude session verifies the drifted entries against the
-#      providers' own pricing pages, updates pricing.json (values and last_verified dates
-#      only for numbers actually confirmed), and opens a pull request.
-#
-# The PR is never auto-merged. Prices are money: a human reviews every change, and the
-# ordinary CI gates run on the PR — including scripts/validate_pricing.py via the test
-# suite — before it can land. Azure AI Foundry pricing is region/deployment-specific and
-# GitHub/M365 Copilot are subscription-billed, so those providers stay out of the table
-# by design; the Azure retail prices API (https://prices.azure.com/api/retail/prices) is
-# the app-side source for Foundry.
+# The deterministic job validates the table and queries three public machine-readable
+# sources. Chutes and Avian are direct provider-owned evidence; OpenRouter is a secondary
+# tripwire for exact mapped OpenAI and Anthropic entries. A mismatch never authorizes an
+# edit by itself. The proposal stage reads the exact report artifact, verifies each finding
+# against the provider's current documentation, and opens a human-reviewed pull request.
 
 on:
   schedule:
@@ -26,20 +14,26 @@ on:
   workflow_dispatch:
     inputs:
       force_propose:
-        description: Run the proposal stage even if the deterministic check saw no drift
+        description: Run proposal review even when the report contains no drift
         type: boolean
         default: false
 
+concurrency:
+  group: pricing-refresh
+  cancel-in-progress: false
+
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   check:
     name: deterministic drift check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       drift: ${{ steps.drift.outputs.drift }}
+      status: ${{ steps.drift.outputs.status }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -49,19 +43,37 @@ jobs:
         run: python -m pip install -e .
       - name: validate bundled table
         run: python scripts/validate_pricing.py
-      - name: compare against OpenRouter listing
+      - name: compare public pricing sources
         id: drift
-        # Exit 1 means drift (the propose job takes over); exit 2 means the check itself
-        # failed and the workflow should surface that, not silently pass.
+        shell: bash
         run: |
-          python scripts/check_pricing_drift.py && status=0 || status=$?
-          if [ "$status" = "2" ]; then exit 2; fi
+          set +e
+          python scripts/check_pricing_drift.py --report pricing-drift-report.json
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" = "1" ]; then exit 0; fi
+          if [ "$status" = "2" ]; then exit 0; fi
+          exit "$status"
+      - name: upload exact drift report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pricing-drift-report
+          path: pricing-drift-report.json
+          if-no-files-found: warn
+      - name: fail incomplete source checks
+        if: steps.drift.outputs.status == '2'
+        run: exit 2
 
   propose:
-    name: verify with web search and open a PR
+    name: verify with provider documentation and open a PR
     needs: check
     if: needs.check.outputs.drift == 'true' || inputs.force_propose
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -69,39 +81,40 @@ jobs:
           python-version: "3.11"
       - name: install dependencies
         run: python -m pip install -e .
+      - name: download exact drift report
+        uses: actions/download-artifact@v7
+        with:
+          name: pricing-drift-report
+          path: pricing-report
       - name: verify pricing and update the table
         uses: anthropics/claude-code-action@v1
         with:
-          # Either secret works; set exactly one (docs/contributing/repository-setup.md).
-          # ANTHROPIC_API_KEY = Console account, pay per token.
-          # CLAUDE_CODE_OAUTH_TOKEN = Claude Pro/Max subscription via `claude setup-token`.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: "--allowedTools Bash,Read,Edit,Write,WebSearch,WebFetch"
           prompt: |
-            You are refreshing src/anyinfer/capabilities/pricing.json, this repo's
-            bundled model-pricing table. Read the file's _comment block first — it
-            states the rules.
+            Review pricing-report/pricing-drift-report.json, the immutable output of the
+            deterministic check. Do not rerun the live comparison. The report identifies
+            provider, model, bundled and observed rates, checker, direct/secondary evidence
+            class, and evidence URL. If this manual run has no drift, summarize that fact
+            and do not invent findings.
 
-            1. Run `python scripts/check_pricing_drift.py` to see which entries drifted
-               against OpenRouter's public listing.
-            2. For each drifted entry, verify the current per-1M-token list price on the
-               provider's OWN pricing page (openai.com/api/pricing for openai models,
-               anthropic.com/pricing for anthropic models) via web search/fetch. The
-               OpenRouter number is a cross-check, not the authority.
-            3. Update ONLY entries you actually verified today: set the new
-               input_per_1m/output_per_1m as JSON strings, set last_verified to today's
-               date, and set source to the URL you verified against. Never touch an
-               entry you could not verify, and never invent a date.
-            4. Prices are keyed by provider AND model — the same model on a different
-               engine may cost differently. Never copy a price across providers.
-            5. Run `python scripts/validate_pricing.py` and make it pass.
-            6. Create a branch `pricing-refresh/<today's date>`, commit the change with
-               a message summarizing old -> new per entry, push it, and open a pull
-               request against `develop` titled "Pricing refresh <date>". The PR body
-               must list each change with the source URL you verified it against, and
-               state which drifted entries you left untouched and why.
+            For every price-drift or upstream-missing finding, open that provider's OWN
+            current human-readable pricing documentation. A direct catalog is evidence and
+            OpenRouter is only a secondary tripwire; neither replaces confirmation of the
+            currency, per-million-token unit, standard service tier, region/deployment,
+            context tier, and input/output sides on provider documentation. If any dimension
+            differs or cannot be represented, leave the bundled entry unchanged and explain
+            why. Never copy one seller's open-model price to another provider.
 
-            If, after verification against provider pages, nothing actually changed
-            (OpenRouter drifted but the providers did not), do not open a PR — print a
-            summary saying so instead.
+            Update only entries whose rates you actually verify today. Use JSON strings for
+            input_per_1m and output_per_1m, set last_verified to the real verification date,
+            and set source to the provider-owned URL you opened. A clean check or metadata
+            migration does not refresh a verification date. Run
+            `python scripts/validate_pricing.py` after editing.
+
+            If verified changes remain, create pricing-refresh/<today>, commit a precise
+            old-to-new summary, push it, and open a pull request against develop titled
+            "Pricing refresh <date>". The body must cite each provider-owned page and list
+            every report finding left untouched with its reason. Never auto-merge. If no
+            verified value changed, print a summary and do not open a pull request.

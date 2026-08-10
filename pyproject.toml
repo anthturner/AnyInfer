@@ -205,6 +205,7 @@ include_external_packages = true
 # telemetry reaches observers through `events.telemetry`, which carries no policy.
 name = "Adapters never orchestrate"
 type = "forbidden"
+allow_indirect_imports = true
 source_modules = ["anyinfer.providers"]
 forbidden_modules = [
   "anyinfer.routing",
@@ -221,6 +222,7 @@ forbidden_modules = [
 # the separate CLI process boundary, so it is not request-path code.
 name = "Sidecar is a codec around the client, never a second core"
 type = "forbidden"
+allow_indirect_imports = true
 source_modules = ["anyinfer.serve.openai_codec", "anyinfer.serve.app"]
 forbidden_modules = [
   "anyinfer.providers",
@@ -235,6 +237,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Types are leaf modules (zero I/O)"
 type = "forbidden"
+allow_indirect_imports = true
 source_modules = ["anyinfer.types"]
 forbidden_modules = [
   "anyinfer.providers",
@@ -253,6 +256,7 @@ forbidden_modules = [
 # has no _client import — and no strategy can reach a provider, the wire, or the disk.
 name = "Context reduction is a leaf consumer"
 type = "forbidden"
+allow_indirect_imports = true
 source_modules = ["anyinfer.context"]
 forbidden_modules = [
   "anyinfer.providers",

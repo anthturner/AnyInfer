@@ -16,9 +16,10 @@ Two v1 choices worth stating:
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, get_args, get_origin, get_type_hints
 
@@ -26,7 +27,7 @@ from ..errors import ToolLoopError
 from ..types.messages import Message, ToolCall, ToolResult
 from ..types.requests import ToolSpec
 
-__all__ = ["DEFAULT_MAX_ROUNDS", "Tool", "ToolRegistry", "tool"]
+__all__ = ["DEFAULT_MAX_ROUNDS", "Tool", "ToolMemo", "ToolRegistry", "tool"]
 
 DEFAULT_MAX_ROUNDS = 8
 """Round bound. Without one, a model that keeps calling tools never terminates."""
@@ -184,11 +185,51 @@ def _json_type(annotation: Any, *, tool_name: str, parameter: str) -> dict[str, 
     return {"type": json_type}
 
 
+class ToolMemo:
+    """Exact, single-flight memo shared only by candidates in one arena run."""
+
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._inflight: dict[str, asyncio.Future[ToolResult]] = {}
+        self.hits = 0
+
+    async def dispatch(
+        self, key: str, call_id: str, execute: Callable[[], Awaitable[ToolResult]]
+    ) -> ToolResult:
+        """Execute once for an exact key; failures are removed rather than cached."""
+        async with self._lock:
+            task = self._inflight.get(key)
+            owner = task is None
+            if task is None:
+                task = asyncio.ensure_future(execute())
+                self._inflight[key] = task
+        result = await task
+        if result.is_error:
+            async with self._lock:
+                if self._inflight.get(key) is task:
+                    self._inflight.pop(key, None)
+            if not owner:
+                return await execute()
+        elif not owner:
+            async with self._lock:
+                self.hits += 1
+        return ToolResult(call_id=call_id, content=result.content, is_error=result.is_error)
+
+
 class ToolRegistry:
     """The tools available to one loop, indexed by name."""
 
-    def __init__(self, tools: Sequence[Tool | Callable[..., Any]]) -> None:
+    def __init__(
+        self,
+        tools: Sequence[Tool | Callable[..., Any]],
+        *,
+        memo: ToolMemo | None = None,
+        memo_mode: str = "off",
+    ) -> None:
         self._tools: dict[str, Tool] = {}
+        self._memo = memo
+        self._memo_mode = memo_mode
+        self.dispatched = 0
         for entry in tools:
             resolved = entry if isinstance(entry, Tool) else tool(entry)
             self._tools[resolved.name] = resolved
@@ -216,17 +257,41 @@ class ToolRegistry:
                 hint=f"registered tools: {known}",
             )
 
-        try:
-            output = entry.call(call.arguments)
-            if inspect.isawaitable(output):
-                output = await output
-        except Exception as exc:  # noqa: BLE001 — surfaced to the model, not the caller
-            return ToolResult(
-                call_id=call.id,
-                content=f"{type(exc).__name__}: {exc}",
-                is_error=True,
+        async def execute() -> ToolResult:
+            self.dispatched += 1
+            try:
+                output = entry.call(call.arguments)
+                if inspect.isawaitable(output):
+                    output = await output
+            except Exception as exc:  # noqa: BLE001 — surfaced to the model
+                return ToolResult(
+                    call_id=call.id,
+                    content=f"{type(exc).__name__}: {exc}",
+                    is_error=True,
+                )
+            return ToolResult(call_id=call.id, content=_stringify(output))
+
+        if self._memo is not None and self._memoizable(entry):
+            arguments = json.dumps(
+                call.arguments,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
             )
-        return ToolResult(call_id=call.id, content=_stringify(output))
+            key = f"{call.name}:{arguments}"
+            return await self._memo.dispatch(key, call.id, execute)
+        return await execute()
+
+    def _memoizable(self, tool_entry: Tool) -> bool:
+        """Whether this registry's arena policy permits memoizing a tool."""
+        annotations = tool_entry.spec.annotations
+        if self._memo_mode == "all":
+            return True
+        if self._memo_mode == "opt_in":
+            return annotations.idempotent is True
+        if self._memo_mode == "read_only":
+            return annotations.read_only is True or annotations.idempotent is True
+        return False
 
 
 def _stringify(value: Any) -> str:

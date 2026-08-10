@@ -47,6 +47,8 @@ plus a content-free `Reduction.summary()` and an optional `ContextReduced` telem
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from .compact import CompactSource, compact_source, supports_compaction
 from .dedup import DuplicateMap, find_duplicates
 from .distill import Distillation, SupportsGenerate, distill, distill_sync
@@ -85,6 +87,12 @@ from .settings import SELECTION_ORDERS, ContextTuning, SelectionOrder
 from .structure import detect_language, imported_names, is_generated_path, structural_extract
 from .tiers import DEFAULT_ROLLUP_SHARE, module_surfaces
 
+if TYPE_CHECKING:
+    from ..context_request import (
+        ContextRequest,
+        ContextSummary,
+    )
+
 __all__ = [
     "DEFAULT_CHUNK_TOKENS",
     "DEFAULT_KEEP_RECENT",
@@ -97,6 +105,8 @@ __all__ = [
     "Chunk",
     "CompactSource",
     "ContextDocument",
+    "ContextRequest",
+    "ContextSummary",
     "ContextTuning",
     "Distillation",
     "DuplicateMap",
@@ -137,3 +147,15 @@ __all__ = [
     "supports_compaction",
     "tokenize",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Load request-boundary records lazily to avoid a package-initialization cycle."""
+    if name in {
+        "ContextRequest",
+        "ContextSummary",
+    }:
+        from .. import context_request
+
+        return getattr(context_request, name)
+    raise AttributeError(name)

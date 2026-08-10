@@ -18,6 +18,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PRICING_PATH = REPO_ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json"
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from pricing_check import load_bundled, validate_policies  # noqa: E402
 
 from anyinfer.capabilities.pricing_table import PricingTable  # noqa: E402
 
@@ -33,6 +36,14 @@ def validate(path: Path = PRICING_PATH) -> list[str]:
         return [f"table does not parse: {error}"]
 
     today = _dt.date.today()
+    generated_raw = data.get("generated")
+    try:
+        generated = _dt.date.fromisoformat(generated_raw)
+    except (TypeError, ValueError):
+        problems.append(f"generated {generated_raw!r} is not an ISO date")
+    else:
+        if generated > today:
+            problems.append(f"generated {generated} is in the future")
     for provider in table.providers:
         for entry in table.entries_for(provider):
             where = f"{provider}:{entry.model}"
@@ -46,9 +57,11 @@ def validate(path: Path = PRICING_PATH) -> list[str]:
             if not entry.source.startswith("https://"):
                 problems.append(f"{where}: source must be an https URL")
             if entry.pricing.input_per_1m == 0 and entry.pricing.output_per_1m == 0:
-                problems.append(
-                    f"{where}: zero prices belong to local engines, not table entries"
-                )
+                problems.append(f"{where}: zero prices belong to local engines, not table entries")
+    try:
+        problems.extend(validate_policies(load_bundled(data)))
+    except (KeyError, TypeError, ValueError) as error:
+        problems.append(f"coverage policy validation failed: {error}")
     return problems
 
 

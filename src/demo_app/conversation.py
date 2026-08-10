@@ -15,7 +15,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from anyinfer.types.messages import ContentPart, Message, Role, Text, ToolCall, ToolResult
+from anyinfer.types.messages import (
+    AudioPart,
+    ContentPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Role,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from anyinfer.types.results import Generation
 
 __all__ = ["Conversation", "GenerationSummary", "conversations_dir", "gist_title"]
@@ -272,6 +282,12 @@ def _part_to_json(part: ContentPart) -> dict[str, Any]:
             "name": part.name,
             "arguments": dict(part.arguments),
         }
+    if isinstance(part, ImagePart | DocumentPart | AudioPart):
+        # The demo's transcript store is intentionally payload-free. A future attachment
+        # picker can own a separate asset store; silently embedding binary request data in
+        # conversation JSON would violate the existing persistence contract.
+        return {"kind": "attachment_omitted", "media_type": part.media_type}
+    assert isinstance(part, ToolResult)
     return {
         "kind": "tool_result",
         "call_id": part.call_id,
@@ -303,4 +319,6 @@ def _part_from_json(data: Mapping[str, Any]) -> ContentPart:
             content=str(data.get("content", "")),
             is_error=bool(data.get("is_error", False)),
         )
+    if kind == "attachment_omitted":
+        return Text(f"[attachment omitted: {data.get('media_type', 'unknown')}]")
     return Text(str(data.get("text", "")))

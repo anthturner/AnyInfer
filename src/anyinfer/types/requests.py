@@ -10,15 +10,23 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
-from .messages import Message
+from .messages import AudioPart, DocumentPart, ImagePart, Message
+
+if TYPE_CHECKING:
+    from ..context_request import ContextRequest
 
 __all__ = [
+    "ARENA_MEMO_MODES",
+    "ARENA_STRATEGIES",
     "CACHE_MODES",
+    "DEFAULT_MAX_INPUT_BYTES",
+    "DEFAULT_MAX_INPUT_PART_BYTES",
     "DEFAULT_MAX_RESPONSE_BYTES",
     "DEFAULT_TIMEOUT_S",
     "HISTORY_MODES",
+    "ArenaPolicy",
     "CacheMechanism",
     "CacheMode",
     "CachePolicy",
@@ -38,6 +46,43 @@ __all__ = [
     "ToolChoice",
     "ToolSpec",
 ]
+
+ARENA_STRATEGIES = ("first_valid", "consensus", "cheapest", "fastest", "judge", "synthesize")
+"""Selection strategies accepted by `ArenaPolicy`."""
+
+ARENA_MEMO_MODES = ("read_only", "all", "opt_in", "off")
+"""Run-scoped tool memoization modes accepted by `ArenaPolicy`."""
+
+
+@dataclass(frozen=True, slots=True)
+class ArenaPolicy:
+    """Fan one request out to fixed targets and select after every branch finishes."""
+
+    targets: tuple[str, ...]
+    strategy: Literal["first_valid", "consensus", "cheapest", "fastest", "judge", "synthesize"] = (
+        "first_valid"
+    )
+    judge_target: str | None = None
+    instructions: str | None = None
+    concurrency: int = 4
+    min_candidates: int = 1
+    reveal_targets: bool = False
+    memoize_tools: Literal["read_only", "all", "opt_in", "off"] = "read_only"
+
+    def __post_init__(self) -> None:
+        """Reject an arena whose fixed bounds or strategy are not executable."""
+        if not self.targets:
+            raise ValueError("arena targets must not be empty")
+        if self.strategy not in ARENA_STRATEGIES:
+            raise ValueError(f"unknown arena strategy {self.strategy!r}")
+        if self.strategy in ("judge", "synthesize") and not self.judge_target:
+            raise ValueError(f"arena strategy {self.strategy!r} requires judge_target")
+        if self.concurrency < 1:
+            raise ValueError("arena concurrency must be at least 1")
+        if self.min_candidates < 1 or self.min_candidates > len(self.targets):
+            raise ValueError("arena min_candidates must be between 1 and target count")
+        if self.memoize_tools not in ARENA_MEMO_MODES:
+            raise ValueError(f"unknown arena memoize_tools mode {self.memoize_tools!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -367,9 +412,7 @@ class SpendPolicy:
             if value is not None and value < 0:
                 raise ValueError(f"{name} must not be negative; got {value!r}")
         if self.on_unknown not in ("allow", "refuse"):
-            raise ValueError(
-                f"on_unknown must be 'allow' or 'refuse'; got {self.on_unknown!r}"
-            )
+            raise ValueError(f"on_unknown must be 'allow' or 'refuse'; got {self.on_unknown!r}")
 
     @property
     def active(self) -> bool:
@@ -424,13 +467,10 @@ class RateLimits:
                 fraction outside the unit interval.
         """
         if self.max_concurrent is not None and self.max_concurrent < 1:
-            raise ValueError(
-                f"max_concurrent must be at least one; got {self.max_concurrent!r}"
-            )
+            raise ValueError(f"max_concurrent must be at least one; got {self.max_concurrent!r}")
         if self.requests_per_minute is not None and self.requests_per_minute <= 0:
             raise ValueError(
-                f"requests_per_minute must be greater than zero; "
-                f"got {self.requests_per_minute!r}"
+                f"requests_per_minute must be greater than zero; got {self.requests_per_minute!r}"
             )
         if self.min_interval_s < 0:
             raise ValueError(
@@ -465,6 +505,12 @@ DEFAULT_TIMEOUT_S = 120.0
 
 DEFAULT_MAX_RESPONSE_BYTES = 1_048_576
 """Cap on total streamed response bytes per attempt."""
+
+DEFAULT_MAX_INPUT_PART_BYTES = 20 * 1024 * 1024
+"""Maximum inline bytes in one multimodal content part."""
+
+DEFAULT_MAX_INPUT_BYTES = 50 * 1024 * 1024
+"""Maximum inline multimodal bytes across one generation request."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -502,6 +548,10 @@ class GenerationRequest:
             ``None`` — the default — means no placement at all, since caching changes what
             a provider bills. Carried on the request for the same codec reason as
             ``history``: an ``anyinfer_cache`` object on the wire decodes into this field.
+        arena: Per-request fixed fan-out policy, overriding the client's default. Adapters
+            never see it; the client runs and selects every candidate before projection.
+        context: Explicit caller-approved documents to reduce for the resolved target.
+            ``None`` preserves ordinary generation byte-for-byte.
     """
 
     messages: tuple[Message, ...]
@@ -512,11 +562,40 @@ class GenerationRequest:
     reasoning: ReasoningEffort | None = None
     timeout_s: float | None = None
     max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES
+    max_input_part_bytes: int = DEFAULT_MAX_INPUT_PART_BYTES
+    max_input_bytes: int = DEFAULT_MAX_INPUT_BYTES
     repair: Repair | None = None
     provider_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     metadata: Mapping[str, str] = field(default_factory=dict)
     history: HistoryPolicy | None = None
     cache: CachePolicy | None = None
+    arena: ArenaPolicy | None = None
+    context: ContextRequest | None = None
+
+    def __post_init__(self) -> None:
+        """Enforce multimodal request byte ceilings before any adapter can run."""
+        if self.max_input_part_bytes < 1 or self.max_input_bytes < 1:
+            raise ValueError("multimodal input byte ceilings must be positive")
+        total = 0
+        for message in self.messages:
+            for part in message.content:
+                data = (
+                    part.data if isinstance(part, ImagePart | DocumentPart | AudioPart) else None
+                )
+                if data is None:
+                    continue
+                size = len(data)
+                if size > self.max_input_part_bytes:
+                    raise ValueError(
+                        f"a multimodal part is {size} bytes; the per-part limit is "
+                        f"{self.max_input_part_bytes}"
+                    )
+                total += size
+        if total > self.max_input_bytes:
+            raise ValueError(
+                f"multimodal inputs total {total} bytes; the request limit is "
+                f"{self.max_input_bytes}"
+            )
 
     @property
     def effective_timeout_s(self) -> float:

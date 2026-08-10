@@ -7,6 +7,8 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - https://platform.openai.com/docs/api-reference/responses
 - https://platform.openai.com/docs/api-reference/models
 - https://platform.openai.com/docs/changelog
+- https://developers.openai.com/api/docs/guides/images-vision
+- https://developers.openai.com/api/docs/guides/file-inputs
 
 ## Wire contract
 ### Endpoints
@@ -21,6 +23,15 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   `max_output_tokens`, `temperature`, `top_p`,
   `reasoning: {"effort": <minimal|low|medium|high>}` (normalized effort translated here),
   `text.format` for structured output (json_schema), `tools`
+
+### Multimodal inputs
+Verified 2026-08-10 against the provider-owned image and file-input guides above.
+- Image input is an `input_image` content item with `image_url` set to an HTTPS URL or a
+  `data:<media-type>;base64,...` URL; `detail` is preserved when supplied.
+- Inline documents are `input_file` items with `filename` and a data URL in `file_data`;
+  remote documents use `file_url`.
+- Audio is projected as an `input_audio` item only for models that accept audio input.
+  Capability remains model-specific; the adapter does not claim all OpenAI models accept it.
 ### Prompt caching (placement)
 - Mechanism: **implicit**. Caching is applied automatically to a sufficiently long, stable
   prompt prefix; there is no field to send and AnyInfer sends none. The core's only duty is

@@ -16,14 +16,28 @@ The codec's four invariants are core obligations and are round-trip tested here:
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
+from .._context_wire import decode_context_request, encode_context_request
+from ..arena import arena_to_dict
 from ..types.events import StreamEvent, TextDelta, ToolCallDelta
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    ContentPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import (
+    ArenaPolicy,
     CachePolicy,
     GenerationRequest,
     HistoryPolicy,
@@ -34,7 +48,9 @@ from ..types.requests import (
 from ..types.results import FinishReason, Generation, Usage
 
 __all__ = [
+    "ARENA_FIELD",
     "CACHE_FIELD",
+    "CONTEXT_FIELD",
     "HISTORY_FIELD",
     "MANIFEST_FIELD",
     "OPENAI_FINISH_REASONS",
@@ -87,12 +103,34 @@ because a stock OpenAI client must get a byte-identical response — so absence 
 means absence of the key, on the non-streaming body and in the stream alike.
 """
 
+ARENA_FIELD = "anyinfer_arena"
+"""Per-request arena policy and result-side candidate evidence extension."""
+
+CONTEXT_FIELD = "anyinfer_context"
+"""Stateless caller-supplied corpus reduction request and content-free summary."""
+
 _RESERVED_FIELDS = frozenset(
     {
-        "model", "messages", "stream", "stream_options", "temperature", "top_p",
-        "max_tokens", "max_completion_tokens", "stop", "tools", "tool_choice",
-        "response_format", "metadata", "n", "user", HISTORY_FIELD, CACHE_FIELD,
+        "model",
+        "messages",
+        "stream",
+        "stream_options",
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "max_completion_tokens",
+        "stop",
+        "tools",
+        "tool_choice",
+        "response_format",
+        "metadata",
+        "n",
+        "user",
+        HISTORY_FIELD,
+        CACHE_FIELD,
         MANIFEST_FIELD,
+        ARENA_FIELD,
+        CONTEXT_FIELD,
     }
 )
 
@@ -140,10 +178,7 @@ def decode_messages(raw: Sequence[Mapping[str, Any]]) -> tuple[Message, ...]:
             )
             continue
 
-        parts: list[Text | ToolCall | ToolResult] = []
-        text = _as_text(entry.get("content"))
-        if text:
-            parts.append(Text(text))
+        parts: list[ContentPart] = list(_decode_content(entry.get("content")))
         for call in entry.get("tool_calls") or ():
             if not isinstance(call, Mapping):
                 continue
@@ -153,9 +188,7 @@ def decode_messages(raw: Sequence[Mapping[str, Any]]) -> tuple[Message, ...]:
             if isinstance(function, Mapping):
                 name = str(function.get("name", ""))
                 arguments = _parse_arguments(function.get("arguments"))
-            parts.append(
-                ToolCall(id=str(call.get("id", "")), name=name, arguments=arguments)
-            )
+            parts.append(ToolCall(id=str(call.get("id", "")), name=name, arguments=arguments))
         normalized_role = role if role in ("system", "user", "assistant") else "user"
         messages.append(Message(role=normalized_role, content=tuple(parts)))  # type: ignore[arg-type]
     return tuple(messages)
@@ -172,6 +205,82 @@ def _as_text(content: Any) -> str:
             if isinstance(part, Mapping) and part.get("type") == "text"
         )
     return ""
+
+
+def _decode_content(content: Any) -> tuple[ContentPart, ...]:
+    if isinstance(content, str):
+        return (Text(content),) if content else ()
+    if not isinstance(content, list):
+        return ()
+    parts: list[ContentPart] = []
+    for raw in content:
+        if not isinstance(raw, Mapping):
+            continue
+        kind = raw.get("type")
+        if kind == "text":
+            text = raw.get("text")
+            if isinstance(text, str) and text:
+                parts.append(Text(text))
+        elif kind == "image_url":
+            image = raw.get("image_url")
+            image = {"url": image} if isinstance(image, str) else image
+            if not isinstance(image, Mapping) or not isinstance(image.get("url"), str):
+                raise ValueError("image_url content requires image_url.url")
+            media_type, data, url = _decode_data_url(str(image["url"]))
+            detail = image.get("detail")
+            parts.append(
+                ImagePart(
+                    data=data,
+                    url=url,
+                    media_type=media_type or "image/png",
+                    detail=(detail if detail in ("auto", "low", "high") else None),
+                )
+            )
+        elif kind == "input_audio":
+            audio = raw.get("input_audio")
+            if not isinstance(audio, Mapping) or not isinstance(audio.get("data"), str):
+                raise ValueError("input_audio content requires base64 data")
+            fmt = str(audio.get("format", "wav")).lower()
+            media_type = {"wav": "audio/wav", "mp3": "audio/mpeg"}.get(fmt, f"audio/{fmt}")
+            parts.append(AudioPart(_decode_base64(str(audio["data"])), media_type))
+        elif kind == "file":
+            file = raw.get("file")
+            if not isinstance(file, Mapping):
+                raise ValueError("file content requires a file object")
+            source = file.get("file_data", file.get("file_url"))
+            if not isinstance(source, str):
+                raise ValueError("file content requires file_data or file_url")
+            media_type, data, url = _decode_data_url(source)
+            parts.append(
+                DocumentPart(
+                    data=data,
+                    url=url,
+                    media_type=media_type or "application/pdf",
+                    filename=(str(file["filename"]) if file.get("filename") is not None else None),
+                )
+            )
+    return tuple(parts)
+
+
+def _decode_data_url(value: str) -> tuple[str | None, bytes | None, str | None]:
+    if not value.startswith("data:"):
+        return None, None, value
+    header, separator, payload = value.partition(",")
+    if not separator or ";base64" not in header:
+        raise ValueError("inline multimodal content must use a base64 data URL")
+    media_type = header[5:].split(";", 1)[0]
+    return media_type, _decode_base64(payload), None
+
+
+def _decode_base64(value: str) -> bytes:
+    try:
+        return base64.b64decode(value, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise ValueError("multimodal content contains invalid base64 data") from exc
+
+
+def _data_url(media_type: str, data: bytes) -> str:
+    return f"data:{media_type};base64,{base64.b64encode(data).decode('ascii')}"
 
 
 def _parse_arguments(raw: Any) -> Mapping[str, Any]:
@@ -202,9 +311,7 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
     sampling = Sampling(
         temperature=_opt_float(body.get("temperature")),
         top_p=_opt_float(body.get("top_p")),
-        max_output_tokens=_opt_int(
-            body.get("max_completion_tokens", body.get("max_tokens"))
-        ),
+        max_output_tokens=_opt_int(body.get("max_completion_tokens", body.get("max_tokens"))),
         stop=_decode_stop(body.get("stop")),
     )
 
@@ -228,6 +335,8 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
         sampling=sampling,
         history=_decode_history(body.get(HISTORY_FIELD)),
         cache=_decode_cache(body.get(CACHE_FIELD)),
+        arena=_decode_arena(body.get(ARENA_FIELD)),
+        context=_decode_context(body.get(CONTEXT_FIELD)),
         provider_options=_decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
     )
@@ -265,6 +374,45 @@ def _decode_cache(raw: Any) -> CachePolicy | None:
         raise ValueError(f"{CACHE_FIELD} is invalid: {exc}") from exc
 
 
+def _decode_arena(raw: Any) -> ArenaPolicy | None:
+    """Decode the complete arena policy extension without applying it in the codec."""
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{ARENA_FIELD} must be an object")
+    known = {
+        "targets",
+        "strategy",
+        "judge_target",
+        "instructions",
+        "concurrency",
+        "min_candidates",
+        "reveal_targets",
+        "memoize_tools",
+    }
+    unknown = set(raw) - known
+    if unknown:
+        raise ValueError(f"{ARENA_FIELD} has unknown key(s): {', '.join(sorted(unknown))}")
+    targets = raw.get("targets")
+    if (
+        not isinstance(targets, list)
+        or not targets
+        or not all(isinstance(item, str) and item for item in targets)
+    ):
+        raise ValueError(f"{ARENA_FIELD}.targets must be a non-empty array of strings")
+    fields = dict(raw)
+    fields["targets"] = tuple(targets)
+    try:
+        return ArenaPolicy(**fields)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{ARENA_FIELD} is invalid: {exc}") from exc
+
+
+def _decode_context(raw: Any) -> Any:
+    """Decode the context extension; reduction remains in the core client."""
+    return decode_context_request(raw)
+
+
 def _decode_history(raw: Any) -> HistoryPolicy | None:
     """Decode the ``anyinfer_history`` extension into a typed policy.
 
@@ -287,9 +435,7 @@ def _decode_history(raw: Any) -> HistoryPolicy | None:
 
     unknown = set(raw) - {"enabled", "mode", "keep_recent", "keep_system"}
     if unknown:
-        raise ValueError(
-            f"{HISTORY_FIELD} has unknown key(s): {', '.join(sorted(unknown))}"
-        )
+        raise ValueError(f"{HISTORY_FIELD} has unknown key(s): {', '.join(sorted(unknown))}")
     fields: dict[str, Any] = {}
     for key in ("enabled", "keep_system"):
         if key in raw:
@@ -355,9 +501,7 @@ def _decode_passthrough(body: Mapping[str, Any]) -> Mapping[str, Mapping[str, An
     namespaced = extra.pop("provider_options", None)
     options: dict[str, Mapping[str, Any]] = {}
     if isinstance(namespaced, Mapping):
-        options.update(
-            {str(k): dict(v) for k, v in namespaced.items() if isinstance(v, Mapping)}
-        )
+        options.update({str(k): dict(v) for k, v in namespaced.items() if isinstance(v, Mapping)})
     if extra:
         options.setdefault("*", dict(extra))
     return options
@@ -389,8 +533,42 @@ def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
             )
             continue
 
-        text = "".join(p.text for p in message.content if isinstance(p, Text))
-        entry: dict[str, Any] = {"role": message.role, "content": text}
+        modal = any(isinstance(p, ImagePart | DocumentPart | AudioPart) for p in message.content)
+        if modal:
+            modal_content: list[dict[str, Any]] = []
+            for part in message.content:
+                if isinstance(part, Text):
+                    modal_content.append({"type": "text", "text": part.text})
+                elif isinstance(part, ImagePart):
+                    image_url = part.url or _data_url(part.media_type, part.data or b"")
+                    image: dict[str, Any] = {"url": image_url}
+                    if part.detail is not None:
+                        image["detail"] = part.detail
+                    modal_content.append({"type": "image_url", "image_url": image})
+                elif isinstance(part, DocumentPart):
+                    file: dict[str, Any] = {}
+                    if part.data is not None:
+                        file["file_data"] = _data_url(part.media_type, part.data)
+                    else:
+                        file["file_url"] = part.url
+                    if part.filename is not None:
+                        file["filename"] = part.filename
+                    modal_content.append({"type": "file", "file": file})
+                elif isinstance(part, AudioPart):
+                    fmt = "mp3" if part.media_type in ("audio/mp3", "audio/mpeg") else "wav"
+                    modal_content.append(
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": base64.b64encode(part.data).decode("ascii"),
+                                "format": fmt,
+                            },
+                        }
+                    )
+            content: str | list[dict[str, Any]] | None = modal_content
+        else:
+            content = "".join(p.text for p in message.content if isinstance(p, Text))
+        entry: dict[str, Any] = {"role": message.role, "content": content}
         calls = [p for p in message.content if isinstance(p, ToolCall)]
         if calls:
             entry["tool_calls"] = [
@@ -404,7 +582,7 @@ def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
                 }
                 for c in calls
             ]
-            if not text:
+            if not content:
                 entry["content"] = None
         encoded.append(entry)
     return encoded
@@ -460,6 +638,19 @@ def request_to_openai(
             "keep_recent": request.history.keep_recent,
             "keep_system": request.history.keep_system,
         }
+    if request.arena is not None:
+        body[ARENA_FIELD] = {
+            "targets": list(request.arena.targets),
+            "strategy": request.arena.strategy,
+            "judge_target": request.arena.judge_target,
+            "instructions": request.arena.instructions,
+            "concurrency": request.arena.concurrency,
+            "min_candidates": request.arena.min_candidates,
+            "reveal_targets": request.arena.reveal_targets,
+            "memoize_tools": request.arena.memoize_tools,
+        }
+    if request.context is not None:
+        body[CONTEXT_FIELD] = encode_context_request(request.context)
 
     if request.schema is not None:
         body["response_format"] = {
@@ -528,6 +719,10 @@ def completion_from_generation(
         body["usage"] = usage
     if include_manifest and result.manifest is not None:
         body[MANIFEST_FIELD] = result.manifest.to_dict()
+    if result.arena is not None:
+        body[ARENA_FIELD] = arena_to_dict(result.arena)
+    if result.context_reduction is not None:
+        body[CONTEXT_FIELD] = result.context_reduction.to_dict()
     return body
 
 
@@ -654,4 +849,22 @@ def final_chunk(
             "model": model,
             "choices": [],
             "usage": usage,
+        }
+    if result.arena is not None:
+        yield {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": stamp,
+            "model": model,
+            "choices": [],
+            ARENA_FIELD: arena_to_dict(result.arena),
+        }
+    if result.context_reduction is not None:
+        yield {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": stamp,
+            "model": model,
+            "choices": [],
+            CONTEXT_FIELD: result.context_reduction.to_dict(),
         }

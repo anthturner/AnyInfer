@@ -35,6 +35,8 @@ from ..capabilities.ledger import SpendLedger, SpendTotals
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import ProbeReport
 from ..catalog.model import Catalog
+from ..compare import TargetComparison
+from ..context_request import ContextRequest
 from ..credentials import ResolverChain
 from ..errors import ConfigError
 from ..events.observers import Observer
@@ -51,7 +53,9 @@ from ..session import Session
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
 from ..types.requests import (
+    ArenaPolicy,
     CachePolicy,
+    GenerationRequest,
     HistoryPolicy,
     ReasoningEffort,
     Repair,
@@ -86,9 +90,7 @@ class _LoopThread:
     def __init__(self) -> None:
         self.loop = asyncio.new_event_loop()
         self._ready = threading.Event()
-        self._thread = threading.Thread(
-            target=self._run, name="anyinfer-loop", daemon=True
-        )
+        self._thread = threading.Thread(target=self._run, name="anyinfer-loop", daemon=True)
         self._thread.start()
         self._ready.wait()
 
@@ -295,6 +297,8 @@ class Client:
         context_gate: bool = True,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        arenas: Mapping[str, ArenaPolicy] | None = None,
         spend: SpendPolicy | None = None,
         ledger: SpendLedger | None = None,
         pricing_table: PricingTable | None = None,
@@ -319,6 +323,8 @@ class Client:
                 context_gate=context_gate,
                 history=history,
                 cache=cache,
+                arena=arena,
+                arenas=arenas,
                 spend=spend,
                 ledger=ledger,
                 pricing_table=pricing_table,
@@ -414,9 +420,7 @@ class Client:
         """
         self._ensure_open()
         return self._loop.run(
-            self._async.pull_model(
-                provider_id, model, progress=progress, timeout_s=timeout_s
-            )
+            self._async.pull_model(provider_id, model, progress=progress, timeout_s=timeout_s)
         )
 
     def session(self, target: Target) -> Session:
@@ -549,9 +553,7 @@ class Client:
         """Find an acquired model on disk. See `AsyncClient.locate_model`."""
         self._ensure_open()
         return self._loop.run(
-            self._async.locate_model(
-                model_id, variant_id=variant_id, engine=engine, verify=verify
-            )
+            self._async.locate_model(model_id, variant_id=variant_id, engine=engine, verify=verify)
         )
 
     def remove_model(self, entry_id: str) -> RemovalReport:
@@ -589,6 +591,51 @@ class Client:
             output_reserve_tokens=output_reserve_tokens,
         )
 
+    def compare(
+        self,
+        messages: MessagesInput | GenerationRequest,
+        *,
+        targets: Sequence[Target],
+        schema: SchemaSpec | SupportsJSONSchema | Mapping[str, Any] | None = None,
+        tools: Sequence[ToolSpec] = (),
+        tool_choice: ToolChoice = "auto",
+        sampling: Sampling | None = None,
+        reasoning: ReasoningEffort | None = None,
+        timeout_s: float | None = None,
+        repair: Repair | None = None,
+        history: HistoryPolicy | None = None,
+        cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        context: ContextRequest | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        refresh: bool = False,
+    ) -> tuple[TargetComparison, ...]:
+        """Compare request portability without generating. See `AsyncClient.compare`."""
+        self._ensure_open()
+        return self._loop.run(
+            self._async.compare(
+                messages,
+                targets=targets,
+                schema=schema,
+                tools=tools,
+                tool_choice=tool_choice,
+                sampling=sampling,
+                reasoning=reasoning,
+                timeout_s=timeout_s,
+                repair=repair,
+                history=history,
+                cache=cache,
+                arena=arena,
+                context=context,
+                provider_options=provider_options,
+                metadata=metadata,
+                max_response_bytes=max_response_bytes,
+                refresh=refresh,
+            )
+        )
+
     # ---- generation ------------------------------------------------------------------
 
     def generate(
@@ -606,9 +653,13 @@ class Client:
         repair: Repair | None = None,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        context: ContextRequest | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        max_input_part_bytes: int | None = None,
+        max_input_bytes: int | None = None,
         session: Session | None = None,
         manifest: bool | None = None,
     ) -> Generation:
@@ -627,10 +678,14 @@ class Client:
                 timeout_s=timeout_s,
                 repair=repair,
                 history=history,
-            cache=cache,
+                cache=cache,
+                arena=arena,
+                context=context,
                 provider_options=provider_options,
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
+                max_input_part_bytes=max_input_part_bytes,
+                max_input_bytes=max_input_bytes,
                 session=session,
                 manifest=manifest,
             )
@@ -677,9 +732,13 @@ class Client:
         repair: Repair | None = None,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        context: ContextRequest | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        max_input_part_bytes: int | None = None,
+        max_input_bytes: int | None = None,
         session: Session | None = None,
         manifest: bool | None = None,
     ) -> SyncStream:
@@ -703,10 +762,14 @@ class Client:
                 timeout_s=timeout_s,
                 repair=repair,
                 history=history,
-            cache=cache,
+                cache=cache,
+                arena=arena,
+                context=context,
                 provider_options=provider_options,
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
+                max_input_part_bytes=max_input_part_bytes,
+                max_input_bytes=max_input_bytes,
                 session=session,
                 manifest=manifest,
             )

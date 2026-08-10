@@ -6,6 +6,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ## Upstream sources
 - https://github.com/ollama/ollama/blob/main/docs/api.md
 - https://github.com/ollama/ollama/releases
+- https://docs.ollama.com/api/chat
 
 ## Wire contract
 ### Endpoints
@@ -21,7 +22,9 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - `model`, `messages`, `stream`, `format` (JSON-schema object for grammar-enforced
   structured output, or `"json"`), `think` (bool or effort for reasoning models),
   `keep_alive` (session retention, e.g. `"10m"`), `options: {num_predict, temperature,
-  top_p, stop, num_ctx, num_gpu}`
+  top_p, stop, num_ctx, num_gpu}`. Verified 2026-08-10: vision-capable models accept
+  base64 image strings in `messages[].images`. The native chat API does not define URL,
+  document, or audio inputs, so those are refused before transport.
 ### Pull request/response fields
 - Request: `{"model": "<name>", "stream": true}`
 - Response: NDJSON lines carrying `status` (phase text), and per **layer**

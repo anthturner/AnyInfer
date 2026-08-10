@@ -109,6 +109,23 @@ No other workflow needs a secret: `ci.yml`, `release.yml`, and `pages.yml` run e
 on the automatic `GITHUB_TOKEN`. PyPI publishing needs no secret either — it uses OIDC,
 configured below.
 
+The scheduled pricing check itself also needs no provider credential. Its OpenRouter,
+Chutes, and Avian model-listing sources are public. Providers whose machine-readable prices
+require authentication are recorded as such in the coverage report and remain out of the
+Monday schedule. If a future checker admits one, it must be a separately named,
+manual-dispatch-only secret documented here; absence of that optional secret must never make
+the public scheduled checks fail.
+
+Maintainers can run one public probe locally without writing a fixture or changing the
+table:
+
+```console
+python scripts/check_pricing_drift.py --live-source avian-models
+```
+
+See [Cost and spending](../concepts/cost.md#how-bundled-prices-are-checked) for report
+formats, exit codes, and the direct-versus-secondary evidence rule.
+
 ## PyPI trusted publishing
 
 `release.yml`'s `publish-pypi` job uploads to PyPI without an API token. PyPI issues a

@@ -1,8 +1,7 @@
 """Message and content-part types.
 
 The conversation model is deliberately small: a `Message` is a role plus an ordered
-tuple of content parts. Multimodal parts are reserved for a future version; v1 models text,
-tool calls, and tool results only.
+tuple of typed text, tool, image, document, and audio input parts.
 """
 
 from __future__ import annotations
@@ -12,7 +11,10 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 __all__ = [
+    "AudioPart",
     "ContentPart",
+    "DocumentPart",
+    "ImagePart",
     "Message",
     "Role",
     "Text",
@@ -32,6 +34,57 @@ class Text:
     """A run of plain text within a message."""
 
     text: str
+
+
+@dataclass(frozen=True, slots=True)
+class ImagePart:
+    """An image supplied inline or by remote URL for a multimodal model."""
+
+    data: bytes | None = None
+    url: str | None = None
+    media_type: str = "image/png"
+    detail: Literal["auto", "low", "high"] | None = None
+
+    def __post_init__(self) -> None:
+        """Require exactly one source and an image media type."""
+        if (self.data is None) == (self.url is None):
+            raise ValueError("ImagePart requires exactly one of data or url")
+        if not self.media_type.startswith("image/"):
+            raise ValueError("ImagePart media_type must start with 'image/'")
+        if self.detail not in (None, "auto", "low", "high"):
+            raise ValueError("ImagePart detail must be auto, low, or high")
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentPart:
+    """A document supplied inline or by remote URL for a capable model."""
+
+    data: bytes | None = None
+    url: str | None = None
+    media_type: str = "application/pdf"
+    filename: str | None = None
+
+    def __post_init__(self) -> None:
+        """Require exactly one source and a non-empty media type."""
+        if (self.data is None) == (self.url is None):
+            raise ValueError("DocumentPart requires exactly one of data or url")
+        if not self.media_type:
+            raise ValueError("DocumentPart media_type must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class AudioPart:
+    """Inline audio input for a multimodal model."""
+
+    data: bytes
+    media_type: str = "audio/wav"
+
+    def __post_init__(self) -> None:
+        """Require bytes and an audio media type."""
+        if not isinstance(self.data, bytes) or not self.data:
+            raise ValueError("AudioPart data must be non-empty bytes")
+        if not self.media_type.startswith("audio/"):
+            raise ValueError("AudioPart media_type must start with 'audio/'")
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +119,7 @@ class ToolResult:
     is_error: bool = False
 
 
-ContentPart = Text | ToolCall | ToolResult
+ContentPart = Text | ToolCall | ToolResult | ImagePart | DocumentPart | AudioPart
 """A single piece of message content."""
 
 

@@ -92,16 +92,44 @@ The bundled pricing table (`src/anyinfer/capabilities/pricing.json`) is drift-ch
 its own automated track — the weekly `pricing-refresh` workflow — and does not need to be
 covered by a manual run of this procedure. For reference, its rules mirror this file's:
 
-- The deterministic tripwire is OpenRouter's public listing
-  (`scripts/check_pricing_drift.py`); the *authority* for any change is the provider's own
-  pricing page, verified by the workflow's web-search pass before a PR is proposed.
+- The deterministic tripwire (`scripts/check_pricing_drift.py`) has multiple sources.
+  Chutes and Avian use their provider-owned public model catalogs as direct evidence;
+  OpenRouter is a secondary signal for exact mapped OpenAI and Anthropic entries. Direct
+  evidence is stronger, but the *authority* for an edit remains the provider's current
+  human-readable pricing documentation, verified before a pull request is proposed.
+- A successful source response with an exact mapped model missing is drift. A timeout,
+  rate limit, HTTP failure, oversized response, malformed payload, or schema failure makes
+  the check incomplete. Incomplete checks publish a partial report and fail; they never
+  turn an outage into a clean result or a list of removed models.
+- Every provider in the bundled table has an explicit coverage posture in
+  `scripts/pricing_check.py`: direct, secondary, manual, authenticated, unrepresentable,
+  or deferred. Unchecked entries stay visible without guessing a rate or dimension.
 - Prices are keyed by provider **and** model — the same model on a different engine may
   cost differently, so a price is never copied across providers. Azure AI Foundry stays
   out of the table (region/deployment-specific; the Azure retail prices API,
   `https://prices.azure.com/api/retail/prices`, is the app-side source), and the Copilots
   stay out because they bill by subscription, not per token.
 - `last_verified` dates are real verification dates — the same never-fabricate rule as
-  contract snapshots. Entries that cannot be verified are left untouched, not refreshed.
+  contract snapshots. `checked_at` is when a report ran and `generated` is when the table
+  document was emitted; neither refreshes an entry. Entries that cannot be verified are
+  left untouched.
+
+### Admitting another pricing source
+
+A new deterministic source is admitted only when its implementation and review record all
+of the following: the provider-owned endpoint and authentication posture; a stable exact
+provider/model identity mapping; currency and price unit; every tier, region, cache,
+long-context, batch, and fee dimension that can change the rate; a bounded failure model;
+an exact-`Decimal` parser fixture; the coverage policy; and the provider-owned page that
+remains the authority for a proposed edit. A missing dimension is classified as
+unrepresentable, not approximated.
+
+Authenticated catalogs are opt-in and never required by the default weekly schedule.
+Bedrock and Vertex pricing remain unrepresentable until provider, model, region, tier, and
+all material price dimensions can be keyed without inventing a default region. Secondary
+catalog candidates likewise remain manual unless both exact identity and the complete rate
+shape are verified against provider-owned documentation; moving an authority URL alone
+never changes `last_verified`.
 
 ## Cadence and hygiene
 

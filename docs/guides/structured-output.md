@@ -36,7 +36,8 @@ except ai.SchemaViolationError as error:
         log.warning("  %s", message)
 ```
 
-You get both the raw output and the specific validation errors, so you can salvage the
+You get the bounded raw output, specific validation errors, and any delimiter-confirmed
+complete top-level members in `error.partial`, so your application can inspect the
 response or tighten the prompt.
 
 ## Pydantic models work

@@ -20,7 +20,15 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from ..types.capabilities import TokenCalibration
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import GenerationRequest
 
 __all__ = [
@@ -109,9 +117,7 @@ class HeuristicTokenEstimator:
     def estimate(self, text: str) -> TokenEstimate:
         """Estimate tokens as ``ceil(bytes/3)``, with a ``bytes//8`` floor."""
         byte_count = len(text.encode("utf-8"))
-        tokens = math.ceil(
-            math.ceil(byte_count / ESTIMATE_BYTES_PER_TOKEN) * self.multiplier
-        )
+        tokens = math.ceil(math.ceil(byte_count / ESTIMATE_BYTES_PER_TOKEN) * self.multiplier)
         return TokenEstimate(tokens, min(byte_count // FLOOR_BYTES_PER_TOKEN, tokens))
 
 
@@ -142,13 +148,12 @@ class RequestEstimate:
     tools: TokenEstimate
     schema: TokenEstimate
     envelope: TokenEstimate = TokenEstimate(0, 0)
+    unpriced_parts: int = 0
 
     @property
     def tokens(self) -> int:
         """Total planning estimate across all components."""
-        return (
-            self.messages.tokens + self.tools.tokens + self.schema.tokens + self.envelope.tokens
-        )
+        return self.messages.tokens + self.tools.tokens + self.schema.tokens + self.envelope.tokens
 
     @property
     def floor(self) -> int:
@@ -180,9 +185,13 @@ def estimate_request(
     counter = estimator or _DEFAULT_ESTIMATOR
 
     messages = TokenEstimate(0, 0)
+    unpriced_parts = 0
     for message in request.messages:
         estimate = counter.estimate(_message_text(message))
         messages += TokenEstimate(estimate.tokens + PER_MESSAGE_OVERHEAD_TOKENS, estimate.floor)
+        unpriced_parts += sum(
+            isinstance(part, ImagePart | DocumentPart | AudioPart) for part in message.content
+        )
 
     tools = TokenEstimate(0, 0)
     for tool in request.tools:
@@ -205,6 +214,7 @@ def estimate_request(
         tools=tools,
         schema=schema,
         envelope=_envelope(messages + tools + schema, calibration),
+        unpriced_parts=unpriced_parts,
     )
 
 

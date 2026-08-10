@@ -26,7 +26,10 @@ from .events import (
     is_content_event,
 )
 from .messages import (
+    AudioPart,
     ContentPart,
+    DocumentPart,
+    ImagePart,
     Message,
     Role,
     Text,
@@ -37,8 +40,11 @@ from .messages import (
     user,
 )
 from .requests import (
+    ARENA_MEMO_MODES,
+    ARENA_STRATEGIES,
     DEFAULT_MAX_RESPONSE_BYTES,
     DEFAULT_TIMEOUT_S,
+    ArenaPolicy,
     CacheMechanism,
     CacheMode,
     CachePolicy,
@@ -71,11 +77,15 @@ from .results import (
 )
 
 __all__ = [
+    "ARENA_MEMO_MODES",
+    "ARENA_STRATEGIES",
     "DEFAULT_MAX_RESPONSE_BYTES",
     "DEFAULT_TIMEOUT_S",
     "DETAIL_MAX_CHARS",
+    "ArenaPolicy",
     "AttemptFailed",
     "AttemptRecord",
+    "AudioPart",
     "CacheMechanism",
     "CacheMode",
     "CachePolicy",
@@ -83,6 +93,7 @@ __all__ = [
     "Diagnostic",
     "DiagnosticSeverity",
     "DiscoveredModel",
+    "DocumentPart",
     "ErrorInfo",
     "Feature",
     "FinishReason",
@@ -90,6 +101,7 @@ __all__ = [
     "GenerationRequest",
     "Health",
     "HistoryPolicy",
+    "ImagePart",
     "LocalModelInfo",
     "Mechanism",
     "Message",

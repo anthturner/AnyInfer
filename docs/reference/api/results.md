@@ -26,6 +26,60 @@ stream yields on the way there. Ordering guarantees are documented in
 
 ::: anyinfer.FinishReason
 
+::: anyinfer.ArenaResult
+
+::: anyinfer.Candidate
+
+::: anyinfer.TargetComparison
+
+::: anyinfer.RunManifest
+
+::: anyinfer.ContextSummary
+
+</div>
+
+## Run manifest facets
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.MANIFEST_FORMAT
+
+::: anyinfer.RequestFacet
+
+::: anyinfer.RouteFacet
+
+::: anyinfer.RouteStep
+
+::: anyinfer.CapabilityFacet
+
+::: anyinfer.SourcedFact
+
+::: anyinfer.AttemptFacet
+
+::: anyinfer.SchemaFacet
+
+::: anyinfer.MechanismRung
+
+::: anyinfer.CacheFacet
+
+::: anyinfer.ContextFacet
+
+::: anyinfer.ReductionRecord
+
+::: anyinfer.RepairRecord
+
+::: anyinfer.DroppedParameter
+
+::: anyinfer.UsageFacet
+
+::: anyinfer.TimingFacet
+
+::: anyinfer.PayloadFacet
+
+::: anyinfer.manifest_json_schema
+
+::: anyinfer.context.ContextSummary
+
 </div>
 
 ## Stream events

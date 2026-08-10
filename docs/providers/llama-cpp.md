@@ -13,6 +13,7 @@ every engine, crash isolation, and no GPU-wheel build matrix in the dependency t
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: structured output (grammar)</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: tool calls</span>
+<span class="anyinfer-badge anyinfer-badge-yes">:material-check: vision with projector</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: health</span>
 <span class="anyinfer-badge anyinfer-badge-no">:material-close: discovery</span>
 </div>
@@ -72,6 +73,18 @@ The typed form of this table, for programmatic construction:
 | Tools | Native, via `--jinja` |
 | Usage | Input and output tokens |
 | Cost | Free — a genuine zero, not an unknown |
+| Images | OpenAI-compatible image content when the artifact pins a projector |
+
+## Vision models and projector companions
+
+A vision artifact is two verified files: the model GGUF and its multimodal projector.
+AnyInfer counts both for fit and download admission, fetches both through the normal model
+store, starts `llama-server` with `--mmproj`, and advertises `VISION` with catalog
+provenance. The bundled Qwen2.5-VL entry includes its pinned projector.
+
+An image request against an artifact without a projector fails before generation instead
+of starting a text-only server that would ignore the image. Documents and audio are not
+projected through the llama.cpp adapter.
 
 ## Structured output
 

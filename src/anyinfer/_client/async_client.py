@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import contextvars
 import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
@@ -20,6 +21,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
+from .._usage import merge_usage
+from ..arena import ArenaResult, Candidate, candidate_envelope, select_candidates
 from ..benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
@@ -35,7 +38,7 @@ from ..capabilities.cache import CachePlan, plan_cache
 from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
 from ..capabilities.gating import check_context_fit
 from ..capabilities.ledger import SpendLedger, SpendTotals
-from ..capabilities.pricing import with_cost
+from ..capabilities.pricing import TRUSTED_PROVENANCE, with_cost
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import (
     DEFAULT_PROBE_FEATURES,
@@ -52,9 +55,13 @@ from ..capabilities.probes import (
 )
 from ..catalog.model import Catalog, TargetEntry
 from ..catalog.resolve import load_default_catalog, resolve_target
+from ..compare import TargetComparison
+from ..context.select import select as select_context
+from ..context_request import ContextRequest, ContextSummary
 from ..credentials import ResolverChain
 from ..errors import (
     AllTargetsFailedError,
+    AnyInferError,
     ConfigError,
     ContextLengthError,
     ProviderError,
@@ -64,9 +71,11 @@ from ..errors import (
     StreamProtocolError,
     ToolLoopError,
     TransportError,
+    UnsupportedInputError,
 )
 from ..events.observers import EventDispatcher, Observer
 from ..events.telemetry import (
+    ArenaCompleted,
     AttemptCompleted,
     AttemptStarted,
     CachePlanned,
@@ -90,13 +99,15 @@ from ..local.services import PULL_TIMEOUT_S, PullReport, PullRequest
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
-from ..manifest import ManifestBuilder, RunManifest
+from ..manifest import DroppedParameter, ManifestBuilder, RunManifest
 from ..providers.base import AdapterFinal, ProviderAdapter
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.attempts import AttemptBuffer
 from ..routing.health import HealthCache
 from ..routing.limits import AttemptPacing, RateLimiter
 from ..routing.policy import Retry, Route, backoff_delay
+from ..schema.mechanism import MechanismRung, choose_mechanism
+from ..schema.partial import partial_object
 from ..schema.repair import build_repair_messages
 from ..schema.validate import extract_json, validate
 from ..session import Session
@@ -118,8 +129,19 @@ from ..types.events import (
     UsageUpdate,
     is_content_event,
 )
-from ..types.messages import Message, user
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    system,
+    user,
+)
 from ..types.requests import (
+    DEFAULT_MAX_INPUT_BYTES,
+    DEFAULT_MAX_INPUT_PART_BYTES,
+    ArenaPolicy,
     CachePolicy,
     GenerationRequest,
     HistoryPolicy,
@@ -162,6 +184,7 @@ from .providers import AdapterPool, ProviderSettings
 from .tools import (
     DEFAULT_MAX_ROUNDS,
     Tool,
+    ToolMemo,
     ToolRegistry,
     build_tool_turn,
 )
@@ -172,6 +195,10 @@ __all__ = ["AsyncClient", "AsyncStream", "MessagesInput"]
 MessagesInput = str | Message | Sequence[Message]
 """What callers may pass as ``messages``: a bare prompt, one message, or a sequence."""
 
+_spend_prechecked: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "anyinfer_spend_prechecked", default=False
+)
+
 
 def _coerce_messages(value: MessagesInput) -> tuple[Message, ...]:
     """Normalize the accepted message spellings into a tuple."""
@@ -180,6 +207,14 @@ def _coerce_messages(value: MessagesInput) -> tuple[Message, ...]:
     if isinstance(value, Message):
         return (value,)
     return tuple(value)
+
+
+def _last_user_text(request: GenerationRequest) -> str:
+    """The last user message's visible text, used only as a context-ranking query."""
+    for message in reversed(request.messages):
+        if message.role == "user":
+            return "".join(part.text for part in message.content if isinstance(part, Text))
+    return ""
 
 
 class _ContentPolicyRedirect(Exception):  # noqa: N818 — control flow, not a failure
@@ -268,6 +303,8 @@ class AsyncClient:
         context_gate: bool = True,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        arenas: Mapping[str, ArenaPolicy] | None = None,
         spend: SpendPolicy | None = None,
         ledger: SpendLedger | None = None,
         pricing_table: PricingTable | None = None,
@@ -301,6 +338,8 @@ class AsyncClient:
         self._context_gate = context_gate
         self._history = history
         self._cache = cache
+        self._arena = arena
+        self._arenas = dict(arenas or {})
         self._spend_policy = spend
         # A policy needs a running total to enforce a cumulative ceiling, so one is
         # created on demand; a caller who supplied their own keeps theirs.
@@ -582,8 +621,7 @@ class AsyncClient:
             raise ConfigError(
                 f"no probe can settle {names}",
                 hint=(
-                    "probeable features are "
-                    f"{', '.join(str(f.name) for f in PROBEABLE_FEATURES)}"
+                    f"probeable features are {', '.join(str(f.name) for f in PROBEABLE_FEATURES)}"
                 ),
             )
 
@@ -1025,9 +1063,13 @@ class AsyncClient:
         repair: Repair | None = None,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        context: ContextRequest | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        max_input_part_bytes: int | None = None,
+        max_input_bytes: int | None = None,
         session: Session | None = None,
         manifest: bool | None = None,
     ) -> Generation:
@@ -1054,18 +1096,38 @@ class AsyncClient:
             repair=repair,
             history=history,
             cache=cache,
+            arena=arena,
+            context=context,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
+            max_input_part_bytes=max_input_part_bytes,
+            max_input_bytes=max_input_bytes,
         )
+        arena_policy = self._effective_arena(arena, target, route)
+        if arena_policy is not None:
+            return await self._run_arena(request, arena_policy, manifest=manifest)
         resolved_route = self._resolve_route(target, route, session)
-        request_id, builder = self._new_run(request, resolved_route, manifest)
+        return await self._generate_request(
+            request, resolved_route, session=session, manifest=manifest
+        )
+
+    async def _generate_request(
+        self,
+        request: GenerationRequest,
+        route: Route,
+        *,
+        session: Session | None = None,
+        manifest: bool | None = None,
+    ) -> Generation:
+        """Run one ordinary route; arena branches reuse this exact path."""
+        request_id, builder = self._new_run(request, route, manifest)
         # Closed explicitly: returning out of `async for` abandons the generator, and its
         # cleanup — which is what unregisters the run — would then wait for a collection.
         async with contextlib.aclosing(
             self._routed_stream(
                 request,
-                resolved_route,
+                route,
                 stream=False,
                 session=session,
                 request_id=request_id,
@@ -1092,9 +1154,13 @@ class AsyncClient:
         repair: Repair | None = None,
         history: HistoryPolicy | None = None,
         cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        context: ContextRequest | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
+        max_input_part_bytes: int | None = None,
+        max_input_bytes: int | None = None,
         session: Session | None = None,
         manifest: bool | None = None,
     ) -> AsyncStream:
@@ -1119,10 +1185,17 @@ class AsyncClient:
             repair=repair,
             history=history,
             cache=cache,
+            arena=arena,
+            context=context,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
+            max_input_part_bytes=max_input_part_bytes,
+            max_input_bytes=max_input_bytes,
         )
+        arena_policy = self._effective_arena(arena, target, route)
+        if arena_policy is not None:
+            return AsyncStream(self._arena_stream(request, arena_policy), builder=None)
         resolved_route = self._resolve_route(target, route, session)
         request_id, builder = self._new_run(request, resolved_route, manifest)
         return AsyncStream(
@@ -1136,6 +1209,287 @@ class AsyncClient:
             ),
             builder=builder,
         )
+
+    def _effective_arena(
+        self,
+        arena: ArenaPolicy | None,
+        target: Target | None,
+        route: Route | Target | Sequence[Target] | None,
+    ) -> ArenaPolicy | None:
+        """Resolve request, named, then client-default arena policy without routing."""
+        if arena is not None:
+            return arena
+        if route is None and isinstance(target, str) and target in self._arenas:
+            return self._arenas[target]
+        if target is None and route is None:
+            return self._arena
+        return None
+
+    async def _arena_stream(
+        self, request: GenerationRequest, policy: ArenaPolicy
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """Buffer arena branches, then expose only the selected answer as one stream."""
+        result = await self._run_arena(request, policy)
+        if result.text:
+            yield TextDelta(result.text)
+        yield StreamEnded(result)
+
+    async def _run_arena(
+        self,
+        request: GenerationRequest,
+        policy: ArenaPolicy,
+        *,
+        manifest: bool | None = None,
+        spend_multiplier: int = 1,
+    ) -> Generation:
+        """Fan out fixed independent routes, then select after every branch completes."""
+        arena_id = uuid.uuid4().hex
+        self._reserve_arena_spend(arena_id, request, policy, candidate_multiplier=spend_multiplier)
+        semaphore = asyncio.Semaphore(policy.concurrency)
+        branch_request = replace(request, arena=None)
+
+        async def candidate(target: str) -> tuple[Candidate, tuple[AttemptRecord, ...]]:
+            started = time.monotonic()
+            try:
+                resolved = self.resolve(target)
+            except (AnyInferError, ValueError) as exc:
+                error = exc if isinstance(exc, AnyInferError) else ConfigError(str(exc))
+                return (
+                    Candidate(
+                        ResolvedTarget("unresolved", target),
+                        error=error.snapshot(),
+                        elapsed_ms=(time.monotonic() - started) * 1000.0,
+                    ),
+                    (),
+                )
+            try:
+                async with semaphore:
+                    token = _spend_prechecked.set(True)
+                    try:
+                        generation = await self._generate_request(
+                            branch_request,
+                            Route(targets=(target,)),
+                            manifest=manifest,
+                        )
+                    finally:
+                        _spend_prechecked.reset(token)
+                return (
+                    Candidate(
+                        resolved,
+                        generation=generation,
+                        valid=(generation.structured is not None)
+                        if request.schema is not None
+                        else None,
+                        elapsed_ms=(time.monotonic() - started) * 1000.0,
+                    ),
+                    generation.attempts,
+                )
+            except AnyInferError as exc:
+                attempts = exc.attempts if isinstance(exc, AllTargetsFailedError) else ()
+                return (
+                    Candidate(
+                        resolved,
+                        error=exc.snapshot(),
+                        valid=False if request.schema is not None else None,
+                        elapsed_ms=(time.monotonic() - started) * 1000.0,
+                    ),
+                    attempts,
+                )
+
+        try:
+            rows = await asyncio.gather(*(candidate(target) for target in policy.targets))
+            candidates = tuple(row[0] for row in rows)
+            successful = tuple(item for item in candidates if item.generation is not None)
+            if len(successful) < policy.min_candidates:
+                attempts = tuple(attempt for row in rows for attempt in row[1])
+                raise AllTargetsFailedError(
+                    f"arena produced {len(successful)} candidates; "
+                    f"{policy.min_candidates} required",
+                    attempts=attempts,
+                    hint="fix a failed target or lower arena min_candidates",
+                )
+
+            winner, strategy, agreement, degradation = select_candidates(
+                candidates, policy, has_schema=request.schema is not None
+            )
+            calls = len(policy.targets)
+            judge_generation: Generation | None = None
+            if policy.strategy in ("judge", "synthesize"):
+                judge_generation, judged_winner, judge_reason = await self._arena_verdict(
+                    request, policy, candidates
+                )
+                calls += 1
+                if policy.strategy == "judge" and judged_winner is not None:
+                    winner = judged_winner
+                    strategy = "judge"
+                    degradation = None
+                elif policy.strategy == "synthesize" and judge_generation is not None:
+                    strategy = "synthesize"
+                    degradation = None
+                else:
+                    degradation = judge_reason or "the arena verdict could not be applied"
+
+            if winner is None or winner.generation is None:
+                raise AllTargetsFailedError("arena had no selectable candidate")
+            if degradation:
+                self._emit(
+                    ParameterDropped(
+                        arena_id,
+                        winner.target,
+                        "arena.strategy",
+                        degradation,
+                    )
+                )
+
+            complete = len(successful) == len(candidates)
+            usages = [item.generation.usage for item in successful if item.generation is not None]
+            if judge_generation is not None:
+                usages.append(judge_generation.usage)
+            aggregate = merge_usage(usages) if complete else Usage()
+            arena_result = ArenaResult(
+                candidates=candidates,
+                winner=winner,
+                strategy=strategy,
+                agreement=agreement,
+                synthesized=(judge_generation if policy.strategy == "synthesize" else None),
+                calls=calls,
+                usage=aggregate,
+                usage_complete=complete,
+            )
+            promoted = (
+                judge_generation
+                if policy.strategy == "synthesize" and judge_generation is not None
+                else winner.generation
+            )
+            assert promoted is not None
+            self._emit(
+                ArenaCompleted(
+                    arena_id,
+                    len(candidates),
+                    arena_result.strategy,
+                    arena_result.agreement,
+                    arena_result.calls,
+                    arena_result.memoized_tool_calls,
+                    arena_result.synthesized is not None,
+                )
+            )
+            return replace(promoted, arena=arena_result)
+        finally:
+            if self._ledger is not None:
+                self._ledger.release(arena_id)
+
+    async def _arena_verdict(
+        self,
+        request: GenerationRequest,
+        policy: ArenaPolicy,
+        candidates: tuple[Candidate, ...],
+    ) -> tuple[Generation | None, Candidate | None, str | None]:
+        """Run the one bounded judge or synthesis call and interpret its result."""
+        default = (
+            "Choose the strongest candidate. Return its one-based index and a brief reason."
+            if policy.strategy == "judge"
+            else "Synthesize one accurate answer from the candidates."
+        )
+        envelope = candidate_envelope(candidates, reveal_targets=policy.reveal_targets)
+        prompt = f"{policy.instructions or default}\n\n{envelope}"
+        schema: Mapping[str, Any] | SchemaSpec | None
+        if policy.strategy == "judge":
+            schema = {
+                "type": "object",
+                "properties": {
+                    "pick": {"type": "integer", "minimum": 1},
+                    "why": {"type": "string"},
+                },
+                "required": ["pick", "why"],
+                "additionalProperties": False,
+            }
+        else:
+            schema = request.schema
+        judge_request = replace(
+            request,
+            messages=(user(prompt),),
+            schema=SchemaSpec.coerce(schema) if schema is not None else None,
+            tools=(),
+            tool_choice="none",
+            arena=None,
+        )
+        token = _spend_prechecked.set(True)
+        try:
+            generation = await self._generate_request(
+                judge_request, Route(targets=(str(policy.judge_target),))
+            )
+        except AnyInferError as exc:
+            return None, None, f"arena {policy.strategy} call failed: {exc.detail}"
+        finally:
+            _spend_prechecked.reset(token)
+        if policy.strategy == "synthesize":
+            return generation, None, None
+        structured = generation.structured
+        pick = structured.get("pick") if isinstance(structured, Mapping) else None
+        if isinstance(pick, int) and 1 <= pick <= len(candidates):
+            selected = candidates[pick - 1]
+            if selected.generation is not None:
+                return generation, selected, None
+        return generation, None, "arena judge returned an unusable candidate index"
+
+    def _reserve_arena_spend(
+        self,
+        arena_id: str,
+        request: GenerationRequest,
+        policy: ArenaPolicy,
+        *,
+        candidate_multiplier: int,
+    ) -> None:
+        """Reserve the summed high estimate before any arena branch dispatches."""
+        spend = self._spend_policy
+        if spend is None or not spend.active:
+            return
+        total = Decimal(0)
+        unknown: list[str] = []
+        weighted = [(target, candidate_multiplier) for target in policy.targets]
+        if policy.judge_target is not None:
+            weighted.append((policy.judge_target, 1))
+        for target, multiplier in weighted:
+            try:
+                resolved = self.resolve(target)
+                descriptor = self._pool.descriptor_for(resolved.provider_id)
+                capabilities = self._capabilities_for(descriptor, resolved)
+                estimate = self._estimate_request_cost(request, capabilities)
+            except (AnyInferError, ValueError):
+                estimate = None
+            if estimate is None:
+                unknown.append(str(target))
+            else:
+                total += estimate * multiplier
+        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
+        if unknown and spend.on_unknown == "refuse":
+            raise SpendLimitError(
+                f"the summed cost of this {len(policy.targets)}-candidate arena cannot "
+                f"be estimated because pricing is unknown for {', '.join(unknown)}",
+                limit_usd=spend.max_request_usd or spend.max_total_usd,
+                spent_usd=spent,
+                hint="supply trusted pricing or set spend on_unknown='allow'",
+            )
+        if spend.max_request_usd is not None and total > spend.max_request_usd:
+            raise SpendLimitError(
+                f"the summed estimate {total} for {len(policy.targets)} arena candidates "
+                f"exceeds the per-request ceiling {spend.max_request_usd}",
+                limit_usd=spend.max_request_usd,
+                spent_usd=spent,
+                estimated_usd=total,
+            )
+        if spend.max_total_usd is not None:
+            assert self._ledger is not None
+            accepted, spent, reserved = self._ledger.reserve(arena_id, total, spend.max_total_usd)
+            if not accepted:
+                raise SpendLimitError(
+                    f"this client has spent {spent}, reserved {reserved}, and this "
+                    f"{len(policy.targets)}-candidate arena could cost {total}, above "
+                    f"the total ceiling {spend.max_total_usd}",
+                    limit_usd=spend.max_total_usd,
+                    spent_usd=spent,
+                    estimated_usd=total,
+                )
 
     def _new_run(
         self, request: GenerationRequest, route: Route, manifest: bool | None
@@ -1192,6 +1546,16 @@ class AsyncClient:
             anyinfer.errors.ToolLoopError: If the model calls an unknown tool, or the round
                 budget is exhausted.
         """
+        arena_arg = kwargs.pop("arena", None)
+        policy = self._effective_arena(arena_arg, target, route)
+        if policy is not None:
+            return await self._run_tools_arena(
+                messages,
+                tools=tools,
+                policy=policy,
+                max_rounds=max_rounds,
+                kwargs=kwargs,
+            )
         registry = ToolRegistry(list(tools))
         conversation: list[Message] = list(_coerce_messages(messages))
 
@@ -1214,6 +1578,162 @@ class AsyncClient:
             hint="raise max_rounds, or simplify the tools so the model converges",
         )
 
+    async def _run_tools_arena(
+        self,
+        messages: MessagesInput,
+        *,
+        tools: Sequence[Tool | Any],
+        policy: ArenaPolicy,
+        max_rounds: int,
+        kwargs: Mapping[str, Any],
+    ) -> Generation:
+        """Run one isolated tool conversation per arena candidate."""
+        template_registry = ToolRegistry(list(tools))
+        base_request = self._build_request(
+            messages,
+            schema=kwargs.get("schema"),
+            tools=template_registry.specs,
+            tool_choice=kwargs.get("tool_choice", "auto"),
+            sampling=kwargs.get("sampling"),
+            reasoning=kwargs.get("reasoning"),
+            timeout_s=kwargs.get("timeout_s"),
+            repair=kwargs.get("repair"),
+            history=kwargs.get("history"),
+            cache=kwargs.get("cache"),
+            provider_options=kwargs.get("provider_options"),
+            metadata=kwargs.get("metadata"),
+            max_response_bytes=kwargs.get("max_response_bytes"),
+            arena=policy,
+        )
+        arena_id = uuid.uuid4().hex
+        self._reserve_arena_spend(arena_id, base_request, policy, candidate_multiplier=max_rounds)
+        memo = ToolMemo()
+        semaphore = asyncio.Semaphore(policy.concurrency)
+
+        async def branch(target: str) -> Candidate:
+            started = time.monotonic()
+            try:
+                resolved = self.resolve(target)
+            except (AnyInferError, ValueError) as exc:
+                error = exc if isinstance(exc, AnyInferError) else ConfigError(str(exc))
+                return Candidate(
+                    ResolvedTarget("unresolved", target),
+                    error=error.snapshot(),
+                    rounds=0,
+                    elapsed_ms=(time.monotonic() - started) * 1000.0,
+                )
+            registry = ToolRegistry(list(tools), memo=memo, memo_mode=policy.memoize_tools)
+            conversation = list(_coerce_messages(messages))
+            rounds = 0
+            try:
+                async with semaphore:
+                    token = _spend_prechecked.set(True)
+                    try:
+                        for rounds in range(1, max_rounds + 1):
+                            result = await self.generate(
+                                conversation,
+                                target=target,
+                                tools=registry.specs,
+                                arena=None,
+                                **dict(kwargs),
+                            )
+                            if result.finish_reason != "tool_calls" or not result.tool_calls:
+                                return Candidate(
+                                    resolved,
+                                    generation=result,
+                                    valid=(result.structured is not None)
+                                    if base_request.schema is not None
+                                    else None,
+                                    elapsed_ms=(time.monotonic() - started) * 1000.0,
+                                    rounds=rounds,
+                                    tool_calls=registry.dispatched,
+                                )
+                            outputs = [await registry.dispatch(call) for call in result.tool_calls]
+                            conversation.extend(build_tool_turn(result.tool_calls, outputs))
+                    finally:
+                        _spend_prechecked.reset(token)
+                raise ToolLoopError(
+                    f"the tool loop ran {max_rounds} rounds without a final answer"
+                )
+            except AnyInferError as exc:
+                return Candidate(
+                    resolved,
+                    error=exc.snapshot(),
+                    valid=False if base_request.schema is not None else None,
+                    elapsed_ms=(time.monotonic() - started) * 1000.0,
+                    rounds=rounds,
+                    tool_calls=registry.dispatched,
+                )
+
+        try:
+            candidates = tuple(
+                await asyncio.gather(*(branch(target) for target in policy.targets))
+            )
+            successful = tuple(item for item in candidates if item.generation is not None)
+            if len(successful) < policy.min_candidates:
+                raise AllTargetsFailedError(
+                    f"arena produced {len(successful)} completed tool loops; "
+                    f"{policy.min_candidates} required"
+                )
+            winner, strategy, agreement, degradation = select_candidates(
+                candidates, policy, has_schema=base_request.schema is not None
+            )
+            calls = sum(item.rounds or 0 for item in candidates)
+            verdict: Generation | None = None
+            if policy.strategy in ("judge", "synthesize"):
+                verdict, selected, reason = await self._arena_verdict(
+                    base_request, policy, candidates
+                )
+                calls += 1
+                if policy.strategy == "judge" and selected is not None:
+                    winner, strategy, degradation = selected, "judge", None
+                elif policy.strategy == "synthesize" and verdict is not None:
+                    strategy, degradation = "synthesize", None
+                else:
+                    degradation = reason or "the arena verdict could not be applied"
+            if winner is None or winner.generation is None:
+                raise AllTargetsFailedError("arena had no selectable completed tool loop")
+            if degradation:
+                self._emit(
+                    ParameterDropped(arena_id, winner.target, "arena.strategy", degradation)
+                )
+            complete = len(successful) == len(candidates)
+            usages = [item.generation.usage for item in successful if item.generation is not None]
+            if verdict is not None:
+                usages.append(verdict.usage)
+            arena_result = ArenaResult(
+                candidates=candidates,
+                winner=winner,
+                strategy=strategy,
+                agreement=agreement,
+                synthesized=verdict if policy.strategy == "synthesize" else None,
+                calls=calls,
+                memoized_tool_calls=memo.hits,
+                usage=merge_usage(usages) if complete else Usage(),
+                usage_complete=complete,
+            )
+            promoted = (
+                verdict
+                if policy.strategy == "synthesize" and verdict is not None
+                else winner.generation
+            )
+            assert promoted is not None
+            self._emit(
+                ArenaCompleted(
+                    arena_id,
+                    len(candidates),
+                    strategy,
+                    agreement,
+                    calls,
+                    memo.hits,
+                    verdict is not None and policy.strategy == "synthesize",
+                )
+            )
+            return replace(promoted, arena=arena_result)
+        finally:
+            if self._ledger is not None:
+                self._ledger.release(arena_id)
+
     def _build_request(
         self,
         messages: MessagesInput,
@@ -1230,6 +1750,10 @@ class AsyncClient:
         provider_options: Mapping[str, Mapping[str, Any]] | None,
         metadata: Mapping[str, str] | None,
         max_response_bytes: int | None,
+        max_input_part_bytes: int | None = None,
+        max_input_bytes: int | None = None,
+        arena: ArenaPolicy | None = None,
+        context: ContextRequest | None = None,
     ) -> GenerationRequest:
         spec = SchemaSpec.coerce(schema) if schema is not None else None
         request = GenerationRequest(
@@ -1243,8 +1767,18 @@ class AsyncClient:
             repair=repair or self._default_repair,
             history=history,
             cache=cache,
+            arena=arena,
+            context=context,
             provider_options=dict(provider_options or {}),
             metadata=dict(metadata or {}),
+            max_input_part_bytes=(
+                DEFAULT_MAX_INPUT_PART_BYTES
+                if max_input_part_bytes is None
+                else max_input_part_bytes
+            ),
+            max_input_bytes=(
+                DEFAULT_MAX_INPUT_BYTES if max_input_bytes is None else max_input_bytes
+            ),
         )
         if max_response_bytes is not None:
             # None means "use the dataclass default cap", so it cannot be passed through.
@@ -1319,6 +1853,192 @@ class AsyncClient:
             output_reserve_tokens=output_reserve_tokens,
         )
 
+    async def compare(
+        self,
+        messages: MessagesInput | GenerationRequest,
+        *,
+        targets: Sequence[Target],
+        schema: SchemaSpec | SupportsJSONSchema | Mapping[str, Any] | None = None,
+        tools: Sequence[ToolSpec] = (),
+        tool_choice: ToolChoice = "auto",
+        sampling: Sampling | None = None,
+        reasoning: ReasoningEffort | None = None,
+        timeout_s: float | None = None,
+        repair: Repair | None = None,
+        history: HistoryPolicy | None = None,
+        cache: CachePolicy | None = None,
+        arena: ArenaPolicy | None = None,
+        context: ContextRequest | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        refresh: bool = False,
+    ) -> tuple[TargetComparison, ...]:
+        """Compare how one request would behave across targets without generating.
+
+        Results preserve caller order and are never ranked or consumed by routing. With
+        ``refresh=False`` (the default), no adapter is constructed and no network is
+        touched. ``refresh=True`` may list models to refresh discovered capabilities.
+        """
+        request = (
+            messages
+            if isinstance(messages, GenerationRequest)
+            else self._build_request(
+                messages,
+                schema=schema,
+                tools=tools,
+                tool_choice=tool_choice,
+                sampling=sampling,
+                reasoning=reasoning,
+                timeout_s=timeout_s,
+                repair=repair,
+                history=history,
+                cache=cache,
+                arena=arena,
+                context=context,
+                provider_options=provider_options,
+                metadata=metadata,
+                max_response_bytes=max_response_bytes,
+            )
+        )
+
+        resolved_items: list[tuple[str, ResolvedTarget | None, str]] = []
+        refresh_ids: list[str] = []
+        for requested in targets:
+            spelling = str(requested)
+            try:
+                resolved = self.resolve(requested)
+                reason = self._pool.configuration_reason(resolved.provider_id) or ""
+            except (ConfigError, ValueError) as exc:
+                resolved_items.append((spelling, None, str(exc)))
+                continue
+            resolved_items.append((spelling, resolved, reason))
+            if refresh and not reason and resolved.provider_id not in refresh_ids:
+                refresh_ids.append(resolved.provider_id)
+
+        refresh_errors: dict[str, str] = {}
+        for provider_id in refresh_ids:
+            try:
+                await self.models(provider_id)
+            except Exception as exc:  # noqa: BLE001 — failure is comparison data
+                refresh_errors[provider_id] = str(exc)
+
+        results: list[TargetComparison] = []
+        policy = request.cache if request.cache is not None else self._cache
+        for requested, item_resolved, reason in resolved_items:
+            if item_resolved is None or reason:
+                results.append(
+                    TargetComparison(
+                        requested=requested,
+                        resolved=item_resolved,
+                        resolvable=False,
+                        reason=reason or "target could not be resolved",
+                    )
+                )
+                continue
+            resolved = item_resolved
+            if resolved.provider_id in refresh_errors:
+                results.append(
+                    TargetComparison(
+                        requested=requested,
+                        resolved=resolved,
+                        resolvable=False,
+                        reason=(
+                            "capability refresh failed: " + refresh_errors[resolved.provider_id]
+                        ),
+                    )
+                )
+                continue
+            listed = self._capabilities.discovered_has_model(resolved.provider_id, resolved.model)
+            if listed is False:
+                results.append(
+                    TargetComparison(
+                        requested=requested,
+                        resolved=resolved,
+                        resolvable=False,
+                        reason=(
+                            f"model {resolved.model!r} was absent from the provider's "
+                            "completed model listing"
+                        ),
+                    )
+                )
+                continue
+
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+            capabilities = self._capabilities_for(descriptor, resolved)
+            target_request = request
+            if request.context is not None:
+                try:
+                    target_request, _ = self._apply_context_request(
+                        request,
+                        capabilities=capabilities,
+                        calibration=descriptor.token_calibration,
+                        builder=None,
+                        emit=False,
+                    )
+                except ConfigError as exc:
+                    results.append(
+                        TargetComparison(
+                            requested=requested,
+                            resolved=resolved,
+                            resolvable=True,
+                            reason=str(exc),
+                        )
+                    )
+                    continue
+            budget = build_context_budget(
+                target_request,
+                capabilities,
+                estimator=self._estimator,
+                calibration=descriptor.token_calibration,
+            )
+            trusted_window = (
+                budget.context_window is not None
+                and budget.context_window.provenance in TRUSTED_PROVENANCE
+            )
+            fits = budget.fits if trusted_window else None
+            mechanism = None
+            rungs: tuple[MechanismRung, ...] = ()
+            if target_request.schema is not None:
+                decision = choose_mechanism(capabilities, with_trail=True)
+                mechanism, rungs = decision
+            drops = tuple(
+                DroppedParameter(str(resolved), parameter, why)
+                for parameter, why in dropped_parameters(target_request, descriptor, capabilities)
+            )
+            cache_plan = (
+                plan_cache(target_request, policy, capabilities, descriptor, self._estimator)
+                if policy is not None and policy.active
+                else None
+            )
+            provenance = {
+                name: sourced.provenance
+                for name, sourced in (
+                    ("context_window", capabilities.context_window),
+                    ("max_output_tokens", capabilities.max_output_tokens),
+                    ("features", capabilities.features),
+                    ("pricing", capabilities.pricing),
+                    ("default_temperature", capabilities.default_temperature),
+                    ("default_top_p", capabilities.default_top_p),
+                )
+                if sourced is not None
+            }
+            results.append(
+                TargetComparison(
+                    requested=requested,
+                    resolved=resolved,
+                    fits=fits,
+                    budget=budget,
+                    structured_mechanism=mechanism,
+                    mechanism_rungs=rungs,
+                    dropped=drops,
+                    cache=cache_plan,
+                    cost=budget.estimated_cost,
+                    capability_provenance=provenance,
+                )
+            )
+        return tuple(results)
+
     def _capabilities_for(
         self, descriptor: ProviderDescriptor, resolved: ResolvedTarget
     ) -> ModelCapabilities:
@@ -1333,8 +2053,10 @@ class AsyncClient:
             resolved.model,
             locality=self._pool.locality_for(resolved.provider_id),
         )
-        if resolved.via_alias and self._catalog is not None and (
-            self._catalog.has_alias(resolved.via_alias)
+        if (
+            resolved.via_alias
+            and self._catalog is not None
+            and (self._catalog.has_alias(resolved.via_alias))
         ):
             entry = self._catalog.alias(resolved.via_alias).targets.get(resolved.provider_id)
             if entry is not None:
@@ -1383,8 +2105,12 @@ class AsyncClient:
             request_id, builder = self._new_run(request, route, None)
         try:
             async for event in self._route_events(
-                request, route, stream=stream, session=session,
-                request_id=request_id, builder=builder,
+                request,
+                route,
+                stream=stream,
+                session=session,
+                request_id=request_id,
+                builder=builder,
             ):
                 yield event
         finally:
@@ -1392,6 +2118,8 @@ class AsyncClient:
             # caller already holds; the registry must not, or an abandoned stream would
             # leak one entry per call.
             self._builders.pop(request_id, None)
+            if self._ledger is not None:
+                self._ledger.release(request_id)
 
     async def _route_events(
         self,
@@ -1429,9 +2157,7 @@ class AsyncClient:
         compacted = False
 
         def unvisited_content_chain() -> list[Target]:
-            return [
-                t for t in route.content_policy_targets if str(self.resolve(t)) not in visited
-            ]
+            return [t for t in route.content_policy_targets if str(self.resolve(t)) not in visited]
 
         while pending:
             target = pending.pop(0)
@@ -1450,6 +2176,16 @@ class AsyncClient:
             capabilities = self._capabilities_for(descriptor, resolved)
             if builder is not None:
                 builder.note_capabilities(resolved, capabilities)
+            try:
+                target_request, context_summary = self._apply_context_request(
+                    active,
+                    capabilities=capabilities,
+                    calibration=descriptor.token_calibration,
+                    builder=builder,
+                )
+            except ConfigError as error:
+                self._emit(RequestFailed(request_id, error.snapshot()))
+                raise
             redirected_now = False
 
             for attempt_number in range(1, route.retry.max_attempts + 1):
@@ -1459,7 +2195,7 @@ class AsyncClient:
 
                 try:
                     async for event in self._run_attempt(
-                        request=active,
+                        request=target_request,
                         resolved=resolved,
                         adapter=adapter,
                         descriptor=descriptor,
@@ -1470,6 +2206,7 @@ class AsyncClient:
                         attempts=attempts,
                         session=session,
                         builder=builder,
+                        context_summary=context_summary,
                         content_chain=(
                             unvisited_content_chain
                             if route.content_policy_targets and not content_redirected
@@ -1490,9 +2227,7 @@ class AsyncClient:
                     redirected_now = True
                     pending = list(redirect.chain)
                     self._emit(
-                        FallbackTriggered(
-                            request_id, from_target=resolved, to_target=pending[0]
-                        )
+                        FallbackTriggered(request_id, from_target=resolved, to_target=pending[0])
                     )
                     break
                 except ProviderError as error:
@@ -1674,6 +2409,65 @@ class AsyncClient:
             return contextlib.nullcontext()
         return limiter.slot()
 
+    def _apply_context_request(
+        self,
+        request: GenerationRequest,
+        *,
+        capabilities: ModelCapabilities,
+        calibration: TokenCalibration,
+        builder: ManifestBuilder | None,
+        emit: bool = True,
+    ) -> tuple[GenerationRequest, ContextSummary | None]:
+        """Reduce caller-approved documents for one resolved target before its gate."""
+        policy = request.context
+        if policy is None:
+            return request, None
+        max_tokens = policy.max_tokens
+        if max_tokens is None:
+            budget = build_context_budget(
+                request,
+                capabilities,
+                estimator=self._estimator,
+                calibration=calibration,
+            )
+            if (
+                budget.context_window is not None
+                and budget.context_window.provenance in TRUSTED_PROVENANCE
+            ):
+                max_tokens = budget.remaining_tokens
+        if max_tokens is None or max_tokens < 1:
+            raise ConfigError(
+                "the resolved target has no known remaining context budget for documents",
+                hint="set ContextRequest(max_tokens=...) explicitly, or choose a target "
+                "with a trusted context window",
+            )
+        query = policy.query if policy.query is not None else _last_user_text(request)
+        reduction = select_context(
+            policy.documents,
+            query,
+            max_tokens=max_tokens,
+            strategy=policy.strategy,
+            max_documents=policy.max_request_documents,
+            max_bytes=policy.max_request_bytes,
+            estimator=self._estimator,
+            tuning=policy.tuning,
+        )
+        if emit:
+            self._emit(reduction.event(), builder=builder)
+        envelope = system(reduction.text) if policy.placement == "system" else user(reduction.text)
+        messages = list(request.messages)
+        if policy.placement == "system":
+            messages.insert(0, envelope)
+        else:
+            index = 0
+            while index < len(messages) and messages[index].role == "system":
+                index += 1
+            messages.insert(index, envelope)
+        return (
+            replace(request, messages=tuple(messages), context=None),
+            ContextSummary.from_reduction(reduction),
+        )
+
     async def _run_attempt(
         self,
         *,
@@ -1688,6 +2482,7 @@ class AsyncClient:
         attempts: list[AttemptRecord],
         session: Session | None = None,
         builder: ManifestBuilder | None = None,
+        context_summary: ContextSummary | None = None,
         content_chain: Callable[[], list[Target]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run one attempt against one target, including the schema repair loop.
@@ -1716,7 +2511,8 @@ class AsyncClient:
 
         # Money is checked in the same place as size, and for the same reason: a refusal
         # that costs a round trip is a refusal that already spent something.
-        self._check_spend(request, resolved, capabilities)
+        self._check_multimodal(request, resolved, capabilities)
+        self._check_spend(request, resolved, capabilities, request_id=request_id)
 
         if self._context_gate:
             # A ContextLengthError raised here follows the exact path a provider-reported
@@ -1741,9 +2537,7 @@ class AsyncClient:
         repair_budget, repair_clamp_reason = _repair_budget(request, descriptor)
         if repair_clamp_reason is not None:
             self._emit(
-                ParameterDropped(
-                    request_id, resolved, "repair.max_attempts", repair_clamp_reason
-                )
+                ParameterDropped(request_id, resolved, "repair.max_attempts", repair_clamp_reason)
             )
         repair_attempts = 0
         yielded_content = False
@@ -1772,9 +2566,7 @@ class AsyncClient:
             )
             limiter = self._pool.limiter_for(resolved.provider_id)
             if repair_attempts == 0:
-                for parameter, reason in dropped_parameters(
-                    current, descriptor, capabilities
-                ):
+                for parameter, reason in dropped_parameters(current, descriptor, capabilities):
                     self._emit(ParameterDropped(request_id, resolved, parameter, reason))
                 if limiter is not None and limiter.unsupported_headers_reason:
                     self._emit(
@@ -1820,8 +2612,7 @@ class AsyncClient:
                 # no failure telemetry. Surface it as the typed, retryable transport
                 # failure it is instead.
                 raise TransportError(
-                    f"attempt against {resolved} timed out after "
-                    f"{current.effective_timeout_s:g}s",
+                    f"attempt against {resolved} timed out after {current.effective_timeout_s:g}s",
                     provider=resolved.provider_id,
                     phase="stream" if stream else "generate",
                     hint="raise timeout_s, or choose a faster model",
@@ -1859,9 +2650,7 @@ class AsyncClient:
                 chain = content_chain()
                 if chain:
                     attempts.append(
-                        AttemptRecord(
-                            resolved, "redirected", timing=active_buffer.build_timing()
-                        )
+                        AttemptRecord(resolved, "redirected", timing=active_buffer.build_timing())
                     )
                     raise _ContentPolicyRedirect(chain)
 
@@ -1887,10 +2676,14 @@ class AsyncClient:
                 continue
 
             if errors:
+                assert request.schema is not None
+                partial, missing = partial_object(active_buffer.text, request.schema.json_schema)
                 raise SchemaViolationError(
                     f"response did not match the required schema: {errors[0]}",
                     raw_text=active_buffer.text,
                     errors=errors,
+                    partial=partial,
+                    missing_required=missing,
                     provider=resolved.provider_id,
                     hint=(
                         "set repair=Repair(max_attempts=1) to let the model correct itself, "
@@ -1918,11 +2711,10 @@ class AsyncClient:
                 repair_attempts,
                 tuple(attempts),
                 timing,
+                context_summary,
             )
             self._emit(
-                AttemptCompleted(
-                    request_id, resolved, result.usage, timing, result.finish_reason
-                )
+                AttemptCompleted(request_id, resolved, result.usage, timing, result.finish_reason)
             )
             self._emit(
                 RequestCompleted(
@@ -1969,6 +2761,7 @@ class AsyncClient:
         repair_attempts: int,
         attempts: tuple[AttemptRecord, ...],
         timing: Timing,
+        context_summary: ContextSummary | None = None,
     ) -> Generation:
         """Build the final `Generation` from an attempt's buffers."""
         tool_calls = buffer.build_tool_calls()
@@ -1991,6 +2784,7 @@ class AsyncClient:
             attempts=attempts,
             warnings=tuple(buffer.warnings),
             raw=buffer.raw,
+            context_reduction=context_summary,
         )
 
     def _plan_cache(
@@ -2059,11 +2853,40 @@ class AsyncClient:
         )
         return plan
 
+    def _check_multimodal(
+        self,
+        request: GenerationRequest,
+        resolved: ResolvedTarget,
+        capabilities: ModelCapabilities,
+    ) -> None:
+        """Refuse only a trusted absence; unknown multimodal support stays unknown."""
+        required: set[Feature] = set()
+        for message in request.messages:
+            for part in message.content:
+                if isinstance(part, ImagePart):
+                    required.add(Feature.VISION)
+                elif isinstance(part, DocumentPart):
+                    required.add(Feature.DOCUMENT)
+                elif isinstance(part, AudioPart):
+                    required.add(Feature.AUDIO_IN)
+        if not required or capabilities.features.provenance not in TRUSTED_PROVENANCE:
+            return
+        missing = [feature for feature in required if feature not in capabilities.features.value]
+        if missing:
+            labels = ", ".join((feature.name or str(feature)).lower() for feature in missing)
+            raise UnsupportedInputError(
+                f"{resolved} does not support attached {labels} input",
+                provider=resolved.provider_id,
+                hint="choose a model whose capabilities include the required input modality",
+            )
+
     def _check_spend(
         self,
         request: GenerationRequest,
         resolved: ResolvedTarget,
         capabilities: ModelCapabilities | None,
+        *,
+        request_id: str,
     ) -> None:
         """Refuse a request that would cross this client's spending ceiling.
 
@@ -2075,6 +2898,8 @@ class AsyncClient:
             SpendLimitError: When a ceiling would be crossed, or when the cost cannot be
                 known and the policy says not to spend blind.
         """
+        if _spend_prechecked.get():
+            return
         policy = self._spend_policy
         if policy is None or not policy.active:
             return
@@ -2105,15 +2930,21 @@ class AsyncClient:
                 hint="shorten the prompt, cap max_output_tokens, or raise max_request_usd",
             )
 
-        if policy.max_total_usd is not None and spent + estimate > policy.max_total_usd:
-            raise SpendLimitError(
-                f"this client has spent {spent} and the next request could cost "
-                f"{estimate}, above the ceiling of {policy.max_total_usd}",
-                limit_usd=policy.max_total_usd,
-                spent_usd=spent,
-                estimated_usd=estimate,
-                hint="raise max_total_usd, or reset the ledger to start a new budget",
+        if policy.max_total_usd is not None:
+            assert self._ledger is not None
+            accepted, spent, reserved = self._ledger.reserve(
+                request_id, estimate, policy.max_total_usd
             )
+            if not accepted:
+                raise SpendLimitError(
+                    f"this client has spent {spent}, reserved {reserved}, and the next "
+                    f"request could cost {estimate}, above the ceiling of "
+                    f"{policy.max_total_usd}",
+                    limit_usd=policy.max_total_usd,
+                    spent_usd=spent,
+                    estimated_usd=estimate,
+                    hint="raise max_total_usd, or reset the ledger to start a new budget",
+                )
 
     def _estimate_request_cost(
         self, request: GenerationRequest, capabilities: ModelCapabilities | None
@@ -2167,9 +2998,7 @@ class AsyncClient:
                 builder=builder,
             )
 
-    def _emit(
-        self, event: TelemetryEvent, *, builder: ManifestBuilder | None = None
-    ) -> None:
+    def _emit(self, event: TelemetryEvent, *, builder: ManifestBuilder | None = None) -> None:
         """Dispatch a telemetry event to observers and to the run's manifest builder.
 
         The builder is normally found by correlation — every request-path event carries a
@@ -2222,9 +3051,7 @@ def _judge_probe(
 
     parsed, error = extract_json(text)
     if error is not None:
-        return FeatureProbe(
-            feature, "inconclusive", f"the request was accepted but {error}"
-        )
+        return FeatureProbe(feature, "inconclusive", f"the request was accepted but {error}")
     if feature is Feature.JSON_MODE:
         # JSON mode promises well-formed JSON and nothing about its shape, so parsing is
         # the whole test. Holding it to the schema would fail a provider doing its job.
@@ -2301,9 +3128,7 @@ def _repair_budget(
     )
 
 
-def _structured_candidate(
-    request: GenerationRequest, buffer: AttemptBuffer
-) -> Any | None:
+def _structured_candidate(request: GenerationRequest, buffer: AttemptBuffer) -> Any | None:
     """Recover a structured answer that arrived as a forced tool call.
 
     Providers with no response-format field (Anthropic, Bedrock) emulate a schema by

@@ -51,6 +51,7 @@ class SourceRef:
         files: Explicit file list. Empty means "whatever the include globs match".
         digests: Per-file expected sha256, when the catalog pinned them.
         sizes: Per-file expected byte counts, when the catalog pinned them.
+        roles: Optional per-file roles for companion artifacts such as a vision projector.
         urls: Direct download URLs, for the ``url`` resolver.
         include: Glob patterns selecting files from a repository listing.
         exclude: Glob patterns removing files the include list matched.
@@ -63,6 +64,7 @@ class SourceRef:
     files: tuple[str, ...] = ()
     digests: Mapping[str, str] = field(default_factory=dict)
     sizes: Mapping[str, int] = field(default_factory=dict)
+    roles: Mapping[str, str] = field(default_factory=dict)
     urls: tuple[str, ...] = ()
     include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
@@ -77,6 +79,8 @@ class SourceRef:
             data["revision"] = self.revision
         if self.files:
             data["files"] = list(self.files)
+        if self.roles:
+            data["roles"] = dict(self.roles)
         if self.urls:
             data["urls"] = list(self.urls)
         if self.path:

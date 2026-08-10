@@ -33,6 +33,8 @@ actionable next step. The prose catalog with examples lives in
 
 ::: anyinfer.SchemaViolationError
 
+::: anyinfer.UnsupportedInputError
+
 ::: anyinfer.SpendLimitError
 
 ::: anyinfer.ToolLoopError

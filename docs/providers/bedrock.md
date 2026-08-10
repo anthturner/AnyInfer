@@ -139,6 +139,12 @@ Bedrock prices per model and per region, and inference profiles differ from base
 The bundled table carries the common `us-east-1` on-demand rates for the Nova family and
 Claude; use `capability_overrides` where your account's rates differ.
 
+## Multimodal inputs
+
+Converse image, document, and audio blocks are used directly. Inline inputs are base64;
+remote image/document references must be S3 URIs. The selected model still decides which
+block types it accepts.
+
 ## See also
 
 <div class="anyinfer-see-also" markdown>

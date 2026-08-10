@@ -35,9 +35,18 @@ from ..types.capabilities import (
     Sourced,
 )
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import Diagnostic, FinishReason, Usage
+from ._multimodal import base64_data, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_ndjson
@@ -290,9 +299,7 @@ class OllamaAdapter:
                 http_status=status,
                 hint=f"pull it first: ollama pull {req.model}",
             )
-        return classify_status(
-            status, provider=self.provider_id, detail=detail, headers=headers
-        )
+        return classify_status(status, provider=self.provider_id, detail=detail, headers=headers)
 
     def build_payload(self, req: WireRequest) -> dict[str, Any]:
         """Translate a wire request into an ``/api/chat`` body."""
@@ -346,6 +353,20 @@ class OllamaAdapter:
             "role": message.role,
             "content": "".join(p.text for p in message.content if isinstance(p, Text)),
         }
+        images: list[str] = []
+        for part in message.content:
+            if isinstance(part, ImagePart):
+                if part.data is None:
+                    raise unsupported(
+                        self.provider_id, "remote image", "inline bytes are required"
+                    )
+                images.append(base64_data(part.data))
+            elif isinstance(part, DocumentPart):
+                raise unsupported(self.provider_id, "document")
+            elif isinstance(part, AudioPart):
+                raise unsupported(self.provider_id, "audio")
+        if images:
+            encoded["images"] = images
         calls = [p for p in message.content if isinstance(p, ToolCall)]
         if calls:
             encoded["tool_calls"] = [
@@ -363,9 +384,7 @@ class OllamaAdapter:
             },
         }
 
-    def _events_from_message(
-        self, message: Any, state: _StreamState
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_message(self, message: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Translate one NDJSON object into events."""
         if not isinstance(message, Mapping):
             return
@@ -469,9 +488,7 @@ class _StreamState:
             finish_reason=self.finish_reason,
             usage=self.usage,
             phases=dict(self.phases),
-            session_state=(
-                None if session_state is None else {"keep_alive": SESSION_KEEP_ALIVE}
-            ),
+            session_state=(None if session_state is None else {"keep_alive": SESSION_KEEP_ALIVE}),
         )
 
 

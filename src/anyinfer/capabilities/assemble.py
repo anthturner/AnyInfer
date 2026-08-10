@@ -175,6 +175,13 @@ class CapabilityStore:
         """Whether a discovery layer has been recorded for this provider."""
         return provider_id in self._discovered
 
+    def discovered_has_model(self, provider_id: str, model: str) -> bool | None:
+        """Whether a completed discovery listed ``model``; ``None`` means not discovered."""
+        layer = self._discovered.get(provider_id)
+        if layer is None:
+            return None
+        return model in layer
+
     def invalidate(self, provider_id: str | None = None) -> None:
         """Drop cached layers for one provider, or all of them."""
         if provider_id is None:

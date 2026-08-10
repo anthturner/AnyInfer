@@ -61,7 +61,7 @@ from .events.telemetry import (
     UsageEstimated,
 )
 from .redaction import redact
-from .schema.mechanism import MECHANISM_LADDER, choose_mechanism
+from .schema.mechanism import MechanismRung, choose_mechanism
 from .types.capabilities import ModelCapabilities
 from .types.requests import GenerationRequest, ResolvedTarget
 from .types.results import ErrorInfo, Generation
@@ -235,21 +235,6 @@ class AttemptFacet:
     retry_reason: str | None = None
     retry_delay_s: float | None = None
     paced_s: Mapping[str, float] = field(default_factory=dict)
-
-
-@dataclass(frozen=True, slots=True)
-class MechanismRung:
-    """One rung of the structured-output ladder, and whether it was available.
-
-    Attributes:
-        mechanism: The rung, from ``grammar`` down to ``prompt``.
-        available: Whether the target was known to support it.
-        reason: Why it was passed over, when it was.
-    """
-
-    mechanism: str
-    available: bool
-    reason: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -665,9 +650,7 @@ class ManifestBuilder:
 
     # -- inputs the event stream does not carry ----------------------------------------
 
-    def note_capabilities(
-        self, target: ResolvedTarget, capabilities: ModelCapabilities
-    ) -> None:
+    def note_capabilities(self, target: ResolvedTarget, capabilities: ModelCapabilities) -> None:
         """Record the capabilities the router resolved for one target.
 
         Called once per target the route reaches; the last one wins, because the
@@ -736,9 +719,7 @@ class ManifestBuilder:
                 retry_delay_s=event.delay_s,
             )
             self._flush_attempt()
-            self._steps.append(
-                RouteStep(str(event.target), "retried", event.error.detail)
-            )
+            self._steps.append(RouteStep(str(event.target), "retried", event.error.detail))
             return
         if isinstance(event, FallbackTriggered):
             reason = (
@@ -920,8 +901,12 @@ class ManifestBuilder:
         if capabilities is None:
             return CapabilityFacet()
         facts: list[SourcedFact] = []
-        for name in ("context_window", "max_output_tokens", "default_temperature",
-                     "default_top_p"):
+        for name in (
+            "context_window",
+            "max_output_tokens",
+            "default_temperature",
+            "default_top_p",
+        ):
             sourced = getattr(capabilities, name)
             if sourced is not None:
                 facts.append(SourcedFact(name, sourced.value, sourced.provenance))
@@ -958,9 +943,7 @@ class ManifestBuilder:
             chosen=chosen,
             used=result.structured_mechanism if result is not None else None,
             ladder=_ladder_report(self._capabilities, chosen),
-            repair_attempts=(
-                result.repair_attempts if result is not None else len(self._repairs)
-            ),
+            repair_attempts=(result.repair_attempts if result is not None else len(self._repairs)),
             repairs=tuple(self._repairs),
             validated=result is not None and result.structured is not None,
         )
@@ -1044,28 +1027,8 @@ def _ladder_report(
     capabilities: ModelCapabilities | None, chosen: str
 ) -> tuple[MechanismRung, ...]:
     """Explain the structured-output ladder: which rungs were available, and why not."""
-    features = capabilities.features if capabilities is not None else None
-    provenance = features.provenance if features is not None else "default"
-    rungs: list[MechanismRung] = []
-    for feature, mechanism in MECHANISM_LADDER:
-        available = features is not None and feature in features.value
-        reason = ""
-        if not available:
-            reason = (
-                f"the target is not known to support {(feature.name or '').lower()} "
-                f"(capability provenance: {provenance})"
-            )
-        elif mechanism != chosen:
-            reason = "a stronger mechanism was available"
-        rungs.append(MechanismRung(mechanism, available, reason))
-    rungs.append(
-        MechanismRung(
-            "prompt",
-            True,
-            "" if chosen == "prompt" else "a native mechanism was available",
-        )
-    )
-    return tuple(rungs)
+    _, rungs = choose_mechanism(capabilities, with_trail=True)
+    return rungs
 
 
 def schema_digest(json_schema: Mapping[str, Any]) -> str:
@@ -1105,8 +1068,7 @@ def render(manifest: RunManifest, *, width: int = 80) -> str:
     status = "complete" if manifest.complete else "incomplete (stream not drained)"
     lines.append(f"run {manifest.request_id or '(unknown)'} - {status}")
     lines.append(
-        f"  anyinfer {manifest.anyinfer_version or '?'}, "
-        f"manifest format {manifest.format}"
+        f"  anyinfer {manifest.anyinfer_version or '?'}, manifest format {manifest.format}"
     )
 
     route = manifest.route
@@ -1149,9 +1111,7 @@ def render(manifest: RunManifest, *, width: int = 80) -> str:
     if manifest.capability.facts:
         lines.append(f"  capabilities ({manifest.capability.target})")
         for fact in manifest.capability.facts:
-            lines.extend(
-                _wrap(f"    {fact.name:<20}{fact.value} [{fact.provenance}]", width)
-            )
+            lines.extend(_wrap(f"    {fact.name:<20}{fact.value} [{fact.provenance}]", width))
 
     cache = manifest.cache
     if cache.policy_mode or cache.mechanism or cache.read_tokens:
@@ -1207,9 +1167,7 @@ def _wrap(text: str, width: int) -> list[str]:
         return [text]
     body = text.lstrip()
     lead = " " * (len(text) - len(body))
-    wrapped = textwrap.wrap(
-        body, width=width, initial_indent=lead, subsequent_indent=lead + "  "
-    )
+    wrapped = textwrap.wrap(body, width=width, initial_indent=lead, subsequent_indent=lead + "  ")
     return wrapped or [text]
 
 
@@ -1333,9 +1291,7 @@ def manifest_json_schema() -> dict[str, Any]:
             },
             "context": {
                 "type": "object",
-                "properties": {
-                    "reductions": {"type": "array", "items": {"type": "object"}}
-                },
+                "properties": {"reductions": {"type": "array", "items": {"type": "object"}}},
             },
             "dropped": {
                 "type": "array",

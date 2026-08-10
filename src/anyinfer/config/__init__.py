@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +15,11 @@ from ..mcp import MCPServer
 from ..registry import ProviderRegistry, default_registry, normalize_provider_id
 from ..routing import Route
 from ..types.requests import (
+    ARENA_MEMO_MODES,
+    ARENA_STRATEGIES,
     CACHE_MODES,
     HISTORY_MODES,
+    ArenaPolicy,
     CachePolicy,
     HistoryPolicy,
     RateLimits,
@@ -57,6 +60,8 @@ _ROOT_KEYS = frozenset(
         "context",
         "history",
         "cache",
+        "arena",
+        "arenas",
         "mcp",
         # Settings owned by the bundled demo. They are accepted so one file can be
         # shared with the SDK, CLI, and sidecar; this loader intentionally ignores them.
@@ -114,6 +119,8 @@ class AnyInferConfig:
     context: ContextTuning = DEFAULT_TUNING
     history: HistoryPolicy | None = None
     cache: CachePolicy | None = None
+    arena: ArenaPolicy | None = None
+    arenas: Mapping[str, ArenaPolicy] = field(default_factory=dict)
     mcp: tuple[MCPServer, ...] = ()
 
 
@@ -218,8 +225,20 @@ def loads_config(
     context = _parse_context(data.get("context"), source)
     history = _parse_history(data.get("history"), source)
     cache = _parse_cache(data.get("cache"), source)
+    arena = _parse_arena(data.get("arena"), source, "'arena'")
+    arenas = _parse_arenas(data.get("arenas"), source)
     mcp = _parse_mcp(data.get("mcp"), source)
-    return AnyInferConfig(tuple(providers), route, version, context, history, cache, mcp)
+    return AnyInferConfig(
+        providers=tuple(providers),
+        route=route,
+        format_version=version,
+        context=context,
+        history=history,
+        cache=cache,
+        arena=arena,
+        arenas=arenas,
+        mcp=mcp,
+    )
 
 
 def dumps_config(config: AnyInferConfig, *, comments: bool = False) -> str:
@@ -271,6 +290,10 @@ def dumps_config(config: AnyInferConfig, *, comments: bool = False) -> str:
         document["history"] = _changed_fields(config.history, HistoryPolicy())
     if config.cache is not None:
         document["cache"] = _changed_fields(config.cache, CachePolicy())
+    if config.arena is not None:
+        document["arena"] = _arena_json(config.arena)
+    if config.arenas:
+        document["arenas"] = {name: _arena_json(policy) for name, policy in config.arenas.items()}
     if config.mcp:
         document["mcp"] = [_mcp_json(server) for server in config.mcp]
 
@@ -608,6 +631,92 @@ def _parse_history(value: Any, source: str) -> HistoryPolicy | None:
         raise _error(source, f"'history' is invalid: {exc}") from exc
 
 
+def _parse_arena(value: Any, source: str, location: str = "'arena'") -> ArenaPolicy | None:
+    """Validate one default or named arena policy."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise _error(source, f"{location} must be an object")
+    known = {
+        "targets",
+        "strategy",
+        "judge_target",
+        "instructions",
+        "concurrency",
+        "min_candidates",
+        "reveal_targets",
+        "memoize_tools",
+    }
+    unknown = set(value) - known
+    if unknown:
+        raise _unknown_keys(source, location, unknown)
+    raw_targets = value.get("targets")
+    if (
+        not isinstance(raw_targets, list)
+        or not raw_targets
+        or not all(isinstance(item, str) and item for item in raw_targets)
+    ):
+        raise _error(source, f"{location}.targets must be a non-empty list of strings")
+    fields: dict[str, Any] = {"targets": tuple(raw_targets)}
+    for key in ("strategy", "judge_target", "instructions", "memoize_tools"):
+        if key in value:
+            raw = value[key]
+            if raw is not None and not isinstance(raw, str):
+                raise _error(source, f"{location}.{key} must be a string")
+            fields[key] = raw
+    if fields.get("strategy", "first_valid") not in ARENA_STRATEGIES:
+        raise _error(source, f"{location}.strategy must be one of {', '.join(ARENA_STRATEGIES)}")
+    if fields.get("memoize_tools", "read_only") not in ARENA_MEMO_MODES:
+        raise _error(
+            source,
+            f"{location}.memoize_tools must be one of {', '.join(ARENA_MEMO_MODES)}",
+        )
+    for key in ("concurrency", "min_candidates"):
+        if key in value:
+            raw = value[key]
+            if isinstance(raw, bool) or not isinstance(raw, int):
+                raise _error(source, f"{location}.{key} must be an integer")
+            fields[key] = raw
+    if "reveal_targets" in value:
+        if not isinstance(value["reveal_targets"], bool):
+            raise _error(source, f"{location}.reveal_targets must be true or false")
+        fields["reveal_targets"] = value["reveal_targets"]
+    try:
+        return ArenaPolicy(**fields)
+    except ValueError as exc:
+        raise _error(source, f"{location} is invalid: {exc}") from exc
+
+
+def _parse_arenas(value: Any, source: str) -> Mapping[str, ArenaPolicy]:
+    """Validate named arena policies addressable from a sidecar model string."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise _error(source, "'arenas' must be an object keyed by arena name")
+    result: dict[str, ArenaPolicy] = {}
+    for name, raw in value.items():
+        if not isinstance(name, str) or not name:
+            raise _error(source, "arena names must be non-empty strings")
+        policy = _parse_arena(raw, source, f"arenas.{name}")
+        assert policy is not None
+        result[name] = policy
+    return result
+
+
+def _arena_json(policy: ArenaPolicy) -> dict[str, Any]:
+    """Render every arena field so config parity cannot hide an implicit default."""
+    return {
+        "targets": list(policy.targets),
+        "strategy": policy.strategy,
+        "judge_target": policy.judge_target,
+        "instructions": policy.instructions,
+        "concurrency": policy.concurrency,
+        "min_candidates": policy.min_candidates,
+        "reveal_targets": policy.reveal_targets,
+        "memoize_tools": policy.memoize_tools,
+    }
+
+
 def _parse_cache(value: Any, source: str) -> CachePolicy | None:
     """Validate the optional prompt-cache block.
 
@@ -666,8 +775,15 @@ def _parse_mcp(value: Any, source: str) -> tuple[MCPServer, ...]:
         raise _error(source, "'mcp' must be a list of server objects")
 
     known = {
-        "name", "command", "url", "env", "headers", "cwd", "timeout_s",
-        "allow_tools", "deny_tools",
+        "name",
+        "command",
+        "url",
+        "env",
+        "headers",
+        "cwd",
+        "timeout_s",
+        "allow_tools",
+        "deny_tools",
     }
     servers: list[MCPServer] = []
     for index, raw in enumerate(value):

@@ -10,6 +10,7 @@ identity (local data).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 __all__ = ["GgufArtifact", "GgufFile"]
 
@@ -30,6 +31,7 @@ class GgufFile:
     url: str
     sha256: str = ""
     size_bytes: int | None = None
+    role: Literal["model", "projector"] = "model"
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +60,13 @@ class GgufArtifact:
     est_ram_bytes: int | None = None
     est_vram_bytes: int | None = None
 
+    def __post_init__(self) -> None:
+        """Require model weights first and at most one projector companion."""
+        if not self.files or self.files[0].role != "model":
+            raise ValueError("a GGUF artifact must begin with a model file")
+        if sum(file.role == "projector" for file in self.files) > 1:
+            raise ValueError("a GGUF artifact may contain at most one projector")
+
     @property
     def total_size_bytes(self) -> int | None:
         """Sum of every file's size, or ``None`` when any is unknown."""
@@ -69,4 +78,9 @@ class GgufArtifact:
     @property
     def is_sharded(self) -> bool:
         """Whether this artifact spans multiple files."""
-        return len(self.files) > 1
+        return sum(file.role == "model" for file in self.files) > 1
+
+    @property
+    def projector(self) -> GgufFile | None:
+        """Pinned multimodal projector file, when this model has one."""
+        return next((file for file in self.files if file.role == "projector"), None)

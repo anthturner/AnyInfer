@@ -37,7 +37,7 @@ from ..capabilities.estimate import (
 )
 from ..events.observers import Observer
 from ..events.telemetry import ContextReduced
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import ContentPart, Message, Text, ToolCall, ToolResult
 
 __all__ = [
     "DEFAULT_KEEP_RECENT",
@@ -248,9 +248,7 @@ def compact_history(
         dropped.add(index)
         total -= costs[index]
 
-    kept = tuple(
-        message for index, message in enumerate(working) if index not in dropped
-    )
+    kept = tuple(message for index, message in enumerate(working) if index not in dropped)
     return _finish(
         kept,
         original=original,
@@ -321,7 +319,7 @@ def _recost(
 
 def _elide_results(message: Message) -> tuple[Message, int]:
     """Replace substantial tool-result payloads with a marker."""
-    parts: list[Text | ToolCall | ToolResult] = []
+    parts: list[ContentPart] = []
     elided = 0
     for part in message.content:
         if isinstance(part, ToolResult) and len(part.content) >= MIN_ELIDABLE_CHARS:
@@ -334,7 +332,7 @@ def _elide_results(message: Message) -> tuple[Message, int]:
 
 def _elide_texts(message: Message) -> tuple[Message, int]:
     """Replace substantial text payloads with a marker."""
-    parts: list[Text | ToolCall | ToolResult] = []
+    parts: list[ContentPart] = []
     elided = 0
     for part in message.content:
         if isinstance(part, Text) and len(part.text) >= MIN_ELIDABLE_CHARS:
@@ -363,6 +361,6 @@ def _message_tokens(message: Message, estimator: TokenEstimator) -> int:
         elif isinstance(part, ToolCall):
             parts.append(part.name)
             parts.append(json.dumps(dict(part.arguments), default=str))
-        else:
+        elif isinstance(part, ToolResult):
             parts.append(part.content)
     return estimator.estimate("".join(parts)).tokens + PER_MESSAGE_OVERHEAD_TOKENS

@@ -20,9 +20,18 @@ from ..errors import Phase, ProviderError, StreamProtocolError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities, Sourced
 from ..types.events import TextDelta, ToolCallDelta, UsageUpdate
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
+from ._multimodal import base64_data, data_url, media_subtype
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
@@ -196,7 +205,40 @@ class OpenAICompatAdapter:
             }
 
         text = "".join(p.text for p in message.content if isinstance(p, Text))
-        encoded: dict[str, Any] = {"role": message.role, "content": text}
+        modal = any(isinstance(p, ImagePart | DocumentPart | AudioPart) for p in message.content)
+        content: str | list[dict[str, Any]] | None = text
+        if modal:
+            content = []
+            for part in message.content:
+                if isinstance(part, Text):
+                    content.append({"type": "text", "text": part.text})
+                elif isinstance(part, ImagePart):
+                    image: dict[str, Any] = {
+                        "url": part.url or data_url(part.media_type, part.data or b"")
+                    }
+                    if part.detail is not None:
+                        image["detail"] = part.detail
+                    content.append({"type": "image_url", "image_url": image})
+                elif isinstance(part, DocumentPart):
+                    file: dict[str, Any] = {}
+                    if part.data is not None:
+                        file["file_data"] = data_url(part.media_type, part.data)
+                    else:
+                        file["file_url"] = part.url
+                    if part.filename is not None:
+                        file["filename"] = part.filename
+                    content.append({"type": "file", "file": file})
+                elif isinstance(part, AudioPart):
+                    content.append(
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": base64_data(part.data),
+                                "format": media_subtype(part.media_type),
+                            },
+                        }
+                    )
+        encoded: dict[str, Any] = {"role": message.role, "content": content}
         calls = [p for p in message.content if isinstance(p, ToolCall)]
         if calls:
             encoded["tool_calls"] = [
@@ -207,7 +249,7 @@ class OpenAICompatAdapter:
                 }
                 for c in calls
             ]
-            if not text:
+            if not content:
                 encoded["content"] = None
         return encoded
 
@@ -270,9 +312,7 @@ class OpenAICompatAdapter:
         except httpx2.HTTPError as exc:
             raise map_transport_error(exc, provider=self.provider_id, phase="stream") from exc
 
-    def _events_from_chunk(
-        self, chunk: Any, state: _StreamState
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Translate one SSE chunk into zero or more adapter events."""
         if not isinstance(chunk, Mapping):
             return

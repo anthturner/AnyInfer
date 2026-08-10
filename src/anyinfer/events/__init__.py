@@ -9,6 +9,7 @@ from ..redaction import (
 from .observers import EventDispatcher, Observer, Subscription
 from .telemetry import (
     PAYLOAD_FIELDS,
+    ArenaCompleted,
     AttemptCompleted,
     AttemptStarted,
     CachePlanned,
@@ -35,6 +36,7 @@ from .telemetry import (
 __all__ = [
     "PAYLOAD_FIELDS",
     "REDACTED",
+    "ArenaCompleted",
     "AttemptCompleted",
     "AttemptStarted",
     "CachePlanned",

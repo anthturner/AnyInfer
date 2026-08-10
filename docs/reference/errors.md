@@ -207,7 +207,9 @@ except ai.SchemaViolationError as error:
 ```
 
 !!! tip "How to fix"
-    Increase `Repair.max_attempts`, simplify the schema, or salvage from `error.raw_text`.
+    Increase `Repair.max_attempts`, simplify the schema, inspect `error.partial` and
+    `error.missing_fields`, or debug the bounded `error.raw_text`. Partial members are not
+    schema-validated and no truncated value is guessed.
     See [structured output](../concepts/structured-output.md#repair).
 
 </div>

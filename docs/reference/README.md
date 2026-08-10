@@ -10,6 +10,8 @@ Look things up.
   from test results rather than assertion.
 - **[Shared configuration](configuration.md)** — provider settings, environment variables,
   and the common JSON file.
+- **[Run manifest format](run-manifest.md)** — serialization, compatibility, and its
+  executable JSON Schema.
 - **[Glossary](glossary.md)** — the vocabulary this project uses precisely.
 
 ## API stability

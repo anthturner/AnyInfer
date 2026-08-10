@@ -24,6 +24,20 @@ def test_generate_returns_a_result() -> None:
     assert result.text == "sync answer"
 
 
+def test_generate_runs_an_arena_through_the_sync_facade() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="candidate"))
+    with make_sync_client(server) as client:
+        result = client.generate(
+            "compare",
+            arena=ai.ArenaPolicy(("openai-compat:a", "openai-compat:b")),
+        )
+
+    assert result.text == "candidate"
+    assert result.arena is not None
+    assert [item.target.model for item in result.arena.candidates] == ["a", "b"]
+    assert len(server.requests) == 2
+
+
 def test_stream_iterates_and_exposes_the_result() -> None:
     server = FakeOpenAIServer(FakeResponse(text="streamed answer"))
     with make_sync_client(server) as client, client.stream(

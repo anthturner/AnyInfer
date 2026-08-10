@@ -8,6 +8,8 @@ Last verified: 2026-08-07 — against live AWS documentation (sources below).
 - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseStream.html
 - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ContentBlockDelta.html
 - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ReasoningContentBlockDelta.html
+- https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ContentBlock.html
+- https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html
 - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModelWithResponseStream.html
 - https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html
 - https://docs.aws.amazon.com/bedrock/latest/userguide/inference-chat-completions-mantle.html
@@ -59,7 +61,10 @@ supported way to use the ambient chain.
 ### Request fields sent
 - `messages[]`: role plus a list of typed content blocks. Blocks emitted: `text`,
   `toolUse` (`toolUseId`, `name`, `input`), `toolResult` (`toolUseId`, `content`,
-  `status`). **Tool results ride on a `user` turn**, as in the Anthropic dialect.
+  `status`), `image`, `document`, and `audio`. Multimodal blocks were verified 2026-08-10
+  against the ContentBlock reference and Converse guide. Inline sources carry base64 in
+  `bytes`; remote sources must be `s3://` and project to `s3Location`. **Tool results ride
+  on a `user` turn**, as in the Anthropic dialect.
 - `system[]`: a top-level list of text blocks, not a message.
 - `inferenceConfig`: `maxTokens`, `temperature`, `topP`, `stopSequences`. Unset sampling
   fields are omitted entirely.

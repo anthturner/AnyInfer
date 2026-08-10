@@ -109,6 +109,7 @@ DIAGNOSTIC = ai.Diagnostic(
 # One instance of every member of the TelemetryEvent union.
 ALL_EVENTS: tuple[TelemetryEvent, ...] = (
     ai.RequestStarted("r1", ("openai:gpt-5",)),
+    ai.ArenaCompleted("arena-1", 3, "consensus", 2, 3, 0, False),
     ai.TargetResolved("r1", TARGET),
     ai.AttemptStarted("r1", TARGET, 1),
     ai.FirstToken("r1", TARGET, 12.5),

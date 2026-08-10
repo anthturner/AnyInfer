@@ -1,8 +1,9 @@
 # huggingface — Protocol Contract
 
 Status: **implemented** — `local/sources/huggingface.py`, `scripts/pin_catalog.py`.
-Last verified: 2026-08-08 — live responses from `huggingface.co/api/models/...` observed
-while pinning the bundled model catalog (42 repositories, 4 endpoints exercised).
+Last verified: 2026-08-10 — live responses from `huggingface.co/api/models/...` observed
+while re-pinning the Qwen2.5-VL weights and projector companion. The full 42-repository
+catalog was last refreshed 2026-08-08.
 
 **Not an inference provider.** Hugging Face is a *weights source*: AnyInfer reads repository
 listings to resolve, size, and verify model files, and never sends it a generation request.
@@ -83,6 +84,11 @@ than implying the result is pinned.
 Catalog-shipped entries *are* pinned: `scripts/pin_catalog.py` reads `lfs.oid` at pin time
 and writes it into `models.json`, so the shipped path verifies against a hash that a human
 reviewed in a pull request.
+
+Vision projectors follow the same rule. A vision candidate names one exact `mmproj` path;
+the pin pass requires that path in the same immutable tree, records its size and LFS sha256,
+and assigns it the `projector` role. Auxiliary-file name matching is never used to choose a
+projector.
 
 File names in a tree response are **attacker-influenced input** and are validated before any
 file is opened: absolute paths, `..` segments, drive letters, NUL bytes, and reserved Windows

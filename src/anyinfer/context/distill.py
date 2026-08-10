@@ -27,6 +27,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
+from .._usage import merge_usage
 from ..capabilities.budget import ContextBudget
 from ..errors import ConfigError
 from ..events.observers import Observer
@@ -212,7 +213,7 @@ async def distill(
         *(run_map(index, text) for index, text in enumerate(chunks, start=1))
     )
     notes = [result.text for result in results]
-    usage = _merge_usage(result.usage for result in results)
+    usage = merge_usage(result.usage for result in results)
     calls = len(results)
 
     if reducer is not None:
@@ -227,7 +228,7 @@ async def distill(
         instructions=reduce_instructions or _REDUCE_INSTRUCTIONS,
         max_output_tokens=max_output_tokens,
     )
-    usage = _merge_usage([usage, reduce_usage]) if reduce_usage else usage
+    usage = merge_usage([usage, reduce_usage]) if reduce_usage else usage
     return _finish(
         text, chunks, calls + reduce_calls, usage, depth, notes, observer, max_output_tokens
     )
@@ -276,7 +277,7 @@ def distill_sync(
         for index, text in enumerate(chunks, start=1)
     ]
     notes = [result.text for result in results]
-    usage = _merge_usage(result.usage for result in results)
+    usage = merge_usage(result.usage for result in results)
 
     if reducer is not None:
         return _finish(
@@ -295,7 +296,7 @@ def distill_sync(
         target=target,
         sampling=Sampling(max_output_tokens=max_output_tokens),
     )
-    usage = _merge_usage([usage, merged.usage])
+    usage = merge_usage([usage, merged.usage])
     return _finish(
         merged.text,
         chunks,
@@ -335,7 +336,7 @@ async def _reduce(
                 sampling=Sampling(max_output_tokens=max_output_tokens),
             )
             calls += 1
-            usage = _merge_usage([usage, result.usage] if usage else [result.usage])
+            usage = merge_usage([usage, result.usage] if usage else [result.usage])
             return _strip_labels(result.text), calls, usage, depth
 
         # Too much to synthesize in one call: summarize in batches, then summarize the
@@ -348,7 +349,7 @@ async def _reduce(
                 sampling=Sampling(max_output_tokens=max_output_tokens),
             )
             calls += 1
-            usage = _merge_usage([usage, result.usage] if usage else [result.usage])
+            usage = merge_usage([usage, result.usage] if usage else [result.usage])
             summaries.append(result.text)
 
         # No progress means the notes are individually too large for this target, and
@@ -494,35 +495,6 @@ def _map_output_cap(chunk_count: int, max_output_tokens: int) -> int | None:
     if chunk_count >= 8:
         return 512
     return 1024
-
-
-def _merge_usage(usages: Iterable[Usage]) -> Usage:
-    """Sum usage across calls.
-
-    Distinct from `Usage.merge`, which overlays a later report onto an earlier one:
-    here every call is a separate charge, so the counts add.
-    """
-    total = Usage()
-    for usage in usages:
-        total = Usage(
-            input_tokens=_add(total.input_tokens, usage.input_tokens),
-            output_tokens=_add(total.output_tokens, usage.output_tokens),
-            total_tokens=_add(total.total_tokens, usage.total_tokens),
-            cache_read_tokens=_add(total.cache_read_tokens, usage.cache_read_tokens),
-            cache_write_tokens=_add(total.cache_write_tokens, usage.cache_write_tokens),
-            reasoning_tokens=_add(total.reasoning_tokens, usage.reasoning_tokens),
-            cost_usd=_add(total.cost_usd, usage.cost_usd),
-        )
-    return total
-
-
-def _add(current: Any, incoming: Any) -> Any:
-    """Add two optional numbers, keeping ``None`` when neither side reported."""
-    if current is None:
-        return incoming
-    if incoming is None:
-        return current
-    return current + incoming
 
 
 def _strip_labels(text: str) -> str:

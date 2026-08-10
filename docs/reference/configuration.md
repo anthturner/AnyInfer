@@ -172,6 +172,8 @@ ai.Client(
     estimator=None,             # token counting; defaults to the byte heuristic
     context_gate=True,          # refuse requests that provably cannot fit pre-dispatch
     history=None,               # conversation compaction when a request overflows
+    arena=None,                 # default fixed-target arena policy
+    arenas={},                  # named arena policies for CLI/sidecar model strings
     pricing_table=None,         # defaults to the bundled table; see fetch_pricing()
     capability_overrides=None,  # "provider:model"-keyed corrections, strongest layer
     model_dir=None,             # where acquired model weights are stored
@@ -197,6 +199,8 @@ client.generate(
     provider_options={},            # namespaced escape hatch
     metadata={},                    # opaque, echoed in telemetry
     max_response_bytes=1_048_576,
+    arena=None,                     # fixed targets and post-run selection
+    context=None,                   # caller-approved stateless corpus reduction
 )
 ```
 
@@ -370,6 +374,37 @@ as before. Set `"enabled": false` to keep a tuned block switched off.
 
 Sidecar callers can override it per request with the `anyinfer_history` field — see
 [the sidecar](../serve/README.md).
+
+### The `arena` and `arenas` blocks
+
+Arena policies fan one request out to fixed targets and select only after the candidates
+finish. A default policy and named policies use the same complete field set:
+
+```json
+{
+  "arena": {
+    "targets": ["openai:gpt-5-mini", "anthropic:claude-haiku-4-5"],
+    "strategy": "first_valid",
+    "concurrency": 2,
+    "min_candidates": 1,
+    "reveal_targets": false,
+    "memoize_tools": "read_only"
+  },
+  "arenas": {
+    "review-panel": {
+      "targets": ["openai:gpt-5-mini", "anthropic:claude-haiku-4-5"],
+      "strategy": "judge",
+      "judge_target": "openai:gpt-5-mini",
+      "instructions": "Choose the most precise supported answer."
+    }
+  }
+}
+```
+
+Unknown keys fail validation. `anyinfer run --arena-name review-panel` and a sidecar model
+string of `review-panel` resolve the named policy without moving orchestration into either
+frontend. See [Arena runs](../concepts/arena.md) for cost ceilings, selection rules, tool
+loops, and the response evidence envelope.
 
 The sidecar can advertise instance-scoped targets from `/v1/models` by writing them in
 instance terms:

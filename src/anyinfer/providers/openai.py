@@ -29,9 +29,18 @@ from ..types.capabilities import (
     Sourced,
 )
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
+from ._multimodal import base64_data, data_url, media_subtype
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
@@ -87,9 +96,7 @@ class OpenAIAdapter:
         return [
             DiscoveredModel(
                 id=str(entry["id"]),
-                capabilities=ModelCapabilities(
-                    features=Sourced(_OPENAI_FEATURES, "discovered")
-                ),
+                capabilities=ModelCapabilities(features=Sourced(_OPENAI_FEATURES, "discovered")),
             )
             for entry in entries
             if isinstance(entry, Mapping) and entry.get("id")
@@ -357,12 +364,44 @@ def _split_instructions(messages: Sequence[Message]) -> tuple[str, list[dict[str
                 )
 
         text = "".join(p.text for p in message.content if isinstance(p, Text))
-        if text:
+        modal = [p for p in message.content if isinstance(p, ImagePart | DocumentPart | AudioPart)]
+        if text or modal:
             content_type = "output_text" if message.role == "assistant" else "input_text"
+            content: list[dict[str, Any]] = []
+            if text:
+                content.append({"type": content_type, "text": text})
+            for part in modal:
+                if isinstance(part, ImagePart):
+                    image: dict[str, Any] = {
+                        "type": "input_image",
+                        "image_url": part.url or data_url(part.media_type, part.data or b""),
+                    }
+                    if part.detail is not None:
+                        image["detail"] = part.detail
+                    content.append(image)
+                elif isinstance(part, DocumentPart):
+                    file: dict[str, Any] = {"type": "input_file"}
+                    if part.data is not None:
+                        file["file_data"] = data_url(part.media_type, part.data)
+                    else:
+                        file["file_url"] = part.url
+                    if part.filename is not None:
+                        file["filename"] = part.filename
+                    content.append(file)
+                elif isinstance(part, AudioPart):
+                    content.append(
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": base64_data(part.data),
+                                "format": media_subtype(part.media_type),
+                            },
+                        }
+                    )
             items.append(
                 {
                     "role": message.role,
-                    "content": [{"type": content_type, "text": text}],
+                    "content": content,
                 }
             )
 

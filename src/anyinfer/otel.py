@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any
 
 from .events.telemetry import (
+    ArenaCompleted,
     AttemptCompleted,
     AttemptStarted,
     CachePlanned,
@@ -130,6 +131,18 @@ class OTelObserver:
                 },
             )
 
+    def _on_ArenaCompleted(self, event: ArenaCompleted) -> None:  # noqa: N802
+        attributes = {
+            f"{GEN_AI}.anyinfer.target_count": event.target_count,
+            f"{GEN_AI}.anyinfer.strategy": event.strategy,
+            f"{GEN_AI}.anyinfer.calls": event.calls,
+            f"{GEN_AI}.anyinfer.memoized_tool_calls": event.memoized_tool_calls,
+            f"{GEN_AI}.anyinfer.synthesized": event.synthesized,
+        }
+        if event.agreement is not None:
+            attributes[f"{GEN_AI}.anyinfer.agreement"] = event.agreement
+        self._standalone("arena.completed", attributes).end()
+
     def _on_AttemptStarted(self, event: AttemptStarted) -> None:  # noqa: N802
         span = self._spans.get(event.request_id)
         if span is None:
@@ -149,8 +162,10 @@ class OTelObserver:
             span.add_event("first_token", attributes={f"{GEN_AI}.anyinfer.at_ms": event.at_ms})
         self._ttft.record(
             event.at_ms / 1000.0,
-            {f"{GEN_AI}.system": event.target.provider_id,
-             f"{GEN_AI}.request.model": event.target.model},
+            {
+                f"{GEN_AI}.system": event.target.provider_id,
+                f"{GEN_AI}.request.model": event.target.model,
+            },
         )
 
     def _on_AttemptCompleted(self, event: AttemptCompleted) -> None:  # noqa: N802

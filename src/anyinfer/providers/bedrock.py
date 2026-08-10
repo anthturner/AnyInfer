@@ -32,9 +32,18 @@ from ..errors import ConfigError, ProviderError, StreamProtocolError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities, Sourced
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
+from ._multimodal import base64_data, media_subtype, neutral_filename, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .cloud_auth import AwsCredentials, resolve_aws_credentials, sigv4_headers
 from .eventstream import EventStreamMessage, iter_event_stream
@@ -260,6 +269,36 @@ class BedrockAdapter:
                             "toolUseId": part.call_id,
                             "content": [{"text": part.content}],
                             **({"status": "error"} if part.is_error else {}),
+                        }
+                    }
+                )
+            elif isinstance(part, ImagePart):
+                source = _bedrock_media_source(self.provider_id, part.data, part.url)
+                blocks.append(
+                    {
+                        "image": {
+                            "format": media_subtype(part.media_type, jpeg=True),
+                            "source": source,
+                        }
+                    }
+                )
+            elif isinstance(part, DocumentPart):
+                source = _bedrock_media_source(self.provider_id, part.data, part.url)
+                blocks.append(
+                    {
+                        "document": {
+                            "format": media_subtype(part.media_type),
+                            "name": neutral_filename(part.filename, "document"),
+                            "source": source,
+                        }
+                    }
+                )
+            elif isinstance(part, AudioPart):
+                blocks.append(
+                    {
+                        "audio": {
+                            "format": media_subtype(part.media_type),
+                            "source": {"bytes": base64_data(part.data)},
                         }
                     }
                 )
@@ -652,6 +691,14 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     }
 
 
+def _bedrock_media_source(provider_id: str, data: bytes | None, url: str | None) -> dict[str, Any]:
+    if data is not None:
+        return {"bytes": base64_data(data)}
+    if url is not None and url.startswith("s3://"):
+        return {"s3Location": {"uri": url}}
+    raise unsupported(provider_id, "remote media", "Bedrock Converse accepts only s3:// URIs")
+
+
 _BEDROCK_FEATURES = (
     Feature.STREAMING
     | Feature.JSON_SCHEMA
@@ -724,8 +771,7 @@ descriptor = ProviderDescriptor(
                 required=False,
                 advanced=True,
                 help_text=(
-                    "The secret half of the access key above. Accepts env:// and "
-                    "credential://."
+                    "The secret half of the access key above. Accepts env:// and credential://."
                 ),
                 placeholder="env://AWS_SECRET_ACCESS_KEY",
                 env_var="AWS_SECRET_ACCESS_KEY",
@@ -746,9 +792,7 @@ descriptor = ProviderDescriptor(
                 kind="host-profile",
                 required=False,
                 advanced=True,
-                help_text=(
-                    "A named profile to resolve through boto3, when it is installed."
-                ),
+                help_text=("A named profile to resolve through boto3, when it is installed."),
                 placeholder="default",
             ),
         ),

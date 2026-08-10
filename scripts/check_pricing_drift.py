@@ -1,74 +1,101 @@
-"""Deterministic pricing drift check against OpenRouter's public model listing.
+"""Deterministic multi-source pricing drift check.
 
-The cheap, machine-readable half of the weekly pricing refresh: every bundled entry that
-declares an ``openrouter_id`` is compared against OpenRouter's current per-token rates.
-OpenRouter passes through first-party list prices for the majors, so a mismatch is a
-strong (not infallible) signal that the provider moved its prices — the LLM verification
-pass in the workflow confirms against the provider's own page before anything changes.
+The checker detects possible drift and never edits pricing data. Direct provider catalogs
+are stronger evidence than OpenRouter's secondary signal, but a contributor still verifies
+the provider's current human-readable pricing documentation before changing a rate or date.
 
-Stdlib only, so the check runs before any dependency is installed.
-
-Exit codes: 0 no drift, 1 drift detected, 2 check could not run.
-Writes ``drift=true|false`` to ``$GITHUB_OUTPUT`` when running in Actions.
+Exit codes: 0 complete/no drift, 1 complete/drift, 2 incomplete or invalid.
 """
 
 from __future__ import annotations
 
+import argparse
+import datetime as dt
 import json
 import os
 import sys
-import urllib.request
-from decimal import Decimal
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
+
+from pricing_check import (
+    SOURCES,
+    DriftFinding,
+    SourceResult,
+    build_report,
+    compare_rates,
+    failed_findings,
+    load_bundled,
+    render_json,
+    render_text,
+    selected_rates,
+    validate_policies,
+)
+from pricing_fetch import fetch_json
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PRICING_PATH = REPO_ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json"
-OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 
-def fetch_openrouter_rates() -> dict[str, tuple[Decimal, Decimal]]:
-    """Fetch OpenRouter's listing as ``id -> (input_per_1m, output_per_1m)``."""
-    request = urllib.request.Request(
-        OPENROUTER_MODELS_URL, headers={"User-Agent": "anyinfer-pricing-drift-check"}
-    )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        listing = json.load(response)
-    rates: dict[str, tuple[Decimal, Decimal]] = {}
-    for model in listing.get("data", []):
-        pricing = model.get("pricing") or {}
+def _checked_at() -> str:
+    return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def run_check(
+    *,
+    source_names: Sequence[str],
+    fetcher: Callable[[str], Mapping[str, Any]] = fetch_json,
+    checked_at: str | None = None,
+    pricing_path: Path = PRICING_PATH,
+) -> tuple[dict[str, Any], int]:
+    """Run enabled sources and return the report plus the documented exit code."""
+    data = json.loads(pricing_path.read_text(encoding="utf-8"), parse_float=str)
+    rates = load_bundled(data)
+    policy_problems = validate_policies(rates)
+    if policy_problems:
+        raise ValueError("; ".join(policy_problems))
+
+    findings: list[DriftFinding] = []
+    results: list[SourceResult] = []
+    for source_name in source_names:
+        source = SOURCES[source_name]
+        selected = selected_rates(rates, source_name)
         try:
-            rates[model["id"]] = (
-                Decimal(pricing["prompt"]) * 1_000_000,
-                Decimal(pricing["completion"]) * 1_000_000,
-            )
-        except (KeyError, ArithmeticError):
-            continue
-    return rates
-
-
-def find_drift() -> list[str]:
-    """Compare every cross-checkable bundled entry; return human-readable mismatches."""
-    bundled = json.loads(PRICING_PATH.read_text(encoding="utf-8"))
-    rates = fetch_openrouter_rates()
-
-    drift: list[str] = []
-    for provider, entries in bundled["providers"].items():
-        for entry in entries:
-            openrouter_id = entry.get("openrouter_id")
-            if not openrouter_id:
-                continue
-            if openrouter_id not in rates:
-                drift.append(f"{provider}:{entry['model']}: {openrouter_id} vanished upstream")
-                continue
-            live_input, live_output = rates[openrouter_id]
-            ours_input = Decimal(entry["input_per_1m"])
-            ours_output = Decimal(entry["output_per_1m"])
-            if live_input != ours_input or live_output != ours_output:
-                drift.append(
-                    f"{provider}:{entry['model']}: bundled {ours_input}/{ours_output} "
-                    f"vs live {live_input.normalize()}/{live_output.normalize()} per 1M"
+            observations = source.parser(fetcher(source.url))
+            if selected and not observations:
+                raise ValueError("source schema yielded no comparable observations")
+        except Exception as error:  # noqa: BLE001 - every source failure is report data
+            reason = f"{type(error).__name__}: {error}"
+            results.append(
+                SourceResult(
+                    source_name, source.authority, source.url, len(selected), 0, False, reason
                 )
-    return drift
+            )
+            findings.extend(failed_findings(selected, checker=source_name, reason=reason))
+            continue
+        results.append(
+            SourceResult(
+                source_name,
+                source.authority,
+                source.url,
+                len(selected),
+                len(observations),
+                True,
+            )
+        )
+        findings.extend(compare_rates(selected, observations, checker=source_name))
+
+    report = build_report(
+        checked_at=checked_at or _checked_at(),
+        all_rates=rates,
+        findings=findings,
+        source_results=results,
+    )
+    if report["summary"]["source_failures"]:
+        return report, 2
+    if report["summary"]["drift"]:
+        return report, 1
+    return report, 0
 
 
 def _write_github_output(drifted: bool) -> None:
@@ -78,22 +105,37 @@ def _write_github_output(drifted: bool) -> None:
             handle.write(f"drift={'true' if drifted else 'false'}\n")
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--report", type=Path, help="write the versioned JSON report here")
+    parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument(
+        "--live-source",
+        action="append",
+        choices=tuple(SOURCES),
+        dest="sources",
+        help="run only this source (repeatable); default runs every public source",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point."""
+    args = _parser().parse_args(argv)
+    source_names = args.sources or list(SOURCES)
     try:
-        drift = find_drift()
-    except Exception as error:  # noqa: BLE001 — an unreachable API is a report, not a crash
+        report, exit_code = run_check(source_names=source_names)
+        report_text = render_json(report)
+        if args.report:
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(report_text, encoding="utf-8")
+        sys.stdout.write(report_text if args.format == "json" else render_text(report))
+    except Exception as error:  # noqa: BLE001 - validation/report failures are exit 2
         print(f"CHECK FAILED: {error}", file=sys.stderr)
         _write_github_output(False)
         return 2
-    _write_github_output(bool(drift))
-    if drift:
-        print("Pricing drift detected:")
-        for line in drift:
-            print(f"  {line}")
-        return 1
-    print("No pricing drift against OpenRouter.")
-    return 0
+    _write_github_output(exit_code == 1)
+    return exit_code
 
 
 if __name__ == "__main__":

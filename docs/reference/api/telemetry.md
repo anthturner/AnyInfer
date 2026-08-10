@@ -40,6 +40,8 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 
 ::: anyinfer.ContextReduced
 
+::: anyinfer.ArenaCompleted
+
 ::: anyinfer.CachePlanned
 
 ::: anyinfer.RateLimitWaited

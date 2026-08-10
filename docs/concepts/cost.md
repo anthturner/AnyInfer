@@ -58,6 +58,34 @@ ledger.by_label("tenant")   # {"acme": SpendTotals(...), "globex": SpendTotals(.
 The library never interprets those labels — tenant, feature, job id are your vocabulary,
 carried through untouched.
 
+## How bundled prices are checked
+
+The repository's weekly drift check is a detector, not a price updater. It compares exact
+provider-and-model keys against three public machine-readable sources: the provider-owned
+Chutes and Avian catalogs are direct evidence, while OpenRouter is a secondary tripwire for
+the ten explicitly mapped OpenAI and Anthropic entries. Every other priced provider has an
+explicit manual, authenticated, unrepresentable, or deferred posture.
+
+A clean run means those sources were reachable and the covered values matched. It does not
+make an old price newly verified. A contributor still opens the provider's own current
+pricing documentation, checks currency, units, tier, region, and token side, and submits a
+human-reviewed change. Source outages make the check incomplete instead of producing a
+false green result.
+
+From a source checkout:
+
+```console
+python scripts/check_pricing_drift.py
+python scripts/check_pricing_drift.py --format json
+python scripts/check_pricing_drift.py --report pricing-drift-report.json
+python scripts/check_pricing_drift.py --live-source chutes-models
+```
+
+Exit status `0` means a complete run with no drift, `1` means a complete run found a changed
+or missing exact mapping, and `2` means validation or a required source failed. Ordinary
+tests use minimized fixtures under `tests/fixtures/pricing/`; refreshing a fixture records a
+source capture, not a new `last_verified` date for bundled rates.
+
 !!! note "One ledger per client, by composition"
 
     There is no process-wide ledger. Two clients that should share a total are given the

@@ -71,6 +71,10 @@ requests in, typed event streams or validated results out, across cloud and loca
   and all. *Amended (§27):* the client may apply it on the request path when a
   `HistoryPolicy` is configured. That is opt-in, emits a typed event, and is the second
   half of an overflow answer the router already owned — not memory, and not a planner.
+  *Amended again:* an opt-in arena is a fixed, bounded fan-out followed by one terminal
+  selection. Its call ceiling is known before dispatch; candidates never see or prune one
+  another, nothing is stored, and outcomes never influence a later route. Selecting which
+  branch to continue would be planning and remains out of scope.
 - **No load balancing or cost/latency-adaptive routing** (deferred; the router's policy
   interface must not preclude them). *Clarified:* `anyinfer.routing.limits` paces **this
   process's own requests** to a provider it is already going to call — a semaphore and a
@@ -80,14 +84,43 @@ requests in, typed event streams or validated results out, across cloud and loca
   moment pacing informs target selection it has become load balancing, and that is a
   reversal to argue, not a config option. Defaults are inert — an unconfigured client
   behaves exactly as it did before pacing existed.
-- **No embeddings, images, audio, or fine-tuning APIs.** Text generation only. (Multimodal
-  *inputs* are structurally reserved in the message model but not implemented.)
+  *Clarified again:* reporting how one request would degrade, fit, and cost across targets
+  is not target selection. `compare()` returns those facts in caller order and the router
+  never consumes them. A built-in ranking or “pick the best” helper would cross the same
+  boundary as pacing-informed routing and is a reversal to argue. Non-OpenAI operations
+  exposed by the sidecar live under `/v1/anyinfer/*`; they remain projections over public
+  client APIs, never a second policy layer.
+- **No embeddings, image generation, audio output, or fine-tuning APIs.** Generation still
+  produces text and tool calls only. Multimodal *inputs* — images, documents, and audio
+  content attached to a generation request — are implemented as typed message parts; they
+  do not introduce a second inference primitive or any multimodal output API.
+- **No cross-provider continuation of interrupted streams.** A continuation would need to
+  replay a provider's partial assistant output into another target without duplicating or
+  revising it. The feasibility gate was rechecked on **2026-08-10** and required verified
+  assistant-prefill semantics on at least three hosted providers. It failed:
+
+  | Dialect | Evidence checked 2026-08-10 | Gate result |
+  |---|---|---|
+  | OpenAI | Current request references accept prior assistant history but document no append-only continuation guarantee for a partial assistant turn. | fail |
+  | Anthropic | The current Messages guide says prefilling returns HTTP 400 on Claude 4.6 and later; older model-specific support is not a provider-wide continuation contract. | fail |
+  | Ollama | `/api/chat` accepts assistant history and the streaming guide shows accumulated assistant output being appended for a later request, but this is a local engine, not a hosted provider. | local evidence only |
+
+  The hosted-provider count is therefore below three. Official evidence:
+  [OpenAI messages](https://platform.openai.com/docs/api-reference/messages),
+  [Anthropic Messages](https://platform.claude.com/docs/en/build-with-claude/working-with-messages),
+  and [Ollama streaming](https://docs.ollama.com/capabilities/streaming).
+  Structured output, reasoning, and tool-call fragments are additionally unsafe continuation
+  boundaries. The core therefore exposes deterministic complete top-level JSON members on a
+  schema error, but does not stitch generations or label guessed continuation as salvage.
 - **No prompt templating.** Applications keep their own prompt construction. *Amended:*
   the optional `anyinfer.context` subsystem renders a mechanical,
   documented context envelope (file/extract/compact/duplicate/rollup blocks) as reducer
   output — a data format like the C3/C4 injection prompts, not a template engine. Apps
   still own all surrounding prompt text, and the core client never constructs prompts on
   their behalf.
+  Arena judge and synthesis calls use one versioned mechanical candidate envelope and a
+  documented default instruction, on the same narrow terms as context distillation. A
+  caller may replace the instruction wholesale; there is no general template facility.
 - **Not an OpenAI-API clone.** OpenAI-compatible is one dialect among several, not the core
   abstraction (see ADR-001).
 - **Not an organization gateway or control plane.** Virtual keys, multi-tenancy, RBAC,
@@ -187,7 +220,7 @@ class ToolResult:
     content: str
     is_error: bool = False
 
-ContentPart = Text | ToolCall | ToolResult   # multimodal parts reserved for future
+ContentPart = Text | ToolCall | ToolResult | ImagePart | DocumentPart | AudioPart
 
 @dataclass(frozen=True, slots=True)
 class Message:
@@ -473,6 +506,11 @@ Health results cache with a short TTL; a skipped target records `skipped_unhealt
 
 Deferred by decision: load balancing, cost/latency-adaptive selection. `Route` is deliberately
 a policy object so richer policies can be added without new client methods.
+
+`compare()` is the reporting side of that boundary: it resolves a concrete request against
+caller-supplied targets without dispatching and reports capability provenance, degradation,
+fit, and estimated cost. Routing never reads a comparison; applications remain responsible
+for any ranking or selection they derive from it.
 
 ## 12. Local subsystem
 
@@ -1110,6 +1148,46 @@ changed meaning, and adding a field does not, because a reader ignoring unknown 
 survives additions.
 
 
+### ADR-015 — Arena is bounded terminal comparison, never adaptive routing
+**Decision.** Ship an opt-in client-layer `ArenaPolicy` that fans one request or tool loop
+out to a fixed caller-supplied target set, waits for every branch, preserves every candidate,
+and applies one terminal deterministic, judge, or synthesis strategy. The generation-call
+ceiling is known before dispatch (`N`, or `N × max_rounds`, plus at most one judge call),
+and a summed spend reservation is acquired before any branch starts. Candidates are
+anonymized in the versioned judge envelope by default, never see another candidate's output
+or tool history, are never pruned mid-run, and arena results are never stored or consumed by
+routing. The sidecar and CLI decode policy only; orchestration remains in `AsyncClient`.
+**Why.** Applications otherwise rebuild concurrent fan-out with inconsistent usage, timing,
+schema validation, cancellation, and cost controls. A fixed terminal comparison has the same
+bounded character as schema repair and context distillation, while mid-run branch selection
+or feedback into later routing would cross the project's agent and adaptive-routing
+boundaries.
+**Consequences.** Cost is visibly multiplied, candidates are evidence and are never dropped
+when a winner is promoted, consensus is available only for validated structured values, and
+judge failures degrade to deterministic selection. Tool memoization is exact, single-flight,
+and run-scoped. Because failed attempts do not carry usage today, any failed candidate makes
+the arena aggregate usage unknown rather than silently understating spend.
+
+
+### ADR-016 — Multimodal inputs are typed payloads; outputs remain text-only
+**Decision.** Activate the message model's input reservation with image, document, and
+audio parts carrying bytes or a remote reference. Adapters alone encode those parts into
+provider dialects, and unsupported projections fail explicitly. Trusted capability absence
+may refuse before dispatch; unknown capability data does not pretend to be absence.
+Multimodal bytes are bounded before dispatch, remain payload-private, and are never logged.
+When no catalog formula can price a part's token contribution, fit and cost remain unknown
+and the context gate declines to guess.
+**Why.** The sidecar's request model must preserve the OpenAI chat surface, and silently
+flattening an image or PDF into an empty text turn violates that boundary. Typed parts make
+every projection site compiler-visible while retaining one request-to-event-stream
+primitive.
+**Consequences.** Text-only requests are byte-for-byte unchanged. Provider and model support
+is partial and provenance-tagged, remote-reference rules stay provider-specific, and local
+vision remains unavailable until the pinned model catalog can represent and verify a
+projector artifact. Image generation, speech output, transcription endpoints, embeddings,
+and fine-tuning remain non-goals.
+
+
 ## 24. Provider conformance test matrix (draft)
 
 **Contract snapshots and drift checking.** Each provider's exact wire dependencies
@@ -1349,9 +1427,24 @@ compacted against (unknown stays unknown — the client will not invent a window
 discarding a conversation), and neither is a window whose output reserve leaves no input
 allowance, since there is nothing to compact *into*.
 
-**Corpus reduction is deliberately not unified this way.** `anyinfer.context.select` needs
-a corpus, and the gateway receives `messages`. Carrying documents over the wire would make
-the sidecar decide what is safe to send about material it never collected — the exact
-boundary §26 exists to draw — so collection-shaped frontends (`anyinfer context`, an
-application) reduce, and message-shaped frontends do not. The asymmetry is corpus-versus-
-conversation, not SDK-versus-gateway.
+**Corpus reduction uses the same client-layer rule when the caller supplies the corpus.**
+The earlier exclusion conflated collection with reduction. A remote caller that places
+documents in `anyinfer_context` has already collected, reviewed, and deliberately approved
+those bytes; the sidecar decides only what fits, exactly as `anyinfer.context.select` does
+in-process. Reduction therefore runs after target resolution and before the context gate,
+while the sidecar remains a decoder. The real constraints are bandwidth and state: request
+payloads are bounded, inference-spending `distill` is excluded, and no document, corpus id,
+or cache survives the response. Upload-once/reference-later corpus storage remains outside
+the sidecar permanently because it would make the frontend a stateful second core.
+
+Arena follows the same client-policy rule as history. `ArenaPolicy` may be configured on a
+client or carried by one request; the CLI and sidecar only decode it and the client alone
+fans out, selects, accounts, and emits telemetry. The shape is fixed and candidates remain
+independent through their final turns. A named sidecar arena is still the same client
+policy selected through configuration, not frontend orchestration.
+
+The event contract cannot currently recover provider usage for a failed attempt. Therefore
+an arena with any failed candidate reports its aggregate usage as unknown rather than
+summing only successful candidates into a falsely authoritative total. Calls, successful
+candidate usage, and attempt trails remain visible; provider invoices remain authoritative
+for failed-attempt billing.

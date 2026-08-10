@@ -1668,8 +1668,9 @@ repetition_penalty, frequency_penalty, presence_penalty, stop, seed).
 - Compatibility notes:
 OpenAI-compatible chat/completions + embeddings. Notable deltas: (1) GET /v1/models is
 UNAUTHENTICATED and returns an unusually rich catalog — dual pricing objects
-(price.{input,output,input_cache_read}.{usd,tao} per token, plus OpenRouter-style
-pricing.{prompt,completion,input_cache_read} flat USD per 1M), context_length/max_model_len,
+(price.{input,output,input_cache_read}.{usd,tao} and
+pricing.{prompt,completion,input_cache_read}, with the displayed USD numbers flat per 1M),
+context_length/max_model_len,
 max_output_length, input/output modalities, supported_features, supported_sampling_parameters,
 quantization, chute_id, confidential_compute (TEE) flag, and root (the underlying non-TEE repo).
 (2) Inline failover routing: the model field accepts "default" (saved failover pool) or a comma-
@@ -1680,7 +1681,7 @@ comes from community-donated compute, so sustained 429s indicate no available GP
 misconfiguration. (6) api.chutes.ai is the management plane (billing, keys, quotas) and is a
 DIFFERENT host from the llm.chutes.ai inference plane. (7) Self-deployed chutes get per-
 deployment subdomains: https://{slug}.chutes.ai/v1.
-- Sources (verified 2026-08-07):
+- Sources (protocol verified 2026-08-07; public model/pricing schema re-verified 2026-08-10):
   - https://chutes.ai/llms.txt
   - https://chutes.ai/pricing
   - https://llm.chutes.ai/v1/models
@@ -1700,12 +1701,13 @@ stream:true, tool/function calling via the tools parameter. GET /v1/models is UN
 and returns a modestly enriched object: id, owned_by, display_name, context_length, max_output,
 a boolean reasoning flag, and pricing.{input_per_million, output_per_million,
 cache_read_per_million} in flat USD per 1M tokens (note the non-standard *_per_million field
-naming rather than OpenRouter's per-token strings). Small curated catalog — 10 text models, all
-open-weight Chinese-lab frontier models (DeepSeek, GLM, Kimi, MiniMax); no OpenAI/Anthropic
+naming rather than OpenRouter's per-token strings). Small curated catalog — 11 text models at
+the 2026-08-10 live check, all open-weight Chinese-lab frontier models (DeepSeek, GLM, Kimi,
+MiniMax); no OpenAI/Anthropic
 proxying. Vision, web search, web reader and native tool calling are advertised across all
 models. Prepaid credits that never expire; no rate limits beyond balance. Dedicated H200/H100
 capacity is sales-contact only.
-- Sources (verified 2026-08-07):
+- Sources (protocol verified 2026-08-07; public model/pricing schema re-verified 2026-08-10):
   - https://avian.io/docs/
   - https://avian.io/pricing/
   - https://api.avian.io/v1/models

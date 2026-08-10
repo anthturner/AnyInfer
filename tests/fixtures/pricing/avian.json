@@ -1,0 +1,16 @@
+{
+  "data": [
+    {"id": "deepseek/deepseek-v4-flash", "pricing": {"input_per_million": 0.0805, "output_per_million": 0.161}},
+    {"id": "deepseek/deepseek-v4-pro", "pricing": {"input_per_million": 1.305, "output_per_million": 2.61}},
+    {"id": "deepseek/deepseek-v3.2", "pricing": {"input_per_million": 0.23, "output_per_million": 0.33}},
+    {"id": "minimax/minimax-m2.5", "pricing": {"input_per_million": 0.27, "output_per_million": 1.08}},
+    {"id": "z-ai/glm-4.7", "pricing": {"input_per_million": 0.388, "output_per_million": 1.806}},
+    {"id": "z-ai/glm-5", "pricing": {"input_per_million": 0.516, "output_per_million": 2.322}},
+    {"id": "z-ai/glm-5.1", "pricing": {"input_per_million": 0.743, "output_per_million": 2.971}},
+    {"id": "z-ai/glm-5.2", "pricing": {"input_per_million": 0.495, "output_per_million": 1.733}},
+    {"id": "moonshotai/kimi-k2.5", "pricing": {"input_per_million": 0.45, "output_per_million": 2.2}},
+    {"id": "moonshotai/kimi-k2.6", "pricing": {"input_per_million": 0.95, "output_per_million": 4.0}},
+    {"id": "xiaomi/mimo-v2.5", "pricing": {"input_per_million": 0.2, "output_per_million": 0.4, "cache_read_per_million": 99}},
+    {"id": "malformed/no-input", "pricing": {"output_per_million": 1}}
+  ]
+}

@@ -20,6 +20,7 @@ from ..types.results import Diagnostic, ErrorInfo, Mechanism, Timing, Usage
 
 __all__ = [
     "PAYLOAD_FIELDS",
+    "ArenaCompleted",
     "AttemptCompleted",
     "AttemptStarted",
     "CachePlanned",
@@ -60,6 +61,19 @@ class RequestStarted:
     targets: tuple[Target, ...]
     metadata: Mapping[str, str] = field(default_factory=dict)
     prompt_text: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ArenaCompleted:
+    """A bounded multi-target arena finished, without carrying answer content."""
+
+    request_id: str
+    target_count: int
+    strategy: str
+    agreement: int | None
+    calls: int
+    memoized_tool_calls: int
+    synthesized: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -448,11 +462,26 @@ class DownloadProgress:
 
 
 TelemetryEvent = (
-    RequestStarted | TargetResolved | AttemptStarted | FirstToken | AttemptCompleted
-    | RetryScheduled | FallbackTriggered | RepairAttempted | RequestCompleted | RequestFailed
-    | ParameterDropped | UsageEstimated | ServerLifecycle | DownloadProgress
-    | ContextReduced | ProviderDiagnostic | CachePlanned
-    | RateLimitWaited | RateLimitObserved
+    RequestStarted
+    | ArenaCompleted
+    | TargetResolved
+    | AttemptStarted
+    | FirstToken
+    | AttemptCompleted
+    | RetryScheduled
+    | FallbackTriggered
+    | RepairAttempted
+    | RequestCompleted
+    | RequestFailed
+    | ParameterDropped
+    | UsageEstimated
+    | ServerLifecycle
+    | DownloadProgress
+    | ContextReduced
+    | ProviderDiagnostic
+    | CachePlanned
+    | RateLimitWaited
+    | RateLimitObserved
 )
 """Any event an observer may receive."""
 

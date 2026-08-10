@@ -45,6 +45,8 @@ def context_gate_error(
         The error to raise before dispatch, or ``None`` when the request may proceed —
         including whenever the window is unknown or untrusted.
     """
+    if budget.estimate.unpriced_parts:
+        return None
     window = budget.context_window
     if window is None or window.provenance not in TRUSTED_PROVENANCE:
         return None

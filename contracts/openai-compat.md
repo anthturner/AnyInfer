@@ -6,6 +6,8 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ## Upstream sources
 - https://platform.openai.com/docs/api-reference/chat (the de-facto dialect spec)
 - https://platform.openai.com/docs/api-reference/models
+- https://developers.openai.com/api/docs/guides/images-vision
+- https://developers.openai.com/api/docs/guides/file-inputs
 
 ## Wire contract
 ### Endpoints
@@ -20,6 +22,13 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   `temperature`, `top_p`, `max_tokens` (subclasses may override the output-token
   parameter name), `stop`, `tools`, `tool_choice`,
   `response_format: {"type":"json_schema","json_schema":{...}}` or `{"type":"json_object"}`
+
+### Multimodal inputs
+Verified 2026-08-10 for the OpenAI Chat Completions dialect. Message content arrays carry
+`text`, `image_url`, `file`, and `input_audio` items; inline image and file bytes are data
+URLs and inline audio is base64 in its content object. Compatibility servers vary, so this
+is a projection contract rather than a capability claim: presets must discover, catalog,
+or document support, and an upstream rejection remains explicit.
 ### Response fields
 - `choices[0].message.content`, `choices[0].message.tool_calls[]`,
   `choices[0].finish_reason` (`stop|length|tool_calls|content_filter`),

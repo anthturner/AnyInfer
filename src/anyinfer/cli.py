@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
+import mimetypes
 import os
 import sys
 from collections.abc import Sequence
+from dataclasses import fields
+from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from . import __version__
 from .config import AnyInferConfig, load_config
@@ -57,6 +61,37 @@ def _add_serve_flags(parser: argparse.ArgumentParser) -> None:
         metavar="TARGET",
         help="advertise a concrete provider:model target from /v1/models (repeatable)",
     )
+
+
+def _copy_parser_actions(
+    source: argparse.ArgumentParser,
+    destination: argparse.ArgumentParser,
+    destinations: set[str],
+) -> None:
+    """Copy selected argparse actions so two verbs cannot drift in shared flags."""
+    for action in source._actions:  # argparse exposes no public action-cloning API
+        if action.dest in destinations:
+            destination._add_action(copy.copy(action))
+
+
+def _add_arena_flags(parser: argparse.ArgumentParser) -> None:
+    """Expose every `ArenaPolicy` field with one generated, parity-checked mapping."""
+    from .types.requests import ARENA_MEMO_MODES, ARENA_STRATEGIES, ArenaPolicy
+
+    definitions: dict[str, tuple[str, dict[str, Any]]] = {
+        "targets": ("--arena", {"metavar": "A,B,C", "help": "fan out to comma-separated targets"}),
+        "strategy": ("--arena-strategy", {"choices": ARENA_STRATEGIES}),
+        "judge_target": ("--judge-target", {"metavar": "TARGET"}),
+        "instructions": ("--arena-instructions", {"metavar": "TEXT"}),
+        "concurrency": ("--arena-concurrency", {"type": int}),
+        "min_candidates": ("--arena-min-candidates", {"type": int}),
+        "reveal_targets": ("--arena-reveal-targets", {"action": "store_true"}),
+        "memoize_tools": ("--memoize-tools", {"choices": ARENA_MEMO_MODES}),
+    }
+    for item in fields(ArenaPolicy):
+        flag, options = definitions[item.name]
+        parser.add_argument(flag, dest=f"arena_{item.name}", default=None, **options)
+    parser.add_argument("--arena-name", help="named arena from the shared config")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -172,6 +207,55 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="TARGET",
         help="ordered fallback target, repeatable; overrides --target",
     )
+    _add_arena_flags(run)
+    run.add_argument(
+        "--context-file",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help="caller-approved document to reduce into the request; repeatable",
+    )
+    run.add_argument(
+        "--image",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help="attach an image as inline bytes; repeatable",
+    )
+    run.add_argument(
+        "--document",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help="attach a document as inline bytes; repeatable",
+    )
+    run.add_argument(
+        "--audio",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help="attach audio as inline bytes; repeatable",
+    )
+    run.add_argument(
+        "--context-dir",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="DIR",
+        help="collect readable source files under a directory; repeatable",
+    )
+    run.add_argument("--context-query", help="ranking query; defaults to the prompt")
+    run.add_argument(
+        "--context-strategy",
+        choices=("auto", "whole", "ranked", "tiered", "packed"),
+        default="auto",
+    )
+    run.add_argument("--context-max-tokens", type=int, default=None)
+    run.add_argument("--context-placement", choices=("system", "prepend_user"), default="system")
     run.add_argument("--system", default=None, help="system prompt")
     run.add_argument(
         "--messages",
@@ -284,6 +368,58 @@ def build_parser() -> argparse.ArgumentParser:
             "Content-free: shape, counts, and decisions, never prompt or reply text"
         ),
     )
+    compare = subcommands.add_parser(
+        "compare",
+        help="compare how one request behaves across targets without sending it",
+        description=(
+            "Resolve one request against every --target and report fit, degradation, "
+            "mechanisms, provenance, and estimated cost. Results stay in caller order; "
+            "the command never ranks or chooses a target."
+        ),
+    )
+    _copy_parser_actions(
+        run,
+        compare,
+        {
+            "prompt",
+            "config",
+            "system",
+            "messages",
+            "schema",
+            "repair",
+            "tool",
+            "tool_choice",
+            "temperature",
+            "top_p",
+            "max_tokens",
+            "stop",
+            "reasoning",
+            "timeout",
+            "cache",
+            "context_file",
+            "context_dir",
+            "context_query",
+            "context_strategy",
+            "context_max_tokens",
+            "context_placement",
+            "image",
+            "document",
+            "audio",
+        },
+    )
+    compare.add_argument(
+        "--target",
+        action="append",
+        required=True,
+        metavar="TARGET",
+        help="target to compare, repeatable; results preserve this order",
+    )
+    compare.add_argument("--json", action="store_true", help="emit JSON records")
+    compare.add_argument(
+        "--refresh",
+        action="store_true",
+        help="refresh provider model listings before comparing (may contact providers)",
+    )
 
     init = subcommands.add_parser(
         "init",
@@ -379,15 +515,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("target", help="a target or alias")
     bench.add_argument("--config", type=Path, help="path to a configuration file")
-    bench.add_argument(
-        "--prompt-tokens", type=int, default=None, help="approximate prompt size"
-    )
+    bench.add_argument("--prompt-tokens", type=int, default=None, help="approximate prompt size")
     bench.add_argument(
         "--output-tokens", type=int, default=None, help="how many tokens to generate"
     )
-    bench.add_argument(
-        "--store", type=Path, help="record the measurement in this JSON file"
-    )
+    bench.add_argument("--store", type=Path, help="record the measurement in this JSON file")
     bench.add_argument("--json", action="store_true", help="emit machine-readable output")
 
     context = subcommands.add_parser(
@@ -406,9 +538,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--query", default="", help="what the request is about; drives relevance ranking"
     )
     context.add_argument("--config", type=Path, help="JSON config file (supplies 'context')")
-    context.add_argument(
-        "--target", help="derive the budget from this target's context window"
-    )
+    context.add_argument("--target", help="derive the budget from this target's context window")
     context.add_argument("--max-tokens", type=int, help="token budget; overrides --target")
     context.add_argument(
         "--strategy",
@@ -574,6 +704,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _serve(args)
         if args.command == "run":
             return _run(args)
+        if args.command == "compare":
+            return _compare(args)
         if args.command == "init":
             return _init(args)
         if args.command == "agents-md":
@@ -650,7 +782,14 @@ def _serve_run(args: argparse.Namespace) -> int:
     settings, route = list(config.providers), config.route
     # The gateway inherits the compaction policy rather than implementing one: it is a
     # codec over a normal client, and that client is where context policy lives.
-    client = AsyncClient(settings, route=route, history=config.history, cache=config.cache)
+    client = AsyncClient(
+        settings,
+        route=route,
+        history=config.history,
+        cache=config.cache,
+        arena=config.arena,
+        arenas=config.arenas,
+    )
     app = create_app(client, auth_token=token, expose_targets=tuple(args.expose))
 
     print(f"anyinfer {__version__} serving on http://{args.host}:{args.port}")
@@ -685,9 +824,7 @@ def _run_command(command: tuple[str, ...]) -> tuple[int, str]:
     import subprocess
 
     try:
-        finished = subprocess.run(
-            list(command), capture_output=True, text=True, check=False
-        )
+        finished = subprocess.run(list(command), capture_output=True, text=True, check=False)
     except OSError as exc:
         return 127, f"{command[0]}: {exc}"
     return finished.returncode, (finished.stdout + finished.stderr).strip()
@@ -781,8 +918,7 @@ def _serve_install(args: argparse.Namespace) -> int:
                 print(f"           {line}")
         if code != 0:
             print(
-                "the service manager refused the definition; it is written but not "
-                "registered",
+                "the service manager refused the definition; it is written but not registered",
                 file=sys.stderr,
             )
             return 1
@@ -898,13 +1034,110 @@ def _confirm(question: str, args: argparse.Namespace) -> bool:
 # ---- run -----------------------------------------------------------------------------
 
 
+def _compare(args: argparse.Namespace) -> int:
+    """Compare a request across targets without dispatching it."""
+    from . import Client, Repair, Sampling, SchemaSpec
+    from .types.requests import CachePolicy
+
+    messages = _compose_messages(args)
+    if not messages:
+        print(
+            "nothing to compare: give a prompt, pipe one on stdin, or pass --messages",
+            file=sys.stderr,
+        )
+        return 2
+    schema = (
+        SchemaSpec(_read_json(args.schema, "schema"), name=args.schema.stem)
+        if args.schema is not None
+        else None
+    )
+    tools = tuple(_load_tool(path) for path in args.tool)
+    if args.tool_choice != "auto" and not tools:
+        print("--tool-choice needs at least one --tool", file=sys.stderr)
+        return 2
+    sampling = None
+    if (
+        any(value is not None for value in (args.temperature, args.top_p, args.max_tokens))
+        or args.stop
+    ):
+        sampling = Sampling(
+            temperature=args.temperature,
+            top_p=args.top_p,
+            max_output_tokens=args.max_tokens,
+            stop=tuple(args.stop),
+        )
+
+    config = _config(args.config)
+    if not config.providers:
+        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+        return 2
+    context_request = _cli_context_request(args, config)
+    if context_request is False:
+        return 2
+    client = Client(
+        list(config.providers),
+        route=config.route,
+        repair=Repair(max_attempts=args.repair) if args.repair is not None else None,
+        history=config.history,
+        cache=config.cache,
+    )
+    try:
+        comparisons = client.compare(
+            messages,
+            targets=tuple(args.target),
+            schema=schema,
+            tools=tools,
+            tool_choice=args.tool_choice,
+            sampling=sampling,
+            reasoning=args.reasoning,
+            timeout_s=args.timeout,
+            cache=CachePolicy(mode=args.cache) if args.cache else None,
+            context=context_request,
+            refresh=args.refresh,
+        )
+    finally:
+        client.close()
+
+    if args.json:
+        print(json.dumps([item.to_dict() for item in comparisons], indent=2))
+        return 0
+
+    headings = ("target", "resolvable", "fits", "schema", "cache", "cost", "dropped")
+    rows: list[tuple[str, ...]] = []
+    for item in comparisons:
+        cost = (
+            f"{item.cost.low}-{item.cost.high} {item.cost.currency}"
+            if item.cost is not None
+            else "unknown"
+        )
+        rows.append(
+            (
+                item.requested,
+                "yes" if item.resolvable else "NO",
+                "unknown" if item.fits is None else ("yes" if item.fits else "NO"),
+                item.structured_mechanism or "none",
+                item.cache.mechanism if item.cache and item.cache.mechanism else "none",
+                cost,
+                ", ".join(drop.parameter for drop in item.dropped) or item.reason or "none",
+            )
+        )
+    widths = [
+        max(len(headings[index]), *(len(row[index]) for row in rows))
+        for index in range(len(headings))
+    ]
+    print("  ".join(name.ljust(widths[index]) for index, name in enumerate(headings)))
+    for row in rows:
+        print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
+    return 0
+
+
 def _run(args: argparse.Namespace) -> int:
     """Run a single prompt and print the result.
 
     Returns:
         A process exit code.
     """
-    from . import Client, Repair, Route, Sampling, SchemaSpec
+    from . import ArenaPolicy, Client, Repair, Route, Sampling, SchemaSpec
 
     messages = _compose_messages(args)
     if not messages:
@@ -941,6 +1174,32 @@ def _run(args: argparse.Namespace) -> int:
     # An explicit --target and a --route are mutually exclusive at the call site; --route
     # wins because naming an ordered fallback list is the more specific instruction.
     target = None if args.route else args.target
+    if args.arena_targets and args.arena_name:
+        print("--arena and --arena-name are mutually exclusive", file=sys.stderr)
+        return 2
+    arena_policy = None
+    if args.arena_name:
+        arena_policy = config.arenas.get(args.arena_name)
+        if arena_policy is None:
+            print(f"unknown configured arena {args.arena_name!r}", file=sys.stderr)
+            return 2
+    elif args.arena_targets:
+        targets = tuple(item.strip() for item in args.arena_targets.split(",") if item.strip())
+        values = {
+            "targets": targets,
+            "strategy": args.arena_strategy or "first_valid",
+            "judge_target": args.arena_judge_target,
+            "instructions": args.arena_instructions,
+            "concurrency": args.arena_concurrency or 4,
+            "min_candidates": args.arena_min_candidates or 1,
+            "reveal_targets": bool(args.arena_reveal_targets),
+            "memoize_tools": args.arena_memoize_tools or "read_only",
+        }
+        try:
+            arena_policy = ArenaPolicy(**values)
+        except ValueError as exc:
+            print(f"invalid arena: {exc}", file=sys.stderr)
+            return 2
 
     if not settings:
         print(
@@ -950,12 +1209,18 @@ def _run(args: argparse.Namespace) -> int:
         )
         return 2
 
+    effective_arena = arena_policy or (config.arena if target is None and not args.route else None)
+    context_request = _cli_context_request(args, config)
+    if context_request is False:
+        return 2
     client = Client(
         settings,
         route=route,
         repair=Repair(max_attempts=args.repair) if args.repair is not None else None,
         history=config.history,
         cache=config.cache,
+        arena=config.arena,
+        arenas=config.arenas,
     )
     call: dict[str, Any] = {
         "target": target,
@@ -966,6 +1231,8 @@ def _run(args: argparse.Namespace) -> int:
         "sampling": sampling,
         "reasoning": args.reasoning,
         "timeout_s": args.timeout,
+        "arena": effective_arena,
+        "context": context_request,
     }
     if args.cache:
         # A flag overrides the configured policy for this one invocation; without either,
@@ -996,15 +1263,52 @@ def _run(args: argparse.Namespace) -> int:
     return _emit_result(generation, args, streamed=streaming)
 
 
-def _dry_run(
-    client: Any, messages: Any, call: dict[str, Any], args: argparse.Namespace
-) -> int:
+def _dry_run(client: Any, messages: Any, call: dict[str, Any], args: argparse.Namespace) -> int:
     """Report the size, fit, and cost of a request without sending it.
 
     Answers the question a user asks *before* paying for a large prompt, using the same
     budget calculator the client uses at dispatch — so what this prints is what the real
     request would have been held to, not a second estimate of it.
     """
+    arena = call.get("arena")
+    if arena is not None:
+        try:
+            rows = client.compare(
+                messages,
+                targets=arena.targets,
+                schema=call["schema"],
+                tools=call["tools"],
+                sampling=call["sampling"],
+            )
+        except AnyInferError as exc:
+            return _report_error(exc)
+        finally:
+            client.close()
+        costs = [row.cost for row in rows]
+        known = all(cost is not None for cost in costs)
+        low = sum((cost.low for cost in costs if cost is not None), start=Decimal(0))
+        high = sum((cost.high for cost in costs if cost is not None), start=Decimal(0))
+        call_ceiling = len(arena.targets) + (1 if arena.strategy in ("judge", "synthesize") else 0)
+        arena_payload = {
+            "arena_targets": list(arena.targets),
+            "strategy": arena.strategy,
+            "call_ceiling": call_ceiling,
+            "estimated_cost": (
+                {"low": str(low), "high": str(high), "currency": "USD"} if known else None
+            ),
+            "fits": [row.fits for row in rows],
+        }
+        if args.json:
+            print(json.dumps(arena_payload, indent=2))
+        else:
+            print(f"arena targets      {len(arena.targets)}")
+            print(f"call ceiling       {call_ceiling}")
+            if known:
+                print(f"summed cost        {low}-{high} USD")
+            else:
+                print("summed cost        unknown — at least one target is unpriced")
+        return 0
+
     target = call["target"] or (call["route"].targets[0] if call["route"] else None)
     if target is None:
         print(
@@ -1035,6 +1339,7 @@ def _dry_run(
             "tools": estimate.tools.tokens,
             "schema": estimate.schema.tokens,
             "envelope": estimate.envelope.tokens,
+            "unpriced_parts": estimate.unpriced_parts,
             "total": estimate.tokens,
             "floor": estimate.floor,
         },
@@ -1060,6 +1365,8 @@ def _dry_run(
 
     print(f"target            {resolved}")
     print(f"input estimate    {estimate.tokens} tokens (floor {estimate.floor})")
+    if estimate.unpriced_parts:
+        print(f"unpriced inputs   {estimate.unpriced_parts} (fit and cost remain unknown)")
     for name, value in (
         ("messages", estimate.messages.tokens),
         ("tools", estimate.tools.tokens),
@@ -1073,10 +1380,7 @@ def _dry_run(
         print("context window    unknown — no trustworthy figure for this model")
         print("fits              unknown")
         return 0
-    print(
-        f"context window    {budget.context_window.value} "
-        f"({budget.context_window.provenance})"
-    )
+    print(f"context window    {budget.context_window.value} ({budget.context_window.provenance})")
     print(f"output reserve    {budget.output_reserve_tokens}")
     print(f"input allowance   {budget.input_allowance_tokens}")
     print(f"remaining         {budget.remaining_tokens}")
@@ -1173,7 +1477,7 @@ def _emit_trace(generation: Any, args: argparse.Namespace) -> None:
 def _result_payload(generation: Any) -> dict[str, Any]:
     """Build the ``--json`` object."""
     usage, timing = generation.usage, generation.timing
-    return {
+    payload = {
         "text": generation.text,
         "structured": generation.structured,
         "target": str(generation.target) if generation.target else None,
@@ -1194,6 +1498,11 @@ def _result_payload(generation: Any) -> dict[str, Any]:
         },
         "warnings": list(generation.warnings),
     }
+    if generation.arena is not None:
+        from .arena import arena_to_dict
+
+        payload["arena"] = arena_to_dict(generation.arena)
+    return payload
 
 
 def _print_stats(generation: Any) -> None:
@@ -1220,6 +1529,28 @@ def _print_stats(generation: Any) -> None:
         print("cost              unknown (no trusted pricing)", file=sys.stderr)
     if generation.cache_mechanism:
         print(f"cache             {generation.cache_mechanism}", file=sys.stderr)
+    if generation.arena is not None:
+        print("\narena candidates", file=sys.stderr)
+        print("target  cost  first-token  total  rounds  valid", file=sys.stderr)
+        for candidate in generation.arena.candidates:
+            result = candidate.generation
+            cost = (
+                f"${result.usage.cost_usd:.6f}"
+                if result is not None and result.usage.cost_usd is not None
+                else "unknown"
+            )
+            first = (
+                f"{result.timing.first_token_ms:.0f}ms"
+                if result is not None and result.timing.first_token_ms is not None
+                else "unknown"
+            )
+            total = f"{candidate.elapsed_ms:.0f}ms"
+            print(
+                f"{candidate.target}  {cost}  {first}  {total}  "
+                f"{candidate.rounds if candidate.rounds is not None else '-'}  "
+                f"{candidate.valid if candidate.valid is not None else '-'}",
+                file=sys.stderr,
+            )
 
 
 def _report_error(exc: Any) -> int:
@@ -1237,7 +1568,7 @@ def _report_error(exc: Any) -> int:
 
 def _compose_messages(args: argparse.Namespace) -> list[Any]:
     """Assemble the conversation from --messages, --system, the argument, and stdin."""
-    from . import Message, Text, system, user
+    from . import AudioPart, DocumentPart, ImagePart, Message, Text, system, user
 
     messages: list[Any] = []
     if args.messages is not None:
@@ -1266,7 +1597,67 @@ def _compose_messages(args: argparse.Namespace) -> list[Any]:
     parts = [part for part in (args.prompt, piped) if part]
     if parts:
         messages.append(user("\n\n".join(parts)))
+    attachments: list[Any] = []
+    for path in args.image:
+        attachments.append(
+            ImagePart(data=_read_attachment(path), media_type=_media_type(path, "image/png"))
+        )
+    for path in args.document:
+        attachments.append(
+            DocumentPart(
+                data=_read_attachment(path),
+                media_type=_media_type(path, "application/pdf"),
+                filename=path.name,
+            )
+        )
+    for path in args.audio:
+        attachments.append(
+            AudioPart(data=_read_attachment(path), media_type=_media_type(path, "audio/wav"))
+        )
+    if attachments:
+        messages.append(Message(role="user", content=tuple(attachments)))
     return messages
+
+
+def _read_attachment(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise SystemExit(f"could not read attachment {path}: {exc}") from exc
+
+
+def _media_type(path: Path, default: str) -> str:
+    return mimetypes.guess_type(path.name)[0] or default
+
+
+def _cli_context_request(args: argparse.Namespace, config: AnyInferConfig) -> Any | Literal[False]:
+    """Build one caller-approved context request identically for run and compare."""
+    from . import ContextRequest
+
+    if not args.context_file and not args.context_dir:
+        return None
+    documents = _collect_documents(
+        argparse.Namespace(
+            paths=[*args.context_file, *args.context_dir],
+            pin=[str(path) for path in args.context_file],
+            include_generated=False,
+        )
+    )
+    if not documents:
+        print("no readable context documents were found", file=sys.stderr)
+        return False
+    try:
+        return ContextRequest(
+            tuple(documents),
+            query=args.context_query,
+            strategy=args.context_strategy,
+            max_tokens=args.context_max_tokens,
+            placement=args.context_placement,
+            tuning=config.context,
+        )
+    except ValueError as exc:
+        print(f"invalid context request: {exc}", file=sys.stderr)
+        return False
 
 
 def _load_tool(path: Path) -> Any:
@@ -1325,9 +1716,7 @@ def _init(args: argparse.Namespace) -> int:
 
     profile = detect()
     probed = () if args.no_probe else endpoint_candidates(default_registry)
-    found = asyncio.run(
-        discover(default_registry, probe=not args.no_probe, keyring=args.keyring)
-    )
+    found = asyncio.run(discover(default_registry, probe=not args.no_probe, keyring=args.keyring))
     settings, notes = _init_settings(found)
     target, recommendation = _init_target(settings, found, profile)
     route = _init_route(target, found)
@@ -1508,11 +1897,7 @@ def _print_init_findings(
     accelerator = ""
     primary = profile.primary_accelerator
     if primary is not None:
-        memory = (
-            "unified memory"
-            if primary.unified_memory
-            else _gib(primary.total_vram_bytes)
-        )
+        memory = "unified memory" if primary.unified_memory else _gib(primary.total_vram_bytes)
         accelerator = f", {primary.name or primary.kind} ({memory})"
     print(
         f"detected   {profile.os_name} / {profile.arch}, "
@@ -1612,9 +1997,7 @@ def _configured_limits(config_path: Path | None) -> dict[str, str]:
             parts.append(f"{limits.min_interval_s:g}s apart")
         if limits.respect_headers:
             reserve = (
-                f", reserving {limits.reserve_fraction:.0%}"
-                if limits.reserve_fraction
-                else ""
+                f", reserving {limits.reserve_fraction:.0%}" if limits.reserve_fraction else ""
             )
             parts.append(f"provider headers{reserve}")
         summaries[settings.instance_id] = ", ".join(parts)
@@ -1719,8 +2102,7 @@ def _verify(args: argparse.Namespace) -> int:
     targets = [args.target] if args.target else list(config.route.targets if config.route else ())
     if not targets:
         print(
-            "nothing to verify: name a target, or configure a route to check every "
-            "target in it",
+            "nothing to verify: name a target, or configure a route to check every target in it",
             file=sys.stderr,
         )
         return 2
@@ -2016,9 +2398,7 @@ def _collect_documents(args: argparse.Namespace) -> list[Any]:
                 continue
             if "\x00" in text:
                 continue
-            seen[relative] = ContextDocument.of(
-                relative, text, pinned=relative in pinned
-            )
+            seen[relative] = ContextDocument.of(relative, text, pinned=relative in pinned)
 
     return [seen[path] for path in sorted(seen)]
 
@@ -2110,10 +2490,7 @@ def _providers(args: argparse.Namespace) -> int:
         if optional:
             print(f"{'':<16} accepts:  {', '.join(optional)}")
         if setup.advanced_fields:
-            print(
-                f"{'':<16} standard: "
-                f"{', '.join(f.key for f in setup.advanced_fields)}"
-            )
+            print(f"{'':<16} standard: {', '.join(f.key for f in setup.advanced_fields)}")
 
     issues = default_registry.plugin_issues()
     if issues:
@@ -2178,7 +2555,7 @@ def _conform(args: argparse.Namespace) -> int:
             list(config.providers),
             route=config.route,
             history=config.history,
-        cache=config.cache,
+            cache=config.cache,
         )
 
     results = asyncio.run(
@@ -2602,8 +2979,7 @@ def _runtime_install(args: argparse.Namespace) -> int:
         print(f"the {report.backend} runtime is already installed at {report.directory}")
     else:
         print(
-            f"installed the {report.backend} runtime (build {report.build}) at "
-            f"{report.directory}"
+            f"installed the {report.backend} runtime (build {report.build}) at {report.directory}"
         )
     print(f"executable        {report.executable}")
     for warning in report.warnings:

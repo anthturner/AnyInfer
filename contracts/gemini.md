@@ -13,6 +13,7 @@ Last verified: 2026-08-07 — against the live Gemini API documentation (sources
 - https://ai.google.dev/gemini-api/docs/rate-limits
 - https://ai.google.dev/gemini-api/docs/pricing
 - https://ai.google.dev/gemini-api/docs/openai (compatibility layer — deliberately unused)
+- https://ai.google.dev/gemini-api/docs/generate-content/file-input-methods
 
 ## Why native, not the OpenAI-compatibility layer
 
@@ -43,7 +44,9 @@ native protocol is used instead.
 - `contents[]`: `{role: "user"|"model", parts: [Part]}`. Assistant turns are spelled
   `model`; **tool results ride on a `user` turn**, not a dedicated role.
 - `Part` shapes emitted: `{text}`, `{functionCall: {name, args, id?}}`,
-  `{functionResponse: {name, response}}`. A synthesized `call_N` id is *not* echoed back
+  `{functionResponse: {name, response}}`, `{inlineData: {mimeType, data}}`, and
+  `{fileData: {mimeType, fileUri}}`. The media shapes were verified 2026-08-10 against
+  the provider-owned file-input guide. A synthesized `call_N` id is *not* echoed back
   as a `functionCall.id` — it is ours, not a key Gemini issued.
 - `functionResponse.response` must be an object: a non-JSON tool result is wrapped as
   `{"output": ...}`, or `{"error": ...}` when the result is error-flagged.

@@ -14,6 +14,23 @@ no sockets, no credentials, no network, and the same result on every machine.
 pip install anyinfer     # the fixtures come with it — no extra to install
 ```
 
+## Regression-test inference behaviour
+
+Lead with a golden run manifest when the route, repair budget, cache placement, or context
+policy is the contract you care about. It tests those decisions without asserting on model
+prose or unstable timing:
+
+```python
+def test_answer_path(anyinfer_golden_manifest):
+    result = application.answer("hi")
+    anyinfer_golden_manifest(result.manifest, "answer-path")
+```
+
+The fixture removes request IDs and timings before comparing `manifests/answer-path.json`
+beside your test. Run `pytest --update-manifests` only after an intentional behavior change,
+then review the JSON diff. The [complete fallback-and-repair example](../examples/golden-manifest.md)
+runs offline in AnyInfer's own suite.
+
 ## Declare a provider, get a real client
 
 The fixtures are available as soon as `anyinfer` is installed. `anyinfer_scripted` builds a
@@ -153,6 +170,7 @@ production code will see against a model that cannot do better.
 | `anyinfer_registry` | The per-test provider registry, if you need it directly |
 | `anyinfer_cassette` | Resolves a cassette stored beside your test file |
 | `anyinfer_recording` | Whether this run is recording cassettes |
+| `anyinfer_golden_manifest` | Compare a normalized run manifest with a checked-in golden |
 
 Each test gets its own provider registry, so two tests may register the same provider id
 without depending on execution order.

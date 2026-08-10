@@ -168,6 +168,9 @@ class Feature(Flag):
     SYSTEM_PROMPT = auto()
     CACHE_USAGE = auto()
     CACHE_PLACEMENT = auto()
+    VISION = auto()
+    DOCUMENT = auto()
+    AUDIO_IN = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,9 +269,7 @@ class ModelCapabilities:
             max_output_tokens=_stronger(self.max_output_tokens, other.max_output_tokens),
             features=_stronger(self.features, other.features) or self.features,
             pricing=_stronger(self.pricing, other.pricing),
-            default_temperature=_stronger(
-                self.default_temperature, other.default_temperature
-            ),
+            default_temperature=_stronger(self.default_temperature, other.default_temperature),
             default_top_p=_stronger(self.default_top_p, other.default_top_p),
             local=other.local if other.local is not None else self.local,
         )

@@ -14,7 +14,7 @@ from typing import Any, Literal
 import httpx2
 
 from ..credentials import ResolverChain, default_resolver
-from ..errors import ConfigError
+from ..errors import ConfigError, CredentialError
 from ..events.telemetry import TelemetryEvent
 from ..local.server import is_loopback
 from ..providers.base import ProviderAdapter, ProviderConfig
@@ -167,6 +167,45 @@ class AdapterPool:
     def descriptor_for(self, provider_id: str) -> ProviderDescriptor:
         """Look up a provider instance's descriptor."""
         return self._registry.get(provider_id)
+
+    def configuration_reason(self, provider_id: str) -> str | None:
+        """Return why an instance cannot be built, without constructing its adapter."""
+        key = self._registry.resolve_alias(provider_id)
+        descriptor = self._registry.get(key)
+        settings = self._settings.get(key)
+        if settings is None:
+            return f"provider instance {key!r} is not configured"
+
+        values: dict[str, str] = {
+            "base_url": settings.base_url or descriptor.default_base_url or "",
+            "api_key": settings.api_key or "",
+            "api_version": settings.api_version or "",
+            **{name: str(value) for name, value in settings.options.items() if value is not None},
+        }
+        missing = [
+            setup_field.key
+            for setup_field in descriptor.setup.fields
+            if setup_field.required and not values.get(setup_field.key, "").strip()
+        ]
+        unsatisfied = descriptor.setup.unsatisfied_groups(values)
+        if missing:
+            return "missing required setting(s): " + ", ".join(missing)
+        if unsatisfied:
+            return "missing one of required setting group: " + " or ".join(unsatisfied[0])
+        if descriptor.requires_base_url and not values["base_url"]:
+            return "the provider requires a base URL"
+
+        for setup_field in descriptor.setup.fields:
+            if setup_field.kind != "secret":
+                continue
+            reference = values.get(setup_field.key, "")
+            if not reference:
+                continue
+            try:
+                self._resolver.resolve(reference)
+            except CredentialError as exc:
+                return str(exc)
+        return None
 
     def base_url_for(self, provider_id: str) -> str | None:
         """The endpoint an instance will actually talk to, after defaults and shorthand."""
@@ -331,9 +370,7 @@ class AdapterPool:
         """Close every built adapter, gathering failures rather than stopping at the first."""
         adapters = list(self._adapters.values())
         self._adapters.clear()
-        results = await asyncio.gather(
-            *(a.aclose() for a in adapters), return_exceptions=True
-        )
+        results = await asyncio.gather(*(a.aclose() for a in adapters), return_exceptions=True)
         for result in results:
             if isinstance(result, BaseException) and not isinstance(result, Exception):
                 raise result

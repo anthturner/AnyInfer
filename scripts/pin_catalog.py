@@ -497,6 +497,7 @@ CANDIDATES: tuple[Mapping[str, Any], ...] = (
         "context_window": 32768, "license": "apache-2.0",
         "best_at": ["vision", "general-chat"],
         "repo": "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+        "projector": "mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf",
         "source": "https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct",
         "ollama": "qwen2.5vl:7b",
     },
@@ -649,6 +650,17 @@ def pin_model(
         return None, [f"{candidate['id']}: empty or unreadable tree for {repo}@{sha[:12]}"]
 
     grouped = group_gguf_variants(tree)
+    projector: Mapping[str, Any] | None = None
+    projector_name = candidate.get("projector")
+    if projector_name:
+        projector = next(
+            (entry for entry in tree if str(entry.get("path", "")) == str(projector_name)),
+            None,
+        )
+        if projector is None or digest_of(projector) is None:
+            return None, [
+                f"{candidate['id']}: projector {projector_name!r} is absent or unverifiable"
+            ]
     artifact_ids = dict(candidate.get("artifact_ids") or {})
     variants: list[dict[str, Any]] = []
 
@@ -667,6 +679,14 @@ def pin_model(
                 break
             digests[path] = digest
             sizes[path] = int(entry.get("size", 0))
+        roles: dict[str, str] = {}
+        if projector is not None:
+            path = str(projector["path"])
+            projector_digest = digest_of(projector)
+            assert projector_digest is not None
+            digests[path] = projector_digest
+            sizes[path] = int(projector.get("size", 0))
+            roles[path] = "projector"
         if unverifiable or not digests:
             notes.append(f"{candidate['id']}: {quant} has no LFS digest; skipped")
             continue
@@ -689,9 +709,10 @@ def pin_model(
                     "resolver": "huggingface",
                     "repo": repo,
                     "revision": sha,
-                    "files": sorted(digests),
+                    "files": list(digests),
                     "sha256": {k: digests[k] for k in sorted(digests)},
                     "size_bytes": {k: sizes[k] for k in sorted(sizes)},
+                    **({"roles": roles} if roles else {}),
                 },
             }
         )
@@ -743,9 +764,8 @@ _COMMENT = [
     "22B (MNPL, non-production), Command R7B (CC-BY-NC), Qwen2.5 3B and 72B (Qwen research",
     "license), Ministral 8B (Mistral research license), DeepSeek-Coder-V2-Lite (bespoke",
     "model license).",
-    "Also excluded: Moondream 2, which publishes only an f16 GGUF paired with a companion",
-    "mmproj projector -- neither the curated quantization ladder nor request-side image",
-    "support covers it yet.",
+    "A vision candidate must name one exact projector; the pinning pass verifies and records",
+    "that companion beside every weight variant rather than matching an mmproj heuristically.",
 ]
 
 

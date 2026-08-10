@@ -31,9 +31,18 @@ from ..types.capabilities import (
     Sourced,
 )
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
-from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.messages import (
+    AudioPart,
+    DocumentPart,
+    ImagePart,
+    Message,
+    Text,
+    ToolCall,
+    ToolResult,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
+from ._multimodal import base64_data, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
@@ -319,6 +328,30 @@ class AnthropicAdapter:
                         **({"is_error": True} if part.is_error else {}),
                     }
                 )
+            elif isinstance(part, ImagePart):
+                source = (
+                    {"type": "url", "url": part.url}
+                    if part.url is not None
+                    else {
+                        "type": "base64",
+                        "media_type": part.media_type,
+                        "data": base64_data(part.data or b""),
+                    }
+                )
+                blocks.append({"type": "image", "source": source})
+            elif isinstance(part, DocumentPart):
+                source = (
+                    {"type": "url", "url": part.url}
+                    if part.url is not None
+                    else {
+                        "type": "base64",
+                        "media_type": part.media_type,
+                        "data": base64_data(part.data or b""),
+                    }
+                )
+                blocks.append({"type": "document", "source": source})
+            elif isinstance(part, AudioPart):
+                raise unsupported(self.provider_id, "audio")
 
         # Tool results are carried on a *user* turn in this dialect, not a "tool" role.
         role = "user" if message.role in ("user", "tool") else "assistant"

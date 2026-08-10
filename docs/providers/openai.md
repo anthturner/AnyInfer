@@ -66,3 +66,9 @@ provider_options={"openai": {"store": False, "service_tier": "flex"}}
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openai.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai.md).
+
+## Multimodal inputs
+
+Images and files are projected to Responses API `input_image` and `input_file` content
+items. Inline bytes become data URLs; remote URLs stay remote. Audio input is model-specific,
+so capability data must not be read as a promise that every OpenAI model accepts it.

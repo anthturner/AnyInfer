@@ -34,6 +34,7 @@ from ..types.events import TextDelta
 from ..types.messages import Text, ToolResult
 from ..types.requests import ReasoningEffort
 from ..types.results import Usage
+from ._multimodal import has_multimodal, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 
 __all__ = ["AUTO_MODEL", "CopilotAdapter", "descriptor"]
@@ -138,9 +139,7 @@ class CopilotAdapter:
         models = [
             DiscoveredModel(
                 id=model_id,
-                capabilities=ModelCapabilities(
-                    features=Sourced(_COPILOT_FEATURES, "discovered")
-                ),
+                capabilities=ModelCapabilities(features=Sourced(_COPILOT_FEATURES, "discovered")),
             )
             for model_id in ids
             if model_id
@@ -150,9 +149,7 @@ class CopilotAdapter:
                 0,
                 DiscoveredModel(
                     id=AUTO_MODEL,
-                    capabilities=ModelCapabilities(
-                        features=Sourced(_COPILOT_FEATURES, "default")
-                    ),
+                    capabilities=ModelCapabilities(features=Sourced(_COPILOT_FEATURES, "default")),
                 ),
             )
         return models
@@ -228,9 +225,7 @@ class CopilotAdapter:
         yield AdapterFinal(
             finish_reason="stop" if emitted_any else "other",
             usage=usage.normalized() if _has_counts(usage) else None,
-            session_state=(
-                None if session_key is None else {"session_id": session_key}
-            ),
+            session_state=(None if session_key is None else {"session_id": session_key}),
         )
 
     def _next_session_key(self) -> str:
@@ -304,6 +299,8 @@ def _split_prompt(req: WireRequest, *, resumed: bool = False) -> tuple[str, str]
     tokens again and show the model every earlier turn twice. Only the newest user turn
     goes out.
     """
+    if has_multimodal(tuple(req.messages)):
+        raise unsupported("copilot", "multimodal")
     system_parts: list[str] = []
     conversation: list[str] = []
 

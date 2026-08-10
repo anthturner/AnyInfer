@@ -86,6 +86,8 @@ class ContextBudget:
         This is the number an app packs context against: keep adding material while it
         stays positive.
         """
+        if self.estimate.unpriced_parts:
+            return None
         allowance = self.input_allowance_tokens
         if allowance is None:
             return None
@@ -107,6 +109,8 @@ class ContextBudget:
         `cost_usd` is only ever computed from
         provider-reported usage, and this range is only ever computed from the estimate.
         """
+        if self.estimate.unpriced_parts:
+            return None
         return estimate_cost(self.estimate, self.output_reserve_tokens, self.pricing)
 
 

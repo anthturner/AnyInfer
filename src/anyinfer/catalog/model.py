@@ -112,8 +112,7 @@ class TargetEntry:
         ref = self.model or self.gguf
         if not ref:
             raise ConfigError(
-                f"catalog entry for provider {self.provider_id!r} has neither "
-                "'model' nor 'gguf'",
+                f"catalog entry for provider {self.provider_id!r} has neither 'model' nor 'gguf'",
                 hint="every alias target must name a model or a gguf artifact",
             )
         return ref
@@ -597,12 +596,18 @@ def _parse_artifact(artifact_id: str, entry: Mapping[str, Any]) -> GgufArtifact:
                 hint="every gguf artifact file needs a pinned 'url'",
             )
         filename = _opt_str(raw.get("filename")) or url.rsplit("/", 1)[-1]
+        role = str(raw.get("role", "model"))
+        if role not in ("model", "projector"):
+            raise ConfigError(
+                f"catalog artifact {artifact_id!r} file {filename!r} has unknown role {role!r}"
+            )
         files.append(
             GgufFile(
                 filename=filename,
                 url=url,
                 sha256=str(raw.get("sha256", "")),
                 size_bytes=_opt_int(raw.get("size_bytes")),
+                role=role,  # type: ignore[arg-type]
             )
         )
 
@@ -744,10 +749,13 @@ def _parse_source(variant_id: str, entry: Any) -> SourceRef:
         raise ConfigError(f"variant {variant_id!r} has a malformed 'source'")
     digests_raw = entry.get("sha256", {})
     sizes_raw = entry.get("size_bytes", {})
+    roles_raw = entry.get("roles", {})
     if not isinstance(digests_raw, Mapping):
         raise ConfigError(f"variant {variant_id!r} 'source.sha256' must be an object")
     if not isinstance(sizes_raw, Mapping):
         raise ConfigError(f"variant {variant_id!r} 'source.size_bytes' must be an object")
+    if not isinstance(roles_raw, Mapping):
+        raise ConfigError(f"variant {variant_id!r} 'source.roles' must be an object")
     return SourceRef(
         resolver=str(entry.get("resolver", "huggingface")),
         repo=_opt_str(entry.get("repo")),
@@ -755,6 +763,7 @@ def _parse_source(variant_id: str, entry: Any) -> SourceRef:
         files=_str_tuple(entry.get("files")),
         digests={str(k): str(v) for k, v in digests_raw.items()},
         sizes={str(k): int(v) for k, v in sizes_raw.items() if isinstance(v, int)},
+        roles={str(k): str(v) for k, v in roles_raw.items()},
         urls=_str_tuple(entry.get("urls")),
         include=_str_tuple(entry.get("include")),
         exclude=_str_tuple(entry.get("exclude")),
@@ -776,6 +785,7 @@ def _artifact_from_variant(model: ModelEntry, variant: ModelVariant) -> GgufArti
                     url=f"https://huggingface.co/{ref.repo}/resolve/{ref.revision}/{name}",
                     sha256=ref.digests.get(name, ""),
                     size_bytes=ref.sizes.get(name),
+                    role=("projector" if ref.roles.get(name) == "projector" else "model"),
                 )
             )
     else:
@@ -787,6 +797,7 @@ def _artifact_from_variant(model: ModelEntry, variant: ModelVariant) -> GgufArti
                     url=url,
                     sha256=ref.digests.get(name, ""),
                     size_bytes=ref.sizes.get(name),
+                    role=("projector" if ref.roles.get(name) == "projector" else "model"),
                 )
             )
     if not files:

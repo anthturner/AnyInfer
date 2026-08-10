@@ -150,6 +150,32 @@ anyinfer run "..." --config anyinfer.json --schema city.json --repair 2
 Schema mode implies `--no-stream`: a JSON document cannot be validated until it is
 complete.
 
+### Attach images, documents, and audio
+
+`run` collects attachment files at the CLI boundary and sends typed multimodal parts through
+the same client path as the SDK and sidecar:
+
+```console
+anyinfer run "Summarize these inputs" --image diagram.png --document report.pdf --audio note.wav
+```
+
+Repeat a flag to attach multiple files. MIME types are inferred from filenames, inline
+payload ceilings are checked before dispatch, and an adapter that cannot represent a part
+fails explicitly instead of dropping it. See [multimodal inputs](../concepts/multimodal-inputs.md)
+for provider coverage and unknown-budget behavior.
+
+### Compare fixed targets with an arena
+
+```console
+anyinfer run "Classify this" --schema schema.json \
+  --arena openai:gpt-5-mini,anthropic:claude-haiku-4-5 \
+  --arena-strategy consensus --stats
+```
+
+`--dry-run` reports the arena call ceiling and summed cost range while making zero provider
+calls. Named policies from the shared configuration use `--arena-name`. See
+[arena runs](../concepts/arena.md) for selection and tool-loop semantics.
+
 ## Declaring tools
 
 `--tool` takes a JSON file declaring one tool, and is repeatable:

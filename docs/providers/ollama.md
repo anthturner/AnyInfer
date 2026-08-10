@@ -105,3 +105,8 @@ provider_options={"ollama": {"keep_alive": "10m", "num_ctx": 8192, "num_gpu": 99
 
 For the exact request/response fields this adapter depends on, see
 [contracts/ollama.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/ollama.md).
+
+## Multimodal inputs
+
+Vision-capable models receive inline images through the native message `images` field.
+Remote image URLs, documents, and audio are refused rather than silently dropped.

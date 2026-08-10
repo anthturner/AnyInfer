@@ -27,6 +27,8 @@ from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
 GIB = 1024**3
 PAYLOAD = b"gguf-bytes"
 DIGEST = hashlib.sha256(PAYLOAD).hexdigest()
+PROJECTOR = b"projector-bytes"
+PROJECTOR_DIGEST = hashlib.sha256(PROJECTOR).hexdigest()
 
 
 def _catalog(tmp_path: Path) -> Catalog:
@@ -48,6 +50,35 @@ def _catalog(tmp_path: Path) -> Catalog:
                             "sha256": DIGEST,
                             "size_bytes": len(PAYLOAD),
                         }
+                    ],
+                }
+            },
+        }
+    )
+
+
+def _vision_catalog() -> Catalog:
+    return Catalog.from_mapping(
+        {
+            "format_version": 1,
+            "gguf_artifacts": {
+                "vision-model": {
+                    "license": "Apache-2.0",
+                    "parameter_size": "7B",
+                    "files": [
+                        {
+                            "filename": "vision-model.gguf",
+                            "url": "https://host.invalid/vision-model.gguf",
+                            "sha256": DIGEST,
+                            "size_bytes": len(PAYLOAD),
+                        },
+                        {
+                            "filename": "mmproj.gguf",
+                            "url": "https://host.invalid/mmproj.gguf",
+                            "sha256": PROJECTOR_DIGEST,
+                            "size_bytes": len(PROJECTOR),
+                            "role": "projector",
+                        },
                     ],
                 }
             },
@@ -224,6 +255,44 @@ async def test_generation_tunes_a_plan_and_delegates_to_the_dialect(tmp_path: Pa
     assert model_path.name == "test-model.gguf"
     assert plan.gpu_layers == 999, "the tuner saw the GPU"
     assert plan.context_size > 0
+
+
+async def test_vision_artifact_supplies_projector_and_capability(tmp_path: Path) -> None:
+    (tmp_path / "vision-model.gguf").write_bytes(PAYLOAD)
+    (tmp_path / "mmproj.gguf").write_bytes(PROJECTOR)
+    fake = FakeOpenAIServer(FakeResponse(text="visible"))
+    adapter, supervisor = _adapter(
+        tmp_path,
+        fake,
+        options={"catalog": _vision_catalog()},
+    )
+    from anyinfer.providers.base import WireRequest
+
+    try:
+        events = [
+            event
+            async for event in adapter.generate(
+                WireRequest(
+                    model="vision-model",
+                    messages=(
+                        ai.Message(
+                            "user",
+                            (ai.Text("inspect"), ai.ImagePart(data=b"image")),
+                        ),
+                    ),
+                )
+            )
+        ]
+        models = await adapter.list_models()
+    finally:
+        await adapter.aclose()
+
+    assert any(isinstance(event, ai.TextDelta) for event in events)
+    plan = supervisor.acquisitions[0][2]
+    assert plan.projector_path is not None and plan.projector_path.endswith("mmproj.gguf")
+    assert "--mmproj" in plan.server_arguments("model.gguf", host="127.0.0.1", port=1)
+    assert models[0].capabilities is not None
+    assert models[0].capabilities.features.value & ai.Feature.VISION
 
 
 async def test_explicit_context_reaches_the_tuner(tmp_path: Path) -> None:

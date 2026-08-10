@@ -146,6 +146,7 @@ class SpendLedger:
         self._by_target: dict[str, SpendTotals] = {}
         self._by_label: dict[str, dict[str, SpendTotals]] = {}
         self._metadata: dict[str, Mapping[str, str]] = {}
+        self._reservations: dict[str, Decimal] = {}
 
     # ---- observer ---------------------------------------------------------------------
 
@@ -163,6 +164,7 @@ class SpendLedger:
         if isinstance(event, RequestFailed):
             with self._lock:
                 self._metadata.pop(event.request_id, None)
+                self._reservations.pop(event.request_id, None)
             return
         if isinstance(event, RequestCompleted):
             self.record(event.target, event.usage, request_id=event.request_id)
@@ -191,6 +193,8 @@ class SpendLedger:
         """
         with self._lock:
             metadata = self._metadata.pop(request_id, {}) if request_id else {}
+            if request_id:
+                self._reservations.pop(request_id, None)
             self._overall = self._overall.plus(usage)
 
             key = str(target)
@@ -200,9 +204,34 @@ class SpendLedger:
 
             for label, value in metadata.items():
                 bucket = self._by_label.setdefault(label, {})
-                bucket[value] = bucket.get(
-                    value, SpendTotals(currency=self._currency)
-                ).plus(usage)
+                bucket[value] = bucket.get(value, SpendTotals(currency=self._currency)).plus(usage)
+
+    def reserve(
+        self, request_id: str, estimate: Decimal, ceiling: Decimal | None
+    ) -> tuple[bool, Decimal, Decimal]:
+        """Atomically reserve a preflight estimate against a cumulative ceiling.
+
+        Re-reserving the same request replaces its prior estimate, which lets fallback
+        targets update the bound without double-counting one caller request.
+        """
+        with self._lock:
+            previous = self._reservations.get(request_id, Decimal(0))
+            reserved = sum(self._reservations.values(), Decimal(0)) - previous
+            spent = self._overall.cost
+            if ceiling is not None and spent + reserved + estimate > ceiling:
+                return False, spent, reserved
+            self._reservations[request_id] = estimate
+            return True, spent, reserved
+
+    def release(self, request_id: str) -> None:
+        """Release a reservation that will not be replaced by a completion event."""
+        with self._lock:
+            self._reservations.pop(request_id, None)
+
+    def reserved(self) -> Decimal:
+        """Total preflight spend currently reserved by in-flight requests."""
+        with self._lock:
+            return sum(self._reservations.values(), Decimal(0))
 
     # ---- reading ----------------------------------------------------------------------
 
@@ -232,6 +261,7 @@ class SpendLedger:
             self._by_target.clear()
             self._by_label.clear()
             self._metadata.clear()
+            self._reservations.clear()
 
 
 class SpendStore:

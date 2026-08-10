@@ -34,6 +34,7 @@ from ..types.capabilities import (
 from ..types.events import TextDelta
 from ..types.messages import Text
 from ..types.results import Usage
+from ._multimodal import has_multimodal, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 
@@ -119,9 +120,7 @@ class M365CopilotAdapter:
         return [
             DiscoveredModel(
                 id=_FIXED_MODEL,
-                capabilities=ModelCapabilities(
-                    features=Sourced(_M365_FEATURES, "catalog")
-                ),
+                capabilities=ModelCapabilities(features=Sourced(_M365_FEATURES, "catalog")),
             )
         ]
 
@@ -146,8 +145,7 @@ class M365CopilotAdapter:
         payload = self.build_payload(req)
 
         try:
-            response = await self._client.post(_CHAT_PATH, json=payload,
-                                               timeout=req.timeout_s)
+            response = await self._client.post(_CHAT_PATH, json=payload, timeout=req.timeout_s)
         except httpx2.HTTPError as exc:
             raise map_transport_error(exc, provider=self.provider_id) from exc
 
@@ -182,6 +180,8 @@ class M365CopilotAdapter:
 
     def build_payload(self, req: WireRequest) -> dict[str, Any]:
         """Flatten the conversation into the single prompt this API accepts."""
+        if has_multimodal(tuple(req.messages)):
+            raise unsupported(self.provider_id, "multimodal")
         parts: list[str] = []
         for message in req.messages:
             text = "".join(p.text for p in message.content if isinstance(p, Text))
@@ -310,7 +310,12 @@ descriptor = ProviderDescriptor(
     # repeated question differently.
     max_repair_attempts=1,
     ignored_parameters=(
-        "temperature", "top_p", "max_output_tokens", "stop", "tools", "reasoning",
+        "temperature",
+        "top_p",
+        "max_output_tokens",
+        "stop",
+        "tools",
+        "reasoning",
     ),
 )
 """Descriptor for the Microsoft 365 Copilot provider."""
