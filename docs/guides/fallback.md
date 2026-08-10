@@ -5,9 +5,9 @@ import anyinfer as ai
 
 route = ai.Route(
     targets=(
-        "anthropic:claude-sonnet-4-5",   # preferred
-        "openai:gpt-5",                  # if Anthropic is unavailable
-        "ollama:qwen3:8b",               # last resort, always local
+        "anthropic:claude-sonnet-4-5",  # preferred
+        "openai:gpt-5",  # if Anthropic is unavailable
+        "ollama:qwen3:8b",  # last resort, always local
     ),
     retry=ai.Retry(max_attempts=2),
 )
@@ -20,7 +20,7 @@ print("served by", result.target)
 
 ```python
 client = ai.Client(providers, route=ai.Route(targets=("medium", "small")))
-result = client.generate(prompt)     # no target= needed
+result = client.generate(prompt)  # no target= needed
 ```
 
 ## Inspect what happened
@@ -69,8 +69,8 @@ down the general one.
 ```python
 ai.Retry(
     max_attempts=3,
-    backoff_base_s=0.5,     # 0.5s, then 1s, then 2s...
-    backoff_max_s=30.0,     # ...capped here
+    backoff_base_s=0.5,  # 0.5s, then 1s, then 2s...
+    backoff_max_s=30.0,  # ...capped here
 )
 ```
 

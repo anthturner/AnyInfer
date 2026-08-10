@@ -67,9 +67,7 @@ def test_manifest_extension_is_opt_in_and_stock_body_is_unchanged() -> None:
     }
 
     stock = http.post("/v1/chat/completions", json=base).json()
-    extended = http.post(
-        "/v1/chat/completions", json={**base, "anyinfer_manifest": True}
-    ).json()
+    extended = http.post("/v1/chat/completions", json={**base, "anyinfer_manifest": True}).json()
 
     assert "anyinfer_manifest" not in stock
     manifest = extended.pop("anyinfer_manifest")
@@ -113,8 +111,10 @@ def test_target_grammar_works_as_a_model_string() -> None:
 
     response = http.post(
         "/v1/chat/completions",
-        json={"model": "openai-compat:some:model", "messages": [{"role": "user",
-                                                                 "content": "hi"}]},
+        json={
+            "model": "openai-compat:some:model",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
     )
     assert response.status_code == 200
     assert server.requests[0]["model"] == "some:model"
@@ -251,7 +251,8 @@ def test_streaming_produces_a_reconstructable_chunk_sequence() -> None:
     assert body.rstrip().endswith("data: [DONE]")
 
     finishes = [
-        c for c in chunks
+        c
+        for c in chunks
         if c.get("choices") and c["choices"][0].get("finish_reason")  # type: ignore[index,union-attr]
     ]
     assert len(finishes) == 1
@@ -294,7 +295,7 @@ def test_streaming_manifest_frame_precedes_done() -> None:
     ) as response:
         body = "".join(response.iter_text())
 
-    assert body.index('\"anyinfer_manifest\"') < body.index("data: [DONE]")
+    assert body.index('"anyinfer_manifest"') < body.index("data: [DONE]")
     frames = _parse_sse(body)
     manifest_frames = [frame for frame in frames if "anyinfer_manifest" in frame]
     assert len(manifest_frames) == 1
@@ -377,16 +378,22 @@ def test_bearer_token_is_enforced() -> None:
     body = {"model": "openai-compat:m", "messages": [{"role": "user", "content": "hi"}]}
 
     assert http.post("/v1/chat/completions", json=body).status_code == 401
-    assert http.post(
-        "/v1/chat/completions",
-        json=body,
-        headers={"authorization": "Bearer wrong-token-value"},
-    ).status_code == 401
-    assert http.post(
-        "/v1/chat/completions",
-        json=body,
-        headers={"authorization": "Bearer secret-token-value"},
-    ).status_code == 200
+    assert (
+        http.post(
+            "/v1/chat/completions",
+            json=body,
+            headers={"authorization": "Bearer wrong-token-value"},
+        ).status_code
+        == 401
+    )
+    assert (
+        http.post(
+            "/v1/chat/completions",
+            json=body,
+            headers={"authorization": "Bearer secret-token-value"},
+        ).status_code
+        == 200
+    )
 
 
 def test_models_also_requires_the_token() -> None:
@@ -626,9 +633,7 @@ def test_a_request_can_ask_for_compaction_the_gateway_did_not_configure() -> Non
     client, _ = _compaction_client(server)
     response = client.post(
         "/v1/chat/completions",
-        json=_oversized_body(
-            anyinfer_history={"mode": "proactive", "keep_recent": 1}
-        ),
+        json=_oversized_body(anyinfer_history={"mode": "proactive", "keep_recent": 1}),
     )
 
     assert response.status_code == 200
@@ -640,9 +645,7 @@ def test_a_request_can_refuse_the_gateways_policy() -> None:
     client, _ = _compaction_client(
         server, history=ai.HistoryPolicy(mode="proactive", keep_recent=1)
     )
-    response = client.post(
-        "/v1/chat/completions", json=_oversized_body(anyinfer_history=False)
-    )
+    response = client.post("/v1/chat/completions", json=_oversized_body(anyinfer_history=False))
 
     assert response.status_code >= 400, "the caller chose the error over a shortened history"
     assert not server.requests

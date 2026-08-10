@@ -36,7 +36,7 @@ If you are still deciding, read [choosing an integration path](integration-paths
 
 ## Letting a coding agent write the integration
 
-- [Coding agents](coding-agents.md) — `anyinfer agents-md`, `llms.txt`, and the
+- [Coding agents](coding-agents.md): `anyinfer agents-md`, `llms.txt`, and the
   integration procedure a skill can execute.
 
 ## Evaluate before integrating

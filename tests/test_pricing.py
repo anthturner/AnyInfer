@@ -212,9 +212,7 @@ async def test_client_budget_carries_catalog_pricing_and_cost() -> None:
 
 async def test_client_capability_overrides_win_end_to_end() -> None:
     overrides = {
-        "openai:gpt-5": ModelCapabilities(
-            pricing=Sourced(Pricing(Decimal("100"), Decimal("100")))
-        )
+        "openai:gpt-5": ModelCapabilities(pricing=Sourced(Pricing(Decimal("100"), Decimal("100"))))
     }
     async with ai.AsyncClient([], capability_overrides=overrides) as client:
         budget = client.budget("hello", target="openai:gpt-5")
@@ -264,12 +262,10 @@ async def test_generate_computes_cost_from_the_table() -> None:
 
 
 def test_fetch_pricing_parses_a_served_table() -> None:
-    document = (
-        REPO_ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json"
-    ).read_text("utf-8")
-    transport = httpx2.MockTransport(
-        lambda request: httpx2.Response(200, text=document)
+    document = (REPO_ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json").read_text(
+        "utf-8"
     )
+    transport = httpx2.MockTransport(lambda request: httpx2.Response(200, text=document))
     table = fetch_pricing("https://fake.invalid/pricing.json", transport=transport)
     assert table.lookup("openai", "gpt-5") is not None
 

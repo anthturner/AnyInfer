@@ -118,12 +118,12 @@ class ScriptedModel:
             script a request that carries a schema.
         tool_calls: Tool calls to emit, as ``(id, name, arguments_json)`` triples.
         finish_reason: Normalized finish reason to report.
-        usage: Usage block to report, or ``None`` to report none at all — which is how a
+        usage: Usage block to report, or ``None`` to report none at all, which is how a
             test reaches the estimated-usage path.
         chunk_size: Characters per streamed delta. Smaller values produce more events.
         answer_after_tools: Text to answer with once the conversation already carries a
             tool result. Without it, a model scripted to call a tool calls it on every
-            round and the loop never converges — which is a test that only ever proves the
+            round and the loop never converges, which is a test that only ever proves the
             round budget works. Set it and the model behaves like a real one: ask, then
             answer.
         failures: Failures consumed in order before any success. A model with two failures
@@ -168,7 +168,7 @@ class ScriptedProvider:
         locality: ``"local"`` (the default) keeps cost at a genuine zero and hardware
             detection honest; pass ``"hosted"`` when a test needs pricing to apply.
         base_url: Endpoint recorded in settings. Never contacted — the transport
-            intercepts every request — so it uses an unroutable ``.invalid`` host.
+            intercepts every request, so it uses an unroutable ``.invalid`` host.
         display_name: Human-readable name for UIs and error messages. Defaults to naming
             the provider as scripted, which is the right answer in a test and the wrong
             one in an application that ships a scripted provider as a visible offline mode.
@@ -245,9 +245,7 @@ class ScriptedProvider:
                     ),
                 ),
             ),
-            static_capabilities={
-                model.id: model.capabilities for model in self._models.values()
-            },
+            static_capabilities={model.id: model.capabilities for model in self._models.values()},
             default_capabilities=DEFAULT_SCRIPTED_CAPABILITIES,
         )
 
@@ -445,10 +443,7 @@ def _carries_tool_result(body: Mapping[str, Any]) -> bool:
     messages = body.get("messages")
     if not isinstance(messages, list):
         return False
-    return any(
-        isinstance(message, dict) and message.get("role") == "tool"
-        for message in messages
-    )
+    return any(isinstance(message, dict) and message.get("role") == "tool" for message in messages)
 
 
 def _format_retry_after(seconds: float) -> str:

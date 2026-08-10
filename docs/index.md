@@ -27,7 +27,9 @@ hide:
     ```python
     import anyinfer as ai
 
-    async with ai.AsyncClient([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]) as client:
+    async with ai.AsyncClient(
+        [ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]
+    ) as client:
         result = await client.generate(prompt, target="anthropic:claude-sonnet-4-5")
         print(result.text)
     ```

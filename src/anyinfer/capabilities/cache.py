@@ -66,7 +66,7 @@ class CachePlan:
         mechanism: The mechanism chosen, or ``None`` when caching will not be engaged.
         marks: Where to mark, in wire order. Always empty for ``implicit``.
         estimated_cacheable_tokens: Planning-side total of the marked segments, or of the
-            stable prefix under ``implicit``. An estimate of intent — never a saving.
+            stable prefix under ``implicit``. An estimate of intent; never a saving.
         reasons: Why the plan came out this way, for the degradation event and for humans
             reading a dry run. Content-free.
     """
@@ -126,9 +126,7 @@ def plan_cache(
         return CachePlan(reasons=("the target declares no prompt-cache mechanism",))
 
     if mechanism == "explicit" and not _supports_placement(capabilities):
-        return CachePlan(
-            reasons=("the target's capabilities do not include cache placement",)
-        )
+        return CachePlan(reasons=("the target's capabilities do not include cache placement",))
 
     if mechanism == "implicit":
         # Nothing to send. The plan exists so the request path can watch prefix stability

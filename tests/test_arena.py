@@ -95,13 +95,15 @@ async def test_cancelling_an_arena_stops_pending_candidates() -> None:
                 raise
         return rendered.handler(request)
 
-    client = ai.AsyncClient([
-        ai.ProviderSettings.of(
-            "openai-compat",
-            base_url="https://arena.invalid/v1",
-            transport=httpx2.MockTransport(handler),
-        )
-    ])
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "openai-compat",
+                base_url="https://arena.invalid/v1",
+                transport=httpx2.MockTransport(handler),
+            )
+        ]
+    )
     async with client:
         task = asyncio.create_task(
             client.generate(

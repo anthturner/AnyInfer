@@ -5,18 +5,19 @@
 ```python
 import anyinfer as ai
 
+
 class Metrics:
     def on_event(self, event: ai.TelemetryEvent) -> None:
         match event:
             case ai.FirstToken(at_ms=ms, target=target):
                 histogram("ttft_ms", ms, provider=target.provider_id)
             case ai.AttemptCompleted(usage=usage, target=target):
-                counter("tokens_out", usage.output_tokens or 0,
-                        provider=target.provider_id)
+                counter("tokens_out", usage.output_tokens or 0, provider=target.provider_id)
             case ai.RetryScheduled(error=error):
                 counter("retries", 1, error=error.type_name)
             case ai.RequestFailed(error=error):
                 counter("failures", 1, error=error.type_name)
+
 
 client = ai.Client(providers, observers=[Metrics()])
 ```
@@ -53,7 +54,7 @@ Prompt and response text are `None` unless an observer opts in, and stripping ha
 observer:
 
 ```python
-client.subscribe(metrics)                     # never sees text
+client.subscribe(metrics)  # never sees text
 client.subscribe(audit_trail, payloads=True)  # sees prompt and response
 ```
 
@@ -65,6 +66,7 @@ payload-carrying event.
 ```python
 import json
 from dataclasses import asdict
+
 
 class JsonlTrail:
     def __init__(self, path):
@@ -81,8 +83,8 @@ class JsonlTrail:
 ```python
 from anyinfer import otel
 
-otel.install(client)                          # payload-free
-otel.install(client, record_payloads=True)    # include prompt/response text
+otel.install(client)  # payload-free
+otel.install(client, record_payloads=True)  # include prompt/response text
 ```
 
 Needs the `[otel]` extra; nothing OTel-related is imported otherwise.
@@ -103,7 +105,7 @@ outside it. A crashed server sets an error status on its span, and only the term
 download event becomes a span — per-chunk progress would flood the exporter.
 
 The bridge is a *consumer* of the event contract rather than the contract itself, so
-consuming events directly and exporting to OTel are both first-class — and you can do both.
+consuming events directly and exporting to OTel are both first-class, and you can do both.
 
 ## Cost
 
@@ -111,7 +113,7 @@ consuming events directly and exporting to OTel are both first-class — and you
 if result.usage.cost_usd is not None:
     ledger.record(result.usage.cost_usd)
 else:
-    ledger.record_unknown(result.target)      # do NOT record this as zero
+    ledger.record_unknown(result.target)  # do NOT record this as zero
 ```
 
 `None` means unknown, not free. Treating the two the same turns a reporting gap into a

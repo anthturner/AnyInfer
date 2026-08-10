@@ -152,11 +152,12 @@ def available_backends(
 def select_backend(
     hardware: HardwareProfile,
     *,
+    preferred: AcceleratorKind | None = None,
     search_paths: list[Path] | None = None,
     runtime_root: Path | None = None,
     include_runtime_root: bool = True,
 ) -> Backend | None:
-    """Pick the best backend this machine can actually use.
+    """Pick the requested, or best, backend this machine can actually use.
 
     A CUDA build on a machine with no NVIDIA device is useless, so the selection is the
     intersection of what is installed and what the hardware can drive. When the best
@@ -183,6 +184,22 @@ def select_backend(
             # Treating it as undrivable on an NVIDIA box would degrade to CPU for no
             # reason.
             drivable.add("vulkan")
+
+    if preferred is not None:
+        chosen = next((backend for backend in installed if backend.kind == preferred), None)
+        if chosen is None:
+            raise LocalRuntimeError(
+                f"the requested {preferred} llama.cpp runtime is not installed",
+                provider="llama-cpp",
+                hint=f"install it with 'anyinfer runtime install {preferred}', or select auto",
+            )
+        if preferred not in drivable:
+            raise LocalRuntimeError(
+                f"the installed {preferred} llama.cpp runtime cannot drive this machine",
+                provider="llama-cpp",
+                hint="select auto or choose a runtime matching the detected accelerator",
+            )
+        return chosen
 
     for backend in installed:
         if backend.kind in drivable:
@@ -211,9 +228,7 @@ def _explain_choice(
     if BACKEND_RANK.get(chosen.kind, 0) >= best_possible:
         return chosen
 
-    preferred = max(
-        hardware.accelerators, key=lambda a: BACKEND_RANK.get(a.kind, 0)
-    ).kind
+    preferred = max(hardware.accelerators, key=lambda a: BACKEND_RANK.get(a.kind, 0)).kind
     if any(b.kind == preferred for b in installed):
         return chosen
     return Backend(

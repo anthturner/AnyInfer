@@ -57,9 +57,10 @@ def test_endpoint_normalization_drops_anything_credential_shaped(
 
 def test_fingerprints_distinguish_what_the_measurement_is_about() -> None:
     base = MeasurementIdentity("ollama", "qwen3:8b", endpoint="http://127.0.0.1:11434")
-    assert base.fingerprint == MeasurementIdentity(
-        "ollama", "qwen3:8b", endpoint="http://127.0.0.1:11434"
-    ).fingerprint
+    assert (
+        base.fingerprint
+        == MeasurementIdentity("ollama", "qwen3:8b", endpoint="http://127.0.0.1:11434").fingerprint
+    )
 
     for other in (
         MeasurementIdentity("ollama", "qwen3:4b", endpoint="http://127.0.0.1:11434"),
@@ -131,7 +132,9 @@ def test_summary_reports_only_what_was_measured() -> None:
     assert "nothing measurable" in bare.summary
 
     full = Measurement(
-        identity=IDENTITY, prefill_tokens_per_s=1500.0, ttft_ms=300.0,
+        identity=IDENTITY,
+        prefill_tokens_per_s=1500.0,
+        ttft_ms=300.0,
         decode_tokens_per_s=42.5,
     )
     assert "prefill 1500 tok/s" in full.summary
@@ -225,6 +228,19 @@ async def test_benchmarking_measures_one_request() -> None:
     assert measurement.measured_at is not None
 
 
+async def test_benchmark_progress_exposes_a_terminal_time_series_point() -> None:
+    samples: list[ai.BenchmarkSample] = []
+    server = FakeOpenAIServer(FakeResponse(text="a summary " * 20), chunk_size=4)
+    async with make_client(server) as client:
+        measurement = await client.benchmark(
+            "openai-compat:m", prompt_tokens=64, progress=samples.append
+        )
+
+    assert samples
+    assert samples[-1].phase == "complete"
+    assert samples[-1].estimated_output_tokens == measurement.output_tokens
+
+
 async def test_a_hosted_target_records_no_host_signature() -> None:
     """This machine's specs say nothing about a hosted provider's throughput."""
     server = FakeOpenAIServer(FakeResponse(text="hi"))
@@ -245,9 +261,7 @@ async def test_a_store_records_when_passed(tmp_path: Path) -> None:
     store = MeasurementStore(tmp_path / "m.json")
     server = FakeOpenAIServer(FakeResponse(text="hi"))
     async with make_client(server) as client:
-        measurement = await client.benchmark(
-            "openai-compat:m", prompt_tokens=64, store=store
-        )
+        measurement = await client.benchmark("openai-compat:m", prompt_tokens=64, store=store)
 
     assert store.get(measurement.identity) == measurement
 

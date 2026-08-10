@@ -65,13 +65,13 @@ VERIFY_REASONING_OUTPUT_TOKENS = 256
 """Output ceiling for the probe when the target is known to be a reasoning model.
 
 A thinking model spends its output budget on reasoning *before* it produces the answer, so
-64 tokens buys a truncated thought and an empty reply — which the probe then reports as
+64 tokens buys a truncated thought and an empty reply, which the probe then reports as
 "the provider answered with empty text", pointing an operator at a connection problem they
 do not have.
 
 This is a ceiling, not a spend: a model that answers in six tokens spends six whichever
 value applies, and the larger cap costs more only for a model that would have been
-truncated — which is to say, one that was going to fail the probe anyway. That is why it
+truncated, which is to say, one that was going to fail the probe anyway. That is why it
 is applied on a mere feature flag rather than on a trusted one, and why it is still not
 applied to targets with no reasoning flag at all: an unbounded probe is not the goal.
 
@@ -94,7 +94,7 @@ class Verification:
 
     Attributes:
         target: What the target string resolved to, and — for a provider that picks the
-            model itself — which model actually served the request.
+            model itself, which model actually served the request.
         ok: The provider answered, in the shape asked for, with the expected content.
         reached: The provider answered *at all*. ``True`` with ``ok`` false means the
             connection and credential are fine and the model's output was not.

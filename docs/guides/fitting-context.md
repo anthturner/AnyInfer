@@ -60,9 +60,9 @@ The default `auto` strategy sends everything when it fits and falls back to `tie
 it does not. Name a strategy when you want a specific shape:
 
 ```python
-context.select(documents, query, max_tokens=max_tokens, strategy="ranked")   # whole files
-context.select(documents, query, max_tokens=max_tokens, strategy="tiered")   # full coverage
-context.select(documents, query, max_tokens=max_tokens, strategy="packed")   # chunk-level
+context.select(documents, query, max_tokens=max_tokens, strategy="ranked")  # whole files
+context.select(documents, query, max_tokens=max_tokens, strategy="tiered")  # full coverage
+context.select(documents, query, max_tokens=max_tokens, strategy="packed")  # chunk-level
 ```
 
 ## 4. Place the result and check what happened
@@ -92,8 +92,8 @@ class ContextWatcher:
         if isinstance(event, ai.ContextReduced):
             metrics.gauge("context.omitted", event.omitted_count)
 
-reduction = context.select(documents, query, max_tokens=max_tokens,
-                           observer=ContextWatcher())
+
+reduction = context.select(documents, query, max_tokens=max_tokens, observer=ContextWatcher())
 ```
 
 ## Reuse the ranking cache across turns
@@ -104,8 +104,7 @@ An interactive application ranks the same corpus on every turn. Build the statis
 cache = context.build_rank_cache(documents)
 
 for turn in conversation:
-    reduction = context.select(documents, turn.text, max_tokens=budget_for(turn),
-                               rank_cache=cache)
+    reduction = context.select(documents, turn.text, max_tokens=budget_for(turn), rank_cache=cache)
 ```
 
 Invalidation is yours: key the cache on a corpus hash and rebuild when the corpus changes.
@@ -135,7 +134,7 @@ print(second.carried_over)
 ```
 
 Unchanged documents get the bonus, so a corpus that barely moved produces the same
-selection — and therefore the same prefix — rather than swapping one equally ranked file
+selection, and therefore the same prefix, rather than swapping one equally ranked file
 for another.
 
 ## Choose a strategy from measurements
@@ -188,7 +187,7 @@ Tool-call pairing survives, system messages survive, and the recent window survi
 three things naive truncation breaks.
 
 Or hand the policy to the client and stop thinking about it. Every frontend built on that
-client — including `anyinfer run` and the sidecar — then behaves the same way:
+client, including `anyinfer run` and the sidecar — then behaves the same way:
 
 ```python
 client = ai.Client(providers, history=ai.HistoryPolicy())
@@ -208,8 +207,8 @@ and writes something shorter, reporting exactly how many calls that took.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Context reduction](../concepts/context-reduction.md) — the strategies and their tradeoffs.
-- [Distill a corpus](../examples/distill-a-corpus.md) — the map/reduce cookbook.
-- [Token estimation and context budgets](../concepts/budgeting.md) — where the budget comes from.
+- [Context reduction](../concepts/context-reduction.md): the strategies and their tradeoffs.
+- [Distill a corpus](../examples/distill-a-corpus.md): the map/reduce cookbook.
+- [Token estimation and context budgets](../concepts/budgeting.md): where the budget comes from.
 
 </div>

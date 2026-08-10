@@ -54,7 +54,7 @@ class ContextTuning:
 
     Attributes:
         collapse_duplicates: Render byte-identical documents once, with the rest as
-            pointer elements. Lossless — the content is still present — and on by
+            pointer elements. Lossless — the content is still present, and on by
             default, since sending the same bytes twice helps nobody.
         near_duplicate_threshold: Jaccard similarity at or above which two documents are
             treated as duplicates of each other. ``0.0`` disables near-duplicate

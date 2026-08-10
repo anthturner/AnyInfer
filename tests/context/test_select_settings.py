@@ -14,9 +14,7 @@ from anyinfer.context import (
     select,
 )
 
-SMALL_RELEVANT = ContextDocument.of(
-    "src/auth/token.py", "def token():\n    return 'credential'\n"
-)
+SMALL_RELEVANT = ContextDocument.of("src/auth/token.py", "def token():\n    return 'credential'\n")
 BIG_RELEVANT = ContextDocument.of(
     "src/auth/credential_store.py",
     "\n".join(f"# credential note {i}\ndef store_{i}(): return 'credential'" for i in range(80)),
@@ -67,9 +65,7 @@ def test_default_tuning_renders_exactly_what_no_tuning_does(strategy):
     ids=["default", "recommended"],
 )
 def test_a_reduction_never_overruns_its_budget(strategy, budget, tuning):
-    reduction = select(
-        CORPUS, "credential", max_tokens=budget, strategy=strategy, tuning=tuning
-    )
+    reduction = select(CORPUS, "credential", max_tokens=budget, strategy=strategy, tuning=tuning)
     assert reduction.estimated_tokens <= budget
     assert reduction.total_bytes == len(reduction.text.encode("utf-8"))
 
@@ -111,7 +107,9 @@ def test_density_ordering_is_deterministic_under_reversal():
 NEAR_TWINS = [
     ContextDocument.of(
         f"src/twin_{index}.py",
-        "\n".join(f"def handler_{i}(request):\n    return dispatch(request, {i})" for i in range(20))
+        "\n".join(
+            f"def handler_{i}(request):\n    return dispatch(request, {i})" for i in range(20)
+        )
         + f"\n\ndef only_in_{index}(): pass\n",
     )
     for index in range(5)
@@ -151,9 +149,7 @@ def test_diversity_makes_room_for_something_different():
 
 def test_diversity_is_deterministic_under_reversal():
     tuning = ContextTuning(diversity=0.9)
-    forward = select(
-        NEAR_TWINS, DIVERSITY_QUERY, max_tokens=900, tuning=tuning, strategy="ranked"
-    )
+    forward = select(NEAR_TWINS, DIVERSITY_QUERY, max_tokens=900, tuning=tuning, strategy="ranked")
     backward = select(
         list(reversed(NEAR_TWINS)),
         DIVERSITY_QUERY,
@@ -200,7 +196,12 @@ def test_carry_over_survives_an_unrelated_corpus_change():
     first = select(CORPUS, "credential", max_tokens=1_200, strategy="ranked", tuning=tuning)
     grown = [*CORPUS, ContextDocument.of("src/new_credential_helper.py", "credential " * 40)]
     second = select(
-        grown, "credential", max_tokens=1_200, strategy="ranked", tuning=tuning, previous=first.state()
+        grown,
+        "credential",
+        max_tokens=1_200,
+        strategy="ranked",
+        tuning=tuning,
+        previous=first.state(),
     )
     kept = {document.path for document in first.documents} & {
         document.path for document in second.documents

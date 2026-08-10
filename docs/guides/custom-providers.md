@@ -12,13 +12,15 @@ If your endpoint speaks `/chat/completions` and differs only by URL, authenticat
 spelling, and a few quirks, you do not. Point the built-in OpenAI-compatible provider at it:
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "openai-compat",
-        base_url="https://llm.internal.example/v1",
-        api_key="env://INTERNAL_LLM_KEY",
-    )
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "openai-compat",
+            base_url="https://llm.internal.example/v1",
+            api_key="env://INTERNAL_LLM_KEY",
+        )
+    ]
+)
 ```
 
 Write an adapter when there is real protocol translation to do — a different request shape,
@@ -50,7 +52,7 @@ yields normalized events; everything else is the core's job:
 
 > Retry, fallback, health gating, schema validation and repair, first-token timing, usage
 > normalization, cost, telemetry, and redaction live in AnyInfer's core. If you find
-> yourself adding control flow to an adapter, it belongs in the core instead — and it is
+> yourself adding control flow to an adapter, it belongs in the core instead, and it is
 > probably already there.
 
 That constraint is what makes an adapter small. It is also what makes your provider behave

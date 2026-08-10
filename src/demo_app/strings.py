@@ -11,27 +11,20 @@ from __future__ import annotations
 __all__ = [
     "CANCEL",
     "COMPOSER_PLACEHOLDER",
-    "CONVERSATIONS_TITLE",
-    "DELETE",
-    "EXPORT_ALL",
-    "EXPORT_JSON",
-    "EXPORT_MARKDOWN",
-    "IMPORT",
-    "NEW_CHAT",
+    "LOCAL_INFERENCE",
+    "OPEN_SAVED",
     "PROVIDERS_TITLE",
     "REFRESH",
     "RENAME",
     "SEND",
     "SETTINGS",
-    "LOCAL_MODELS",
-    "SHOW_CONVERSATIONS",
-    "SHOW_LEFT_SIDEBAR",
     "SHOW_PROVIDERS",
-    "SHOW_RIGHT_SIDEBAR",
+    "SHOW_SIDEBAR",
     "SHOW_STRUCTURED",
     "SHOW_TARGET",
     "SHOW_TELEMETRY",
     "SHOW_TOOLS",
+    "SIDEBAR",
     "STRUCTURED_TITLE",
     "TARGET_TITLE",
     "TELEMETRY_TITLE",
@@ -44,15 +37,10 @@ __all__ = [
 ]
 
 COMPOSER_PLACEHOLDER = "Ask something… (Ctrl+Enter to send, Shift+Enter for a new line)"
-NEW_CHAT = "New chat"
 SEND = "Send"
 CANCEL = "Cancel"
-EXPORT_ALL = "Export all"
-IMPORT = "Import"
 RENAME = "Rename"
-DELETE = "Delete"
-EXPORT_JSON = "Export as JSON"
-EXPORT_MARKDOWN = "Export as Markdown"
+OPEN_SAVED = "Open Saved…"
 
 WELCOME_TAGLINE = "A faithful, offline worked example of AnyInfer integration."
 WELCOME_QUICK_QUESTION = "Ask a quick question"
@@ -65,14 +53,11 @@ STRUCTURED_TITLE = "Structured output"
 PROVIDERS_TITLE = "Providers"
 TARGET_TITLE = "Target inspector"
 TOOLS_TITLE = "Tool loop"
-LOCAL_MODELS = "Local models…"
+LOCAL_INFERENCE = "Local Inference…"
 REFRESH = "Refresh"
 SETTINGS = "Provider settings…"
-CONVERSATIONS_TITLE = "Conversations"
-
-SHOW_LEFT_SIDEBAR = "Show Left Sidebar"
-SHOW_RIGHT_SIDEBAR = "Show Right Sidebar"
-SHOW_CONVERSATIONS = "Conversation History"
+SIDEBAR = "Sidebar"
+SHOW_SIDEBAR = "Show Sidebar"
 SHOW_TELEMETRY = "Telemetry"
 SHOW_STRUCTURED = "Structured Output"
 SHOW_PROVIDERS = "Providers"

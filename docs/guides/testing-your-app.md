@@ -2,7 +2,7 @@
 
 Your application's inference code has behaviour worth testing: it falls back when a
 provider is down, it repairs a malformed structured answer, it reduces a corpus to fit a
-budget. Testing that normally means either mocking the library — which tests your mocks —
+budget. Testing that normally means either mocking the library, which tests your mocks —
 or calling a real provider from CI, which is slow, costs money, and fails for reasons that
 have nothing to do with your change.
 
@@ -55,7 +55,7 @@ the target, the adapter spoke the wire dialect, the core measured the timings.
 ## Prove your fallback chain works
 
 A scripted model can be told to fail. Failures are consumed in order, then the model
-answers normally — so "fails once, then succeeds" is one line.
+answers normally, so "fails once, then succeeds" is one line.
 
 ```python
 from anyinfer.testing import ScriptedFailure, ScriptedModel

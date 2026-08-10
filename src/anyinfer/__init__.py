@@ -34,6 +34,7 @@ from .arena import ArenaResult, Candidate
 from .benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
+    BenchmarkSample,
     Measurement,
     MeasurementIdentity,
     MeasurementStore,
@@ -245,6 +246,7 @@ __all__ = [
     "AttemptStarted",
     "AudioPart",
     "AuthError",
+    "BenchmarkSample",
     "CacheFacet",
     "CacheMechanism",
     "CacheMode",

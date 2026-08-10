@@ -3,7 +3,7 @@
 An adapter that starts from a blank file starts by reading `openai_compat.py` and guessing
 which parts are contract and which are that provider's quirks. This writes the contract
 part — the four methods, the descriptor, the entry point, the conformance test, and the
-contract-snapshot stub — so what is left to write is the translation, which is the only
+contract-snapshot stub, so what is left to write is the translation, which is the only
 part that is actually provider knowledge.
 
 The generated package is green out of the box. A template whose conformance run fails on
@@ -122,7 +122,7 @@ def provider() -> ProviderDescriptor:
 _ADAPTER = '''"""Translate AnyInfer\'s normalized request into {provider_id}\'s wire format.
 
 An adapter *only* translates. Retry, fallback, schema validation and repair, timing, usage
-normalization, telemetry, and redaction all live in AnyInfer\'s core — if you find yourself
+normalization, telemetry, and redaction all live in AnyInfer\'s core, if you find yourself
 adding control flow here, it belongs there instead.
 
 If this provider differs from OpenAI only by endpoint, auth spelling, and quirks, do not
@@ -198,7 +198,7 @@ async def test_conformance() -> None:
     """
 '''
 
-_PYPROJECT = '''[build-system]
+_PYPROJECT = """[build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
@@ -220,7 +220,7 @@ dependencies = ["anyinfer"]
 [tool.anyinfer.conformance]
 # reasoning = false
 # retry_after = false
-'''
+"""
 
 _CONTRACT = """# {provider_id} — Protocol Contract
 

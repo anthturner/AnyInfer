@@ -26,6 +26,7 @@ from ..arena import ArenaResult, Candidate, candidate_envelope, select_candidate
 from ..benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
+    BenchmarkSample,
     Measurement,
     MeasurementStore,
     benchmark_prompt,
@@ -95,6 +96,7 @@ from ..events.telemetry import (
 )
 from ..local.acquire import AcquisitionReport, ProgressSink
 from ..local.hardware import HardwareProfile, probe_signature
+from ..local.metrics import ResourceSample, SystemSampler
 from ..local.services import PULL_TIMEOUT_S, PullReport, PullRequest
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
@@ -252,17 +254,17 @@ class AsyncClient:
             and only on the estimate's floor, so a heuristic never refuses a request
             that might have fit.
         history: Conversation-compaction policy applied when a request outgrows its
-            target's window. ``None`` — the default — never compacts. This is the
+            target's window. ``None`` — the default; never compacts. This is the
             client's half of the overflow answer; ``Route.context_window_targets`` is
             the other half, and the policy's ``mode`` decides which is tried first.
         spend: Ceiling on what this client may spend, checked before dispatch.
-            ``None`` — the default — never refuses anything. Not an organization
+            ``None`` — the default; never refuses anything. Not an organization
             quota: it governs this client object in this process and nothing else.
         ledger: Spend rollup to record into. One is created automatically when
             ``spend`` is set; supply your own to share a total between clients or to
             read it without a policy in force.
         cache: Prompt-cache placement applied to every request that does not carry its
-            own. ``None`` — the default — never engages a provider's cache, because
+            own. ``None`` — the default; never engages a provider's cache, because
             caching changes what a provider bills and how long it keeps a copy of the
             prompt. A request's own ``cache`` overrides this.
             Every frontend built on this client inherits it.
@@ -281,7 +283,7 @@ class AsyncClient:
             because some unrelated telemetry sink asked for it.
         capability_overrides: Deliberate corrections keyed by ``"provider:model"``.
             Every supplied field is applied at ``override`` provenance — the strongest
-            layer, outranking discovery and probes — so a wrong upstream number can
+            layer, outranking discovery and probes, so a wrong upstream number can
             always be fixed locally.
         model_dir: Where acquired model weights are stored. Defaults to the per-OS data
             directory, overridable with ``ANYINFER_MODEL_DIR``.
@@ -315,17 +317,18 @@ class AsyncClient:
     ) -> None:
         self._registry = registry or default_registry
         self._events = EventDispatcher(list(observers or []))
+        if catalog is None and use_default_catalog:
+            catalog = load_default_catalog()
+        self._catalog = catalog
         self._pool = AdapterPool(
             list(providers or []),
             registry=self._registry,
+            catalog=self._catalog,
             resolver=resolver,
             # Lifecycle telemetry from adapters (server start/stop, download progress)
             # flows through the same dispatcher as request-path events.
             events=self._emit,
         )
-        if catalog is None and use_default_catalog:
-            catalog = load_default_catalog()
-        self._catalog = catalog
         self._default_route = route
         self._health = HealthCache()
         self._capabilities = CapabilityStore(
@@ -455,7 +458,7 @@ class AsyncClient:
         Every request is independent by default, which is right for one-shot work and
         wrong for a conversation. Providers that can carry state between turns each save
         something different — Copilot keeps the conversation server-side, llama.cpp keeps
-        the model and its KV cache resident, Ollama keeps the model loaded — and a session
+        the model and its KV cache resident, Ollama keeps the model loaded, and a session
         is how a caller says "these requests belong together" without having to know which.
 
         A session never changes an answer; it is a performance and cost optimization.
@@ -662,7 +665,7 @@ class AsyncClient:
         Deliberately not routed: a probe asks what *this* target does, so a retry or a
         fallback answering from somewhere else would record a measurement of the wrong
         model. It also has to force a mechanism the capability ladder would not choose —
-        that is the entire point — which it does by handing the wire builder a synthetic
+        that is the entire point, which it does by handing the wire builder a synthetic
         capability set claiming exactly the feature under test.
         """
         wanted = Feature.STREAMING if feature is Feature.STREAMING else feature
@@ -721,13 +724,14 @@ class AsyncClient:
         output_tokens: int = BENCHMARK_OUTPUT_TOKENS,
         timeout_s: float = 120.0,
         store: MeasurementStore | None = None,
+        progress: Callable[[BenchmarkSample], None] | None = None,
     ) -> Measurement:
         """Measure what a target actually does, with one deterministic request.
 
         Capabilities describe a model; none of them says how fast it is *here*. For local
         inference that is the number that decides everything — the same weights on the same
         GPU differ by an order of magnitude depending on what else is resident and how many
-        layers ended up offloaded — and it is the number an application needs to pick a
+        layers ended up offloaded, and it is the number an application needs to pick a
         default model or explain a slow session.
 
         Prefill and decode are reported separately, because a machine can be fast at one
@@ -747,6 +751,8 @@ class AsyncClient:
             timeout_s: Wall clock for the request.
             store: An application-owned store to record the result in. Omitted, the
                 measurement is returned and forgotten.
+            progress: Optional sink for live token-rate and local host-utilization samples.
+                Token counts are estimated until the terminal provider usage arrives.
 
         Returns:
             The `Measurement`, whose rates are
@@ -758,12 +764,75 @@ class AsyncClient:
                 unmeasurable target is a failure, unlike an unverifiable one.
         """
         resolved = self.resolve(target)
-        result = await self.generate(
-            benchmark_prompt(prompt_tokens),
-            route=Route(targets=(target,), retry=Retry(max_attempts=1)),
-            sampling=Sampling(max_output_tokens=output_tokens, temperature=0.0),
-            timeout_s=timeout_s,
+        started = time.monotonic()
+        estimated_bytes = 0
+        decoding = False
+        stop_sampling = asyncio.Event()
+        sampler = (
+            SystemSampler()
+            if self._pool.locality_for(resolved.provider_id) == "local"
+            else None
         )
+
+        def publish(sample: BenchmarkSample) -> None:
+            if progress is None:
+                return
+            try:
+                progress(sample)
+            except Exception:  # noqa: BLE001 — an observer must not break the measurement
+                return
+
+        async def sample_live() -> None:
+            previous_tokens = 0
+            previous_at = started
+            while not stop_sampling.is_set():
+                resources = (
+                    await asyncio.to_thread(sampler.sample)
+                    if sampler is not None
+                    else ResourceSample()
+                )
+                now = time.monotonic()
+                tokens = estimated_bytes // 4
+                interval = now - previous_at
+                if not decoding:
+                    # No output during load/prefill is a measured zero, and preserving it
+                    # makes the warm-up interval visible instead of starting the chart at
+                    # the first decoded token.
+                    rate = 0.0
+                elif interval > 0 and tokens >= previous_tokens:
+                    rate = (tokens - previous_tokens) / interval
+                else:
+                    rate = None
+                publish(
+                    BenchmarkSample(
+                        elapsed_ms=(now - started) * 1000.0,
+                        phase="decode" if decoding else "warmup",
+                        estimated_output_tokens=tokens,
+                        output_tokens_per_s=rate,
+                        resources=resources,
+                    )
+                )
+                previous_tokens, previous_at = tokens, now
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(stop_sampling.wait(), timeout=0.25)
+
+        sample_task = asyncio.create_task(sample_live()) if progress is not None else None
+        try:
+            async with self.stream(
+                benchmark_prompt(prompt_tokens),
+                route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+                sampling=Sampling(max_output_tokens=output_tokens, temperature=0.0),
+                timeout_s=timeout_s,
+            ) as stream:
+                async for event in stream:
+                    if isinstance(event, TextDelta):
+                        decoding = True
+                        estimated_bytes += len(event.text.encode("utf-8"))
+            result = stream.result
+        finally:
+            stop_sampling.set()
+            if sample_task is not None:
+                await sample_task
         measurement = measurement_from(
             identity_for(
                 result.target,
@@ -781,6 +850,20 @@ class AsyncClient:
         )
         if store is not None:
             store.record(measurement)
+        final_resources = (
+            await asyncio.to_thread(sampler.sample)
+            if sampler is not None
+            else ResourceSample()
+        )
+        publish(
+            BenchmarkSample(
+                elapsed_ms=measurement.total_ms,
+                phase="complete",
+                estimated_output_tokens=measurement.output_tokens or estimated_bytes // 4,
+                output_tokens_per_s=measurement.decode_tokens_per_s,
+                resources=final_resources,
+            )
+        )
         return measurement
 
     def _host_signature(self, provider_id: str) -> str | None:
@@ -1026,7 +1109,7 @@ class AsyncClient:
         """Find an acquired model on disk, with advisory launch arguments.
 
         No network I/O. Verification is shallow by default — size and modification time
-        against the index — because re-hashing forty gigabytes on every lookup would be
+        against the index, because re-hashing forty gigabytes on every lookup would be
         absurd; ``verify=True`` forces the full check.
         """
         return locate_catalog_model(
@@ -1123,7 +1206,7 @@ class AsyncClient:
         """Run one ordinary route; arena branches reuse this exact path."""
         request_id, builder = self._new_run(request, route, manifest)
         # Closed explicitly: returning out of `async for` abandons the generator, and its
-        # cleanup — which is what unregisters the run — would then wait for a collection.
+        # cleanup, which is what unregisters the run — would then wait for a collection.
         async with contextlib.aclosing(
             self._routed_stream(
                 request,
@@ -1497,7 +1580,7 @@ class AsyncClient:
         """Mint a correlation id and, unless manifests are off, the builder to go with it.
 
         The builder is created *here* rather than inside the routed generator so a
-        streaming caller holds it before the first event is produced — which is what makes
+        streaming caller holds it before the first event is produced, which is what makes
         a cancelled stream still able to answer for itself.
         """
         request_id = uuid.uuid4().hex
@@ -1788,7 +1871,7 @@ class AsyncClient:
     def spend(self) -> SpendTotals:
         """What this client has spent so far.
 
-        Returns zeros — never ``None`` — when no ledger is attached, so a caller reading
+        Returns zeros; never ``None``, when no ledger is attached, so a caller reading
         this never has to branch on whether accounting was switched on. Check
         `SpendTotals.unknown_requests` before treating the figure as complete: requests
         against a target with no trusted pricing are counted there rather than being
@@ -2075,7 +2158,7 @@ class AsyncClient:
         `Route`, one target string, or a sequence of targets forming a fallback chain.
 
         An open session names a target of its own, and a caller who has one rarely wants to
-        repeat it on every turn — so it stands in when nothing more specific was given. It
+        repeat it on every turn, so it stands in when nothing more specific was given. It
         never *overrides* anything: a session is about reuse, not routing.
         """
         if route is not None:
@@ -2293,7 +2376,7 @@ class AsyncClient:
                 )
 
             if not pending and not compacted and isinstance(last_error, ContextLengthError):
-                # Every target — including the overflow chain — is exhausted and the
+                # Every target, including the overflow chain — is exhausted and the
                 # request still does not fit anywhere. Only now is losing history the
                 # better answer than failing, which is what `last_resort` means. One
                 # pass only: a second would be compacting an already-compacted request.
@@ -2645,7 +2728,7 @@ class AsyncClient:
                 and not (stream and yielded_content)
             ):
                 # A refusal with a configured content-policy chain redirects instead of
-                # completing — but never after the consumer has already seen streamed
+                # completing, but never after the consumer has already seen streamed
                 # text from this attempt, where a silent restart would contradict it.
                 chain = content_chain()
                 if chain:
@@ -2972,7 +3055,7 @@ class AsyncClient:
 
         An implicit-caching provider only helps if the prefix is identical between turns.
         A timestamp in the system block, or tools serialized in a different order each
-        time, silently produces a hit rate of zero — and the only evidence is a
+        time, silently produces a hit rate of zero, and the only evidence is a
         ``cache_read_tokens`` that never rises, which nobody is watching. Comparing the
         prefix signature across requests to the same target turns that into a diagnostic.
 
@@ -3002,7 +3085,7 @@ class AsyncClient:
         """Dispatch a telemetry event to observers and to the run's manifest builder.
 
         The builder is normally found by correlation — every request-path event carries a
-        ``request_id`` — and passed explicitly only for the handful of events that carry
+        ``request_id``, and passed explicitly only for the handful of events that carry
         none, where correlation would have to guess between concurrent runs.
         """
         if self._builders:
@@ -3023,7 +3106,7 @@ def _judge_probe(
     """Read what came back from a probe the provider accepted.
 
     Acceptance alone proves nothing — the failure this whole layer exists to catch is a
-    server that takes ``response_format`` and ignores it — so each feature is judged on
+    server that takes ``response_format`` and ignores it, so each feature is judged on
     whether the *answer* shows the mechanism worked. Anything short of that is
     inconclusive rather than a verdict, because one reply cannot separate a weak model
     from an ignored parameter.

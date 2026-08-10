@@ -31,13 +31,15 @@ allowances:
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "openai",
-        api_key="env://OPENAI_API_KEY",
-        limits=ai.RateLimits(max_concurrent=8, requests_per_minute=300),
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "openai",
+            api_key="env://OPENAI_API_KEY",
+            limits=ai.RateLimits(max_concurrent=8, requests_per_minute=300),
+        ),
+    ]
+)
 ```
 
 The same thing in a configuration file, which the CLI and the sidecar read too:
@@ -83,7 +85,7 @@ rather than branched on by name in the core. Two dialects ship today:
 
 Every derived wait is clamped, so a skewed clock costs a bounded pause rather than a hang.
 A provider that declares no dialect is paced by the bounds you configured and nothing else —
-a smaller promise, honestly kept, rather than a guessed header name that silently reads
+a smaller, reliable promise, rather than a guessed header name that silently reads
 nothing forever.
 
 If you ask for `respect_headers` where it cannot work — a provider that publishes no
@@ -98,7 +100,7 @@ and once in the result, where a caller can attribute it without a debugger.
 
 ```python
 result = client.generate(prompt, target="openai:gpt-5")
-result.timing.phases.get("queued_ms")   # present only when this request waited
+result.timing.phases.get("queued_ms")  # present only when this request waited
 ```
 
 ```python
@@ -107,6 +109,7 @@ def observer(event):
         print(f"{event.provider_id} held a request {event.waited_s:.2f}s ({event.reason})")
     if isinstance(event, ai.RateLimitObserved):
         print(f"{event.provider_id} has {event.requests_remaining} requests left")
+
 
 client.events.subscribe(observer)
 ```
@@ -121,12 +124,12 @@ place.
 ## One interaction worth knowing
 
 Queue time counts against the request's own `timeout_s`. A request that cannot be dispatched
-inside its own timeout fails as a timeout, which is the honest reading of "how long until I
-get an answer" — but it does mean that aggressive pacing and a tight timeout will fight each
+inside its own timeout fails as a timeout, which is the literal reading of "how long until I
+get an answer", but it does mean that aggressive pacing and a tight timeout will fight each
 other. Raise `timeout_s` when you pace hard.
 
 ## Related
 
-- [Cost and spending](cost.md) — the other ceiling a client can carry
-- [Routing and fallback](routing.md) — what happens after a limit is hit anyway
-- [`RateLimits`](../reference/api/capabilities.md#anyinfer.RateLimits) — the full field reference
+- [Cost and spending](cost.md): the other ceiling a client can carry
+- [Routing and fallback](routing.md): what happens after a limit is hit anyway
+- [`RateLimits`](../reference/api/capabilities.md#anyinfer.RateLimits): the full field reference

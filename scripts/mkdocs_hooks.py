@@ -68,9 +68,7 @@ def on_config(config: Any) -> Any:
 
 def on_page_markdown(markdown: str, *, config: Any, **kwargs: Any) -> str:
     """Replace the ``{{ extra.anyinfer_version }}`` placeholder in page source."""
-    resolved = markdown.replace(
-        "{{ extra.anyinfer_version }}", config.extra["anyinfer_version"]
-    )
+    resolved = markdown.replace("{{ extra.anyinfer_version }}", config.extra["anyinfer_version"])
     page = kwargs.get("page")
     if page is not None:
         _SUMMARIES[page.file.src_uri] = _first_paragraph(resolved)
@@ -103,14 +101,12 @@ def on_post_build(*, config: Any, **kwargs: Any) -> None:
         ValueError: If the index came out empty, or if either file carries an internal
             ADR identifier. Both are build failures rather than test failures because
             these files are the ones read in somebody else's repository, where nothing
-            here can correct them — and the build is the last place that can.
+            here can correct them, and the build is the last place that can.
     """
     site_dir = Path(config.site_dir)
     index = _render_index(config)
     if "\n## " not in index:
-        raise ValueError(
-            f"{LLMS_INDEX} lists no pages; the navigation hook produced nothing"
-        )
+        raise ValueError(f"{LLMS_INDEX} lists no pages; the navigation hook produced nothing")
     (site_dir / LLMS_INDEX).write_text(index, encoding="utf-8")
 
     bundle = _render_full(config)
@@ -252,9 +248,7 @@ class _ArticleText(HTMLParser):
     """
 
     _SKIP = frozenset({"script", "style", "nav", "svg", "button", "form"})
-    _BREAK = frozenset(
-        {"p", "div", "li", "tr", "br", "pre", "h1", "h2", "h3", "h4", "h5", "h6"}
-    )
+    _BREAK = frozenset({"p", "div", "li", "tr", "br", "pre", "h1", "h2", "h3", "h4", "h5", "h6"})
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -264,7 +258,7 @@ class _ArticleText(HTMLParser):
         # how many of that same element are nested inside. Counting every open tag instead
         # goes wrong the first time a void element (`<br>`, `<img>`) appears inside the
         # subtree: it never closes, the counter never returns to zero, and the rest of the
-        # page silently disappears — which is exactly what a plain counter did here, since
+        # page silently disappears, which is exactly what a plain counter did here, since
         # every Material heading ends in an `<a class="headerlink">`.
         self._skip_tag: str | None = None
         self._skip_depth = 0

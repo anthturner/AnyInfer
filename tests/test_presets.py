@@ -106,7 +106,7 @@ def test_presets_without_a_default_base_url_require_one() -> None:
 
 
 def test_local_presets_default_to_loopback() -> None:
-    """A local engine's default must be loopback — but it may have no default at all.
+    """A local engine's default must be loopback, but it may have no default at all.
 
     KServe is addressed by a cluster service host and Foundry Local picks its port at
     service start, so neither has a loopback address to guess. Those declare
@@ -169,8 +169,7 @@ async def test_moonshot_renames_the_output_token_parameter() -> None:
             200,
             json={
                 "choices": [
-                    {"message": {"role": "assistant", "content": "ok"},
-                     "finish_reason": "stop"}
+                    {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
                 ]
             },
         )
@@ -212,11 +211,7 @@ async def test_errors_are_attributed_to_the_preset_id() -> None:
         return httpx2.Response(401, json={"error": {"message": "bad key"}})
 
     client = ai.AsyncClient(
-        [
-            ai.ProviderSettings.of(
-                "groq", api_key="bad", transport=httpx2.MockTransport(handler)
-            )
-        ]
+        [ai.ProviderSettings.of("groq", api_key="bad", transport=httpx2.MockTransport(handler))]
     )
     async with client:
         with pytest.raises(ai.AllTargetsFailedError) as excinfo:
@@ -233,9 +228,7 @@ def test_reasoning_translators_produce_the_documented_wire_fields() -> None:
     assert registry.get("parasail").reasoning_translator("minimal") == {
         "reasoning_effort": "low"
     }, "three-level providers clamp minimal onto their lowest documented level"
-    assert registry.get("parasail").reasoning_translator("high") == {
-        "reasoning_effort": "high"
-    }
+    assert registry.get("parasail").reasoning_translator("high") == {"reasoning_effort": "high"}
     assert registry.get("mistral").reasoning_translator("minimal") == {
         "reasoning_effort": "minimal"
     }
@@ -336,12 +329,8 @@ def test_endpoints_corrected_by_re_verification_stay_corrected() -> None:
 def test_requesty_spells_its_lowest_effort_min_not_minimal() -> None:
     """Requesty documents `min`; `minimal` is a near-homograph it does not accept."""
     registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
-    assert registry.get("requesty").reasoning_translator("minimal") == {
-        "reasoning_effort": "min"
-    }
-    assert registry.get("requesty").reasoning_translator("high") == {
-        "reasoning_effort": "high"
-    }
+    assert registry.get("requesty").reasoning_translator("minimal") == {"reasoning_effort": "min"}
+    assert registry.get("requesty").reasoning_translator("high") == {"reasoning_effort": "high"}
 
 
 async def test_perplexity_declares_tools_as_ignored() -> None:
@@ -378,8 +367,7 @@ def _server_for(scenario: str) -> FakeOpenAIServer:
     if scenario == "rate_limited":
         return FakeOpenAIServer(
             [
-                FakeResponse(status=429, error_message="slow down",
-                             headers={"retry-after": "0"}),
+                FakeResponse(status=429, error_message="slow down", headers={"retry-after": "0"}),
                 FakeResponse(text="recovered"),
             ]
         )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pin the downloadable ``llama-server`` runtime variants.
 
-AnyInfer never bundles llama.cpp binaries — they are fetched at runtime — so the set of
+AnyInfer never bundles llama.cpp binaries — they are fetched at runtime, so the set of
 fetchable builds is pinned data with the same discipline as the model catalog: a real build
 tag, real asset URLs, real sha256 digests, real sizes, and a real ``last_verified`` date,
 all read from the upstream GitHub release rather than typed by hand.

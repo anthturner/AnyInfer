@@ -676,7 +676,7 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
 
     Converse has no reasoning field of its own; thinking is a model-specific parameter, so
     it travels in ``additionalModelRequestFields``. Bedrock forwards unknown fields to the
-    model, which ignores them — so this is harmless on models without thinking, and the
+    model, which ignores them, so this is harmless on models without thinking, and the
     escape hatch remains available for other spellings.
     """
     if effort is None:

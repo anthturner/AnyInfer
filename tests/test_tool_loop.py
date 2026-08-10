@@ -68,6 +68,7 @@ def test_unsupported_type_is_rejected_at_declaration() -> None:
         pass
 
     with pytest.raises(ToolLoopError) as excinfo:
+
         @tool
         def bad(value: Custom) -> None:
             """Take something unsupported."""
@@ -105,9 +106,7 @@ async def test_dispatch_invokes_the_function() -> None:
         return a + b
 
     registry = ToolRegistry([add])
-    result = await registry.dispatch(
-        ai.ToolCall(id="c1", name="add", arguments={"a": 2, "b": 3})
-    )
+    result = await registry.dispatch(ai.ToolCall(id="c1", name="add", arguments={"a": 2, "b": 3}))
 
     assert result.call_id == "c1"
     assert result.content == "5"
@@ -162,9 +161,7 @@ async def test_a_raising_tool_becomes_an_error_result() -> None:
         raise ValueError("that did not work")
 
     registry = ToolRegistry([explode])
-    result = await registry.dispatch(
-        ai.ToolCall(id="c", name="explode", arguments={"value": "x"})
-    )
+    result = await registry.dispatch(ai.ToolCall(id="c", name="explode", arguments={"value": "x"}))
 
     assert result.is_error is True
     assert "ValueError: that did not work" in result.content
@@ -207,9 +204,7 @@ async def test_loop_dispatches_then_returns_the_final_answer() -> None:
         ]
     )
     async with make_client(server) as client:
-        result = await client.run_tools(
-            "look up alpha", tools=[lookup], target="openai-compat:m"
-        )
+        result = await client.run_tools("look up alpha", tools=[lookup], target="openai-compat:m")
 
     assert result.text == "The value is value-for-alpha."
     assert server.call_count == 2
@@ -294,9 +289,7 @@ async def test_round_bound_is_enforced() -> None:
     )
     async with make_client(server) as client:
         with pytest.raises(ToolLoopError) as excinfo:
-            await client.run_tools(
-                "go", tools=[lookup], target="openai-compat:m", max_rounds=3
-            )
+            await client.run_tools("go", tools=[lookup], target="openai-compat:m", max_rounds=3)
 
     assert server.call_count == 3
     assert excinfo.value.hint is not None

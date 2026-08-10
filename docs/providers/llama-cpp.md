@@ -15,22 +15,23 @@ every engine, crash isolation, and no GPU-wheel build matrix in the dependency t
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: tool calls</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: vision with projector</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: health</span>
-<span class="anyinfer-badge anyinfer-badge-no">:material-close: discovery</span>
+<span class="anyinfer-badge anyinfer-badge-yes">:material-check: catalog discovery</span>
 </div>
 
 ## Setup
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "llama-cpp",
-        options={
-            "catalog": ai.load_default_catalog(),
-            "posture": "balanced",
-            "idle_ttl_s": 900,
-        },
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "llama-cpp",
+            options={
+                "posture": "balanced",
+                "idle_ttl_s": 900,
+            },
+        ),
+    ]
+)
 
 result = client.generate(prompt, target="llama-cpp:qwen2.5-7b-instruct-q4-k-m")
 ```
@@ -40,7 +41,9 @@ the artifact, downloads and verifies it, tunes a server for your hardware, start
 answers.
 
 Install a pinned runtime with `anyinfer runtime install`, or supply your own `llama-server`
-through the `binary` option. AnyInfer fetches runtimes and weights on demand rather than
+through the `binary` option. With multiple installed runtimes, set `runtime` to `cuda`,
+`vulkan`, `metal`, `rocm`, or `cpu`; the default `auto` selects the highest-ranked installed
+backend the detected hardware can drive. AnyInfer fetches runtimes and weights on demand rather than
 embedding them in the wheel, and verifies catalog-managed downloads before use.
 
 Aliases: `llamacpp`, `llama`.
@@ -49,8 +52,9 @@ Aliases: `llamacpp`, `llama`.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `catalog` | — | Required. Resolves artifact ids to pinned downloads. |
-| `binary` | `llama-server` | Optional executable override; otherwise the best installed AnyInfer runtime is selected. |
+| `catalog` | client's active catalog | Optional direct-adapter override for artifact resolution. |
+| `runtime` | `auto` | Installed backend family to use; `auto` selects the best usable one. |
+| `binary` | — | Optional executable override; takes precedence over `runtime`. |
 | `model_dir` | platform cache | Where GGUF files are stored. |
 | `posture` | `balanced` | `conservative`, `balanced`, or `aggressive`. |
 | `hardware` | detected | A pre-detected profile, to skip re-probing. |
@@ -100,7 +104,7 @@ template and tool calling silently does not work at all.
 ## Supervision
 
 - Servers bind `127.0.0.1`. A non-loopback bind requires `allow_remote_exposure=True`.
-- Model swaps are serialized — two unloaded models never race for the same VRAM.
+- Model swaps are serialized: two unloaded models never race for the same VRAM.
 - Requests block until the server is ready rather than receiving a 503 mid-load.
 - VRAM admission is checked before spawning, so an oversized model is refused with a clear
   message instead of crashing the child process.
@@ -113,7 +117,7 @@ See [the local subsystem](../concepts/local.md).
 VRAM admission control refuses a model that cannot fit, but it also does something quieter:
 on a machine where the weights plus KV cache leave no room, the plan offloads **no** layers
 and the model is served entirely on the CPU. That is the right call — a slow answer beats no
-answer — and it is invisible from the result.
+answer, and it is invisible from the result.
 
 ```python
 for note in client.diagnostics("llama-cpp"):
@@ -123,7 +127,7 @@ for note in client.diagnostics("llama-cpp"):
 ```
 
 Reported only when an accelerator was actually detected — on a CPU-only machine this is the
-plan working, not the plan degrading — and read from the supervisor's own state, so it costs
+plan working, not the plan degrading, and read from the supervisor's own state, so it costs
 nothing and never triggers hardware detection on its own.
 
 ## Wire contract

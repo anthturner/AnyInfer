@@ -39,16 +39,14 @@ async def test_attempt_start_precedes_first_token_which_precedes_content() -> No
     assert names == ["attempt_start", "first_token"]
 
     first_token_index = next(
-        i for i, e in enumerate(events)
-        if isinstance(e, ai.TimingMark) and e.name == "first_token"
+        i for i, e in enumerate(events) if isinstance(e, ai.TimingMark) and e.name == "first_token"
     )
-    first_content_index = next(
-        i for i, e in enumerate(events) if isinstance(e, CONTENT_EVENTS)
-    )
+    first_content_index = next(i for i, e in enumerate(events) if isinstance(e, CONTENT_EVENTS))
     assert first_token_index < first_content_index, "first_token marks the first content"
 
     attempt_start_index = next(
-        i for i, e in enumerate(events)
+        i
+        for i, e in enumerate(events)
         if isinstance(e, ai.TimingMark) and e.name == "attempt_start"
     )
     assert attempt_start_index < first_token_index
@@ -114,11 +112,13 @@ async def test_usage_may_arrive_late_and_still_reach_the_result() -> None:
     """Usage often arrives in a trailing chunk after the finish reason.
 
     Closing the stream on ``finish_reason`` instead of the terminal sentinel is a known way
-    to lose it, and it silently undercounts tokens — so the parser drains to ``[DONE]``.
+    to lose it, and it silently undercounts tokens, so the parser drains to ``[DONE]``.
     """
-    server = FakeOpenAIServer(FakeResponse(text="hello", usage={"prompt_tokens": 3,
-                                                                "completion_tokens": 2,
-                                                                "total_tokens": 5}))
+    server = FakeOpenAIServer(
+        FakeResponse(
+            text="hello", usage={"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}
+        )
+    )
     async with make_client(server) as client:
         events = await _events(client, target="openai-compat:m")
 
@@ -163,14 +163,13 @@ async def test_repair_restarts_the_attempt_clock_and_the_delta_sequence() -> Non
         result = stream.result
 
     starts = [
-        i for i, e in enumerate(events)
+        i
+        for i, e in enumerate(events)
         if isinstance(e, ai.TimingMark) and e.name == "attempt_start"
     ]
     assert len(starts) == 2, "the repair re-run must open with a fresh attempt_start"
 
-    replayed = "".join(
-        e.text for e in events[starts[1]:] if isinstance(e, ai.TextDelta)
-    )
+    replayed = "".join(e.text for e in events[starts[1] :] if isinstance(e, ai.TextDelta))
     assert replayed == result.text, "deltas after the last attempt_start rebuild the text"
     assert result.repair_attempts == 1
     assert result.structured == {"n": 7}

@@ -70,16 +70,12 @@ class XaiAdapter(OpenAICompatAdapter):
         try:
             response = await self._client.get("/language-models")
         except httpx2.HTTPError as exc:
-            raise map_transport_error(
-                exc, provider=self.provider_id, phase="discover"
-            ) from exc
+            raise map_transport_error(exc, provider=self.provider_id, phase="discover") from exc
         if response.status_code >= 400:
             detail = read_error_detail(response.content)
             if response.status_code == 404:
                 return await super().list_models()
-            raise self._classify(
-                response.status_code, detail, response.headers, phase="discover"
-            )
+            raise self._classify(response.status_code, detail, response.headers, phase="discover")
 
         payload = response.json()
         entries = payload.get("models") if isinstance(payload, Mapping) else payload
@@ -202,9 +198,7 @@ descriptor = ProviderDescriptor(
                 label="API key",
                 kind="secret",
                 required=True,
-                help_text=(
-                    "Conventionally env://XAI_API_KEY. Accepts env:// and credential://."
-                ),
+                help_text=("Conventionally env://XAI_API_KEY. Accepts env:// and credential://."),
                 placeholder="env://XAI_API_KEY or a literal key",
                 env_var="XAI_API_KEY",
             ),

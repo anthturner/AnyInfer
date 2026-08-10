@@ -68,7 +68,7 @@ a 2.4× multiplier plus 1,200 flat tokens.
 
 ```python
 budget = client.budget(messages, target="copilot:auto")
-budget.estimate.envelope.tokens    # the harness, counted separately from your prompt
+budget.estimate.envelope.tokens  # the harness, counted separately from your prompt
 ```
 
 It moves the planning figure only, so `budget()` packs conservatively here while the

@@ -484,7 +484,7 @@ def select(
             query expansion, centrality, compact fallback. Defaults reproduce the plain
             behaviour exactly.
         previous: The state of the last reduction over this corpus. Unchanged documents
-            get ``tuning.carry_over_bonus`` so the selected set — and the rendered prefix
+            get ``tuning.carry_over_bonus`` so the selected set, and the rendered prefix
             — stays stable across turns.
         observer: Receives a `ContextReduced` event describing the outcome.
 
@@ -817,7 +817,7 @@ def _admission_order(
     budget than relevance alone. ``diversity`` then penalizes each remaining candidate by
     how much it resembles what is already chosen, so a budget is not spent on eight files
     that say the same thing. The penalty is multiplicative — ``value * (1 - diversity *
-    similarity)`` — because the two value scales differ by orders of magnitude and a
+    similarity)``, because the two value scales differ by orders of magnitude and a
     subtractive penalty calibrated for one would be meaningless for the other.
     """
     if tuning.selection_order == "rank" and tuning.diversity <= 0:
@@ -932,9 +932,7 @@ def _compact_block(
     return _with_pointers(block, document.path, duplicates)
 
 
-def _overflow(
-    used_bytes: int, max_bytes: int, used_tokens: int, max_tokens: int
-) -> str | None:
+def _overflow(used_bytes: int, max_bytes: int, used_tokens: int, max_tokens: int) -> str | None:
     """Which ceiling a prospective admission would breach, if any."""
     if used_bytes > max_bytes:
         return "bytes"

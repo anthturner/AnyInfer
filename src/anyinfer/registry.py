@@ -182,7 +182,7 @@ class SetupField:
     So the provider says it here: ``advanced`` fields are the ones a UI may fold behind a
     disclosure, leaving the fields a user genuinely has to answer in front of them. A
     required field is never advanced — hiding something that blocks saving is exactly the
-    trap this exists to avoid — and `ProviderSetupSpec` rejects that combination.
+    trap this exists to avoid, and `ProviderSetupSpec` rejects that combination.
     """
 
     default_value: str = ""
@@ -341,9 +341,7 @@ class ProviderSetupSpec:
         needs to allow a save.
         """
         return tuple(
-            group
-            for group in self.any_of
-            if not any(values.get(key, "").strip() for key in group)
+            group for group in self.any_of if not any(values.get(key, "").strip() for key in group)
         )
 
     def label_for(self, key: str) -> str:
@@ -415,7 +413,7 @@ class ProviderDescriptor:
     Declared here rather than measured per request because it is a property of the
     provider's envelope, not of any one call: a session API that wraps the caller's
     messages in its own harness charges that harness on every request. The default is the
-    identity — the provider counts what it was sent — and only a provider with evidence of
+    identity — the provider counts what it was sent, and only a provider with evidence of
     a systematic gap should declare otherwise.
     """
 
@@ -439,7 +437,7 @@ class ProviderDescriptor:
 
     supports_sessions: bool = False
     """Whether the provider can keep state between requests — a session API, or keep-alive
-    model residency — rather than treating every request as independent."""
+    model residency, rather than treating every request as independent."""
 
     model_puller: ModelPuller | None = None
     """How this provider is told to make a model available, or ``None`` when it cannot be.
@@ -454,6 +452,23 @@ class ProviderDescriptor:
     Weights fetched this way land in the *engine's* store under the engine's own name.
     Nothing is written to AnyInfer's model store and nothing is indexed there, so
     `locate_model()` will not find them — they are not ours to find.
+    """
+
+    model_inventory: Literal["available", "installed", "served"] = "served"
+    """What ``list_models()`` means for model-management UIs.
+
+    ``available`` is a catalog of things that could be run, ``installed`` is a
+    provider-owned on-disk store, and ``served`` is the set an already-running engine
+    exposes. The distinction prevents an application from presenting every catalog entry
+    as though it were already installed.
+    """
+
+    uses_catalog: bool = False
+    """Whether the core should supply its active catalog to this adapter.
+
+    Declared here so catalog composition is a provider fact, not a provider-id branch in
+    client construction. Supervised engines use it to resolve model references while
+    ordinary protocol adapters leave it false.
     """
 
     reports_diagnostics: bool = False
@@ -608,9 +623,7 @@ class ProviderRegistry:
             # A provider that failed to load looks identical to one that was never
             # installed. Saying which happened is the difference between a five-minute
             # fix and an abandoned integration.
-            blamed = next(
-                (i for i in issues if key in i.entry_point or key in i.detail), None
-            )
+            blamed = next((i for i in issues if key in i.entry_point or key in i.detail), None)
             if blamed is not None:
                 raise ConfigError(
                     f"unknown provider {name!r}",
@@ -688,7 +701,7 @@ class ProviderRegistry:
         """Discover third-party providers.
 
         A provider package that fails to import or yields a bad object must not take down
-        every other provider, so broken entries are skipped — but each skip is recorded on
+        every other provider, so broken entries are skipped, but each skip is recorded on
         `plugin_issues`, because a provider that vanishes without explanation is the worst
         failure mode this registry has.
         """
@@ -716,9 +729,7 @@ class ProviderRegistry:
                         continue
                     taken = [a for a in descriptor.identifiers if a in self._aliases]
                     if taken:
-                        self._record_issue(
-                            point.name, "alias-taken", f"alias {taken[0]!r}"
-                        )
+                        self._record_issue(point.name, "alias-taken", f"alias {taken[0]!r}")
                         continue
                     self._register_locked(descriptor)
             except Exception as exc:  # noqa: BLE001 — a broken plugin must not break us

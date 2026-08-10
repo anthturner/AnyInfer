@@ -40,10 +40,7 @@ class AzureFoundryAdapter(OpenAICompatAdapter):
             raise ConfigError(
                 "azure-foundry requires the base URL of your Foundry resource",
                 provider=config.provider_id,
-                hint=(
-                    "for example "
-                    "https://<resource>.services.ai.azure.com/openai/v1"
-                ),
+                hint=("for example https://<resource>.services.ai.azure.com/openai/v1"),
             )
         self._api_version = config.api_version
         super().__init__(config)
@@ -149,8 +146,7 @@ descriptor = ProviderDescriptor(
                 required=False,
                 advanced=True,
                 help_text=(
-                    "Only needed for deployments that still require it; the v1 surface "
-                    "does not."
+                    "Only needed for deployments that still require it; the v1 surface does not."
                 ),
                 placeholder="2024-10-21",
             ),

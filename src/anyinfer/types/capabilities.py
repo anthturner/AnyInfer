@@ -65,7 +65,7 @@ class TokenCalibration:
 
     Serialized request bytes are not what every provider counts. Some wrap the caller's
     messages in a transport of their own before the model ever sees them — a session API
-    that prepends its harness, a tool scaffold, a service-side system preamble — and then
+    that prepends its harness, a tool scaffold, a service-side system preamble, and then
     bill (and window-check) the inflated total. Estimating such a provider from message
     bytes alone under-counts every request, and the under-count is systematic rather than
     noise, so budgets stay optimistic right up to the overflow.
@@ -111,7 +111,7 @@ class RateLimitHeaders:
     """Which response headers a provider reports its rate-limit state in.
 
     Header names are wire facts and differ per provider, so they are declared on the
-    descriptor and recorded in that provider's contract snapshot — never branched on by
+    descriptor and recorded in that provider's contract snapshot; never branched on by
     provider id in the core.
 
     A provider whose dialect cannot be verified from its documentation declares nothing.
@@ -243,7 +243,7 @@ class ModelCapabilities:
 
     The two sampling defaults exist so an application can say *what* "provider default"
     means instead of only that it is one. They are populated from a provider's own
-    documentation and nowhere else — never probed, never inferred from a sibling
+    documentation and nowhere else; never probed, never inferred from a sibling
     provider, never carried over from a model family. A provider whose documentation
     states no default keeps ``None`` indefinitely, and that is the correct final state for
     it rather than a gap waiting to be filled: an invented number presented beside a

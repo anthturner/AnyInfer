@@ -5,7 +5,7 @@ kind of local engine: one that already has a store, a registry, and a downloader
 own, and simply needs to be told to use them. Ollama is the case in the shipped registry.
 
 Acquisition lives here rather than in an adapter for the reason it always has — fetching
-gigabytes is not protocol translation — and a provider that can do it points at this
+gigabytes is not protocol translation, and a provider that can do it points at this
 module from its descriptor rather than implementing it. Which providers *can* is therefore
 readable from the registry rather than from a chain of engine checks in the core.
 
@@ -240,7 +240,7 @@ _MISSING_MODEL_MARKERS = ("not found", "no such", "does not exist", "unknown mod
 """What Ollama says when the name is wrong.
 
 More than one spelling because the registry answers a missing manifest with
-``pull model manifest: file does not exist`` — which reads like a disk error and is
+``pull model manifest: file does not exist``, which reads like a disk error and is
 actually a typo in the model name, and telling a user to check their disk would send them
 somewhere there is nothing to find.
 """

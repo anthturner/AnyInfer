@@ -304,9 +304,7 @@ def _nebius_server(scenario: str) -> Any:
     elif scenario == "rate_limited":
         inner = FakeOpenAIServer(
             [
-                FakeResponse(
-                    status=429, error_message="slow down", headers={"retry-after": "0"}
-                ),
+                FakeResponse(status=429, error_message="slow down", headers={"retry-after": "0"}),
                 FakeResponse(text="recovered"),
             ]
         )

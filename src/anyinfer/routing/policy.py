@@ -24,7 +24,7 @@ def never_retry_client_errors(error: ProviderError) -> bool:
     later in the route might have needed.
 
     A spending refusal never reaches this predicate: `SpendLimitError` is not a
-    `ProviderError` — no provider was involved — so it leaves the router entirely rather
+    `ProviderError` — no provider was involved, so it leaves the router entirely rather
     than being retried or redirected to the next target. That is deliberate. A ceiling is
     client-wide, so a different target does not satisfy it, and choosing a cheaper one
     because of cost is the adaptive routing this project defers.

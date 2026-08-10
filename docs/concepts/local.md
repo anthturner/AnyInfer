@@ -27,12 +27,12 @@ answer. Six components, composed once so applications do not compose them.
 from anyinfer import local
 
 profile = local.detect()
-profile.total_ram_bytes        # 136_365_211_648
-profile.primary_accelerator    # Accelerator(kind='cuda', total_vram_bytes=..., ...)
-profile.warnings               # everything that could not be determined, and why
+profile.total_ram_bytes  # 136_365_211_648
+profile.primary_accelerator  # Accelerator(kind='cuda', total_vram_bytes=..., ...)
+profile.warnings  # everything that could not be determined, and why
 ```
 
-Detection **proposes**; callers decide. Every probe is best-effort — a missing tool, a
+Detection **proposes**; callers decide. Every probe is best-effort; a missing tool, a
 permission error, or unparseable output produces a warning and a `None` field, never an
 exception. A wrong number here would silently mis-tune a server, so unknown is always
 preferred to guessed.
@@ -50,7 +50,7 @@ plan = local.plan_server(
     posture="balanced",
 )
 
-plan.context_size        # 32768
+plan.context_size  # 32768
 for line in plan.rationale:
     print(line)
 # offloading all layers to the cuda device
@@ -58,7 +58,7 @@ for line in plan.rationale:
 # using 4 CPU threads
 ```
 
-Postures — `conservative`, `balanced`, `aggressive` — control how much of the machine to
+Postures; `conservative`, `balanced`, `aggressive`; control how much of the machine to
 commit. Aggressive additionally enables a `q8_0` KV cache and two concurrent slots.
 
 Two subtleties the tuner gets right, both of which cause real failures when missed:
@@ -71,15 +71,15 @@ Two subtleties the tuner gets right, both of which cause real failures when miss
 
 ## Downloads are verified and resumable
 
-Model files are large, slow to fetch, and catastrophic to get subtly wrong — a truncated
+Model files are large, slow to fetch, and catastrophic to get subtly wrong; a truncated
 GGUF fails at load time with an error that says nothing about the download. So every
 artifact is:
 
-- **pinned** — URL and SHA-256 come from the catalog, not the network;
-- **verified** — hashed before it is ever considered present;
-- **atomic** — bytes land in a `.part` file, renamed only after verification;
-- **resumable** — an interrupted transfer continues with a range request;
-- **lock-guarded** — concurrent processes cooperate instead of corrupting each other.
+- **pinned**: URL and SHA-256 come from the catalog, not the network;
+- **verified**: hashed before it is ever considered present;
+- **atomic**: bytes land in a `.part` file, renamed only after verification;
+- **resumable**: an interrupted transfer continues with a range request;
+- **lock-guarded**: concurrent processes cooperate instead of corrupting each other.
 
 Sharded artifacts are handled as one unit. Progress surfaces as `DownloadProgress`
 telemetry events to the client's observers, and to a `progress` callback when one is
@@ -89,7 +89,7 @@ configured in the provider options.
 
 The supervisor's semantics come from studying how comparable local multiplexers fail:
 
-- **Swaps are serialized.** Two requests for two unloaded models do not race — the first
+- **Swaps are serialized.** Two requests for two unloaded models do not race: the first
   loads, the second waits. Racing means two full model loads competing for the same VRAM,
   and both lose.
 - **Requests block until ready.** You never get a 503 because a model happened to be
@@ -97,7 +97,7 @@ The supervisor's semantics come from studying how comparable local multiplexers 
 - **"Loading" and "failed" are distinguished.** The child's output is captured, so a broken
   model reports *why* instead of looking like a slow one for the full timeout.
 - **The idle timer keys on active streams, not last-request time.** A long generation with
-  no *new* requests is not idle — keying on request arrival kills work mid-flight.
+  no *new* requests is not idle; keying on request arrival kills work mid-flight.
 - **VRAM admission is checked before spawning.** A model that provably will not fit is
   refused with a clear message rather than crashing the child with an OOM.
 - **Reaping is verified.** A process is not gone because we asked it to stop; on Windows a
@@ -121,7 +121,7 @@ found = await local.discover(default_registry)
 
 Two sources, and a third only when asked for. An engine answering on a loopback address
 the provider itself declares; a credential variable the provider itself names; and, with
-`keyring=True`, the OS vault — off by default because reading a vault can prompt the user
+`keyring=True`, the OS vault; off by default because reading a vault can prompt the user
 to unlock it, while an environment variable is already in this process.
 
 Three properties are worth knowing, because they are what makes the answer trustworthy:
@@ -141,9 +141,9 @@ configuration and a runnable starter. See [the CLI guide](../guides/cli.md).
 
 ```python
 recommendation = local.recommend_alias(profile, ai.load_default_catalog())
-recommendation.alias        # "large"
-recommendation.reason       # "24 GiB of VRAM comfortably fits the large tier"
-recommendation.confident    # False when memory could not be determined
+recommendation.alias  # "large"
+recommendation.reason  # "24 GiB of VRAM comfortably fits the large tier"
+recommendation.confident  # False when memory could not be determined
 ```
 
 Requirements live in the catalog as data, so updating a recommendation is a catalog change
@@ -153,32 +153,32 @@ rather than a code change. Unknowns never inflate the recommendation.
 
 A tier recommendation predicts; it does not measure. On the same GPU the same weights can
 differ by an order of magnitude depending on what else is resident and how many layers ended
-up offloaded, so an application choosing a default — or explaining a slow session — needs a
+up offloaded, so an application choosing a default, or explaining a slow session; needs a
 number from this machine, not from a table.
 
 ```python
 measurement = client.benchmark("llama-cpp:qwen3-8b-q4-k-m")
 
-measurement.prefill_tokens_per_s   # compute-bound: sets time to first token
-measurement.decode_tokens_per_s    # bandwidth-bound: sets the rest of the wait
+measurement.prefill_tokens_per_s  # compute-bound: sets time to first token
+measurement.decode_tokens_per_s  # bandwidth-bound: sets the rest of the wait
 measurement.summary
 # 'llama-cpp:qwen3-8b-q4-k-m: prefill 1840 tok/s, ttft 1120 ms, decode 38.4 tok/s'
 ```
 
 The two rates are separate because a machine can be fast at one and slow at the other, and
-`prefill_tokens_per_s` is `None` unless the provider timed its own prefill phase — deriving
+`prefill_tokens_per_s` is `None` unless the provider timed its own prefill phase; deriving
 it from time-to-first-token would fold queueing and network latency into a figure labelled
 *compute*. Ollama reports the phase; most hosted providers do not.
 
 ### Was it warm?
 
-A local engine that had to load the model first is not slow, it was asleep — and reporting
+A local engine that had to load the model first is not slow, it was asleep, and reporting
 those two as one number makes every first measurement look like a bad one:
 
 ```python
-measurement.model_load_ms   # 1840.0 — this run paid a cold start
-measurement.model_load_ms   # 0.0    — the model was already resident
-measurement.model_load_ms   # None   — this engine does not report loads at all
+measurement.model_load_ms  # 1840.0; this run paid a cold start
+measurement.model_load_ms  # 0.0   ; the model was already resident
+measurement.model_load_ms  # None  ; this engine does not report loads at all
 ```
 
 Ollama reports it on every request. The supervised llama.cpp runtime reports it on the
@@ -203,14 +203,14 @@ The CLI wraps the same call as `anyinfer benchmark`.
 
 ## What is *not* here
 
-No bundled binaries or weights, ever — llama-server runtimes and GGUF files are
+No bundled binaries or weights, ever; llama-server runtimes and GGUF files are
 runtime-fetched by design, which keeps wheels small and the GPU build matrix out of the
 dependency tree.
 
 !!! tip "Key takeaways"
     - Hardware detection is advisory: every probe is best-effort, and unknown is always
       preferred to a guessed number that could mis-tune a server.
-    - Downloads are pinned, hash-verified, atomic, and resumable — never a "trust the URL"
+    - Downloads are pinned, hash-verified, atomic, and resumable; never a "trust the URL"
       fetch of a large binary artifact.
     - Servers bind loopback only by default; supervision handles swaps, readiness, and
       VRAM admission so applications never compose those themselves.

@@ -200,5 +200,6 @@ def map_transport_error(
             phase=phase,
             hint="check the base URL and that the server is running",
         )
-    return TransportError(f"transport failure talking to {provider}: {exc}", provider=provider,
-                         phase=phase)
+    return TransportError(
+        f"transport failure talking to {provider}: {exc}", provider=provider, phase=phase
+    )

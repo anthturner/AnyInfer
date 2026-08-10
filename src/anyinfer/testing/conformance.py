@@ -202,9 +202,7 @@ async def _case_non_streaming(client: AsyncClient, h: ConformanceHarness) -> Non
     result = await client.generate("Say hello.", target=h.target)
     assert result.text, "a non-streaming generation must produce text"
     assert result.target.provider_id == h.provider_id
-    assert result.finish_reason in {
-        "stop", "length", "tool_calls", "content_filter", "other"
-    }
+    assert result.finish_reason in {"stop", "length", "tool_calls", "content_filter", "other"}
 
 
 async def _case_streaming(client: AsyncClient, h: ConformanceHarness) -> None:
@@ -233,12 +231,11 @@ async def _case_event_ordering(client: AsyncClient, h: ConformanceHarness) -> No
     )
 
     content_types = (TextDelta, ReasoningDelta, ToolCallDelta)
-    first_content = next(
-        (i for i, e in enumerate(events) if isinstance(e, content_types)), None
-    )
+    first_content = next((i for i, e in enumerate(events) if isinstance(e, content_types)), None)
     if first_content is not None:
         first_tokens = [
-            i for i, e in enumerate(events)
+            i
+            for i, e in enumerate(events)
             if isinstance(e, TimingMark) and e.name == "first_token"
         ]
         assert len(first_tokens) == 1, "exactly one first_token mark (guarantee 2)"
@@ -248,9 +245,7 @@ async def _case_event_ordering(client: AsyncClient, h: ConformanceHarness) -> No
 
     failures = [i for i, e in enumerate(events) if isinstance(e, AttemptFailed)]
     if failures and first_content is not None:
-        assert max(failures) < first_content, (
-            "AttemptFailed events precede content (guarantee 1)"
-        )
+        assert max(failures) < first_content, "AttemptFailed events precede content (guarantee 1)"
 
 
 async def _case_ttft(client: AsyncClient, h: ConformanceHarness) -> None:
@@ -294,9 +289,7 @@ async def _case_usage_survives_streaming(client: AsyncClient, h: ConformanceHarn
 
 
 async def _case_tool_calls(client: AsyncClient, h: ConformanceHarness) -> None:
-    result = await client.generate(
-        "Look up the key 'alpha'.", target=h.target, tools=[PROBE_TOOL]
-    )
+    result = await client.generate("Look up the key 'alpha'.", target=h.target, tools=[PROBE_TOOL])
     assert result.tool_calls, "the provider must surface tool calls"
     call = result.tool_calls[0]
     assert call.id, "every tool call needs an id (synthesized if the provider omits one)"
@@ -393,9 +386,9 @@ async def _case_byte_cap(client: AsyncClient, h: ConformanceHarness) -> None:
 async def _case_unknown_finish_reason(client: AsyncClient, h: ConformanceHarness) -> None:
     """``finish_reason`` is an open enum; an unrecognized value must not break reassembly."""
     result = await client.generate("Say hello.", target=h.target)
-    assert result.finish_reason in {
-        "stop", "length", "tool_calls", "content_filter", "other"
-    }, "unknown finish reasons must normalize, not propagate"
+    assert result.finish_reason in {"stop", "length", "tool_calls", "content_filter", "other"}, (
+        "unknown finish reasons must normalize, not propagate"
+    )
 
 
 CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (

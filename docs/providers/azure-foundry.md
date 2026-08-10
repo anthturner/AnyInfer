@@ -19,13 +19,15 @@ modes.
 ## Setup with an API key
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "azure-foundry",
-        base_url="https://<resource>.services.ai.azure.com/openai/v1",
-        api_key="env://AZURE_AI_KEY",
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "azure-foundry",
+            base_url="https://<resource>.services.ai.azure.com/openai/v1",
+            api_key="env://AZURE_AI_KEY",
+        ),
+    ]
+)
 result = client.generate(prompt, target="azure-foundry:gpt-5")
 ```
 

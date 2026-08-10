@@ -9,7 +9,9 @@ LICENSE = "\n".join(f"# Copyright line {i} of a long standard header." for i in 
 
 def _vendored(index: int) -> str:
     """A file that differs from its siblings only in one identifier."""
-    body = "\n".join(f"def helper_{i}(value):\n    return transform(value, {i})" for i in range(40))
+    body = "\n".join(
+        f"def helper_{i}(value):\n    return transform(value, {i})" for i in range(40)
+    )
     return f"{LICENSE}\n\n{body}\n\ndef unique_{index}():\n    return {index}\n"
 
 

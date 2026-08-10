@@ -116,9 +116,7 @@ async def test_the_handshake_completes_with_the_initialized_notification() -> No
 
 
 async def test_pagination_is_followed() -> None:
-    fake = FakeMCPServer(
-        [FakeMCPTool(f"tool_{index}") for index in range(5)], page_size=2
-    )
+    fake = FakeMCPServer([FakeMCPTool(f"tool_{index}") for index in range(5)], page_size=2)
 
     async with await _connect(fake) as toolset:
         assert len(toolset.tools) == 5
@@ -132,9 +130,7 @@ async def test_allow_and_deny_filters_narrow_what_is_exposed() -> None:
     async with await _connect(
         fake, _server(allow_tools=("read_file", "write_file"), deny_tools=("write_file",))
     ) as toolset:
-        assert [tool.spec.name for tool in toolset.tools] == [
-            f"fs{NAMESPACE_SEPARATOR}read_file"
-        ]
+        assert [tool.spec.name for tool in toolset.tools] == [f"fs{NAMESPACE_SEPARATOR}read_file"]
 
 
 async def test_annotations_are_captured_as_untrusted_hints() -> None:
@@ -221,7 +217,11 @@ async def test_an_unknown_method_raises_rather_than_returning_empty() -> None:
     """A server with no tool surface is a misconfiguration, not an empty tool set."""
     fake = FakeMCPServer([])
     fake.handle = lambda message: (  # type: ignore[method-assign]
-        {"jsonrpc": "2.0", "id": message.get("id"), "result": {"protocolVersion": PROTOCOL_VERSION}}
+        {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "result": {"protocolVersion": PROTOCOL_VERSION},
+        }
         if message.get("method") == "initialize"
         else (
             None
@@ -308,9 +308,7 @@ async def test_an_mcp_tool_runs_through_the_real_tool_loop() -> None:
     )
     provider.register(registry)
 
-    client = ai.AsyncClient(
-        [provider.settings()], registry=registry, use_default_catalog=False
-    )
+    client = ai.AsyncClient([provider.settings()], registry=registry, use_default_catalog=False)
     try:
         async with await _connect(fake) as toolset:
             await client.run_tools(

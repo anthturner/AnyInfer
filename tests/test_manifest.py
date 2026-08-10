@@ -65,9 +65,7 @@ class TestAssembly:
             anyinfer_registry,
             [ScriptedModel("broken", failures=(ScriptedFailure(retry_after_s=0.0),) * 3)],
         )
-        second = ScriptedProvider(
-            "backup", [ScriptedModel("good", structured={"answer": "yes"})]
-        )
+        second = ScriptedProvider("backup", [ScriptedModel("good", structured={"answer": "yes"})])
         second.register(anyinfer_registry)
 
         async with AsyncClient(
@@ -169,9 +167,7 @@ class TestClientWiring:
             assert result.manifest is not None
 
     @pytest.mark.asyncio
-    async def test_abandoned_stream_leaves_no_builder_behind(
-        self, anyinfer_registry: Any
-    ) -> None:
+    async def test_abandoned_stream_leaves_no_builder_behind(self, anyinfer_registry: Any) -> None:
         provider = _provider(anyinfer_registry, [ScriptedModel("m", text="hello")])
         async with AsyncClient(
             [provider.settings()], registry=anyinfer_registry, use_default_catalog=False
@@ -344,9 +340,7 @@ class TestDerivation:
             "fallback": lambda: any(isinstance(e, FallbackTriggered) for e in events),
             "repair": lambda: any(isinstance(e, RepairAttempted) for e in events),
             "dropped": lambda: any(isinstance(e, ParameterDropped) for e in events),
-            "cache": lambda: any(
-                isinstance(e, CachePlanned | ParameterDropped) for e in events
-            ),
+            "cache": lambda: any(isinstance(e, CachePlanned | ParameterDropped) for e in events),
             "compaction": lambda: any(isinstance(e, ContextReduced) for e in events),
         }[scenario]
         assert witness(), f"the {scenario} scenario never reached its own code path"
@@ -382,9 +376,7 @@ class TestDerivation:
         await client.aclose()
 
     @pytest.mark.asyncio
-    async def test_events_for_another_request_are_ignored(
-        self, anyinfer_registry: Any
-    ) -> None:
+    async def test_events_for_another_request_are_ignored(self, anyinfer_registry: Any) -> None:
         builder = _builder(request_id="mine")
         builder.observe(AttemptStarted("theirs", _target(), 1))
         assert builder.build().attempts == ()

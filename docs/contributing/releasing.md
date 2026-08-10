@@ -12,11 +12,11 @@ flowchart LR
   C --> D[release packages]
 ```
 
-- **`feature/*`** — all work happens here, one topic per branch. Branched from `develop`.
-- **`develop`** — the integration branch. Feature branches merge in by pull request;
+- **`feature/*`**: all work happens here, one topic per branch. Branched from `develop`.
+- **`develop`**: the integration branch. Feature branches merge in by pull request;
   [CI](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/ci.yml) must be
   green before the merge button works.
-- **`main`** — always releasable. Receives only pull requests from `develop`, again
+- **`main`**: always releasable. Receives only pull requests from `develop`, again
   gated on CI. Every merge to `main` rebuilds the release packages; a merge that bumps
   the version also publishes them.
 
@@ -72,14 +72,14 @@ runs on every merge to `main`:
 
 1. It reads `project.version` and checks whether tag `v<version>` already exists.
 2. It always rebuilds every release artifact, so `main` is continuously proven releasable:
-    - **the library** — sdist + wheel, `twine check`-ed and smoke-installed;
-    - **the demo bundles** — standalone PyInstaller builds of the pack-in demo app on
+    - **the library**: sdist + wheel, `twine check`-ed and smoke-installed;
+    - **the demo bundles**: standalone PyInstaller builds of the pack-in demo app on
       native runners for Windows (x64), macOS (arm64 and x64), and Linux (x64 and
       arm64), named without a version
       (`anyinfer-demo-<os>-<arch>.zip`) so the site's
       [downloads page](../downloads.md) can link `releases/latest/download/` URLs that
       never go stale;
-    - **the sidecar bundles** — native builds on the same runners, named
+    - **the sidecar bundles**: native builds on the same runners, named
       `anyinfer-serve-<os>-<arch>.zip`, with a build-time `--help` smoke test.
 3. **Only when the version is new** does it tag `v<version>` and create the GitHub
    Release, with notes generated from the merged pull requests, every package attached,

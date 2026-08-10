@@ -1,7 +1,7 @@
 """The logical model catalog: schema, fit classification, and variant selection.
 
 Everything here is offline. The bundled catalog is data, hardware profiles are synthetic,
-and the point under test is the *judgement* — which rung is chosen, which fit level is
+and the point under test is the *judgement*, which rung is chosen, which fit level is
 reported, and whether the stated reason actually explains it.
 """
 
@@ -89,9 +89,7 @@ def test_headline_artifact_matches_the_advertised_quantization() -> None:
 
 def test_unknown_best_at_category_is_rejected_at_parse_time() -> None:
     with pytest.raises(ai.ConfigError, match="unknown best_at category"):
-        Catalog.from_mapping(
-            {"format_version": 1, "models": [{"id": "x", "best_at": ["vibes"]}]}
-        )
+        Catalog.from_mapping({"format_version": 1, "models": [{"id": "x", "best_at": ["vibes"]}]})
 
 
 def test_with_alias_target_bridges_a_pick_into_the_tier_ladder() -> None:
@@ -151,7 +149,8 @@ def test_a_model_that_fits_vram_reports_gpu_with_a_reason() -> None:
 
 def test_a_model_too_big_for_vram_falls_back_to_the_cpu_path() -> None:
     fit = classify_fit(
-        _Entry("mid", ram=12 * GIB, vram=12 * GIB, params="14B"), _profile(ram=64 * GIB, vram=8 * GIB)
+        _Entry("mid", ram=12 * GIB, vram=12 * GIB, params="14B"),
+        _profile(ram=64 * GIB, vram=8 * GIB),
     )
     assert fit.level == "cpu"
     assert any("slowly" in reason for reason in fit.reasons)
@@ -289,7 +288,7 @@ def test_nothing_below_q4_is_chosen_without_the_opt_in() -> None:
 
 
 def test_a_refusal_carries_the_reasons_behind_it() -> None:
-    """"Nothing fits" is only useful advice with the numbers attached."""
+    """A refusal includes the numbers that explain why nothing fits."""
     choice, rejections = evaluate_variants(
         _ladder(), _profile(ram=6 * GIB, vram=None), parameter_size="7B"
     )
@@ -301,9 +300,7 @@ def test_a_refusal_carries_the_reasons_behind_it() -> None:
 
 def test_a_gpu_resident_rung_beats_a_better_one_that_would_only_fit_in_ram() -> None:
     """Q4_K_M on the GPU beats Q8_0 paging through the CPU, and says why."""
-    choice = select_variant(
-        _ladder(), _profile(ram=64 * GIB, vram=8 * GIB), parameter_size="7B"
-    )
+    choice = select_variant(_ladder(), _profile(ram=64 * GIB, vram=8 * GIB), parameter_size="7B")
     assert choice is not None
     assert choice.quantization == "Q4_K_M"
     assert any("VRAM" in reason for reason in choice.reasons)
@@ -333,9 +330,7 @@ def test_an_unknown_compute_capability_excludes_a_gated_variant() -> None:
 
 def test_vllm_is_never_selected_without_an_accelerator() -> None:
     variants = [_Variant("v-bf16", "bf16", 90, 14 * GIB, engine="vllm")]
-    choice = select_variant(
-        variants, _profile(ram=64 * GIB), engine="vllm", parameter_size="7B"
-    )
+    choice = select_variant(variants, _profile(ram=64 * GIB), engine="vllm", parameter_size="7B")
     assert choice is None
 
 

@@ -13,8 +13,10 @@
                 print(event.text, end="", flush=True)
 
         result = stream.result
-        print(f"\n\n{result.usage.output_tokens} tokens, "
-              f"first token in {result.timing.first_token_ms:.0f} ms")
+        print(
+            f"\n\n{result.usage.output_tokens} tokens, "
+            f"first token in {result.timing.first_token_ms:.0f} ms"
+        )
     ```
 
 === "Async"
@@ -29,8 +31,10 @@
                     print(event.text, end="", flush=True)
 
             result = stream.result
-            print(f"\n\n{result.usage.output_tokens} tokens, "
-                  f"first token in {result.timing.first_token_ms:.0f} ms")
+            print(
+                f"\n\n{result.usage.output_tokens} tokens, "
+                f"first token in {result.timing.first_token_ms:.0f} ms"
+            )
     ```
 
 ## Use the context manager
@@ -44,7 +48,7 @@ with client.stream(prompt, target=target) as stream:
         if isinstance(event, ai.TextDelta):
             print(event.text, end="", flush=True)
             if user_pressed_escape():
-                break        # the request is cancelled on the way out
+                break  # the request is cancelled on the way out
 ```
 
 ## Show thinking separately

@@ -86,8 +86,8 @@ If one of these fails, the fix is almost always to move code, not to loosen the 
 
 ## Where to read first
 
-1. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture and decision rationale. Start with §3 and §23.
-2. [Architecture](architecture.md) — the condensed version of the rules.
+1. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md): architecture and decision rationale. Start with §3 and §23.
+2. [Architecture](architecture.md): the condensed version of the rules.
 
 ## Choose the owning workstream
 
@@ -124,7 +124,7 @@ non-obvious constraints:
 
 ```python
 # Closing a buffered pipe while another thread is blocked reading it deadlocks, and on
-# Windows a grandchild process can keep the write end open after its parent exits — so the
+# Windows a grandchild process can keep the write end open after its parent exits, so the
 # stream is closed here, on the way out, and nowhere else.
 ```
 
@@ -148,8 +148,8 @@ coding against what the provider does *now*.
 - [Testing guide](testing.md)
 - [Coding-agent instructions and workstreams](automation.md)
 - [Branding and visual assets](branding.md)
-- [Branching and releases](releasing.md) — the branch model, what a release is, and how
+- [Branching and releases](releasing.md): the branch model, what a release is, and how
   a version bump reaches PyPI
-- [Repository setup](repository-setup.md) — the one-time GitHub settings and secrets
+- [Repository setup](repository-setup.md): the one-time GitHub settings and secrets
   (branch protection, Pages, Actions PR permission, PyPI trusted publishing,
   `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` for the pricing refresh)

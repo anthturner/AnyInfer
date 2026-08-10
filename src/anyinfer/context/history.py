@@ -19,8 +19,8 @@ naive truncation gets wrong:
   saying how much went, not by silence.
 
 This is a pure function: messages in, messages out. It never touches
-`GenerationRequest.messages` and issues no calls — where the compacted history goes is the
-application's decision, exactly as the context envelope's placement is.
+`GenerationRequest.messages` or issues calls. The application decides where the compacted
+history goes, just as it decides where to place the context envelope.
 """
 
 from __future__ import annotations
@@ -224,7 +224,7 @@ def compact_history(
             break
         rewritten, count = _elide_results(working[index])
         if count:
-            total += _recost(working, costs, index, rewritten, counter)
+            total += _recost(costs, index, rewritten, counter)
             working[index] = rewritten
             elided_results += count
 
@@ -233,7 +233,7 @@ def compact_history(
             break
         rewritten, count = _elide_texts(working[index])
         if count:
-            total += _recost(working, costs, index, rewritten, counter)
+            total += _recost(costs, index, rewritten, counter)
             working[index] = rewritten
             elided_texts += count
 
@@ -304,7 +304,6 @@ def _protected_indices(
 
 
 def _recost(
-    working: Sequence[Message],
     costs: list[int],
     index: int,
     rewritten: Message,

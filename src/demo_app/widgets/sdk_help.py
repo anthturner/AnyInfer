@@ -21,8 +21,8 @@ from PySide6.QtGui import (
     QDesktopServices,
     QFont,
     QFontDatabase,
-    QPaintEvent,
     QPainter,
+    QPaintEvent,
     QResizeEvent,
     QTextCursor,
     QTextFormat,
@@ -175,9 +175,7 @@ class _CodeView(QPlainTextEdit):
         painter.setFont(self.font())
         stripe = _stripe_color()
         block = self.firstVisibleBlock()
-        top = round(
-            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
-        )
+        top = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
         bottom = top + round(self.blockBoundingRect(block).height())
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
@@ -211,7 +209,9 @@ class _CodeView(QPlainTextEdit):
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 — Qt's spelling
         super().resizeEvent(event)
         rect = self.contentsRect()
-        self._gutter.setGeometry(QRect(rect.left(), rect.top(), self.gutter_width(), rect.height()))
+        self._gutter.setGeometry(
+            QRect(rect.left(), rect.top(), self.gutter_width(), rect.height())
+        )
         self._copy_button.move(rect.right() - self._copy_button.width() - 6, rect.top() + 6)
 
     def enterEvent(self, event: QEvent) -> None:  # noqa: N802 — Qt's spelling
@@ -232,8 +232,7 @@ class SdkHelpDialog(QDialog):
     def __init__(self, topic: HelpTopic, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"How is this built? — {topic.title}")
-        self.setMinimumSize(560, 480)
-        self._topic = topic
+        self.setMinimumSize(round(560 * 1.35), 480)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
@@ -290,9 +289,6 @@ class SdkHelpDialog(QDialog):
         close_button.clicked.connect(self.accept)
         footer.addWidget(close_button)
         layout.addLayout(footer)
-
-    def _copy_snippet(self) -> None:
-        QApplication.clipboard().setText(self._topic.snippet)
 
 
 def open_topic(key: str, parent: QWidget | None = None) -> SdkHelpDialog:

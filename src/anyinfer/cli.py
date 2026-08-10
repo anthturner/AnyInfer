@@ -109,7 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     serve = subcommands.add_parser("serve", help="run the OpenAI-compatible HTTP frontend")
     _add_serve_flags(serve)
     # A subparser group that is *not* required, so `anyinfer serve` with no verb keeps
-    # running the server — which is the command everything else documents.
+    # running the server, which is the command everything else documents.
     serve_commands = serve.add_subparsers(dest="serve_command", required=False)
 
     serve_install = serve_commands.add_parser(
@@ -468,7 +468,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Print a short instruction fragment describing how AnyInfer is actually "
             "called, for a coding agent working in a repository that uses it. Rendered "
             "from live introspection — the provider counts come from the registry, the "
-            "extras from installed metadata, the version from the package — so it cannot "
+            "extras from installed metadata, the version from the package, so it cannot "
             "describe an API this release does not have. It writes nothing: redirect it "
             "yourself, e.g. `anyinfer agents-md >> AGENTS.md`."
         ),
@@ -1267,7 +1267,7 @@ def _dry_run(client: Any, messages: Any, call: dict[str, Any], args: argparse.Na
     """Report the size, fit, and cost of a request without sending it.
 
     Answers the question a user asks *before* paying for a large prompt, using the same
-    budget calculator the client uses at dispatch — so what this prints is what the real
+    budget calculator the client uses at dispatch, so what this prints is what the real
     request would have been held to, not a second estimate of it.
     """
     arena = call.get("arena")
@@ -1763,7 +1763,7 @@ def _init(args: argparse.Namespace) -> int:
     print(f"\nnext       python {starter_path}")
     print(f"           anyinfer verify --config {config_path}")
     # Said once, and nothing is edited: the generated file holds only credential
-    # references, so it is safe to commit — and repo hygiene files belong to the user.
+    # references, so it is safe to commit, and repo hygiene files belong to the user.
     print(
         f"\nnote       {config_path} holds only env:// references, never key material, "
         "so it is safe to commit"
@@ -1775,7 +1775,7 @@ def _init_settings(found: Any) -> tuple[list[Any], list[str]]:
     """Turn discovery evidence into provider settings, and note what it could not write.
 
     A provider whose endpoint is per-account cannot be configured from evidence alone —
-    knowing a key exists says nothing about which tenant it belongs to — so it becomes a
+    knowing a key exists says nothing about which tenant it belongs to, so it becomes a
     note rather than a half-written entry that fails at the first request.
     """
     from . import ProviderSettings, default_registry
@@ -2059,7 +2059,7 @@ def _doctor(args: argparse.Namespace) -> int:
     for warning in profile.warnings:
         print(f"warning           {warning}")
 
-    # Pacing is invisible from the outside — a governed request just looks slow — so an
+    # Pacing is invisible from the outside — a governed request just looks slow, so an
     # operator asking "why is this slow" should be able to see the bounds in one place.
     for instance_id, summary in limits.items():
         print(f"rate limit        {instance_id}: {summary}")
@@ -2590,7 +2590,7 @@ def _mcp_list(args: argparse.Namespace) -> int:
     """Connect to each configured MCP server and report what it exposes.
 
     Discovery only. The command-line runner never executes tools — requested calls are
-    reported so a caller can run them — and connecting a tool source does not change that.
+    reported so a caller can run them, and connecting a tool source does not change that.
     What this answers is the question an operator actually has: is my server reachable, and
     what does it claim to offer?
     """

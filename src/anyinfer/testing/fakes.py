@@ -189,9 +189,7 @@ class FakeOpenAIServer:
             "id": "chatcmpl-fake",
             "object": "chat.completion",
             "model": "fake-model-small",
-            "choices": [
-                {"index": 0, "message": message, "finish_reason": response.finish_reason}
-            ],
+            "choices": [{"index": 0, "message": message, "finish_reason": response.finish_reason}],
         }
         if response.usage is not None:
             body["usage"] = dict(response.usage)
@@ -225,11 +223,7 @@ class FakeOpenAIServer:
             for fragment in chunk_text(args, self._chunk_size):
                 chunks.append(
                     self._delta_chunk(
-                        {
-                            "tool_calls": [
-                                {"index": index, "function": {"arguments": fragment}}
-                            ]
-                        }
+                        {"tool_calls": [{"index": index, "function": {"arguments": fragment}}]}
                     )
                 )
 
@@ -324,9 +318,7 @@ class FakeGeminiServer:
             404, json={"error": {"code": 404, "message": f"no such path: {path}"}}
         )
 
-    def _handle_generate(
-        self, request: httpx2.Request, *, streaming: bool
-    ) -> httpx2.Response:
+    def _handle_generate(self, request: httpx2.Request, *, streaming: bool) -> httpx2.Response:
         body = json.loads(request.content or b"{}")
         self.requests.append(body)
         index = min(self._call_index, len(self._responses) - 1)
@@ -349,13 +341,10 @@ class FakeGeminiServer:
             )
 
         if not streaming:
-            return httpx2.Response(
-                200, json=self._body(response, parts=self._all_parts(response))
-            )
+            return httpx2.Response(200, json=self._body(response, parts=self._all_parts(response)))
 
         chunks = [
-            self._body(response, parts=[part], usage=False)
-            for part in self._all_parts(response)
+            self._body(response, parts=[part], usage=False) for part in self._all_parts(response)
         ] or [self._body(response, parts=[{"text": ""}], usage=False)]
         chunks[-1]["candidates"][0]["finishReason"] = _GEMINI_FINISH.get(
             response.finish_reason, response.finish_reason.upper()
@@ -511,10 +500,18 @@ class FakeOllamaServer:
             digest = "sha256:layer-one"
             lines = [
                 {"status": "pulling manifest"},
-                {"status": "pulling " + digest, "digest": digest,
-                 "total": 8_000_000, "completed": 4_000_000},
-                {"status": "pulling " + digest, "digest": digest,
-                 "total": 8_000_000, "completed": 8_000_000},
+                {
+                    "status": "pulling " + digest,
+                    "digest": digest,
+                    "total": 8_000_000,
+                    "completed": 4_000_000,
+                },
+                {
+                    "status": "pulling " + digest,
+                    "digest": digest,
+                    "total": 8_000_000,
+                    "completed": 8_000_000,
+                },
                 {"status": "verifying sha256 digest"},
                 {"status": "success"},
             ]

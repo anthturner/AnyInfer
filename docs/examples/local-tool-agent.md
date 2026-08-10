@@ -45,22 +45,23 @@ runaway loop raises `ToolLoopError` rather than spinning).
 
 For interactive use, stream tokens as they arrive instead of waiting for the full
 answer. Streaming and non-streaming are the same primitive — a
-[typed event stream](../concepts/events.md) — so nothing else about the program changes:
+[typed event stream](../concepts/events.md), so nothing else about the program changes:
 
 ```python
 with client.stream("Explain this project's layout", target="ollama:qwen3:8b") as stream:
     for event in stream:
         if isinstance(event, ai.TextDelta):
             print(event.text, end="", flush=True)
-    result = stream.result   # usage, timing, and the attempt trail, same as generate()
+    result = stream.result  # usage, timing, and the attempt trail, same as generate()
 
-print(f"\n\n[{result.usage.output_tokens} tokens, "
-      f"first token in {result.timing.first_token_ms} ms]")
+print(
+    f"\n\n[{result.usage.output_tokens} tokens, first token in {result.timing.first_token_ms} ms]"
+)
 ```
 
 ## What to notice
 
-- **`@ai.tool` derives the wire schema from the signature** — name, docstring, and type
+- **`@ai.tool` derives the wire schema from the signature**: name, docstring, and type
   hints become the provider-facing tool spec. `read_file.spec` is inspectable if you want
   to see exactly what the model is told. See [the tool loop](../guides/tool-loop.md).
 - **The loop lives in the core, not your code.** `run_tools` handles the call → execute →

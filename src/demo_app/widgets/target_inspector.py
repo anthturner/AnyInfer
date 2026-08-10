@@ -18,7 +18,7 @@ spend real tokens against a real provider, and a probe that quietly issues six r
 exactly the sort of thing an application should not do on a user's behalf without saying so.
 
 Capability values are rendered with their `Sourced`
-provenance intact — ``catalog``, ``discovered``, ``probed``, or ``default`` — because that
+provenance intact — ``catalog``, ``discovered``, ``probed``, or ``default``, because that
 tag is the difference between a measured context window and a guess, and collapsing it to
 a bare number is precisely what the library refuses to do.
 """
@@ -142,7 +142,7 @@ class TargetInspector(QWidget):
         self._probe_button.clicked.connect(self._on_probe)
         self._benchmark_button = self._button(
             buttons,
-            "Benchmark ×2 (2 requests)",
+            "Benchmark x2 (2 requests)",
             "Two deterministic requests, back to back. The second is warm by "
             "construction; comparing it with the first makes any cold-start cost "
             "visible instead of silently folded into one number.",

@@ -435,7 +435,7 @@ class ModelStore:
         """The best registered entry matching a model and optional constraints.
 
         "Best" is the most recently installed match, so re-acquiring at a different
-        quantization changes what a bare model id resolves to — which is what a user who
+        quantization changes what a bare model id resolves to, which is what a user who
         just downloaded something expects.
         """
         candidates = [
@@ -571,7 +571,7 @@ class ModelStore:
 
         Earlier builds wrote ``<root>/<filename>.gguf`` with no revision in the path. Those
         files are perfectly good bytes a user paid bandwidth for, so the store adopts them
-        where they lie — but only after verifying each one against its catalog hash, so
+        where they lie, but only after verifying each one against its catalog hash, so
         adoption is never a lie about what is on disk.
 
         Args:
@@ -645,7 +645,7 @@ class ModelStore:
         """Register a directory this store does not own, if every file checks out.
 
         The Hugging Face cache case. We do not adopt another library's *layout* for our own
-        writes — it is their private implementation detail — but re-downloading forty
+        writes — it is their private implementation detail, but re-downloading forty
         gigabytes the user already has is user-hostile. Adopted entries are marked
         `StoreEntry.external`, are never written to, and are never deleted by `remove`.
 
@@ -711,9 +711,7 @@ class ModelStore:
 # ---- placement ------------------------------------------------------------------------
 
 
-def placement_for(
-    kind: str, ref: SourceRef, *, revision: str | None, variant_id: str
-) -> str:
+def placement_for(kind: str, ref: SourceRef, *, revision: str | None, variant_id: str) -> str:
     """The store-relative directory a variant's files belong in.
 
     Revision-scoped, publisher-scoped, and kind-scoped, so nothing can collide and a single

@@ -108,7 +108,7 @@ def test_no_user_facing_text_carries_an_adr_identifier() -> None:
     """`ADR-NNN` is internal shorthand; outside this repo it explains nothing.
 
     One sweep over every outward surface — the published docs, the README, the emitted
-    instruction fragment, and the skill shims — because the rule is stated in AGENTS.md
+    instruction fragment, and the skill shims, because the rule is stated in AGENTS.md
     and was, until now, enforced by nobody.
     """
     from anyinfer._agents_md import AGENTS_MD_FORMATS, render_agents_md

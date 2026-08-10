@@ -120,9 +120,7 @@ async def test_documents_split_per_document():
 async def test_an_empty_source_spends_nothing():
     server = FakeOpenAIServer(FakeResponse(text="unused"))
     async with _client(server) as client:
-        result = await distill(
-            "   ", "summarize", client=client, target=TARGET, chunk_tokens=512
-        )
+        result = await distill("   ", "summarize", client=client, target=TARGET, chunk_tokens=512)
 
     assert result.calls == 0
     assert result.chunk_count == 0
@@ -210,9 +208,7 @@ async def test_scaffolding_labels_are_stripped_from_the_answer():
         FakeResponse(text="## Chunk 2\n\nThe real answer.\n\n\n\nMore answer.")
     )
     async with _client(server) as client:
-        result = await distill(
-            "text", "summarize", client=client, target=TARGET, chunk_tokens=512
-        )
+        result = await distill("text", "summarize", client=client, target=TARGET, chunk_tokens=512)
 
     assert "Chunk 2" not in result.text
     assert "The real answer." in result.text
@@ -225,9 +221,7 @@ async def test_intermediate_notes_are_excluded_from_the_repr():
         [FakeResponse(text="an intermediate note"), FakeResponse(text="the answer")]
     )
     async with _client(server) as client:
-        result = await distill(
-            "text", "summarize", client=client, target=TARGET, chunk_tokens=512
-        )
+        result = await distill("text", "summarize", client=client, target=TARGET, chunk_tokens=512)
 
     assert "intermediate note" not in repr(result), "notes stay out of the repr"
     assert result.notes[0] == "an intermediate note", "but remain available"
@@ -237,9 +231,7 @@ async def test_intermediate_notes_are_excluded_from_the_repr():
 async def test_summary_is_content_free():
     server = FakeOpenAIServer(FakeResponse(text="a note"))
     async with _client(server) as client:
-        result = await distill(
-            "text", "summarize", client=client, target=TARGET, chunk_tokens=512
-        )
+        result = await distill("text", "summarize", client=client, target=TARGET, chunk_tokens=512)
 
     assert "note" not in result.summary()
     assert "call(s)" in result.summary()

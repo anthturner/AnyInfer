@@ -47,9 +47,7 @@ __all__ = [
     "plan_acquisition",
 ]
 
-AcquisitionPhase = Literal[
-    "resolving", "planning", "downloading", "verifying", "placing", "done"
-]
+AcquisitionPhase = Literal["resolving", "planning", "downloading", "verifying", "placing", "done"]
 """Where an acquisition is. Every transition produces a callback, unthrottled."""
 
 _CHUNK_BYTES = 1024 * 1024
@@ -268,9 +266,7 @@ async def plan_acquisition(
         variant_id=request.variant_id or request.model_id,
         filename=resolved.files[0].path,
     )
-    handle = (
-        f"{directory}/{resolved.files[0].path}" if request.kind == "gguf" else directory
-    )
+    handle = f"{directory}/{resolved.files[0].path}" if request.kind == "gguf" else directory
 
     entry_dir = target.root / directory
     staging = target.staging_dir(entry_id)
@@ -298,9 +294,7 @@ async def plan_acquisition(
             ),
         )
     if unverifiable:
-        warnings.append(
-            f"{len(unverifiable)} file(s) will be stored without verification"
-        )
+        warnings.append(f"{len(unverifiable)} file(s) will be stored without verification")
 
     if request.enforce_license and request.license and not license_allowed(request.license):
         raise LocalRuntimeError(
@@ -545,9 +539,7 @@ async def acquire(
                     )
 
             try:
-                await asyncio.gather(
-                    *(fetch(i, f) for i, f in enumerate(resolved_plan.files))
-                )
+                await asyncio.gather(*(fetch(i, f) for i, f in enumerate(resolved_plan.files)))
             except _Cancelled:
                 cancelled = True
             except asyncio.CancelledError:

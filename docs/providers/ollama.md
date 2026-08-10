@@ -92,7 +92,7 @@ megabytes, and a warning on every healthy load is one nobody reads.
 ## Provider options
 
 ```python
-provider_options={"ollama": {"keep_alive": "10m", "num_ctx": 8192, "num_gpu": 99}}
+provider_options = {"ollama": {"keep_alive": "10m", "num_ctx": 8192, "num_gpu": 99}}
 ```
 
 ## Notes

@@ -39,8 +39,7 @@ class _Recorder:
 async def test_a_pull_reports_what_it_transferred() -> None:
     server = FakeOllamaServer()
     report = await pull_ollama_model(
-        PullRequest(model=MODEL, base_url="http://127.0.0.1:11434",
-                    transport=server.transport())
+        PullRequest(model=MODEL, base_url="http://127.0.0.1:11434", transport=server.transport())
     )
 
     assert server.pulled == [MODEL]
@@ -77,12 +76,11 @@ async def test_layer_counts_accumulate_into_aggregate_progress() -> None:
 
 
 async def test_an_already_present_model_is_distinguished_from_a_transfer() -> None:
-    """"Took two seconds" is reassuring one way and alarming the other."""
+    """Distinguish a cache hit from a transfer that happened to finish quickly."""
     server = FakeOllamaServer()
     server.pull_lines = [{"status": "success"}]
     report = await pull_ollama_model(
-        PullRequest(model=MODEL, base_url="http://127.0.0.1:11434",
-                    transport=server.transport())
+        PullRequest(model=MODEL, base_url="http://127.0.0.1:11434", transport=server.transport())
     )
 
     assert report.already_present is True
@@ -94,8 +92,9 @@ async def test_a_missing_model_is_a_model_not_found_error() -> None:
     server.pull_lines = [{"error": "pull model manifest: file does not exist"}]
     with pytest.raises(ai.ModelNotFoundError) as excinfo:
         await pull_ollama_model(
-            PullRequest(model="nope:1b", base_url="http://127.0.0.1:11434",
-                        transport=server.transport())
+            PullRequest(
+                model="nope:1b", base_url="http://127.0.0.1:11434", transport=server.transport()
+            )
         )
 
     assert excinfo.value.hint is not None
@@ -111,8 +110,9 @@ async def test_a_midstream_failure_surfaces_as_a_local_runtime_error() -> None:
     ]
     with pytest.raises(ai.LocalRuntimeError) as excinfo:
         await pull_ollama_model(
-            PullRequest(model=MODEL, base_url="http://127.0.0.1:11434",
-                        transport=server.transport())
+            PullRequest(
+                model=MODEL, base_url="http://127.0.0.1:11434", transport=server.transport()
+            )
         )
 
     assert "partway through" in excinfo.value.detail

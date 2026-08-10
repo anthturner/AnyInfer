@@ -45,8 +45,7 @@ def _server_for(scenario: str) -> FakeOpenAIServer:
     if scenario == "rate_limited":
         return FakeOpenAIServer(
             [
-                FakeResponse(status=429, error_message="slow down",
-                             headers={"retry-after": "0"}),
+                FakeResponse(status=429, error_message="slow down", headers={"retry-after": "0"}),
                 FakeResponse(text="recovered"),
             ]
         )

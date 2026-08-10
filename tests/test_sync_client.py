@@ -40,9 +40,10 @@ def test_generate_runs_an_arena_through_the_sync_facade() -> None:
 
 def test_stream_iterates_and_exposes_the_result() -> None:
     server = FakeOpenAIServer(FakeResponse(text="streamed answer"))
-    with make_sync_client(server) as client, client.stream(
-        "hi", target="openai-compat:m"
-    ) as stream:
+    with (
+        make_sync_client(server) as client,
+        client.stream("hi", target="openai-compat:m") as stream,
+    ):
         text = "".join(e.text for e in stream if isinstance(e, ai.TextDelta))
         result = stream.result
 
@@ -52,9 +53,10 @@ def test_stream_iterates_and_exposes_the_result() -> None:
 
 def test_stream_collect_drains() -> None:
     server = FakeOpenAIServer(FakeResponse(text="drained"))
-    with make_sync_client(server) as client, client.stream(
-        "hi", target="openai-compat:m"
-    ) as stream:
+    with (
+        make_sync_client(server) as client,
+        client.stream("hi", target="openai-compat:m") as stream,
+    ):
         result = stream.collect()
 
     assert result.text == "drained"
@@ -62,9 +64,10 @@ def test_stream_collect_drains() -> None:
 
 def test_result_before_consumption_is_an_error() -> None:
     server = FakeOpenAIServer(FakeResponse(text="x"))
-    with make_sync_client(server) as client, client.stream(
-        "hi", target="openai-compat:m"
-    ) as stream:
+    with (
+        make_sync_client(server) as client,
+        client.stream("hi", target="openai-compat:m") as stream,
+    ):
         with pytest.raises(RuntimeError, match="not available until"):
             _ = stream.result
 

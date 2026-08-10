@@ -2,7 +2,7 @@
 
 Deliberately generic. A provider's configuration is a plain ``{field key: value}`` mapping
 whose keys come from that provider's `ProviderSetupSpec`, so
-adding a provider to AnyInfer — or installing a third-party one via the entry-point group —
+adding a provider to AnyInfer, or installing a third-party one via the entry-point group —
 requires no change here and no change in the settings dialog.
 
 Secrets are stored as credential *references* (``env://OPENAI_API_KEY``) whenever the user
@@ -45,7 +45,7 @@ class ProviderConfig:
     """One configured provider *instance*, keyed by its engine's setup-spec field keys.
 
     An engine may be configured more than once — two Azure tenants, a local and a remote
-    Ollama — so ``provider_id`` names the engine while `instance_id` names this
+    Ollama, so ``provider_id`` names the engine while `instance_id` names this
     particular configuration of it.
     """
 
@@ -137,6 +137,8 @@ class DemoConfig:
     """Appearance preference: ``system`` (follow the OS), ``light``, or ``dark``."""
     context_window_tokens: int | None = None
     """Manual context-window override in tokens; ``None`` means auto-detect."""
+    ignore_runtime_hardware_constraints: bool = False
+    """Allow runtime variants even when detected hardware cannot use them."""
 
     def enabled_providers(self) -> Iterator[ProviderConfig]:
         """Every provider instance the user turned on."""
@@ -192,11 +194,7 @@ class DemoConfig:
             "providers": [
                 {
                     "id": p.instance_id,
-                    **(
-                        {"adapter": p.provider_id}
-                        if p.alias and p.alias != p.provider_id
-                        else {}
-                    ),
+                    **({"adapter": p.provider_id} if p.alias and p.alias != p.provider_id else {}),
                     "enabled": p.enabled,
                     "values": dict(p.values),
                     "options": dict(p.options),
@@ -210,6 +208,7 @@ class DemoConfig:
             "system_prompt": self.system_prompt,
             "theme": self.theme,
             "context_window_tokens": self.context_window_tokens,
+            "ignore_runtime_hardware_constraints": self.ignore_runtime_hardware_constraints,
         }
 
     @classmethod
@@ -238,12 +237,18 @@ class DemoConfig:
         theme = str(data.get("theme", "system"))
         raw_tokens = data.get("context_window_tokens")
         tokens = raw_tokens if isinstance(raw_tokens, int) and raw_tokens > 0 else None
+        raw_ignore_runtime_constraints = data.get("ignore_runtime_hardware_constraints", False)
         return cls(
             providers=tuple(providers),
             targets=targets or ("demo-fake:reliable",),
             system_prompt=str(data.get("system_prompt", "")),
             theme=theme if theme in _THEME_PREFERENCES else "system",
             context_window_tokens=tokens,
+            ignore_runtime_hardware_constraints=(
+                raw_ignore_runtime_constraints
+                if isinstance(raw_ignore_runtime_constraints, bool)
+                else False
+            ),
         )
 
     def save(self, path: Path | None = None) -> None:

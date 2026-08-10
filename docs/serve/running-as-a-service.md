@@ -2,7 +2,7 @@
 
 An application pointing at `http://127.0.0.1:8080/v1` needs that endpoint to exist at boot,
 not just while somebody keeps a terminal window open. `anyinfer serve install` writes the
-systemd unit, launchd agent, or scheduled task that arranges it — and shows you the file
+systemd unit, launchd agent, or scheduled task that arranges it, and shows you the file
 first.
 
 ```bash
@@ -25,7 +25,7 @@ cannot describe different definitions.
   *prints* the commands to run as root; it will not elevate for you.
 - **It never overwrites silently.** An existing definition stops the command; `--force`
   replaces it.
-- **`uninstall` removes what `install` wrote** — the definition and, where one exists, the
+- **`uninstall` removes what `install` wrote**: the definition and, where one exists, the
   private environment file.
 - **`status` is read-only.** It reports whether a definition exists and what the platform's
   manager says about it. It never starts, stops, or restarts anything: that is the
@@ -59,7 +59,7 @@ reported; nothing is uninstalled.
 
     The hardening directives are on rather than offered. This process reads a
     configuration file and speaks HTTP; it has no business writing to the filesystem,
-    gaining privileges, or opening anything but IP sockets — and a default you have to
+    gaining privileges, or opening anything but IP sockets, and a default you have to
     turn on is a default nobody has. Logs go to the journal:
     `journalctl --user -u anyinfer-serve.service`.
 
@@ -70,7 +70,7 @@ reported; nothing is uninstalled.
 
     When a bearer token is configured the agent runs through `/bin/sh` to source the
     private environment file. launchd has no `EnvironmentFile`, and its
-    `EnvironmentVariables` dictionary lives in the plist itself — which is exactly where a
+    `EnvironmentVariables` dictionary lives in the plist itself, which is exactly where a
     token must not go.
 
 === "Windows (scheduled task)"
@@ -107,7 +107,7 @@ expose one.
 
 Nothing is redirected by default: systemd has the journal and launchd has `os_log`, and
 duplicating them into a file helps nobody. The Windows task has no sink, so `--log-file`
-writes one — and AnyInfer does not rotate it. That is stated in the generated definition
+writes one, and AnyInfer does not rotate it. That is stated in the generated definition
 and here, because a library that silently grows a file on your disk forever is worse than
 one that says it will not manage logs.
 

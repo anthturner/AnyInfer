@@ -15,7 +15,9 @@ def _registry() -> ProviderRegistry:
     return ProviderRegistry(load_builtins=True, load_entry_points=False)
 
 
-def _client(provider: ScriptedProvider, registry: ProviderRegistry, **kwargs: object) -> ai.AsyncClient:
+def _client(
+    provider: ScriptedProvider, registry: ProviderRegistry, **kwargs: object
+) -> ai.AsyncClient:
     return ai.AsyncClient(
         [provider.settings()],
         registry=registry,

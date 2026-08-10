@@ -2,7 +2,7 @@
 
 Most libraries in this space solve *provider switching*: one function, many APIs, one
 response shape. That is a real problem and several tools solve it well. AnyInfer is built
-for the problem that starts immediately afterwards — when an application has to be correct
+for the problem that starts immediately afterwards, when an application has to be correct
 about what it sent, what it got back, what it cost, and what quietly did not happen.
 
 The short version: **an OpenAI-shaped request does not make providers behave alike.** One
@@ -20,7 +20,7 @@ it. AnyInfer normalizes the behaviour and reports every place it could not.
 
 Your application's inference code has behaviour worth testing: it falls back when a
 provider is down, it repairs a malformed structured answer, it reduces a corpus to fit.
-Testing that normally means either mocking your own wrapper — which tests the mock — or
+Testing that normally means mocking your own wrapper, which mostly tests the mock, or
 provoking a real outage.
 
 The test kit ships with the library, so your fallback chain has a real test with no
@@ -29,15 +29,21 @@ credentials and no network:
 ```python
 from anyinfer.testing import ScriptedFailure, ScriptedModel, ScriptedProvider
 
-provider = ScriptedProvider("acme", [
-    ScriptedModel("flaky", failures=(ScriptedFailure(status=503, retry_after_s=0.0),)),
-    ScriptedModel("structured", structured={"answer": "valid on the second try"},
-                  failures=(ScriptedFailure(kind="malformed-json"),)),
-])
+provider = ScriptedProvider(
+    "acme",
+    [
+        ScriptedModel("flaky", failures=(ScriptedFailure(status=503, retry_after_s=0.0),)),
+        ScriptedModel(
+            "structured",
+            structured={"answer": "valid on the second try"},
+            failures=(ScriptedFailure(kind="malformed-json"),),
+        ),
+    ],
+)
 ```
 
-Five failure kinds are declarable — an HTTP status with `Retry-After`, a stream cut
-mid-event, a body that will not validate, a read timeout, a content-policy refusal — and
+Five failure kinds are declarable: an HTTP status with `Retry-After`, a stream cut
+mid-event, a body that will not validate, a read timeout, and a content-policy refusal. Each
 each reaches a different part of the core. These are the failures you cannot schedule
 against a real provider, and they are exactly the ones your error handling is written for.
 
@@ -50,13 +56,13 @@ not the same fact, and code that cannot tell them apart will eventually gate a r
 guess.
 
 ```python
-budget.context_window        # Sourced(200000, 'catalog')
-budget.context_window        # Sourced(8192, 'discovered')
-budget.context_window        # None — and it stays None
+budget.context_window  # Sourced(200000, 'catalog')
+budget.context_window  # Sourced(8192, 'discovered')
+budget.context_window  # None, and it stays None
 ```
 
-Five provenances — `default`, `catalog`, `discovered`, `probed`, `override` — layered
-weakest to strongest, so a weaker source never displaces a stronger one. Only trusted
+Five provenances are layered from weakest to strongest: `default`, `catalog`, `discovered`,
+`probed`, and `override`. A weaker source never displaces a stronger one. Only trusted
 provenance is allowed to refuse a request pre-dispatch. Nothing is ever silently upgraded
 from "we assumed" to "we know".
 
@@ -68,19 +74,19 @@ in this category, and it is unrepresentable here.
 
 ### 3. Portability is a test result, not a claim
 
-103 providers is inventory, not a feature. What is a feature is knowing which of them
-actually does what you need — and the honest way to know is to run the same suite against
-each one and publish the result, including the gaps.
+103 providers is inventory, not a feature. The useful part is knowing which of them does
+what you need. AnyInfer runs the same suite against each adapter and publishes the results,
+including the gaps.
 
 The [conformance matrix](reference/conformance-matrix.md) is generated from real runs, and
 every cell is one parametrized test case that executed against that adapter. A `➖` is a
 declared limitation, not a pass. Ten providers carry rows today and the rest are
-uncertified — which the matrix shows rather than hides, and which is the point: an empty
-row is information, a marketing table is not.
+uncertified. The matrix leaves those rows empty instead of turning missing evidence into a
+claim.
 
 Underneath it, 20 [contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md)
 record exactly which upstream endpoints, fields, framing, and error shapes each adapter
-depends on, each with the date it was last verified — including snapshots that say plainly
+depends on, each with the date it was last verified, including snapshots that say plainly
 "not yet verified against live provider documentation". A
 [drift-check procedure](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md)
 audits them against current provider documentation. When an adapter's wire behaviour
@@ -96,7 +102,7 @@ against it and emits its matrix row.
 
 ```python
 client.generate(prompt, target="anthropic:claude-sonnet-4-5")
-client.generate(prompt, target="llama-cpp:qwen3-8b-q4-k-m")   # one string changed
+client.generate(prompt, target="llama-cpp:qwen3-8b-q4-k-m")  # one string changed
 ```
 
 The second call, if the weights are not there yet, will acquire a pinned and hash-verified
@@ -116,16 +122,16 @@ contract.
 
 ```python
 budget = client.budget(messages, target="anthropic:claude-sonnet-4-5")
-budget.remaining_tokens     # what is left for context
-budget.fits                 # True / False / None — None means the window is unknown
-budget.estimated_cost       # a range, or None
+budget.remaining_tokens  # what is left for context
+budget.fits  # True / False / None; None means the window is unknown
+budget.estimated_cost  # a range, or None
 
 reduction = context.select(documents, query, max_tokens=budget.remaining_tokens)
-reduction.summary()         # what was sent, what was dropped, and what bound the decision
+reduction.summary()  # what was sent, what was dropped, and what bound the decision
 ```
 
 The same target capabilities drive budgeting, reduction, pre-dispatch refusal, cost
-estimation, and context-overflow routing — one set of facts, not five. Reduction reports
+estimation, and context-overflow routing. They all use the same facts. Reduction reports
 its omissions rather than quietly truncating, because a prompt that lost your most
 important file without saying so is worse than one that did not fit.
 
@@ -141,31 +147,31 @@ not specific products, because a category claim can be checked against what the 
 for, while a product claim goes stale the week after it is written. Individual products
 vary widely and move fast. **Snapshot date: 2026-08-09.** If you are choosing between
 AnyInfer and a specific tool, verify that tool's current behaviour rather than trusting a
-generalization here — and read [when to use AnyInfer](guides/when-to-use.md), which argues
+generalization here, and read [when to use AnyInfer](guides/when-to-use.md), which argues
 the other side.
 
 | | **AnyInfer** | Provider-switching client | Hosted gateway / proxy | Local-model server | Agent framework |
 |---|---|---|---|---|---|
 | What your code holds | Typed event stream | An OpenAI-shaped response | OpenAI wire format | OpenAI wire format | The framework's abstraction |
-| Runs in your process | Yes | Yes | No — it is a service you operate | No — it is a service you operate | Yes |
+| Runs in your process | Yes | Yes | No; it is a service you operate | No; it is a service you operate | Yes |
 | Hosted **and** managed-local in one fallback chain | Yes | Hosted, usually | Across endpoints you already run | Local only | Whatever its client does |
-| Acquires, verifies, and supervises a local model process | Yes (`llama.cpp`) | No | No | Yes — that is its job | No |
-| Capability values carry provenance | Yes | Not typically | Not typically | — | Not typically |
-| Unknown cost is `None`, never `0` | Yes | Varies | Varies | — | Varies |
+| Acquires, verifies, and supervises a local model process | Yes (`llama.cpp`) | No | No | Yes; that is its job | No |
+| Capability values carry provenance | Yes | Not typically | Not typically | N/A | Not typically |
+| Unknown cost is `None`, never `0` | Yes | Varies | Varies | N/A | Varies |
 | Structured output validated client-side, with bounded repair | Yes | Varies | Passes the provider's mode through | Passes through | Commonly yes |
 | Dropped parameters and weakened mechanisms are reported | Yes, as typed events | Rare | Rare | Rare | Rare |
-| Ships a test kit for *your* failure paths | Yes | Rare | Rare | — | Varies |
-| Per-adapter conformance matrix from executed tests | Yes (10 certified so far) | Rare | Rare | — | Rare |
+| Ships a test kit for *your* failure paths | Yes | Rare | Rare | N/A | Varies |
+| Per-adapter conformance matrix from executed tests | Yes (10 certified so far) | Rare | Rare | N/A | Rare |
 | Dated upstream contract snapshots + drift audit | Yes (20) | Rare | Rare | Rare | Rare |
-| Mandatory dependencies | 2 | Varies | — | — | Typically many |
-| Central keys, org quotas, admin plane | **No — use a gateway** | No | Yes | No | No |
+| Mandatory dependencies | 2 | Varies | N/A | N/A | Typically many |
+| Central keys, org quotas, admin plane | **No; use a gateway** | No | Yes | No | No |
 | Retrieval / vector index | **No** | No | No | No | Often yes |
-| Prompt templates, chains, agents | **No** | No | No | No | Yes — that is its job |
+| Prompt templates, chains, agents | **No** | No | No | No | Yes; that is its job |
 | High-throughput GPU serving | **No** | No | No | Some | No |
 
 The last four rows are the important ones. AnyInfer is a runtime, not a platform, and the
-tools in those columns are not competitors to be beaten — they are boundaries to compose
-with. A gateway in front of AnyInfer is a reasonable architecture. So is AnyInfer calling
+tools in those columns are not competitors. They are boundaries to compose with. A gateway
+in front of AnyInfer is a reasonable architecture. So is AnyInfer calling
 an Ollama you already operate.
 
 ---
@@ -183,8 +189,8 @@ anyinfer verify --config anyinfer.json    # does each target actually answer?
 anyinfer run "..." --dry-run --target ollama:qwen3:8b   # cost and fit, nothing spent
 ```
 
-`anyinfer verify` is the honest one. It sends a real, tiny request, because a credential
-can be valid for a model listing and useless for inference — and it distinguishes
+`anyinfer verify` is the definitive check. It sends a real, tiny request, because a credential
+can be valid for a model listing and useless for inference, and it distinguishes
 *unreachable* from *reachable but could not hold the requested shape*, which need
 completely different fixes.
 
@@ -207,6 +213,6 @@ for a central control plane. Those have better-shaped tools, and
 
 ## Continue
 
-- [When to use AnyInfer](guides/when-to-use.md) — the same question, argued against
-- [Quickstart](guides/quickstart.md) — install to first result
-- [Choosing an integration path](guides/integration-paths.md) — SDK, CLI, or sidecar
+- [When to use AnyInfer](guides/when-to-use.md): the same question, argued against
+- [Quickstart](guides/quickstart.md): install to first result
+- [Choosing an integration path](guides/integration-paths.md): SDK, CLI, or sidecar

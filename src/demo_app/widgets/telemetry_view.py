@@ -2,7 +2,7 @@
 
 Everything shown here arrives as a `TelemetryEvent` through a
 plain observer callable. The rendering is structural — event type, target, and the fields that
-type carries — rather than a formatted log string, because the contract is *typed events*, not
+type carries, rather than a formatted log string, because the contract is *typed events*, not
 text.
 
 Payload privacy is demonstrated too: the observer is registered without ``payloads=True``, so
@@ -93,13 +93,24 @@ class _RequestCard(QFrame):
         severity = _SEVERITY.get(type(event))
         badge = _BADGE.get(severity, "•") if severity else "•"
         color = theme.color(severity) if severity else theme.color("muted")
-        line = QLabel(
-            f"<span style='color:{color}'>{badge} <b>{type(event).__name__}</b></span> "
-            f"{_details_of(event)}"
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(7)
+
+        badge_label = QLabel(
+            f"<span style='color:{color}'>{badge} <b>{type(event).__name__}</b></span>"
         )
-        line.setTextFormat(Qt.TextFormat.RichText)
-        line.setWordWrap(True)
-        self._events.addWidget(line)
+        badge_label.setTextFormat(Qt.TextFormat.RichText)
+        badge_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(badge_label, 0)
+
+        detail_label = QLabel(_details_of(event))
+        detail_label.setTextFormat(Qt.TextFormat.PlainText)
+        detail_label.setWordWrap(True)
+        detail_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(detail_label, 1)
+        self._events.addWidget(row)
 
 
 class TelemetryView(QWidget):

@@ -18,6 +18,7 @@ Or from Python:
 
 ```python
 import keyring
+
 keyring.set_password("AnyInfer", "openai-api-key", "sk-...")
 ```
 
@@ -26,9 +27,11 @@ The service name is `AnyInfer`; the identifier is yours to choose.
 ## Reference it
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of("openai", api_key="credential://system/openai-api-key"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("openai", api_key="credential://system/openai-api-key"),
+    ]
+)
 ```
 
 That string is safe to commit. It names *where* the secret lives, not the secret.
@@ -36,9 +39,9 @@ That string is safe to commit. It names *where* the secret lives, not the secret
 ## All three forms
 
 ```python
-api_key="sk-literal-value"                    # in code; fine for tests, poor for config
-api_key="env://OPENAI_API_KEY"                # the usual choice for containers and CI
-api_key="credential://system/openai-api-key"  # the usual choice on a workstation
+api_key = "sk-literal-value"  # in code; fine for tests, poor for config
+api_key = "env://OPENAI_API_KEY"  # the usual choice for containers and CI
+api_key = "credential://system/openai-api-key"  # the usual choice on a workstation
 ```
 
 ## Failures are actionable

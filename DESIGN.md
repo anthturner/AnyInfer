@@ -204,9 +204,11 @@ accepted via duck-typed `model_json_schema()`).
 
 Role = Literal["system", "user", "assistant", "tool"]
 
+
 @dataclass(frozen=True, slots=True)
 class Text:
     text: str
+
 
 @dataclass(frozen=True, slots=True)
 class ToolCall:
@@ -214,18 +216,22 @@ class ToolCall:
     name: str
     arguments: Mapping[str, Any]
 
+
 @dataclass(frozen=True, slots=True)
 class ToolResult:
     call_id: str
     content: str
     is_error: bool = False
 
+
 ContentPart = Text | ToolCall | ToolResult | ImagePart | DocumentPart | AudioPart
+
 
 @dataclass(frozen=True, slots=True)
 class Message:
     role: Role
     content: tuple[ContentPart, ...]
+
 
 @dataclass(frozen=True, slots=True)
 class Sampling:
@@ -234,17 +240,19 @@ class Sampling:
     max_output_tokens: int | None = None
     stop: tuple[str, ...] = ()
 
-ReasoningEffort = Literal["minimal", "low", "medium", "high"]   # normalized; adapters translate
+
+ReasoningEffort = Literal["minimal", "low", "medium", "high"]  # normalized; adapters translate
+
 
 @dataclass(frozen=True, slots=True)
 class GenerationRequest:
     messages: tuple[Message, ...]
-    schema: SchemaSpec | None = None          # structured-output contract
+    schema: SchemaSpec | None = None  # structured-output contract
     tools: tuple[ToolSpec, ...] = ()
     sampling: Sampling = Sampling()
     reasoning: ReasoningEffort | None = None
     timeout_s: float | None = None
-    max_response_bytes: int = 1 << 20         # hard cap on a single response body
+    max_response_bytes: int = 1 << 20  # hard cap on a single response body
     provider_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     # ^ escape hatch, namespaced by provider id: {"ollama": {"keep_alive": "10m"}}
     #   Never consulted by the core; passed verbatim to the matching adapter only.
@@ -253,14 +261,15 @@ class GenerationRequest:
 **Targets** name where a request goes. Three spellings, one resolution path:
 
 ```python
-Target = str            # "anthropic:claude-sonnet-5" | "ollama:qwen3:8b" | alias "medium"
-                        # engine aliases normalize: "claude:..." → "anthropic:..."
+Target = str  # "anthropic:claude-sonnet-5" | "ollama:qwen3:8b" | alias "medium"
+# engine aliases normalize: "claude:..." → "anthropic:..."
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedTarget:
     provider_id: str
-    model: str            # may be the sentinel "auto" (Copilot) — see §7
-    via_alias: str | None # "medium" if resolved through the catalog
+    model: str  # may be the sentinel "auto" (Copilot) — see §7
+    via_alias: str | None  # "medium" if resolved through the catalog
 ```
 
 **Results:**
@@ -274,15 +283,17 @@ class Usage:
     cache_read_tokens: int | None = None
     cache_write_tokens: int | None = None
     reasoning_tokens: int | None = None
-    cost_usd: Decimal | None = None          # computed from pricing metadata when known
+    cost_usd: Decimal | None = None  # computed from pricing metadata when known
+
 
 @dataclass(frozen=True, slots=True)
 class Timing:
     started_at: float
-    first_token_ms: float | None             # TTFT, measured centrally at first visible delta
+    first_token_ms: float | None  # TTFT, measured centrally at first visible delta
     total_ms: float
     output_tokens_per_s: float | None
     phases: Mapping[str, float] = field(default_factory=dict)  # e.g. ollama model_load_ms
+
 
 @dataclass(frozen=True, slots=True)
 class AttemptRecord:
@@ -291,20 +302,21 @@ class AttemptRecord:
     error: ErrorInfo | None
     timing: Timing | None
 
+
 @dataclass(frozen=True, slots=True)
 class Generation:
     text: str
-    structured: Any | None                   # present iff request.schema; already validated
+    structured: Any | None  # present iff request.schema; already validated
     tool_calls: tuple[ToolCall, ...]
-    target: ResolvedTarget                   # what actually served it (post-fallback)
+    target: ResolvedTarget  # what actually served it (post-fallback)
     finish_reason: Literal["stop", "length", "tool_calls", "content_filter", "other"]
     usage: Usage
     timing: Timing
     structured_mechanism: Literal["grammar", "json_schema", "json_mode", "prompt"] | None
     repair_attempts: int
-    attempts: tuple[AttemptRecord, ...]      # full routing trail
+    attempts: tuple[AttemptRecord, ...]  # full routing trail
     warnings: tuple[str, ...]
-    raw: Any | None                          # provider payload escape hatch (opt-in retention)
+    raw: Any | None  # provider payload escape hatch (opt-in retention)
 ```
 
 ## 6. Streaming event model
@@ -314,22 +326,52 @@ the final result" (ADR-001).
 
 ```python
 @dataclass(frozen=True, slots=True)
-class TextDelta:        text: str
-@dataclass(frozen=True, slots=True)
-class ReasoningDelta:   text: str
-@dataclass(frozen=True, slots=True)
-class ToolCallDelta:    call_id: str; name: str | None; arguments_fragment: str
-@dataclass(frozen=True, slots=True)
-class UsageUpdate:      usage: Usage
-@dataclass(frozen=True, slots=True)
-class TimingMark:       name: Literal["first_token", "attempt_start", ...]; at_ms: float
-@dataclass(frozen=True, slots=True)
-class AttemptFailed:    record: AttemptRecord      # emitted before a retry/fallback
-@dataclass(frozen=True, slots=True)
-class StreamEnded:      result: Generation
+class TextDelta:
+    text: str
 
-StreamEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate \
-            | TimingMark | AttemptFailed | StreamEnded
+
+@dataclass(frozen=True, slots=True)
+class ReasoningDelta:
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCallDelta:
+    call_id: str
+    name: str | None
+    arguments_fragment: str
+
+
+@dataclass(frozen=True, slots=True)
+class UsageUpdate:
+    usage: Usage
+
+
+@dataclass(frozen=True, slots=True)
+class TimingMark:
+    name: Literal["first_token", "attempt_start", ...]
+    at_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptFailed:
+    record: AttemptRecord  # emitted before a retry/fallback
+
+
+@dataclass(frozen=True, slots=True)
+class StreamEnded:
+    result: Generation
+
+
+StreamEvent = (
+    TextDelta
+    | ReasoningDelta
+    | ToolCallDelta
+    | UsageUpdate
+    | TimingMark
+    | AttemptFailed
+    | StreamEnded
+)
 ```
 
 Consumption patterns this must serve:
@@ -348,14 +390,23 @@ events. Providers without streaming (or when the transport refuses) degrade to a
 ```python
 Provenance = Literal["catalog", "discovered", "probed", "default"]
 
+
 @dataclass(frozen=True, slots=True)
 class Sourced(Generic[T]):
     value: T
     provenance: Provenance
 
+
 class Feature(Flag):
-    STREAMING = auto(); JSON_SCHEMA = auto(); GRAMMAR = auto(); JSON_MODE = auto()
-    TOOLS = auto(); REASONING = auto(); SYSTEM_PROMPT = auto(); CACHE_USAGE = auto()
+    STREAMING = auto()
+    JSON_SCHEMA = auto()
+    GRAMMAR = auto()
+    JSON_MODE = auto()
+    TOOLS = auto()
+    REASONING = auto()
+    SYSTEM_PROMPT = auto()
+    CACHE_USAGE = auto()
+
 
 @dataclass(frozen=True, slots=True)
 class ModelCapabilities:
@@ -363,8 +414,8 @@ class ModelCapabilities:
     max_output_tokens: Sourced[int] | None
     features: Sourced[Feature]
     pricing: Sourced[Pricing] | None
-    local: LocalModelInfo | None    # artifact size, quantization, est. RAM/VRAM,
-                                    # observed VRAM residency
+    local: LocalModelInfo | None  # artifact size, quantization, est. RAM/VRAM,
+    # observed VRAM residency
 ```
 
 Assembly is layered, later layers overriding earlier, every field provenance-tagged:
@@ -391,7 +442,7 @@ class ProviderAdapter(Protocol):
     descriptor: ClassVar[ProviderDescriptor]
 
     async def list_models(self) -> Sequence[DiscoveredModel]: ...
-    async def health(self) -> Health: ...          # cheap readiness probe; router consults
+    async def health(self) -> Health: ...  # cheap readiness probe; router consults
     def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]: ...
     async def aclose(self) -> None: ...
 ```
@@ -409,20 +460,20 @@ class ProviderAdapter(Protocol):
 ```python
 @dataclass(frozen=True, slots=True)
 class ProviderDescriptor:
-    id: str                             # "anthropic"
-    aliases: tuple[str, ...]            # ("claude",)
+    id: str  # "anthropic"
+    aliases: tuple[str, ...]  # ("claude",)
     display_name: str
     factory: AdapterFactory
     locality: Literal["hosted", "local"]
     default_base_url: str | None
     requires_base_url: bool
-    setup: ProviderSetupSpec            # declarative fields → app UIs need no engine branches
+    setup: ProviderSetupSpec  # declarative fields → app UIs need no engine branches
     reasoning_translator: ReasoningTranslator
-    static_capabilities: Mapping[str, ModelCapabilities]   # catalog layer seed
+    static_capabilities: Mapping[str, ModelCapabilities]  # catalog layer seed
     token_calibration: TokenCalibration = TokenCalibration()  # envelope this provider bills for
-    max_repair_attempts: int | None = None                    # ceiling on schema-repair round trips
+    max_repair_attempts: int | None = None  # ceiling on schema-repair round trips
     supports_sessions: bool = False
-    reports_diagnostics: bool = False                         # adapter implements diagnostics()
+    reports_diagnostics: bool = False  # adapter implements diagnostics()
 ```
 
 Registration: built-ins pre-registered; third parties via entry points
@@ -488,14 +539,15 @@ All `detail` strings pass the redaction registry before construction.
 @dataclass(frozen=True, slots=True)
 class Retry:
     max_attempts: int = 2
-    backoff_base_s: float = 0.5          # exponential, honors retry_after when larger
-    retry_on: Callable[[ProviderError], bool] | None = None   # default: e.retryable
+    backoff_base_s: float = 0.5  # exponential, honors retry_after when larger
+    retry_on: Callable[[ProviderError], bool] | None = None  # default: e.retryable
+
 
 @dataclass(frozen=True, slots=True)
 class Route:
-    targets: tuple[Target, ...]          # ordered fallback chain
+    targets: tuple[Target, ...]  # ordered fallback chain
     retry: Retry = Retry()
-    health_gate: bool = True             # skip targets whose health() failed recently
+    health_gate: bool = True  # skip targets whose health() failed recently
     on_fallback: Literal["same_request", "revalidate_capabilities"] = "same_request"
 ```
 
@@ -666,7 +718,7 @@ through the existing overlay machinery, with no resolver changes.
 import anyinfer as ai
 
 # --- one-liner, alias target, sync ---
-client = ai.Client()                       # default registry, bundled catalog
+client = ai.Client()  # default registry, bundled catalog
 result = client.generate("Summarize:\n" + text, target="medium")
 print(result.text, result.usage.output_tokens, result.timing.first_token_ms)
 
@@ -674,15 +726,18 @@ print(result.text, result.usage.output_tokens, result.timing.first_token_ms)
 with client.stream(messages, target="ollama:qwen3:8b") as stream:
     for ev in stream:
         match ev:
-            case ai.TextDelta(text=t): print(t, end="", flush=True)
-    final = stream.result                    # Generation
+            case ai.TextDelta(text=t):
+                print(t, end="", flush=True)
+    final = stream.result  # Generation
 
 # --- structured contract with repair ---
 result = client.generate(
-    messages, target="copilot:auto",
-    schema=ANSWER_SCHEMA, repair=ai.Repair(max_attempts=1),
+    messages,
+    target="copilot:auto",
+    schema=ANSWER_SCHEMA,
+    repair=ai.Repair(max_attempts=1),
 )
-answer = result.structured                   # validated against ANSWER_SCHEMA
+answer = result.structured  # validated against ANSWER_SCHEMA
 
 # --- fallback chain + retries (router) ---
 route = ai.Route(
@@ -690,7 +745,8 @@ route = ai.Route(
     retry=ai.Retry(max_attempts=3),
 )
 result = client.generate(messages, route=route)
-for a in result.attempts: print(a.target, a.outcome)
+for a in result.attempts:
+    print(a.target, a.outcome)
 
 # --- instrumented benchmarking ---
 async with ai.AsyncClient(observers=[metrics_writer]) as ac:
@@ -705,21 +761,26 @@ for m in client.models("openrouter"):
     print(m.id, m.capabilities.context_window, m.capabilities.pricing)
 
 # --- local inference, hardware-aware ---
-hw = ai.local.detect()                      # cached HardwareProfile
-alias = ai.local.recommend_alias(hw)        # e.g. "large" on a 24 GB GPU
-result = client.generate(prompt, target=alias)   # llama-cpp: download → tune → serve → answer
+hw = ai.local.detect()  # cached HardwareProfile
+alias = ai.local.recommend_alias(hw)  # e.g. "large" on a 24 GB GPU
+result = client.generate(prompt, target=alias)  # llama-cpp: download → tune → serve → answer
+
 
 # --- tool loop (late v1) ---
 @ai.tool
 def read_file(path: str) -> str:
     """Read a project file."""
     ...
-result = client.run_tools(messages, tools=[read_file],
-                          target="anthropic:claude-sonnet-5", max_rounds=8)
+
+
+result = client.run_tools(
+    messages, tools=[read_file], target="anthropic:claude-sonnet-5", max_rounds=8
+)
 
 # --- provider escape hatch ---
-result = client.generate(messages, target="ollama:qwen3:8b",
-                         provider_options={"ollama": {"keep_alive": "10m"}})
+result = client.generate(
+    messages, target="ollama:qwen3:8b", provider_options={"ollama": {"keep_alive": "10m"}}
+)
 ```
 
 ## 18. Package layout
@@ -737,12 +798,12 @@ src/anyinfer/
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
   session.py             # the session handle
-  benchmark.py           # throughput measurement + caller-owned store
+  benchmark.py           # throughput measurement, live samples + caller-owned store
   verification.py        # the end-to-end target probe
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
-  local/                 # hardware.py backends.py runtimes.py runtimes.json tuning.py
+  local/                 # hardware.py metrics.py backends.py runtimes.py runtimes.json tuning.py
                          # services.py engine-managed model pulls
                          # fit.py variants.py artifacts.py downloads.py
                          # acquire.py store.py sources/ server.py recommend.py

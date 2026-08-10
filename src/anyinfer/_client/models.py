@@ -257,9 +257,7 @@ def choose_variant(
         if hardware is None:
             raise ConfigError(
                 f"choosing a quantization for {entry.id!r} needs a hardware profile",
-                hint=(
-                    "pass hardware=..., or name a variant explicitly with variant_id="
-                ),
+                hint=("pass hardware=..., or name a variant explicitly with variant_id="),
             )
         # The rejections are the answer to "why not?", and a refusal that withholds them
         # is one a user cannot act on.

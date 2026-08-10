@@ -119,7 +119,9 @@ def test_reset_forgets_everything() -> None:
 # ---- as an observer, through a real client -------------------------------------------
 
 
-def _client(capabilities: ModelCapabilities, **kwargs: object) -> tuple[ai.Client, ScriptedProvider]:
+def _client(
+    capabilities: ModelCapabilities, **kwargs: object
+) -> tuple[ai.Client, ScriptedProvider]:
     provider = ScriptedProvider("acme", [ScriptedModel("m", text="ok")])
     base = provider.descriptor()
     registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
@@ -208,9 +210,7 @@ def test_client_spend_reports_the_ledger_when_one_is_attached() -> None:
 
 def test_a_per_request_ceiling_refuses_before_dispatch() -> None:
     """Nothing is sent: the provider must record zero calls."""
-    client, provider = _client(
-        PRICED, spend=ai.SpendPolicy(max_request_usd=Decimal("0.0000001"))
-    )
+    client, provider = _client(PRICED, spend=ai.SpendPolicy(max_request_usd=Decimal("0.0000001")))
     with client, pytest.raises(SpendLimitError) as caught:
         client.generate("hi", target=provider.target("m"))
 

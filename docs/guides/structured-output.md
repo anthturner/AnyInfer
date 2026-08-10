@@ -21,7 +21,7 @@ result = client.generate(
     repair=ai.Repair(max_attempts=1),
 )
 
-analysis = result.structured        # already validated against REVIEW
+analysis = result.structured  # already validated against REVIEW
 print(analysis["sentiment"], analysis["score"])
 ```
 
@@ -47,9 +47,11 @@ No pydantic dependency is added; the model is duck-typed through `model_json_sch
 ```python
 from pydantic import BaseModel
 
+
 class Review(BaseModel):
     sentiment: str
     score: int
+
 
 result = client.generate(prompt, target="medium", schema=Review)
 parsed = Review.model_validate(result.structured)
@@ -58,8 +60,8 @@ parsed = Review.model_validate(result.structured)
 ## Knowing what happened
 
 ```python
-result.structured_mechanism   # "grammar" | "json_schema" | "json_mode" | "prompt"
-result.repair_attempts        # 0 if the model got it right first time
+result.structured_mechanism  # "grammar" | "json_schema" | "json_mode" | "prompt"
+result.repair_attempts  # 0 if the model got it right first time
 ```
 
 Both are worth logging in aggregate. A model that frequently needs repair is usually a
@@ -81,7 +83,7 @@ a few keywords are expensive:
 - `minItems` / `maxItems` of 2000 or more are stripped **for the wire**.
 
 Both are still enforced by client-side validation, so nothing you asked for is lost. But if
-a local model keeps failing a length constraint, that is why — and clearer prompt wording
+a local model keeps failing a length constraint, that is why, and clearer prompt wording
 will help more than a tighter constraint.
 
 Two things that improve results under every mechanism: prefer `enum` over free-form strings,

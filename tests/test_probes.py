@@ -28,9 +28,7 @@ PROBE_SCHEMA_COPY = {
 def test_a_probe_never_erases_the_flags_it_did_not_test() -> None:
     """`features` overlays wholesale, so a bare Feature.TOOLS would wipe the rest."""
     known = Sourced(Feature.STREAMING | Feature.JSON_MODE | Feature.TOOLS, "catalog")
-    merged = probed_features(
-        known, (ai.FeatureProbe(Feature.JSON_SCHEMA, "supported"),)
-    )
+    merged = probed_features(known, (ai.FeatureProbe(Feature.JSON_SCHEMA, "supported"),))
 
     assert merged is not None
     assert merged.provenance == "probed"
@@ -41,9 +39,7 @@ def test_a_probe_never_erases_the_flags_it_did_not_test() -> None:
 
 def test_an_unsupported_probe_clears_only_its_own_bit() -> None:
     known = Sourced(Feature.STREAMING | Feature.JSON_SCHEMA, "catalog")
-    merged = probed_features(
-        known, (ai.FeatureProbe(Feature.JSON_SCHEMA, "unsupported"),)
-    )
+    merged = probed_features(known, (ai.FeatureProbe(Feature.JSON_SCHEMA, "unsupported"),))
 
     assert merged is not None
     assert Feature.JSON_SCHEMA not in merged.value
@@ -171,17 +167,13 @@ async def test_a_measured_absence_overrides_what_the_descriptor_claimed() -> Non
         ]
     )
     async with make_multi_client([("claims", server)], registry=registry) as client:
-        before = await client.generate(
-            "what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY
-        )
+        before = await client.generate("what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY)
         assert before.structured_mechanism == "json_schema", "the claim is believed at first"
 
         report = await client.probe("claims:m", features=[Feature.JSON_SCHEMA])
         assert report.outcome_for(Feature.JSON_SCHEMA) == "unsupported"
 
-        after = await client.generate(
-            "what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY
-        )
+        after = await client.generate("what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY)
 
     assert after.structured_mechanism == "prompt", (
         "a measured absence must outrank the descriptor's assumption"
@@ -195,17 +187,13 @@ async def test_a_measured_presence_upgrades_the_mechanism() -> None:
     registry = _claiming_registry(Feature.STREAMING)
     server = FakeOpenAIServer(FakeResponse(text=BLUE))
     async with make_multi_client([("claims", server)], registry=registry) as client:
-        before = await client.generate(
-            "what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY
-        )
+        before = await client.generate("what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY)
         assert before.structured_mechanism == "prompt"
 
         report = await client.probe("claims:m", features=[Feature.JSON_SCHEMA])
         assert report.outcome_for(Feature.JSON_SCHEMA) == "supported"
 
-        after = await client.generate(
-            "what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY
-        )
+        after = await client.generate("what colour?", target="claims:m", schema=PROBE_SCHEMA_COPY)
 
     assert after.structured_mechanism == "json_schema"
 

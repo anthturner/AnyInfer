@@ -2,7 +2,7 @@
 
 An ``openai-compat`` subclass whose one real delta is its **model listing**. Passing
 ``?verbose=true`` to ``GET /models`` returns per-model pricing, context length,
-quantization, and rate limits — so capabilities arrive with ``discovered`` provenance
+quantization, and rate limits, so capabilities arrive with ``discovered`` provenance
 rather than as catalogued estimates, the same strength OpenRouter's listing gives.
 
 That matters more here than for most hosts, because Nebius prices *flavors* separately:
@@ -49,9 +49,7 @@ _TOKENS_PER_MILLION = Decimal(1_000_000)
 class NebiusAdapter(OpenAICompatAdapter):
     """Adapter for Nebius Token Factory, with its verbose model listing."""
 
-    def _events_from_chunk(
-        self, chunk: Any, state: _StreamState
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Surface Nebius reasoning fields separately from visible answer text."""
         if isinstance(chunk, Mapping):
             choices = chunk.get("choices")
@@ -63,9 +61,7 @@ class NebiusAdapter(OpenAICompatAdapter):
                         yield ReasoningDelta(reasoning)
         yield from super()._events_from_chunk(chunk, state)
 
-    def _events_from_completion(
-        self, payload: Any, req: WireRequest
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_completion(self, payload: Any, req: WireRequest) -> Iterable[AdapterEvent]:
         """Apply the same reasoning-channel handling to buffered responses."""
         if isinstance(payload, Mapping):
             choices = payload.get("choices")
@@ -86,9 +82,7 @@ class NebiusAdapter(OpenAICompatAdapter):
         try:
             response = await self._client.get(self.models_path, params={"verbose": "true"})
         except httpx2.HTTPError as exc:
-            raise map_transport_error(
-                exc, provider=self.provider_id, phase="discover"
-            ) from exc
+            raise map_transport_error(exc, provider=self.provider_id, phase="discover") from exc
         if response.status_code >= 400:
             if response.status_code in (400, 404, 422):
                 return await super().list_models()
@@ -234,8 +228,7 @@ descriptor = ProviderDescriptor(
                 placeholder="env://NEBIUS_API_KEY or a literal key",
                 env_var="NEBIUS_API_KEY",
                 help_text=(
-                    "Conventionally env://NEBIUS_API_KEY. Accepts env:// and "
-                    "credential://."
+                    "Conventionally env://NEBIUS_API_KEY. Accepts env:// and credential://."
                 ),
             ),
             SetupField(

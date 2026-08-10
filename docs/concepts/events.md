@@ -84,7 +84,7 @@ result = client.generate(messages, target=target)
 ## Non-streaming providers still stream
 
 An adapter for a provider with no streaming API emits one `TextDelta` and a final event.
-Your consumer code does not change — which is the point. The contract is the library's, not
+Your consumer code does not change, which is the point. The contract is the library's, not
 the provider's.
 
 ## Usage is a late-arriving, optional event
@@ -112,7 +112,7 @@ including queue and prefill time would understate a model's generation rate.
 Provider-reported sub-timings, when available, land in `timing.phases`:
 
 ```python
-result.timing.phases   # {"model_load_ms": 300.0, "prefill_ms": 200.0, "decode_ms": 1000.0}
+result.timing.phases  # {"model_load_ms": 300.0, "prefill_ms": 200.0, "decode_ms": 1000.0}
 ```
 
 ## Early exit cancels
@@ -123,7 +123,7 @@ Leaving a stream's context manager before draining it cancels the underlying req
 with client.stream(prompt, target=target) as stream:
     for event in stream:
         if enough(event):
-            break        # the provider request is cancelled here
+            break  # the provider request is cancelled here
 ```
 
 !!! tip "Key takeaways"
@@ -137,8 +137,8 @@ with client.stream(prompt, target=target) as stream:
 
 <div class="anyinfer-see-also" markdown>
 
-- [Routing](routing.md) — where `AttemptFailed` comes from.
-- [Telemetry](telemetry.md) — the separate, observer-facing event channel.
-- [OpenAI-compatible sidecar](../serve/README.md) — the OpenAI chunk projection.
+- [Routing](routing.md): where `AttemptFailed` comes from.
+- [Telemetry](telemetry.md): the separate, observer-facing event channel.
+- [OpenAI-compatible sidecar](../serve/README.md): the OpenAI chunk projection.
 
 </div>

@@ -56,8 +56,16 @@ class TestRegistry:
 
     def test_the_absorbed_verbs_are_gone(self):
         """The old standalone gates live inside `check` (and `build docs`) now."""
-        for name in ("lint", "format", "types", "contracts", "test", "conformance",
-                     "docs-check", "docs-build"):
+        for name in (
+            "lint",
+            "format",
+            "types",
+            "contracts",
+            "test",
+            "conformance",
+            "docs-check",
+            "docs-build",
+        ):
             assert name not in workspace.REGISTRY
 
     def test_help_lists_every_registered_verb(self):
@@ -120,10 +128,12 @@ class TestVerbs:
 
     def test_check_runs_every_default_gate_in_order(self, recorded):
         assert workspace.main(["check"]) == 0
+
         # `tool()` resolves executables to absolute paths, so match on basename + argv.
         def position(name: str, subcommand: str | None = None) -> int:
             return next(
-                i for i, cmd in enumerate(recorded)
+                i
+                for i, cmd in enumerate(recorded)
                 if name in Path(cmd[0]).name.lower()
                 and (subcommand is None or (len(cmd) > 1 and cmd[1] == subcommand))
             )
@@ -161,9 +171,7 @@ class TestVerbs:
         )
 
     def test_pages_deploy_isolated_from_reruns_and_upload_retries(self):
-        workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(
-            encoding="utf-8"
-        )
+        workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
         artifact_name = "github-pages-${{ github.run_id }}-${{ github.run_attempt }}"
 
         assert f"PAGES_ARTIFACT_NAME: {artifact_name}" in workflow
@@ -213,9 +221,7 @@ class TestVerbs:
         monkeypatch.setattr(
             workspace, "_check_docstrings", lambda: calls.append("docstrings") or 0
         )
-        monkeypatch.setattr(
-            workspace, "_check_doc_links", lambda: calls.append("doc-links") or 0
-        )
+        monkeypatch.setattr(workspace, "_check_doc_links", lambda: calls.append("doc-links") or 0)
         assert workspace.main(["check"]) == 1
 
         output = capsys.readouterr().out
@@ -236,8 +242,7 @@ class TestVerbs:
 
         build, serve = recorded
         assert "mkdocs" in build[0] and build[1:] == ["build", "--strict"]
-        assert serve[-6:] == ["http.server", "9999", "--directory", "site",
-                              "--bind", "127.0.0.1"]
+        assert serve[-6:] == ["http.server", "9999", "--directory", "site", "--bind", "127.0.0.1"]
         assert "http://127.0.0.1:9999/" in capsys.readouterr().out
 
     def test_demo_verb_reports_a_missing_pyside(self, monkeypatch, capsys):
@@ -263,12 +268,8 @@ class TestBuild:
         """Record which builders run, instead of running PyInstaller in the suite."""
         calls: list[str] = []
         monkeypatch.setattr(workspace, "_build_wheel", lambda: calls.append("wheel") or 0)
-        monkeypatch.setattr(
-            workspace, "_build_demo_bundle", lambda: calls.append("demo") or 0
-        )
-        monkeypatch.setattr(
-            workspace, "_build_serve_bundle", lambda: calls.append("serve") or 0
-        )
+        monkeypatch.setattr(workspace, "_build_demo_bundle", lambda: calls.append("demo") or 0)
+        monkeypatch.setattr(workspace, "_build_serve_bundle", lambda: calls.append("serve") or 0)
         return calls
 
     def test_the_bundle_demo_verb_is_gone(self):
@@ -338,9 +339,7 @@ class TestAbsorbedGates:
         assert workspace._check_doc_links() == 1
         assert "missing.md" in capsys.readouterr().err
 
-    def test_doc_link_check_accepts_external_and_anchor_links(
-        self, tmp_path, monkeypatch
-    ):
+    def test_doc_link_check_accepts_external_and_anchor_links(self, tmp_path, monkeypatch):
         monkeypatch.setattr(workspace, "ROOT", tmp_path)
         (tmp_path / "index.md").write_text(
             "[web](https://example.com) [mail](mailto:x@y.z) [top](#heading)",
@@ -365,8 +364,7 @@ class TestAbsorbedGates:
     def test_bundle_platform_tag_is_os_dash_arch(self):
         import re
 
-        assert re.fullmatch(r"(windows|macos|linux)-[a-z0-9_]+",
-                            workspace._bundle_platform_tag())
+        assert re.fullmatch(r"(windows|macos|linux)-[a-z0-9_]+", workspace._bundle_platform_tag())
 
 
 class TestClean:
@@ -419,9 +417,7 @@ class TestRepositoryRoot:
         assert (workspace.ROOT / "pyproject.toml").exists()
         assert (workspace.ROOT / "src" / "anyinfer").is_dir()
 
-    def test_a_directory_without_the_markers_is_not_a_checkout(
-        self, tmp_path, monkeypatch
-    ):
+    def test_a_directory_without_the_markers_is_not_a_checkout(self, tmp_path, monkeypatch):
         """With the module outside a checkout too, nothing is found.
 
         This is the case that matters for the installed console script, run from a
@@ -442,9 +438,7 @@ class TestRepositoryRoot:
         monkeypatch.chdir(workspace.ROOT / "src")
         assert workspace._find_repository_root() == workspace.ROOT
 
-    def test_running_outside_a_checkout_refuses_with_a_reason(
-        self, tmp_path, monkeypatch, capsys
-    ):
+    def test_running_outside_a_checkout_refuses_with_a_reason(self, tmp_path, monkeypatch, capsys):
         """Gates must not run against site-packages and emit a screenful of noise."""
         monkeypatch.setattr(workspace, "_ROOT", None)
 

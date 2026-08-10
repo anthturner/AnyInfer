@@ -3,7 +3,7 @@
 Layers, weakest to strongest: descriptor defaults → static catalog (including the bundled
 pricing table) → live discovery → opt-in probes → application overrides. Later layers
 override earlier ones field by field, and every value keeps its provenance so a consumer
-can tell a measured context window from a guessed one — and a deliberate user correction
+can tell a measured context window from a guessed one, and a deliberate user correction
 from both.
 """
 

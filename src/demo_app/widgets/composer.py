@@ -9,8 +9,10 @@ cancels only when busy).
 
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtGui import QKeyEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -37,10 +39,16 @@ class _AutoGrowingTextEdit(QPlainTextEdit):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._adjusting_height = False
         self.setPlaceholderText(strings.COMPOSER_PLACEHOLDER)
         self.setAccessibleName("Message")
         self.setAccessibleDescription(strings.COMPOSER_PLACEHOLDER)
         self.textChanged.connect(self._adjust_height)
+        self._adjust_height()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 — Qt's spelling
+        """Recompute the height when a narrower viewport wraps text onto more lines."""
+        super().resizeEvent(event)
         self._adjust_height()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 — Qt's spelling
@@ -56,10 +64,24 @@ class _AutoGrowingTextEdit(QPlainTextEdit):
         super().keyPressEvent(event)
 
     def _adjust_height(self) -> None:
-        metrics = self.fontMetrics()
-        lines = min(_MAX_LINES, max(1, self.document().blockCount()))
-        height = metrics.lineSpacing() * lines + 16
-        self.setFixedHeight(height)
+        if self._adjusting_height:
+            return
+        self._adjusting_height = True
+        try:
+            document = self.document()
+            # QPlainTextDocumentLayout reports its height in laid-out text lines (including
+            # soft-wrapped lines), not pixels. Unlike blockCount(), this therefore grows for
+            # one long paragraph as the viewport narrows.
+            visual_lines = max(1, math.ceil(document.size().height()))
+            document_chrome = math.ceil(document.documentMargin() * 2)
+            visible_lines = min(_MAX_LINES, visual_lines)
+            laid_out_height = self.fontMetrics().lineSpacing() * visible_lines
+            frame_chrome = self.frameWidth() * 2
+            height = laid_out_height + document_chrome + frame_chrome
+            if self.height() != height:
+                self.setFixedHeight(height)
+        finally:
+            self._adjusting_height = False
 
 
 class Composer(QWidget):
@@ -72,15 +94,22 @@ class Composer(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._busy = False
+        self._send_enabled = True
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(2)  # the hint hugs the input — they are one instrument
 
+        hint_row = QHBoxLayout()
+        hint_row.setSpacing(6)
         self._hint = QLabel("—")
         self._hint.setObjectName("Muted")
         self._hint.setAccessibleName("Token estimate")
-        layout.addWidget(self._hint)
+        hint_row.addWidget(self._hint)
+        self._budget_help = SdkHelpButton("budget")
+        hint_row.addWidget(self._budget_help)
+        hint_row.addStretch(1)
+        layout.addLayout(hint_row)
 
         row = QHBoxLayout()
         row.setSpacing(8)
@@ -99,7 +128,6 @@ class Composer(QWidget):
         self._action_button.clicked.connect(self._on_action_clicked)
         row.addWidget(self._action_button, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        row.addWidget(SdkHelpButton("budget"), 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(row)
 
         self._apply_state()
@@ -136,15 +164,22 @@ class Composer(QWidget):
         self._busy = busy
         self._apply_state()
 
+    def set_send_enabled(self, enabled: bool) -> None:
+        """Enable idle sending only when the window has a complete target selection."""
+        if enabled == self._send_enabled:
+            return
+        self._send_enabled = enabled
+        self._apply_state()
+
     def _on_action_clicked(self) -> None:
         if self._busy:
             self.cancel_requested.emit()
-        else:
+        elif self._send_enabled:
             self.send_requested.emit()
 
     def _on_send_key(self) -> None:
         """Ctrl+Enter sends only while idle; while busy the keystroke is inert."""
-        if not self._busy:
+        if not self._busy and self._send_enabled:
             self.send_requested.emit()
 
     def _on_cancel_key(self) -> None:
@@ -154,6 +189,7 @@ class Composer(QWidget):
 
     def _apply_state(self) -> None:
         self._text.setReadOnly(self._busy)
+        self._action_button.setEnabled(self._busy or self._send_enabled)
         if self._busy:
             self._action_button.setIcon(
                 themed_icon(self._action_button, "stop", color=theme.color("on_accent"))
@@ -164,7 +200,12 @@ class Composer(QWidget):
             self._action_button.setIcon(
                 themed_icon(self._action_button, "send", color=theme.color("on_accent"))
             )
-            self._action_button.setToolTip(f"{strings.SEND} (Ctrl+Enter)")
+            tooltip = (
+                f"{strings.SEND} (Ctrl+Enter)"
+                if self._send_enabled
+                else "Choose an engine and model before sending."
+            )
+            self._action_button.setToolTip(tooltip)
             self._action_button.setAccessibleName(strings.SEND)
 
     # ---- token hint ------------------------------------------------------------------

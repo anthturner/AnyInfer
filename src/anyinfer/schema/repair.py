@@ -1,6 +1,6 @@
 """The bounded repair loop's prompt construction.
 
-Repair re-prompts the *same resolved target* — not the whole route — with the validation
+Repair re-prompts the *same resolved target*; not the whole route — with the validation
 errors appended. Re-routing on a schema violation would confound "this model can't follow the
 schema" with "this endpoint is down", and would spend the fallback budget on a problem
 fallback cannot fix.

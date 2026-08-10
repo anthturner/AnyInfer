@@ -17,7 +17,7 @@ import atexit
 import contextlib
 import queue
 import threading
-from collections.abc import Coroutine, Iterator, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Iterator, Mapping, Sequence
 from concurrent.futures import Future
 from pathlib import Path
 from types import TracebackType
@@ -26,6 +26,7 @@ from typing import Any, TypeVar
 from ..benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
+    BenchmarkSample,
     Measurement,
     MeasurementStore,
 )
@@ -174,7 +175,7 @@ class SyncStream:
         self._result: Generation | None = None
         self._closed = False
         # Built here rather than inside the pump so the caller's thread holds the stream
-        # object — and therefore its manifest — before the first event exists. Nothing in
+        # object, and therefore its manifest — before the first event exists. Nothing in
         # `AsyncClient.stream()` awaits, and an async generator binds no loop until it is
         # first iterated, so constructing it off the loop thread is safe.
         self._async_stream = factory()
@@ -439,6 +440,7 @@ class Client:
         output_tokens: int = BENCHMARK_OUTPUT_TOKENS,
         timeout_s: float = 120.0,
         store: MeasurementStore | None = None,
+        progress: Callable[[BenchmarkSample], None] | None = None,
     ) -> Measurement:
         """Measure what a target actually does, with one deterministic request.
 
@@ -452,6 +454,7 @@ class Client:
                 output_tokens=output_tokens,
                 timeout_s=timeout_s,
                 store=store,
+                progress=progress,
             )
         )
 

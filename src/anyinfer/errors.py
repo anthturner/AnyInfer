@@ -204,7 +204,7 @@ class SpendLimitError(AnyInferError):
     construction: the identical request refused once will be refused again, which is why
     the default retry predicate declines it alongside auth and context-length failures.
 
-    A ceiling is the caller's own policy on their own client — not an organization quota,
+    A ceiling is the caller's own policy on their own client; not an organization quota,
     which this library deliberately does not implement.
 
     Attributes:

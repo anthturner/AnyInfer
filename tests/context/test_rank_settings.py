@@ -73,7 +73,9 @@ VOCABULARY = [
     ),
     ContextDocument.of(
         "src/login.py",
-        "\n".join(f"def login_step_{i}(session, token):\n    return validate(session)" for i in range(20)),
+        "\n".join(
+            f"def login_step_{i}(session, token):\n    return validate(session)" for i in range(20)
+        ),
     ),
     ContextDocument.of(
         "src/colors.py",

@@ -108,7 +108,7 @@ class WireRequest:
         session_state: Opaque continuation data from an open
             `Session`, or ``None`` for an
             independent request. The distinction matters: ``{}`` means *a session is open
-            and has nothing stored yet* — the first turn — while ``None`` means there is
+            and has nothing stored yet* — the first turn, while ``None`` means there is
             no session at all. Only providers declaring ``supports_sessions`` ever receive
             a value, and only they interpret it; the core stores and forwards it without
             reading it.

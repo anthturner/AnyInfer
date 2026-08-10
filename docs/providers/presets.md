@@ -6,17 +6,19 @@ icon: material/format-list-group
 
 One implementation, many brandings. Every provider on this page speaks the
 chat-completions dialect closely enough that AnyInfer's shared OpenAI-compatible adapter
-covers it — so each ships as a **preset**: a first-class registered provider with the
+covers it, so each ships as a **preset**: a first-class registered provider with the
 endpoint, auth spelling, quirks, and capabilities filled in for you.
 
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of("groq", api_key="env://GROQ_API_KEY"),
-    ai.ProviderSettings.of("together", api_key="env://TOGETHER_API_KEY"),
-    ai.ProviderSettings.of("vllm"),   # local engines need no key
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("groq", api_key="env://GROQ_API_KEY"),
+        ai.ProviderSettings.of("together", api_key="env://TOGETHER_API_KEY"),
+        ai.ProviderSettings.of("vllm"),  # local engines need no key
+    ]
+)
 
 result = client.generate(prompt, target="groq:llama-3.3-70b-versatile")
 result = client.generate(prompt, target="together:deepseek-ai/DeepSeek-V3")
@@ -64,7 +66,7 @@ Provider-specific extras go through `provider_options`, passed to the provider v
 | Nous Research | `nous:` / `hermes:` | `NOUS_API_KEY` | `max_tokens` defaults to 100 — set it |
 | Arcee AI | `arcee:` | `ARCEE_API_KEY` | Trinity models |
 | DigitalOcean | `digitalocean:` | `MODEL_ACCESS_KEY` | Fixed host; `max_completion_tokens` dialect |
-| OVHcloud | `ovhcloud:` / `ovh:` | `OVH_AI_ENDPOINTS_ACCESS_TOKEN` | Ids are irregular — never normalize |
+| OVHcloud | `ovhcloud:` / `ovh:` | `OVH_AI_ENDPOINTS_ACCESS_TOKEN` | Ids are irregular; never normalize |
 | Snowflake Cortex | `snowflake-cortex:` / `cortex:` | `SNOWFLAKE_PAT` | Base URL embeds your account |
 | Databricks | `databricks:` | `DATABRICKS_TOKEN` | Base URL is your workspace host |
 | Oracle OCI | `oci-genai:` / `oci:` | `OCI_GENAI_API_KEY` | Region-templated base URL |
@@ -74,7 +76,7 @@ Provider-specific extras go through `provider_options`, passed to the provider v
 | Chutes | `chutes:` | `CHUTES_API_KEY` | Model field doubles as a routing directive |
 | Avian | `avian:` | `AVIAN_API_KEY` | Keys carry a literal `avian-` prefix |
 | BytePlus ModelArk | `volcengine:` / `doubao:` | `ARK_API_KEY` | International edition; Doubao models |
-| Baidu Qianfan | `qianfan:` / `ernie:` | `QIANFAN_API_KEY` | v2 bearer key only — never the v1 AK/SK flow |
+| Baidu Qianfan | `qianfan:` / `ernie:` | `QIANFAN_API_KEY` | v2 bearer key only; never the v1 AK/SK flow |
 | Tencent Hunyuan | `hunyuan:` | `HUNYUAN_API_KEY` | `stop` halts *after* the match |
 | iFlytek Spark | `spark:` / `iflytek:` | `SPARK_API_PASSWORD` | Console APIPassword, not the AppID triple |
 | StepFun | `stepfun:` / `step:` | `STEP_API_KEY` | Reasoning effort supported |
@@ -146,7 +148,7 @@ port (`ProviderSettings.of("vllm", base_url="gpu-box")` →
 | Docker Model Runner | `docker-model-runner:` / `dmr:` | `http://127.0.0.1:12434/engines/v1` | Routes live under `/engines/v1`, not `/v1` |
 | llama-swap | `llama-swap:` | `http://127.0.0.1:8080/v1` | Model id is a config profile; swapping reloads |
 | KServe | `kserve:` | _you supply it_ | Routes sit behind an `/openai` prefix |
-| Foundry Local | `foundry-local:` | _you supply it_ | Port is assigned at service start — never hardcode |
+| Foundry Local | `foundry-local:` | _you supply it_ | Port is assigned at service start; never hardcode |
 
 Ports are the easiest thing to get wrong here, and a wrong one fails only at request time,
 so each is taken from the engine's own documentation and pinned by a test. Two cannot be
@@ -212,7 +214,7 @@ client.generate(
 
 Presets participate in [cost computation](../concepts/budgeting.md) like every other
 provider: models with entries in the bundled pricing table report `usage.cost_usd`
-automatically, and unknown prices stay honestly unknown rather than reading as zero.
+automatically, and unknown prices remain unknown rather than reading as zero.
 
 ## Anthropic-compatible endpoints
 

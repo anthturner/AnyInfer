@@ -178,7 +178,7 @@ def probe_prompt(feature: Feature) -> str:
     """The request text for one probe.
 
     Mechanical scaffolding for a library-owned operation, like the verification probe and
-    the repair re-prompt — never application prose.
+    the repair re-prompt; never application prose.
     """
     if feature is Feature.TOOLS:
         return "The user mentioned the colour blue. Record it with the tool provided."

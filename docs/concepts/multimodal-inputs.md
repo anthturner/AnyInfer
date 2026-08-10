@@ -32,7 +32,7 @@ The default ceilings are 20 MiB for one inline part and 50 MiB for the whole req
 `generate()` and `stream()` accept `max_input_part_bytes` and `max_input_bytes` when an
 application needs a tighter bound. A violation is rejected before a provider call.
 
-## Capabilities and honest budgets
+## Capabilities and conservative budgets
 
 The capability flags are `VISION`, `DOCUMENT`, and `AUDIO_IN`. A trusted capability record
 that lacks a required flag refuses the request before dispatch. Unknown or defaulted

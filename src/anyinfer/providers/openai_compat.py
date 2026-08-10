@@ -178,7 +178,7 @@ class OpenAICompatAdapter:
         """Encode the structured-output mechanism, when it has a wire form.
 
         ``prompt`` has none — the core already injected the instruction into the system
-        message — so this returns ``None`` for it.
+        message, so this returns ``None`` for it.
         """
         if req.mechanism == "json_schema" and req.wire_schema is not None:
             return {

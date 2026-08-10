@@ -134,9 +134,7 @@ async def test_concurrency_never_exceeds_the_bound() -> None:
 @pytest.mark.asyncio
 async def test_a_requests_per_minute_cap_paces_to_the_expected_wall_time() -> None:
     """60/min is one per second: four requests cost three seconds of waiting."""
-    limiter, clock, _ = _limiter(
-        ai.RateLimits(requests_per_minute=60.0, respect_headers=False)
-    )
+    limiter, clock, _ = _limiter(ai.RateLimits(requests_per_minute=60.0, respect_headers=False))
 
     for _ in range(4):
         async with limiter.slot():
@@ -193,9 +191,7 @@ async def test_a_healthy_window_delays_nothing() -> None:
 
 @pytest.mark.asyncio
 async def test_respect_headers_false_ignores_the_same_headers() -> None:
-    limiter, clock, _ = _limiter(
-        ai.RateLimits(respect_headers=False), dialect=OPENAI_DIALECT
-    )
+    limiter, clock, _ = _limiter(ai.RateLimits(respect_headers=False), dialect=OPENAI_DIALECT)
     limiter.observe(
         {
             "x-ratelimit-remaining-requests": "0",
@@ -212,9 +208,7 @@ async def test_respect_headers_false_ignores_the_same_headers() -> None:
 @pytest.mark.asyncio
 async def test_reserve_fraction_stops_early_leaving_headroom() -> None:
     """10% of a 1000-request window means stopping with 100 left, not with none."""
-    limiter, clock, _ = _limiter(
-        ai.RateLimits(reserve_fraction=0.1), dialect=OPENAI_DIALECT
-    )
+    limiter, clock, _ = _limiter(ai.RateLimits(reserve_fraction=0.1), dialect=OPENAI_DIALECT)
     limiter.observe(
         {
             "x-ratelimit-limit-requests": "1000",
@@ -232,9 +226,7 @@ async def test_reserve_fraction_stops_early_leaving_headroom() -> None:
 @pytest.mark.asyncio
 async def test_a_reserve_without_a_stated_limit_takes_no_fraction() -> None:
     """Reserving a share of an unknown allowance would throttle against a made-up number."""
-    limiter, clock, _ = _limiter(
-        ai.RateLimits(reserve_fraction=0.5), dialect=OPENAI_DIALECT
-    )
+    limiter, clock, _ = _limiter(ai.RateLimits(reserve_fraction=0.5), dialect=OPENAI_DIALECT)
     limiter.observe(
         {
             "x-ratelimit-remaining-requests": "5",
@@ -309,9 +301,7 @@ def test_not_asking_for_header_pacing_is_not_a_degradation() -> None:
 
 @pytest.mark.asyncio
 async def test_a_wait_is_attributed_to_the_request_that_paid_for_it() -> None:
-    limiter, _, events = _limiter(
-        ai.RateLimits(requests_per_minute=60.0, respect_headers=False)
-    )
+    limiter, _, events = _limiter(ai.RateLimits(requests_per_minute=60.0, respect_headers=False))
 
     async with limiter.slot():
         pass  # spends the one available token
@@ -328,9 +318,7 @@ async def test_a_wait_is_attributed_to_the_request_that_paid_for_it() -> None:
 
 @pytest.mark.asyncio
 async def test_a_wait_outside_a_request_still_reports_itself() -> None:
-    limiter, _, events = _limiter(
-        ai.RateLimits(requests_per_minute=60.0, respect_headers=False)
-    )
+    limiter, _, events = _limiter(ai.RateLimits(requests_per_minute=60.0, respect_headers=False))
 
     for _ in range(2):
         async with limiter.slot():

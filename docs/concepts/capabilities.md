@@ -1,8 +1,8 @@
 # Capabilities and provenance
 
-Every capability value records **where it came from** — its
+Every capability value records **where it came from**; its
 [provenance](../reference/glossary.md#provenance). That is the whole idea, and it exists
-because providers omit, misreport, and change these numbers — so a consumer needs to know
+because providers omit, misreport, and change these numbers, so a consumer needs to know
 how much to trust one before routing, budgeting, or billing against it.
 
 <div class="anyinfer-hero-diagram" markdown>
@@ -39,18 +39,18 @@ stronger one, and **unknown stays `None`** rather than becoming a guess.
 ```python
 caps = ModelCapabilities(context_window=Sourced(8192, "catalog"))
 caps = caps.overlay(ModelCapabilities(context_window=Sourced(32768, "discovered")))
-caps.context_window     # Sourced(32768, 'discovered') — discovery wins
+caps.context_window  # Sourced(32768, 'discovered'); discovery wins
 ```
 
 ## What capabilities drive
 
-- **Structured-output mechanism selection** — `features` decides grammar vs json_schema vs
+- **Structured-output mechanism selection**: `features` decides grammar vs json_schema vs
   json_mode vs prompt.
-- **Cost computation** — see below.
-- **Pre-dispatch gating** — a request that provably cannot fit a known context window fails
+- **Cost computation**: see below.
+- **Pre-dispatch gating**: a request that provably cannot fit a known context window fails
   fast instead of paying a round trip. Only trusted-provenance windows gate; see
   [token estimation and context budgets](budgeting.md).
-- **Probe sizing** — a target known to reason gets a larger budget for the `verify()`
+- **Probe sizing**: a target known to reason gets a larger budget for the `verify()`
   probe, because a thinking model spends the ordinary one before it says anything. Only a
   trusted-provenance feature flag raises it; a descriptor's guess does not.
 
@@ -60,8 +60,8 @@ caps.context_window     # Sourced(32768, 'discovered') — discovery wins
 otherwise leaves open: "provider default" is true, but *what* default?
 
 ```python
-capabilities.default_temperature   # Sourced(0.4, 'catalog') — the provider documents it
-capabilities.default_temperature   # None — it documents nothing, and none is invented
+capabilities.default_temperature  # Sourced(0.4, 'catalog'); the provider documents it
+capabilities.default_temperature  # None; it documents nothing, and none is invented
 ```
 
 They are populated **only** from a provider's own documentation, recorded in its contract
@@ -84,7 +84,7 @@ tools:
 |---|---|
 | `Decimal("0.0031")` | A known cost, computed from trustworthy pricing. |
 | `None` | **Unknown.** No trustworthy pricing exists. |
-| `Decimal("0")` | A genuine zero — free local inference. |
+| `Decimal("0")` | A genuine zero; free local inference. |
 
 `None` is never coerced to zero. A cost that renders as `$0.00` when it is really unknown
 turns a reporting gap into a silent financial error.
@@ -94,7 +94,7 @@ Cost is only computed from pricing whose provenance is trusted (`catalog`, `disc
 would manufacture authority the number does not have.
 
 ```python
-result.usage.cost_usd    # Decimal or None — check before formatting
+result.usage.cost_usd  # Decimal or None; check before formatting
 ```
 
 ### Where prices come from
@@ -108,15 +108,15 @@ copied across providers. On top of that:
 
 - **OpenRouter** reports real per-token pricing in its model listing, so its costs carry
   `discovered` provenance and beat the table.
-- **Local engines** (Ollama, llama.cpp) get a genuine `Pricing(0, 0)` — free inference is
+- **Local engines** (Ollama, llama.cpp) get a genuine `Pricing(0, 0)`: free inference is
   a real zero, not an unknown.
 - **Azure AI Foundry and the Copilots** ship no table entries on purpose: Foundry pricing
   is region- and deployment-specific, and Copilot bills by subscription rather than per
-  token. Their costs stay honestly `None` unless you override.
+  token. Their costs stay `None` unless you override.
 
 ### Overriding prices (and anything else)
 
-`capability_overrides` applies your own numbers at `override` provenance — the strongest
+`capability_overrides` applies your own numbers at `override` provenance; the strongest
 layer, so a deliberate correction can never lose to data the library merely collected:
 
 ```python
@@ -131,30 +131,30 @@ client = ai.Client(
 )
 ```
 
-Provenance on the supplied fields is stamped automatically — supplying them deliberately
+Provenance on the supplied fields is stamped automatically; supplying them deliberately
 *is* the provenance.
 
 ## The `auto` sentinel
 
-Some providers pick the model at request time (GitHub Copilot's `"auto"`). The only honest
+Some providers pick the model at request time (GitHub Copilot's `"auto"`). The only safe
 capability claim is then the **conjunction** across every model it might choose: the minimum
 of each numeric bound, the intersection of feature flags.
 
 ```python
 caps = conjunction([gpt_5_caps, gpt_41_caps])
-caps.context_window      # the smaller of the two
-caps.features            # only features both support
+caps.context_window  # the smaller of the two
+caps.features  # only features both support
 ```
 
-If *any* candidate's bound is unknown, the conjunction is unknown — you cannot promise a
+If *any* candidate's bound is unknown, the conjunction is unknown; you cannot promise a
 minimum without knowing every value. Claiming more would be a promise the caller cannot
 verify until a request fails.
 
 ## Three states, not two
 
 A capability is either **natively supported**, **emulated by the core** (a schema
-prompt-injected for a provider with no structured-output mode, say), or **honestly
-unavailable** — and the fourth state peers accidentally ship, **silently ignored**, is
+prompt-injected for a provider with no structured-output mode, say), or **explicitly
+unavailable**, and the fourth state peers accidentally ship, **silently ignored**, is
 what this model exists to prevent.
 
 Some providers accept a parameter, discard it, and return success. `temperature=0` that had
@@ -174,28 +174,28 @@ carrying `reasoning="high"` to a model whose capabilities do not include
 `Feature.REASONING` withholds the field and reports it rather than sending a parameter
 that does nothing.
 
-That only happens on a **known** absence — a `default`-provenance feature set is a
+That only happens on a **known** absence; a `default`-provenance feature set is a
 descriptor-level guess, and dropping a caller's parameter on a guess would be worse than
 sending one the model ignores. Same rule as the [pre-dispatch gate](budgeting.md#the-pre-dispatch-gate).
 
 ## Measuring instead of assuming
 
 The catalog says what a model *should* support; discovery says what a provider *claims*.
-Neither is a measurement, and on the compatibility surface — every preset endpoint, every
-self-hosted OpenAI-compatible server — both are educated guesses. A server that accepts
+Neither is a measurement. On the compatibility surface, every preset endpoint and every
+self-hosted OpenAI-compatible server starts from an educated guess. A server that accepts
 `response_format` and quietly ignores it is indistinguishable from one that honors it,
 right up until a schema silently stops being enforced.
 
 `probe()` settles it by trying, one deliberately tiny request per feature:
 
 ```python
-report = client.probe("openai-compat:m")          # four requests by default
+report = client.probe("openai-compat:m")  # four requests by default
 
 report.summary
 # 'openai-compat:m: supports JSON_MODE, STREAMING; does not support JSON_SCHEMA'
 ```
 
-Findings record at `probed` provenance, so the **next** request stops guessing — a measured
+Findings record at `probed` provenance, so the **next** request stops guessing; a measured
 absence downgrades the mechanism ladder, a measured presence upgrades it. Pass `record=False`
 to look without committing.
 
@@ -212,18 +212,18 @@ and guessing between them is exactly what provenance exists to prevent.
 
 !!! warning "Probing costs requests"
     Four round trips for the default feature set, billed like any other. Run it once when
-    an application first configures an endpoint — not on every start.
+    an application first configures an endpoint; not on every start.
 
 ## Runtime diagnostics
 
 A capability says what a model *can* do. It says nothing about the state the engine is
-actually in right now — and that state is where local inference's worst surprise lives:
+actually in right now, and that state is where local inference's worst surprise lives:
 
 > The request succeeded. The answer is correct. It took ninety seconds, because the model
 > no longer fits in VRAM alongside whatever else the GPU is holding, and half of it is
 > running on the CPU.
 
-Nothing in a `Generation` explains that, and no health probe catches it — the server is
+Nothing in a `Generation` explains that, and no health probe catches it; the server is
 perfectly reachable. So providers that can inspect their own runtime report it:
 
 ```python
@@ -237,11 +237,11 @@ The same notes arrive automatically on every result that hit the condition, and 
 
 ```python
 result = client.generate(prompt, target="ollama:qwen3:8b")
-result.warnings    # ("qwen3:8b is only 45% resident in VRAM; ...",)
+result.warnings  # ("qwen3:8b is only 45% resident in VRAM; ...",)
 ```
 
 Which providers can answer is declared on the descriptor (`reports_diagnostics`), not
-discovered by probing — so it is readable from the registry. Today that is
+discovered by probing, so it is readable from the registry. Today that is
 [Ollama](../providers/ollama.md) (VRAM spill) and [llama.cpp](../providers/llama-cpp.md)
 (a GPU machine serving on the CPU). Everything else reports nothing.
 
@@ -258,8 +258,8 @@ for model in client.models("openrouter"):
 ```
 
 !!! tip "Key takeaways"
-    - Every capability value carries provenance — `default`, `catalog`, `discovered`,
-      `probed`, or `override` — so callers know how much to trust it.
+    - Every capability value carries provenance: `default`, `catalog`, `discovered`,
+      `probed`, or `override`, so callers know how much to trust it.
     - Cost is tri-state: a real amount, a genuine zero for local inference, or `None` for
       unknown. `None` is never coerced to zero.
     - Assembly is a strict overlay: a weaker value never displaces a stronger one, and
@@ -269,8 +269,8 @@ for model in client.models("openrouter"):
 
 <div class="anyinfer-see-also" markdown>
 
-- [Structured output](structured-output.md) — the mechanism ladder in detail.
-- [Token estimation and context budgets](budgeting.md) — what the context window drives.
-- [Telemetry](telemetry.md) — `ParameterDropped` and `UsageEstimated` events.
+- [Structured output](structured-output.md): the mechanism ladder in detail.
+- [Token estimation and context budgets](budgeting.md): what the context window drives.
+- [Telemetry](telemetry.md): `ParameterDropped` and `UsageEstimated` events.
 
 </div>

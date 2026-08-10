@@ -1,7 +1,7 @@
 """The ``vnd.amazon.eventstream`` binary framing.
 
 AWS streams Bedrock's ConverseStream as length-prefixed binary frames rather than SSE or
-NDJSON, and offers no text alternative — so speaking Converse at all means decoding this.
+NDJSON, and offers no text alternative, so speaking Converse at all means decoding this.
 It is first-party for the same reason the SSE parser is: the core carries no provider SDKs,
 and one well-tested decoder beats a dependency.
 
@@ -91,9 +91,7 @@ class EventStreamMessage:
         try:
             return json.loads(self.payload)
         except ValueError as exc:
-            raise StreamProtocolError(
-                f"malformed JSON in an event-stream frame: {exc}"
-            ) from exc
+            raise StreamProtocolError(f"malformed JSON in an event-stream frame: {exc}") from exc
 
 
 async def iter_event_stream(
@@ -152,9 +150,7 @@ def _take_frame(buffer: bytearray, provider: str | None) -> EventStreamMessage |
 
     computed = binascii.crc32(bytes(buffer[:8])) & 0xFFFFFFFF
     if computed != prelude_crc:
-        raise StreamProtocolError(
-            "event-stream prelude failed its checksum", provider=provider
-        )
+        raise StreamProtocolError("event-stream prelude failed its checksum", provider=provider)
     if total_length < _PRELUDE_LENGTH + _CRC_LENGTH or headers_length > total_length:
         raise StreamProtocolError(
             f"event-stream frame declares an impossible length ({total_length})",
@@ -168,9 +164,7 @@ def _take_frame(buffer: bytearray, provider: str | None) -> EventStreamMessage |
 
     message_crc = struct.unpack(">I", frame[-_CRC_LENGTH:])[0]
     if binascii.crc32(frame[:-_CRC_LENGTH]) & 0xFFFFFFFF != message_crc:
-        raise StreamProtocolError(
-            "event-stream frame failed its checksum", provider=provider
-        )
+        raise StreamProtocolError("event-stream frame failed its checksum", provider=provider)
 
     headers_end = _PRELUDE_LENGTH + headers_length
     headers = _decode_headers(frame[_PRELUDE_LENGTH:headers_end], provider)
@@ -231,6 +225,4 @@ def _decode_header_value(
     if value_type == _HEADER_UUID:
         return raw[offset : offset + 16].hex(), offset + 16
 
-    raise StreamProtocolError(
-        f"unknown event-stream header type {value_type}", provider=provider
-    )
+    raise StreamProtocolError(f"unknown event-stream header type {value_type}", provider=provider)

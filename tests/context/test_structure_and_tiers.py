@@ -140,9 +140,7 @@ def test_the_rollup_names_modules_and_their_share():
 
 def test_rollup_symbol_lines_carry_clean_identifiers():
     reduction = select(CORPUS, "auth", max_tokens=2000, strategy="tiered")
-    symbol_lines = [
-        line for line in reduction.text.splitlines() if line.startswith("symbols:")
-    ]
+    symbol_lines = [line for line in reduction.text.splitlines() if line.startswith("symbols:")]
     assert symbol_lines
     for line in symbol_lines:
         assert "(" not in line, "a signature must not leak a dangling paren"
@@ -177,9 +175,9 @@ def test_documents_reports_what_was_rendered_in_detail():
     """Not the ranked prefix — the set that actually appears at detail fidelity."""
     reduction = select(CORPUS, "auth", max_tokens=1200, strategy="tiered")
     for document in reduction.documents:
-        assert (
-            f'path="{document.path}"' in reduction.text
-        ), "every reported document must appear in the envelope"
+        assert f'path="{document.path}"' in reduction.text, (
+            "every reported document must appear in the envelope"
+        )
     assert reduction.tier_metadata is not None
     detail_count = (
         reduction.tier_metadata["extract_count"] + reduction.tier_metadata["verbatim_count"]

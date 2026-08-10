@@ -39,9 +39,7 @@ def _in_a_temporary_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.chdir(tmp_path)
 
 
-def _fake_discovery(
-    monkeypatch: pytest.MonkeyPatch, found: Sequence[DiscoveredProvider]
-) -> None:
+def _fake_discovery(monkeypatch: pytest.MonkeyPatch, found: Sequence[DiscoveredProvider]) -> None:
     """Pin what discovery reports, and prove nothing is contacted."""
 
     async def discover(*_args: object, **_kwargs: object) -> tuple[DiscoveredProvider, ...]:
@@ -277,8 +275,9 @@ def test_the_summary_names_every_endpoint_it_contacted(
 # ---- machine-readable output -------------------------------------------------------
 
 
-def test_json_output_reports_the_same_decisions(monkeypatch: pytest.MonkeyPatch,
-                                                capsys: pytest.CaptureFixture[str]) -> None:
+def test_json_output_reports_the_same_decisions(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     _fake_discovery(monkeypatch, [_running_engine(), _environment_key()])
 
     assert main(["init", "--yes", "--json"]) == 0
@@ -347,9 +346,7 @@ def test_the_generated_starter_runs_against_a_scripted_provider(
     registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
     provider = ScriptedProvider("acme", [ScriptedModel("m", text="Hello there.")])
     provider.register(registry)
-    with ai.Client(
-        [provider.settings()], registry=registry, use_default_catalog=False
-    ) as client:
+    with ai.Client([provider.settings()], registry=registry, use_default_catalog=False) as client:
         assert module.run(client, provider.target("m")) == "Hello there."
 
 

@@ -76,12 +76,8 @@ class TestAdapterPool:
         registry = _registry()
         pool = AdapterPool(
             [
-                ProviderSettings.of(
-                    "fake-engine", alias="tenant-a", base_url="https://a.example"
-                ),
-                ProviderSettings.of(
-                    "fake-engine", alias="tenant-b", base_url="https://b.example"
-                ),
+                ProviderSettings.of("fake-engine", alias="tenant-a", base_url="https://a.example"),
+                ProviderSettings.of("fake-engine", alias="tenant-b", base_url="https://b.example"),
             ],
             registry=registry,
         )
@@ -149,17 +145,11 @@ class TestAdapterPool:
     def test_an_alias_may_not_shadow_a_registered_provider(self):
         registry = _registry()
         registry.register(
-            ProviderDescriptor(
-                id="other-engine", display_name="Other", factory=_RecordingAdapter
-            )
+            ProviderDescriptor(id="other-engine", display_name="Other", factory=_RecordingAdapter)
         )
         with pytest.raises(ConfigError, match="already registered"):
             AdapterPool(
-                [
-                    ProviderSettings.of(
-                        "fake-engine", alias="other-engine", base_url="https://a"
-                    )
-                ],
+                [ProviderSettings.of("fake-engine", alias="other-engine", base_url="https://a")],
                 registry=registry,
             )
 
@@ -175,9 +165,7 @@ class TestAdapterPool:
 
     async def test_a_missing_required_field_still_fails_per_instance(self):
         registry = _registry()
-        pool = AdapterPool(
-            [ProviderSettings.of("fake-engine", alias="no-url")], registry=registry
-        )
+        pool = AdapterPool([ProviderSettings.of("fake-engine", alias="no-url")], registry=registry)
         with pytest.raises(ConfigError, match="requires a base URL"):
             await pool.get("no-url")
 
@@ -187,7 +175,7 @@ class TestAdapterPool:
         """A second credential must not bypass the resolver just because it rides options.
 
         Driven off the setup spec's `secret` fields, so this holds for any provider that
-        declares one — including third-party adapters the core has never heard of.
+        declares one, including third-party adapters the core has never heard of.
         """
         monkeypatch.setenv("FAKE_ENGINE_TOKEN", "resolved-secret")
         registry = ProviderRegistry(load_builtins=False, load_entry_points=False)

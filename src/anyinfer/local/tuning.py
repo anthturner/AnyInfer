@@ -156,7 +156,7 @@ class ServerPlan:
             "--jinja",
         ]
         if self.flash_attention:
-            args.append("--flash-attn")
+            args.extend(("--flash-attn", "on"))
         if self.projector_path is not None:
             args.extend(("--mmproj", self.projector_path))
         return args

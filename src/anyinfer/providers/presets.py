@@ -270,8 +270,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         base_url="https://api.together.ai/v1",
         aliases=("together-ai",),
         key_env="TOGETHER_API_KEY",
-        features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE
-        | Feature.REASONING,
+        features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE | Feature.REASONING,
         reasoning="effort-min-low",
         note="Large open-model catalog; org/model ids (e.g. deepseek-ai/…).",
     ),
@@ -281,8 +280,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         base_url="https://api.fireworks.ai/inference/v1",
         aliases=("fireworks-ai",),
         key_env="FIREWORKS_API_KEY",
-        features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE
-        | Feature.REASONING,
+        features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE | Feature.REASONING,
         reasoning="effort",
         note="Model ids look like accounts/fireworks/models/…; over-long max_tokens is "
         "silently truncated unless context_length_exceeded_behavior='error'.",
@@ -302,8 +300,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         base_url="https://api.novita.ai/openai/v1",
         aliases=("novita-ai",),
         key_env="NOVITA_API_KEY",
-        note="max_tokens is required by the API; reasoning models stream "
-        "reasoning_content.",
+        note="max_tokens is required by the API; reasoning models stream reasoning_content.",
     ),
     CompatPreset(
         id="hyperbolic",
@@ -361,8 +358,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         base_url="https://api.inference.net/v1",
         aliases=("inference",),
         key_env="INFERENCE_API_KEY",
-        note="Serverless ids plus team/model deployments; BYOK passthrough via "
-        "provider headers.",
+        note="Serverless ids plus team/model deployments; BYOK passthrough via provider headers.",
     ),
     CompatPreset(
         id="nscale",
@@ -441,8 +437,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         base_url="https://api.mistral.ai/v1",
         aliases=("mistral-ai",),
         key_env="MISTRAL_API_KEY",
-        features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE
-        | Feature.REASONING,
+        features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE | Feature.REASONING,
         reasoning="effort",
         note="Uses random_seed instead of seed; safe_prompt via provider_options.",
     ),
@@ -451,8 +446,11 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         display_name="Perplexity Sonar",
         base_url="https://api.perplexity.ai",
         key_env="PERPLEXITY_API_KEY",
-        features=Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.JSON_SCHEMA
-        | Feature.JSON_MODE | Feature.REASONING,
+        features=Feature.STREAMING
+        | Feature.SYSTEM_PROMPT
+        | Feature.JSON_SCHEMA
+        | Feature.JSON_MODE
+        | Feature.REASONING,
         ignored_parameters=("tools",),
         reasoning="effort",
         note="Grounded web search built in; search_results ride on the raw payload "
@@ -465,8 +463,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         aliases=("kimi",),
         key_env="MOONSHOT_API_KEY",
         output_tokens_field="max_completion_tokens",
-        note="Kimi model family; thinking controls via provider_options "
-        "({'thinking': …}).",
+        note="Kimi model family; thinking controls via provider_options ({'thinking': …}).",
     ),
     CompatPreset(
         id="z-ai",
@@ -544,8 +541,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         key_env="AI_GATEWAY_API_KEY",
         features=_DEFAULT_FEATURES | Feature.REASONING,
         reasoning="reasoning-object",
-        note="creator/model ids across upstream providers; gateway-normalized "
-        "reasoning object.",
+        note="creator/model ids across upstream providers; gateway-normalized reasoning object.",
     ),
     CompatPreset(
         id="cloudflare-workers-ai",
@@ -554,9 +550,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         aliases=("workers-ai", "cloudflare"),
         key_env="CLOUDFLARE_API_TOKEN",
         requires_base_url=True,
-        base_url_hint=(
-            "https://api.cloudflare.com/client/v4/accounts/<account_id>/ai/v1"
-        ),
+        base_url_hint=("https://api.cloudflare.com/client/v4/accounts/<account_id>/ai/v1"),
         models_listing=False,
         note="@cf/author/model ids; the base URL embeds your account id.",
     ),
@@ -581,7 +575,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         features=_DEFAULT_FEATURES | Feature.REASONING,
         reasoning="effort-three-level",
         note="EU-hosted unified gateway. Model ids are load-bearing and irregularly "
-        "punctuated (Meta-Llama-3_3-70B-Instruct) — never normalize them.",
+        "punctuated (Meta-Llama-3_3-70B-Instruct); never normalize them.",
     ),
     CompatPreset(
         id="snowflake-cortex",
@@ -590,9 +584,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         aliases=("cortex", "snowflake"),
         key_env="SNOWFLAKE_PAT",
         requires_base_url=True,
-        base_url_hint=(
-            "https://<account-identifier>.snowflakecomputing.com/api/v2/cortex/v1"
-        ),
+        base_url_hint=("https://<account-identifier>.snowflakecomputing.com/api/v2/cortex/v1"),
         models_listing=False,
         output_tokens_field="max_completion_tokens",
         features=_DEFAULT_FEATURES | Feature.REASONING,
@@ -622,9 +614,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         aliases=("oci", "oracle"),
         key_env="OCI_GENAI_API_KEY",
         requires_base_url=True,
-        base_url_hint=(
-            "https://inference.generativeai.<region>.oci.oraclecloud.com/openai/v1"
-        ),
+        base_url_hint=("https://inference.generativeai.<region>.oci.oraclecloud.com/openai/v1"),
         models_listing=False,
         features=_DEFAULT_FEATURES | Feature.REASONING,
         reasoning="effort",
@@ -807,8 +797,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         requires_api_key=False,
         default_port=4891,
         features=Feature.SYSTEM_PROMPT,
-        note="Minimal local server (enable in settings); no streaming or tool calling "
-        "documented.",
+        note="Minimal local server (enable in settings); no streaming or tool calling documented.",
     ),
     CompatPreset(
         id="text-generation-webui",
@@ -1085,9 +1074,7 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         aliases=("cf-ai-gateway",),
         key_env="CF_AIG_TOKEN",
         requires_base_url=True,
-        base_url_hint=(
-            "https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/compat"
-        ),
+        base_url_hint=("https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/compat"),
         models_listing=False,
         note="The multi-provider gateway, not Workers AI: it fronts OpenAI, Anthropic, "
         "Groq and others behind provider/model ids. Distinct from "
@@ -1212,7 +1199,7 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
 
     Which of the two fields a user is actually asked for depends on the preset, and the
     two cases are mirror images. A hosted service knows its endpoint and not your key, so
-    the key is the question and the URL folds away. A local engine knows neither — but its
+    the key is the question and the URL folds away. A local engine knows neither, but its
     address has a conventional default and its credential usually does not exist at all,
     so *both* fold away and adding it asks nothing.
     """
@@ -1237,7 +1224,7 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
                 help_text=hint,
                 # The preset table already knows this provider's conventional variable,
                 # so the example in an empty editor can name it rather than leaving a UI
-                # to guess — and a guess is necessarily some *other* provider's spelling.
+                # to guess, and a guess is necessarily some *other* provider's spelling.
                 placeholder=(
                     f"env://{preset.key_env} or a literal key"
                     if preset.key_env

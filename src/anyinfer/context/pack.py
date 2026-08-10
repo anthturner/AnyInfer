@@ -51,7 +51,7 @@ MIN_CHUNK_TOKENS = 64
 _BYTES_PER_TOKEN = 3
 """The planning heuristic's inverse, used to turn a token target into a character budget.
 
-An explicit, documented conversion — not a silent conflation of tokens with characters.
+An explicit, documented conversion; not a silent conflation of tokens with characters.
 """
 
 _BOUNDARY_FLOOR = 0.25
@@ -225,9 +225,7 @@ def reduce_packed(
     for document in unpinned:
         chunks.extend(split_document(document, chunk_tokens=size))
 
-    corpus = rank_cache or build_rank_cache(
-        ordered, split_identifiers=tuning.split_identifiers
-    )
+    corpus = rank_cache or build_rank_cache(ordered, split_identifiers=tuning.split_identifiers)
     ranked_chunks = _rank_chunks(chunks, query, corpus, ordered, tuning)
 
     selected: list[Chunk] = []
@@ -305,7 +303,7 @@ def _rank_chunks(
     """Order chunks by relevance, tie-broken by path then position.
 
     A chunk is scored as a small document whose body is the chunk text but whose path
-    signals — including the anchor bonus — come from its parent, so a chunk of
+    signals, including the anchor bonus — come from its parent, so a chunk of
     ``credentials.py`` still benefits from its filename. Query expansion is resolved once
     against the whole corpus rather than per chunk: feedback terms harvested from a single
     chunk would describe that chunk, not the query.

@@ -23,9 +23,11 @@ was processed from what was billed.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of("cohere", api_key="env://CO_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("cohere", api_key="env://CO_API_KEY"),
+    ]
+)
 
 result = client.generate(prompt, target="cohere:command-a-03-2025")
 ```
@@ -63,7 +65,7 @@ what the model actually processed, which is what a context window measures:
 
 ```python
 result = client.generate(prompt, target="cohere:command-a-03-2025")
-print(result.usage.input_tokens)   # processed
+print(result.usage.input_tokens)  # processed
 ```
 
 If you need billed units for cost reconciliation, build the client with `retain_raw=True`
@@ -78,10 +80,12 @@ citations are not yet surfaced as typed results:
 client.generate(
     question,
     target="cohere:command-a-03-2025",
-    provider_options={"cohere": {
-        "documents": [{"id": "doc1", "data": {"text": "..."}}],
-        "citation_options": {"mode": "ACCURATE"},
-    }},
+    provider_options={
+        "cohere": {
+            "documents": [{"id": "doc1", "data": {"text": "..."}}],
+            "citation_options": {"mode": "ACCURATE"},
+        }
+    },
 )
 ```
 
@@ -105,6 +109,6 @@ Only chat-capable models are listed.
 <div class="anyinfer-see-also" markdown>
 
 - [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/cohere.md)
-- [Structured output](../concepts/structured-output.md) — how the schema mechanism is chosen.
+- [Structured output](../concepts/structured-output.md): how the schema mechanism is chosen.
 
 </div>

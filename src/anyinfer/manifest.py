@@ -56,7 +56,6 @@ from .events.telemetry import (
     RequestFailed,
     RequestStarted,
     RetryScheduled,
-    TargetResolved,
     TelemetryEvent,
     UsageEstimated,
 )
@@ -126,7 +125,7 @@ class SourcedFact:
 
 @dataclass(frozen=True, slots=True)
 class RequestFacet:
-    """Shape and fingerprints of what was asked for — never the payload.
+    """The shape and fingerprints of what was asked for, never the payload.
 
     Attributes:
         message_count: How many messages the request carried.
@@ -284,8 +283,8 @@ class CacheFacet:
 
     Attributes:
         policy_mode: The cache mode in force, or ``None`` when no policy applied.
-        mechanism: How caching was engaged — ``explicit`` marks or ``implicit`` prefix
-            stability — or ``None`` when nothing was engaged.
+        mechanism: How caching was engaged: ``explicit`` marks or ``implicit`` prefix
+            stability. ``None`` means caching was not engaged.
         mark_count: How many marks were placed; always zero for ``implicit``.
         estimated_cacheable_tokens: Planning-side size of what the plan tried to cache.
         read_tokens: Prompt tokens the provider reported serving from its cache.
@@ -307,7 +306,7 @@ class ReductionRecord:
     Attributes:
         strategy: The strategy requested, or ``history`` for a compacted conversation.
         representation: The strategy actually applied.
-        candidate_count: Documents — or messages — offered to the reducer.
+        candidate_count: Documents or messages offered to the reducer.
         selected_count: Documents kept at detail fidelity, or messages retained.
         omitted_count: What was not represented in detail.
         estimated_tokens: Planning-side estimate of the result.
@@ -610,7 +609,6 @@ class ManifestBuilder:
         "_request",
         "_request_id",
         "_requested",
-        "_resolved",
         "_result",
         "_steps",
         "_usage_estimates",
@@ -644,7 +642,6 @@ class ManifestBuilder:
         self._capabilities: ModelCapabilities | None = None
         self._capability_target = ""
         self._current: AttemptFacet | None = None
-        self._resolved: str | None = None
         self._result: Generation | None = None
         self._payloads: dict[str, Any] = {}
 
@@ -685,9 +682,6 @@ class ManifestBuilder:
             return
 
         if isinstance(event, RequestStarted):
-            return
-        if isinstance(event, TargetResolved):
-            self._resolved = str(event.target)
             return
         if isinstance(event, AttemptStarted):
             self._flush_attempt()
@@ -937,12 +931,12 @@ class ManifestBuilder:
         request, result = self._request, self._result
         if request.schema is None:
             return SchemaFacet()
-        chosen = choose_mechanism(self._capabilities)
+        chosen, ladder = choose_mechanism(self._capabilities, with_trail=True)
         return SchemaFacet(
             requested=True,
             chosen=chosen,
             used=result.structured_mechanism if result is not None else None,
-            ladder=_ladder_report(self._capabilities, chosen),
+            ladder=ladder,
             repair_attempts=(result.repair_attempts if result is not None else len(self._repairs)),
             repairs=tuple(self._repairs),
             validated=result is not None and result.structured is not None,
@@ -1021,14 +1015,6 @@ def _replace_facet(facet: _FacetT, **changes: Any) -> _FacetT:
     values.update({name: value for name, value in changes.items() if value is not None})
     rebuilt: _FacetT = type(facet)(**values)
     return rebuilt
-
-
-def _ladder_report(
-    capabilities: ModelCapabilities | None, chosen: str
-) -> tuple[MechanismRung, ...]:
-    """Explain the structured-output ladder: which rungs were available, and why not."""
-    _, rungs = choose_mechanism(capabilities, with_trail=True)
-    return rungs
 
 
 def schema_digest(json_schema: Mapping[str, Any]) -> str:

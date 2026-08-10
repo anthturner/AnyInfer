@@ -4,7 +4,7 @@
 
 - a **known** cost, computed from pricing whose provenance is trusted (``catalog``,
   ``discovered``, ``probed``, or an application ``override``);
-- an **unknown** cost — ``None`` — when no trustworthy pricing exists;
+- an **unknown** cost — ``None``, when no trustworthy pricing exists;
 - a genuine **zero**, for free local inference.
 
 An unknown cost that renders as ``$0.00`` is the single most common accounting bug in

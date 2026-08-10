@@ -83,7 +83,6 @@ class StdioTransport:
         self._cwd = cwd
         self._process: subprocess.Popen[bytes] | None = None
         self._lock = asyncio.Lock()
-        self._stderr_thread: threading.Thread | None = None
 
     def _spawn(self) -> subprocess.Popen[bytes]:
         if self._process is not None and self._process.poll() is None:
@@ -104,7 +103,7 @@ class StdioTransport:
                 hint="check that it is installed and on PATH",
             ) from exc
         self._process = process
-        self._stderr_thread = _start_stderr_drain(process, self._command[0])
+        _start_stderr_drain(process, self._command[0])
         return process
 
     async def request(self, payload: bytes, *, timeout_s: float) -> dict[str, Any]:
@@ -121,8 +120,7 @@ class StdioTransport:
                     line = await asyncio.to_thread(self._read_line, process)
             except TimeoutError as exc:
                 raise ToolLoopError(
-                    f"the MCP server {self._command[0]!r} did not answer within "
-                    f"{timeout_s:g}s",
+                    f"the MCP server {self._command[0]!r} did not answer within {timeout_s:g}s",
                     hint="raise the server's timeout_s, or check whether it is wedged",
                 ) from exc
             return decode_message(line)
@@ -177,7 +175,7 @@ class HTTPTransport:
 
     Args:
         url: The server endpoint.
-        headers: Extra request headers — where authentication goes, when a server wants any.
+        headers: Extra request headers, including authentication when the server requires it.
         transport: Test seam; an ``httpx2`` transport that intercepts the traffic.
     """
 
@@ -253,7 +251,7 @@ def _spawn_flags() -> dict[str, Any]:
     return {"creationflags": new_group} if new_group is not None else {}
 
 
-def _start_stderr_drain(process: subprocess.Popen[bytes], name: str) -> threading.Thread:
+def _start_stderr_drain(process: subprocess.Popen[bytes], name: str) -> None:
     """Drain the child's stderr so a chatty server cannot fill its pipe and block.
 
     The thread owns the stream for its whole life and is a daemon, for the two reasons
@@ -274,7 +272,6 @@ def _start_stderr_drain(process: subprocess.Popen[bytes], name: str) -> threadin
 
     thread = threading.Thread(target=pump, name=f"anyinfer-mcp-{name}", daemon=True)
     thread.start()
-    return thread
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:

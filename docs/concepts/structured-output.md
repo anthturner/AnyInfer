@@ -1,7 +1,7 @@
 # Structured output
 
 A schema is a **contract**, not a hint. Pass one and you get back a value that satisfies it,
-or an error explaining why not — never a "mostly right" string you have to re-parse.
+or an error explaining why not; never a "mostly right" string you have to re-parse.
 
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
@@ -28,7 +28,7 @@ PERSON = {
 }
 
 result = client.generate(prompt, target="medium", schema=PERSON)
-result.structured        # {"name": "Ada", "age": 36} — already validated
+result.structured  # {"name": "Ada", "age": 36} — already validated
 ```
 
 Pydantic models work too, via duck typing — AnyInfer takes no pydantic dependency:
@@ -60,13 +60,13 @@ degrades to something that still produces a validated result rather than failing
 The chosen mechanism is recorded on the result:
 
 ```python
-result.structured_mechanism   # "grammar"
+result.structured_mechanism  # "grammar"
 ```
 
 **2. Project the schema for that provider.**
 
 Grammar-based engines choke on constructs that are cheap for a validator but expensive for a
-grammar — string length bounds, very large array bounds — so those are stripped *for the
+grammar — string length bounds, very large array bounds, so those are stripped *for the
 wire only*.
 
 **3. Validate the response against your original schema.**
@@ -104,7 +104,7 @@ result = client.generate(
     repair=ai.Repair(max_attempts=1),
 )
 
-result.repair_attempts   # 0 if it got it right the first time
+result.repair_attempts  # 0 if it got it right the first time
 ```
 
 On a violation, AnyInfer re-prompts **the same model** with the validation errors appended.
@@ -118,8 +118,8 @@ The budget is bounded. When it is exhausted:
 try:
     result = client.generate(prompt, schema=PERSON, target="medium")
 except ai.SchemaViolationError as error:
-    print(error.errors)     # ("age: 'age' is a required property",)
-    print(error.raw_text)   # what the model actually said
+    print(error.errors)  # ("age: 'age' is a required property",)
+    print(error.raw_text)  # what the model actually said
 ```
 
 You get the validation errors, bounded raw output, and—when a truncated top-level JSON
@@ -158,15 +158,15 @@ Validation, once a value is extracted, is strict.
 !!! tip "Key takeaways"
     - A schema is a contract: you always get a client-side-validated value, regardless of
       which mechanism produced it.
-    - The strongest native mechanism is chosen automatically — grammar beats json_schema
-      beats json_mode beats prompt — and the choice is recorded on the result.
+    - The strongest native mechanism is chosen automatically: grammar beats json_schema
+      beats json_mode beats prompt, and the choice is recorded on the result.
     - Repair is opt-in, bounded, and re-prompts the same model; it never triggers fallback.
 
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
-- [Capabilities](capabilities.md) — how mechanism selection knows what a model supports.
+- [Capabilities](capabilities.md): how mechanism selection knows what a model supports.
 - [How-to: enforce a JSON schema](../guides/structured-output.md)
 
 </div>

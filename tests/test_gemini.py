@@ -80,8 +80,7 @@ async def test_sampling_lives_under_generation_config() -> None:
         await client.generate(
             "hello",
             target="gemini:gemini-2.5-flash",
-            sampling=Sampling(temperature=0.2, top_p=0.9, max_output_tokens=64,
-                              stop=("END",)),
+            sampling=Sampling(temperature=0.2, top_p=0.9, max_output_tokens=64, stop=("END",)),
         )
 
     config = server.requests[0]["generationConfig"]
@@ -133,12 +132,8 @@ async def test_reasoning_effort_becomes_a_thinking_level() -> None:
         await client.generate("hi", target="gemini:gemini-2.5-flash", reasoning="high")
         await client.generate("hi", target="gemini:gemini-2.5-flash", reasoning="minimal")
 
-    assert server.requests[0]["generationConfig"]["thinkingConfig"] == {
-        "thinkingLevel": "high"
-    }
-    assert server.requests[1]["generationConfig"]["thinkingConfig"] == {
-        "thinkingLevel": "minimal"
-    }
+    assert server.requests[0]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "high"}
+    assert server.requests[1]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "minimal"}
 
 
 async def test_thinking_tokens_are_counted_as_output_and_reported_separately() -> None:
@@ -196,9 +191,7 @@ async def test_schema_becomes_a_response_schema_with_json_mime_type() -> None:
         "additionalProperties": False,
     }
     async with _client(server) as client:
-        result = await client.generate(
-            "answer", target="gemini:gemini-2.5-flash", schema=schema
-        )
+        result = await client.generate("answer", target="gemini:gemini-2.5-flash", schema=schema)
 
     config = server.requests[0]["generationConfig"]
     assert config["responseMimeType"] == "application/json"
@@ -330,8 +323,7 @@ async def test_blocked_prompt_finishes_as_content_filter() -> None:
         events = [
             e
             async for e in adapter.generate(
-                WireRequest(model="gemini-2.5-flash", messages=(ai.user("hi"),),
-                            stream=False)
+                WireRequest(model="gemini-2.5-flash", messages=(ai.user("hi"),), stream=False)
             )
         ]
     finally:
@@ -380,8 +372,7 @@ async def test_unknown_finish_reasons_normalize() -> None:
         events = [
             e
             async for e in adapter.generate(
-                WireRequest(model="gemini-2.5-flash", messages=(ai.user("hi"),),
-                            stream=False)
+                WireRequest(model="gemini-2.5-flash", messages=(ai.user("hi"),), stream=False)
             )
         ]
     finally:
@@ -417,8 +408,7 @@ def _server_for(scenario: str) -> FakeGeminiServer:
     if scenario == "rate_limited":
         return FakeGeminiServer(
             [
-                FakeResponse(status=429, error_message="slow down",
-                             headers={"retry-after": "0"}),
+                FakeResponse(status=429, error_message="slow down", headers={"retry-after": "0"}),
                 FakeResponse(text="recovered"),
             ]
         )

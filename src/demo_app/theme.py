@@ -232,6 +232,7 @@ QMenu::separator { height: 1px; background: $border; margin: 6px 12px; }
 
 QLabel { background: transparent; }
 QLabel#Muted { color: $muted; }
+QLabel#HintText { color: $muted; font-size: 9pt; }
 QLabel#ErrorText { color: $danger; }
 QLabel#Caption { color: $muted; padding: 6px 0; }
 
@@ -363,20 +364,13 @@ QFrame#TelemetryCard {
     border-radius: 10px;
 }
 QFrame#TelemetryCard:hover { border-color: $accent_border; }
-QLabel#NoticeBar { color: $muted; font-style: italic; }
-QListWidget#ConversationList {
-    background: transparent;
-    border: none;
-    outline: none;
-}
-QListWidget#ConversationList::item {
-    border-radius: 8px;
-    padding: 8px;
-    margin: 3px 0;
-}
-QListWidget#ConversationList::item:selected {
-    background: $accent_bg;
-    color: $text;
+QLabel#NoticeBar {
+    color: $muted;
+    background: $surface;
+    border-left: 3px solid $accent;
+    padding: 5px 9px;
+    font-size: 9pt;
+    font-style: italic;
 }
 
 /* Docked sections sit flush in a rectangular pane; rounding them reads as floating
@@ -407,6 +401,43 @@ QFrame#ProviderCard {
     border: 1px solid $border;
     border-radius: 10px;
 }
+QFrame#HardwareCard {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 12px;
+}
+QFrame#HardwareCard:hover { border-color: $accent_border; }
+QLabel#HardwareCardHeading { color: $muted; font-size: 9pt; font-weight: 600; }
+QLabel#HardwareCardName { color: $text; font-size: 11pt; font-weight: 600; }
+QLabel#SystemRecommendation {
+    background: $accent_bg;
+    border: 1px solid $accent_border;
+    border-radius: 9px;
+    padding: 10px 12px;
+}
+QLabel#BenchmarkValue { font-size: 11pt; font-weight: 600; padding: 4px 8px; }
+
+/* Nested controls in the dock are visually part of its rectangular sections. Several
+   Qt platform styles omit the arc pixels of one-pixel rounded borders, leaving apparent
+   gaps at every corner. Square dock-control corners keep every border continuous while
+   the floating surfaces elsewhere retain their softer radii. */
+QWidget#InspectorPane QLineEdit,
+QWidget#InspectorPane QPlainTextEdit,
+QWidget#InspectorPane QTextEdit,
+QWidget#InspectorPane QComboBox,
+QWidget#InspectorPane QSpinBox,
+QWidget#InspectorPane QDoubleSpinBox,
+QWidget#InspectorPane QTreeWidget,
+QWidget#InspectorPane QListWidget,
+QWidget#InspectorPane QTableWidget,
+QWidget#InspectorPane QPushButton,
+QWidget#InspectorPane QScrollArea#TelemetryScroll,
+QWidget#InspectorPane QFrame#TelemetryCard,
+QWidget#InspectorPane QFrame#SectionCard,
+QWidget#InspectorPane QFrame#ProviderCard,
+QWidget#InspectorPane QLabel#ApiList {
+    border-radius: 0;
+}
 
 /* Slim, rounded scrollbars that match the palette instead of the platform default. */
 QScrollBar:vertical {
@@ -429,10 +460,11 @@ QScrollBar::handle:hover { background: $accent_border; }
 QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
 QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
 
-/* Tabs (the Local models dialog). */
+/* Every tabbed surface reserves a transparent pane edge; BorderedTabWidget paints the
+   visible outline as one continuous topmost path so Qt cannot drop its corner arcs. */
 QTabWidget::pane {
-    border: 1px solid $border;
-    border-radius: 8px;
+    border: 1px solid transparent;
+    border-radius: 0;
     top: -1px;
 }
 QTabBar::tab {
@@ -451,6 +483,8 @@ QTabBar::tab:selected {
     color: $accent;
     border-color: $border;
     font-weight: 600;
+    margin-bottom: -1px;
+    padding-bottom: 8px;
 }
 
 /* Qt's own tab-bar scroll buttons still do the actual scrolling (there is no public API
@@ -469,22 +503,6 @@ QToolButton#NewTabButton, QToolButton#TabScrollButton {
 QToolButton#NewTabButton:hover, QToolButton#TabScrollButton:hover {
     background: $accent_bg;
     border-color: $accent_border;
-}
-
-/* Conversation tabs: the frame wraps the tab bar and the pane below it in one border,
-   open at the top so the tabs read as growing out of the box rather than being cut off
-   from it. QTabWidget's own frame only ever outlines the pane, not the tab bar, so the
-   border lives on the plain frame around it instead of on QTabWidget::pane. */
-QFrame#ConversationTabsFrame {
-    border-left: 1px solid $border;
-    border-right: 1px solid $border;
-    border-bottom: 1px solid $border;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-}
-QTabWidget#ConversationTabs::pane {
-    border: none;
-    top: 0px;
 }
 
 QProgressBar {
@@ -522,21 +540,6 @@ QToolButton {
     color: $muted;
 }
 QToolButton:hover { background: $accent_bg; color: $text; }
-
-/* Quick-action chips under the composer: pill-shaped invitations, not commands. */
-QPushButton#ChipButton {
-    background: $surface;
-    border: 1px solid $border;
-    border-radius: 14px;
-    padding: 4px 14px;
-    min-height: 0;
-    color: $muted;
-}
-QPushButton#ChipButton:hover {
-    border-color: $accent;
-    color: $accent;
-    background: $accent_bg;
-}
 
 /* The send button: the one filled, unmistakable action on the screen. */
 QPushButton#PrimaryButton {

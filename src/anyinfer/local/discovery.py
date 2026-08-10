@@ -3,7 +3,7 @@
 The question `anyinfer init` has to answer before it can write anything: which providers
 would work right now, without installing, downloading, or asking for a credential. Two
 sources answer it — an engine already listening on loopback, and an API key already in the
-environment — and a third, the OS credential vault, answers it only when asked, because
+environment, and a third, the OS credential vault, answers it only when asked, because
 reading a vault can prompt the user to unlock it.
 
 This lives in the local subsystem because "what is running on this machine" is its subject,
@@ -110,7 +110,7 @@ def endpoint_candidates(registry: ProviderRegistry) -> tuple[tuple[str, ...], ..
     Returns:
         One entry per distinct endpoint, as ``(base_url, provider_id, provider_id, …)``
         in registry order. Several engines share a port — ``llamafile``, ``localai``,
-        ``ramalama`` and ``llama-swap`` all default to 8080 — so an address that answers
+        ``ramalama`` and ``llama-swap`` all default to 8080, so an address that answers
         cannot be attributed to one of them by probing alone, and grouping is how that
         stays visible instead of becoming a coin flip.
 
@@ -226,10 +226,7 @@ async def _probe_endpoints(
     if not candidates:
         return []
     results = await asyncio.gather(
-        *(
-            _probe_one(registry, group[0], group[1:], timeout_s, transports)
-            for group in candidates
-        )
+        *(_probe_one(registry, group[0], group[1:], timeout_s, transports) for group in candidates)
     )
     return [entry for entry in results if entry is not None]
 
@@ -245,7 +242,7 @@ async def _probe_one(
 
     Every failure is swallowed: a refused connection, a timeout, a wrong protocol behind
     the port, and a provider whose optional extra is missing all mean the same thing to a
-    user — that engine is not available here — and distinguishing them would turn a
+    user — that engine is not available here, and distinguishing them would turn a
     discovery summary into a diagnostics report.
     """
     from ..providers.base import ProviderConfig
@@ -316,9 +313,7 @@ def _environment_evidence(
     return None
 
 
-def _vault_evidence(
-    descriptor: ProviderDescriptor, read: Any
-) -> DiscoveredProvider | None:
+def _vault_evidence(descriptor: ProviderDescriptor, read: Any) -> DiscoveredProvider | None:
     """Whether the OS vault holds a secret under a conventional identifier."""
     secret_fields = [f for f in descriptor.setup.fields if f.kind == "secret"]
     if not secret_fields:

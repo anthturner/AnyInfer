@@ -157,11 +157,7 @@ def render() -> str:
         if not (REPO_ROOT / "docs" / "providers" / page).is_file():
             raise RuntimeError(f"provider guide does not exist: docs/providers/{page}")
 
-    out = [
-        HEADER.format(
-            total=len(descriptors), adapters=len(adapters), presets=len(presets)
-        )
-    ]
+    out = [HEADER.format(total=len(descriptors), adapters=len(adapters), presets=len(presets))]
 
     for descriptor in adapters:
         page = ADAPTER_PAGES[descriptor.id]
@@ -169,8 +165,7 @@ def render() -> str:
         kind = "Local" if descriptor.locality == "local" else "Hosted"
         summary = ADAPTER_SUMMARIES.get(descriptor.id, "")
         out.append(
-            f"| {name} | {_targets(descriptor.id, descriptor.aliases)} | {kind} "
-            f"| {summary} |\n"
+            f"| {name} | {_targets(descriptor.id, descriptor.aliases)} | {kind} | {summary} |\n"
         )
 
     out.append(PRESET_INTRO)

@@ -99,7 +99,7 @@ MANIFEST_FIELD = "anyinfer_manifest"
 The result-side half of the same superset argument `HISTORY_FIELD` makes. Every routing,
 mechanism, and provenance decision this library takes was reachable only from Python; a
 caller on the standalone binary could use every one of them and see none of them. Opt-in,
-because a stock OpenAI client must get a byte-identical response — so absence of the field
+because a stock OpenAI client must get a byte-identical response, so absence of the field
 means absence of the key, on the non-streaming body and in the stream alike.
 """
 
@@ -736,7 +736,7 @@ def manifest_chunk(
     """Render the terminal manifest frame for a streaming response.
 
     Shaped as an ordinary ``chat.completion.chunk`` with an empty ``choices`` array — the
-    same envelope the trailing usage chunk uses — so a reader that has never heard of the
+    same envelope the trailing usage chunk uses, so a reader that has never heard of the
     extension parses it, finds no delta, and moves on.
 
     Args:
@@ -824,7 +824,7 @@ def final_chunk(
 
     Usage rides in its own trailing chunk with an empty ``choices`` array, matching
     ``stream_options.include_usage``. Clients that stop reading at ``finish_reason`` miss
-    it — which is exactly the bug the core's own parser is written to avoid.
+    it, which is exactly the bug the core's own parser is written to avoid.
     """
     stamp = created if created is not None else int(time.time())
     yield {

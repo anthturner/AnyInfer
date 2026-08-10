@@ -1,6 +1,6 @@
 """Where model weights come from, as data.
 
-A *source reference* is declarative — "this repo at this revision, these files" — and a
+A *source reference* is declarative — "this repo at this revision, these files", and a
 *resolver* turns it into a concrete, ordered file list with URLs, sizes, and digests. That
 split is what keeps acquisition source-agnostic: adding an internal mirror is a new
 resolver, not a new downloader.
@@ -157,7 +157,7 @@ class SourceResolver(Protocol):
         """Expand a reference into a concrete file list.
 
         ``client`` is an optional ``httpx2.AsyncClient`` the caller already owns. Passing
-        it keeps resolution and the subsequent transfer on one connection pool — and is
+        it keeps resolution and the subsequent transfer on one connection pool, and is
         what makes a resolver testable against a mock transport.
         """
         ...
@@ -204,7 +204,7 @@ _BUILTINS_LOADED = False
 def _load_builtin_resolvers() -> None:
     """Import the bundled resolvers on first use.
 
-    Deferred so that merely reading a `SourceRef` — which the catalog does at import time —
+    Deferred so that merely reading a `SourceRef`, which the catalog does at import time —
     never pulls in an HTTP client.
 
     Guarded by an explicit flag rather than by "is the registry empty?": something else

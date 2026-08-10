@@ -3,7 +3,7 @@
 A command-line tool that turns arbitrary text into a schema-validated summary, staying up
 when a provider is not: it tries Anthropic first, falls back to OpenAI, and finally to a
 local Ollama model. Whatever path the request took, the caller gets the same validated
-shape back — or one typed error naming every attempt.
+shape back, or one typed error naming every attempt.
 
 ```python
 """summarize.py — `python summarize.py < release-notes.txt`"""
@@ -52,9 +52,9 @@ for attempt in result.attempts:
 
 ## What to notice
 
-- **`result.structured` is always valid** against `SUMMARY_SCHEMA` — validation happens
+- **`result.structured` is always valid** against `SUMMARY_SCHEMA`: validation happens
   client-side regardless of which provider answered, and `result.structured_mechanism`
-  tells you honestly how it was enforced (`grammar`, `json_schema`, `json_mode`, or
+  tells you how it was enforced (`grammar`, `json_schema`, `json_mode`, or
   `prompt`). See [structured output](../concepts/structured-output.md).
 - **The fallback chain is data, not code.** `Route.targets` is an ordered tuple; retry
   policy applies per target. No `try/except` pyramid, and the
@@ -64,7 +64,7 @@ for attempt in result.attempts:
   [credential reference](../concepts/credentials.md); the resolved secret is registered
   for redaction, so it cannot leak through errors or telemetry.
 - **The local fallback needs no key at all.** If both hosted providers are down, the same
-  call lands on Ollama — and if *everything* fails, you get one
+  call lands on Ollama, and if *everything* fails, you get one
   `AllTargetsFailedError` carrying the per-target causes, not the last exception to
   happen to escape.
 

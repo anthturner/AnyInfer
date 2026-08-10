@@ -2,7 +2,7 @@
 
 Deliberately the **native** protocol rather than Google's OpenAI-compatibility layer at
 ``/v1beta/openai/``. That layer is documented as beta and *silently ignores* parameters it
-does not implement — the exact failure mode AnyInfer exists to eliminate — while thinking
+does not implement — the exact failure mode AnyInfer exists to eliminate, while thinking
 levels, response schemas, safety settings, context caching, and grounding tools are
 native-only or better supported here.
 

@@ -89,15 +89,38 @@ class TestConfig:
         assert DemoConfig.load(path).targets == ("demo-fake:flaky", "demo-fake:reliable")
 
     def test_round_trips_theme_and_context_window(self):
-        config = replace(default_config(), theme="dark", context_window_tokens=8192)
+        config = replace(
+            default_config(),
+            theme="dark",
+            context_window_tokens=8192,
+            ignore_runtime_hardware_constraints=True,
+        )
         restored = DemoConfig.from_json(config.to_json())
         assert restored.theme == "dark"
         assert restored.context_window_tokens == 8192
+        assert restored.ignore_runtime_hardware_constraints is True
 
     def test_malformed_preferences_fall_back_to_defaults(self):
-        restored = DemoConfig.from_json({"theme": "neon", "context_window_tokens": "lots"})
+        restored = DemoConfig.from_json(
+            {
+                "theme": "neon",
+                "context_window_tokens": "lots",
+                "ignore_runtime_hardware_constraints": "yes",
+            }
+        )
         assert restored.theme == "system"
         assert restored.context_window_tokens is None
+        assert restored.ignore_runtime_hardware_constraints is False
+
+    def test_app_settings_edits_runtime_constraint_override(self, qapp: object):
+        from demo_app.widgets.app_settings_dialog import AppSettingsDialog
+
+        dialog = AppSettingsDialog(default_config())
+        try:
+            dialog._ignore_runtime_hardware.setChecked(True)
+            assert dialog.result_config().ignore_runtime_hardware_constraints is True
+        finally:
+            dialog.close()
 
     def test_shared_identity_spelling_round_trips_without_redundancy(self):
         config = DemoConfig(
@@ -744,10 +767,11 @@ class TestSettingsDialog:
         assert editor.echoMode() == QLineEdit.EchoMode.Password
 
     def test_required_fields_are_marked_and_optional_ones_are_not(self, qapp: object):
-        """A red asterisk is the only signal that separates mandatory from optional."""
+        """A themed danger asterisk separates mandatory from optional fields."""
         from PySide6.QtWidgets import QFormLayout
 
         from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
+        from demo_app import theme
         from demo_app.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
@@ -765,16 +789,16 @@ class TestSettingsDialog:
         layout = panel._form
         assert isinstance(layout, QFormLayout)
         labels = {
-            layout.itemAt(row, QFormLayout.ItemRole.LabelRole)
-            .widget()
-            .text(): layout.itemAt(row, QFormLayout.ItemRole.LabelRole)
+            layout.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text(): layout.itemAt(
+                row, QFormLayout.ItemRole.LabelRole
+            )
             for row in range(layout.rowCount())
             if layout.itemAt(row, QFormLayout.ItemRole.LabelRole) is not None
         }
         required = next(text for text in labels if text.startswith("Endpoint"))
         optional = next(text for text in labels if text.startswith("Version"))
 
-        assert "color:#d13438" in required and "*" in required
+        assert f"color:{theme.color('danger')}" in required and "*" in required
         assert "*" not in optional
 
     def test_placeholders_come_from_the_field_not_the_dialog(self, qapp: object):
@@ -830,9 +854,7 @@ class TestSettingsDialog:
         empty = _ProviderPanel(descriptor, ProviderConfig("either-or"))
         assert empty.missing_required() == ["API key or OAuth token"]
 
-        keyed = _ProviderPanel(
-            descriptor, ProviderConfig("either-or", values={"api_key": "sk-x"})
-        )
+        keyed = _ProviderPanel(descriptor, ProviderConfig("either-or", values={"api_key": "sk-x"}))
         assert keyed.missing_required() == []
 
         oauthed = _ProviderPanel(
@@ -856,9 +878,7 @@ class TestSettingsDialog:
     def test_saving_preserves_a_provider_options_mapping(self, qapp: object):
         """The dialog edits no options, so a save round-trip must not drop them."""
         config = default_config().with_provider(
-            ProviderConfig(
-                DEMO_PROVIDER_ID, enabled=True, options={"reasoning_effort": "high"}
-            )
+            ProviderConfig(DEMO_PROVIDER_ID, enabled=True, options={"reasoning_effort": "high"})
         )
         dialog = self._dialog(config)
 
@@ -868,9 +888,7 @@ class TestSettingsDialog:
     def test_a_provider_that_is_no_longer_installed_still_renders(self, qapp: object):
         """Its settings must survive a save, not be silently deleted."""
         config = DemoConfig(
-            providers=(
-                ProviderConfig("gone-away", enabled=True, values={"api_key": "env://K"}),
-            )
+            providers=(ProviderConfig("gone-away", enabled=True, values={"api_key": "env://K"}),)
         )
         dialog = self._dialog(config)
 
@@ -1169,13 +1187,52 @@ class TestChatView:
 
 
 class TestMainWindow:
-    def test_constructs_and_closes(self, qapp: object):
+    def test_constructs_without_exposing_an_unverified_saved_model(
+        self, qapp: object, monkeypatch
+    ):
+        from anyinfer.types.capabilities import DiscoveredModel
         from demo_app.main_window import MainWindow
 
-        window = MainWindow(default_config())
+        monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
+        monkeypatch.setattr(MainWindow, "_refresh_token_hint", lambda _self: None)
+        config = DemoConfig(
+            providers=(ProviderConfig(DEMO_PROVIDER_ID, enabled=True),),
+            targets=("demo-fake:not-on-this-engine",),
+        )
+        window = MainWindow(config)
         try:
-            assert window._engine_bar.target() == "demo-fake:reliable"
-            assert window._route_targets() == ("demo-fake:reliable",)
+            assert window._engine_bar.model() == ""
+            assert window._route_targets() == ()
+            assert not window._composer._action_button.isEnabled()
+
+            window._engine_bar.on_models_listed(
+                DEMO_PROVIDER_ID,
+                [DiscoveredModel("available"), DiscoveredModel("also-available")],
+            )
+
+            assert window._engine_bar.target() == "demo-fake:available"
+            assert window._route_targets() == ("demo-fake:available",)
+            assert window._composer._action_button.isEnabled()
+        finally:
+            window.close()
+
+    def test_send_tracks_model_selection(self, qapp: object, monkeypatch):
+        from anyinfer.types.capabilities import DiscoveredModel
+        from demo_app.main_window import MainWindow
+
+        monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
+        monkeypatch.setattr(MainWindow, "_refresh_token_hint", lambda _self: None)
+        config = DemoConfig(
+            providers=(ProviderConfig(DEMO_PROVIDER_ID, enabled=True),), targets=()
+        )
+        window = MainWindow(config)
+        try:
+            assert not window._composer._action_button.isEnabled()
+
+            window._engine_bar.on_models_listed(DEMO_PROVIDER_ID, [DiscoveredModel("available")])
+
+            assert window._engine_bar.model() == "available"
+            assert window._composer._action_button.isEnabled()
         finally:
             window.close()
 
@@ -1209,12 +1266,16 @@ class TestMainWindow:
         finally:
             window.close()
 
-    def test_a_failed_request_does_not_leave_a_dangling_user_turn(self, qapp: object):
+    def test_a_failed_request_does_not_leave_a_dangling_user_turn(self, qapp: object, monkeypatch):
+        from anyinfer.types.capabilities import DiscoveredModel
         from demo_app.main_window import MainWindow
 
+        monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
+        monkeypatch.setattr(MainWindow, "_refresh_token_hint", lambda _self: None)
         window = MainWindow(default_config())
         try:
-            window._engine_bar.set_target("no-such-provider:model")
+            window._engine_bar.on_models_listed(DEMO_PROVIDER_ID, [DiscoveredModel("reliable")])
+            monkeypatch.setattr(window, "_route_targets", lambda: ("no-such-provider:model",))
             window._composer.set_text("This should fail.")
             window._on_send()
 
@@ -1251,11 +1312,11 @@ class TestMainWindow:
 
             files_after = list(window._conversations_dir.glob("*.json"))
             assert len(files_after) == 1  # the new, empty chat is not saved
-            assert window._sidebar._list.count() == 1
+            assert window._tabs.count() == 2
         finally:
             window.close()
 
-    def test_selecting_a_conversation_restores_its_transcript(self, qapp: object):
+    def test_open_saved_restores_a_conversation_in_a_tab(self, qapp: object, monkeypatch):
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
@@ -1264,11 +1325,15 @@ class TestMainWindow:
             window._on_send()
             _drain(window._engine)
             saved_id = window._current_conversation.id
+            saved_path = window._conversations_dir / f"{saved_id}.json"
 
-            window._on_new_chat()
-            assert window._chat.transcript_text() == ""
+            window._on_tab_close(window._tabs.currentIndex())
+            monkeypatch.setattr(
+                "demo_app.main_window.QFileDialog.getOpenFileName",
+                lambda *_args, **_kwargs: (str(saved_path), "JSON"),
+            )
 
-            window._on_conversation_selected(saved_id)
+            window._on_open_saved()
             assert "Remember this." in window._chat.transcript_text()
             assert window._current_conversation.id == saved_id
         finally:
@@ -1286,24 +1351,8 @@ class TestMainWindow:
             path = window._conversations_dir / f"{saved_id}.json"
             assert path.exists()
 
-            window._on_delete_conversation(saved_id)
+            window._on_tab_delete(window._tabs.currentIndex())
             assert not path.exists()
-        finally:
-            window.close()
-
-    def test_hiding_the_left_sidebar_hides_the_conversation_list(self, qapp: object):
-        from demo_app.main_window import MainWindow
-
-        window = MainWindow(default_config())
-        try:
-            window.show()
-            assert window._sidebar.isVisible()
-            window._set_left_sidebar_visible(False)
-            assert not window._sidebar.isVisible()
-            assert not window._left_sidebar_action.isChecked()
-            window._set_left_sidebar_visible(True)
-            assert window._sidebar.isVisible()
-            assert window._left_sidebar_action.isChecked()
         finally:
             window.close()
 
@@ -1358,16 +1407,23 @@ class TestMainWindow:
         finally:
             window.close()
 
-    def test_conversation_history_checkbox_stays_in_sync_with_left_sidebar_checkbox(
-        self, qapp: object
-    ):
+    def test_view_menu_has_one_sidebar_flyout(self, qapp: object):
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
-            window.show()
-            window._left_sidebar_action.trigger()
-            assert not window._sidebar.isVisible()
+            assert window._sidebar_menu.title() == "Sidebar"
+            actions = window._sidebar_menu.actions()
+            assert actions[0].text() == "Show Sidebar"
+            assert actions[1].isSeparator()
+            assert [action.text() for action in actions[2:]] == [
+                "Telemetry",
+                "Structured Output",
+                "Providers",
+                "Target Inspector",
+                "Tool Loop",
+            ]
+            assert all(action.isCheckable() for action in actions[:1] + actions[2:])
         finally:
             window.close()
 
@@ -1381,6 +1437,27 @@ class TestMainWindow:
             window._set_theme("dark")  # persists preferences
             assert path.exists(), "the save went somewhere other than the session's path"
             assert DemoConfig.load(path).theme == "dark"
+        finally:
+            window.close()
+
+    def test_local_models_can_add_default_llama_cpp_in_one_click(
+        self, qapp: object, tmp_path, monkeypatch
+    ):
+        from demo_app.main_window import MainWindow
+
+        path = tmp_path / "demo.json"
+        monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
+        # Keep this configuration-only test clear of the sync client's unrelated
+        # context-budget startup path.
+        monkeypatch.setattr(MainWindow, "_refresh_token_hint", lambda _self: None)
+        window = MainWindow(default_config(), config_path=path)
+        try:
+            window._on_quick_add_llama_cpp()
+
+            llama = list(window._engine.config.instances_of("llama-cpp"))
+            assert llama == [ProviderConfig(provider_id="llama-cpp", enabled=True)]
+            assert DemoConfig.load(path).for_provider("llama-cpp").enabled is True
+            assert "llama.cpp added" in window.statusBar().currentMessage()
         finally:
             window.close()
 
@@ -1423,6 +1500,11 @@ class TestEngineBar:
     def test_builds_the_target_from_the_dropdowns(self, qapp: object):
         bar = self._bar()
         assert bar.provider_id() == DEMO_PROVIDER_ID
+        assert bar.target() == ""
+
+        from anyinfer.types.capabilities import DiscoveredModel
+
+        bar.on_models_listed(DEMO_PROVIDER_ID, [DiscoveredModel(model) for model in DEMO_MODELS])
         assert bar.target() == "demo-fake:reliable"
 
     def test_engine_dropdown_shows_display_names(self, qapp: object):
@@ -1475,10 +1557,101 @@ class TestEngineBar:
         assert bar.model() == "qwen3:8b"
         assert bar.target() == "demo-fake:qwen3:8b"
 
-    def test_a_saved_target_for_a_missing_provider_is_kept_verbatim(self, qapp: object):
+    def test_a_saved_target_for_a_missing_provider_is_not_selectable(self, qapp: object):
         bar = self._bar()
+        count = bar._engine.count()
         bar.set_target("no-such-provider:model")
-        assert bar.target() == "no-such-provider:model"
+        assert bar._engine.count() == count
+        assert bar.target() == ""
+
+    def test_engine_change_clears_the_previous_model_and_requests_discovery(self, qapp: object):
+        config = DemoConfig(
+            providers=(
+                ProviderConfig(DEMO_PROVIDER_ID, enabled=True),
+                ProviderConfig(DEMO_PROVIDER_ID, alias="second", enabled=True),
+            ),
+            targets=("demo-fake:reliable",),
+        )
+        bar = self._bar(config)
+        requested: list[str] = []
+        bar.refresh_requested.connect(requested.append)
+
+        bar._engine.setCurrentIndex(bar._engine.findData("second"))
+
+        assert bar.model() == ""
+        assert bar.target() == ""
+        assert requested == ["second"]
+
+    def test_engine_change_uses_the_first_model_from_its_cached_list(self, qapp: object):
+        from anyinfer.types.capabilities import DiscoveredModel
+
+        config = DemoConfig(
+            providers=(
+                ProviderConfig(DEMO_PROVIDER_ID, enabled=True),
+                ProviderConfig(DEMO_PROVIDER_ID, alias="second", enabled=True),
+            ),
+            targets=("demo-fake:reliable",),
+        )
+        bar = self._bar(config)
+        requested: list[str] = []
+        bar.refresh_requested.connect(requested.append)
+        bar.on_models_listed("second", [DiscoveredModel("first"), DiscoveredModel("next")])
+
+        bar._engine.setCurrentIndex(bar._engine.findData("second"))
+
+        assert bar.model() == "first"
+        assert bar.target() == "second:first"
+        assert requested == []
+
+    def test_startup_keeps_a_saved_model_only_when_discovery_confirms_it(self, qapp: object):
+        from anyinfer.types.capabilities import DiscoveredModel
+
+        config = DemoConfig(
+            providers=(ProviderConfig(DEMO_PROVIDER_ID, enabled=True),),
+            targets=("demo-fake:preferred",),
+        )
+        bar = self._bar(config)
+        assert bar.model() == ""
+
+        bar.on_models_listed(
+            DEMO_PROVIDER_ID,
+            [DiscoveredModel("first"), DiscoveredModel("preferred")],
+        )
+
+        assert bar.model() == "preferred"
+
+    def test_refresh_replaces_a_model_the_engine_no_longer_reports(self, qapp: object):
+        from anyinfer.types.capabilities import DiscoveredModel
+
+        bar = self._bar()
+        bar.on_models_listed(
+            DEMO_PROVIDER_ID,
+            [DiscoveredModel("first"), DiscoveredModel("selected")],
+        )
+        bar.set_target("demo-fake:selected")
+        assert bar.model() == "selected"
+
+        bar.on_models_listed(DEMO_PROVIDER_ID, [DiscoveredModel("replacement")])
+
+        assert bar.model() == "replacement"
+        assert not bar._model.isEditable()
+
+    def test_target_controls_follow_engine_and_model_availability(self, qapp: object):
+        empty = self._bar(DemoConfig(providers=(), targets=()))
+        assert not empty._model.isEnabled()
+        assert not empty._refresh.isEnabled()
+        assert not empty._context.isEnabled()
+
+        selected = self._bar(
+            DemoConfig(providers=(ProviderConfig(DEMO_PROVIDER_ID, enabled=True),), targets=())
+        )
+        assert selected._model.isEnabled()
+        assert selected._refresh.isEnabled()
+        assert not selected._context.isEnabled()
+        from anyinfer.types.capabilities import DiscoveredModel
+
+        selected.on_models_listed(DEMO_PROVIDER_ID, [DiscoveredModel("available")])
+        assert selected._context.isEnabled()
 
     def test_auto_detect_shows_the_known_token_count_in_the_disabled_input(self, qapp: object):
         bar = self._bar()
@@ -1510,7 +1683,10 @@ class TestEngineBar:
         assert bar._context._input.text() == "Auto-Detected (9,000 tokens)"
 
     def test_manual_override_round_trips_and_survives_toggling(self, qapp: object):
+        from anyinfer.types.capabilities import DiscoveredModel
+
         bar = self._bar()
+        bar.on_models_listed(DEMO_PROVIDER_ID, [DiscoveredModel("reliable")])
         row = bar._context
         row._toggle.click()
         assert not row.auto_detect
@@ -1635,6 +1811,21 @@ class TestMarkdownRenderer:
         assert 'href="https://example.com"' in html
         assert "onclick" not in html
 
+    def test_tolerates_html_void_tags_and_named_entities(self, qapp: object):
+        from demo_app.widgets.markdown_renderer import render_markdown
+
+        html = render_markdown("before\n\n<hr>\n\na&nbsp;b and **bold**")
+        assert "<pre>" not in html
+        assert "<hr" in html
+        assert "<strong>bold</strong>" in html
+
+    def test_drops_script_link_schemes(self, qapp: object):
+        from demo_app.widgets.markdown_renderer import render_markdown
+
+        html = render_markdown('[unsafe](javascript:alert("x"))')
+        assert "javascript:" not in html
+        assert "unsafe" in html
+
 
 class TestComposer:
     def test_ctrl_enter_sends(self, qapp: object):
@@ -1687,6 +1878,21 @@ class TestComposer:
         composer._on_send_key()
         assert sent == [True]
 
+    def test_send_is_disabled_without_a_target_but_cancel_remains_available(self, qapp: object):
+        from demo_app.widgets.composer import Composer
+
+        composer = Composer()
+        sent: list[bool] = []
+        composer.send_requested.connect(lambda: sent.append(True))
+        composer.set_send_enabled(False)
+
+        assert not composer._action_button.isEnabled()
+        composer._on_send_key()
+        assert sent == []
+
+        composer.set_busy(True)
+        assert composer._action_button.isEnabled()
+
     def test_token_hint_sits_directly_above_the_input(self, qapp: object):
         """The hint and the text box are one instrument; the layout keeps them adjacent."""
         from demo_app.widgets.composer import Composer
@@ -1694,7 +1900,10 @@ class TestComposer:
         composer = Composer()
         layout = composer.layout()
         assert layout is not None
-        assert layout.itemAt(0).widget() is composer._hint
+        hint_row = layout.itemAt(0).layout()
+        assert hint_row is not None
+        assert hint_row.itemAt(0).widget() is composer._hint
+        assert hint_row.itemAt(1).widget() is composer._budget_help
 
     def test_set_token_hint_flags_when_it_does_not_fit(self, qapp: object):
         from demo_app.widgets.composer import Composer
@@ -1704,31 +1913,46 @@ class TestComposer:
         assert "100" in composer._hint.text()
         assert composer._hint.styleSheet() != ""
 
+    def test_wrapped_paragraph_grows_to_the_visual_line_cap(self, qapp: object):
+        from demo_app.widgets.composer import _MAX_LINES, _AutoGrowingTextEdit
 
-class TestConversationSidebar:
-    def test_selecting_an_item_emits_its_id(self, qapp: object):
-        from demo_app.conversation import Conversation
-        from demo_app.widgets.conversation_sidebar import ConversationSidebar
+        editor = _AutoGrowingTextEdit()
+        editor.resize(180, editor.height())
+        editor.show()
+        qapp.processEvents()  # type: ignore[attr-defined]
+        single_line_height = editor.height()
 
-        sidebar = ConversationSidebar()
-        conversation = Conversation.new()
-        sidebar.set_conversations([conversation])
+        editor.setPlainText(
+            "A single paragraph that wraps across many visual lines at this narrow width. " * 5
+        )
+        qapp.processEvents()  # type: ignore[attr-defined]
 
-        selected = []
-        sidebar.conversation_selected.connect(selected.append)
-        sidebar._list.setCurrentRow(0)
-        assert selected == [conversation.id]
+        assert editor.document().blockCount() == 1
+        assert editor.height() > single_line_height
+        expected_cap = (
+            editor.fontMetrics().lineSpacing() * _MAX_LINES
+            + round(editor.document().documentMargin() * 2)
+            + editor.frameWidth() * 2
+        )
+        assert editor.height() <= expected_cap
 
-    def test_active_conversation_is_preselected(self, qapp: object):
-        from demo_app.conversation import Conversation
-        from demo_app.widgets.conversation_sidebar import ConversationSidebar
 
-        sidebar = ConversationSidebar()
-        a, b = Conversation.new(), Conversation.new()
-        sidebar.set_conversations([a, b], active_id=b.id)
+class TestSystemPromptDialog:
+    def test_editor_is_wider_and_wraps_at_its_viewport(self, qapp: object):
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QTextOption
+        from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
-        assert sidebar._list.item(1).isSelected()
-        assert not sidebar._list.item(0).isSelected()
+        from demo_app.main_window import _make_system_prompt_dialog
+
+        parent = QWidget()
+        dialog = _make_system_prompt_dialog(parent, "instructions " * 40)
+        editor = dialog.findChild(QPlainTextEdit)
+        assert editor is not None
+        assert dialog.width() == round(dialog.sizeHint().width() * 1.5)
+        assert editor.lineWrapMode() == QPlainTextEdit.LineWrapMode.WidgetWidth
+        assert editor.wordWrapMode() == QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere
+        assert editor.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
 
 
 class TestCollapsibleSection:

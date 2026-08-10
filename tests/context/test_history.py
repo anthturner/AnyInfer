@@ -44,7 +44,7 @@ def test_a_conversation_that_fits_is_returned_untouched():
 
 def test_an_oversized_conversation_is_brought_under_budget():
     # The budget has to clear the protected floor — the system prompt plus the recent
-    # window — because compaction will not touch those to make room.
+    # window, because compaction will not touch those to make room.
     messages = _transcript()
     result = compact_history(messages, max_tokens=6_000, keep_recent=2)
     assert result.fits

@@ -14,6 +14,7 @@ import pytest
 
 from anyinfer.catalog.resolve import load_default_catalog
 from anyinfer.local import hardware as hw
+from anyinfer.local import metrics
 from anyinfer.local.hardware import Accelerator, HardwareProfile, detect
 from anyinfer.local.recommend import recommend_alias
 from anyinfer.local.tuning import (
@@ -71,6 +72,33 @@ def test_no_accelerator_is_a_warning_not_a_failure(monkeypatch: pytest.MonkeyPat
 
     assert profile.has_accelerator is False
     assert any("no accelerator" in w for w in profile.warnings)
+
+
+def test_live_sampler_reports_deltas_without_guessing_the_first_cpu_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    counters = iter(((100, 25), (200, 50)))
+    monkeypatch.setattr(metrics, "_cpu_counters", lambda: next(counters))
+    monkeypatch.setattr(metrics, "_ram", lambda: (40.0, 4 * GIB))
+    monkeypatch.setattr(metrics, "_gpu", lambda: (60.0, 25.0, 2 * GIB))
+    sampler = metrics.SystemSampler()
+
+    first = sampler.sample()
+    second = sampler.sample()
+
+    assert first.cpu_percent is None
+    assert second.cpu_percent == 75.0
+    assert second.ram_percent == 40.0
+    assert second.gpu_percent == 60.0
+    assert second.vram_percent == 25.0
+
+
+def test_storage_profile_reads_capacity_without_running_a_speed_test(tmp_path: Path) -> None:
+    profile = metrics.storage_profile(tmp_path / "models" / "not-created-yet")
+
+    assert profile.path == str(tmp_path)
+    assert profile.total_bytes is not None and profile.total_bytes > 0
+    assert profile.free_bytes is not None and profile.free_bytes >= 0
 
 
 def test_nvidia_output_is_parsed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -257,10 +285,8 @@ def test_unknown_memory_falls_back_to_the_smallest_context() -> None:
 def test_weights_are_subtracted_from_the_budget() -> None:
     """A model must fit alongside its KV cache, not instead of it."""
     profile = _profile(accelerators=_cuda(16))
-    light = plan_server(profile, TuningInputs(artifact_size_bytes=1 * GIB,
-                                              parameter_size="7B"))
-    heavy = plan_server(profile, TuningInputs(artifact_size_bytes=12 * GIB,
-                                              parameter_size="7B"))
+    light = plan_server(profile, TuningInputs(artifact_size_bytes=1 * GIB, parameter_size="7B"))
+    heavy = plan_server(profile, TuningInputs(artifact_size_bytes=12 * GIB, parameter_size="7B"))
     assert heavy.context_size <= light.context_size
 
 
@@ -269,8 +295,7 @@ def test_unified_memory_budgets_against_system_ram() -> None:
         total_ram_bytes=32 * GIB,
         accelerators=(Accelerator(kind="metal", name="M3", unified_memory=True),),
     )
-    plan = plan_server(profile, TuningInputs(artifact_size_bytes=4 * GIB,
-                                             parameter_size="7B"))
+    plan = plan_server(profile, TuningInputs(artifact_size_bytes=4 * GIB, parameter_size="7B"))
     assert plan.gpu_layers == 999
     assert any("unified memory" in r for r in plan.rationale)
 
@@ -285,6 +310,7 @@ def test_server_arguments_always_enable_jinja() -> None:
     assert args[args.index("--host") + 1] == "127.0.0.1"
     assert args[args.index("--port") + 1] == "9999"
     assert args[args.index("--ctx-size") + 1] == str(plan.context_size)
+    assert args[args.index("--flash-attn") + 1] == "on"
 
 
 def test_plan_reports_its_memory_estimate() -> None:

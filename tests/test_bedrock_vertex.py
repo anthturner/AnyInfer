@@ -165,7 +165,7 @@ async def test_aws_secret_access_key_is_resolved_and_redacted(
     """AWS credentials ride in options, and must still go through the resolver.
 
     Unresolved, ``env://VAR`` would be signed with as the literal string — every request
-    would 403 with nothing to explain it — and a literal key would never be registered
+    would 403 with nothing to explain it, and a literal key would never be registered
     for redaction, so it could surface in a log line.
     """
     from anyinfer._client.providers import AdapterPool
@@ -219,8 +219,7 @@ async def test_system_prompts_become_top_level_blocks() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -242,8 +241,7 @@ async def test_sampling_lives_under_inference_config() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -296,8 +294,7 @@ async def test_tool_results_ride_on_a_user_turn() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -328,8 +325,7 @@ async def test_a_schema_becomes_a_forced_tool() -> None:
             "message": {
                 "role": "assistant",
                 "content": [
-                    {"toolUse": {"toolUseId": "t1", "name": "response",
-                                 "input": {"answer": "ok"}}}
+                    {"toolUse": {"toolUseId": "t1", "name": "response", "input": {"answer": "ok"}}}
                 ],
             }
         },
@@ -361,8 +357,7 @@ async def test_reasoning_effort_becomes_an_additional_model_field() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -407,8 +402,7 @@ async def test_streaming_tool_calls_reassemble_by_block_index() -> None:
         _frame("messageStart", {"role": "assistant"}),
         _frame(
             "contentBlockStart",
-            {"contentBlockIndex": 0, "start": {"toolUse": {"toolUseId": "t1",
-                                                           "name": "lookup"}}},
+            {"contentBlockIndex": 0, "start": {"toolUse": {"toolUseId": "t1", "name": "lookup"}}},
         ),
         _frame(
             "contentBlockDelta",
@@ -439,8 +433,7 @@ async def test_reasoning_frames_are_a_separate_channel() -> None:
     frames = (
         _frame(
             "contentBlockDelta",
-            {"contentBlockIndex": 0,
-             "delta": {"reasoningContent": {"text": "Let me think."}}},
+            {"contentBlockIndex": 0, "delta": {"reasoningContent": {"text": "Let me think."}}},
         ),
         _frame("contentBlockDelta", {"contentBlockIndex": 1, "delta": {"text": "42"}}),
         _frame("messageStop", {"stopReason": "end_turn"}),
@@ -518,8 +511,10 @@ def _vertex(handler: Any, **options: Any) -> VertexAdapter:
 
 _GEMINI_RESPONSE = {
     "candidates": [
-        {"content": {"role": "model", "parts": [{"text": "Hi from Vertex."}]},
-         "finishReason": "STOP"}
+        {
+            "content": {"role": "model", "parts": [{"text": "Hi from Vertex."}]},
+            "finishReason": "STOP",
+        }
     ],
     "usageMetadata": {"promptTokenCount": 8, "candidatesTokenCount": 4},
 }

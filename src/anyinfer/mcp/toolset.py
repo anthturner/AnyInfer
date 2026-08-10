@@ -1,7 +1,7 @@
 """Model Context Protocol servers as a source of tools for the existing loop.
 
 What this adds is a *source* of `ToolSpec` plus a dispatcher. It adds no loop semantics —
-no planning, no memory, no parallelism — so the tool loop it feeds is exactly the bounded,
+no planning, no memory, no parallelism, so the tool loop it feeds is exactly the bounded,
 sequential one that already shipped. That distinction is the whole reason this can exist
 without becoming the agent framework this project refuses to be.
 
@@ -58,7 +58,7 @@ class MCPServer:
         env: Extra environment for a spawned server. Values may be credential references
             (``env://``, ``credential://``) and are resolved and registered for redaction
             before the process starts.
-        headers: Extra request headers for an HTTP server — where authentication goes.
+        headers: Extra request headers for an HTTP server, where authentication goes.
         cwd: Working directory for a spawned server.
         timeout_s: How long any one call may take.
         allow_tools: If non-empty, only these tool names are exposed.
@@ -192,9 +192,7 @@ def _build_transport(server: MCPServer, resolver: ResolverChain) -> MCPTransport
 
     # Environment values are credential-shaped: resolve references and register them for
     # redaction before they reach a process listing, an error, or an event.
-    resolved = {
-        key: resolver.resolve(value) or "" for key, value in server.env.items()
-    }
+    resolved = {key: resolver.resolve(value) or "" for key, value in server.env.items()}
     return StdioTransport(server.command, env=resolved, cwd=server.cwd)
 
 
@@ -285,7 +283,7 @@ class _ToolReportedError(Exception):
 def _read_annotations(raw: Any) -> ToolAnnotations:
     """Read the optional behavioural hints, absent fields staying ``None``.
 
-    These are untrusted server-supplied hints — the protocol says so — so they are captured
+    These are untrusted server-supplied hints — the protocol says so, so they are captured
     for a caller to reason about and are never acted on as a permission.
     """
     if not isinstance(raw, Mapping):
@@ -325,4 +323,3 @@ def _flatten_content(result: Mapping[str, Any]) -> tuple[str, bool]:
     if len(text) > _MAX_RESULT_CHARS:
         text = text[:_MAX_RESULT_CHARS] + "\n[truncated]"
     return text, bool(result.get("isError"))
-

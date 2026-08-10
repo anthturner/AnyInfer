@@ -208,7 +208,8 @@ async def test_reasoning_is_withheld_from_a_model_known_not_to_have_it() -> None
 
     assert "reasoning_effort" not in server.requests[0]
     dropped = [
-        e for e in recorder.events
+        e
+        for e in recorder.events
         if isinstance(e, ai.ParameterDropped) and e.parameter == "reasoning"
     ]
     assert len(dropped) == 1

@@ -40,7 +40,7 @@ __all__ = [
 AgentsMdFormat = Literal["agents", "claude", "copilot"]
 """Which consuming file the fragment is shaped for.
 
-The body is identical in all three — one description of one API — and only the wrapper
+The body is identical in all three — one description of one API, and only the wrapper
 differs, because the three tools disagree about where instructions live and what a file
 opens with, not about what is true.
 """
@@ -207,14 +207,14 @@ def _never_hand_roll() -> list[str]:
         "honoured, and every attempt lands on `result.attempts`.",
         "- **Schema validation and repair** — pass `schema=` and, if you want repair, "
         "`repair=ai.Repair(max_attempts=1)`.",
-        "- **Provider branches** — no `if provider == \"ollama\"`. Providers are "
+        '- **Provider branches** — no `if provider == "ollama"`. Providers are '
         "described by registry descriptors; anything a caller needs to know is a field on "
         "one.",
         "- **Token counting and cost arithmetic** — `client.budget(...)` before a call, "
         "`result.usage` after it.",
         "- **Trimming a prompt to fit** — `anyinfer.context` reduces a corpus and reports "
         "exactly what it omitted; `ai.HistoryPolicy` compacts a conversation.",
-        "- **Secret handling** — pass `api_key=\"env://VAR\"`. Resolved values are "
+        '- **Secret handling** — pass `api_key="env://VAR"`. Resolved values are '
         "registered for redaction, so they cannot reach a log line, an error, or an event.",
     ]
 
@@ -286,12 +286,14 @@ def _where_to_look(registry: ProviderRegistry) -> list[str]:
             + ". There is no per-provider extra for a hosted API."
         )
         lines.append("")
-    lines.extend([
-        "- `anyinfer providers` — every provider and the fields it needs.",
-        "- `anyinfer verify <target>` — proves a target answers, which a health check "
-        "cannot: a credential can be valid for a model listing and useless for inference.",
-        "- `anyinfer run \"...\" --dry-run` — what a request would cost and whether it fits.",
-        "- `anyinfer init` — writes a working configuration from what this machine has.",
-        "- <https://anyinfer.dev/llms.txt> — the documentation index, for agents.",
-    ])
+    lines.extend(
+        [
+            "- `anyinfer providers` — every provider and the fields it needs.",
+            "- `anyinfer verify <target>` — proves a target answers, which a health check "
+            "cannot: a credential can be valid for a model listing and useless for inference.",
+            '- `anyinfer run "..." --dry-run` — what a request would cost and whether it fits.',
+            "- `anyinfer init` — writes a working configuration from what this machine has.",
+            "- <https://anyinfer.dev/llms.txt> — the documentation index, for agents.",
+        ]
+    )
     return lines

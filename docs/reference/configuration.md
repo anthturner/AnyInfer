@@ -51,13 +51,13 @@ keys, so a disabled entry can hold settings for a provider that is not installed
 ```python
 ai.ProviderSettings.of(
     "openai",
-    alias=None,                             # instance id; defaults to the provider id
-    base_url="https://api.openai.com/v1",   # provider default when omitted
-    api_key="env://OPENAI_API_KEY",         # literal, env://, or credential://
-    api_version=None,                       # Azure and Anthropic
-    headers={},                             # extra request headers
-    options={},                             # adapter-specific settings
-    timeout_s=120.0,                        # default per-request timeout
+    alias=None,  # instance id; defaults to the provider id
+    base_url="https://api.openai.com/v1",  # provider default when omitted
+    api_key="env://OPENAI_API_KEY",  # literal, env://, or credential://
+    api_version=None,  # Azure and Anthropic
+    headers={},  # extra request headers
+    options={},  # adapter-specific settings
+    timeout_s=120.0,  # default per-request timeout
 )
 ```
 
@@ -67,20 +67,28 @@ The **order** you list providers is the preference order for
 ### Configuring one engine more than once
 
 `alias` gives an entry its own identity, so the same engine can be configured several
-times — two Azure tenants, a local and a remote Ollama — each with its own endpoint and
+times; two Azure tenants, a local and a remote Ollama; each with its own endpoint and
 credentials. The alias is what a target string names:
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of("azure-foundry", alias="work",
-                            base_url="https://work.openai.azure.com",
-                            api_key="env://WORK_KEY"),
-    ai.ProviderSettings.of("azure-foundry", alias="lab",
-                            base_url="https://lab.openai.azure.com",
-                            api_key="env://LAB_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "azure-foundry",
+            alias="work",
+            base_url="https://work.openai.azure.com",
+            api_key="env://WORK_KEY",
+        ),
+        ai.ProviderSettings.of(
+            "azure-foundry",
+            alias="lab",
+            base_url="https://lab.openai.azure.com",
+            api_key="env://LAB_KEY",
+        ),
+    ]
+)
 
-client.generate(messages, target="work:gpt-4o")   # the work tenant, not the lab one
+client.generate(messages, target="work:gpt-4o")  # the work tenant, not the lab one
 ```
 
 Each alias becomes its own adapter with its own connection pool. Omitting `alias` is the
@@ -97,10 +105,10 @@ token authenticate with different headers, so they are separate fields rather th
 spellings of one.
 
 ```python
-# An Anthropic API key — sent as x-api-key.
+# An Anthropic API key; sent as x-api-key.
 ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")
 
-# A claude.ai OAuth token — sent as a bearer token, with the beta flag the API requires.
+# A claude.ai OAuth token; sent as a bearer token, with the beta flag the API requires.
 # Obtain one with: ant auth print-credentials --access-token
 ai.ProviderSettings.of("anthropic", options={"oauth_token": "env://ANTHROPIC_OAUTH_TOKEN"})
 ```
@@ -112,23 +120,26 @@ resolver as `api_key`**, so they accept `env://` and `credential://` references 
 registered for redaction. Bedrock's explicit AWS credentials work the same way:
 
 ```python
-ai.ProviderSettings.of("bedrock", options={
-    "aws_access_key_id": "AKIA…",                        # an identifier, passed through
-    "aws_secret_access_key": "env://AWS_SECRET_ACCESS_KEY",  # resolved and redacted
-})
+ai.ProviderSettings.of(
+    "bedrock",
+    options={
+        "aws_access_key_id": "AKIA…",  # an identifier, passed through
+        "aws_secret_access_key": "env://AWS_SECRET_ACCESS_KEY",  # resolved and redacted
+    },
+)
 ```
 
 Fields a provider declares as anything *other* than `secret` are passed through verbatim —
 resolving them would corrupt any literal value that merely looked like a reference.
 
-To discover what a provider accepts without hardcoding it, read its setup spec — the
+To discover what a provider accepts without hardcoding it, read its setup spec; the
 `any_of` groups are the ones where one of several fields will do:
 
 ```python
 setup = ai.default_registry.get("anthropic").setup
 [(f.key, f.required) for f in setup.fields]  # declared fields
-setup.any_of                                 # (('api_key', 'oauth_token'),)
-setup.requirement_note                       # why, in one line
+setup.any_of  # (('api_key', 'oauth_token'),)
+setup.requirement_note  # why, in one line
 ```
 
 ### Which fields to actually ask for
@@ -140,8 +151,8 @@ have to infer it from help text:
 
 ```python
 setup = ai.default_registry.get("openai").setup
-[f.key for f in setup.essential_fields]  # ['api_key']  — ask for these
-[f.key for f in setup.advanced_fields]   # ['base_url'] — offer these, folded away
+[f.key for f in setup.essential_fields]  # ['api_key'] ; ask for these
+[f.key for f in setup.advanced_fields]  # ['base_url']; offer these, folded away
 ```
 
 An advanced field is never required and never part of an `any_of` group, so a form built
@@ -152,7 +163,7 @@ pre-filling the editor with it: a saved copy of today's default keeps overriding
 default long after it has moved on.
 
 The two extremes are worth knowing. `ollama`, `vllm`, and the other local engines have no
-essential fields at all — there is nothing to fill in. `azure-foundry`, `runpod`, and
+essential fields at all; there is nothing to fill in. `azure-foundry`, `runpod`, and
 anything else whose URL embeds an account or endpoint id keeps `base_url` essential,
 because no default could be right.
 
@@ -161,22 +172,22 @@ because no default could be right.
 ```python
 ai.Client(
     providers,
-    registry=None,              # defaults to the process-wide registry
-    catalog=None,               # defaults to the bundled catalog
-    route=None,                 # default route when a call names no target
-    observers=[],               # telemetry sinks, registered payload-free
-    resolver=None,              # credential resolver chain
-    retain_raw=False,           # keep raw provider payloads on results
-    repair=None,                # default repair budget
-    use_default_catalog=True,   # False disables alias resolution entirely
-    estimator=None,             # token counting; defaults to the byte heuristic
-    context_gate=True,          # refuse requests that provably cannot fit pre-dispatch
-    history=None,               # conversation compaction when a request overflows
-    arena=None,                 # default fixed-target arena policy
-    arenas={},                  # named arena policies for CLI/sidecar model strings
-    pricing_table=None,         # defaults to the bundled table; see fetch_pricing()
+    registry=None,  # defaults to the process-wide registry
+    catalog=None,  # defaults to the bundled catalog
+    route=None,  # default route when a call names no target
+    observers=[],  # telemetry sinks, registered payload-free
+    resolver=None,  # credential resolver chain
+    retain_raw=False,  # keep raw provider payloads on results
+    repair=None,  # default repair budget
+    use_default_catalog=True,  # False disables alias resolution entirely
+    estimator=None,  # token counting; defaults to the byte heuristic
+    context_gate=True,  # refuse requests that provably cannot fit pre-dispatch
+    history=None,  # conversation compaction when a request overflows
+    arena=None,  # default fixed-target arena policy
+    arenas={},  # named arena policies for CLI/sidecar model strings
+    pricing_table=None,  # defaults to the bundled table; see fetch_pricing()
     capability_overrides=None,  # "provider:model"-keyed corrections, strongest layer
-    model_dir=None,             # where acquired model weights are stored
+    model_dir=None,  # where acquired model weights are stored
 )
 ```
 
@@ -188,24 +199,24 @@ telemetry deliberately omits.
 ```python
 client.generate(
     messages,
-    target="medium",                # or route=
+    target="medium",  # or route=
     schema=None,
     tools=(),
-    tool_choice="auto",             # "auto" | "none" | "required" | a tool name
+    tool_choice="auto",  # "auto" | "none" | "required" | a tool name
     sampling=ai.Sampling(...),
-    reasoning=None,                 # "minimal" | "low" | "medium" | "high"
-    timeout_s=None,                 # per attempt; defaults to 120
+    reasoning=None,  # "minimal" | "low" | "medium" | "high"
+    timeout_s=None,  # per attempt; defaults to 120
     repair=None,
-    provider_options={},            # namespaced escape hatch
-    metadata={},                    # opaque, echoed in telemetry
+    provider_options={},  # namespaced escape hatch
+    metadata={},  # opaque, echoed in telemetry
     max_response_bytes=1_048_576,
-    arena=None,                     # fixed targets and post-run selection
-    context=None,                   # caller-approved stateless corpus reduction
+    arena=None,  # fixed targets and post-run selection
+    context=None,  # caller-approved stateless corpus reduction
 )
 ```
 
 `Sampling` fields default to `None`, meaning *provider default*. AnyInfer never invents a
-temperature — an unset value is omitted from the wire request entirely.
+temperature; an unset value is omitted from the wire request entirely.
 
 ## Environment variables
 
@@ -224,7 +235,7 @@ credential variable names.
 ## Generating a file
 
 `anyinfer init` writes a valid configuration from what the machine can already do —
-running loopback engines and credential variables that are actually set — plus a runnable
+running loopback engines and credential variables that are actually set; plus a runnable
 starter program beside it. See [the CLI guide](../guides/cli.md#getting-a-config-file-in-the-first-place).
 
 In Python, the same format is written by `anyinfer.dumps_config` and `anyinfer.dump_config`:
@@ -236,8 +247,8 @@ config = ai.AnyInferConfig(
     providers=(ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),),
     route=ai.Route(targets=("openai:gpt-5",)),
 )
-ai.dump_config(config, "anyinfer.json")          # refuses to replace an existing file
-text = ai.dumps_config(config, comments=True)     # the same JSON, with a leading note
+ai.dump_config(config, "anyinfer.json")  # refuses to replace an existing file
+text = ai.dumps_config(config, comments=True)  # the same JSON, with a leading note
 ```
 
 Round-tripping is the contract: `loads_config(dumps_config(c)) == c` for every
@@ -263,7 +274,7 @@ one, so no code path exists by which `dump_config` could write key material.
     {"id": "ollama"},
     {
       "id": "llama-cpp",
-      "options": {"posture": "balanced", "binary": "/usr/local/bin/llama-server"}
+      "options": {"posture": "balanced", "runtime": "cuda"}
     }
   ],
   "default_route": ["anthropic:claude-sonnet-4-5", "ollama:qwen3:8b"]
@@ -345,7 +356,7 @@ config = ai.load_config("anyinfer.json")
 reduction = context.select(docs, query, max_tokens=8_000, tuning=config.context)
 ```
 
-A misspelled setting is a `ConfigError`, not a silent no-op — a tuning key that quietly
+A misspelled setting is a `ConfigError`, not a silent no-op; a tuning key that quietly
 does nothing is worse than one that fails loudly. The sidecar reads the same file so one
 config serves every frontend, but it does not reduce context itself: it is a wire codec
 over a normal client, and reduction is the application's call about its own material.
@@ -372,7 +383,7 @@ larger-window target further down the route.
 Omitting the block means no compaction: an oversized request is rerouted or fails, exactly
 as before. Set `"enabled": false` to keep a tuned block switched off.
 
-Sidecar callers can override it per request with the `anyinfer_history` field — see
+Sidecar callers can override it per request with the `anyinfer_history` field; see
 [the sidecar](../serve/README.md).
 
 ### The `arena` and `arenas` blocks

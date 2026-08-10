@@ -132,9 +132,7 @@ class CollapsibleSection(QFrame):
 
     def _render_icon(self) -> None:
         if self._icon_label is not None and self._icon_name is not None:
-            self._icon_label.setPixmap(
-                themed_icon(self, self._icon_name, size=16).pixmap(16, 16)
-            )
+            self._icon_label.setPixmap(themed_icon(self, self._icon_name, size=16).pixmap(16, 16))
 
     def _update_toggle(self) -> None:
         """Sync the toggle's icon, tooltip, and accessible name to the current state.

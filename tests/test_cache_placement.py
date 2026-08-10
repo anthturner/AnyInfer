@@ -41,9 +41,7 @@ def test_no_marks_leaves_the_payload_exactly_as_before() -> None:
 
     assert payload["system"] == "a long stable preamble"
     assert not any(
-        "cache_control" in block
-        for message in payload["messages"]
-        for block in message["content"]
+        "cache_control" in block for message in payload["messages"] for block in message["content"]
     )
 
 
@@ -100,9 +98,7 @@ def test_out_of_range_marks_are_ignored_rather_than_raising() -> None:
     payload = _adapter().build_payload(_wire(cache_marks=(99,)))
 
     assert not any(
-        "cache_control" in block
-        for message in payload["messages"]
-        for block in message["content"]
+        "cache_control" in block for message in payload["messages"] for block in message["content"]
     )
 
 
@@ -193,15 +189,11 @@ def test_a_policy_reaches_the_result_and_the_event_stream() -> None:
 def test_a_target_without_caching_reports_a_dropped_parameter() -> None:
     client, provider, events = _scripted_client(None)
     with client:
-        result = client.generate(
-            "hi", target=provider.target("m"), cache=ai.CachePolicy()
-        )
+        result = client.generate("hi", target=provider.target("m"), cache=ai.CachePolicy())
 
     assert result.cache_mechanism is None
     dropped = [
-        e
-        for e in events
-        if isinstance(e, ai.ParameterDropped) and e.parameter == "cache.mode"
+        e for e in events if isinstance(e, ai.ParameterDropped) and e.parameter == "cache.mode"
     ]
     assert dropped
 
@@ -251,9 +243,7 @@ def test_an_unstable_prefix_is_reported_on_an_implicit_target() -> None:
             cache=ai.CachePolicy(),
         )
 
-    codes = [
-        e.diagnostic.code for e in events if isinstance(e, ai.ProviderDiagnostic)
-    ]
+    codes = [e.diagnostic.code for e in events if isinstance(e, ai.ProviderDiagnostic)]
     assert "cache.prefix-unstable" in codes
 
 
@@ -264,7 +254,5 @@ def test_a_stable_prefix_reports_nothing() -> None:
         client.generate(messages, target=provider.target("m"), cache=ai.CachePolicy())
         client.generate(messages, target=provider.target("m"), cache=ai.CachePolicy())
 
-    codes = [
-        e.diagnostic.code for e in events if isinstance(e, ai.ProviderDiagnostic)
-    ]
+    codes = [e.diagnostic.code for e in events if isinstance(e, ai.ProviderDiagnostic)]
     assert "cache.prefix-unstable" not in codes

@@ -12,13 +12,13 @@ something to show:
 ``demo-fake:reliable``
     Answers immediately, streams, reports usage.
 ``demo-fake:flaky``
-    Fails its first call with a retryable 503, then succeeds — which makes retry, fallback,
+    Fails its first call with a retryable 503, then succeeds, which makes retry, fallback,
     and the attempt trail visible without needing a real outage.
 ``demo-fake:slow``
     Streams the same answer in smaller chunks, so incremental rendering is easy to watch.
 ``demo-fake:tools``
     Answers a plain request with a tool call and a request carrying a tool result with
-    text — which is the whole shape of a tool loop: the model asks, the application runs
+    text, which is the whole shape of a tool loop: the model asks, the application runs
     the function, the result goes back, the model answers. Without it the loop could only
     be demonstrated against a real provider, and the demo would stop being offline-capable
     exactly where it got interesting.
@@ -85,7 +85,7 @@ class DemoFakeBackend:
     """The demo's offline provider.
 
     Two providers are kept — one answering prose, one answering the canned structured
-    object — and *each request* is routed to the right one by reading its own body. A
+    object, and *each request* is routed to the right one by reading its own body. A
     single mutable "json mode" flag would be a global for something that is per request,
     and with several conversations streaming at once the last caller to set it would
     decide what the others got back.
@@ -125,9 +125,7 @@ class DemoFakeBackend:
             body = _chat_body(request)
             if body is not None and body.get("model") == TOOL_MODEL:
                 messages = body.get("messages") or []
-                answered = any(
-                    isinstance(m, dict) and m.get("role") == "tool" for m in messages
-                )
+                answered = any(isinstance(m, dict) and m.get("role") == "tool" for m in messages)
                 response = (
                     FakeResponse(text=_TOOL_ANSWER)
                     if answered
@@ -151,7 +149,7 @@ def _wants_structured(body: dict[str, Any] | None) -> bool:
     """Whether this request asked for a schema-shaped answer.
 
     ``response_format`` is how every structured-output mechanism the OpenAI dialect
-    carries announces itself — ``json_schema`` and plain ``json_object`` alike — so one
+    carries announces itself — ``json_schema`` and plain ``json_object`` alike, so one
     check covers both. A prompt-injected schema (the last-resort mechanism) sends no
     such field and legitimately gets prose, which is exactly the case the repair loop
     exists for.

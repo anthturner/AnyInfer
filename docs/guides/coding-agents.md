@@ -5,7 +5,7 @@ integration. That path has a specific failure mode here, and this page is about 
 
 An agent working from pre-training and a web search will confidently produce an OpenAI
 clone — `client.chat.completions.create(...)`, a `model=` keyword,
-`response_format={"type": "json_object"}` — because that is what almost every other library
+`response_format={"type": "json_object"}`, because that is what almost every other library
 in this space looks like. AnyInfer deliberately is not that, so the most predictable guess
 is also the most likely to be wrong. Worse, the wrong version usually *runs*: a hand-written
 retry loop around a call that already retries produces four attempts where you asked for two,
@@ -43,9 +43,9 @@ yours to make, and it is also your review step.
 
 Built with the site and published at its root:
 
-- <https://anyinfer.dev/llms.txt> — the index: a one-line summary of every page, grouped
+- <https://anyinfer.dev/llms.txt>: the index: a one-line summary of every page, grouped
   the way the navigation is.
-- <https://anyinfer.dev/llms-full.txt> — the full text of every page, navigation chrome
+- <https://anyinfer.dev/llms-full.txt>: the full text of every page, navigation chrome
   stripped, including the generated API reference.
 
 Both are generated from the navigation and the built pages, so a page added to the docs
@@ -55,7 +55,7 @@ appears without a hand edit and a deleted one cannot linger.
 
 [`docs/agents/INTEGRATION.md`](https://github.com/anthturner/AnyInfer/blob/main/docs/agents/INTEGRATION.md)
 is the canonical procedure: establish the version, read what the application already
-configured, write the call, do not re-implement the core, read results honestly, prove it
+configured, write the call, do not re-implement the core, interpret results accurately, prove it
 offline, then check the work. Three thin entry points in the repository invoke it —
 `.claude/skills/anyinfer-integration/`, `.agents/skills/anyinfer-integration/`, and
 `.github/prompts/anyinfer-integration.prompt.md`.
@@ -74,7 +74,7 @@ The library never writes into your `.claude/`, `.agents/`, or `.github/` directo
 wheel carries no skill payload. Adjust the relative link in the shim to wherever you put the
 procedure.
 
-## The honest caveat
+## One caveat
 
 A generated fragment reflects the version that generated it, and a copied procedure
 reflects the day it was copied. Neither updates itself. Regenerate after upgrading:
@@ -85,4 +85,4 @@ anyinfer agents-md > /tmp/anyinfer-agents.md && diff /tmp/anyinfer-agents.md AGE
 
 What does not go stale is the library itself. `anyinfer providers`, `anyinfer verify`, and
 `anyinfer run --dry-run` answer from the installed code, which is why the procedure tells an
-agent to run them rather than to trust anything it remembers — including this page.
+agent to run them rather than to trust anything it remembers, including this page.

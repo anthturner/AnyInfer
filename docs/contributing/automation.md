@@ -34,7 +34,7 @@ Tests mirror those boundaries under `tests/`. Shared behavior belongs in the eng
 configuration package, not copied into the CLI, sidecar, or demo. A change that crosses a
 boundary should say why in its pull request and update every affected guide.
 
-## Keeping the shims honest
+## Keeping the shims in sync
 
 The test suite checks that each tool-specific shim points to its canonical file and stays
 small. When a rule changes:

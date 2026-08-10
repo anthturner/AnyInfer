@@ -3,7 +3,7 @@
 Nine cooperating pieces that turn "run this model locally" into something a novice can do:
 
 - `anyinfer.local.hardware` — what this machine has, advisory and cached.
-- `anyinfer.local.backends` — which llama.cpp runtime variants are installed.
+- `anyinfer.local.backends`, which llama.cpp runtime variants are installed.
 - `anyinfer.local.runtimes` — fetching and validating those runtime variants.
 - `anyinfer.local.tuning` — hardware + posture → concrete server flags.
 - `anyinfer.local.fit` — catalog entry + hardware → will it run, and why.
@@ -13,7 +13,7 @@ Nine cooperating pieces that turn "run this model locally" into something a novi
   finding them again.
 - `anyinfer.local.server` — supervised llama-server processes, loopback only.
 - `anyinfer.local.recommend` — hardware → catalog tier.
-- `anyinfer.local.discovery` — which providers this machine can already use.
+- `anyinfer.local.discovery`, which providers this machine can already use.
 
 Model acquisition lives here, never in a provider adapter: adapters translate protocol, and
 fetching forty gigabytes is not protocol translation.
@@ -60,6 +60,7 @@ from .hardware import (
     detect,
     probe_signature,
 )
+from .metrics import ResourceSample, StorageProfile, SystemSampler, storage_profile
 from .recommend import Recommendation, Tier, TierSource, recommend_alias
 from .runtimes import (
     InstallReport,
@@ -131,6 +132,7 @@ __all__ = [
     "RemovalReport",
     "ResolvedArtifact",
     "ResolvedModel",
+    "ResourceSample",
     "RuntimeArtifact",
     "RuntimeManifest",
     "RuntimeTable",
@@ -140,7 +142,9 @@ __all__ = [
     "SizedEntry",
     "SourceRef",
     "SourceResolver",
+    "StorageProfile",
     "StoreEntry",
+    "SystemSampler",
     "Tier",
     "TierSource",
     "TuningInputs",
@@ -179,5 +183,6 @@ __all__ = [
     "select_backend",
     "select_variant",
     "sort_by_fit",
+    "storage_profile",
     "verify_file",
 ]

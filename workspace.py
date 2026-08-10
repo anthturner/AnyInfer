@@ -738,7 +738,7 @@ _MD_SKIP_DIRS = {
     "plans",
 }
 """Directories whose Markdown is generated, third-party, or internal working notes whose
-illustrative links are not meant to resolve — not ours to gate."""
+illustrative links are not meant to resolve; not ours to gate."""
 
 
 def _markdown_files() -> list[Path]:
@@ -790,7 +790,7 @@ def _build_docs_site() -> int:
     """Build the published site with the strict build the Pages deploy runs.
 
     One function behind both entry points — the ``docs-build`` gate phase and
-    ``workspace build docs`` — because a gate that runs a *different* build from the one
+    ``workspace build docs``, because a gate that runs a *different* build from the one
     that publishes is a gate that can pass while the deploy breaks.
     """
     return tool("mkdocs", "build", "--strict")
@@ -1296,7 +1296,7 @@ def _bundle_windows_icon(work_dir: Path) -> Path | None:
 
     The guard tests ``os.name`` rather than ``sys.platform`` on purpose. mypy narrows
     ``sys.platform`` to the host it runs on, so under ``warn_unreachable`` the whole body
-    below reads as dead code whenever the type check runs off Windows — which it does in
+    below reads as dead code whenever the type check runs off Windows, which it does in
     CI. ``os.name`` is the same test at runtime and carries no such narrowing.
     """
     if os.name != "nt":
@@ -1373,7 +1373,7 @@ def render_service_install_text(executable: Path) -> str:
     Rendered from `anyinfer.serve.service`, the same module ``anyinfer-serve install``
     uses, so the download and the command can never describe different service
     definitions. The executable path is the one this archive will be unpacked to, which
-    the archive cannot know — so it is rendered against a stated placeholder and the file
+    the archive cannot know, so it is rendered against a stated placeholder and the file
     says, twice, that running the command regenerates it with the real path.
     """
     from anyinfer.serve.service import ServiceRequest, render_service

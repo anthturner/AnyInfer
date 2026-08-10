@@ -2,7 +2,7 @@
 
 Offline throughout. What matters here is the honest-unknown rule — a remote engine gets
 ``unknown`` fits and a machine-readable cue to ask the user, rather than advice derived
-from the wrong computer — and that the locality distinction reaches capability assembly,
+from the wrong computer, and that the locality distinction reaches capability assembly,
 where it decides whether "free" is a genuine zero or an unknown.
 """
 
@@ -21,6 +21,18 @@ from anyinfer.local.server import is_loopback
 from anyinfer.registry import default_registry
 
 GIB = 1024**3
+
+
+async def test_client_supplies_its_catalog_to_llama_cpp_discovery(tmp_path: Path) -> None:
+    """The default demo setup needs no unserializable catalog object in provider options."""
+    client = ai.AsyncClient(
+        [ai.ProviderSettings.of("llama-cpp", options={"model_dir": tmp_path})]
+    )
+    try:
+        models = await client.models("llama-cpp")
+        assert models
+    finally:
+        await client.aclose()
 
 
 # ---- loopback detection --------------------------------------------------------------
@@ -99,9 +111,7 @@ def _profile(ram: int = 32 * GIB) -> HardwareProfile:
 
 
 def test_a_view_is_annotated_sorted_and_needs_no_network() -> None:
-    view = build_catalog_view(
-        load_default_catalog(), hardware=_profile(), detect_backend=False
-    )
+    view = build_catalog_view(load_default_catalog(), hardware=_profile(), detect_backend=False)
     assert len(view) >= 35
     assert view.hardware_source == "provided"
     ranks = [entry.fit.rank for entry in view.entries]
@@ -219,5 +229,8 @@ def test_local_catalog_through_the_sync_facade(tmp_path: Path) -> None:
 
 
 def test_acquiring_an_unknown_model_names_the_problem(tmp_path: Path) -> None:
-    with ai.Client(model_dir=tmp_path) as client, pytest.raises(ai.ConfigError, match="unknown catalog model"):
+    with (
+        ai.Client(model_dir=tmp_path) as client,
+        pytest.raises(ai.ConfigError, match="unknown catalog model"),
+    ):
         client.acquire_model("no-such-model", variant_id="x")

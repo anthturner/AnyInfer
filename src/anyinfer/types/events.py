@@ -120,7 +120,12 @@ class StreamEnded:
 
 
 StreamEvent = (
-    TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate | TimingMark | AttemptFailed
+    TextDelta
+    | ReasoningDelta
+    | ToolCallDelta
+    | UsageUpdate
+    | TimingMark
+    | AttemptFailed
     | StreamEnded
 )
 """Any event a consumer may observe."""

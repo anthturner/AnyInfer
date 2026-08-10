@@ -40,16 +40,29 @@ def test_every_error_descends_from_the_base(cls: type) -> None:
 @pytest.mark.parametrize("cls", ERROR_CLASSES, ids=lambda c: c.__name__)
 def test_every_error_carries_the_structured_fields(cls: type) -> None:
     error = cls("something went wrong")
-    for field in ("provider", "phase", "retryable", "retry_after_s", "http_status", "detail",
-                  "hint"):
+    for field in (
+        "provider",
+        "phase",
+        "retryable",
+        "retry_after_s",
+        "http_status",
+        "detail",
+        "hint",
+    ):
         assert hasattr(error, field), f"{cls.__name__} is missing {field}"
 
 
 def test_provider_errors_are_a_distinct_branch() -> None:
     """Adapters raise only ProviderError subclasses; the router catches that branch."""
-    for cls in (ai.AuthError, ai.RateLimitError, ai.TransportError,
-                ai.StreamProtocolError, ai.ProviderUnavailableError,
-                ai.ModelNotFoundError, ai.ContextLengthError):
+    for cls in (
+        ai.AuthError,
+        ai.RateLimitError,
+        ai.TransportError,
+        ai.StreamProtocolError,
+        ai.ProviderUnavailableError,
+        ai.ModelNotFoundError,
+        ai.ContextLengthError,
+    ):
         assert issubclass(cls, ai.ProviderError)
     for cls in (ai.ConfigError, ai.SchemaViolationError, ai.AllTargetsFailedError):
         assert not issubclass(cls, ai.ProviderError)

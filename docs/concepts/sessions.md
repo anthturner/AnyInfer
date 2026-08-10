@@ -1,7 +1,7 @@
 # Sessions
 
 Every request is independent by default. That is the right default — it makes results
-reproducible, routing free, and fallback safe — and it is the wrong one for a conversation,
+reproducible, routing free, and fallback safe, and it is the wrong one for a conversation,
 where the provider often already has everything the next turn needs.
 
 A **session** is how a caller says *these requests belong together*, without having to know
@@ -34,8 +34,8 @@ and does nothing:
 
 ```python
 session = client.session("openai:gpt-5")
-session.supported     # False
-session.reuse         # 'unsupported' — and every request behaves exactly as it would have
+session.supported  # False
+session.reuse  # 'unsupported', and every request behaves exactly as it would have
 ```
 
 ## Reuse is reported, not assumed
@@ -51,16 +51,16 @@ session.reuse         # 'unsupported' — and every request behaves exactly as i
 ## State is bound to one target
 
 Provider state is not portable, so a session names the target it belongs to and applies
-only there. If a route falls back to a different provider — or a different model on the
+only there. If a route falls back to a different provider, or a different model on the
 same one — that turn simply runs without it and reports `unsupported`:
 
 ```python
 result = client.generate(
     "and the risks?",
     route=ai.Route(targets=("ollama:qwen3:8b", "openai:gpt-5")),
-    session=chat,          # chat belongs to ollama:qwen3:8b
+    session=chat,  # chat belongs to ollama:qwen3:8b
 )
-chat.reuse   # 'unsupported' if the fallback answered
+chat.reuse  # 'unsupported' if the fallback answered
 ```
 
 Because a session already names a target, you can leave the target off entirely and it
@@ -75,7 +75,7 @@ something it cannot deliver. Closing the client itself *does* release what an ad
 open locally, such as a Copilot SDK session.
 
 !!! tip "Key takeaways"
-    - A session is an opaque handle, not a conversation — the library never interprets what
+    - A session is an opaque handle, not a conversation: the library never interprets what
       a provider stores in it.
     - It never changes an answer, so passing one to a stateless provider is safe and inert.
     - `reuse` reports what the provider actually did, including when a fallback meant the
@@ -85,8 +85,8 @@ open locally, such as a Copilot SDK session.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Routing](routing.md) — what happens to a session when a route falls back.
-- [The local subsystem](local.md) — why pinning a supervised server matters.
-- [Capabilities and provenance](capabilities.md) — `supports_sessions` on the descriptor.
+- [Routing](routing.md): what happens to a session when a route falls back.
+- [The local subsystem](local.md): why pinning a supervised server matters.
+- [Capabilities and provenance](capabilities.md): `supports_sessions` on the descriptor.
 
 </div>

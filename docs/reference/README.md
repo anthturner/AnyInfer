@@ -2,17 +2,17 @@
 
 Look things up.
 
-- **[SDK reference](api/README.md)** — the generated API reference: every public class,
+- **[SDK reference](api/README.md)**: the generated API reference: every public class,
   function, and event, from the docstrings.
-- **[Error catalog](errors.md)** — every exception, when it is raised, whether it retries,
+- **[Error catalog](errors.md)**: every exception, when it is raised, whether it retries,
   and the `hint` your user will see.
-- **[Conformance matrix](conformance-matrix.md)** — what each provider actually supports,
+- **[Conformance matrix](conformance-matrix.md)**: what each provider actually supports,
   from test results rather than assertion.
-- **[Shared configuration](configuration.md)** — provider settings, environment variables,
+- **[Shared configuration](configuration.md)**: provider settings, environment variables,
   and the common JSON file.
-- **[Run manifest format](run-manifest.md)** — serialization, compatibility, and its
+- **[Run manifest format](run-manifest.md)**: serialization, compatibility, and its
   executable JSON Schema.
-- **[Glossary](glossary.md)** — the vocabulary this project uses precisely.
+- **[Glossary](glossary.md)**: the vocabulary this project uses precisely.
 
 ## API stability
 

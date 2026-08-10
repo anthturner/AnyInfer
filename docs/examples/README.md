@@ -1,6 +1,6 @@
 # Examples
 
-Small, complete programs — not fragments. Each one is a pattern the library was designed
+Small, complete programs; not fragments. Each one is a pattern the library was designed
 around, and the shape of every example is exercised against the in-process fake providers
 in CI (`tests/test_docs_examples.py`), so what you read here is what actually runs.
 

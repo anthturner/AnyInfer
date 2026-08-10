@@ -139,13 +139,13 @@ class AttemptPacing:
     """How long one attempt spent waiting on its own limiter.
 
     The limiter lives under the transport and has no idea which request it is delaying.
-    Rather than thread a correlation id through every adapter — which would make adapters
+    Rather than thread a correlation id through every adapter, which would make adapters
     aware of routing, and they must not be — the client marks the context it dispatches in
     and the limiter reads it back.
 
     Detach is explicit and must be called, because the dispatch site is an async generator.
     An async generator does not get a context of its own, so a marker left set across a
-    ``yield`` stays visible to whatever the consumer does next — including another request
+    ``yield`` stays visible to whatever the consumer does next, including another request
     of its own, which would then be credited with this attempt's wait. Pacing happens before
     the first event arrives, so detaching there costs nothing and closes the window.
 
@@ -273,9 +273,7 @@ class RateLimiter:
         self._clock = clock or time.monotonic
         self._sleep = sleep or asyncio.sleep
         self._semaphore = (
-            asyncio.Semaphore(limits.max_concurrent)
-            if limits.max_concurrent is not None
-            else None
+            asyncio.Semaphore(limits.max_concurrent) if limits.max_concurrent is not None else None
         )
         self._gate = asyncio.Lock()
         self._last_dispatch: float | None = None
@@ -297,7 +295,7 @@ class RateLimiter:
 
         Both halves are needed: a remaining count says the window is nearly spent, and a
         reset says how long that lasts. With only one of them the honest move is to pace by
-        the caller's own bounds — never to invent the missing half.
+        the caller's own bounds; never to invent the missing half.
         """
         if not self._limits.respect_headers or not self._sees_responses:
             return False
@@ -499,7 +497,7 @@ class GoverningTransport(httpx2.AsyncBaseTransport):
     Governance sits here rather than in adapter code for one reason: adapters translate and
     nothing more, and a limiter is policy. Wrapping the transport means every ``httpx2``
     adapter is governed without knowing it, and the fake and cassette transports compose
-    underneath — so pacing is testable against a scripted provider with no network and no
+    underneath, so pacing is testable against a scripted provider with no network and no
     real clock.
 
     Args:

@@ -119,9 +119,7 @@ def test_entry_point_providers_are_discovered(monkeypatch: pytest.MonkeyPatch) -
         def load() -> Any:
             return lambda: [plugin]
 
-    monkeypatch.setattr(
-        "anyinfer.registry.entry_points", lambda group=None: [FakeEntryPoint()]
-    )
+    monkeypatch.setattr("anyinfer.registry.entry_points", lambda group=None: [FakeEntryPoint()])
     registry = ProviderRegistry(load_builtins=False, load_entry_points=True)
 
     assert registry.resolve_alias("acme") == "acme-llm"
@@ -137,9 +135,7 @@ def test_a_broken_plugin_does_not_break_discovery(monkeypatch: pytest.MonkeyPatc
         def load() -> Any:
             raise RuntimeError("this plugin is broken")
 
-    monkeypatch.setattr(
-        "anyinfer.registry.entry_points", lambda group=None: [BrokenEntryPoint()]
-    )
+    monkeypatch.setattr("anyinfer.registry.entry_points", lambda group=None: [BrokenEntryPoint()])
     registry = ProviderRegistry(load_builtins=True, load_entry_points=True)
     assert "openai-compat" in registry.known_ids()
 
@@ -251,7 +247,7 @@ def test_alias_targets_resolve_to_bundled_artifacts() -> None:
     """Every llama-cpp alias target must name an artifact models.json actually defines.
 
     The two files are maintained on different cadences — default.json by hand, models.json
-    by the pin script — so a target that silently stops resolving is the failure mode this
+    by the pin script, so a target that silently stops resolving is the failure mode this
     split introduces.
     """
     catalog = load_default_catalog()
@@ -454,7 +450,7 @@ class TestSetupSpecInvariants:
         """Discovery is descriptor-driven; a provider that declares nothing is invisible.
 
         Not every provider has a conventional variable — a generic OpenAI-compatible
-        endpoint genuinely does not — so this asserts the weaker, checkable thing: any
+        endpoint genuinely does not, so this asserts the weaker, checkable thing: any
         provider whose own documentation names one has said so here.
         """
         for descriptor in ai.default_registry:
@@ -520,9 +516,7 @@ class TestSetupSpecInvariants:
         """Caught as a provider-authoring error rather than as a user's dead end."""
         with pytest.raises(ai.ConfigError):
             ProviderSetupSpec(
-                fields=(
-                    SetupField("api_key", "Key", "secret", required=True, advanced=True),
-                )
+                fields=(SetupField("api_key", "Key", "secret", required=True, advanced=True),)
             )
 
     def test_an_advanced_field_inside_an_any_of_group_is_rejected(self) -> None:
@@ -604,7 +598,7 @@ class TestEveryProviderIsWellFormed:
         Dedicated adapters legitimately have neither a default nor a prompt: Bedrock and
         Vertex compute the endpoint from a region and project, and Copilot's host is
         GitHub's and not the caller's to change. A preset is the opposite case by
-        construction — it is a base URL plus quirks — so one with neither a default nor
+        construction — it is a base URL plus quirks, so one with neither a default nor
         `requires_base_url` would send requests to nowhere with nothing in the setup UI
         to fix it.
         """
@@ -617,7 +611,7 @@ class TestEveryProviderIsWellFormed:
                 )
 
     def test_local_providers_never_default_off_box(self) -> None:
-        """"Local" is a promise about where the data goes, not just a UI label.
+        """Local providers never default to an off-box endpoint.
 
         It also drives pricing: `capabilities/assemble.py` treats a local provider's
         absent price as free rather than unknown, which is only true on your own metal.
@@ -625,9 +619,7 @@ class TestEveryProviderIsWellFormed:
         for descriptor in ProviderRegistry(load_builtins=True, load_entry_points=False):
             if descriptor.locality != "local" or not descriptor.default_base_url:
                 continue
-            host = (
-                descriptor.default_base_url.split("://", 1)[-1].split("/")[0].split(":")[0]
-            )
+            host = descriptor.default_base_url.split("://", 1)[-1].split("/")[0].split(":")[0]
             assert host in {"127.0.0.1", "localhost", "0.0.0.0"}, (
                 f"{descriptor.id} is declared local but defaults to {host}"
             )
@@ -640,7 +632,11 @@ class TestEveryProviderIsWellFormed:
         """
         for descriptor in ProviderRegistry(load_builtins=True, load_entry_points=False):
             efforts: tuple[ReasoningEffort | None, ...] = (
-                None, "minimal", "low", "medium", "high",
+                None,
+                "minimal",
+                "low",
+                "medium",
+                "high",
             )
             for effort in efforts:
                 translated = descriptor.reasoning_translator(effort)
@@ -669,7 +665,7 @@ class TestEveryProviderIsWellFormed:
         """Two providers rendering identically in a picker cannot be told apart.
 
         Engines only. A *derived* descriptor is a configured instance of an engine — two
-        Azure tenants, two OpenAI-compatible endpoints — and deliberately inherits the
+        Azure tenants, two OpenAI-compatible endpoints, and deliberately inherits the
         engine's display name, so requiring uniqueness there would forbid the feature.
         """
         registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
@@ -679,7 +675,6 @@ class TestEveryProviderIsWellFormed:
                 continue
             clash = seen.get(descriptor.display_name)
             assert clash is None, (
-                f"{descriptor.id} and {clash} share the display name "
-                f"{descriptor.display_name!r}"
+                f"{descriptor.id} and {clash} share the display name {descriptor.display_name!r}"
             )
             seen[descriptor.display_name] = descriptor.id

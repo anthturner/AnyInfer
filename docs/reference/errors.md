@@ -9,7 +9,7 @@ callers branch on *fields* far more often than on exception class:
 
 ```python
 except ai.AnyInferError as error:
-    error.detail          # what happened — redacted, ≤512 chars
+    error.detail          # what happened; redacted, ≤512 chars
     error.hint            # the actionable next step, when one exists
     error.provider        # which provider, when applicable
     error.phase           # configure | discover | generate | stream | validate | cleanup
@@ -49,7 +49,7 @@ provider errors and propagate straight to you.
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
 
-## `ConfigError` :material-alert-circle:{ title="Not retryable — fix the configuration" }
+## `ConfigError` :material-alert-circle:{ title="Not retryable; fix the configuration" }
 
 **When:** an unknown target or provider, a malformed catalog, a missing required setting, or
 a provider whose optional extra is not installed.
@@ -66,14 +66,14 @@ ConfigError: the copilot provider requires the github-copilot-sdk extra
 ```
 
 !!! tip "How to fix"
-    Read `error.hint` — it names the exact target spelling, alias, or install command to
+    Read `error.hint`; it names the exact target spelling, alias, or install command to
     use next.
 
 </div>
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
 
-## `CredentialError` :material-alert-circle:{ title="Not retryable — fix the credential" }
+## `CredentialError` :material-alert-circle:{ title="Not retryable; fix the credential" }
 
 **When:** an `env://` variable is unset, a keyring entry is missing, or the OS vault is
 locked or unavailable.
@@ -93,11 +93,11 @@ CredentialError: environment variable OPENAI_API_KEY is not set
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
 
-## `AuthError` :material-alert-circle:{ title="Not retryable — the same key will fail again" }
+## `AuthError` :material-alert-circle:{ title="Not retryable; the same key will fail again" }
 
 **When:** 401 or 403 from a provider.
 
-**Retryable:** **no** — the same key will fail the same way, and retrying only spends budget
+**Retryable:** **no**; the same key will fail the same way, and retrying only spends budget
 a transient failure might have needed.
 
 ```
@@ -127,7 +127,7 @@ AuthError: invalid api key
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
 
-## `ModelNotFoundError` :material-alert-circle:{ title="Not retryable — the model doesn't exist" }
+## `ModelNotFoundError` :material-alert-circle:{ title="Not retryable; the model doesn't exist" }
 
 **When:** 404, or a provider reporting the model does not exist.
 
@@ -139,18 +139,18 @@ ModelNotFoundError: model "qwen3:70b" not found
 ```
 
 !!! tip "How to fix"
-    Follow `error.hint` — usually pulling or deploying the model, or fixing a typo'd
+    Follow `error.hint`; usually pulling or deploying the model, or fixing a typo'd
     model id.
 
 </div>
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
 
-## `ContextLengthError` :material-alert-circle:{ title="Not retryable — the prompt is the same size" }
+## `ContextLengthError` :material-alert-circle:{ title="Not retryable; the prompt is the same size" }
 
 **When:** the prompt exceeds the model's context window.
 
-**Retryable:** no — the same prompt is the same size. Use `Route.context_window_targets` to
+**Retryable:** no; the same prompt is the same size. Use `Route.context_window_targets` to
 fall back to a larger model instead.
 
 !!! tip "How to fix"
@@ -161,7 +161,7 @@ fall back to a larger model instead.
 
 <div class="anyinfer-error-card anyinfer-severity-medium" markdown>
 
-## `TransportError` :material-alert:{ title="Retryable — no usable response arrived" }
+## `TransportError` :material-alert:{ title="Retryable; no usable response arrived" }
 
 **When:** a timeout, connection failure, or TLS error. No usable response arrived.
 
@@ -176,14 +176,14 @@ fall back to a larger model instead.
 **When:** malformed SSE/NDJSON framing, or a response exceeding `max_response_bytes`.
 
 **Retryable:** no by default. Note that if content had **already been emitted**, this is
-raised rather than retried — the consumer has seen text, and silently restarting would
+raised rather than retried; the consumer has seen text, and silently restarting would
 duplicate or contradict it.
 
 </div>
 
 <div class="anyinfer-error-card anyinfer-severity-medium" markdown>
 
-## `ProviderUnavailableError` :material-alert:{ title="Retryable — also marks the target unhealthy" }
+## `ProviderUnavailableError` :material-alert:{ title="Retryable; also marks the target unhealthy" }
 
 **When:** 5xx, or a failed health probe.
 
@@ -193,11 +193,11 @@ duplicate or contradict it.
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
 
-## `SchemaViolationError` :material-alert-circle:{ title="Not retryable — and not a routing failure" }
+## `SchemaViolationError` :material-alert-circle:{ title="Not retryable, and not a routing failure" }
 
 **When:** the response failed validation and the repair budget is spent.
 
-**Retryable:** no — and deliberately **not** a routing failure. The request reached the model
+**Retryable:** no, and deliberately **not** a routing failure. The request reached the model
 and the model answered; it just answered the wrong shape.
 
 ```python
@@ -250,7 +250,7 @@ The `attempts` trail is the complete routing history, including retries and heal
 skips.
 
 !!! tip "What to check next"
-    Read `error.attempts` — it names exactly which targets were tried, in what order, and
+    Read `error.attempts`; it names exactly which targets were tried, in what order, and
     why each failed.
 
 </div>
@@ -273,7 +273,7 @@ The server's own log tail is included, because polling a health endpoint alone t
 nothing about *why* it failed.
 
 !!! tip "How to fix"
-    Read the included log tail first — it usually names the real cause (OOM, an
+    Read the included log tail first; it usually names the real cause (OOM, an
     incompatible GGUF, a port conflict). See [the local subsystem](../concepts/local.md).
 
 </div>

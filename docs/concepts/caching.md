@@ -5,7 +5,7 @@ see it. What "hold on to it" means differs: some want to be told exactly where t
 part ends, others work it out themselves and want you not to disturb it.
 
 AnyInfer treats that difference the way it treats structured output. You state an intent —
-*cache what is worth caching* — and the core picks the strongest mechanism the target
+*cache what is worth caching*, and the core picks the strongest mechanism the target
 actually offers, reporting it when a weaker one is all that is available.
 
 !!! warning "This is not a response cache"
@@ -17,8 +17,8 @@ actually offers, reporting it when a weaker one is all that is available.
 ## It is off unless you ask
 
 ```python
-result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")          # no caching
-result = client.generate(prompt, target="...", cache=ai.CachePolicy())          # caching
+result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")  # no caching
+result = client.generate(prompt, target="...", cache=ai.CachePolicy())  # caching
 ```
 
 Caching changes what a provider bills you and how long it keeps a copy of your prompt.
@@ -80,14 +80,14 @@ ai.CachePolicy(include_tools=True, include_system=False, min_segment_tokens=2048
 The result reports which mechanism was engaged:
 
 ```python
-result.cache_mechanism      # "explicit", "implicit", or None
-result.usage.cache_read_tokens    # what the provider says it served from cache
-result.usage.cache_write_tokens   # what it says it stored
+result.cache_mechanism  # "explicit", "implicit", or None
+result.usage.cache_read_tokens  # what the provider says it served from cache
+result.usage.cache_write_tokens  # what it says it stored
 ```
 
 Those two are different kinds of fact and are kept apart on purpose. `cache_mechanism` is
 what was *asked for*; the usage figures are what the provider *reported*. Cost is computed
-only from the reported numbers — an intention is never billed as an outcome — and when a
+only from the reported numbers — an intention is never billed as an outcome, and when a
 provider does not report cache accounting, the figures stay `None` rather than becoming
 zero.
 

@@ -3,7 +3,7 @@
 Deliberately the **native** ``/api/chat`` dialect rather than Ollama's ``/v1``
 OpenAI-compatibility layer. The native API is strictly more capable for our purposes: it
 carries grammar-enforced structured output via ``format``, per-phase nanosecond timings,
-``keep_alive`` session retention, and reasoning via ``think`` — and the ``/v1`` layer
+``keep_alive`` session retention, and reasoning via ``think``, and the ``/v1`` layer
 *silently discards* parameters it does not implement, which is the failure mode AnyInfer
 exists to eliminate.
 
@@ -199,7 +199,7 @@ class OllamaAdapter:
         does.
 
         Reads ``/api/ps`` only — the same endpoint `loaded_models()` uses, no generation
-        cost — and reports nothing at all when the server is unreachable or too old to
+        cost, and reports nothing at all when the server is unreachable or too old to
         answer, because an advisory that guesses is worse than one that stays quiet.
         """
         reports: list[Diagnostic] = []
@@ -576,6 +576,7 @@ descriptor = ProviderDescriptor(
     # Ollama keeps its own store and downloader, so acquisition here means asking it to
     # pull. The implementation lives in local/, never in this adapter.
     model_puller=_pull_model,
+    model_inventory="installed",
     reports_diagnostics=True,
     grammar_needs_prompt_injection=True,
 )

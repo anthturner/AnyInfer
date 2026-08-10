@@ -31,7 +31,7 @@ from .. import theme
 from ..assets import asset_path
 from .sdk_help import _monospace
 
-__all__ = ["AboutDialog", "LicensesDialog", "THIRD_PARTY_COMPONENTS"]
+__all__ = ["THIRD_PARTY_COMPONENTS", "AboutDialog", "LicensesDialog"]
 
 _MIT_TABLER = """MIT License
 

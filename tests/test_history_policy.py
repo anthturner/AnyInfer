@@ -28,18 +28,14 @@ BIG = "x" * 10_000
 # zero allowance is not "too small to fit" but "too small to have an inside", and
 # compaction correctly declines it — see `test_a_window_with_no_input_allowance_is_left_alone`.
 SMALL_WINDOW = {
-    "openai-compat:fake-model-small": ModelCapabilities(
-        context_window=Sourced(8_192, "catalog")
-    )
+    "openai-compat:fake-model-small": ModelCapabilities(context_window=Sourced(8_192, "catalog"))
 }
 TWO_WINDOWS = {
     "small:fake-model-small": ModelCapabilities(context_window=Sourced(8_192, "catalog")),
     "large:fake-model-small": ModelCapabilities(context_window=Sourced(200_000, "catalog")),
 }
 NO_ALLOWANCE = {
-    "openai-compat:fake-model-small": ModelCapabilities(
-        context_window=Sourced(512, "catalog")
-    )
+    "openai-compat:fake-model-small": ModelCapabilities(context_window=Sourced(512, "catalog"))
 }
 
 
@@ -140,9 +136,7 @@ async def test_proactive_shrinks_the_conversation_to_fit_and_succeeds() -> None:
         observers=[recorder],
         history=ai.HistoryPolicy(mode="proactive", keep_recent=1),
     ) as client:
-        result = await client.generate(
-            _oversized(), target="openai-compat:fake-model-small"
-        )
+        result = await client.generate(_oversized(), target="openai-compat:fake-model-small")
 
     assert result.text == "hi"
     assert server.requests, "the request was dispatched, not refused"
@@ -255,9 +249,7 @@ async def test_last_resort_compacts_once_the_route_is_exhausted() -> None:
         observers=[recorder],
         history=ai.HistoryPolicy(mode="last_resort", keep_recent=1),
     ) as client:
-        result = await client.generate(
-            _oversized(), target="openai-compat:fake-model-small"
-        )
+        result = await client.generate(_oversized(), target="openai-compat:fake-model-small")
 
     assert result.text == "compacted"
     assert len(_reductions(recorder)) == 1
@@ -370,12 +362,8 @@ def test_the_extension_does_not_leak_into_provider_options() -> None:
 
 
 def test_a_bare_boolean_is_accepted() -> None:
-    _, enabled, _ = request_from_openai(
-        {"model": "m", "messages": [], HISTORY_FIELD: True}
-    )
-    _, disabled, _ = request_from_openai(
-        {"model": "m", "messages": [], HISTORY_FIELD: False}
-    )
+    _, enabled, _ = request_from_openai({"model": "m", "messages": [], HISTORY_FIELD: True})
+    _, disabled, _ = request_from_openai({"model": "m", "messages": [], HISTORY_FIELD: False})
     assert enabled.history is not None and enabled.history.enabled
     assert disabled.history is not None and not disabled.history.enabled
 
@@ -469,9 +457,7 @@ def test_the_cli_hands_the_policy_to_its_client(
     config.write_text(
         json.dumps(
             {
-                "providers": [
-                    {"id": "openai-compat", "base_url": "https://fake.invalid/v1"}
-                ],
+                "providers": [{"id": "openai-compat", "base_url": "https://fake.invalid/v1"}],
                 "history": {"mode": "proactive", "keep_recent": 3},
             }
         ),

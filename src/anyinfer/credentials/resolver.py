@@ -48,7 +48,7 @@ class CredentialResolver(Protocol):
 class ResolverChain:
     """Tries each resolver in order, returning the first match's result.
 
-    The chain — not the individual resolvers — is responsible for registering resolved
+    The chain; not the individual resolvers — is responsible for registering resolved
     secrets for redaction, so a third-party resolver cannot forget to.
     """
 

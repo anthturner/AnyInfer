@@ -76,10 +76,10 @@ class _MessageBody(QTextEdit):
         self.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Fenced code is the one block Qt will not wrap on its own, and a bubble is too
-        # narrow to lose the right half of a line to. Anything still too wide — a table —
-        # keeps a horizontal bar rather than being clipped away silently.
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        # The transcript owns vertical scrolling; an individual message must never grow
+        # a second horizontal navigation axis. Code is explicitly wrapped below, and the
+        # word-wrap mode breaks any remaining long token at the bubble edge.
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.document().setDefaultStyleSheet("pre, code { white-space: pre-wrap; }")
         self.document().setDocumentMargin(0)
@@ -127,9 +127,9 @@ class _MessageBody(QTextEdit):
     def _natural_width(self) -> int:
         """The width this text would need unwrapped, clamped to the bubble maximum.
 
-        Measuring lays the document out unwrapped and then back again — two extra layouts
-        — so the result is cached per document revision: streaming appends measure once per
-        delta no matter how often the layout asks for a size hint.
+         Measuring lays the document out unwrapped and then back again — two extra layouts
+        , so the result is cached per document revision: streaming appends measure once per
+         delta no matter how often the layout asks for a size hint.
         """
         document = self.document()
         if self._width_cache is not None and self._width_revision == document.revision():
@@ -217,9 +217,7 @@ class MessageBubble(QFrame):
     def __init__(self, role: str, target: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.role = role
-        self.setObjectName(
-            "MessageBubbleUser" if role == "user" else "MessageBubbleAssistant"
-        )
+        self.setObjectName("MessageBubbleUser" if role == "user" else "MessageBubbleAssistant")
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setAccessibleName(f"{'Your' if role == 'user' else 'Assistant'} message")
 
@@ -253,7 +251,6 @@ class MessageBubble(QFrame):
 
         max_width = USER_BUBBLE_MAX_WIDTH if role == "user" else ASSISTANT_BUBBLE_MAX_WIDTH
         self._body = _MessageBody(max_width - _BUBBLE_CHROME)
-        self._body.setFont(QFont("Segoe UI", 10))
         outer.addWidget(self._body)
 
         self._reasoning = ReasoningFold()
@@ -269,7 +266,7 @@ class MessageBubble(QFrame):
         """Adopt the target that actually produced this turn.
 
         The bubble opens under the route's primary target; once the result arrives, the
-        resolved target may differ — a fallback answered — and the hover reveal must say
+        resolved target may differ — a fallback answered, and the hover reveal must say
         so.
         """
         if self.role != "assistant":
@@ -283,9 +280,7 @@ class MessageBubble(QFrame):
             self._header_label.setText("<b>You</b>")
             return
         if hovered and self._target:
-            self._header_label.setText(
-                f"<b>Assistant</b> — {html.escape(self._target)}"
-            )
+            self._header_label.setText(f"<b>Assistant</b> — {html.escape(self._target)}")
         else:
             self._header_label.setText("<b>Assistant</b>")
         if self._target:
@@ -346,6 +341,7 @@ class MessageList(QScrollArea):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setAccessibleName("Conversation transcript")
         self.setFrameShape(QFrame.Shape.NoFrame)
 
@@ -538,6 +534,8 @@ class _WelcomeCard(QFrame):
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedWidth(190)
+        self.setMinimumHeight(132)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.MinimumExpanding)
         self.setAccessibleName(title)
         self.setAccessibleDescription(description)
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
@@ -648,7 +646,9 @@ class WelcomeView(QWidget):
         card_row.setLayout(cards)
         layout.addWidget(card_row, 0, Qt.AlignmentFlag.AlignCenter)
 
-        hint = QLabel("Every surface here carries a  </>  chip — click one to see the SDK call behind it.")
+        hint = QLabel(
+            "Every surface here carries a  </>  chip — click one to see the SDK call behind it."
+        )
         hint.setObjectName("Muted")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(hint)
@@ -660,5 +660,3 @@ class WelcomeView(QWidget):
     def _reapply_logo(self) -> None:
         variant = "dark" if theme.is_dark_active() else "light"
         self._logo.load(str(asset_path(f"anyinfer-horizontal-{variant}.svg")))
-
-

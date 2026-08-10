@@ -153,9 +153,9 @@ def test_a_token_lands_only_in_the_private_file(
 def test_a_non_loopback_install_without_a_token_is_refused(
     commands: list[tuple[str, ...]], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert main(
-        ["serve", "install", "--host", "0.0.0.0", "--allow-remote-exposure", "--print"]
-    ) == 1
+    assert (
+        main(["serve", "install", "--host", "0.0.0.0", "--allow-remote-exposure", "--print"]) == 1
+    )
     assert "bearer token" in capsys.readouterr().err
     assert commands == []
 
@@ -212,6 +212,5 @@ def test_status_is_read_only(
     commands.clear()
 
     assert main(["serve", "status"]) == 0
-    assert commands == [("systemctl", "--user", "status", "anyinfer-serve.service",
-                         "--no-pager")]
+    assert commands == [("systemctl", "--user", "status", "anyinfer-serve.service", "--no-pager")]
     assert "installed  yes" in capsys.readouterr().out

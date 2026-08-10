@@ -37,7 +37,6 @@ _TOKENS_PER_MILLION = Decimal(1_000_000)
 class OpenRouterAdapter(OpenAICompatAdapter):
     """Adapter for OpenRouter's aggregation API."""
 
-
     def _build_headers(self, config: ProviderConfig) -> dict[str, str]:
         """Add OpenRouter's optional attribution headers."""
         headers = super()._build_headers(config)
@@ -86,8 +85,9 @@ class OpenRouterAdapter(OpenAICompatAdapter):
             ),
         )
 
-    def _classify(self, status: int, detail: str, headers: Mapping[str, str],
-                  phase: Phase = "generate") -> ProviderError:
+    def _classify(
+        self, status: int, detail: str, headers: Mapping[str, str], phase: Phase = "generate"
+    ) -> ProviderError:
         """Map OpenRouter's billing-specific 402 alongside the standard statuses."""
         if status == 402:
             return AuthError(
@@ -191,8 +191,6 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
-    default_capabilities=ModelCapabilities(
-        features=Sourced(_OPENROUTER_FEATURES, "default")
-    ),
+    default_capabilities=ModelCapabilities(features=Sourced(_OPENROUTER_FEATURES, "default")),
 )
 """Descriptor for the OpenRouter provider."""

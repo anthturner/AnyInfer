@@ -40,7 +40,7 @@ _MAX_FILES_PER_VARIANT = 1
 """Check the first shard of each variant.
 
 A shard set is written by one build at one revision, so if the first shard is intact the
-rest almost certainly are — and issuing forty requests per model to prove it would make the
+rest almost certainly are, and issuing forty requests per model to prove it would make the
 weekly job slow enough that someone turns it off.
 """
 
@@ -58,9 +58,7 @@ def _head(url: str) -> tuple[int, int | None]:
 
 def _get_json(url: str, headers: dict[str, str] | None = None) -> tuple[int, Any, Any]:
     """Return ``(status, payload, headers)`` for a JSON GET."""
-    request = urllib.request.Request(
-        url, headers={"User-Agent": _USER_AGENT, **(headers or {})}
-    )
+    request = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT, **(headers or {})})
     try:
         with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
             return response.status, json.load(response), response.headers
@@ -95,9 +93,7 @@ def check_models(path: Path = MODELS_PATH) -> list[str]:
                     )
                     continue
                 if status >= 400:
-                    drift.append(
-                        f"{model_id}/{variant.get('id')}: {name} returned HTTP {status}"
-                    )
+                    drift.append(f"{model_id}/{variant.get('id')}: {name} returned HTTP {status}")
                     continue
                 expected = sizes.get(name)
                 if expected and length and length != expected:

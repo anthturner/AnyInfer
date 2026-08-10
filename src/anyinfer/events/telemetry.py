@@ -315,7 +315,7 @@ class ContextReduced:
         strategy: The strategy requested (``auto`` stays ``auto``), or ``history`` for a
             compacted conversation.
         representation: The strategy actually applied.
-        candidate_count: Documents — or messages — offered to the reducer.
+        candidate_count: Documents, or messages — offered to the reducer.
         selected_count: Documents represented at detail fidelity, or messages kept.
         omitted_count: Documents not represented in detail, or messages dropped.
         estimated_tokens: Planning-side estimate of the rendered envelope, or of the
@@ -440,7 +440,7 @@ class DownloadProgress:
     Attributes:
         artifact_id: The artifact or catalog variant being acquired.
         downloaded_bytes: Bytes present across every file, including bytes that were
-            already on disk before this run — so resuming reports the resumed position.
+            already on disk before this run, so resuming reports the resumed position.
         total_bytes: Total expected bytes, or ``None`` when a size is genuinely unknown.
         done: Whether the acquisition finished.
         phase: Which stage emitted this, when the acquisition engine supplied one.

@@ -60,9 +60,11 @@ the same file the command-line runner, the sidecar, and the Python API all read.
     ```python hl_lines="8"
     import anyinfer as ai
 
-    client = ai.Client([
-        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-    ])
+    client = ai.Client(
+        [
+            ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+        ]
+    )
 
     result = client.generate(
         "Summarize this in one sentence:\n" + text,
@@ -78,9 +80,11 @@ the same file the command-line runner, the sidecar, and the Python API all read.
     ```python hl_lines="9"
     import anyinfer as ai
 
-    async with ai.AsyncClient([
-        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-    ]) as client:
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+        ]
+    ) as client:
         result = await client.generate(
             "Summarize this in one sentence:\n" + text,
             target="anthropic:claude-sonnet-4-5",
@@ -124,12 +128,14 @@ request instead of letting it run on.
 configured:
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of("ollama"),
-    ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("ollama"),
+        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+    ]
+)
 
-result = client.generate(prompt, target="medium")   # -> ollama, since it is listed first
+result = client.generate(prompt, target="medium")  # -> ollama, since it is listed first
 ```
 
 The order you configure providers is the preference order. See
@@ -157,7 +163,7 @@ result = client.generate(
 )
 
 print(result.structured["headline"])
-print(result.structured_mechanism)   # "json_schema", "grammar", "json_mode", or "prompt"
+print(result.structured_mechanism)  # "json_schema", "grammar", "json_mode", or "prompt"
 ```
 
 AnyInfer uses the strongest mechanism the provider supports, then validates the result
@@ -187,8 +193,9 @@ fact. See [routing](../concepts/routing.md).
 `Client` is a facade; `AsyncClient` is the real implementation and has the same surface:
 
 ```python
-async with ai.AsyncClient([ai.ProviderSettings.of("openai",
-                                                    api_key="env://OPENAI_API_KEY")]) as client:
+async with ai.AsyncClient(
+    [ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY")]
+) as client:
     result = await client.generate(prompt, target="openai:gpt-5")
 
     async with client.stream(prompt, target="openai:gpt-5") as stream:
@@ -201,7 +208,7 @@ async with ai.AsyncClient([ai.ProviderSettings.of("openai",
 ```python
 from anyinfer import local
 
-profile = local.detect()                                    # cached hardware probe
+profile = local.detect()  # cached hardware probe
 recommendation = local.recommend_alias(profile, ai.load_default_catalog())
 
 print(recommendation.alias, "-", recommendation.reason)
@@ -213,6 +220,6 @@ all from one `generate()` call. See [local inference](local-inference.md).
 
 ## What next
 
-- [Concepts](../concepts/README.md) — the model behind the API.
-- [Choosing an integration path](integration-paths.md) — SDK or standalone service?
-- [Providers](../providers/README.md) — the quirks of each backend.
+- [Concepts](../concepts/README.md): the model behind the API.
+- [Choosing an integration path](integration-paths.md): SDK or standalone service?
+- [Providers](../providers/README.md): the quirks of each backend.

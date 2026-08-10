@@ -18,11 +18,7 @@ from anyinfer.types.requests import Sampling, ToolSpec
 
 def _client(provider: str, handler: Any, **settings: Any) -> ai.AsyncClient:
     return ai.AsyncClient(
-        [
-            ai.ProviderSettings.of(
-                provider, transport=httpx2.MockTransport(handler), **settings
-            )
-        ]
+        [ai.ProviderSettings.of(provider, transport=httpx2.MockTransport(handler), **settings)]
     )
 
 
@@ -51,8 +47,9 @@ _COHERE_RESPONSE = {
 
 
 async def test_uppercase_finish_reasons_normalize() -> None:
-    async with _client("cohere", lambda r: httpx2.Response(200, json=_COHERE_RESPONSE),
-                       api_key="co-key") as client:
+    async with _client(
+        "cohere", lambda r: httpx2.Response(200, json=_COHERE_RESPONSE), api_key="co-key"
+    ) as client:
         result = await client.generate("hi", target="cohere:command-a")
 
     assert result.text == "Hello."
@@ -61,8 +58,9 @@ async def test_uppercase_finish_reasons_normalize() -> None:
 
 async def test_an_unknown_finish_reason_normalizes_to_other() -> None:
     body = {**_COHERE_RESPONSE, "finish_reason": "SOMETHING_NEW"}
-    async with _client("cohere", lambda r: httpx2.Response(200, json=body),
-                       api_key="co-key") as client:
+    async with _client(
+        "cohere", lambda r: httpx2.Response(200, json=body), api_key="co-key"
+    ) as client:
         result = await client.generate("hi", target="cohere:command-a")
 
     assert result.finish_reason == "other"
@@ -70,8 +68,9 @@ async def test_an_unknown_finish_reason_normalizes_to_other() -> None:
 
 async def test_usage_follows_processed_tokens_not_billed_units() -> None:
     """A context window measures what was processed, not what was charged."""
-    async with _client("cohere", lambda r: httpx2.Response(200, json=_COHERE_RESPONSE),
-                       api_key="co-key") as client:
+    async with _client(
+        "cohere", lambda r: httpx2.Response(200, json=_COHERE_RESPONSE), api_key="co-key"
+    ) as client:
         result = await client.generate("hi", target="cohere:command-a")
 
     assert result.usage.input_tokens == 12
@@ -93,8 +92,7 @@ async def test_sampling_uses_coheres_parameter_names() -> None:
         await client.generate(
             "hi",
             target="cohere:command-a",
-            sampling=Sampling(temperature=0.3, top_p=0.8, max_output_tokens=50,
-                              stop=("END",)),
+            sampling=Sampling(temperature=0.3, top_p=0.8, max_output_tokens=50, stop=("END",)),
         )
 
     body = seen[0]
@@ -109,10 +107,10 @@ async def test_tool_choice_uses_the_uppercase_enum() -> None:
     seen, handler = _capture(lambda r: httpx2.Response(200, json=_COHERE_RESPONSE))
     tool = ToolSpec(name="lookup", description="d", parameters={"type": "object"})
     async with _client("cohere", handler, api_key="co-key") as client:
-        await client.generate("hi", target="cohere:command-a", tools=[tool],
-                              tool_choice="required")
-        await client.generate("hi", target="cohere:command-a", tools=[tool],
-                              tool_choice="auto")
+        await client.generate(
+            "hi", target="cohere:command-a", tools=[tool], tool_choice="required"
+        )
+        await client.generate("hi", target="cohere:command-a", tools=[tool], tool_choice="auto")
 
     assert seen[0]["tool_choice"] == "REQUIRED"
     assert "tool_choice" not in seen[1], "omitting the field is how auto is expressed"
@@ -129,8 +127,9 @@ async def test_thinking_blocks_are_a_separate_channel() -> None:
             ],
         },
     }
-    async with _client("cohere", lambda r: httpx2.Response(200, json=body),
-                       api_key="co-key") as client:
+    async with _client(
+        "cohere", lambda r: httpx2.Response(200, json=body), api_key="co-key"
+    ) as client:
         result = await client.generate("hard", target="cohere:command-a")
 
     assert result.text == "42", "thinking must stay out of the answer"
@@ -149,16 +148,25 @@ async def test_reasoning_effort_becomes_a_token_budget() -> None:
 async def test_streaming_translates_typed_events() -> None:
     events = [
         {"type": "message-start", "delta": {"message": {"role": "assistant"}}},
-        {"type": "content-start", "index": 0,
-         "delta": {"message": {"content": {"type": "text"}}}},
-        {"type": "content-delta", "index": 0,
-         "delta": {"message": {"content": {"text": "Hello"}}}},
-        {"type": "content-delta", "index": 0,
-         "delta": {"message": {"content": {"text": " there"}}}},
+        {"type": "content-start", "index": 0, "delta": {"message": {"content": {"type": "text"}}}},
+        {
+            "type": "content-delta",
+            "index": 0,
+            "delta": {"message": {"content": {"text": "Hello"}}},
+        },
+        {
+            "type": "content-delta",
+            "index": 0,
+            "delta": {"message": {"content": {"text": " there"}}},
+        },
         {"type": "content-end", "index": 0},
-        {"type": "message-end",
-         "delta": {"finish_reason": "COMPLETE",
-                   "usage": {"tokens": {"input_tokens": 7, "output_tokens": 3}}}},
+        {
+            "type": "message-end",
+            "delta": {
+                "finish_reason": "COMPLETE",
+                "usage": {"tokens": {"input_tokens": 7, "output_tokens": 3}},
+            },
+        },
     ]
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -180,13 +188,25 @@ async def test_streaming_translates_typed_events() -> None:
 
 async def test_streaming_tool_calls_reassemble() -> None:
     events = [
-        {"type": "tool-call-start", "index": 0,
-         "delta": {"message": {"tool_calls": {"id": "t1", "type": "function",
-                                              "function": {"name": "lookup"}}}}},
-        {"type": "tool-call-delta", "index": 0,
-         "delta": {"message": {"tool_calls": {"function": {"arguments": '{"key":'}}}}},
-        {"type": "tool-call-delta", "index": 0,
-         "delta": {"message": {"tool_calls": {"function": {"arguments": '"a"}'}}}}},
+        {
+            "type": "tool-call-start",
+            "index": 0,
+            "delta": {
+                "message": {
+                    "tool_calls": {"id": "t1", "type": "function", "function": {"name": "lookup"}}
+                }
+            },
+        },
+        {
+            "type": "tool-call-delta",
+            "index": 0,
+            "delta": {"message": {"tool_calls": {"function": {"arguments": '{"key":'}}}},
+        },
+        {
+            "type": "tool-call-delta",
+            "index": 0,
+            "delta": {"message": {"tool_calls": {"function": {"arguments": '"a"}'}}}},
+        },
         {"type": "tool-call-end", "index": 0},
         {"type": "message-end", "delta": {"finish_reason": "TOOL_CALL"}},
     ]
@@ -213,12 +233,17 @@ async def test_streaming_tool_calls_reassemble() -> None:
 async def test_discovery_reports_context_lengths() -> None:
     listing = {
         "models": [
-            {"name": "command-a-03-2025", "context_length": 256000,
-             "endpoints": ["chat"], "features": ["tools"]}
+            {
+                "name": "command-a-03-2025",
+                "context_length": 256000,
+                "endpoints": ["chat"],
+                "features": ["tools"],
+            }
         ]
     }
-    async with _client("cohere", lambda r: httpx2.Response(200, json=listing),
-                       api_key="co-key") as client:
+    async with _client(
+        "cohere", lambda r: httpx2.Response(200, json=listing), api_key="co-key"
+    ) as client:
         models = await client.models("cohere")
 
     caps = models[0].capabilities
@@ -337,8 +362,7 @@ async def test_generation_uses_the_openai_dialect() -> None:
     """Chat is the shared dialect; only discovery is native."""
     body = {
         "choices": [
-            {"message": {"role": "assistant", "content": "local answer"},
-             "finish_reason": "stop"}
+            {"message": {"role": "assistant", "content": "local answer"}, "finish_reason": "stop"}
         ]
     }
     async with _client("lm-studio", lambda r: httpx2.Response(200, json=body)) as client:
@@ -378,8 +402,10 @@ def _cohere_server(scenario: str) -> Any:
     """Program a Cohere fake for one conformance scenario."""
     ok = {
         "finish_reason": "COMPLETE",
-        "message": {"role": "assistant",
-                    "content": [{"type": "text", "text": "Hello from Cohere."}]},
+        "message": {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Hello from Cohere."}],
+        },
         "usage": {"tokens": {"input_tokens": 11, "output_tokens": 7}},
     }
     state = {"calls": 0}
@@ -388,8 +414,11 @@ def _cohere_server(scenario: str) -> Any:
         if request.url.path.endswith("/v1/models"):
             return httpx2.Response(
                 200,
-                json={"models": [{"name": "command-a", "endpoints": ["chat"],
-                                  "context_length": 256000}]},
+                json={
+                    "models": [
+                        {"name": "command-a", "endpoints": ["chat"], "context_length": 256000}
+                    ]
+                },
             )
         calls = state["calls"]
         state["calls"] += 1
@@ -398,8 +427,9 @@ def _cohere_server(scenario: str) -> Any:
         if scenario == "auth_error":
             return httpx2.Response(401, json={"message": "invalid key"})
         if scenario == "rate_limited" and calls == 0:
-            return httpx2.Response(429, json={"message": "slow down"},
-                                   headers={"retry-after": "0"})
+            return httpx2.Response(
+                429, json={"message": "slow down"}, headers={"retry-after": "0"}
+            )
 
         body = dict(ok)
         if scenario == "tools":
@@ -408,22 +438,38 @@ def _cohere_server(scenario: str) -> Any:
                 "message": {
                     "role": "assistant",
                     "content": [],
-                    "tool_calls": [{"id": "c0", "type": "function",
-                                    "function": {"name": "lookup",
-                                                 "arguments": '{"key": "alpha"}'}}],
+                    "tool_calls": [
+                        {
+                            "id": "c0",
+                            "type": "function",
+                            "function": {"name": "lookup", "arguments": '{"key": "alpha"}'},
+                        }
+                    ],
                 },
                 "usage": {"tokens": {"input_tokens": 11, "output_tokens": 7}},
             }
         elif scenario == "structured":
-            body = {**ok, "message": {"role": "assistant",
-                                      "content": [{"type": "text", "text": PROBE_ANSWER}]}}
+            body = {
+                **ok,
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": PROBE_ANSWER}],
+                },
+            }
         elif scenario == "repair":
             text = '{"wrong": true}' if calls == 0 else PROBE_ANSWER
-            body = {**ok, "message": {"role": "assistant",
-                                      "content": [{"type": "text", "text": text}]}}
+            body = {
+                **ok,
+                "message": {"role": "assistant", "content": [{"type": "text", "text": text}]},
+            }
         elif scenario == "oversized":
-            body = {**ok, "message": {"role": "assistant",
-                                      "content": [{"type": "text", "text": "x" * 20_000}]}}
+            body = {
+                **ok,
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "x" * 20_000}],
+                },
+            }
         elif scenario == "odd_finish":
             body = {**ok, "finish_reason": "SOMETHING_NEW"}
 
@@ -435,19 +481,48 @@ def _cohere_server(scenario: str) -> Any:
             {"type": "message-start", "delta": {"message": {"role": "assistant"}}}
         ]
         for block in message.get("content", []):
-            events.append({"type": "content-delta", "index": 0,
-                           "delta": {"message": {"content": {"text": block["text"]}}}})
+            events.append(
+                {
+                    "type": "content-delta",
+                    "index": 0,
+                    "delta": {"message": {"content": {"text": block["text"]}}},
+                }
+            )
         for index, call in enumerate(message.get("tool_calls", [])):
-            events.append({"type": "tool-call-start", "index": index,
-                           "delta": {"message": {"tool_calls": {
-                               "id": call["id"], "type": "function",
-                               "function": {"name": call["function"]["name"]}}}}})
-            events.append({"type": "tool-call-delta", "index": index,
-                           "delta": {"message": {"tool_calls": {"function": {
-                               "arguments": call["function"]["arguments"]}}}}})
-        events.append({"type": "message-end",
-                       "delta": {"finish_reason": body["finish_reason"],
-                                 "usage": body.get("usage", {})}})
+            events.append(
+                {
+                    "type": "tool-call-start",
+                    "index": index,
+                    "delta": {
+                        "message": {
+                            "tool_calls": {
+                                "id": call["id"],
+                                "type": "function",
+                                "function": {"name": call["function"]["name"]},
+                            }
+                        }
+                    },
+                }
+            )
+            events.append(
+                {
+                    "type": "tool-call-delta",
+                    "index": index,
+                    "delta": {
+                        "message": {
+                            "tool_calls": {
+                                "function": {"arguments": call["function"]["arguments"]}
+                            }
+                        }
+                    },
+                }
+            )
+        events.append(
+            {
+                "type": "message-end",
+                "delta": {"finish_reason": body["finish_reason"], "usage": body.get("usage", {})},
+            }
+        )
         return httpx2.Response(
             200,
             content=sse_lines(events, done=False),
@@ -461,7 +536,8 @@ async def _build_cohere_client(scenario: str) -> ai.AsyncClient:
     return ai.AsyncClient(
         [
             ai.ProviderSettings.of(
-                "cohere", api_key="co-key",
+                "cohere",
+                api_key="co-key",
                 transport=httpx2.MockTransport(_cohere_server(scenario)),
             )
         ],

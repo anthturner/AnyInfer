@@ -22,9 +22,11 @@ Want the chat-completions dialect instead? Point [openai-compat](openai-compat.m
 ## Setup
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),
+    ]
+)
 result = client.generate(prompt, target="openai:gpt-5")
 ```
 
@@ -59,7 +61,7 @@ Effort levels pass straight through: `minimal`, `low`, `medium`, `high`.
 ## Provider options
 
 ```python
-provider_options={"openai": {"store": False, "service_tier": "flex"}}
+provider_options = {"openai": {"store": False, "service_tier": "flex"}}
 ```
 
 ## Wire contract

@@ -85,7 +85,7 @@ class PricingTable:
 
         Returns:
             The pricing tagged ``catalog`` provenance, or ``None`` when the model has no
-            entry — never a fallback price.
+            entry; never a fallback price.
         """
         entries = self._entries.get(provider_id)
         if not entries:
@@ -166,7 +166,7 @@ def _parse_rate(value: Any) -> Decimal:
     if not isinstance(value, str):
         raise ConfigError(
             f"price {value!r} must be a JSON string, not a number",
-            hint="floats lose precision; write prices as strings like \"1.25\"",
+            hint='floats lose precision; write prices as strings like "1.25"',
         )
     try:
         rate = Decimal(value)

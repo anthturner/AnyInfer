@@ -48,11 +48,21 @@ descriptor = ProviderDescriptor(
     requires_base_url=False,
     setup=ProviderSetupSpec(
         fields=(
-            SetupField(key="api_key", label="API key", kind="secret", required=True,
-                       help_text="Accepts env:// and credential:// references."),
-            SetupField(key="base_url", label="Base URL", kind="endpoint",
-                       advanced=True, default_value="https://api.example.com/v1",
-                       help_text="Defaults to https://api.example.com/v1."),
+            SetupField(
+                key="api_key",
+                label="API key",
+                kind="secret",
+                required=True,
+                help_text="Accepts env:// and credential:// references.",
+            ),
+            SetupField(
+                key="base_url",
+                label="Base URL",
+                kind="endpoint",
+                advanced=True,
+                default_value="https://api.example.com/v1",
+                help_text="Defaults to https://api.example.com/v1.",
+            ),
         ),
     ),
     reasoning_translator=lambda effort: {} if effort is None else {"effort": effort},
@@ -62,21 +72,21 @@ descriptor = ProviderDescriptor(
 )
 ```
 
-`setup` is what lets config UIs stay generic — never add a per-engine branch to UI code when
+`setup` is what lets config UIs stay generic; never add a per-engine branch to UI code when
 you can add a declarative field here.
 
 Three fields worth understanding:
 
-- **`SetupField.advanced`** — set it on every field you already have a working value for,
+- **`SetupField.advanced`**: set it on every field you already have a working value for,
   and put that value in `default_value`. It is what keeps a config UI down to the
   questions only the user can answer: mark the endpoint you default to, the version you
   pin, and the credential path that only a non-standard deployment uses. A required field
   may not be advanced — hiding something that blocks saving is the failure this prevents —
   and `ProviderSetupSpec` rejects that combination at import time.
-- **`grammar_needs_prompt_injection`** — set it when your engine compiles a schema to a
+- **`grammar_needs_prompt_injection`**: set it when your engine compiles a schema to a
   decoding grammar *without* conditioning the model on it. A grammar guarantees well-formed
   JSON, not meaningful JSON.
-- **`ignored_parameters`** — declare anything your provider accepts and silently discards.
+- **`ignored_parameters`**: declare anything your provider accepts and silently discards.
   The core emits `ParameterDropped` so users find out.
 
 ## If it speaks OpenAI
@@ -133,22 +143,25 @@ breaking every other provider.
 ```python
 from anyinfer.testing.conformance import Capabilities, ConformanceHarness, run_conformance
 
+
 async def build_client(scenario: str) -> AsyncClient:
-    return AsyncClient([ProviderSettings.of("my-provider",
-                                            transport=fake_for(scenario).transport())])
+    return AsyncClient(
+        [ProviderSettings.of("my-provider", transport=fake_for(scenario).transport())]
+    )
+
 
 HARNESS = ConformanceHarness(
     provider_id="my-provider",
     model="my-model",
     build_client=build_client,
-    supports=Capabilities(reasoning=False),   # declare what you genuinely cannot do
+    supports=Capabilities(reasoning=False),  # declare what you genuinely cannot do
 )
 
 results = await run_conformance(HARNESS)
 assert all(r.passed or r.skipped for r in results)
 ```
 
-Declare unsupported behaviors honestly in `Capabilities`. A declared ➖ is a documented
+Declare unsupported behaviors explicitly in `Capabilities`. A declared ➖ is a documented
 limitation; a silently passing test is a lie that will cost a user an afternoon.
 
 See [the conformance suite](conformance.md).

@@ -70,14 +70,14 @@ This is the *recovery* half of a rate limit. The avoidance half — pacing a fan
 ## Failure-specific fallback chains
 
 The right *next* target depends on why the last one failed. A context overflow needs a
-larger model, not another same-sized one — and a content-policy refusal needs a
+larger model, not another same-sized one, and a content-policy refusal needs a
 differently-governed provider, not a retry:
 
 ```python
 route = ai.Route(
     targets=("openai:gpt-5-mini",),
-    context_window_targets=("anthropic:claude-sonnet-4-5",),   # bigger context
-    content_policy_targets=("ollama:qwen3:8b",),               # different governance
+    context_window_targets=("anthropic:claude-sonnet-4-5",),  # bigger context
+    content_policy_targets=("ollama:qwen3:8b",),  # different governance
 )
 ```
 
@@ -150,7 +150,7 @@ rather than retried: the consumer has already seen text, and silently restarting
 duplicate or contradict it.
 
 !!! tip "Key takeaways"
-    - Targets are tried in order with no scoring or load balancing — a `Route` is a policy
+    - Targets are tried in order with no scoring or load balancing: a `Route` is a policy
       object precisely so smarter selection can be added later without a new client method.
     - Only failures repetition can plausibly fix are retried; auth and context-length errors
       are not.
@@ -161,7 +161,7 @@ duplicate or contradict it.
 
 <div class="anyinfer-see-also" markdown>
 
-- [The event stream](events.md) — `AttemptFailed` events during routing.
-- [Error catalog](../reference/errors.md) — every error and its retry semantics.
+- [The event stream](events.md): `AttemptFailed` events during routing.
+- [Error catalog](../reference/errors.md): every error and its retry semantics.
 
 </div>

@@ -205,9 +205,7 @@ def classify_fit(
     if need_ram is not None and ram_budget is not None:
         headroom = ram_budget - need_ram
         if headroom >= int(ram_budget * _TIGHT_MARGIN):
-            reasons.append(
-                f"needs {_gib(need_ram)} of system RAM; {_gib(ram_budget)} is budgeted"
-            )
+            reasons.append(f"needs {_gib(need_ram)} of system RAM; {_gib(ram_budget)} is budgeted")
             reasons.extend(_cpu_speed_reasons(entry))
             return ModelFit("cpu", tuple(reasons), headroom)
         if headroom >= 0:

@@ -77,7 +77,10 @@ async def test_unresolvable_targets_are_data_and_order_is_preserved() -> None:
         )
 
     assert [item.requested for item in compared] == [
-        "missing:m", "json-only:m", "also-missing:m", "json-only:other"
+        "missing:m",
+        "json-only:m",
+        "also-missing:m",
+        "json-only:other",
     ]
     assert [item.resolvable for item in compared] == [False, True, False, True]
 

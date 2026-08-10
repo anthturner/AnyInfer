@@ -3,7 +3,7 @@
 Each `HelpTopic` ties one thing the user can see or click to the public AnyInfer calls
 that implement it, with a minimal snippet showing the same thing done from plain Python.
 The widgets never write their own explanation prose — they name a topic key, and the
-help dialog renders this registry — so the story the UI tells and the API it points at
+help dialog renders this registry, so the story the UI tells and the API it points at
 cannot drift apart silently. A test resolves every ``api`` entry against the real
 package, which turns "the help is stale" from a review comment into a red test.
 
@@ -50,7 +50,7 @@ def resolve_api(path: str) -> Any:
     is still inside a package, a submodule wins over a same-named attribute —
     ``anyinfer.local`` re-exports a *function* called ``acquire`` that would otherwise
     shadow the ``local.acquire`` module. Raises ``AttributeError`` (or ``ImportError``)
-    when the entry has drifted from the API — which is exactly what the help test wants
+    when the entry has drifted from the API, which is exactly what the help test wants
     to catch.
     """
     import types
@@ -96,11 +96,11 @@ TOPICS: dict[str, HelpTopic] = {
             snippet=(
                 "import anyinfer as ai\n"
                 "\n"
-                "client = ai.Client([ai.ProviderSettings.of(\"ollama\")])\n"
-                "with client.stream(\"Tell me a joke.\", target=\"ollama:qwen3:8b\") as stream:\n"
+                'client = ai.Client([ai.ProviderSettings.of("ollama")])\n'
+                'with client.stream("Tell me a joke.", target="ollama:qwen3:8b") as stream:\n'
                 "    for event in stream:\n"
                 "        if isinstance(event, ai.TextDelta):\n"
-                "            print(event.text, end=\"\", flush=True)\n"
+                '            print(event.text, end="", flush=True)\n'
                 "        elif isinstance(event, ai.StreamEnded):\n"
                 "            result = event.result  # the finished Generation"
             ),
@@ -122,10 +122,10 @@ TOPICS: dict[str, HelpTopic] = {
                 "import anyinfer as ai\n"
                 "\n"
                 "route = ai.Route(\n"
-                "    targets=(\"demo-fake:flaky\", \"demo-fake:reliable\"),\n"
+                '    targets=("demo-fake:flaky", "demo-fake:reliable"),\n'
                 "    retry=ai.Retry(max_attempts=1),\n"
                 ")\n"
-                "result = client.generate(\"hello\", route=route)\n"
+                'result = client.generate("hello", route=route)\n'
                 "for attempt in result.attempts:\n"
                 "    print(attempt.target, attempt.outcome)"
             ),
@@ -146,7 +146,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "\n"
                 "sampling = ai.Sampling(temperature=0.7, max_output_tokens=256)\n"
                 "# top_p stays None -> the field never appears on the wire\n"
-                "result = client.generate(\"hello\", target=target, sampling=sampling)"
+                'result = client.generate("hello", target=target, sampling=sampling)'
             ),
             demo_source="src/demo_app/main_window.py",
         ),
@@ -164,9 +164,9 @@ TOPICS: dict[str, HelpTopic] = {
             api=("ReasoningEffort", "ReasoningDelta", "ParameterDropped"),
             snippet=(
                 "result = client.generate(\n"
-                "    \"Prove there are infinitely many primes.\",\n"
+                '    "Prove there are infinitely many primes.",\n'
                 "    target=target,\n"
-                "    reasoning=\"high\",  # a ReasoningEffort: minimal | low | medium | high\n"
+                '    reasoning="high",  # a ReasoningEffort: minimal | low | medium | high\n'
                 ")\n"
                 "# while streaming, thoughts arrive as ReasoningDelta events, apart\n"
                 "# from the answer text"
@@ -193,11 +193,11 @@ TOPICS: dict[str, HelpTopic] = {
                 "SchemaSpec",
             ),
             snippet=(
-                "schema = {\"type\": \"object\", \"properties\": {\"sentiment\": "
-                "{\"enum\": [\"pos\", \"neg\"]}},\n"
-                "          \"required\": [\"sentiment\"]}\n"
+                'schema = {"type": "object", "properties": {"sentiment": '
+                '{"enum": ["pos", "neg"]}},\n'
+                '          "required": ["sentiment"]}\n'
                 "result = client.generate(\n"
-                "    \"Review: great value!\", target=target,\n"
+                '    "Review: great value!", target=target,\n'
                 "    schema=schema, repair=ai.Repair(max_attempts=1),\n"
                 ")\n"
                 "print(result.structured, result.structured_mechanism, result.repair_attempts)"
@@ -260,9 +260,9 @@ TOPICS: dict[str, HelpTopic] = {
                 "Feature",
             ),
             snippet=(
-                "for model in client.models(\"ollama\"):\n"
+                'for model in client.models("ollama"):\n'
                 "    print(model.id, model.capabilities)\n"
-                "health = client.health(\"ollama\")\n"
+                'health = client.health("ollama")\n'
                 "print(health.ok, health.detail)"
             ),
             demo_source="src/demo_app/main_window.py",
@@ -303,7 +303,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "The estimate under the composer is Client.budget(): a pure in-process "
                 "calculation holding the drafted request against the model's known "
                 "context window. The verdict is honestly tri-state — fits, does not "
-                "fit, or unknown when no trustworthy window is on file — and the cost "
+                "fit, or unknown when no trustworthy window is on file, and the cost "
                 "is a range from the pricing table, shown only when pricing actually "
                 "exists for the target."
             ),
@@ -316,10 +316,10 @@ TOPICS: dict[str, HelpTopic] = {
                 "load_default_pricing",
             ),
             snippet=(
-                "budget = client.budget(messages, target=\"openai:gpt-4.1-mini\")\n"
-                "print(budget.estimate.tokens, \"of\", budget.context_window)\n"
-                "print(\"fits:\", budget.fits)  # True / False / None — never a guess\n"
-                "print(\"cost:\", budget.estimated_cost)  # None without pricing on file"
+                'budget = client.budget(messages, target="openai:gpt-4.1-mini")\n'
+                'print(budget.estimate.tokens, "of", budget.context_window)\n'
+                'print("fits:", budget.fits)  # True / False / None; never a guess\n'
+                'print("cost:", budget.estimated_cost)  # None without pricing on file'
             ),
             demo_source="src/demo_app/widgets/composer.py",
         ),
@@ -331,17 +331,47 @@ TOPICS: dict[str, HelpTopic] = {
                 "per target. A provider that keeps conversations can resume instead of "
                 "re-reading the transcript; one that cannot simply gets the messages "
                 "again. The handle's reuse property reports what actually happened — "
-                "resumed, fresh, or unsupported — and the status line repeats it "
+                "resumed, fresh, or unsupported, and the status line repeats it "
                 "verbatim, because the three cost very different amounts."
             ),
             api=("Client.session", "Session", "SessionReuse"),
             snippet=(
-                "session = client.session(\"copilot:gpt-4.1\")\n"
-                "client.generate(\"hi\", target=session.target, session=session)\n"
-                "client.generate(\"and again\", target=session.target, session=session)\n"
+                'session = client.session("copilot:gpt-4.1")\n'
+                'client.generate("hi", target=session.target, session=session)\n'
+                'client.generate("and again", target=session.target, session=session)\n'
                 "print(session.reuse)  # 'resumed' | 'fresh' | 'unsupported'"
             ),
             demo_source="src/demo_app/engine.py",
+        ),
+        HelpTopic(
+            key="local-system",
+            title="Local system profile and benchmark",
+            summary=(
+                "The System tab renders the HardwareProfile returned with "
+                "Client.local_catalog(), so its CPU, RAM, accelerator, VRAM, runtime, "
+                "storage, and model-fit facts stay honest about their source. The separate "
+                "Benchmark tab runs Client.benchmark() twice against an installed local "
+                "target and consumes BenchmarkSample progress for its live charts. The "
+                "second run is warm by construction; its latency and throughput "
+                "validate one real model/runtime pairing without pretending to predict "
+                "the speed of every model that fits in memory."
+            ),
+            api=(
+                "Client.local_catalog",
+                "CatalogView",
+                "local.hardware.HardwareProfile",
+                "Client.benchmark",
+                "BenchmarkSample",
+                "Measurement",
+            ),
+            snippet=(
+                'view = client.local_catalog(posture="balanced")\n'
+                "print(view.hardware, len(view.runnable))\n"
+                'first = client.benchmark("ollama:qwen3:8b")\n'
+                'warm = client.benchmark("ollama:qwen3:8b")\n'
+                "print(first.ttft_ms, warm.ttft_ms, warm.decode_tokens_per_s)"
+            ),
+            demo_source="src/demo_app/widgets/models_dialog.py",
         ),
         HelpTopic(
             key="catalog",
@@ -351,7 +381,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "bundled, pinned catalog annotated with how each entry fits this "
                 "machine's detected RAM, VRAM, and accelerators at the posture you "
                 "pick. The fit verdict carries the library's own reasons — the numbers "
-                "that make 'will not fit' checkable — and the demo only filters rows, "
+                "that make 'will not fit' checkable, and the demo only filters rows, "
                 "never re-derives a verdict."
             ),
             api=(
@@ -362,7 +392,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "load_default_catalog",
             ),
             snippet=(
-                "view = client.local_catalog(posture=\"balanced\")\n"
+                'view = client.local_catalog(posture="balanced")\n'
                 "for entry in view.runnable:\n"
                 "    print(entry.name, entry.fit.level, entry.fit.reasons)"
             ),
@@ -388,9 +418,9 @@ TOPICS: dict[str, HelpTopic] = {
                 "local.store.StoreEntry",
             ),
             snippet=(
-                "plan = client.acquire_model(\"qwen3-8b\", dry_run=True)\n"
-                "print(plan.plan.total_bytes, \"bytes to fetch\")\n"
-                "report = client.acquire_model(\"qwen3-8b\", progress=print)\n"
+                'plan = client.acquire_model("qwen3-8b", dry_run=True)\n'
+                'print(plan.plan.total_bytes, "bytes to fetch")\n'
+                'report = client.acquire_model("qwen3-8b", progress=print)\n'
                 "for entry in client.installed_models():\n"
                 "    print(entry.model_id, entry.directory)"
             ),
@@ -405,7 +435,8 @@ TOPICS: dict[str, HelpTopic] = {
                 "accelerator backends this machine can drive; Install fetches the "
                 "pinned build for the chosen backend into the per-user runtime "
                 "directory. The supervised llama-server the library runs later uses "
-                "exactly these builds."
+                "the automatic best usable build or the per-instance backend selected "
+                "on this tab."
             ),
             api=(
                 "local.runtimes.installed_runtimes",
@@ -436,7 +467,7 @@ TOPICS: dict[str, HelpTopic] = {
             ),
             api=("Client.pull_model", "PullReport", "PullRequest"),
             snippet=(
-                "report = client.pull_model(\"ollama\", \"qwen3:8b\")\n"
+                'report = client.pull_model("ollama", "qwen3:8b")\n'
                 "print(report)  # the engine's own account of what it fetched"
             ),
             demo_source="src/demo_app/widgets/models_dialog.py",
@@ -445,7 +476,7 @@ TOPICS: dict[str, HelpTopic] = {
             key="target-inspection",
             title="Target inspector",
             summary=(
-                "Four separate library calls, with four different price tags — and the "
+                "Four separate library calls, with four different price tags, and the "
                 "buttons say so. Capabilities is resolve(): a free lookup of what is "
                 "already known, every value tagged with its provenance (catalog, "
                 "discovered, probed, or default — a measured number and a guess must "
@@ -473,8 +504,8 @@ TOPICS: dict[str, HelpTopic] = {
                 "DiagnosticSeverity",
             ),
             snippet=(
-                "resolved = client.resolve(\"ollama:qwen3:8b\")  # no request issued\n"
-                "verification = client.verify(resolved.provider_id + \":\" + resolved.model)\n"
+                'resolved = client.resolve("ollama:qwen3:8b")  # no request issued\n'
+                'verification = client.verify(resolved.provider_id + ":" + resolved.model)\n'
                 "report = client.probe(target)      # one request per probed feature\n"
                 "timing = client.benchmark(target)  # one deterministic request, timed\n"
                 "print(timing.ttft_ms, timing.decode_tokens_per_s)"
@@ -505,7 +536,7 @@ TOPICS: dict[str, HelpTopic] = {
             snippet=(
                 "@ai.tool\n"
                 "def word_count(text: str) -> int:\n"
-                "    \"\"\"Count the words in a piece of text.\"\"\"\n"
+                '    """Count the words in a piece of text."""\n'
                 "    return len(text.split())\n"
                 "\n"
                 "result = client.run_tools(\n"
@@ -521,7 +552,7 @@ TOPICS: dict[str, HelpTopic] = {
             summary=(
                 "Every failure notice in the transcript ends with a hint because every "
                 "AnyInfer error carries one: a shallow typed hierarchy with structured "
-                "fields — provider, phase, retryable, HTTP status — where detail says "
+                "fields — provider, phase, retryable, HTTP status, where detail says "
                 "what happened and hint says what to do next. Anything "
                 "credential-shaped is registered for redaction before it can appear in "
                 "an error, an event, or a log."
@@ -538,7 +569,7 @@ TOPICS: dict[str, HelpTopic] = {
             ),
             snippet=(
                 "try:\n"
-                "    client.generate(\"hi\", target=\"openai:gpt-4.1-mini\")\n"
+                '    client.generate("hi", target="openai:gpt-4.1-mini")\n'
                 "except ai.AnyInferError as error:\n"
                 "    print(error.detail)  # bounded, redacted\n"
                 "    print(error.hint)    # the actionable next step"
@@ -553,7 +584,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "scripted-provider kit registered like any real engine, served through "
                 "an in-process transport by the stock OpenAI-compatible adapter. The "
                 "router resolves it, telemetry observes it, and the settings dialog "
-                "renders it from its setup spec — which is why everything you watch "
+                "renders it from its setup spec, which is why everything you watch "
                 "offline is the real code path, minus the network."
             ),
             api=(
@@ -565,9 +596,9 @@ TOPICS: dict[str, HelpTopic] = {
             snippet=(
                 "from anyinfer.testing import ScriptedModel, ScriptedProvider\n"
                 "\n"
-                "provider = ScriptedProvider(\"demo-fake\", [\n"
-                "    ScriptedModel(\"reliable\"),\n"
-                "    ScriptedModel(\"flaky\", failures=(ScriptedFailure(status=503),)),\n"
+                'provider = ScriptedProvider("demo-fake", [\n'
+                '    ScriptedModel("reliable"),\n'
+                '    ScriptedModel("flaky", failures=(ScriptedFailure(status=503),)),\n'
                 "])\n"
                 "provider.register(registry)\n"
                 "client = ai.Client([provider.settings()], registry=registry)"
@@ -591,7 +622,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "result = client.generate(\n"
                 "    messages,\n"
                 "    target=target,\n"
-                "    history=ai.HistoryPolicy(mode=\"last_resort\", keep_recent=6),\n"
+                '    history=ai.HistoryPolicy(mode="last_resort", keep_recent=6),\n'
                 ")\n"
                 "# watch for ContextReduced in telemetry — compaction is never silent"
             ),
@@ -605,7 +636,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "a provider bills and how long it retains a copy of the prompt, so no "
                 "policy means cached exactly as before: not at all. With one, the "
                 "client plans placement — explicit marks where the provider has them, "
-                "implicit prefix caching where it does not — and reports the plan as a "
+                "implicit prefix caching where it does not, and reports the plan as a "
                 "CachePlanned telemetry event: mechanism, mark count, and the tokens it "
                 "expects to be cacheable. It caches the prefix you send; it never skips "
                 "a call or reuses an answer."
@@ -615,7 +646,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "result = client.generate(\n"
                 "    messages,\n"
                 "    target=target,\n"
-                "    cache=ai.CachePolicy(mode=\"auto\"),  # a CacheMode\n"
+                '    cache=ai.CachePolicy(mode="auto"),  # a CacheMode\n'
                 ")\n"
                 "# the CachePlanned event reports the mechanism and mark placement"
             ),
@@ -634,8 +665,8 @@ TOPICS: dict[str, HelpTopic] = {
             api=("Message", "Role", "Text", "ContentPart", "system", "user", "assistant"),
             snippet=(
                 "messages = [\n"
-                "    ai.system(\"You are concise.\"),\n"
-                "    ai.user(\"Why is the sky blue?\"),\n"
+                '    ai.system("You are concise."),\n'
+                '    ai.user("Why is the sky blue?"),\n'
                 "]\n"
                 "result = client.generate(messages, target=target)\n"
                 "messages.append(ai.assistant(result.text))  # carry history forward"
@@ -649,15 +680,15 @@ TOPICS: dict[str, HelpTopic] = {
                 "The status-bar readout shows only what was measured or reported: TTFT "
                 "and total time measured centrally by the core (never by the provider's "
                 "own clock), token counts and cost from the provider's usage block. A "
-                "number AnyInfer was not given renders as an em dash — never as zero, "
+                "number AnyInfer was not given renders as an em dash; never as zero, "
                 "and never as an estimate dressed up as a measurement."
             ),
             api=("Timing", "Usage", "Generation", "UsageUpdate", "FirstToken"),
             snippet=(
-                "result = client.generate(\"hello\", target=target)\n"
+                'result = client.generate("hello", target=target)\n'
                 "print(result.timing.first_token_ms)   # Timing — measured by the core\n"
                 "print(result.usage.output_tokens)     # Usage — reported by the provider\n"
-                "print(result.usage.cost_usd)          # None without pricing — not 0.0"
+                "print(result.usage.cost_usd)          # None without pricing; not 0.0"
             ),
             demo_source="src/demo_app/widgets/metrics.py",
         ),
@@ -708,8 +739,6 @@ def uncovered_symbols() -> tuple[str, ...]:
     covered = covered_symbols()
     return tuple(
         sorted(
-            name
-            for name in anyinfer.__all__
-            if name not in covered and not name.startswith("__")
+            name for name in anyinfer.__all__ if name not in covered and not name.startswith("__")
         )
     )

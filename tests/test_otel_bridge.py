@@ -1,7 +1,7 @@
 """The OTel bridge maps every event in the contract (ADR-006).
 
 The bridge is a *consumer* of the event contract, so it may present events differently
-(span events vs. standalone spans) — but it must not silently drop them. `OTelObserver`
+(span events vs. standalone spans), but it must not silently drop them. `OTelObserver`
 dispatches by method name lookup, which fails open: an unmapped event type is discarded
 with no error. The completeness test below is what keeps that from happening quietly when
 a new event type is added.
@@ -113,13 +113,22 @@ ALL_EVENTS: tuple[TelemetryEvent, ...] = (
     ai.TargetResolved("r1", TARGET),
     ai.AttemptStarted("r1", TARGET, 1),
     ai.FirstToken("r1", TARGET, 12.5),
-    ai.AttemptCompleted("r1", TARGET, Usage(input_tokens=10, output_tokens=5),
-                         Timing(started_at=0.0, total_ms=100.0), "stop"),
+    ai.AttemptCompleted(
+        "r1",
+        TARGET,
+        Usage(input_tokens=10, output_tokens=5),
+        Timing(started_at=0.0, total_ms=100.0),
+        "stop",
+    ),
     ai.RetryScheduled("r1", TARGET, 1, 0.5, ERROR),
     ai.FallbackTriggered("r1", TARGET, "anthropic:claude-opus-5", ERROR),
     ai.RepairAttempted("r1", TARGET, 1, "json_schema", ("missing 'n'",)),
-    ai.RequestCompleted("r1", TARGET, Usage(input_tokens=10, output_tokens=5),
-                         Timing(started_at=0.0, total_ms=100.0)),
+    ai.RequestCompleted(
+        "r1",
+        TARGET,
+        Usage(input_tokens=10, output_tokens=5),
+        Timing(started_at=0.0, total_ms=100.0),
+    ),
     ai.RequestFailed("r1", ERROR),
     ai.ParameterDropped("r1", TARGET, "temperature", "target ignores sampling"),
     ai.UsageEstimated("r1", TARGET, "input_tokens", "heuristic"),
@@ -171,14 +180,12 @@ def test_every_event_produces_otel_output(
     observer.on_event(event)
 
     produced = (
-        len(tracer.spans) > spans_before                    # a standalone span
-        or len(request_span.events) > events_before         # a span event
-        or request_span.attributes != attributes_before     # enriched the request span
-        or request_span.ended                               # terminated the request
+        len(tracer.spans) > spans_before  # a standalone span
+        or len(request_span.events) > events_before  # a span event
+        or request_span.attributes != attributes_before  # enriched the request span
+        or request_span.ended  # terminated the request
     )
-    assert produced, (
-        f"{type(event).__name__} produced no OTel output — the bridge dropped it"
-    )
+    assert produced, f"{type(event).__name__} produced no OTel output — the bridge dropped it"
 
 
 # ---- request-scoped events -----------------------------------------------------------
@@ -255,9 +262,7 @@ def test_request_scoped_events_without_a_span_are_dropped_quietly(
 def test_context_reduced_becomes_a_standalone_span(
     observer: OTelObserver, tracer: FakeTracer
 ) -> None:
-    observer.on_event(
-        ai.ContextReduced("auto", "select", 10, 4, 6, 900, 1000, ("max_tokens",), 0)
-    )
+    observer.on_event(ai.ContextReduced("auto", "select", 10, 4, 6, 900, 1000, ("max_tokens",), 0))
 
     span = tracer.spans[0]
     assert span.name == "context.reduced"
@@ -315,9 +320,7 @@ def test_server_lifecycle_becomes_a_standalone_span(
     assert span.ended
 
 
-def test_a_crashed_server_sets_an_error_status(
-    observer: OTelObserver, tracer: FakeTracer
-) -> None:
+def test_a_crashed_server_sets_an_error_status(observer: OTelObserver, tracer: FakeTracer) -> None:
     observer.on_event(ai.ServerLifecycle("llama-1", "crashed", "exit code 1"))
 
     span = tracer.spans[0]
@@ -427,7 +430,10 @@ def test_a_request_exports_as_one_span_with_attempts_as_events(
     span = spans[0]
     assert span.name == "generate"
     assert [e.name for e in span.events] == [
-        "target.resolved", "attempt.started", "fallback.triggered", "usage.estimated",
+        "target.resolved",
+        "attempt.started",
+        "fallback.triggered",
+        "usage.estimated",
     ]
 
 

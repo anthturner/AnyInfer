@@ -2,7 +2,7 @@
 
 No transfer at all. A user who downloaded a GGUF by hand, or an operator who mounted a
 shared model volume, should not have to re-fetch forty gigabytes to make AnyInfer aware of
-them — so a path is validated, listed, and handed to the store as an already-satisfied file
+them, so a path is validated, listed, and handed to the store as an already-satisfied file
 set.
 
 Files resolved this way carry no digest from any authority, so they are recorded unverified

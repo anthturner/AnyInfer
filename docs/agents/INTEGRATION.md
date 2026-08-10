@@ -36,7 +36,7 @@ anyinfer agents-md --config anyinfer.json
 
 If there is no configuration file, `anyinfer init` writes one from what the machine can
 already reach. Do not invent provider ids, model names, or targets: a target that does not
-resolve fails at dispatch, and the whole point of the registry is that the answer is
+resolve fails at dispatch, and the purpose of the registry is that the answer is
 lookupable.
 
 ## Step 2 — write the call
@@ -83,14 +83,14 @@ a second answer to a question that already has one.
 | a spend guard | `ai.SpendPolicy` on the client |
 | client-side rate limiting | `RateLimits` on the provider instance |
 
-## Step 4 — read results honestly
+## Step 4: interpret results accurately
 
 - `result.usage.cost_usd` is a `Decimal` or `None`. `None` means the price is unknown, not
   zero. Never coerce it to `0`.
 - Capability values are `Sourced[T]`: `.value` plus a `.provenance` of `catalog`,
   `discovered`, `probed`, or `default`. Do not present a defaulted context window as a
   measured one.
-- `result.warnings` and the telemetry stream carry degradations — a dropped parameter, a
+- `result.warnings` and the telemetry stream carry degradations: a dropped parameter, a
   weaker structured-output mechanism, a compacted conversation. If the application shows
   results to a user, show these too.
 
@@ -128,8 +128,8 @@ anyinfer verify --config anyinfer.json
 
 ## Where to look next
 
-- <https://anyinfer.dev/llms.txt> — the documentation index, and
+- <https://anyinfer.dev/llms.txt>: the documentation index, and
   <https://anyinfer.dev/llms-full.txt> for the full text.
-- `anyinfer run "..." --dry-run` — what a request would cost and whether it fits.
+- `anyinfer run "..." --dry-run`: what a request would cost and whether it fits.
 - The guide behind this procedure:
   [coding agents](https://anyinfer.dev/guides/coding-agents/).

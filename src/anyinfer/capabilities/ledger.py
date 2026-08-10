@@ -48,7 +48,7 @@ class SpendTotals:
     """What was spent, and what could not be priced.
 
     ``unknown_requests`` is the honest counterpart to ``cost``. A provider whose pricing is
-    absent or untrusted produces no cost at all — never a zero — so a total that reported
+    absent or untrusted produces no cost at all; never a zero, so a total that reported
     only ``cost`` would quietly understate spend by however many calls it could not price.
     Both numbers travel together for that reason, and every rendering of one should render
     the other.

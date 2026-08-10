@@ -1,7 +1,7 @@
 """Discovery: what this machine can already use, and nothing it cannot (IN.2).
 
 Every probe here goes through an in-process transport. No test may open a socket to a real
-port — including 127.0.0.1:11434 — because a developer machine running Ollama would
+port, including 127.0.0.1:11434, because a developer machine running Ollama would
 otherwise make the suite non-deterministic, and a machine behind a proxy would make it
 slow.
 """
@@ -42,9 +42,7 @@ def _local(provider_id: str, port: int, *models: str) -> ScriptedProvider:
 
 async def test_a_running_endpoint_is_found() -> None:
     provider = _local("acme", 9101, "fast", "slow")
-    found = await discover(
-        _registry(provider), transports={"acme": provider.transport()}
-    )
+    found = await discover(_registry(provider), transports={"acme": provider.transport()})
 
     assert [e.provider_id for e in found] == ["acme"]
     assert found[0].evidence == "endpoint"
@@ -60,9 +58,7 @@ async def test_a_refused_endpoint_is_absent() -> None:
     def refuse(request: httpx2.Request) -> httpx2.Response:
         raise httpx2.ConnectError("connection refused", request=request)
 
-    found = await discover(
-        _registry(provider), transports={"acme": httpx2.MockTransport(refuse)}
-    )
+    found = await discover(_registry(provider), transports={"acme": httpx2.MockTransport(refuse)})
     assert found == ()
 
 
@@ -92,9 +88,7 @@ async def test_an_endpoint_serving_nothing_is_not_reported() -> None:
     def empty(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, json={"object": "list", "data": []}, request=request)
 
-    found = await discover(
-        _registry(provider), transports={"acme": httpx2.MockTransport(empty)}
-    )
+    found = await discover(_registry(provider), transports={"acme": httpx2.MockTransport(empty)})
     assert found == ()
 
 
@@ -141,9 +135,7 @@ async def test_a_shared_port_reports_once_and_names_the_alternatives() -> None:
     second = _local("engine-b", 9108, "m")
     registry = _registry(first, second)
 
-    assert endpoint_candidates(registry) == (
-        ("http://127.0.0.1:9108/v1", "engine-a", "engine-b"),
-    )
+    assert endpoint_candidates(registry) == (("http://127.0.0.1:9108/v1", "engine-a", "engine-b"),)
 
     found = await discover(registry, transports={"engine-a": first.transport()})
     assert len(found) == 1
@@ -192,7 +184,7 @@ async def test_an_environment_variable_is_reported_without_being_read() -> None:
 
 
 async def test_a_blank_variable_is_not_evidence() -> None:
-    """"Set to empty" is how a shell unsets a variable it cannot delete."""
+    """A blank environment variable does not count as evidence."""
     from anyinfer.providers.openai_compat import OpenAICompatAdapter
     from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 
@@ -271,7 +263,7 @@ async def test_vault_evidence_records_a_reference_not_a_secret(
     monkeypatch.setattr(
         discover_module,
         "_keyring_reader",
-        lambda: (lambda identifier: identifier == "vaulted-api-key"),
+        lambda: lambda identifier: identifier == "vaulted-api-key",
     )
 
     found = await discover(registry, probe=False, keyring=True)

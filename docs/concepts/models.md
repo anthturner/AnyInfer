@@ -4,14 +4,14 @@ One path from *catalog pick* → *bytes on disk* → *a path an engine can be po
 
 ```python
 report = client.acquire_model("qwen2.5-7b-instruct", progress=on_progress)
-report.plan.quantization      # 'Q5_K_M' — chosen for this machine, not assumed
-report.entry.handle           # the file llama-server will be launched against
+report.plan.quantization  # 'Q5_K_M' — chosen for this machine, not assumed
+report.entry.handle  # the file llama-server will be launched against
 ```
 
 Two file shapes flow through one engine: a **GGUF** variant is a shard set whose handle is
 the first shard, and a **Hugging Face snapshot** (for vLLM) is a directory whose handle is
 the directory. What differs is the file list and the handle; resume, verification, locking,
-cancellation, and progress accounting do not — and those are exactly the things that are
+cancellation, and progress accounting do not, and those are exactly the things that are
 expensive to get right twice.
 
 ## The quantization is chosen, not assumed
@@ -42,9 +42,7 @@ Ask for it explicitly if you want it:
 ```python
 from anyinfer import local
 
-client.acquire_model(
-    "qwen2.5-32b-instruct", prefs=local.VariantPrefs(allow_low_quality=True)
-)
+client.acquire_model("qwen2.5-32b-instruct", prefs=local.VariantPrefs(allow_low_quality=True))
 ```
 
 For vLLM the ladder is a different shape with hard gates: FP8 kernels need NVIDIA compute
@@ -57,9 +55,9 @@ guessing there produces a download that fails at model load with a kernel error.
 ```python
 report = await client.acquire_model("gpt-oss-120b", dry_run=True)
 
-report.plan.total_bytes          # 63_387_346_208
-report.plan.already_have_bytes   # what a previous interrupted run already fetched
-report.plan.remaining_bytes      # what this run would actually transfer
+report.plan.total_bytes  # 63_387_346_208
+report.plan.already_have_bytes  # what a previous interrupted run already fetched
+report.plan.remaining_bytes  # what this run would actually transfer
 ```
 
 Nothing is written. This is what an application needs to put a real confirmation dialog in
@@ -135,9 +133,9 @@ Two rules apply to every acquisition and are not optional:
 ```python
 located = client.locate_model("qwen2.5-7b-instruct")
 
-located.path            # a file for GGUF, a directory for a snapshot
-located.verified        # whether every file was checked against a digest
-located.launch_hints    # {'engine': 'llama.cpp', 'model': '…', 'ctx_size': 32768, …}
+located.path  # a file for GGUF, a directory for a snapshot
+located.verified  # whether every file was checked against a digest
+located.launch_hints  # {'engine': 'llama.cpp', 'model': '…', 'ctx_size': 32768, …}
 ```
 
 No network I/O, ever. Verification is the deliberate exception to "always check": re-hashing
@@ -179,7 +177,7 @@ rescanning.
 
 Two kinds of pre-existing files are adopted rather than re-downloaded:
 
-- **Flat-layout GGUFs** from earlier AnyInfer builds, adopted where they lie — but only after
+- **Flat-layout GGUFs** from earlier AnyInfer builds, adopted where they lie, but only after
   verifying each against its catalog hash, so adoption is never a lie about the bytes.
 - **Directories another tool owns**, registered as *external*: never written to, and never
   deleted by `remove_model()`, which only unregisters them.
@@ -191,13 +189,13 @@ bandwidth for is not a decision a library should make.
 ## Engines that keep their own store
 
 Everything above is about weights **this library** fetches, places, verifies, and indexes.
-Some local engines already have all of that — a store, a registry, a downloader — and for
+Some local engines already have all of that — a store, a registry, a downloader, and for
 those the useful operation is not *download these bytes* but *make yourself ready*:
 
 ```python
 report = client.pull_model("ollama", "qwen3:8b")
 
-report.already_present   # True when nothing had to move
+report.already_present  # True when nothing had to move
 report.bytes_transferred
 ```
 
@@ -207,11 +205,11 @@ Ollama's per-layer counts accumulated into the whole-transfer figures that event
 
 The distinction is worth keeping in mind: those bytes land in **the engine's** store under
 the engine's own name. Nothing is written to AnyInfer's model store, nothing is indexed, and
-`locate_model()` will not find it — because it is not ours to find. Which providers work
+`locate_model()` will not find it, because it is not ours to find. Which providers work
 this way is declared on the descriptor, so a UI can ask the registry rather than
 special-casing engines.
 
 ## Next
 
-- [The model catalog](catalog.md) — what exists, and what fits.
-- [Choose and download a local model](../guides/local-models.md) — the task walkthrough.
+- [The model catalog](catalog.md): what exists, and what fits.
+- [Choose and download a local model](../guides/local-models.md): the task walkthrough.

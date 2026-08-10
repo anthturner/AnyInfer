@@ -20,13 +20,15 @@ provenance rather than catalogued estimates.
 ## Setup
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "openrouter",
-        api_key="env://OPENROUTER_API_KEY",
-        options={"http_referer": "https://myapp.example", "x_title": "My App"},
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "openrouter",
+            api_key="env://OPENROUTER_API_KEY",
+            options={"http_referer": "https://myapp.example", "x_title": "My App"},
+        ),
+    ]
+)
 result = client.generate(prompt, target="openrouter:anthropic/claude-sonnet-4.5")
 ```
 

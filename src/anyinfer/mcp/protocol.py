@@ -38,9 +38,7 @@ JSONRPC_VERSION = "2.0"
 PROTOCOL_VERSION = "2025-06-18"
 """MCP revision AnyInfer asks for. Recorded in ``contracts/mcp.md``."""
 
-ACCEPTED_PROTOCOL_VERSIONS: frozenset[str] = frozenset(
-    {"2025-06-18", "2025-03-26", "2024-11-05"}
-)
+ACCEPTED_PROTOCOL_VERSIONS: frozenset[str] = frozenset({"2025-06-18", "2025-03-26", "2024-11-05"})
 """Revisions AnyInfer will speak if a server answers with one of them.
 
 A server that answers with anything else fails loudly. Proceeding on an unrecognized
@@ -147,11 +145,7 @@ def read_result(message: Mapping[str, Any]) -> Mapping[str, Any]:
                 code,
                 str(error.get("message", "")),
                 error.get("data"),
-                hint=(
-                    "the server does not expose a tool surface"
-                    if code == -32601
-                    else None
-                ),
+                hint=("the server does not expose a tool surface" if code == -32601 else None),
             )
         raise ToolLoopError("an MCP server sent a malformed JSON-RPC error object")
 
@@ -165,7 +159,7 @@ def initialize_params(client_version: str) -> dict[str, Any]:
     """Build the ``initialize`` params.
 
     Capabilities are deliberately empty. AnyInfer implements none of the client-side
-    features a capability would claim — sampling, roots, elicitation — and advertising one
+    features a capability would claim — sampling, roots, elicitation, and advertising one
     it does not honour is how a server ends up waiting on a request that never comes.
     """
     return {

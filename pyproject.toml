@@ -120,7 +120,7 @@ src = ["src", "tests"]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D"]
 ignore = [
   "RUF012",  # ClassVar annotations on mutable class attrs — descriptors are frozen by convention
-  "B008",    # function call in default arg — not used; dataclass field() is fine
+  "B008",    # function call in default arg; not used; dataclass field() is fine
   "D203",    # incompatible with D211 (no blank line before class docstring)
   "D213",    # incompatible with D212 (summary on the first line)
   "D401",    # imperative-mood rule misfires on property and attribute docstrings
@@ -253,7 +253,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 # D28: context reduction composes the core's leaf surfaces and nothing else. distill
 # takes the client by structural Protocol, so even the one strategy that generates text
-# has no _client import — and no strategy can reach a provider, the wire, or the disk.
+# has no _client import, and no strategy can reach a provider, the wire, or the disk.
 name = "Context reduction is a leaf consumer"
 type = "forbidden"
 allow_indirect_imports = true
