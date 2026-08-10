@@ -31,6 +31,7 @@ from .types.results import Diagnostic, Mechanism, Usage
 __all__ = [
     "VERIFY_MAX_OUTPUT_TOKENS",
     "VERIFY_PROMPT",
+    "VERIFY_REASONING_OUTPUT_TOKENS",
     "VERIFY_SCHEMA",
     "Verification",
     "excerpt",
@@ -59,6 +60,25 @@ shape is distinguishable from one that works — see `Verification.reached`.
 
 VERIFY_MAX_OUTPUT_TOKENS = 64
 """Output ceiling for the probe. A target that needs more than this to say OK has failed."""
+
+VERIFY_REASONING_OUTPUT_TOKENS = 256
+"""Output ceiling for the probe when the target is known to be a reasoning model.
+
+A thinking model spends its output budget on reasoning *before* it produces the answer, so
+64 tokens buys a truncated thought and an empty reply — which the probe then reports as
+"the provider answered with empty text", pointing an operator at a connection problem they
+do not have.
+
+This is a ceiling, not a spend: a model that answers in six tokens spends six whichever
+value applies, and the larger cap costs more only for a model that would have been
+truncated — which is to say, one that was going to fail the probe anyway. That is why it
+is applied on a mere feature flag rather than on a trusted one, and why it is still not
+applied to targets with no reasoning flag at all: an unbounded probe is not the goal.
+
+Four times the ordinary ceiling, which is enough headroom for the short deliberation a
+one-word connection test provokes. Raise it if a real reasoning target is found to
+overrun it; do not raise it speculatively.
+"""
 
 _EXCERPT_CHARS = 160
 

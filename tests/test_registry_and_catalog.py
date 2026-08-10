@@ -415,6 +415,59 @@ class TestSetupSpecInvariants:
                         wrong.append(f"{descriptor.id}.{setup_field.key} -> {named}")
         assert wrong == []
 
+    def test_placeholder_and_env_var_never_drift(self) -> None:
+        """The prose hint and the machine-readable fact must name the same variable.
+
+        Two spellings of one fact is how they end up disagreeing: a provider changes the
+        variable in its placeholder, discovery keeps looking for the old one, and the
+        symptom is a key that is set and a provider that is never found.
+        """
+        generic = {"VARIABLE_NAME", "VAR", "VAR_NAME"}
+        mismatched: list[str] = []
+        for descriptor in ai.default_registry:
+            for setup_field in descriptor.setup.fields:
+                named = ""
+                if "env://" in setup_field.placeholder:
+                    named = setup_field.placeholder.split("env://", 1)[1].split()[0]
+                if named and named not in generic:
+                    if setup_field.env_var != named:
+                        mismatched.append(
+                            f"{descriptor.id}.{setup_field.key}: placeholder names "
+                            f"{named!r} but env_var is {setup_field.env_var!r}"
+                        )
+                elif setup_field.env_var:
+                    mismatched.append(
+                        f"{descriptor.id}.{setup_field.key}: declares env_var "
+                        f"{setup_field.env_var!r} but its placeholder does not name it"
+                    )
+        assert mismatched == []
+
+    def test_env_var_is_never_a_credential_reference(self) -> None:
+        """The bare name, never ``env://NAME`` — stored either way, every consumer strips."""
+        for descriptor in ai.default_registry:
+            for setup_field in descriptor.setup.fields:
+                assert "://" not in setup_field.env_var, (
+                    f"{descriptor.id}.{setup_field.key} stores a reference, not a name"
+                )
+
+    def test_every_hosted_provider_with_a_key_convention_declares_it(self) -> None:
+        """Discovery is descriptor-driven; a provider that declares nothing is invisible.
+
+        Not every provider has a conventional variable — a generic OpenAI-compatible
+        endpoint genuinely does not — so this asserts the weaker, checkable thing: any
+        provider whose own documentation names one has said so here.
+        """
+        for descriptor in ai.default_registry:
+            for setup_field in descriptor.setup.fields:
+                if "env://" not in setup_field.placeholder:
+                    continue
+                named = setup_field.placeholder.split("env://", 1)[1].split()[0]
+                if named in {"VARIABLE_NAME", "VAR", "VAR_NAME"}:
+                    continue
+                assert setup_field.env_var, (
+                    f"{descriptor.id}.{setup_field.key} names {named} in prose only"
+                )
+
     def test_any_of_groups_reference_declared_fields(self) -> None:
         """A group naming a field that does not exist can never be satisfied."""
         for descriptor in ai.default_registry:

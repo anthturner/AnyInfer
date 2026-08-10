@@ -44,6 +44,7 @@ from ..local.services import PULL_TIMEOUT_S, PullReport
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
+from ..manifest import RunManifest
 from ..registry import ProviderRegistry
 from ..routing.policy import Route
 from ..session import Session
@@ -170,11 +171,15 @@ class SyncStream:
         self._queue: queue.Queue[Any] = queue.Queue(maxsize=_STREAM_QUEUE_SIZE)
         self._result: Generation | None = None
         self._closed = False
-        self._future = loop.submit(self._pump(factory))
+        # Built here rather than inside the pump so the caller's thread holds the stream
+        # object — and therefore its manifest — before the first event exists. Nothing in
+        # `AsyncClient.stream()` awaits, and an async generator binds no loop until it is
+        # first iterated, so constructing it off the loop thread is safe.
+        self._async_stream = factory()
+        self._future = loop.submit(self._pump(self._async_stream))
 
-    async def _pump(self, factory: Any) -> None:
+    async def _pump(self, stream: Any) -> None:
         """Drain the async stream into the thread-safe queue."""
-        stream = factory()
         try:
             async for event in stream:
                 await asyncio.to_thread(self._queue.put, event)
@@ -246,6 +251,17 @@ class SyncStream:
             )
         return self._result
 
+    @property
+    def manifest(self) -> RunManifest | None:
+        """What this call has done so far, as a `RunManifest`.
+
+        The blocking mirror of `AsyncStream.manifest`, and readable at any point — including
+        after `close()` cancelled the request, which is when it is most useful. ``None``
+        when the client was built with manifests switched off.
+        """
+        manifest: RunManifest | None = self._async_stream.manifest
+        return manifest
+
     def collect(self) -> Generation:
         """Drain the stream and return the final result."""
         for _ in self:
@@ -282,6 +298,8 @@ class Client:
         spend: SpendPolicy | None = None,
         ledger: SpendLedger | None = None,
         pricing_table: PricingTable | None = None,
+        manifests: bool = True,
+        manifest_payloads: bool = False,
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
     ) -> None:
@@ -304,6 +322,8 @@ class Client:
                 spend=spend,
                 ledger=ledger,
                 pricing_table=pricing_table,
+                manifests=manifests,
+                manifest_payloads=manifest_payloads,
                 capability_overrides=capability_overrides,
                 model_dir=model_dir,
             )
@@ -590,6 +610,7 @@ class Client:
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
         session: Session | None = None,
+        manifest: bool | None = None,
     ) -> Generation:
         """Generate a single result. See `AsyncClient.generate()`."""
         self._ensure_open()
@@ -611,6 +632,7 @@ class Client:
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
                 session=session,
+                manifest=manifest,
             )
         )
 
@@ -659,6 +681,7 @@ class Client:
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
         session: Session | None = None,
+        manifest: bool | None = None,
     ) -> SyncStream:
         """Start a streaming generation, returning a blocking iterator.
 
@@ -685,6 +708,7 @@ class Client:
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
                 session=session,
+                manifest=manifest,
             )
 
         return SyncStream(self._loop, factory)

@@ -36,14 +36,17 @@ from ..types.results import FinishReason, Generation, Usage
 __all__ = [
     "CACHE_FIELD",
     "HISTORY_FIELD",
+    "MANIFEST_FIELD",
     "OPENAI_FINISH_REASONS",
     "chunk_from_event",
     "completion_from_generation",
     "decode_messages",
     "encode_messages",
     "final_chunk",
+    "manifest_chunk",
     "request_from_openai",
     "request_to_openai",
+    "wants_manifest",
 ]
 
 OPENAI_FINISH_REASONS: Mapping[FinishReason, str] = {
@@ -74,13 +77,45 @@ when the gateway does not ask for that by default, says so per request. Decodes 
 `GenerationRequest.cache`.
 """
 
+MANIFEST_FIELD = "anyinfer_manifest"
+"""Request-body flag asking for the run manifest, and the response key it comes back in.
+
+The result-side half of the same superset argument `HISTORY_FIELD` makes. Every routing,
+mechanism, and provenance decision this library takes was reachable only from Python; a
+caller on the standalone binary could use every one of them and see none of them. Opt-in,
+because a stock OpenAI client must get a byte-identical response — so absence of the field
+means absence of the key, on the non-streaming body and in the stream alike.
+"""
+
 _RESERVED_FIELDS = frozenset(
     {
         "model", "messages", "stream", "stream_options", "temperature", "top_p",
         "max_tokens", "max_completion_tokens", "stop", "tools", "tool_choice",
         "response_format", "metadata", "n", "user", HISTORY_FIELD, CACHE_FIELD,
+        MANIFEST_FIELD,
     }
 )
+
+
+def wants_manifest(body: Mapping[str, Any]) -> bool:
+    """Whether this request asked for its run manifest.
+
+    Args:
+        body: The parsed request JSON.
+
+    Returns:
+        ``True`` when the request set the extension to a truthy value.
+
+    Raises:
+        ValueError: If the field is present but is not a boolean, so a client that
+            mis-spelled it learns rather than silently getting no manifest.
+    """
+    if MANIFEST_FIELD not in body:
+        return False
+    value = body[MANIFEST_FIELD]
+    if not isinstance(value, bool):
+        raise ValueError(f"{MANIFEST_FIELD} must be true or false")
+    return value
 
 
 # ---- request: OpenAI -> AnyInfer -----------------------------------------------------
@@ -449,8 +484,19 @@ def completion_from_generation(
     model: str,
     completion_id: str = "chatcmpl-anyinfer",
     created: int | None = None,
+    include_manifest: bool = False,
 ) -> dict[str, Any]:
-    """Render a `Generation` as a ``chat.completion`` object."""
+    """Render a `Generation` as a ``chat.completion`` object.
+
+    Args:
+        result: The generation to render.
+        model: The ``model`` string to echo back.
+        completion_id: The completion id to stamp.
+        created: Unix timestamp; defaults to now.
+        include_manifest: Attach the run manifest under `MANIFEST_FIELD`. Off by default,
+            so a stock client's response is byte-identical to what it was before manifests
+            existed. Serialization only — nothing here assembles a manifest.
+    """
     message: dict[str, Any] = {"role": "assistant", "content": result.text or None}
     if result.tool_calls:
         message["tool_calls"] = [
@@ -480,7 +526,43 @@ def completion_from_generation(
     usage = _encode_usage(result.usage)
     if usage is not None:
         body["usage"] = usage
+    if include_manifest and result.manifest is not None:
+        body[MANIFEST_FIELD] = result.manifest.to_dict()
     return body
+
+
+def manifest_chunk(
+    result: Generation,
+    *,
+    model: str,
+    completion_id: str = "chatcmpl-anyinfer",
+    created: int | None = None,
+) -> dict[str, Any] | None:
+    """Render the terminal manifest frame for a streaming response.
+
+    Shaped as an ordinary ``chat.completion.chunk`` with an empty ``choices`` array — the
+    same envelope the trailing usage chunk uses — so a reader that has never heard of the
+    extension parses it, finds no delta, and moves on.
+
+    Args:
+        result: The finished generation.
+        model: The ``model`` string to echo back.
+        completion_id: The completion id to stamp.
+        created: Unix timestamp; defaults to now.
+
+    Returns:
+        The frame, or ``None`` when the generation carries no manifest.
+    """
+    if result.manifest is None:
+        return None
+    return {
+        "id": completion_id,
+        "object": "chat.completion.chunk",
+        "created": created if created is not None else int(time.time()),
+        "model": model,
+        "choices": [],
+        MANIFEST_FIELD: result.manifest.to_dict(),
+    }
 
 
 def _encode_usage(usage: Usage) -> dict[str, Any] | None:

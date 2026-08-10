@@ -270,6 +270,7 @@ descriptor = ProviderDescriptor(
                 required=False,
                 help_text="A pre-acquired bearer token. Omit to sign in interactively.",
                 placeholder="env://M365_COPILOT_TOKEN or a literal token",
+                env_var="M365_COPILOT_TOKEN",
             ),
             SetupField(
                 key="tenant_id",

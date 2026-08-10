@@ -33,9 +33,20 @@ This file is the single authoritative instruction set for Codex, Claude Code, Gi
 Copilot, and other coding agents. `CLAUDE.md` and `.github/copilot-instructions.md` are
 discovery shims only: they point here and contain no independent engineering policy. A
 tool-specific skill or prompt may adapt invocation syntax, but the procedure it runs must
-live in one tool-neutral canonical file. Today the provider drift check follows that model:
-`contracts/DRIFT-CHECK.md` is authoritative; the Codex and Claude skills and the Copilot
-prompt are thin entry points.
+live in one tool-neutral canonical file. Today two procedures follow that model:
+`contracts/DRIFT-CHECK.md` and `docs/agents/INTEGRATION.md` are authoritative; the Codex
+and Claude skills and the Copilot prompts beside each are thin entry points.
+
+**The same rule governs instruction text that ships outward.** Agent instructions this
+project *emits* — `anyinfer agents-md`, the `llms.txt` pair built with the docs site, and
+`docs/agents/INTEGRATION.md` with its three shims — are read in somebody else's
+repository, where nothing here can correct them. So they are derived, never authored
+twice: generated from the registry, the installed distribution metadata, and the package
+version, or else a shim over a canonical file, and covered by the same shim tests. Two
+consequences follow. Every generated artifact carries the version it was generated from,
+so a reader can notice a stale one. And the no-ADR-identifiers rule applies with full
+force: an outward artifact is the likeliest place for `ADR-NNN` to leak into a stranger's
+codebase, so `tests/test_agent_instructions.py` asserts its absence from all of them.
 
 Keep these product surfaces distinct:
 
@@ -43,7 +54,7 @@ Keep these product surfaces distinct:
 |---|---|---|
 | Core SDK / inference engine | `src/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
 | Demo application | `src/demo_app/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
-| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `run`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, and `context`. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`. |
+| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `init`, `agents-md`, `run`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, and `context`. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`, and endpoint/credential discovery for `init` belongs in `anyinfer.local.discovery`. |
 | OpenAI-compatible sidecar | `src/anyinfer/serve/`, sidecar tests | Owns only the OpenAI wire codec and ASGI lifecycle. It stays a projection over `AsyncClient`; no provider, routing, validation, or config policy belongs here. |
 | Shared configuration | `src/anyinfer/config/`, configuration docs and tests | One versioned format feeds Python SDK callers, the CLI, the sidecar, and compatible demo settings. Frontends may add flags, but they must not fork file semantics. |
 

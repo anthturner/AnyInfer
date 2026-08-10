@@ -232,6 +232,7 @@ descriptor = ProviderDescriptor(
                 kind="secret",
                 required=True,
                 placeholder="env://NEBIUS_API_KEY or a literal key",
+                env_var="NEBIUS_API_KEY",
                 help_text=(
                     "Conventionally env://NEBIUS_API_KEY. Accepts env:// and "
                     "credential://."

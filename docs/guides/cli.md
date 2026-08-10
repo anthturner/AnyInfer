@@ -10,6 +10,61 @@ anyinfer run "Explain TCP slow start." --config anyinfer.json --target ollama:qw
 
 The reply streams to stdout as it arrives.
 
+## Getting a config file in the first place
+
+`anyinfer init` writes one from what this machine can already do, so the first five
+minutes end in a working call rather than in the configuration reference:
+
+```bash
+anyinfer init
+```
+
+```text
+detected   Linux / x86_64, 32.0 GiB RAM, NVIDIA RTX 4070 (12.0 GiB)
+probed     17 loopback endpoint(s), every one a provider default:
+           http://127.0.0.1:11434, http://127.0.0.1:1234/v1, …
+found      ollama at http://127.0.0.1:11434 (4 models)
+found      anthropic, credential env://ANTHROPIC_API_KEY
+recommend  medium -> ollama:qwen3:8b
+
+wrote      anyinfer.json
+wrote      starter.py
+
+next       python starter.py
+           anyinfer verify --config anyinfer.json
+```
+
+It discovers rather than guesses: a provider reaches the file only when a loopback
+endpoint it declares answered a model listing, or a credential variable it names is set.
+Detected keys are written as `env://` references, never values, so the generated file is
+safe to commit — which `init` says once and then leaves your `.gitignore` alone.
+
+| Flag | What it does |
+|---|---|
+| `--output PATH` | Write the configuration somewhere other than `anyinfer.json` |
+| `--force` | Replace an existing configuration and starter |
+| `--no-probe` | Contact nothing; report credential evidence only |
+| `--keyring` | Also look in the OS credential vault (may prompt to unlock) |
+| `-y`, `--yes` | Do not ask before writing, on a terminal |
+| `--json` | Emit the findings and the decisions for a script |
+
+`anyinfer doctor` reports the same hardware without writing anything, and points here
+when no configuration exists yet.
+
+## Instructions for a coding agent
+
+`anyinfer agents-md` prints a short fragment describing how this library is actually
+called — the call shape, the traps worth pre-empting, and the list of things not to
+hand-roll — rendered from the installed version rather than from memory:
+
+```bash
+anyinfer agents-md >> AGENTS.md
+anyinfer agents-md --config anyinfer.json --format claude > CLAUDE.md
+```
+
+It writes nothing itself; the redirect is yours, and so is the review. See
+[coding agents](coding-agents.md).
+
 ## Pointing it at providers
 
 `run` reads the same [shared config file](../reference/configuration.md#file-format)
@@ -210,6 +265,11 @@ answered  ollama:qwen3:0.6b
 
 `--json` emits the same information for scripts, including anything the provider reported
 about [its own runtime](../concepts/capabilities.md#runtime-diagnostics).
+
+A target known to reason gets a larger output budget for the probe than the ordinary
+64 tokens. A thinking model spends the small budget on reasoning before it says anything,
+and the truncated result reads as "the provider answered with empty text" — a connection
+failure you do not have.
 
 ## Fitting a directory into a prompt
 

@@ -100,6 +100,13 @@ class CompatPreset:
             surfaced as `ParameterDropped` telemetry.
         reasoning: How reasoning effort is spelled, or ``None`` when the provider has no
             documented control (use ``provider_options`` for provider-specific spellings).
+        default_temperature: The temperature this service applies when a request sends
+            none, **only** where its own documentation states one. ``None`` otherwise, and
+            ``None`` is the correct final answer for almost every provider here: OpenAI
+            compatibility says nothing about defaults, and copying a plausible number from
+            a sibling service would be an invented fact carrying a provenance tag.
+        default_top_p: The nucleus cutoff applied when a request sends none, under the
+            same documentation-only rule.
         default_port: Port used by the local host shorthand (``myhost`` →
             ``http://myhost:PORT``).
         note: One-line quirk summary, rendered into the generated provider index.
@@ -122,6 +129,8 @@ class CompatPreset:
     features: Feature = _DEFAULT_FEATURES
     ignored_parameters: tuple[str, ...] = ()
     reasoning: ReasoningStyle | None = None
+    default_temperature: float | None = None
+    default_top_p: float | None = None
     default_port: int | None = None
     note: str = ""
 
@@ -498,6 +507,14 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         base_url="https://api.ai21.com/studio/v1",
         key_env="AI21_API_KEY",
         models_listing=False,
+        # AI21 is the one service in this table whose own reference states its sampling
+        # defaults outright, and the contract snapshot records them with the date they
+        # were verified (contracts/openai-compat-presets.md, "ai21", verified 2026-08-07).
+        # Every other preset leaves these unset, which is not an omission: OpenAI
+        # compatibility says nothing about defaults, and a number copied from a sibling
+        # service would be a guess wearing a provenance tag.
+        default_temperature=0.4,
+        default_top_p=1.0,
         note="Jamba model family; max_tokens caps at 4096.",
     ),
     # ---- routers and gateways --------------------------------------------------------
@@ -1226,6 +1243,11 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
                     if preset.key_env
                     else "env://VARIABLE_NAME or a literal key"
                 ),
+                # The same fact as the placeholder, in the form a program can use:
+                # discovery asks "is this provider already usable here?" and a UI asks
+                # "did we find this in your environment?", and neither should be parsing
+                # an example sentence to find out.
+                env_var=preset.key_env,
             )
         )
     url_help = preset.base_url_hint or (
@@ -1272,7 +1294,20 @@ def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
         requires_base_url=preset.requires_base_url,
         setup=_setup_spec(preset),
         default_capabilities=ModelCapabilities(
-            features=Sourced(preset.features, "default")
+            features=Sourced(preset.features, "default"),
+            # ``catalog`` provenance: these are values the provider's own documentation
+            # states, recorded in the contract snapshot with the date they were verified.
+            # Nothing here is probed or inferred, so nothing here degrades to ``default``.
+            default_temperature=(
+                Sourced(preset.default_temperature, "catalog")
+                if preset.default_temperature is not None
+                else None
+            ),
+            default_top_p=(
+                Sourced(preset.default_top_p, "catalog")
+                if preset.default_top_p is not None
+                else None
+            ),
         ),
         ignored_parameters=preset.ignored_parameters,
         reasoning_translator=_TRANSLATORS[preset.reasoning],

@@ -682,6 +682,7 @@ descriptor = ProviderDescriptor(
                     "requests with AWS credentials instead."
                 ),
                 placeholder="env://AWS_BEARER_TOKEN_BEDROCK or a literal key",
+                env_var="AWS_BEARER_TOKEN_BEDROCK",
             ),
             SetupField(
                 key="region",
@@ -727,6 +728,7 @@ descriptor = ProviderDescriptor(
                     "credential://."
                 ),
                 placeholder="env://AWS_SECRET_ACCESS_KEY",
+                env_var="AWS_SECRET_ACCESS_KEY",
             ),
             SetupField(
                 key="aws_session_token",
@@ -736,6 +738,7 @@ descriptor = ProviderDescriptor(
                 advanced=True,
                 help_text="Only for temporary (STS) credentials.",
                 placeholder="env://AWS_SESSION_TOKEN",
+                env_var="AWS_SESSION_TOKEN",
             ),
             SetupField(
                 key="profile",

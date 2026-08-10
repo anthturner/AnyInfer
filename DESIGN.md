@@ -576,6 +576,12 @@ through the existing overlay machinery, with no resolver changes.
   *their* codebases, or a shared `anyinfer.sinks` contrib module later.
 - **Cost:** `Usage.cost_usd` computed from capability-layer pricing when provenance is
   `catalog` or `discovered` (OpenRouter reports pricing); `None` otherwise — never guessed.
+- **Run manifest** (`anyinfer.manifest`, ADR-014): a terminal *projection* of one request's
+  events plus its `Generation`, carried on `Generation.manifest`. It adds no source of
+  truth — every field is derivable from the event stream, the request, the resolved
+  capabilities, and the result — and it is content-free by default on the same terms as
+  events. Events remain the contract for an observer watching a system; the manifest is
+  the contract for a developer holding one call.
 
 ## 15. Configuration and credentials
 
@@ -1066,6 +1072,42 @@ process-tree termination, bounded waits) rather than growing a second one. Tool 
 attacker-influenceable text entering a model's context; that trust decision is the
 application's and the documentation says so. This ships ahead of a named consumer — risk R5
 knowingly accepted, bounded by living entirely behind an extra.
+
+### ADR-014 — The run manifest is a projection of events, never a second source of truth
+**Decision.** Ship `anyinfer.manifest`: one versioned, serializable `RunManifest` per call,
+carried on `Generation.manifest`, readable mid-flight from a stream handle, printed by
+`anyinfer run --trace`, and offered by the sidecar as an opt-in `anyinfer_manifest`
+response extension. **The derivation rule is the decision**: every field is computed from
+one request's telemetry events, the `GenerationRequest` they came from, the capabilities
+the router resolved for its targets, and the `Generation` it produced. No field is measured
+independently, nothing on the request path reports to the manifest and nowhere else, and
+`tests/test_manifest.py` records a run through both a subscribed observer and the builder
+and fails when the two disagree. On by default: it allocates one small object per in-flight
+request, writes nothing, sends nothing, and is content-free — the invited/uninvited line in
+this codebase has always been about spend and side effects, and this has neither.
+**Why.** ADR-006 makes typed events *the* telemetry contract, and this is a second
+representation of the same facts, so it needs a reason not to be a fork. The reason is that
+the two answer different questions. Events serve an observer watching a *system*: they
+arrive as things happen, they must be subscribed before dispatch, and a developer who did
+not subscribe has lost the story. The manifest serves a developer holding *one call*: it is
+terminal, it is a value, and it can be diffed, pasted into an issue, or asserted against as
+a golden file. That last use is why it exists at all — a golden manifest lets an application
+regression-test its inference *behaviour* (route, mechanism, repair budget, reduction)
+rather than the model's prose, which is untestable. It is also the fix for a parity defect:
+before it, all twenty typed events were Python-only and the sidecar had no observability
+surface whatsoever, so a developer on the standalone binary got every provider, route, and
+mechanism with no way to see which fired.
+**Consequences.** Content-free by default on the same terms as events, and structurally so:
+the payload strings live in their own `payloads` facet which is `None` unless a client asks
+for them, and every string in it passes redaction. A schema is recorded as a digest plus its
+title, never its body. **No I/O anywhere in the subsystem** — writing manifests to a
+directory, rotating them, or querying them is a durable store, which §2 rules out, and the
+caller serializes if it wants one. The sidecar extension is response-scoped and stateless:
+`/v1/anyinfer/runs`, retention, and a query API are permanently out of scope, the same fence
+§27 puts around corpus storage. `serve/` imports the manifest *types* only and assembles
+nothing. Format versioning follows §26's envelope rule — a bump means an existing field
+changed meaning, and adding a field does not, because a reader ignoring unknown keys
+survives additions.
 
 
 ## 24. Provider conformance test matrix (draft)

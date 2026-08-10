@@ -63,6 +63,12 @@ without knowing which provider it is: which fields to prompt for, which have sen
 defaults, which are credentials, and which environment variable each conventionally comes
 from. Fill it in and every AnyInfer-based application can configure your provider.
 
+Declare `SetupField.env_var` on any field with a conventional variable — the bare name,
+`"ACME_API_KEY"`, not the `env://` reference form. It is the machine-readable half of what
+`placeholder` says in prose, and it is what lets `anyinfer init` find your provider already
+usable on somebody's machine, and a config UI say "we found this in your environment",
+without either of them parsing an example sentence.
+
 ## Certify it
 
 ```bash

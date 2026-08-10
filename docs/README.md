@@ -16,6 +16,7 @@ arranged.
 
 | I want to… | Go to |
 |---|---|
+| See what makes it different from the alternatives | [Why AnyInfer](why-anyinfer.md) |
 | Decide whether AnyInfer is the right layer | [When to use AnyInfer](guides/when-to-use.md) |
 | Add AnyInfer to my application | [Integrator guide](#for-integrators) |
 | Run it as a service my existing tools talk to | [OpenAI-compatible sidecar](serve/README.md) |
@@ -67,6 +68,9 @@ You are embedding AnyInfer in an application.
 - [Store credentials in the OS keyring](guides/credentials.md)
 - [Run the tool loop](guides/tool-loop.md)
 - [Fit a corpus to a context budget](guides/fitting-context.md)
+- [Keep the sidecar running across reboots](serve/running-as-a-service.md)
+- [Let a coding agent write the integration](guides/coding-agents.md) — and have it write
+  correct code rather than a plausible OpenAI clone
 - [Explore the pack-in demo app](guides/demo-app.md) — a PySide6 reference integration that
   runs offline. Standalone builds are on the [downloads page](downloads.md).
 

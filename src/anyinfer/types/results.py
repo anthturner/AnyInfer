@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
-from typing import Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from .messages import ToolCall
 from .requests import CacheMechanism, ResolvedTarget
+
+if TYPE_CHECKING:  # pragma: no cover — imported for the annotation only
+    from ..manifest import RunManifest
 
 __all__ = [
     "DETAIL_MAX_CHARS",
@@ -233,6 +236,11 @@ class Generation:
         raw: The provider-native response payload, as an escape hatch for fields
             the normalized types do not carry. ``None`` unless the request asked
             to keep it.
+        manifest: The run manifest — one content-free record of which target won, which
+            mechanisms were used, what was dropped or reduced, and what it cost. ``None``
+            when the client was built with manifests switched off. It is a *projection* of
+            this call's telemetry events and this result, never an independent account of
+            them.
     """
 
     text: str
@@ -248,3 +256,4 @@ class Generation:
     attempts: tuple[AttemptRecord, ...] = ()
     warnings: tuple[str, ...] = ()
     raw: Any | None = None
+    manifest: RunManifest | None = None

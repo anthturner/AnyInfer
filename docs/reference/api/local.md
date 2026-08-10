@@ -240,6 +240,26 @@ Where weights come from. Adding an internal mirror is a resolver, not a dependen
 
 </div>
 
+## Discovery
+
+What this machine can already use: engines answering on loopback, and credential
+variables that are actually set. This is what `anyinfer init` composes into a
+configuration file.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.local.discover
+
+::: anyinfer.local.DiscoveredProvider
+
+::: anyinfer.local.DiscoveryEvidence
+
+::: anyinfer.local.endpoint_candidates
+
+::: anyinfer.local.KEYRING_IDENTIFIER_SUFFIX
+
+</div>
+
 ## Engine-managed models
 
 <div class="anyinfer-api-block" markdown>

@@ -544,6 +544,7 @@ descriptor = ProviderDescriptor(
                     "Conventionally env://CO_API_KEY. Accepts env:// and credential://."
                 ),
                 placeholder="env://CO_API_KEY or a literal key",
+                env_var="CO_API_KEY",
             ),
             SetupField(
                 key="base_url",

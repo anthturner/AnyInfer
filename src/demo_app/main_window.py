@@ -47,7 +47,7 @@ from PySide6.QtWidgets import (
 
 from anyinfer import CachePolicy, CostEstimate, HistoryPolicy, Retry, Route
 from anyinfer.errors import AnyInferError
-from anyinfer.types.capabilities import Health
+from anyinfer.types.capabilities import Health, Sourced
 from anyinfer.types.messages import Message, Text, system, user
 from anyinfer.types.requests import Repair, Sampling
 from anyinfer.types.results import AttemptRecord, Generation
@@ -947,9 +947,10 @@ class MainWindow(QMainWindow):
     def _refresh_default_hints(self) -> None:
         """Show the values the SDK actually has on file for 'provider default' fields.
 
-        Only the max-output-tokens capability is knowable here; sampling defaults are
-        provider-side and unreported, and their tooltips say so instead of showing an
-        invented number.
+        Three fields, one rule: show the number when the library has one on file, and say
+        plainly that it does not when it does not. Sampling defaults are known only for a
+        provider whose own documentation states them, so most selections still land on the
+        unreported note — which is the point, not a shortfall.
         """
         detected = self._engine_bar.max_output_tokens_detected()
         base = (
@@ -959,13 +960,41 @@ class MainWindow(QMainWindow):
         if detected is None:
             self._max_output_tokens.setSpecialValueText("provider default")
             self._max_output_tokens.setToolTip(base + _UNREPORTED_DEFAULT_NOTE)
-            return
-        self._max_output_tokens.setSpecialValueText(
-            f"provider default ({detected.value:,})"
+        else:
+            self._max_output_tokens.setSpecialValueText(
+                f"provider default ({detected.value:,})"
+            )
+            self._max_output_tokens.setToolTip(
+                f"{base} (Provider default: {detected.value:,} tokens — "
+                f"{detected.provenance}.)"
+            )
+
+        self._apply_sampling_hint(
+            self._temperature,
+            self._engine_bar.default_temperature_detected(),
+            "Sampling temperature. At the minimum the field reads 'provider default' and "
+            "is omitted from the wire request entirely — AnyInfer never invents a "
+            "temperature.",
         )
-        self._max_output_tokens.setToolTip(
-            f"{base} (Provider default: {detected.value:,} tokens — "
-            f"{detected.provenance}.)"
+        self._apply_sampling_hint(
+            self._top_p,
+            self._engine_bar.default_top_p_detected(),
+            "Nucleus-sampling cutoff. At the minimum the value is omitted from the wire "
+            "request, so the provider's default is used.",
+        )
+
+    @staticmethod
+    def _apply_sampling_hint(
+        spin: QDoubleSpinBox, detected: Sourced[float] | None, base: str
+    ) -> None:
+        """Name the provider's documented default, or say it was never reported."""
+        if detected is None:
+            spin.setSpecialValueText("provider default")
+            spin.setToolTip(base + _UNREPORTED_DEFAULT_NOTE)
+            return
+        spin.setSpecialValueText(f"provider default ({detected.value:g})")
+        spin.setToolTip(
+            f"{base} (Provider default: {detected.value:g} — {detected.provenance}.)"
         )
 
     def _on_configure(self) -> None:

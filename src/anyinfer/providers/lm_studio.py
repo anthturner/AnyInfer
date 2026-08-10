@@ -212,6 +212,7 @@ descriptor = ProviderDescriptor(
                 advanced=True,
                 help_text="Only needed when LM Studio's authentication is enabled.",
                 placeholder="env://LM_STUDIO_API_KEY or a literal key",
+                env_var="LM_STUDIO_API_KEY",
             ),
         ),
         model_selection="discover-or-manual",

@@ -296,3 +296,77 @@ async def test_a_provider_that_times_its_prefill_gets_a_prefill_rate() -> None:
 
     assert measurement.prefill_tokens_per_s is not None
     assert measurement.identity.host is not None, "a loopback ollama runs on this machine"
+
+
+# ---- the warmth signal (CS.1) ------------------------------------------------------------
+
+
+def test_a_reported_load_duration_reaches_the_measurement() -> None:
+    """Ollama reports `load_duration` on every request; the benchmark path now reads it."""
+    from anyinfer.benchmark import measurement_from
+
+    measurement = measurement_from(
+        IDENTITY,
+        input_tokens=10,
+        output_tokens=5,
+        ttft_ms=12.0,
+        total_ms=100.0,
+        decode_tokens_per_s=40.0,
+        prefill_ms=None,
+        model_load_ms=1_840.0,
+    )
+    assert measurement.model_load_ms == 1_840.0
+    assert "loaded in 1840 ms" in measurement.summary
+
+
+def test_an_unreported_load_is_none_rather_than_zero() -> None:
+    """The same tri-state rule as every other rate: unknown is not "instant"."""
+    from anyinfer.benchmark import measurement_from
+
+    measurement = measurement_from(
+        IDENTITY,
+        input_tokens=10,
+        output_tokens=5,
+        ttft_ms=None,
+        total_ms=50.0,
+        decode_tokens_per_s=None,
+        prefill_ms=None,
+    )
+    assert measurement.model_load_ms is None
+    assert "loaded in" not in measurement.summary
+
+
+def test_the_load_signal_survives_a_store_round_trip(tmp_path: Path) -> None:
+    from anyinfer.benchmark import Measurement, measurement_from
+
+    measurement = measurement_from(
+        IDENTITY,
+        input_tokens=1,
+        output_tokens=1,
+        ttft_ms=None,
+        total_ms=1.0,
+        decode_tokens_per_s=None,
+        prefill_ms=None,
+        model_load_ms=7.5,
+    )
+    restored = Measurement.from_json(measurement.to_json())
+    assert restored is not None
+    assert restored.model_load_ms == 7.5
+
+
+async def test_a_provider_reported_phase_flows_through_benchmark() -> None:
+    """End to end: an adapter phase becomes a field on the measurement."""
+    from anyinfer.testing.fakes import FakeOllamaServer
+
+    # The fake reports Ollama's own terminal fields, `load_duration` among them.
+    server = FakeOllamaServer(FakeResponse(text="hello"))
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "ollama", base_url="http://127.0.0.1:11434", transport=server.transport()
+            )
+        ]
+    ) as client:
+        measurement = await client.benchmark("ollama:qwen3:8b", output_tokens=4)
+
+    assert measurement.model_load_ms == 300.0

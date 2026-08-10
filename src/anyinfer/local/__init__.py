@@ -13,6 +13,7 @@ Nine cooperating pieces that turn "run this model locally" into something a novi
   finding them again.
 - `anyinfer.local.server` — supervised llama-server processes, loopback only.
 - `anyinfer.local.recommend` — hardware → catalog tier.
+- `anyinfer.local.discovery` — which providers this machine can already use.
 
 Model acquisition lives here, never in a provider adapter: adapters translate protocol, and
 fetching forty gigabytes is not protocol translation.
@@ -30,6 +31,13 @@ from .acquire import (
 )
 from .artifacts import GgufArtifact, GgufFile
 from .backends import BACKEND_RANK, Backend, available_backends, select_backend
+from .discovery import (
+    KEYRING_IDENTIFIER_SUFFIX,
+    DiscoveredProvider,
+    DiscoveryEvidence,
+    discover,
+    endpoint_candidates,
+)
 from .downloads import (
     ALLOWED_LICENSES,
     DownloadReport,
@@ -94,6 +102,7 @@ __all__ = [
     "CACHE_BYPASS_ENV",
     "CACHE_REFRESH_ENV",
     "CONTEXT_LADDER",
+    "KEYRING_IDENTIFIER_SUFFIX",
     "LOOPBACK_HOST",
     "Accelerator",
     "AcceleratorKind",
@@ -102,6 +111,8 @@ __all__ = [
     "AcquisitionProgress",
     "AcquisitionReport",
     "Backend",
+    "DiscoveredProvider",
+    "DiscoveryEvidence",
     "DownloadReport",
     "FitLevel",
     "GgufArtifact",
@@ -146,7 +157,9 @@ __all__ = [
     "default_model_dir",
     "default_runtime_kind",
     "detect",
+    "discover",
     "download_artifact",
+    "endpoint_candidates",
     "evaluate_variants",
     "install_hint",
     "install_runtime",

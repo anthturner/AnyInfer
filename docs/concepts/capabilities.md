@@ -50,6 +50,30 @@ caps.context_window     # Sourced(32768, 'discovered') — discovery wins
 - **Pre-dispatch gating** — a request that provably cannot fit a known context window fails
   fast instead of paying a round trip. Only trusted-provenance windows gate; see
   [token estimation and context budgets](budgeting.md).
+- **Probe sizing** — a target known to reason gets a larger budget for the `verify()`
+  probe, because a thinking model spends the ordinary one before it says anything. Only a
+  trusted-provenance feature flag raises it; a descriptor's guess does not.
+
+### Sampling defaults
+
+`default_temperature` and `default_top_p` answer a question an unset sampling knob
+otherwise leaves open: "provider default" is true, but *what* default?
+
+```python
+capabilities.default_temperature   # Sourced(0.4, 'catalog') — the provider documents it
+capabilities.default_temperature   # None — it documents nothing, and none is invented
+```
+
+They are populated **only** from a provider's own documentation, recorded in its contract
+snapshot with the date it was verified. Never probed, never inferred from a sibling
+provider, never carried across a model family. Almost every provider answers `None`, and
+that is the correct final state for it rather than a gap awaiting research: a plausible
+number wearing a provenance tag is the estimate-as-authority this whole model exists to
+prevent.
+
+For the same reason the [`auto` sentinel](#the-auto-sentinel) omits them. The minimum of
+two candidates' default temperatures is not a fact about anything a delegating provider
+will actually do.
 
 ## Cost is tri-state
 

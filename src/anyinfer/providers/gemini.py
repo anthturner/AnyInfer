@@ -626,6 +626,7 @@ descriptor = ProviderDescriptor(
                     "env://GEMINI_API_KEY. Accepts env:// and credential://."
                 ),
                 placeholder="env://GEMINI_API_KEY or a literal key",
+                env_var="GEMINI_API_KEY",
             ),
             SetupField(
                 key="base_url",

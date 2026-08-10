@@ -11,13 +11,25 @@ from __future__ import annotations
 from ..types.capabilities import Feature, ModelCapabilities
 from ..types.results import Mechanism
 
-__all__ = ["SCHEMA_PROMPT_TEMPLATE", "choose_mechanism", "system_prompt_for"]
+__all__ = [
+    "MECHANISM_LADDER",
+    "SCHEMA_PROMPT_TEMPLATE",
+    "choose_mechanism",
+    "system_prompt_for",
+]
 
-_LADDER: tuple[tuple[Feature, Mechanism], ...] = (
+MECHANISM_LADDER: tuple[tuple[Feature, Mechanism], ...] = (
     (Feature.GRAMMAR, "grammar"),
     (Feature.JSON_SCHEMA, "json_schema"),
     (Feature.JSON_MODE, "json_mode"),
 )
+"""The native rungs, strongest first.
+
+Public because explaining a choice needs the same table that made it: a run manifest
+reports which rungs were rejected and why, and a second copy of this tuple would be a
+second answer to drift away from the first. ``prompt`` is not a rung here — it is what is
+left when every rung fails, and it is always available.
+"""
 
 SCHEMA_PROMPT_TEMPLATE = (
     "Respond with ONLY a JSON value matching this JSON Schema. No prose. Schema:\n{schema}"
@@ -35,7 +47,7 @@ def choose_mechanism(caps: ModelCapabilities | None) -> Mechanism:
         The chosen mechanism. ``"prompt"`` when no native mechanism is known to work.
     """
     features = caps.features.value if caps is not None else Feature(0)
-    for feature, mechanism in _LADDER:
+    for feature, mechanism in MECHANISM_LADDER:
         if feature in features:
             return mechanism
     return "prompt"

@@ -1,0 +1,100 @@
+{
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "error": null,
+      "outcome": "ok",
+      "retry_reason": null,
+      "target": "scripted:m"
+    }
+  ],
+  "cache": {
+    "estimated_cacheable_tokens": 0,
+    "mark_count": 0,
+    "mechanism": null,
+    "policy_mode": null,
+    "read_tokens": null,
+    "write_tokens": null
+  },
+  "capability": {
+    "facts": [
+      {
+        "name": "context_window",
+        "provenance": "default",
+        "value": 32768
+      },
+      {
+        "name": "features",
+        "provenance": "default",
+        "value": [
+          "JSON_MODE",
+          "STREAMING",
+          "SYSTEM_PROMPT",
+          "TOOLS"
+        ]
+      }
+    ],
+    "target": "scripted:m"
+  },
+  "complete": true,
+  "context": {
+    "reductions": []
+  },
+  "dropped": [],
+  "format": "1",
+  "notes": [],
+  "payloads": null,
+  "request": {
+    "char_count": 2,
+    "estimated_tokens": 5,
+    "message_count": 1,
+    "metadata_keys": [],
+    "reasoning": null,
+    "repair_budget": 0,
+    "role_counts": {
+      "user": 1
+    },
+    "sampling": {},
+    "schema_digest": null,
+    "schema_name": null,
+    "schema_present": false,
+    "timeout_s": null,
+    "tool_choice": "auto",
+    "tool_names": []
+  },
+  "route": {
+    "considered": [
+      {
+        "outcome": "ok",
+        "reason": "",
+        "target": "scripted:m"
+      }
+    ],
+    "requested": [
+      "scripted:m"
+    ],
+    "resolved": "scripted:m"
+  },
+  "structured": {
+    "chosen": null,
+    "ladder": [],
+    "repair_attempts": 0,
+    "repairs": [],
+    "requested": false,
+    "used": null,
+    "validated": false
+  },
+  "timing": {},
+  "usage": {
+    "cache_read_tokens": null,
+    "cache_write_tokens": null,
+    "cost_usd": null,
+    "estimated_fields": {
+      "input_tokens": "pre-dispatch context-gate estimate"
+    },
+    "input_tokens": 11,
+    "output_tokens": 7,
+    "reasoning_tokens": null,
+    "total_tokens": 18
+  }
+}

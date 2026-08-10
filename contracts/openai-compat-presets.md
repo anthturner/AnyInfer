@@ -585,7 +585,10 @@ one.
   supports 1-16 but n>1 is incompatible with temperature=0; stream requires n=1 and is
   incompatible with tools (tools require non-streaming); response_format {'type':'json_object'}
   for JSON mode; extra non-OpenAI 'documents' parameter (content + metadata key-value pairs) for
-  RAG-style grounding; ~256K-token cap on the messages list. Model aliases float: docs advise
+  RAG-style grounding; ~256K-token cap on the messages list. AnyInfer surfaces the two stated
+  defaults (temperature 0.4, top_p 1.0) as `ModelCapabilities.default_temperature` /
+  `default_top_p` at `catalog` provenance — a documented fact, not a probe; re-check them on
+  the next drift run for this preset. Model aliases float: docs advise
   dated versions — jamba-large currently -> jamba-large-1.7-2025-07 and jamba-mini -> jamba-
   mini-2-2026-01. No Anthropic-compatible endpoint documented.
 - Reasoning:

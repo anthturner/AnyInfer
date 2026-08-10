@@ -96,6 +96,7 @@ descriptor = ProviderDescriptor(
                 kind="secret",
                 required=True,
                 placeholder="env://{provider_id_upper}_API_KEY or a literal key",
+                env_var="{provider_id_upper}_API_KEY",
             ),
             SetupField(
                 key="base_url",

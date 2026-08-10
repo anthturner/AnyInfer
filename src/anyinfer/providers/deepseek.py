@@ -154,6 +154,7 @@ descriptor = ProviderDescriptor(
                     "credential://."
                 ),
                 placeholder="env://DEEPSEEK_API_KEY or a literal key",
+                env_var="DEEPSEEK_API_KEY",
             ),
             SetupField(
                 key="base_url",

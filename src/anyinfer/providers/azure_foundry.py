@@ -140,6 +140,7 @@ descriptor = ProviderDescriptor(
                 required=False,
                 help_text="Leave empty to authenticate with Entra via azure-identity.",
                 placeholder="env://AZURE_OPENAI_API_KEY or a literal key",
+                env_var="AZURE_OPENAI_API_KEY",
             ),
             SetupField(
                 key="api_version",

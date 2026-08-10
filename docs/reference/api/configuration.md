@@ -9,3 +9,7 @@
 ::: anyinfer.load_config
 
 ::: anyinfer.loads_config
+
+::: anyinfer.dumps_config
+
+::: anyinfer.dump_config

@@ -29,6 +29,7 @@ from .fakes import (
     ndjson_lines,
     sse_lines,
 )
+from .manifests import VOLATILE_FIELDS, assert_manifest_matches, normalize
 from .mcp_fake import FakeMCPServer, FakeMCPTool
 from .scripted import (
     DEFAULT_SCRIPTED_CAPABILITIES,
@@ -41,6 +42,7 @@ from .scripted import (
 __all__ = [
     "CONFORMANCE_CASES",
     "DEFAULT_SCRIPTED_CAPABILITIES",
+    "VOLATILE_FIELDS",
     "Capabilities",
     "CaseResult",
     "Cassette",
@@ -58,9 +60,11 @@ __all__ = [
     "ScriptedFailure",
     "ScriptedModel",
     "ScriptedProvider",
+    "assert_manifest_matches",
     "chunk_text",
     "matrix_row",
     "ndjson_lines",
+    "normalize",
     "results_to_json",
     "run_conformance",
     "sse_lines",

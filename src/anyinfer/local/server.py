@@ -140,6 +140,15 @@ class ServerHandle:
     """The supervised child, polled for liveness and terminated on stop."""
     started_at: float
     """Monotonic time the child was spawned."""
+    load_ms: float | None = None
+    """How long this server took to become ready, in milliseconds, or ``None`` once that
+    has been reported.
+
+    The supervised runtime's equivalent of a hosted engine's load duration. It is a
+    property of the *request that caused the start*, not of the server, so it is consumed
+    exactly once — every later request on the same server is warm by definition, and
+    re-reporting the original load would turn one cold start into a permanent one.
+    """
     log_tail: deque[str] = field(default_factory=lambda: deque(maxlen=_LOG_TAIL_LINES))
     """The child's most recent output lines, kept so failures can explain themselves."""
     active_streams: int = 0
@@ -176,6 +185,12 @@ class ServerHandle:
         """Mark activity, resetting the idle clock."""
         self.last_activity = time.monotonic()
 
+    def take_load_ms(self) -> float | None:
+        """Return this server's load duration once, then forget it."""
+        value = self.load_ms
+        self.load_ms = None
+        return value
+
 
 class ManagedServer:
     """A context manager marking a server busy for the duration of a request.
@@ -197,6 +212,10 @@ class ManagedServer:
         self.handle.active_streams += 1
         self.handle.touch()
         return self
+
+    def take_load_ms(self) -> float | None:
+        """This request's share of a cold start: the load it caused, or ``None``."""
+        return self.handle.take_load_ms()
 
     def __exit__(self, *exc: object) -> None:
         """Release the server and restart its idle clock."""
@@ -380,6 +399,7 @@ class ServerSupervisor:
         except BaseException:
             await self._stop(handle, reason="failed to become ready")
             raise
+        handle.load_ms = (time.monotonic() - handle.started_at) * 1000.0
         self._emit(model_key, "ready", f"port {port}")
         return handle
 

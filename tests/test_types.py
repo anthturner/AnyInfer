@@ -176,3 +176,62 @@ def test_conjunction_is_unknown_when_any_candidate_is_unknown() -> None:
 
 def test_conjunction_of_nothing_is_unknown() -> None:
     assert conjunction([]).context_window is None
+
+
+# ---- sampling defaults (CS.6, CS.7) --------------------------------------------------------
+
+
+def test_stronger_provenance_wins_a_sampling_default_overlay() -> None:
+    base = ModelCapabilities(default_temperature=Sourced(1.0, "default"))
+    stronger = ModelCapabilities(default_temperature=Sourced(0.4, "catalog"))
+
+    assert base.overlay(stronger).default_temperature == Sourced(0.4, "catalog")
+    assert stronger.overlay(base).default_temperature == Sourced(0.4, "catalog")
+
+
+def test_a_sampling_default_survives_an_overlay_that_does_not_mention_it() -> None:
+    base = ModelCapabilities(default_top_p=Sourced(1.0, "catalog"))
+    assert base.overlay(ModelCapabilities()).default_top_p == Sourced(1.0, "catalog")
+
+
+def test_conjunction_omits_sampling_defaults_rather_than_reducing_them() -> None:
+    """No numeric reduction across candidates is a fact about what the provider will do."""
+    result = conjunction(
+        [
+            ModelCapabilities(
+                context_window=Sourced(8_000, "catalog"),
+                default_temperature=Sourced(0.4, "catalog"),
+                default_top_p=Sourced(1.0, "catalog"),
+            ),
+            ModelCapabilities(
+                context_window=Sourced(16_000, "catalog"),
+                default_temperature=Sourced(1.0, "catalog"),
+                default_top_p=Sourced(0.9, "catalog"),
+            ),
+        ]
+    )
+    assert result.context_window == Sourced(8_000, "catalog")
+    assert result.default_temperature is None
+    assert result.default_top_p is None
+
+
+def test_a_documented_default_is_carried_at_catalog_provenance() -> None:
+    """CS.7: the one preset whose own reference states its defaults, and cites them."""
+    import anyinfer as ai
+
+    capabilities = ai.default_registry.get("ai21").default_capabilities
+    assert capabilities.default_temperature == Sourced(0.4, "catalog")
+    assert capabilities.default_top_p == Sourced(1.0, "catalog")
+
+
+def test_no_provider_invents_a_sampling_default() -> None:
+    """Only documentation populates these, so nothing may carry ``default`` provenance."""
+    import anyinfer as ai
+
+    for descriptor in ai.default_registry:
+        for field_name in ("default_temperature", "default_top_p"):
+            value = getattr(descriptor.default_capabilities, field_name)
+            assert value is None or value.provenance in {"catalog", "override"}, (
+                f"{descriptor.id}.{field_name} is {value!r}; a sampling default is only "
+                "ever a documented fact"
+            )

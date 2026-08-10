@@ -86,8 +86,10 @@ Use a simpler provider client when you only need cloud API switching. Use a gate
 you need organization-wide keys, quotas, spend controls, or an admin plane. Use Ollama,
 LM Studio, or LocalAI directly when a dedicated local-model service is the product boundary.
 
-The [decision guide](https://anyinfer.dev/guides/when-to-use/) compares
-those cases directly.
+**[Why AnyInfer →](https://anyinfer.dev/why-anyinfer/)** goes through the five capabilities
+that are genuinely unusual here, with a dated comparison by category and the commands that
+check each claim. The [decision guide](https://anyinfer.dev/guides/when-to-use/) argues the
+other side and names the tools that are a better fit when they are.
 
 ## Install
 
@@ -104,6 +106,18 @@ pip install "anyinfer[all]"
 ```
 
 Python 3.11+. Windows, macOS, and Linux are all first-class.
+
+### Two commands to a working call
+
+```bash
+anyinfer init      # detect what is usable here, write anyinfer.json and starter.py
+python starter.py  # run it
+```
+
+`init` reports only what it observed — a loopback engine that answered, a credential
+variable that is actually set — and writes detected keys as `env://` references rather
+than values, so the file it generates is safe to commit. It installs nothing and never
+replaces a configuration you already have.
 
 ### Try it without credentials
 
@@ -198,6 +212,8 @@ Quick links by role:
 - **Running the HTTP service?** → [OpenAI-compatible sidecar](https://anyinfer.dev/serve/)
 - **Working from a shell?** → [Run a prompt from the shell](https://anyinfer.dev/guides/cli/)
 - **Sharing provider and route settings?** → [Configuration](https://anyinfer.dev/reference/configuration/)
+- **Letting a coding agent write the integration?** → [Coding agents](https://anyinfer.dev/guides/coding-agents/) ·
+  [`llms.txt`](https://anyinfer.dev/llms.txt) · run `anyinfer agents-md >> AGENTS.md`
 - **Contributing or writing an adapter?** →
   [Contributor guide](https://github.com/anthturner/AnyInfer/blob/main/CONTRIBUTING.md) ·
   [Provider contracts](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md)

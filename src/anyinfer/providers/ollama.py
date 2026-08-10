@@ -547,6 +547,7 @@ descriptor = ProviderDescriptor(
                 advanced=True,
                 help_text="Only needed for proxied deployments that require auth.",
                 placeholder="env://OLLAMA_API_KEY or a literal key",
+                env_var="OLLAMA_API_KEY",
             ),
         ),
         model_selection="discover-or-manual",

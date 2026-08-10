@@ -176,6 +176,7 @@ descriptor = ProviderDescriptor(
                 required=True,
                 help_text="Accepts a literal, env://VAR, or credential://system/name.",
                 placeholder="env://OPENROUTER_API_KEY or a literal key",
+                env_var="OPENROUTER_API_KEY",
             ),
             SetupField(
                 key="base_url",

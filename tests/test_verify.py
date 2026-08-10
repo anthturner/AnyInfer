@@ -185,3 +185,110 @@ def test_sync_client_verify() -> None:
         assert client.verify("openai-compat:m").ok is True
     finally:
         client.close()
+
+
+# ---- reasoning-aware probing (CS.4) -------------------------------------------------------
+
+
+async def test_a_reasoning_model_gets_a_larger_probe_budget() -> None:
+    """A thinking model spends the ordinary 64 tokens before it says anything at all."""
+    from anyinfer.providers.openai_compat import OpenAICompatAdapter
+    from anyinfer.registry import ProviderDescriptor, ProviderRegistry
+    from anyinfer.types.capabilities import Feature, ModelCapabilities, Sourced
+    from anyinfer.verification import VERIFY_REASONING_OUTPUT_TOKENS
+
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    registry.register(
+        ProviderDescriptor(
+            id="thinker",
+            display_name="Thinker",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+            default_capabilities=ModelCapabilities(
+                features=Sourced(
+                    Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.REASONING,
+                    "catalog",
+                )
+            ),
+        )
+    )
+    server = FakeOpenAIServer(FakeResponse(text=OK))
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "thinker", base_url="https://fake.invalid/v1", transport=server.transport()
+            )
+        ],
+        registry=registry,
+    ) as client:
+        result = await client.verify("thinker:m")
+
+    assert result.ok
+    assert server.requests[0]["max_tokens"] == VERIFY_REASONING_OUTPUT_TOKENS
+
+
+async def test_a_non_reasoning_model_keeps_the_small_budget() -> None:
+    """Quadrupling every probe to fix one misdiagnosis would be the wrong trade."""
+    server = FakeOpenAIServer(FakeResponse(text=OK))
+    async with make_client(server) as client:
+        await client.verify("openai-compat:m")
+
+    assert server.requests[0]["max_tokens"] == VERIFY_MAX_OUTPUT_TOKENS
+
+
+async def test_a_descriptor_level_reasoning_flag_is_enough() -> None:
+    """The gate is a ceiling, not a claim, so it does not wait for trusted provenance.
+
+    Every real Ollama model reports its features at ``default``. A trusted-provenance gate
+    read as the careful choice and would simply never have fired for the thinking models
+    this exists for — confirmed against a live ``ollama:gpt-oss:20b``.
+    """
+    from anyinfer.providers.openai_compat import OpenAICompatAdapter
+    from anyinfer.registry import ProviderDescriptor, ProviderRegistry
+    from anyinfer.types.capabilities import Feature, ModelCapabilities, Sourced
+    from anyinfer.verification import VERIFY_REASONING_OUTPUT_TOKENS
+
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    registry.register(
+        ProviderDescriptor(
+            id="maybe-thinker",
+            display_name="Maybe Thinker",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+            default_capabilities=ModelCapabilities(
+                features=Sourced(Feature.STREAMING | Feature.REASONING, "default")
+            ),
+        )
+    )
+    server = FakeOpenAIServer(FakeResponse(text=OK))
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "maybe-thinker",
+                base_url="https://fake.invalid/v1",
+                transport=server.transport(),
+            )
+        ],
+        registry=registry,
+    ) as client:
+        await client.verify("maybe-thinker:m")
+
+    assert server.requests[0]["max_tokens"] == VERIFY_REASONING_OUTPUT_TOKENS
+
+
+async def test_a_real_ollama_model_would_get_the_larger_budget() -> None:
+    """The reported bug, pinned: `ollama:qwen3:4b` must not be probed at 64 tokens."""
+    from anyinfer.testing.fakes import FakeOllamaServer
+    from anyinfer.verification import VERIFY_REASONING_OUTPUT_TOKENS
+
+    server = FakeOllamaServer(FakeResponse(text=OK))
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "ollama", base_url="http://127.0.0.1:11434", transport=server.transport()
+            )
+        ]
+    ) as client:
+        await client.verify("ollama:qwen3:4b")
+
+    assert server.requests[0]["options"]["num_predict"] == VERIFY_REASONING_OUTPUT_TOKENS

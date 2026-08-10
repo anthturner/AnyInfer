@@ -28,8 +28,14 @@ If you are still deciding, read [choosing an integration path](integration-paths
 
 - [Choose and download a local model](local-models.md)
 - [Run a local model end to end](local-inference.md)
+- [Keep the sidecar running across reboots](../serve/running-as-a-service.md)
 - [Observe requests and bridge to OpenTelemetry](observability.md)
 - [Store credentials in the OS keyring](credentials.md)
+
+## Letting a coding agent write the integration
+
+- [Coding agents](coding-agents.md) — `anyinfer agents-md`, `llms.txt`, and the
+  integration procedure a skill can execute.
 
 ## Evaluate before integrating
 

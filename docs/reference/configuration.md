@@ -217,6 +217,38 @@ temperature — an unset value is omitted from the wire request entirely.
 Credential references (`env://NAME`) read any variable you name; there are no magic
 credential variable names.
 
+## Generating a file
+
+`anyinfer init` writes a valid configuration from what the machine can already do —
+running loopback engines and credential variables that are actually set — plus a runnable
+starter program beside it. See [the CLI guide](../guides/cli.md#getting-a-config-file-in-the-first-place).
+
+In Python, the same format is written by `anyinfer.dumps_config` and `anyinfer.dump_config`:
+
+```python
+import anyinfer as ai
+
+config = ai.AnyInferConfig(
+    providers=(ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),),
+    route=ai.Route(targets=("openai:gpt-5",)),
+)
+ai.dump_config(config, "anyinfer.json")          # refuses to replace an existing file
+text = ai.dumps_config(config, comments=True)     # the same JSON, with a leading note
+```
+
+Round-tripping is the contract: `loads_config(dumps_config(c)) == c` for every
+configuration the loader accepts. Two consequences are worth knowing:
+
+- An opt-in policy left entirely at its defaults still writes its block, as `{}`. The
+  block's *presence* is what asks for the policy; dropping it would turn "pace this
+  provider by whatever it reports" back into "do not pace it at all".
+- `comments=True` writes a `_comment` string at the root rather than `//` lines. The
+  format is JSON, so a generated file explains itself in something the loader accepts;
+  reading it back changes nothing.
+
+The writer emits credential *references* exactly as they were given. It never resolves
+one, so no code path exists by which `dump_config` could write key material.
+
 ## File format
 
 ```json
@@ -349,11 +381,14 @@ anyinfer serve --config anyinfer.json --expose work-azure:gpt-4o
 ## CLI
 
 ```bash
+anyinfer init [--output PATH] [--force]         # write this file from what is available
 anyinfer serve --host 127.0.0.1 --port 8080 --config anyinfer.json
 anyinfer serve --token SECRET --host 0.0.0.0 --allow-remote-exposure
+anyinfer serve install --print   # the service definition for this platform; writes nothing
 anyinfer run "PROMPT" --config anyinfer.json   # one prompt, then exit
 anyinfer doctor [--json]        # detected hardware, recommended tier
 anyinfer providers [--json]     # every registered provider and what it needs
+anyinfer agents-md >> AGENTS.md # coding-agent instructions for this version
 anyinfer context src/ --query "how does auth work?" --max-tokens 8000
 anyinfer context src/ --query "…" --max-tokens 8000 --plan   # cost every strategy
 ```

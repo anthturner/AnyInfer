@@ -28,6 +28,7 @@ import pytest
 if TYPE_CHECKING:  # pragma: no cover — import-time cost is the whole point of deferring
     from .. import AsyncClient, Client
     from ..events.telemetry import TelemetryEvent
+    from ..manifest import RunManifest
     from ..registry import ProviderRegistry
     from .cassettes import Cassette
     from .scripted import ScriptedModel, ScriptedProvider
@@ -39,13 +40,29 @@ __all__ = [
     "anyinfer_cassette",
     "anyinfer_client",
     "anyinfer_events",
+    "anyinfer_golden_manifest",
     "anyinfer_recording",
     "anyinfer_registry",
     "anyinfer_scripted",
+    "pytest_addoption",
 ]
 
 RECORD_ENV_VAR = "ANYINFER_RECORD_CASSETTES"
 """Set to ``1`` to record cassettes instead of replaying them."""
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Register ``--update-manifests``.
+
+    Args:
+        parser: The pytest command-line parser.
+    """
+    parser.addoption(
+        "--update-manifests",
+        action="store_true",
+        default=False,
+        help="rewrite golden run manifests instead of asserting against them",
+    )
 
 
 class EventCollector:
@@ -202,6 +219,36 @@ def anyinfer_cassette(request: pytest.FixtureRequest) -> Callable[[str], Cassett
         return Cassette(directory / f"{name}.json")
 
     return resolve
+
+
+@pytest.fixture
+def anyinfer_golden_manifest(
+    request: pytest.FixtureRequest,
+) -> Callable[[RunManifest | Any, str], None]:
+    """Assert a run manifest against a golden file stored beside the test.
+
+    Call it with the manifest and a name; the golden lands in ``manifests/<name>.json``
+    next to the test file. A missing golden is written on the first run, and
+    ``--update-manifests`` rewrites every one of them.
+
+    Args:
+        request: Supplied by pytest; identifies the test file the goldens sit beside.
+
+    Returns:
+        The assertion callable.
+    """
+    from .manifests import assert_manifest_matches
+
+    directory = Path(str(request.path)).parent / "manifests"
+    update = bool(request.config.getoption("--update-manifests"))
+
+    def check(manifest: RunManifest | Any, name: str) -> None:
+        assert manifest is not None, (
+            "this generation carries no manifest; build the client with manifests=True"
+        )
+        assert_manifest_matches(manifest, directory / f"{name}.json", update=update)
+
+    return check
 
 
 @pytest.fixture

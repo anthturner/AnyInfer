@@ -90,6 +90,10 @@ The core depends on only `httpx2` and `jsonschema`; everything else is an extra.
   or model weights — install a runtime explicitly and let the local subsystem acquire
   verified model artifacts when needed.
 - Unzip the sidecar bundle and run `anyinfer-serve --config anyinfer.json` from inside it.
+  To keep it running across reboots, `anyinfer-serve install` writes the service
+  definition for your platform after showing it to you; the archive's `INSTALL.txt`
+  carries the same text. See
+  [running as a service](serve/running-as-a-service.md).
   It includes the HTTP frontend and built-in dependency-free adapters. Integrations that
   require an optional provider SDK, such as GitHub Copilot or Entra authentication, should
   install the Python distribution with the corresponding extra.

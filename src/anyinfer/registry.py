@@ -153,6 +153,23 @@ class SetupField:
     Empty means the UI falls back to whatever generic hint suits the `kind`.
     """
 
+    env_var: str = ""
+    """Environment variable this field is conventionally supplied from, if any.
+
+    The machine-readable half of what `placeholder` says in prose. A placeholder reading
+    ``"env://ANTHROPIC_API_KEY or a literal key"`` is a UI hint; parsing it back out to
+    learn which variable to look for is guessing at free text. Declared here, "is this
+    provider already usable on this machine?" becomes a lookup rather than a regex, which
+    is what `anyinfer.local.discovery` and a config UI's "we found this in your
+    environment" both need.
+
+    The bare variable name, never the ``env://`` reference form — the scheme is the
+    credential resolver's spelling, and storing it here would make every consumer strip it.
+    Empty when the provider has no convention, which is the case for a generic
+    OpenAI-compatible endpoint and for every provider whose credential is not an
+    environment variable at all.
+    """
+
     advanced: bool = False
     """Whether this field has a standard value that is right for almost every user.
 
@@ -208,6 +225,12 @@ class SetupField:
             raise ConfigError(
                 f"setup field {self.key!r} declares choices but its kind is {self.kind!r}",
                 hint="only kind='choice' fields are rendered as a fixed set of values",
+            )
+        if self.env_var and ("://" in self.env_var or self.env_var != self.env_var.strip()):
+            raise ConfigError(
+                f"setup field {self.key!r} declares env_var {self.env_var!r}, which is not "
+                "a bare variable name",
+                hint="declare env_var='ANTHROPIC_API_KEY', not the 'env://…' reference form",
             )
 
 

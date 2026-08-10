@@ -404,6 +404,34 @@ class EngineBar(QFrame):
             return None
         return defaults.max_output_tokens if defaults is not None else None
 
+    def default_temperature_detected(self) -> Sourced[float] | None:
+        """The temperature this selection's provider documents, if it documents one.
+
+        The same discovery-then-descriptor lookup `max_output_tokens_detected` performs.
+        Almost every provider answers ``None`` here and that is the honest answer: only a
+        provider whose own reference states a default carries one.
+        """
+        return self._sampling_default("default_temperature")
+
+    def default_top_p_detected(self) -> Sourced[float] | None:
+        """The nucleus cutoff this selection's provider documents, if it documents one."""
+        return self._sampling_default("default_top_p")
+
+    def _sampling_default(self, field: str) -> Sourced[float] | None:
+        """One documented sampling default, discovery outranking the descriptor."""
+        provider, model = self.provider_id(), self.model()
+        for discovered in self._discovered.get(provider, []):
+            if discovered.id != model or discovered.capabilities is None:
+                continue
+            value = getattr(discovered.capabilities, field, None)
+            if value is not None:
+                return value  # type: ignore[no-any-return]
+        try:
+            defaults = self._registry.get(self._engine_for(provider)).default_capabilities
+        except AnyInferError:
+            return None
+        return getattr(defaults, field, None) if defaults is not None else None
+
     def _context_window(self) -> Sourced[int] | None:
         """What is known about the current selection's context window, if anything.
 

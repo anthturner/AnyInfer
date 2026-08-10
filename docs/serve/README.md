@@ -131,6 +131,12 @@ representation, so AnyInfer-native observability is SDK-only. Everything the Ope
     anyinfer serve --host 0.0.0.0 --allow-remote-exposure
     ```
 
+## Keeping it running
+
+`anyinfer serve install` writes the systemd unit, launchd agent, or scheduled task
+that keeps the sidecar up across logins and reboots — after showing you the exact
+file and commands. See [running as a service](running-as-a-service.md).
+
 ## Embedding it
 
 `create_app` returns a plain ASGI app, mountable in an existing Starlette or FastAPI stack:
@@ -189,5 +195,6 @@ The sidecar, CLI, and Python SDK use the same
 - [Choosing an integration path](../guides/integration-paths.md)
 - [Run a prompt from the shell](../guides/cli.md) — the same config file, one prompt, no server
 - [Shared configuration](../reference/configuration.md)
+- [Running as a service](running-as-a-service.md) — surviving a reboot
 
 </div>

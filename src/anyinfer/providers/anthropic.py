@@ -554,6 +554,7 @@ descriptor = ProviderDescriptor(
                     "env:// and credential://."
                 ),
                 placeholder="env://ANTHROPIC_API_KEY or a literal key",
+                env_var="ANTHROPIC_API_KEY",
             ),
             SetupField(
                 key="oauth_token",
@@ -567,6 +568,7 @@ descriptor = ProviderDescriptor(
                     "expires."
                 ),
                 placeholder="env://ANTHROPIC_OAUTH_TOKEN or sk-ant-oat01-…",
+                env_var="ANTHROPIC_OAUTH_TOKEN",
             ),
             SetupField(
                 key="api_version",

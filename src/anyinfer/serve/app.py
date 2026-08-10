@@ -30,7 +30,9 @@ from .openai_codec import (
     chunk_from_event,
     completion_from_generation,
     final_chunk,
+    manifest_chunk,
     request_from_openai,
+    wants_manifest,
 )
 
 __all__ = ["create_app"]
@@ -83,6 +85,7 @@ def create_app(
 
         try:
             target, generation_request, wants_stream = request_from_openai(body)
+            include_manifest = wants_manifest(body)
         except ValueError as exc:
             # A malformed AnyInfer extension field is the client's mistake, and telling it
             # so beats silently applying the gateway's default instead of what it asked for.
@@ -109,7 +112,11 @@ def create_app(
 
         return starlette.JSONResponse(
             completion_from_generation(
-                result, model=target, completion_id=completion_id, created=created
+                result,
+                model=target,
+                completion_id=completion_id,
+                created=created,
+                include_manifest=include_manifest,
             )
         )
 
@@ -212,6 +219,7 @@ async def _stream_chunks(
         metadata=request.metadata,
     )
     include_usage = _wants_usage(body)
+    include_manifest = _wants_manifest_quietly(body)
 
     try:
         async for event in stream:
@@ -229,6 +237,15 @@ async def _stream_chunks(
                     include_usage=include_usage,
                 ):
                     yield _sse(terminal)
+                if include_manifest:
+                    frame = manifest_chunk(
+                        event.result,
+                        model=model,
+                        completion_id=completion_id,
+                        created=created,
+                    )
+                    if frame is not None:
+                        yield _sse(frame)
     except AnyInferError as exc:
         yield _sse(
             {
@@ -240,6 +257,19 @@ async def _stream_chunks(
             }
         )
     yield b"data: [DONE]\n\n"
+
+
+def _wants_manifest_quietly(body: Mapping[str, Any]) -> bool:
+    """Whether the stream should end with a manifest frame.
+
+    A malformed value was already rejected with a 400 before the response started; by the
+    time the generator runs there is no status line left to change, so it re-reads the
+    field rather than raising into a half-sent stream.
+    """
+    try:
+        return wants_manifest(body)
+    except ValueError:
+        return False
 
 
 def _wants_usage(body: Mapping[str, Any]) -> bool:

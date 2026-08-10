@@ -117,6 +117,7 @@ nav:
   - Home: index.md
   - Integrate:
       - guides/README.md
+      - Why AnyInfer: why-anyinfer.md
       - When to use AnyInfer: guides/when-to-use.md
       - Quickstart: guides/quickstart.md
       - Choosing an integration path: guides/integration-paths.md
@@ -125,6 +126,7 @@ nav:
       - Python SDK: guides/python-sdk.md
       - Command-line tool: guides/cli.md
       - OpenAI-compatible sidecar: serve/README.md
+      - Running the sidecar as a service: serve/running-as-a-service.md
       - Python tasks:
           - Stream typed events: guides/streaming.md
           - Enforce a JSON schema: guides/structured-output.md
@@ -138,6 +140,8 @@ nav:
           - Choose and download a local model: guides/local-models.md
           - Observability: guides/observability.md
           - Credentials in the OS keyring: guides/credentials.md
+      - Coding agents: guides/coding-agents.md
+      - Integration procedure: agents/INTEGRATION.md
       - Reference application: guides/demo-app.md
   - Concepts:
       - concepts/README.md

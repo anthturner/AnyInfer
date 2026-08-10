@@ -158,6 +158,16 @@ class Measurement:
             time-to-first-token would fold queueing and network latency into a figure
             labelled compute.
         decode_tokens_per_s: Generated tokens per second, from first token to completion.
+        model_load_ms: How long the engine spent loading the model before it could answer,
+            when it reported one. This is the *warmth* signal: a figure here means the run
+            paid a cold start, and ``None`` means either the model was already resident or
+            the engine does not report loads at all. Absent that distinction a caller has
+            to measure every target twice and compare, which is what the demo did.
+
+            Reported by Ollama on every request (``load_duration``, zero-ish when warm)
+            and by the supervised llama.cpp runtime on the request that started its
+            server. A hosted provider reports nothing: what a shared endpoint spent
+            loading a model is not a property of this request.
         measured_at: ISO-8601 timestamp the caller stamped, when they stamped one.
     """
 
@@ -168,6 +178,7 @@ class Measurement:
     total_ms: float = 0.0
     prefill_tokens_per_s: float | None = None
     decode_tokens_per_s: float | None = None
+    model_load_ms: float | None = None
     measured_at: str | None = None
 
     @property
@@ -180,6 +191,8 @@ class Measurement:
             parts.append(f"ttft {self.ttft_ms:.0f} ms")
         if self.decode_tokens_per_s is not None:
             parts.append(f"decode {self.decode_tokens_per_s:.1f} tok/s")
+        if self.model_load_ms:
+            parts.append(f"loaded in {self.model_load_ms:.0f} ms")
         body = ", ".join(parts) or "nothing measurable"
         return f"{self.identity.provider_id}:{self.identity.model}: {body}"
 
@@ -287,6 +300,7 @@ def measurement_from(
     total_ms: float,
     decode_tokens_per_s: float | None,
     prefill_ms: float | None,
+    model_load_ms: float | None = None,
     measured_at: str | None = None,
 ) -> Measurement:
     """Assemble a measurement from one request's usage and timing.
@@ -294,6 +308,10 @@ def measurement_from(
     Prefill throughput is computed here and only here, and only from a provider-reported
     prefill duration — see the module docstring for why time-to-first-token is not an
     acceptable substitute.
+
+    ``model_load_ms`` passes straight through, unlike the rates: it is a duration the
+    engine reported, not something derived from one, and deriving a load time from
+    anything else would be exactly the invented figure this module refuses to produce.
     """
     prefill_rate: float | None = None
     if prefill_ms is not None and prefill_ms > 0 and input_tokens:
@@ -306,6 +324,7 @@ def measurement_from(
         total_ms=total_ms,
         prefill_tokens_per_s=prefill_rate,
         decode_tokens_per_s=decode_tokens_per_s,
+        model_load_ms=model_load_ms,
         measured_at=measured_at,
     )
 

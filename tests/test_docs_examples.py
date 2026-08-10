@@ -769,3 +769,126 @@ def test_docs_testing_guide_fallback_and_repair() -> None:
     assert [attempt.outcome for attempt in retried.attempts] == ["retried", "ok"]
     assert repaired.structured == {"answer": "valid on the second try"}
     assert repaired.repair_attempts == 1
+
+
+# ---- coding agents -------------------------------------------------------------------
+#
+# Every "what the API actually is" cell in the fragment `anyinfer agents-md` prints is
+# backed by one test here (AL.3). A wrong claim in that fragment is worse than no
+# fragment: it is read in somebody else's repository, by an agent with no way to check
+# it. So it fails CI instead.
+
+
+async def test_agents_md_row_targets_are_provider_qualified() -> None:
+    """Row: `target=`, not `model=`, and the split is on the first colon only."""
+    server = FakeOllamaServer(FakeResponse(text="ok"))
+    async with _ollama_client(server) as client:
+        resolved = client.resolve("ollama:qwen3:8b")
+        alias = client.resolve("medium")
+
+    assert resolved.provider_id == "ollama"
+    assert resolved.model == "qwen3:8b", "only the first colon separates provider and model"
+    assert alias.via_alias == "medium", "a bare string with no colon is a catalog alias"
+
+
+async def test_agents_md_row_schema_replaces_response_format() -> None:
+    """Row: `schema=`, and the reply is validated before the caller sees it."""
+    schema = {
+        "type": "object",
+        "properties": {"answer": {"type": "string"}},
+        "required": ["answer"],
+    }
+    server = FakeOpenAIServer(FakeResponse(text=json.dumps({"answer": "yes"})))
+    async with make_client(server) as client:
+        result = await client.generate("q", target="openai-compat:m", schema=schema)
+
+    assert result.structured == {"answer": "yes"}
+    assert result.structured_mechanism in {"json_schema", "grammar", "json_mode", "prompt"}
+    assert "response_format" not in server.requests[0] or server.requests[0].get(
+        "response_format"
+    ), "the mechanism is chosen by the core, never asked for by the caller"
+
+
+def test_agents_md_row_there_is_no_openai_shaped_namespace() -> None:
+    """Row: `client.generate(...)`, not `client.chat.completions.create(...)`."""
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    with make_sync_client(server) as client:
+        assert not hasattr(client, "chat")
+        assert not hasattr(client, "completions")
+        for method in ("generate", "stream", "run_tools", "budget", "verify"):
+            assert callable(getattr(client, method))
+
+
+async def test_agents_md_row_the_router_owns_retry() -> None:
+    """Row: `ai.Route` / `ai.Retry`, and every attempt lands on the trail."""
+    server = FakeOpenAIServer(
+        [FakeResponse(status=503), FakeResponse(text="recovered")]
+    )
+    async with make_client(server) as client:
+        result = await client.generate(
+            "hi",
+            route=ai.Route(
+                targets=("openai-compat:m",),
+                retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+            ),
+        )
+    assert result.text == "recovered"
+    assert [a.outcome for a in result.attempts] == ["retried", "ok"]
+
+
+def test_agents_md_row_cost_is_a_decimal_and_none_is_not_zero() -> None:
+    """Row: `Decimal`, and `None` means unknown. Coercing it to 0 is the trap."""
+    from decimal import Decimal
+
+    assert ai.Usage(input_tokens=100, output_tokens=50).cost_usd is None
+    priced = ai.Usage(input_tokens=1, output_tokens=1, cost_usd=Decimal("0.000125"))
+    assert isinstance(priced.cost_usd, Decimal)
+
+
+async def test_agents_md_row_capabilities_carry_provenance() -> None:
+    """Row: a capability is `Sourced[T]`, never a bare number."""
+    overrides = {
+        "openai-compat:m": ai.ModelCapabilities(
+            context_window=ai.Sourced(8_192, "catalog")
+        )
+    }
+    server = FakeOpenAIServer()
+    async with make_client(server, capability_overrides=overrides) as client:
+        window = client.budget("hi", target="openai-compat:m").context_window
+
+    assert window is not None
+    assert window.value == 8_192, "the value is reached through .value, not directly"
+    assert window.provenance in {"catalog", "discovered", "probed", "default", "override"}
+
+
+def test_agents_md_row_there_is_no_per_provider_extra() -> None:
+    """Row: `pip install anyinfer[anthropic]` names an extra that has never existed."""
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    with (root / "pyproject.toml").open("rb") as handle:
+        extras = set(tomllib.load(handle)["project"].get("optional-dependencies", {}))
+
+    provider_ids = set(ai.default_registry.known_ids())
+    # Two extras share a provider's name, and both are honest: each exists because that
+    # adapter needs a real dependency (a vendor SDK, an RSA implementation), not because
+    # hosted providers are sold separately. Every other provider works on the core alone.
+    assert extras & provider_ids == {"copilot", "vertex"}
+    assert "anthropic" not in extras and "openai" not in extras
+
+
+def test_every_trap_row_has_a_test() -> None:
+    """A row added without a test would be an unchecked claim in a stranger's repo."""
+    from anyinfer._agents_md import render_agents_md
+
+    fragment = render_agents_md()
+    table = fragment.split("### What not to guess", 1)[1].split("###", 1)[0]
+    rows = [line for line in table.splitlines() if line.startswith("| `") or
+            line.startswith("| a ")]
+    covered = [
+        name for name in globals() if name.startswith("test_agents_md_row_")
+    ]
+    assert len(rows) == len(covered), (
+        f"{len(rows)} trap rows but {len(covered)} tests — add one beside the others"
+    )

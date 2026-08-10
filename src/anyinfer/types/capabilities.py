@@ -232,13 +232,27 @@ class ModelCapabilities:
             ``None`` when unknown.
         features: Which `Feature` flags the model supports, with provenance.
         pricing: Per-million-token pricing, when known.
+        default_temperature: The temperature this provider applies when a request sends
+            none, with provenance; ``None`` when the provider does not document one.
+        default_top_p: The nucleus-sampling cutoff this provider applies when a request
+            sends none, with provenance; ``None`` when undocumented.
         local: Facts about the local artifact, for locally-run models only.
+
+    The two sampling defaults exist so an application can say *what* "provider default"
+    means instead of only that it is one. They are populated from a provider's own
+    documentation and nowhere else — never probed, never inferred from a sibling
+    provider, never carried over from a model family. A provider whose documentation
+    states no default keeps ``None`` indefinitely, and that is the correct final state for
+    it rather than a gap waiting to be filled: an invented number presented beside a
+    provenance tag is precisely the estimate-as-authority this type exists to prevent.
     """
 
     context_window: Sourced[int] | None = None
     max_output_tokens: Sourced[int] | None = None
     features: Sourced[Feature] = Sourced(Feature(0), "default")
     pricing: Sourced[Pricing] | None = None
+    default_temperature: Sourced[float] | None = None
+    default_top_p: Sourced[float] | None = None
     local: LocalModelInfo | None = None
 
     def overlay(self, other: ModelCapabilities) -> ModelCapabilities:
@@ -252,6 +266,10 @@ class ModelCapabilities:
             max_output_tokens=_stronger(self.max_output_tokens, other.max_output_tokens),
             features=_stronger(self.features, other.features) or self.features,
             pricing=_stronger(self.pricing, other.pricing),
+            default_temperature=_stronger(
+                self.default_temperature, other.default_temperature
+            ),
+            default_top_p=_stronger(self.default_top_p, other.default_top_p),
             local=other.local if other.local is not None else self.local,
         )
 
@@ -268,6 +286,13 @@ def conjunction(candidates: list[ModelCapabilities]) -> ModelCapabilities:
     When a provider delegates model choice at request time (GitHub Copilot's ``"auto"``), the
     only safe capability claim is the conjunction: the minimum of each numeric bound and the
     intersection of feature flags. Provenance degrades to the weakest contributor.
+
+    Sampling defaults are deliberately **not** reduced: they are omitted from the result.
+    The minimum of two candidates' default temperatures is not a fact about anything — a
+    delegating provider does not apply "the lowest default among the models it might
+    pick", it applies whichever model's default it ends up using. Reporting a computed
+    number there would be a guess wearing a provenance tag, which is the one thing this
+    module refuses to produce.
 
     Args:
         candidates: Capabilities of every model the provider might pick.
@@ -293,6 +318,8 @@ def conjunction(candidates: list[ModelCapabilities]) -> ModelCapabilities:
         max_output_tokens=max_out,
         features=Sourced(features, provenance),
         pricing=None,
+        default_temperature=None,
+        default_top_p=None,
         local=None,
     )
 

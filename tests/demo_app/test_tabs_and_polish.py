@@ -210,6 +210,46 @@ class TestDefaultsSurfaced:
         assert "not reported" in window._temperature.toolTip()
         assert "not reported" in window._reasoning.toolTip()
 
+    def test_a_documented_sampling_default_is_shown_with_its_provenance(self, window):
+        """A provider whose own reference states a default gets to show the number."""
+        from anyinfer.types.capabilities import (
+            DiscoveredModel,
+            ModelCapabilities,
+            Sourced,
+        )
+
+        window._engine_bar.on_models_listed(
+            "demo-fake",
+            [
+                DiscoveredModel(
+                    "documented",
+                    ModelCapabilities(
+                        default_temperature=Sourced(0.4, "catalog"),
+                        default_top_p=Sourced(1.0, "catalog"),
+                    ),
+                )
+            ],
+        )
+        window._engine_bar.set_target("demo-fake:documented")
+        window._refresh_default_hints()
+
+        assert window._temperature.specialValueText() == "provider default (0.4)"
+        assert "catalog" in window._temperature.toolTip()
+        assert window._top_p.specialValueText() == "provider default (1)"
+
+    def test_an_undocumented_sampling_default_keeps_the_unreported_note(self, window):
+        """Most providers state nothing, and saying so is the point of the note."""
+        from anyinfer.types.capabilities import DiscoveredModel, ModelCapabilities
+
+        window._engine_bar.on_models_listed(
+            "demo-fake", [DiscoveredModel("plain", ModelCapabilities())]
+        )
+        window._engine_bar.set_target("demo-fake:plain")
+        window._refresh_default_hints()
+
+        assert window._temperature.specialValueText() == "provider default"
+        assert "not reported" in window._temperature.toolTip()
+
 
 class TestSectionMenuIcons:
     def test_hidden_sections_wear_their_icon_in_the_menu(self, window):

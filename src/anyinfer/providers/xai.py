@@ -206,6 +206,7 @@ descriptor = ProviderDescriptor(
                     "Conventionally env://XAI_API_KEY. Accepts env:// and credential://."
                 ),
                 placeholder="env://XAI_API_KEY or a literal key",
+                env_var="XAI_API_KEY",
             ),
             SetupField(
                 key="base_url",

@@ -23,9 +23,12 @@ from ..types.requests import (
 )
 
 __all__ = [
+    "COMMENT_KEY",
     "CONFIG_FORMAT_VERSION",
     "MAX_CONFIG_BYTES",
     "AnyInferConfig",
+    "dump_config",
+    "dumps_config",
     "load_config",
     "loads_config",
 ]
@@ -36,8 +39,18 @@ CONFIG_FORMAT_VERSION = 1
 MAX_CONFIG_BYTES = 1024 * 1024
 """Maximum accepted configuration size."""
 
+COMMENT_KEY = "_comment"
+"""Root key carrying a human-readable note, accepted and ignored by the loader.
+
+The format is JSON, not JSONC, so a generated file cannot explain itself in `//` lines
+without becoming something this loader would reject. A string under this key is the
+version of that idea the format can actually carry: `dumps_config(..., comments=True)`
+writes one, and reading it back changes nothing.
+"""
+
 _ROOT_KEYS = frozenset(
     {
+        COMMENT_KEY,
         "format_version",
         "providers",
         "default_route",
@@ -207,6 +220,170 @@ def loads_config(
     cache = _parse_cache(data.get("cache"), source)
     mcp = _parse_mcp(data.get("mcp"), source)
     return AnyInferConfig(tuple(providers), route, version, context, history, cache, mcp)
+
+
+def dumps_config(config: AnyInferConfig, *, comments: bool = False) -> str:
+    """Render a configuration as the JSON text `loads_config` accepts.
+
+    The other half of the shared format. Three frontends could read this file and none
+    could write it, which left every example of the format as prose and left
+    ``anyinfer init`` with no way to produce one but string templating.
+
+    Round-tripping is the contract: ``loads_config(dumps_config(c)) == c`` for every
+    configuration the loader accepts. What that costs is verbosity in one place — a
+    provider instance carrying an opt-in policy emits that policy even when every field in
+    it is standard, because an omitted block and a default-valued block mean different
+    things to the loader and only one of them is what the caller had.
+
+    Only *references* are written. A `ProviderSettings.api_key` holding a literal secret is
+    emitted as it was given, which is the caller's own value round-tripped rather than
+    anything this function resolved — discovery and `anyinfer init` produce ``env://``
+    references precisely so the file they write never contains key material.
+
+    Args:
+        config: The configuration to render.
+        comments: Write a leading `COMMENT_KEY` note explaining what the file is. Still
+            JSON, and still accepted by the loader.
+
+    Returns:
+        UTF-8 JSON text, two-space indented, ending in a newline.
+
+    Raises:
+        ConfigError: If a provider's ``options`` or ``headers`` hold a value JSON cannot
+            represent. Settings built in Python may carry anything; a file cannot.
+    """
+    document: dict[str, Any] = {}
+    if comments:
+        document[COMMENT_KEY] = (
+            "AnyInfer configuration. Credentials are references (env://VAR, "
+            "credential://system/name), never values, so this file is safe to commit."
+        )
+    document["format_version"] = CONFIG_FORMAT_VERSION
+
+    providers = [_provider_json(settings) for settings in config.providers]
+    if providers:
+        document["providers"] = providers
+    if config.route is not None:
+        document["default_route"] = list(config.route.targets)
+    if config.context != DEFAULT_TUNING:
+        document["context"] = _changed_fields(config.context, ContextTuning())
+    if config.history is not None:
+        document["history"] = _changed_fields(config.history, HistoryPolicy())
+    if config.cache is not None:
+        document["cache"] = _changed_fields(config.cache, CachePolicy())
+    if config.mcp:
+        document["mcp"] = [_mcp_json(server) for server in config.mcp]
+
+    try:
+        return json.dumps(document, indent=2, sort_keys=False) + "\n"
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(
+            f"this configuration cannot be written as JSON: {exc}",
+            hint="provider options and headers must hold JSON values",
+        ) from exc
+
+
+def dump_config(config: AnyInferConfig, path: str | Path, *, force: bool = False) -> None:
+    """Write a configuration to a file, refusing to replace one that exists.
+
+    Destructive-by-default is not acceptable for a file a user may have hand-tuned, and a
+    configuration file is exactly that kind of file. Overwriting is available and has to be
+    asked for.
+
+    Args:
+        config: The configuration to write.
+        path: Where to write it. Parent directories must already exist.
+        force: Replace an existing file instead of refusing.
+
+    Raises:
+        ConfigError: If the path exists and ``force`` is false, if the configuration
+            cannot be rendered, or if the file cannot be written.
+    """
+    destination = Path(path)
+    text = dumps_config(config, comments=True)
+    if destination.exists() and not force:
+        raise ConfigError(
+            f"{destination} already exists",
+            hint="pass force=True to replace it, or write to a different path",
+        )
+    try:
+        destination.write_text(text, encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError(
+            f"cannot write {destination}: {exc}",
+            hint="check the directory exists and is writable",
+        ) from exc
+
+
+def _provider_json(settings: ProviderSettings) -> dict[str, Any]:
+    """Render one provider instance.
+
+    ``adapter`` appears only when the instance is named something other than its engine,
+    which is the multi-instance case: one entry per Azure tenant, each with its own id and
+    all naming the same adapter.
+    """
+    entry: dict[str, Any] = {"id": settings.instance_id}
+    if settings.instance_id != normalize_provider_id(settings.provider_id):
+        entry["adapter"] = normalize_provider_id(settings.provider_id)
+    for key in ("base_url", "api_key", "api_version"):
+        value = getattr(settings, key)
+        if value:
+            entry[key] = value
+    if settings.headers:
+        entry["headers"] = dict(settings.headers)
+    if settings.options:
+        entry["options"] = dict(settings.options)
+    if settings.timeout_s != 120.0:
+        entry["timeout_s"] = settings.timeout_s
+    if settings.limits is not None:
+        entry["limits"] = _changed_fields(settings.limits, RateLimits())
+    return entry
+
+
+def _mcp_json(server: MCPServer) -> dict[str, Any]:
+    """Render one Model Context Protocol server description."""
+    entry: dict[str, Any] = {"name": server.name}
+    if server.command:
+        entry["command"] = list(server.command)
+    if server.url:
+        entry["url"] = server.url
+    if server.env:
+        entry["env"] = dict(server.env)
+    if server.headers:
+        entry["headers"] = dict(server.headers)
+    if server.cwd:
+        entry["cwd"] = server.cwd
+    if server.timeout_s != 30.0:
+        entry["timeout_s"] = server.timeout_s
+    for key in ("allow_tools", "deny_tools"):
+        names = getattr(server, key)
+        if names:
+            entry[key] = list(names)
+    return entry
+
+
+def _changed_fields(value: Any, reference: Any) -> dict[str, Any]:
+    """The dataclass fields of ``value`` that differ from ``reference``.
+
+    An empty object is the correct rendering of a policy left entirely at its defaults:
+    the block's *presence* is what asks for the policy, and its contents only say how it
+    was tuned. Dropping the block instead would turn "pace this provider by whatever it
+    reports" back into "do not pace it at all".
+    """
+    import dataclasses
+
+    return {
+        f.name: _json_scalar(getattr(value, f.name))
+        for f in dataclasses.fields(value)
+        if getattr(value, f.name) != getattr(reference, f.name)
+    }
+
+
+def _json_scalar(value: Any) -> Any:
+    """Render one settings value in its JSON form, tuples becoming lists."""
+    if isinstance(value, tuple):
+        return list(value)
+    return value
 
 
 def _parse_provider(

@@ -11,7 +11,7 @@ import asyncio
 import contextlib
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -90,6 +90,7 @@ from ..local.services import PULL_TIMEOUT_S, PullReport, PullRequest
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
+from ..manifest import ManifestBuilder, RunManifest
 from ..providers.base import AdapterFinal, ProviderAdapter
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.attempts import AttemptBuffer
@@ -145,6 +146,7 @@ from ..types.results import (
 from ..verification import (
     VERIFY_MAX_OUTPUT_TOKENS,
     VERIFY_PROMPT,
+    VERIFY_REASONING_OUTPUT_TOKENS,
     VERIFY_SCHEMA,
     Verification,
     excerpt,
@@ -232,6 +234,16 @@ class AsyncClient:
         pricing_table: Model pricing supplying the ``catalog`` layer of capability
             assembly. Defaults to the table bundled with this release; pass the
             result of `fetch_pricing()` for newer numbers.
+        manifests: Assemble a `RunManifest` for every call, reachable as
+            `Generation.manifest`. On by default: it allocates one small object per
+            in-flight request, writes nothing, sends nothing, and is content-free — the
+            invited/uninvited line in this library has always been about spend and side
+            effects, and a manifest has neither. Switch it off to skip the allocation
+            entirely.
+        manifest_payloads: Capture prompt, response, schema, and tool-call text into the
+            manifest's ``payloads`` facet, redacted. Off by default and independent of
+            observer payload opt-in, so a manifest cannot start carrying prompt text
+            because some unrelated telemetry sink asked for it.
         capability_overrides: Deliberate corrections keyed by ``"provider:model"``.
             Every supplied field is applied at ``override`` provenance — the strongest
             layer, outranking discovery and probes — so a wrong upstream number can
@@ -259,6 +271,8 @@ class AsyncClient:
         spend: SpendPolicy | None = None,
         ledger: SpendLedger | None = None,
         pricing_table: PricingTable | None = None,
+        manifests: bool = True,
+        manifest_payloads: bool = False,
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
     ) -> None:
@@ -296,6 +310,11 @@ class AsyncClient:
         # Last cacheable-prefix signature per target, for the implicit-mode guard.
         # Bounded by the number of targets a client talks to, and content-free.
         self._cache_prefixes: dict[str, str] = {}
+        self._manifests = manifests
+        self._manifest_payloads = manifest_payloads
+        # Builders in flight, keyed by request id, so `_emit` can route an event to the
+        # run it belongs to without every emit site having to carry the handle.
+        self._builders: dict[str, ManifestBuilder] = {}
         self._store = ModelStore(model_dir)
         self._closed = False
 
@@ -440,7 +459,10 @@ class AsyncClient:
         provider can answer fluently while never holding a schema. Only a real request
         distinguishes those, so this spends one — deliberately tiny, capped at
         `VERIFY_MAX_OUTPUT_TOKENS`
-        output tokens.
+        output tokens, or
+        `VERIFY_REASONING_OUTPUT_TOKENS`
+        when the target is known to be a reasoning model and would otherwise spend the
+        whole budget thinking before it said anything.
 
         Never raises for a provider problem: "this target is broken" is the answer to the
         question, not a failure to answer it. A malformed *target*, on the other hand, is
@@ -468,7 +490,9 @@ class AsyncClient:
                 VERIFY_PROMPT,
                 route=Route(targets=(target,), retry=Retry(max_attempts=1)),
                 schema=VERIFY_SCHEMA,
-                sampling=Sampling(max_output_tokens=VERIFY_MAX_OUTPUT_TOKENS, temperature=0.0),
+                sampling=Sampling(
+                    max_output_tokens=self._probe_output_budget(resolved), temperature=0.0
+                ),
                 timeout_s=timeout_s,
             )
         except SchemaViolationError as error:
@@ -714,6 +738,7 @@ class AsyncClient:
             total_ms=result.timing.total_ms,
             decode_tokens_per_s=result.timing.output_tokens_per_s,
             prefill_ms=result.timing.phases.get("prefill_ms"),
+            model_load_ms=result.timing.phases.get("model_load_ms"),
             measured_at=datetime.now(UTC).isoformat(timespec="seconds"),
         )
         if store is not None:
@@ -733,6 +758,34 @@ class AsyncClient:
             return probe_signature()
         except Exception:  # noqa: BLE001 — an identity detail, never a reason to fail
             return None
+
+    def _probe_output_budget(self, resolved: ResolvedTarget) -> int:
+        """How many output tokens the probe may spend on this target.
+
+        A thinking model produces its reasoning first and its answer second, so the
+        ordinary 64-token ceiling truncates it mid-thought and the probe reports "the
+        provider answered with empty text" — a connection failure the operator does not
+        have.
+
+        The reasoning flag decides this **whatever its provenance**, which is deliberately
+        weaker than the rule the request path applies to sending a reasoning *parameter*.
+        The two differ because their consequences differ. Sending a parameter a model does
+        not have is a silently-ignored request field, so that decision waits for a
+        trustworthy signal. This decision only moves a *ceiling*: a model that answers in
+        six tokens spends six either way, and the larger cap costs more only for a model
+        that was going to be truncated — that is, one that would have failed the probe
+        regardless. Gating it on trusted provenance sounded careful and was not: every
+        real Ollama model reports its features at ``default``, so the gate would never
+        have fired for the thinking models it was written for.
+        """
+        try:
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+        except ConfigError:
+            return VERIFY_MAX_OUTPUT_TOKENS
+        capabilities = self._capabilities_for(descriptor, resolved)
+        if Feature.REASONING in capabilities.features.value:
+            return VERIFY_REASONING_OUTPUT_TOKENS
+        return VERIFY_MAX_OUTPUT_TOKENS
 
     async def _safe_diagnostics(self, provider_id: str) -> tuple[Diagnostic, ...]:
         """Diagnostics for a verification report, tolerating an unconfigured provider."""
@@ -976,8 +1029,12 @@ class AsyncClient:
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
         session: Session | None = None,
+        manifest: bool | None = None,
     ) -> Generation:
         """Generate a single result, draining the event stream internally.
+
+        ``manifest`` overrides the client's manifest setting for this one call; ``None``
+        inherits it.
 
         Returns:
             The assembled `Generation`.
@@ -1002,11 +1059,22 @@ class AsyncClient:
             max_response_bytes=max_response_bytes,
         )
         resolved_route = self._resolve_route(target, route, session)
-        async for event in self._routed_stream(
-            request, resolved_route, stream=False, session=session
-        ):
-            if isinstance(event, StreamEnded):
-                return event.result
+        request_id, builder = self._new_run(request, resolved_route, manifest)
+        # Closed explicitly: returning out of `async for` abandons the generator, and its
+        # cleanup — which is what unregisters the run — would then wait for a collection.
+        async with contextlib.aclosing(
+            self._routed_stream(
+                request,
+                resolved_route,
+                stream=False,
+                session=session,
+                request_id=request_id,
+                builder=builder,
+            )
+        ) as events:
+            async for event in events:
+                if isinstance(event, StreamEnded):
+                    return event.result
         raise AllTargetsFailedError(hint="the router produced no result and no error")
 
     def stream(
@@ -1028,8 +1096,12 @@ class AsyncClient:
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
         session: Session | None = None,
+        manifest: bool | None = None,
     ) -> AsyncStream:
         """Start a streaming generation.
+
+        ``manifest`` overrides the client's manifest setting for this one call; ``None``
+        inherits it.
 
         Returns:
             An `AsyncStream`: an async iterator of
@@ -1052,9 +1124,42 @@ class AsyncClient:
             max_response_bytes=max_response_bytes,
         )
         resolved_route = self._resolve_route(target, route, session)
+        request_id, builder = self._new_run(request, resolved_route, manifest)
         return AsyncStream(
-            self._routed_stream(request, resolved_route, stream=True, session=session)
+            self._routed_stream(
+                request,
+                resolved_route,
+                stream=True,
+                session=session,
+                request_id=request_id,
+                builder=builder,
+            ),
+            builder=builder,
         )
+
+    def _new_run(
+        self, request: GenerationRequest, route: Route, manifest: bool | None
+    ) -> tuple[str, ManifestBuilder | None]:
+        """Mint a correlation id and, unless manifests are off, the builder to go with it.
+
+        The builder is created *here* rather than inside the routed generator so a
+        streaming caller holds it before the first event is produced — which is what makes
+        a cancelled stream still able to answer for itself.
+        """
+        request_id = uuid.uuid4().hex
+        enabled = self._manifests if manifest is None else manifest
+        if not enabled:
+            return request_id, None
+        builder = ManifestBuilder(
+            request,
+            [str(t) for t in route.targets],
+            request_id=request_id,
+            anyinfer_version=_version(),
+            payloads=self._manifest_payloads,
+            estimator=self._estimator,
+        )
+        self._builders[request_id] = builder
+        return request_id, builder
 
     async def run_tools(
         self,
@@ -1270,11 +1375,37 @@ class AsyncClient:
         *,
         stream: bool,
         session: Session | None = None,
-    ) -> AsyncIterator[StreamEvent]:
+        request_id: str | None = None,
+        builder: ManifestBuilder | None = None,
+    ) -> AsyncGenerator[StreamEvent, None]:
         """Run the route and yield its events."""
+        if request_id is None:
+            request_id, builder = self._new_run(request, route, None)
+        try:
+            async for event in self._route_events(
+                request, route, stream=stream, session=session,
+                request_id=request_id, builder=builder,
+            ):
+                yield event
+        finally:
+            # The builder outlives this generator only through the handle a streaming
+            # caller already holds; the registry must not, or an abandoned stream would
+            # leak one entry per call.
+            self._builders.pop(request_id, None)
+
+    async def _route_events(
+        self,
+        request: GenerationRequest,
+        route: Route,
+        *,
+        stream: bool,
+        session: Session | None,
+        request_id: str,
+        builder: ManifestBuilder | None,
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """Run the route proper, once the run is registered."""
         if session is not None:
             session._ensure_usable()
-        request_id = uuid.uuid4().hex
         attempts: list[AttemptRecord] = []
         self._emit(
             RequestStarted(
@@ -1317,6 +1448,8 @@ class AsyncClient:
             adapter = await self._pool.get(resolved.provider_id)
             descriptor = self._pool.descriptor_for(resolved.provider_id)
             capabilities = self._capabilities_for(descriptor, resolved)
+            if builder is not None:
+                builder.note_capabilities(resolved, capabilities)
             redirected_now = False
 
             for attempt_number in range(1, route.retry.max_attempts + 1):
@@ -1336,6 +1469,7 @@ class AsyncClient:
                         stream=stream,
                         attempts=attempts,
                         session=session,
+                        builder=builder,
                         content_chain=(
                             unvisited_content_chain
                             if route.content_policy_targets and not content_redirected
@@ -1430,7 +1564,7 @@ class AsyncClient:
                 # pass only: a second would be compacting an already-compacted request.
                 policy = self._history_policy(active)
                 if policy is not None and policy.mode == "last_resort":
-                    retry = await self._compact_for_route(active, route, policy)
+                    retry = await self._compact_for_route(active, route, policy, builder)
                     if retry is not None:
                         compacted = True
                         active = retry
@@ -1447,7 +1581,11 @@ class AsyncClient:
         raise failure
 
     async def _compact_for_route(
-        self, request: GenerationRequest, route: Route, policy: HistoryPolicy
+        self,
+        request: GenerationRequest,
+        route: Route,
+        policy: HistoryPolicy,
+        builder: ManifestBuilder | None = None,
     ) -> GenerationRequest | None:
         """Shrink a conversation to fit the route's first target, for a retry pass.
 
@@ -1463,6 +1601,7 @@ class AsyncClient:
             capabilities=self._capabilities_for(descriptor, resolved),
             calibration=descriptor.token_calibration,
             policy=policy,
+            builder=builder,
         )
 
     def _history_policy(self, request: GenerationRequest) -> HistoryPolicy | None:
@@ -1477,6 +1616,7 @@ class AsyncClient:
         capabilities: ModelCapabilities,
         calibration: TokenCalibration | None,
         policy: HistoryPolicy,
+        builder: ManifestBuilder | None = None,
     ) -> GenerationRequest | None:
         """Shrink a request's conversation to fit one target, or return ``None``.
 
@@ -1515,7 +1655,9 @@ class AsyncClient:
         )
         if not compaction.changed:
             return None
-        self._emit(compaction.event())
+        # A compaction event carries no request id, so the builder is handed over
+        # explicitly rather than found by correlation.
+        self._emit(compaction.event(), builder=builder)
         return request.with_messages(compaction.messages)
 
     def _client_side_pacing(
@@ -1545,6 +1687,7 @@ class AsyncClient:
         stream: bool,
         attempts: list[AttemptRecord],
         session: Session | None = None,
+        builder: ManifestBuilder | None = None,
         content_chain: Callable[[], list[Target]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run one attempt against one target, including the schema repair loop.
@@ -1566,6 +1709,7 @@ class AsyncClient:
                 capabilities=capabilities,
                 calibration=descriptor.token_calibration,
                 policy=policy,
+                builder=builder,
             )
             if fitted is not None:
                 request = fitted
@@ -1604,7 +1748,9 @@ class AsyncClient:
         repair_attempts = 0
         yielded_content = False
 
-        cache_plan = self._plan_cache(current, resolved, descriptor, capabilities, request_id)
+        cache_plan = self._plan_cache(
+            current, resolved, descriptor, capabilities, request_id, builder
+        )
         buffer.cache_mechanism = cache_plan.mechanism
 
         while True:
@@ -1722,6 +1868,8 @@ class AsyncClient:
             structured, errors = self._validate(current, active_buffer)
 
             if errors and repair_attempts < repair_budget:
+                if builder is not None:
+                    builder.note_repair_text(active_buffer.text)
                 self._emit(
                     RepairAttempted(
                         request_id,
@@ -1786,6 +1934,11 @@ class AsyncClient:
                     result.text if self._events.wants_payloads else None,
                 )
             )
+            if builder is not None:
+                # Assembled last, so the record carries the completion events above as
+                # well as the result they describe.
+                builder.note_result(result)
+                result = replace(result, manifest=builder.build())
             yield StreamEnded(result)
             return
 
@@ -1847,6 +2000,7 @@ class AsyncClient:
         descriptor: ProviderDescriptor,
         capabilities: ModelCapabilities | None,
         request_id: str,
+        builder: ManifestBuilder | None = None,
     ) -> CachePlan:
         """Decide how to engage this target's prompt cache, and say so out loud.
 
@@ -1855,6 +2009,8 @@ class AsyncClient:
         wrong, and finding out from a bill is not acceptable.
         """
         policy = request.cache if request.cache is not None else self._cache
+        if builder is not None:
+            builder.note_cache_policy(policy.mode if policy is not None else None)
         if policy is None or not policy.active:
             return CachePlan()
 
@@ -1867,7 +2023,7 @@ class AsyncClient:
         )
 
         if plan.mechanism == "implicit":
-            self._check_prefix_stability(request, plan, resolved)
+            self._check_prefix_stability(request, plan, resolved, builder)
 
         if not plan.active:
             self._emit(
@@ -1975,7 +2131,11 @@ class AsyncClient:
         return estimated.high if estimated is not None else None
 
     def _check_prefix_stability(
-        self, request: GenerationRequest, plan: CachePlan, resolved: ResolvedTarget
+        self,
+        request: GenerationRequest,
+        plan: CachePlan,
+        resolved: ResolvedTarget,
+        builder: ManifestBuilder | None = None,
     ) -> None:
         """Warn when a caller's own prompt is defeating the cache they asked for.
 
@@ -2003,11 +2163,27 @@ class AsyncClient:
                             "target, so the provider's prompt cache will not be hit"
                         ),
                     ),
-                )
+                ),
+                builder=builder,
             )
 
-    def _emit(self, event: TelemetryEvent) -> None:
-        """Dispatch a telemetry event when anyone is listening."""
+    def _emit(
+        self, event: TelemetryEvent, *, builder: ManifestBuilder | None = None
+    ) -> None:
+        """Dispatch a telemetry event to observers and to the run's manifest builder.
+
+        The builder is normally found by correlation — every request-path event carries a
+        ``request_id`` — and passed explicitly only for the handful of events that carry
+        none, where correlation would have to guess between concurrent runs.
+        """
+        if self._builders:
+            sink = builder
+            if sink is None:
+                request_id = getattr(event, "request_id", None)
+                if isinstance(request_id, str) and request_id:
+                    sink = self._builders.get(request_id)
+            if sink is not None:
+                sink.observe(event)
         if self._events.has_observers:
             self._events.emit(event)
 
@@ -2190,6 +2366,13 @@ def _parse_overrides(
     return parsed
 
 
+def _version() -> str:
+    """This distribution's version, imported late to keep the package import acyclic."""
+    from .. import __version__
+
+    return __version__
+
+
 def _prompt_text(request: GenerationRequest) -> str:
     """Flatten a request's messages for payload-opted-in observers."""
     return "\n\n".join(m.text for m in request.messages if m.text)
@@ -2231,10 +2414,16 @@ class AsyncStream:
     first-token mark and then read the result, or ignore events and read the result.
     """
 
-    def __init__(self, source: AsyncIterator[StreamEvent]) -> None:
+    def __init__(
+        self,
+        source: AsyncIterator[StreamEvent],
+        *,
+        builder: ManifestBuilder | None = None,
+    ) -> None:
         self._source = source
         self._result: Generation | None = None
         self._closed = False
+        self._builder = builder
 
     def __aiter__(self) -> AsyncStream:
         """Iterate stream events."""
@@ -2282,6 +2471,19 @@ class AsyncStream:
                 "iterate the stream to completion first"
             )
         return self._result
+
+    @property
+    def manifest(self) -> RunManifest | None:
+        """What this call has done so far, as a `RunManifest`.
+
+        Available at any point, which is the whole reason the handle lives on the stream
+        rather than only on the result: a stream that was cancelled or that failed
+        part-way has no `Generation` to carry a manifest, and that is precisely the call
+        whose story a caller needs. Such a record has ``complete=False``.
+
+        ``None`` when the client was built with manifests switched off.
+        """
+        return self._builder.build() if self._builder is not None else None
 
     async def collect(self) -> Generation:
         """Drain the stream and return the final result."""

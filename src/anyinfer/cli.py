@@ -22,6 +22,42 @@ _LOOPBACK = "127.0.0.1"
 _TOKEN_ENV = "ANYINFER_SERVE_TOKEN"
 """Bearer token source, so a token never has to appear in a process listing."""
 
+_DEFAULT_CONFIG_NAME = "anyinfer.json"
+"""What ``init`` writes, and the file every ``--config`` flag in this CLI expects."""
+
+_DEFAULT_STARTER_NAME = "starter.py"
+"""The runnable program ``init`` writes beside the configuration."""
+
+
+def _add_serve_flags(parser: argparse.ArgumentParser) -> None:
+    """Add the flags that describe a sidecar's binding, credentials, and exposure.
+
+    Shared by ``serve`` and ``serve install`` so a generated service definition can only
+    ever say what the running command would accept: one declaration, no drift.
+    """
+    parser.add_argument("--host", default=_LOOPBACK, help="bind address (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=_DEFAULT_PORT, help="bind port")
+    parser.add_argument(
+        "--config", type=Path, help="JSON config file describing providers and routes"
+    )
+    parser.add_argument(
+        "--token",
+        default=None,
+        help=f"bearer token clients must present (or set {_TOKEN_ENV})",
+    )
+    parser.add_argument(
+        "--allow-remote-exposure",
+        action="store_true",
+        help="permit binding a non-loopback address; requires a token",
+    )
+    parser.add_argument(
+        "--expose",
+        action="append",
+        default=[],
+        metavar="TARGET",
+        help="advertise a concrete provider:model target from /v1/models (repeatable)",
+    )
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser."""
@@ -36,27 +72,74 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     serve = subcommands.add_parser("serve", help="run the OpenAI-compatible HTTP frontend")
-    serve.add_argument("--host", default=_LOOPBACK, help="bind address (default: 127.0.0.1)")
-    serve.add_argument("--port", type=int, default=_DEFAULT_PORT, help="bind port")
-    serve.add_argument(
-        "--config", type=Path, help="JSON config file describing providers and routes"
+    _add_serve_flags(serve)
+    # A subparser group that is *not* required, so `anyinfer serve` with no verb keeps
+    # running the server — which is the command everything else documents.
+    serve_commands = serve.add_subparsers(dest="serve_command", required=False)
+
+    serve_install = serve_commands.add_parser(
+        "install",
+        help="generate, and optionally register, a service definition for this sidecar",
+        description=(
+            "Write the systemd unit, launchd agent, or scheduled task that keeps this "
+            "sidecar running across logins and reboots. Nothing is registered without "
+            "showing the exact file and commands first. User scope by default, which "
+            "needs no privileges; --system prints the elevated commands rather than "
+            "trying to elevate."
+        ),
     )
-    serve.add_argument(
-        "--token",
-        default=None,
-        help=f"bearer token clients must present (or set {_TOKEN_ENV})",
-    )
-    serve.add_argument(
-        "--allow-remote-exposure",
+    _add_serve_flags(serve_install)
+    serve_install.add_argument(
+        "--print",
+        dest="print_only",
         action="store_true",
-        help="permit binding a non-loopback address; requires a token",
+        help="write the definition to stdout and do nothing else",
     )
-    serve.add_argument(
-        "--expose",
-        action="append",
-        default=[],
-        metavar="TARGET",
-        help="advertise a concrete provider:model target from /v1/models (repeatable)",
+    serve_install.add_argument(
+        "--system",
+        action="store_true",
+        help="generate a system-wide service and print the commands to run as root",
+    )
+    serve_install.add_argument(
+        "--force", action="store_true", help="replace an existing definition"
+    )
+    serve_install.add_argument(
+        "-y", "--yes", action="store_true", help="do not ask before writing or registering"
+    )
+    serve_install.add_argument(
+        "--log-file",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="send output to this file; AnyInfer never rotates it",
+    )
+    serve_install.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="skip the post-install check that the configured route actually answers",
+    )
+
+    serve_uninstall = serve_commands.add_parser(
+        "uninstall", help="deregister the service and remove its definition"
+    )
+    serve_uninstall.add_argument(
+        "--system", action="store_true", help="target the system-wide service"
+    )
+    serve_uninstall.add_argument(
+        "-y", "--yes", action="store_true", help="do not ask before removing"
+    )
+
+    serve_status = serve_commands.add_parser(
+        "status",
+        help="report whether the service is installed and what its manager says",
+        description=(
+            "Read-only. It reports what exists and what the platform's service manager "
+            "thinks; it never starts, stops, or restarts anything — that is the "
+            "manager's job, not this command's."
+        ),
+    )
+    serve_status.add_argument(
+        "--system", action="store_true", help="target the system-wide service"
     )
 
     run = subcommands.add_parser(
@@ -181,6 +264,90 @@ def build_parser() -> argparse.ArgumentParser:
         "--stats",
         action="store_true",
         help="print timing, token, and cost figures to stderr when finished",
+    )
+    run.add_argument(
+        "--trace",
+        action="store_true",
+        help=(
+            "print the run manifest to stderr: which target won, which structured-output "
+            "mechanism was used, what was dropped or reduced, and on what provenance"
+        ),
+    )
+    run.add_argument(
+        "--trace-json",
+        nargs="?",
+        const="-",
+        default=None,
+        metavar="PATH",
+        help=(
+            "write the run manifest as JSON to PATH, or to stdout when given no value. "
+            "Content-free: shape, counts, and decisions, never prompt or reply text"
+        ),
+    )
+
+    init = subcommands.add_parser(
+        "init",
+        help="write a working configuration from what this machine can already use",
+        description=(
+            "Inspect this machine, report what is already usable, and write a valid "
+            "configuration file plus a starter program pointed at it. Discovery is "
+            "evidence-based: a provider is written only if a loopback endpoint it "
+            "declares answered, or a credential variable it names is set. Nothing is "
+            "installed, and no credential value is ever written — only 'env://' and "
+            "'credential://' references, so the generated file is safe to commit."
+        ),
+    )
+    init.add_argument(
+        "--output",
+        type=Path,
+        default=Path(_DEFAULT_CONFIG_NAME),
+        metavar="PATH",
+        help=f"where to write the configuration (default: {_DEFAULT_CONFIG_NAME})",
+    )
+    init.add_argument(
+        "--force", action="store_true", help="replace an existing configuration file"
+    )
+    init.add_argument(
+        "--no-probe",
+        action="store_true",
+        help="do not contact any endpoint; report credential evidence only",
+    )
+    init.add_argument(
+        "--keyring",
+        action="store_true",
+        help="also look for stored credentials in the OS vault (may prompt to unlock)",
+    )
+    init.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="write the files without asking, when running on a terminal",
+    )
+    init.add_argument("--json", action="store_true", help="emit machine-readable output")
+
+    agents_md = subcommands.add_parser(
+        "agents-md",
+        help="print coding-agent instructions to paste into a consuming repository",
+        description=(
+            "Print a short instruction fragment describing how AnyInfer is actually "
+            "called, for a coding agent working in a repository that uses it. Rendered "
+            "from live introspection — the provider counts come from the registry, the "
+            "extras from installed metadata, the version from the package — so it cannot "
+            "describe an API this release does not have. It writes nothing: redirect it "
+            "yourself, e.g. `anyinfer agents-md >> AGENTS.md`."
+        ),
+    )
+    agents_md.add_argument(
+        "--format",
+        dest="agents_format",
+        choices=_agents_md_formats(),
+        default="agents",
+        help="which consuming file to shape the wrapper for (default: agents)",
+    )
+    agents_md.add_argument(
+        "--config",
+        type=Path,
+        help="also name this file's configured providers and default route",
     )
 
     doctor = subcommands.add_parser(
@@ -407,6 +574,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _serve(args)
         if args.command == "run":
             return _run(args)
+        if args.command == "init":
+            return _init(args)
+        if args.command == "agents-md":
+            return _agents_md(args)
         if args.command == "doctor":
             return _doctor(args)
         if args.command == "verify":
@@ -434,6 +605,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _serve(args: argparse.Namespace) -> int:
+    """Run the frontend, or dispatch one of its service-management verbs."""
+    command = getattr(args, "serve_command", None)
+    if command == "install":
+        return _serve_install(args)
+    if command == "uninstall":
+        return _serve_uninstall(args)
+    if command == "status":
+        return _serve_status(args)
+    return _serve_run(args)
+
+
+def _serve_run(args: argparse.Namespace) -> int:
     """Start the HTTP frontend."""
     token = args.token or os.environ.get(_TOKEN_ENV)
 
@@ -488,6 +671,228 @@ def _describe(settings: Any) -> str:
 def _config(path: Path | None) -> AnyInferConfig:
     """Load shared configuration, or return an empty configuration."""
     return load_config(path) if path is not None else AnyInferConfig()
+
+
+# ---- serve install / uninstall / status -------------------------------------------------
+
+
+def _run_command(command: tuple[str, ...]) -> tuple[int, str]:
+    """Run one service-manager command, capturing what it said.
+
+    A module-level seam so the command tests can prove what *would* be run without a
+    developer's real systemd, launchd, or Task Scheduler being touched.
+    """
+    import subprocess
+
+    try:
+        finished = subprocess.run(
+            list(command), capture_output=True, text=True, check=False
+        )
+    except OSError as exc:
+        return 127, f"{command[0]}: {exc}"
+    return finished.returncode, (finished.stdout + finished.stderr).strip()
+
+
+def _service_request(args: argparse.Namespace) -> Any:
+    """Build the service request from the flags the user supplied."""
+    from .serve.service import ServiceRequest, resolve_executable
+
+    executable, arguments = resolve_executable()
+    token = getattr(args, "token", None) or os.environ.get(_TOKEN_ENV)
+    config = getattr(args, "config", None)
+    return ServiceRequest(
+        executable=executable,
+        arguments=arguments,
+        config=Path(config).resolve() if config is not None else None,
+        host=getattr(args, "host", _LOOPBACK),
+        port=getattr(args, "port", _DEFAULT_PORT),
+        expose=tuple(getattr(args, "expose", ()) or ()),
+        allow_remote_exposure=bool(getattr(args, "allow_remote_exposure", False)),
+        token=token,
+        log_file=getattr(args, "log_file", None),
+        scope="system" if getattr(args, "system", False) else "user",
+    )
+
+
+def _print_definition(definition: Any) -> None:
+    """Show the exact file and commands, with any secret elided."""
+    from .redaction import redact
+
+    print(f"path       {definition.path}")
+    if definition.environment_content:
+        print(f"env file   {definition.environment_path}   (mode 0600, token only)")
+    print(f"scope      {definition.scope}")
+    print()
+    # Redacted rather than trusted: the token is registered as a secret before this runs,
+    # so even an accidental interpolation into the body cannot reach the terminal.
+    for line in redact(definition.content).splitlines():
+        print(f"  {line}")
+    print()
+    for label, commands in (
+        ("install", definition.install_commands),
+        ("uninstall", definition.uninstall_commands),
+    ):
+        for command in commands:
+            print(f"{label:<10} {' '.join(command)}")
+    for note in definition.notes:
+        print(f"note       {note}")
+
+
+def _serve_install(args: argparse.Namespace) -> int:
+    """Generate a service definition and, once confirmed, register it.
+
+    Returns:
+        A process exit code.
+    """
+    from .redaction import register_secret
+    from .serve.service import render_service, write_service
+
+    request = _service_request(args)
+    if request.token:
+        register_secret(request.token)
+    definition = render_service(request)
+    _print_definition(definition)
+
+    if args.print_only:
+        return 0
+    if definition.needs_elevation:
+        # Printing rather than elevating. A library CLI that shells into `sudo` is not
+        # something to ship, and the operator running these lines is the review step.
+        print("\nrun these as root — this command will not elevate for you:")
+        print(f"  install -m 644 /dev/stdin {definition.path} <<'UNIT'")
+        print("  …the definition above…")
+        print("  UNIT")
+        for command in definition.install_commands:
+            print(f"  {' '.join(command)}")
+        return 0
+    if not _confirm(f"\nwrite {definition.path} and register the service?", args):
+        print("nothing written")
+        return 0
+
+    written = write_service(definition, force=args.force)
+    for path in written:
+        print(f"wrote      {path}")
+
+    for command in definition.install_commands:
+        code, output = _run_command(command)
+        print(f"ran        {' '.join(command)}" + ("" if code == 0 else f"  (exit {code})"))
+        if output:
+            for line in output.splitlines():
+                print(f"           {line}")
+        if code != 0:
+            print(
+                "the service manager refused the definition; it is written but not "
+                "registered",
+                file=sys.stderr,
+            )
+            return 1
+
+    if not args.no_verify:
+        _verify_after_install(args)
+    return 0
+
+
+def _verify_after_install(args: argparse.Namespace) -> None:
+    """Prove the configured route answers, now that the service is running.
+
+    A service that starts and then fails every request at 3am because a credential
+    reference is wrong is the failure this catches. It reports; it never uninstalls —
+    undoing an operator's install because one target was down would be the wrong call.
+    """
+    from . import Client
+
+    config = _config(getattr(args, "config", None))
+    targets = list(config.route.targets) if config.route else []
+    if not config.providers or not targets:
+        print("verify     skipped — the configuration names no route to check")
+        return
+
+    client = Client(list(config.providers))
+    try:
+        results = [client.verify(target, timeout_s=30.0) for target in targets]
+    except AnyInferError as exc:
+        print(f"verify     could not run: {exc.detail}")
+        return
+    finally:
+        client.close()
+
+    for result in results:
+        mark = "ok" if result.ok else "FAILED"
+        print(f"verify     {mark:<7} {result.target}  {result.detail or ''}".rstrip())
+    if not all(result.ok for result in results):
+        print(
+            "the service is installed and running, but a configured target did not "
+            "answer — fix it and the service will pick it up on its next request"
+        )
+
+
+def _serve_uninstall(args: argparse.Namespace) -> int:
+    """Deregister the service and remove whatever install wrote.
+
+    Returns:
+        A process exit code.
+    """
+    from .serve.service import render_service
+
+    definition = render_service(_service_request(args))
+    paths = [definition.path]
+    if definition.environment_path is not None:
+        paths.append(definition.environment_path)
+    existing = [path for path in paths if Path(path).exists()]
+
+    print(f"path       {definition.path}" + ("" if existing else "   (not present)"))
+    for command in definition.uninstall_commands:
+        print(f"uninstall  {' '.join(command)}")
+    if definition.needs_elevation:
+        print("\nrun the commands above as root; this command will not elevate for you")
+        return 0
+    if not _confirm("\nderegister the service and delete its definition?", args):
+        print("nothing removed")
+        return 0
+
+    for command in definition.uninstall_commands:
+        code, output = _run_command(command)
+        print(f"ran        {' '.join(command)}" + ("" if code == 0 else f"  (exit {code})"))
+        if output:
+            for line in output.splitlines():
+                print(f"           {line}")
+
+    for path in paths:
+        target = Path(path)
+        if target.exists():
+            target.unlink()
+            print(f"removed    {target}")
+    return 0
+
+
+def _serve_status(args: argparse.Namespace) -> int:
+    """Report what exists and what the platform's manager says. Read-only.
+
+    Returns:
+        ``0`` when a definition is installed, ``1`` when none is.
+    """
+    from .serve.service import render_service
+
+    definition = render_service(_service_request(args))
+    installed = Path(definition.path).exists()
+    print(f"definition {definition.path}")
+    print(f"installed  {'yes' if installed else 'no'}")
+    if definition.environment_path is not None and Path(definition.environment_path).exists():
+        print(f"env file   {definition.environment_path}  (present)")
+
+    for command in definition.status_commands:
+        code, output = _run_command(command)
+        print(f"manager    {' '.join(command)}  (exit {code})")
+        for line in output.splitlines():
+            print(f"           {line}")
+    return 0 if installed else 1
+
+
+def _confirm(question: str, args: argparse.Namespace) -> bool:
+    """Ask before acting, on a terminal, unless told not to."""
+    if getattr(args, "yes", False) or not sys.stdin.isatty():
+        return True
+    return input(f"{question} [Y/n] ").strip().lower() in ("", "y", "yes")
 
 
 # ---- run -----------------------------------------------------------------------------
@@ -737,7 +1142,32 @@ def _emit_result(generation: Any, args: argparse.Namespace, *, streamed: bool) -
 
     if args.stats and not args.json:
         _print_stats(generation)
+    _emit_trace(generation, args)
     return 0
+
+
+def _emit_trace(generation: Any, args: argparse.Namespace) -> None:
+    """Print the run manifest, in whichever spellings were asked for.
+
+    The human tree goes to stderr so it never contaminates the reply on stdout; the JSON
+    goes to stdout only when no path was given, which is the one case a caller is clearly
+    asking for it as the output.
+    """
+    from .manifest import render
+
+    manifest = getattr(generation, "manifest", None)
+    if manifest is None:
+        return
+    if getattr(args, "trace", False):
+        print(render(manifest), file=sys.stderr)
+    destination = getattr(args, "trace_json", None)
+    if destination is None:
+        return
+    payload = manifest.to_json()
+    if destination == "-":
+        print(payload)
+    else:
+        Path(destination).write_text(payload + "\n", encoding="utf-8")
 
 
 def _result_payload(generation: Any) -> dict[str, Any]:
@@ -863,6 +1293,297 @@ def _read_json(path: Path, label: str) -> Any:
         raise SystemExit(f"{label} file {path} is not valid JSON: {exc}") from exc
 
 
+# ---- init ----------------------------------------------------------------------------
+
+
+def _init(args: argparse.Namespace) -> int:
+    """Discover what this machine can use, then write a configuration and a starter.
+
+    The first command a new user should run, and the one that decides whether the first
+    five minutes end in a working call or in the configuration reference.
+
+    Returns:
+        A process exit code.
+    """
+    import asyncio
+
+    from . import default_registry
+    from .config import AnyInferConfig
+    from .local import detect, discover, endpoint_candidates
+
+    config_path: Path = args.output
+    starter_path = config_path.parent / _DEFAULT_STARTER_NAME
+    if config_path.exists() and not args.force:
+        # Refused before anything is probed: a command that is going to decline should
+        # not spend two dozen connection attempts first.
+        print(f"error: {config_path} already exists", file=sys.stderr)
+        print(
+            "hint: pass --force to replace it, or --output to write somewhere else",
+            file=sys.stderr,
+        )
+        return 1
+
+    profile = detect()
+    probed = () if args.no_probe else endpoint_candidates(default_registry)
+    found = asyncio.run(
+        discover(default_registry, probe=not args.no_probe, keyring=args.keyring)
+    )
+    settings, notes = _init_settings(found)
+    target, recommendation = _init_target(settings, found, profile)
+    route = _init_route(target, found)
+    config = AnyInferConfig(providers=tuple(settings), route=route)
+
+    if args.json:
+        payload = {
+            "hardware": profile.to_json(),
+            "probed_endpoints": [group[0] for group in probed],
+            "discovered": [
+                {
+                    "provider_id": entry.provider_id,
+                    "evidence": entry.evidence,
+                    "base_url": entry.base_url,
+                    "detail": entry.detail,
+                    "models": list(entry.models),
+                    "credential_ref": entry.credential_ref,
+                }
+                for entry in found
+            ],
+            "recommendation": {
+                "alias": recommendation.alias,
+                "reason": recommendation.reason,
+                "confident": recommendation.confident,
+            },
+            "target": target,
+            "route": list(route.targets) if route else [],
+            "notes": notes,
+            "config_path": str(config_path),
+            "starter_path": str(starter_path),
+        }
+        _write_init_files(config, config_path, starter_path, target, force=args.force)
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    _print_init_findings(profile, probed, found, recommendation, target, notes, args)
+    if not _confirm_init(config_path, starter_path, args):
+        print("nothing written")
+        return 0
+    _write_init_files(config, config_path, starter_path, target, force=args.force)
+
+    print(f"\nwrote      {config_path}")
+    print(f"wrote      {starter_path}")
+    print(f"\nnext       python {starter_path}")
+    print(f"           anyinfer verify --config {config_path}")
+    # Said once, and nothing is edited: the generated file holds only credential
+    # references, so it is safe to commit — and repo hygiene files belong to the user.
+    print(
+        f"\nnote       {config_path} holds only env:// references, never key material, "
+        "so it is safe to commit"
+    )
+    return 0
+
+
+def _init_settings(found: Any) -> tuple[list[Any], list[str]]:
+    """Turn discovery evidence into provider settings, and note what it could not write.
+
+    A provider whose endpoint is per-account cannot be configured from evidence alone —
+    knowing a key exists says nothing about which tenant it belongs to — so it becomes a
+    note rather than a half-written entry that fails at the first request.
+    """
+    from . import ProviderSettings, default_registry
+
+    settings: list[Any] = []
+    notes: list[str] = []
+    for entry in found:
+        descriptor = default_registry.get(entry.provider_id)
+        base_url = entry.base_url if entry.evidence == "endpoint" else None
+        if descriptor.requires_base_url and not base_url:
+            notes.append(
+                f"{entry.provider_id}: {entry.detail}, but this provider also needs a "
+                f"base URL — add one to {_DEFAULT_CONFIG_NAME} and it becomes usable"
+            )
+            continue
+        fields: dict[str, Any] = {}
+        if base_url:
+            fields["base_url"] = base_url
+        if entry.credential_ref:
+            # Well-known settings are their own field; anything else is an options entry,
+            # which is exactly the split the configuration format already makes.
+            if entry.credential_key in ("api_key", "api_version", "base_url"):
+                fields[entry.credential_key] = entry.credential_ref
+            else:
+                fields["options"] = {entry.credential_key: entry.credential_ref}
+        settings.append(ProviderSettings.of(entry.provider_id, **fields))
+    return settings, notes
+
+
+def _init_target(profile_settings: list[Any], found: Any, profile: Any) -> tuple[str, Any]:
+    """Choose what the generated route and starter should point at.
+
+    Preference order, and the reason for it: a catalog alias, because it keeps working
+    when the machine changes; then a model that was actually *observed* on a running
+    engine; then the alias again, unconfirmed, so the starter still has something to say.
+    An alias is only kept when it does not contradict what discovery saw — an engine that
+    listed four models and none of them is the alias's model would otherwise produce a
+    configuration that fails on its first request.
+    """
+    from . import Client, load_default_catalog
+    from .local import recommend_alias
+
+    recommendation = recommend_alias(profile, load_default_catalog())
+    observed = {e.provider_id: e.models for e in found if e.evidence == "endpoint"}
+    alias = recommendation.alias
+
+    resolved = None
+    if alias and profile_settings:
+        client = Client(profile_settings)
+        try:
+            resolved = client.resolve(alias)
+        except AnyInferError:
+            resolved = None
+        finally:
+            client.close()
+
+    if resolved is not None:
+        serves = observed.get(resolved.provider_id)
+        if serves is None or resolved.model in serves:
+            return alias or str(resolved), recommendation
+
+    for entry in found:
+        if entry.evidence == "endpoint" and entry.models:
+            return f"{entry.provider_id}:{entry.models[0]}", recommendation
+    return alias or "medium", recommendation
+
+
+def _init_route(target: str, found: Any) -> Any:
+    """The default route to write, or ``None`` when nothing was confirmed.
+
+    A route is a claim that these targets work. With no evidence behind it there is
+    nothing to claim, and an empty ``default_route`` is a more honest file than one
+    naming a provider that was never found.
+    """
+    from .routing import Route
+
+    return Route(targets=(target,)) if found else None
+
+
+def _write_init_files(
+    config: Any, config_path: Path, starter_path: Path, target: str, *, force: bool
+) -> None:
+    """Write the configuration and the starter program.
+
+    Raises:
+        ConfigError: If either file exists and ``force`` is false, or cannot be written.
+    """
+    from ._starter import render_starter
+    from .config import dump_config
+
+    dump_config(config, config_path, force=force)
+    if starter_path.exists() and not force:
+        raise ConfigError(
+            f"{starter_path} already exists",
+            hint="pass --force to replace it, or --output to write elsewhere",
+        )
+    source = render_starter(target=target, config_path=config_path.as_posix())
+    try:
+        starter_path.write_text(source, encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError(
+            f"cannot write {starter_path}: {exc}",
+            hint="check the directory exists and is writable",
+        ) from exc
+
+
+def _print_init_findings(
+    profile: Any,
+    probed: Any,
+    found: Any,
+    recommendation: Any,
+    target: str,
+    notes: list[str],
+    args: argparse.Namespace,
+) -> None:
+    """Print what was detected, contacted, and found, in `_doctor`'s two-column style."""
+    import textwrap
+
+    accelerator = ""
+    primary = profile.primary_accelerator
+    if primary is not None:
+        memory = (
+            "unified memory"
+            if primary.unified_memory
+            else _gib(primary.total_vram_bytes)
+        )
+        accelerator = f", {primary.name or primary.kind} ({memory})"
+    print(
+        f"detected   {profile.os_name} / {profile.arch}, "
+        f"{_gib(profile.total_ram_bytes)} RAM{accelerator}"
+    )
+
+    # Naming every address contacted is the point: touching loopback ports uninvited can
+    # read as scanning, and the answer to that is a summary nobody has to take on trust.
+    if args.no_probe:
+        print("probed     nothing (--no-probe)")
+    elif probed:
+        addresses = ", ".join(group[0] for group in probed)
+        print(f"probed     {len(probed)} loopback endpoint(s), every one a provider default:")
+        for line in textwrap.wrap(addresses, width=88):
+            print(f"           {line}")
+
+    if not found:
+        print("found      nothing usable yet")
+    for entry in found:
+        if entry.evidence == "endpoint":
+            print(f"found      {entry.provider_id} at {entry.base_url} ({entry.detail})")
+        else:
+            # The reference rather than the prose, because the reference is literally
+            # what lands in the file: what is shown here is what gets written there.
+            print(f"found      {entry.provider_id}, credential {entry.credential_ref}")
+
+    alias = recommendation.alias or "none"
+    print(f"recommend  {alias}" if target == alias else f"recommend  {alias} -> {target}")
+    if not recommendation.confident:
+        print("           (low confidence — some hardware could not be detected)")
+    for note in notes:
+        print(f"note       {note}")
+    if not found:
+        print(
+            "note       nothing to configure yet: start a local engine, set a provider's "
+            "API key, or run 'anyinfer models add' to download one"
+        )
+
+
+def _confirm_init(config_path: Path, starter_path: Path, args: argparse.Namespace) -> bool:
+    """Ask before writing, on a terminal, unless told not to.
+
+    Two files appear in a directory the user did not name individually. On a terminal
+    that is worth one question; in a script it is not, so a non-interactive run proceeds.
+    """
+    if args.yes or not sys.stdin.isatty():
+        return True
+    answer = input(f"\nwrite {config_path} and {starter_path}? [Y/n] ").strip().lower()
+    return answer in ("", "y", "yes")
+
+
+# ---- agents-md -------------------------------------------------------------------------
+
+
+def _agents_md(args: argparse.Namespace) -> int:
+    """Print the coding-agent instruction fragment, and write nothing.
+
+    Printing rather than installing is deliberate: the library does not write into
+    anybody's ``.claude/``, ``.agents/``, or ``.github/`` directory, and the user's own
+    redirect is the confirmation step.
+
+    Returns:
+        A process exit code.
+    """
+    from ._agents_md import render_agents_md
+
+    config = load_config(args.config) if args.config is not None else None
+    print(render_agents_md(style=args.agents_format, config=config), end="")
+    return 0
+
+
 # ---- doctor --------------------------------------------------------------------------
 
 
@@ -967,6 +1688,11 @@ def _doctor(args: argparse.Namespace) -> int:
 
     for issue in default_registry.plugin_issues():
         print(f"plugin            {issue.summary}")
+
+    # A tier alias is a recommendation, not a configuration. Without this line the next
+    # step is the configuration reference, which is the gap `init` exists to close.
+    if getattr(args, "config", None) is None and not Path(_DEFAULT_CONFIG_NAME).exists():
+        print(f"\nnext              anyinfer init   (writes this as {_DEFAULT_CONFIG_NAME})")
     return 0
 
 
@@ -1090,6 +1816,11 @@ def _benchmark(args: argparse.Namespace) -> int:
         print("prefill           not reported by this provider")
     if measurement.decode_tokens_per_s is not None:
         print(f"decode            {measurement.decode_tokens_per_s:.1f} tok/s")
+    if measurement.model_load_ms is not None:
+        # The warmth signal: a figure here means this run paid a cold start, which is the
+        # difference between a slow target and a target that was merely asleep.
+        state = "cold start" if measurement.model_load_ms > 0 else "already resident"
+        print(f"model load        {measurement.model_load_ms:.0f} ms ({state})")
     return 0
 
 
@@ -1097,6 +1828,13 @@ def _benchmark(args: argparse.Namespace) -> int:
 
 _CONTEXT_MAX_FILE_BYTES = 2 * 1024 * 1024
 """Per-file ceiling for CLI collection. A file larger than this is a database, not source."""
+
+
+def _agents_md_formats() -> tuple[str, ...]:
+    """Instruction-fragment formats, read from the renderer so the two cannot drift."""
+    from ._agents_md import AGENTS_MD_FORMATS
+
+    return AGENTS_MD_FORMATS
 
 
 def _context_strategies() -> tuple[str, ...]:
@@ -1346,6 +2084,10 @@ def _providers(args: argparse.Namespace) -> int:
                                 # fields to ask for, and what the rest already do.
                                 "advanced": f.advanced,
                                 "default": f.default_value,
+                                # The variable this field conventionally comes from, so a
+                                # config UI can say "we found this in your environment"
+                                # without parsing the placeholder's prose for a name.
+                                "env_var": f.env_var,
                             }
                             for f in d.setup.fields
                         ],

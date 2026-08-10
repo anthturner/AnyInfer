@@ -105,6 +105,38 @@ The supervisor's semantics come from studying how comparable local multiplexers 
 
 Servers bind `127.0.0.1` only. A non-loopback bind requires `allow_remote_exposure=True`.
 
+## What is already usable here
+
+Before any of the above is worth doing, there is a cheaper question: what can this machine
+use *right now*?
+
+```python
+from anyinfer import default_registry, local
+
+found = await local.discover(default_registry)
+# (DiscoveredProvider(provider_id='ollama', evidence='endpoint', detail='4 models', …),
+#  DiscoveredProvider(provider_id='anthropic', evidence='environment',
+#                     credential_ref='env://ANTHROPIC_API_KEY', …))
+```
+
+Two sources, and a third only when asked for. An engine answering on a loopback address
+the provider itself declares; a credential variable the provider itself names; and, with
+`keyring=True`, the OS vault — off by default because reading a vault can prompt the user
+to unlock it, while an environment variable is already in this process.
+
+Three properties are worth knowing, because they are what makes the answer trustworthy:
+
+- **Only loopback is contacted**, and only addresses a descriptor declares as its default.
+  `local.endpoint_candidates()` returns exactly the list, so a command can name every
+  address it touched instead of asking to be trusted.
+- **Nothing speculative is reported.** An endpoint has to answer with at least one model.
+  A provider that cannot enumerate models is skipped rather than reported optimistically.
+- **No secret is read.** Environment evidence records the variable's *name* and a
+  `credential_ref` of `env://NAME`; the value stays where it was.
+
+`anyinfer init` is this composed with the config writer: discover, then write a valid
+configuration and a runnable starter. See [the CLI guide](../guides/cli.md).
+
 ## Tier recommendation
 
 ```python
@@ -137,6 +169,26 @@ The two rates are separate because a machine can be fast at one and slow at the 
 `prefill_tokens_per_s` is `None` unless the provider timed its own prefill phase — deriving
 it from time-to-first-token would fold queueing and network latency into a figure labelled
 *compute*. Ollama reports the phase; most hosted providers do not.
+
+### Was it warm?
+
+A local engine that had to load the model first is not slow, it was asleep — and reporting
+those two as one number makes every first measurement look like a bad one:
+
+```python
+measurement.model_load_ms   # 1840.0 — this run paid a cold start
+measurement.model_load_ms   # 0.0    — the model was already resident
+measurement.model_load_ms   # None   — this engine does not report loads at all
+```
+
+Ollama reports it on every request. The supervised llama.cpp runtime reports it on the
+request that started its server, and on that request only: every later one is warm by
+definition, and re-reporting the original load would turn one cold start into a permanent
+one. A hosted provider reports nothing, because what a shared endpoint spent loading a
+model is not a property of your request.
+
+Without this an application has to measure twice and compare, which is exactly what the
+bundled demo used to do.
 
 Nothing is written anywhere unless you ask:
 

@@ -444,12 +444,24 @@ class LlamaCppAdapter:
             req.model, model_path, plan, persist=req.session_state is not None
         )
         with managed:
+            # A cold start belongs to the request that paid for it. The supervisor holds
+            # the figure until someone takes it, so exactly one request reports it and
+            # every later one is warm — which is what makes the signal mean anything.
+            load_ms = managed.take_load_ms()
             delegate = await self._delegate_for(managed.base_url)
             # The supervised server is a plain OpenAI-compatible endpoint, so the whole
             # generation path is the base adapter's — no duplicated wire logic.
             async for event in delegate.generate(req):
-                if isinstance(event, AdapterFinal) and req.session_state is not None:
-                    yield replace(event, session_state={"model_key": req.model})
+                if isinstance(event, AdapterFinal):
+                    phases = dict(event.phases)
+                    if load_ms is not None:
+                        phases["model_load_ms"] = load_ms
+                    state = (
+                        {"model_key": req.model}
+                        if req.session_state is not None
+                        else event.session_state
+                    )
+                    yield replace(event, phases=phases, session_state=state)
                     continue
                 yield event
 

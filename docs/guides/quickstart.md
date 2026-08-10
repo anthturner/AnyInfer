@@ -12,6 +12,47 @@ pip install anyinfer
 The core depends on `httpx2` and `jsonschema` and nothing else. Providers that need more come
 as extras — see [installation](installation.md).
 
+## Zero to a working call
+
+`anyinfer init` inspects the machine, reports what is already usable, and writes a valid
+configuration plus a runnable starter program:
+
+```bash
+anyinfer init
+python starter.py
+```
+
+```text
+detected   Linux / x86_64, 32.0 GiB RAM, NVIDIA RTX 4070 (12.0 GiB)
+probed     17 loopback endpoint(s), every one a provider default:
+           http://127.0.0.1:11434, http://127.0.0.1:1234/v1, …
+found      ollama at http://127.0.0.1:11434 (4 models)
+found      anthropic, credential env://ANTHROPIC_API_KEY
+recommend  medium -> ollama:qwen3:8b
+
+wrote      anyinfer.json
+wrote      starter.py
+```
+
+What it will and will not do:
+
+- **It only reports what it observed.** A provider is written into the file because a
+  loopback endpoint it declares answered, or because a credential variable it names is set —
+  never because it might work.
+- **It never writes a credential value.** A detected key becomes `"api_key":
+  "env://ANTHROPIC_API_KEY"`, the reference and not the secret, so the generated file is safe
+  to commit.
+- **It never installs anything.** Use [`anyinfer models add`](../guides/local-models.md) to
+  download weights and `anyinfer runtime install` for a llama.cpp runtime.
+- **It never replaces a file you already have.** An existing `anyinfer.json` stops the
+  command; pass `--force` to replace it or `--output` to write elsewhere.
+
+Useful flags: `--no-probe` contacts nothing at all, `--keyring` also looks in the OS
+credential vault, and `--json` emits the same findings for a script.
+
+The file it writes is the [shared configuration](../reference/configuration.md) format —
+the same file the command-line runner, the sidecar, and the Python API all read.
+
 ## Your first call
 
 === "Sync"
