@@ -913,6 +913,7 @@ class _CatalogPanel(QWidget):
         self._remove.clicked.connect(self._on_remove)
         buttons.addWidget(self._remove)
         buttons.addStretch(1)
+        buttons.addWidget(SdkHelpButton("acquisition"))
         layout.addLayout(buttons)
 
         self.set_providers(config)
@@ -1072,12 +1073,14 @@ class _CatalogPanel(QWidget):
                 else source.total_bytes if isinstance(source, StoreEntry) else None
             )
             self._table.setItem(row, 1, QTableWidgetItem(_bytes(size)))
-            context = (
+            discovered_context = (
                 source.capabilities.context_window
                 if isinstance(source, DiscoveredModel) and source.capabilities is not None
                 else None
             )
-            context_value = context.value if context is not None else None
+            context_value = (
+                discovered_context.value if discovered_context is not None else None
+            )
             self._table.setItem(
                 row, 2, QTableWidgetItem(f"{context_value:,}" if context_value else "—")
             )
@@ -1172,7 +1175,8 @@ class _CatalogPanel(QWidget):
         items = self._table.selectedItems()
         if not items:
             return ()
-        value = self._table.item(items[0].row(), 0).data(Qt.ItemDataRole.UserRole + 1)
+        item = self._table.item(items[0].row(), 0)
+        value = item.data(Qt.ItemDataRole.UserRole + 1) if item is not None else None
         if not isinstance(value, tuple):
             return ()
         return tuple(item for item in value if isinstance(item, str))
@@ -1542,8 +1546,8 @@ class _RuntimePanel(QWidget):
             None,
         )
         if selected is not None:
-            return selected
-        return next(
+            return str(selected)
+        fallback = next(
             (
                 manifest.backend
                 for manifest in self._report.installed
@@ -1551,6 +1555,7 @@ class _RuntimePanel(QWidget):
             ),
             None,
         )
+        return str(fallback) if fallback is not None else None
 
     def _select_configured_or_recommended_runtime(self) -> None:
         """Prefer an explicit setting, otherwise show the SDK's machine recommendation."""
@@ -1713,7 +1718,7 @@ class _PullPanel(QWidget):
         self._pull = QPushButton("Pull")
         self._pull.clicked.connect(self._on_pull)
         row.addWidget(self._pull)
-        row.addWidget(SdkHelpButton("engine-pull"))
+        row.addWidget(SdkHelpButton("acquisition"))
         layout.addLayout(row)
 
         self._empty = QLabel()
@@ -2018,7 +2023,11 @@ class ModelsDialog(QDialog):
             if not self._engine.registry.has(provider.provider_id):
                 continue
             descriptor = self._engine.registry.get(provider.provider_id)
-            if descriptor.locality != "local" or descriptor.model_inventory == "available":
+            if (
+                descriptor.id == DEMO_PROVIDER_ID
+                or descriptor.locality != "local"
+                or descriptor.model_inventory == "available"
+            ):
                 continue
             instances[provider.instance_id] = provider.provider_id
         self._local_provider_instances = instances

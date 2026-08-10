@@ -95,6 +95,7 @@ class AddModelDialog(QDialog):
         self._registry = registry
         self._providers: dict[str, ProviderConfig] = {}
         self._choice: AddModelChoice | None = None
+        self._free_disk_bytes: int | None
         try:
             self._free_disk_bytes = shutil.disk_usage(_nearest_existing(default_model_dir())).free
         except OSError:
@@ -320,6 +321,7 @@ class AddModelDialog(QDialog):
         )
         first_reason = entry.fit.reasons[0] if entry.fit.reasons else "No fit reason reported."
         if disk_problem:
+            assert size is not None
             return (
                 "Do not use — disk",
                 False,
@@ -340,7 +342,8 @@ class AddModelDialog(QDialog):
         items = self._table.selectedItems()
         if not items:
             return None
-        value = self._table.item(items[0].row(), 0).data(Qt.ItemDataRole.UserRole)
+        item = self._table.item(items[0].row(), 0)
+        value = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
         return value if isinstance(value, CatalogEntryFit) else None
 
     def _on_selection_changed(self) -> None:

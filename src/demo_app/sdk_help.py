@@ -407,12 +407,16 @@ TOPICS: dict[str, HelpTopic] = {
                 "snapshots to the callback you pass. dry_run=True returns the plan — "
                 "files, bytes, what is already on disk — without fetching, which is "
                 "what the 'What would this download?' button shows. installed_models() "
-                "lists the store; remove_model() frees it."
+                "lists the store; remove_model() frees it. Engine-owned stores stay "
+                "distinct: pull_model() asks the engine to fetch an exact model id, and "
+                "the Catalog table merges its discovered inventory without claiming to "
+                "own those files."
             ),
             api=(
                 "Client.acquire_model",
                 "Client.installed_models",
                 "Client.remove_model",
+                "Client.pull_model",
                 "local.acquire.AcquisitionReport",
                 "local.acquire.AcquisitionProgress",
                 "local.store.StoreEntry",
@@ -421,6 +425,7 @@ TOPICS: dict[str, HelpTopic] = {
                 'plan = client.acquire_model("qwen3-8b", dry_run=True)\n'
                 'print(plan.plan.total_bytes, "bytes to fetch")\n'
                 'report = client.acquire_model("qwen3-8b", progress=print)\n'
+                'client.pull_model("ollama", "qwen3:8b")\n'
                 "for entry in client.installed_models():\n"
                 "    print(entry.model_id, entry.directory)"
             ),
@@ -435,8 +440,8 @@ TOPICS: dict[str, HelpTopic] = {
                 "accelerator backends this machine can drive; Install fetches the "
                 "pinned build for the chosen backend into the per-user runtime "
                 "directory. The supervised llama-server the library runs later uses "
-                "the automatic best usable build or the per-instance backend selected "
-                "on this tab."
+                "the selected backend. The table checkmark shows which installed build "
+                "is currently selected."
             ),
             api=(
                 "local.runtimes.installed_runtimes",
@@ -450,25 +455,6 @@ TOPICS: dict[str, HelpTopic] = {
                 "print([b.kind for b in available_backends()])\n"
                 "report = install_runtime(None)  # None -> best for this machine\n"
                 "print(report.backend, report.executable)"
-            ),
-            demo_source="src/demo_app/widgets/models_dialog.py",
-        ),
-        HelpTopic(
-            key="engine-pull",
-            title="Engine-managed pulls",
-            summary=(
-                "Ollama and its kin keep their own model store, so 'make this model "
-                "available' is a request to the engine, not a download AnyInfer "
-                "performs. pull_model() asks; the weights land under the engine's name "
-                "in the engine's directory, and AnyInfer's store neither indexes nor "
-                "removes them. Only engines whose descriptor declares a puller are "
-                "offered — the registry answers 'who can do this', not a list in the "
-                "UI."
-            ),
-            api=("Client.pull_model", "PullReport", "PullRequest"),
-            snippet=(
-                'report = client.pull_model("ollama", "qwen3:8b")\n'
-                "print(report)  # the engine's own account of what it fetched"
             ),
             demo_source="src/demo_app/widgets/models_dialog.py",
         ),

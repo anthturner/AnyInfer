@@ -525,15 +525,27 @@ class TestModelsDialog:
         finally:
             panel.close()
 
-    def test_catalog_lists_entries_carrying_their_fit_reasons(self, engine: Engine, qapp: object):
+    def test_catalog_lists_entries_carrying_their_fit_reasons(
+        self, engine: Engine, qapp: object, monkeypatch: pytest.MonkeyPatch
+    ):
         """Real catalog data on purpose: a fake one would test the table, not the wiring."""
-        from demo_app.widgets.models_dialog import _CATALOG_KEY, ModelsDialog
+        from anyinfer import load_default_catalog
+        from anyinfer._client.models import build_catalog_view
+        from anyinfer.local.hardware import HardwareProfile
+        from demo_app.widgets.models_dialog import ModelsDialog
         from demo_app.widgets.tab_widget import BorderedTabWidget
 
+        monkeypatch.setattr(engine, "local_catalog", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(engine, "installed_models", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(engine, "run_task", lambda *_args, **_kwargs: None)
         dialog = ModelsDialog(engine, default_config())
         try:
             assert isinstance(dialog._tabs, BorderedTabWidget)
-            view = _drain_task(engine, _CATALOG_KEY)
+            view = build_catalog_view(
+                load_default_catalog(),
+                hardware=HardwareProfile("linux", "x86_64"),
+                detect_backend=False,
+            )
             dialog._catalog.on_catalog(view)
             assert dialog._catalog._table.rowCount() > 0
             # The verdict stays checkable: its tooltip is the library's own reasons for it.
@@ -543,9 +555,14 @@ class TestModelsDialog:
         finally:
             dialog.close()
 
-    def test_catalog_replaces_installed_and_engine_pull_tabs(self, engine: Engine, qapp: object):
+    def test_catalog_replaces_installed_and_engine_pull_tabs(
+        self, engine: Engine, qapp: object, monkeypatch: pytest.MonkeyPatch
+    ):
         from demo_app.widgets.models_dialog import ModelsDialog
 
+        monkeypatch.setattr(engine, "local_catalog", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(engine, "installed_models", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(engine, "run_task", lambda *_args, **_kwargs: None)
         dialog = ModelsDialog(engine, default_config())
         try:
             labels = [dialog._tabs.tabText(index) for index in range(dialog._tabs.count())]
@@ -570,6 +587,7 @@ class TestModelsDialog:
         config = default_config().with_provider(ProviderConfig("ollama", enabled=True))
         dialog = AddModelDialog(view, config, engine.registry)
         try:
+            dialog._engine.setCurrentIndex(dialog._engine.findData("ollama"))
             dialog._search.setText("private-model:latest")
             assert dialog._table.rowCount() == 0
             assert dialog._add.text() == "Pull"

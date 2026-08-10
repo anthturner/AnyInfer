@@ -8,6 +8,8 @@ render time, which keeps the glyphs legible in both the light and dark theme.
 
 from __future__ import annotations
 
+from functools import cache
+
 from PySide6.QtCore import QByteArray, QRectF, Qt
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -158,6 +160,7 @@ _BRAND_SVGS: dict[str, str] = {
 }
 
 
+@cache
 def brand_icon(name: str) -> QIcon:
     """Return an official local-engine brand mark, or a null icon when unknown."""
     svg = _BRAND_SVGS.get(name)

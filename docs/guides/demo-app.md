@@ -213,24 +213,26 @@ CPU/GPU/RAM/VRAM utilization live, then replaces estimates with the provider's t
 timings. The System tab summarizes that measured profile instead of collapsing a
 model/runtime/workload-specific result into a misleading universal score.
 
-The remaining manager keeps ownership explicit. **Installed** merges
-`installed_models()` from AnyInfer's store with the model inventories reported by enabled
-local services, but only AnyInfer-owned rows offer removal. Its **Add…** dialog searches
-the verified catalog by enabled engine: llama.cpp artifacts are pinned Hugging Face GGUFs,
-Ollama choices use catalog tags handed to `pull_model()`, and a configured vLLM remains
-visible even when the bundled catalog has no pinned vLLM snapshot rather than silently
-falling back to an unverified repository download. Models are ranked by the catalog's
-hardware fit, estimated free disk is called out, and deliberately unreasonable choices
-remain visible as warnings.
+**Catalog** is the unified model manager. It overlays `installed_models()` and the inventories
+reported by enabled local services onto the `local_catalog()` view, with a distinct
+**Installed For** column preserving ownership. A provider-reported model that is not in the
+shipped catalog still gets its own row. The Engines and Installed For columns use the Ollama
+and llama.cpp marks with accessible name tooltips; other engines retain text labels. Only
+AnyInfer-owned rows offer removal.
 
-**Catalog** exposes the underlying `local_catalog()` view and dry-run acquisition plan.
+The tab's **Add…** dialog searches the verified catalog by enabled engine: llama.cpp
+artifacts are pinned Hugging Face GGUFs and Ollama choices use catalog tags handed to
+`pull_model()`. An exact provider-owned model id outside the shipped catalog can be entered
+there too. Models are ranked by catalog hardware fit, estimated free disk is called out,
+and deliberately unreasonable choices remain visible as warnings. The former Installed and
+Engine pull tabs are therefore no longer separate surfaces.
+
 **Runtimes** is llama.cpp-specific: its contents stay hidden until that provider is enabled,
-its backend choices are disabled when the detected hardware cannot drive them, and runtime
-archive downloads have their own progress bar. When several are installed, the same tab can
-leave selection on automatic or pin a backend per llama.cpp provider instance. vLLM and
-Ollama manage different runtime
-environments and are therefore not presented as llama.cpp runtime variants. **Engine pull**
-remains available for a provider-owned model name that is outside the verified catalog.
+and its one selector suggests the SDK's machine recommendation while disabling choices the
+detected hardware cannot drive. Every choice keeps the same **Install Runtime** action. A
+successful install also makes that backend the demo-wide llama.cpp default, and the installed
+runtime table marks the selected backend with a check. vLLM and Ollama manage different
+runtime environments and are therefore not presented as llama.cpp runtime variants.
 
 ### How is this built? The `</>` chips
 
