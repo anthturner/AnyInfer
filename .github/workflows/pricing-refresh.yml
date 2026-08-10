@@ -4,9 +4,10 @@ name: Pricing refresh
 #
 # Two stages, deliberately split by trust level:
 #
-#   1. `check` — deterministic, stdlib-only: cross-checks every bundled entry that has an
-#      `openrouter_id` against OpenRouter's public listing. Cheap, machine-readable, and
-#      immune to hallucination — but it only *detects* drift.
+#   1. `check` — deterministic: validates the table through the installed library, then
+#      cross-checks every bundled entry that has an `openrouter_id` against OpenRouter's
+#      public listing. Cheap, machine-readable, and immune to hallucination — but it only
+#      *detects* drift.
 #   2. `propose` — runs only when drift was detected (or on manual dispatch): a
 #      web-search-capable Claude session verifies the drifted entries against the
 #      providers' own pricing pages, updates pricing.json (values and last_verified dates
@@ -44,6 +45,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - name: install dependencies
+        run: python -m pip install -e .
       - name: validate bundled table
         run: python scripts/validate_pricing.py
       - name: compare against OpenRouter listing
@@ -64,6 +67,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - name: install dependencies
+        run: python -m pip install -e .
       - name: verify pricing and update the table
         uses: anthropics/claude-code-action@v1
         with:

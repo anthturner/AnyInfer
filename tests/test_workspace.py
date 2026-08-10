@@ -160,6 +160,19 @@ class TestVerbs:
             "CI must not run a gate outside `workspace check`"
         )
 
+    def test_pages_deploy_isolated_from_reruns_and_upload_retries(self):
+        workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(
+            encoding="utf-8"
+        )
+        artifact_name = "github-pages-${{ github.run_id }}-${{ github.run_attempt }}"
+
+        assert f"PAGES_ARTIFACT_NAME: {artifact_name}" in workflow
+        assert workflow.count("actions: write") == 1
+        assert "KEEP_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}" in workflow
+        assert "(.id | tostring) != $keep" in workflow
+        assert "gh api --method DELETE" in workflow
+        assert "artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}" in workflow
+
     def test_check_announces_each_phase_with_a_heading(self, recorded, capsys):
         assert workspace.main(["check"]) == 0
         output = capsys.readouterr().out

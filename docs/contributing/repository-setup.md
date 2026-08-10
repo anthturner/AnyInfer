@@ -48,8 +48,10 @@ Breaks without it: nothing *fails*, which is the problem — merges land without
 
 **Settings → Pages → Source: "GitHub Actions".** The docs site deploys from
 `pages.yml` on every merge to `main` and on every published release; the workflow
-carries the `pages: write` / `id-token: write` permissions it needs, but the source
-selection cannot be set by a workflow.
+carries the `pages: write` / `id-token: write` permissions it needs. Its build job also
+has a narrowly scoped `actions: write` permission so it can remove duplicate copies of
+its own Pages artifact if GitHub records an upload-finalization retry more than once. The
+source selection cannot be set by a workflow.
 
 Breaks without it: `pages.yml` deploy jobs fail; the site never publishes.
 

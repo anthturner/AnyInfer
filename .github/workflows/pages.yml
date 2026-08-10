@@ -16,6 +16,11 @@ permissions:
   pages: write
   id-token: write
 
+# A full job re-run keeps the workflow run id but increments run_attempt. Giving each
+# attempt its own name prevents an earlier attempt's artifact from confusing deploy-pages.
+env:
+  PAGES_ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
 # One deploy at a time; a queued deploy for a newer commit supersedes older ones.
 concurrency:
   group: pages
@@ -24,6 +29,12 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # upload-artifact can leave duplicate records when its finalize request succeeds
+    # server-side but times out client-side. The cleanup step below needs to delete only
+    # those extras; keep that authority out of the deployment job.
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -38,9 +49,50 @@ jobs:
       - name: build the site
         run: python workspace.py build docs
 
-      - uses: actions/upload-pages-artifact@v5
+      - id: pages-artifact
+        uses: actions/upload-pages-artifact@v5
         with:
+          name: ${{ env.PAGES_ARTIFACT_NAME }}
           path: site
+
+      # deploy-pages selects by artifact name and refuses to guess when GitHub's artifact
+      # service has recorded the same finalized upload more than once. Preserve the exact
+      # id returned by upload-pages-artifact and remove only same-name extras from this run.
+      # Three passes allow a briefly delayed duplicate record to become visible.
+      - name: remove duplicate Pages artifact records
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_ARTIFACT_ID: ${{ steps.pages-artifact.outputs.artifact_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$KEEP_ARTIFACT_ID" =~ ^[0-9]+$ ]]; then
+            echo "upload-pages-artifact returned an invalid artifact id" >&2
+            exit 1
+          fi
+
+          declare -A deleted_artifacts=()
+          for pass in 1 2 3; do
+            duplicate_ids="$(
+              gh api --paginate \
+                "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" |
+                jq -r \
+                  --arg name "$PAGES_ARTIFACT_NAME" \
+                  --arg keep "$KEEP_ARTIFACT_ID" \
+                  '.artifacts[] | select(.name == $name and (.id | tostring) != $keep) | .id'
+            )"
+            while IFS= read -r artifact_id; do
+              if [[ "$artifact_id" =~ ^[0-9]+$ && -z "${deleted_artifacts[$artifact_id]:-}" ]]; then
+                echo "deleting duplicate Pages artifact $artifact_id; keeping $KEEP_ARTIFACT_ID"
+                gh api --method DELETE \
+                  "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+                deleted_artifacts[$artifact_id]=1
+              fi
+            done <<< "$duplicate_ids"
+            if [[ "$pass" -lt 3 ]]; then
+              sleep 2
+            fi
+          done
 
   deploy:
     needs: build
@@ -51,3 +103,5 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
