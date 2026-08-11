@@ -1,7 +1,7 @@
 """Shared httpx2 plumbing and HTTP error classification.
 
 Every httpx2-based adapter maps transport and status failures the same way, so the mapping
-lives here rather than being reimplemented (and diverging) nine times. Adapters classify;
+lives here rather than being reimplemented (and diverging) in every adapter. Adapters classify;
 the router decides what to do about it.
 """
 

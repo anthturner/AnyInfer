@@ -47,7 +47,7 @@ from ..types.messages import (
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import Diagnostic, FinishReason, Usage
 from ._multimodal import base64_data, unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_ndjson
 
@@ -375,14 +375,7 @@ class OllamaAdapter:
         return encoded
 
     def _encode_tool(self, tool: ToolSpec) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": dict(tool.parameters),
-            },
-        }
+        return _encode_function_tool(tool)
 
     def _events_from_message(self, message: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Translate one NDJSON object into events."""

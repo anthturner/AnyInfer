@@ -20,7 +20,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QKeySequence, QTextOption
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QTextOption
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -32,7 +32,6 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QMainWindow,
-    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -96,7 +95,7 @@ _SECTION_ICONS: dict[str, str] = {
     "target": "target",
     "tools": "tool",
 }
-"""Inspector section key → Tabler icon, shared by the headers and the View menu."""
+"""Inspector section key → Tabler icon used by its header."""
 
 _UNREPORTED_DEFAULT_NOTE = (
     " (Provider default: decided by the provider itself — the value is not reported "
@@ -191,7 +190,8 @@ class MainWindow(QMainWindow):
     def _chat(self) -> MessageList:
         """The active tab's transcript view."""
         page = self._tabs.current_page()
-        assert page is not None, "the window always keeps at least one tab"
+        if page is None:
+            raise RuntimeError("the window must keep at least one conversation tab")
         return page.view
 
     # ---- construction ----------------------------------------------------------------
@@ -472,9 +472,6 @@ class MainWindow(QMainWindow):
         self._tools_section.set_minimized(True)
         self._inspector_splitter.addWidget(self._tools_section)
 
-        self._inspector_splitter.setSizes([280, 280, 220, HEADER_HEIGHT, HEADER_HEIGHT])
-        layout.addWidget(self._inspector_splitter, 1)
-
         self._inspector_sections: dict[str, CollapsibleSection] = {
             "telemetry": self._telemetry_section,
             "structured": self._schema_section,
@@ -482,6 +479,23 @@ class MainWindow(QMainWindow):
             "target": self._target_section,
             "tools": self._tools_section,
         }
+        # A splitter distributes surplus height between its handles when every visible
+        # child is fixed at its collapsed height. This invisible final child absorbs that
+        # surplus instead, keeping a stack of collapsed headers anchored to the top.
+        self._inspector_bottom_spacer = QWidget()
+        self._inspector_bottom_spacer.setObjectName("InspectorBottomSpacer")
+        self._inspector_bottom_spacer.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        self._inspector_splitter.addWidget(self._inspector_bottom_spacer)
+        self._inspector_splitter.setStretchFactor(len(self._inspector_sections), 1)
+        self._inspector_bottom_spacer.hide()
+        for section in self._inspector_sections.values():
+            section.minimized_changed.connect(self._sync_inspector_bottom_spacer)
+
+        self._inspector_splitter.setSizes([280, 280, 220, HEADER_HEIGHT, HEADER_HEIGHT, 0])
+        layout.addWidget(self._inspector_splitter, 1)
+
         # Both panels act on whatever engine/model the bar currently points at.
         self._engine_bar.changed.connect(self._sync_inspector_targets)
         self._sync_inspector_targets()
@@ -492,6 +506,32 @@ class MainWindow(QMainWindow):
         target = self._engine_bar.target()
         self._target_inspector.set_target(target)
         self._tools.set_target(target)
+
+    def _sync_inspector_bottom_spacer(self, *_args: object) -> None:
+        """Put surplus splitter height below an entirely collapsed visible stack."""
+        visible_sections = [
+            section for section in self._inspector_sections.values() if not section.isHidden()
+        ]
+        anchor_to_top = bool(visible_sections) and all(
+            section.minimized for section in visible_sections
+        )
+        self._inspector_bottom_spacer.setVisible(anchor_to_top)
+        if not anchor_to_top:
+            return
+
+        handle_count = len(visible_sections)
+        used_height = len(visible_sections) * HEADER_HEIGHT
+        remaining = max(
+            0,
+            self._inspector_splitter.height()
+            - used_height
+            - handle_count * self._inspector_splitter.handleWidth(),
+        )
+        sizes = [
+            HEADER_HEIGHT if section in visible_sections else 0
+            for section in self._inspector_sections.values()
+        ]
+        self._inspector_splitter.setSizes([*sizes, remaining])
 
     def _build_providers_tab(self) -> QWidget:
         pane = QWidget()
@@ -578,10 +618,7 @@ class MainWindow(QMainWindow):
         models_action.triggered.connect(self._on_local_models)
         tools_menu.addAction(models_action)
 
-        view_menu = self.menuBar().addMenu("&View")
-        self._build_sidebar_menu(view_menu)
-        view_menu.addSeparator()
-        self._build_theme_menu(view_menu)
+        self._build_sidebar_menu()
 
         self._build_help_menu()
 
@@ -632,9 +669,9 @@ class MainWindow(QMainWindow):
             "info": about_action,
         }
 
-    def _build_sidebar_menu(self, view_menu: QMenu) -> None:
-        """Build View > Sidebar with one master switch and section checkboxes."""
-        self._sidebar_menu = view_menu.addMenu(strings.SIDEBAR)
+    def _build_sidebar_menu(self) -> None:
+        """Build the top-level Sidebar menu and its visibility checkboxes."""
+        self._sidebar_menu = self.menuBar().addMenu(f"&{strings.SIDEBAR}")
 
         self._right_sidebar_action = QAction(strings.SHOW_SIDEBAR, self, checkable=True)
         self._right_sidebar_action.setChecked(True)
@@ -658,38 +695,6 @@ class MainWindow(QMainWindow):
             )
             self._sidebar_menu.addAction(action)
             self._section_actions[key] = action
-
-    def _build_theme_menu(self, view_menu: QMenu) -> None:
-        """Build the Theme submenu.
-
-        Custom palettes first, then a separator, then the OS-following defaults — custom
-        themes are the more deliberate, less "default" choice, so they lead.
-
-        The menu, action group, and per-theme actions are kept as instance attributes
-        rather than locals: PySide6 does not keep a Python wrapper alive just because its
-        underlying Qt object is still parented, so an unreferenced local here can be
-        garbage-collected out from under the menu it was wired into.
-        """
-        self._theme_menu = view_menu.addMenu("&Theme")
-        self._theme_action_group = QActionGroup(self)
-        self._theme_action_group.setExclusive(True)
-        self._theme_actions: dict[str, QAction] = {}
-
-        for key, label in theme.CUSTOM_THEMES_MENU:
-            self._add_theme_action(key, label)
-
-        self._theme_menu.addSeparator()
-
-        for key, label in theme.DEFAULT_THEME_CHOICES:
-            self._add_theme_action(key, label)
-
-    def _add_theme_action(self, key: str, label: str) -> None:
-        action = QAction(label, self, checkable=True)
-        action.setChecked(key == self._theme)
-        action.triggered.connect(lambda _checked=False, p=key: self._set_theme(p))
-        self._theme_action_group.addAction(action)
-        self._theme_menu.addAction(action)
-        self._theme_actions[key] = action
 
     def _build_shortcuts(self) -> None:
         cancel_action = QAction("Cancel generation", self)
@@ -1008,7 +1013,12 @@ class MainWindow(QMainWindow):
         dialog = AppSettingsDialog(self._engine.config, self)
         if dialog.exec() != AppSettingsDialog.DialogCode.Accepted:
             return
-        config = self._with_ui_state(dialog.result_config())
+        self._apply_app_settings(dialog.result_config())
+
+    def _apply_app_settings(self, edited: DemoConfig) -> None:
+        """Apply and persist the result of the application-settings dialog."""
+        self._apply_theme(edited.theme)
+        config = self._with_ui_state(edited)
         self._engine.update_preferences(config)
         if self._models_dialog is not None:
             self._models_dialog.set_providers(config)
@@ -1169,6 +1179,7 @@ class MainWindow(QMainWindow):
     def _set_inspector_section_visible(self, key: str, visible: bool) -> None:
         """Show or fully hide one inspector section (distinct from minimize)."""
         self._inspector_sections[key].setVisible(visible)
+        self._sync_inspector_bottom_spacer()
 
     # ---- welcome / quick actions -------------------------------------------------------
 
@@ -1194,7 +1205,7 @@ class MainWindow(QMainWindow):
         self._engine_bar.set_target("demo-fake:tools")
         self._sync_inspector_targets()
         self._set_right_sidebar_visible(True)
-        self._tools_section.setVisible(True)
+        self._set_inspector_section_visible("tools", True)
         self._tools_section.set_minimized(False)
         self.statusBar().showMessage(
             "Tool loop ready — press 'Run tool loop' in the right sidebar."
@@ -1288,17 +1299,6 @@ class MainWindow(QMainWindow):
                 "info": "info",
             }[name]
             action.setIcon(themed_icon(self, icon_name, size=16))
-
-    def _set_theme(self, preference: str) -> None:
-        """Adopt a theme chosen from the menu (or set programmatically), and remember it."""
-        self._apply_theme(preference)
-        action = self._theme_actions.get(preference)
-        if action is not None:
-            action.setChecked(True)
-        config = self._with_ui_state(self._engine.config)
-        self._engine.update_preferences(config)
-        with contextlib.suppress(OSError):
-            config.save(self._config_path)
 
     def _follow_system_scheme(self) -> None:
         """Track the OS appearance live while the preference is 'system'."""

@@ -240,9 +240,19 @@ def choose_variant(
 
     candidates = entry.variants_for(engine)
     if not candidates:
+        variant_engines = ", ".join(sorted({variant.engine for variant in entry.variants}))
+        hint = f"downloadable variant engines: {variant_engines or '(none)'}"
+        channel = getattr(entry, engine.replace("-", "_"), None) if engine else None
+        tag = getattr(channel, "tag", None)
+        if isinstance(tag, str) and tag:
+            hint += (
+                f"; this channel owns its model store, so use pull_model({engine!r}, "
+                f"{tag!r}) instead"
+            )
         raise ConfigError(
-            f"catalog model {entry.id!r} has no variants for {engine or 'any engine'}",
-            hint=f"it is available on: {', '.join(entry.channels) or '(no channel)'}",
+            f"catalog model {entry.id!r} has no downloadable weight variants for "
+            f"{engine or 'any engine'}",
+            hint=hint,
         )
 
     choice, rejections = evaluate_variants(

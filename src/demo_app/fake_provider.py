@@ -135,11 +135,13 @@ class DemoFakeBackend:
                 # does internally, so the wire framing stays the library's own.
                 server = FakeOpenAIServer([response], models=list(DEMO_MODELS))
                 rendered = server.transport().handler(request)
-                assert isinstance(rendered, httpx2.Response)
+                if not isinstance(rendered, httpx2.Response):
+                    raise RuntimeError("the synchronous fake returned an awaitable response")
                 return rendered
             provider = self._structured if _wants_structured(body) else self._prose
             fallthrough = provider.transport().handler(request)
-            assert isinstance(fallthrough, httpx2.Response)
+            if not isinstance(fallthrough, httpx2.Response):
+                raise RuntimeError("the scripted fake returned an awaitable response")
             return fallthrough
 
         return httpx2.MockTransport(handle)

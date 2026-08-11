@@ -395,7 +395,8 @@ class ScriptedProvider:
         )
         # `MockTransport.handler` is typed sync-or-async; the fakes are always sync.
         rendered = server.transport().handler(request)
-        assert isinstance(rendered, httpx2.Response)
+        if not isinstance(rendered, httpx2.Response):
+            raise RuntimeError("the synchronous fake server returned an awaitable response")
         return rendered
 
     def _model_for(self, body: Mapping[str, Any]) -> ScriptedModel:

@@ -52,8 +52,10 @@ provider's `ProviderSetupSpec` (see [Configuration](../reference/configuration.m
 | `text` | Line edit |
 
 `File → App settings…` holds preferences that are not properties of one provider. Its
-local-inference override can expose accelerator runtime variants that hardware detection
-normally disables; builds absent for the current OS/architecture remain unavailable.
+Theme dropdown selects whether the demo follows the operating system appearance or uses
+an explicit palette. The local-inference override can expose accelerator runtime variants
+that hardware detection normally disables; builds absent for the current OS/architecture
+remain unavailable.
 
 The kind decides the *hint* as much as the widget. A field a provider declares as an
 `endpoint` may reasonably be offered `https://…` in an empty editor; a model directory, a
@@ -215,10 +217,11 @@ model/runtime/workload-specific result into a misleading universal score.
 
 **Catalog** is the unified model manager. It overlays `installed_models()` and the inventories
 reported by enabled local services onto the `local_catalog()` view, with a distinct
-**Installed For** column preserving ownership. A provider-reported model that is not in the
-shipped catalog still gets its own row. The Engines and Installed For columns use the Ollama
-and llama.cpp marks with accessible name tooltips; other engines retain text labels. Only
-AnyInfer-owned rows offer removal.
+**Installed For** column preserving ownership. Its sortable **Family** column groups related
+lines under broad names such as Qwen, DeepSeek, Llama, Phi, and Mistral. A provider-reported
+model that is not in the shipped catalog still gets its own row. The Engines and Installed
+For columns use the Ollama and llama.cpp marks with accessible name tooltips; other engines
+retain text labels. Only AnyInfer-owned rows offer removal.
 
 The tab's **Add…** dialog searches the verified catalog by enabled engine: llama.cpp
 artifacts are pinned Hugging Face GGUFs and Ollama choices use catalog tags handed to
@@ -250,9 +253,9 @@ also links the documentation and SDK reference, lists the demo's third-party lic
 ### Appearance
 
 The demo follows the OS light/dark appearance by default and repaints live when it
-changes; *View → Theme* overrides it explicitly. *View → Sidebar* contains the one
-whole-sidebar switch followed by checkboxes for each inspector section. The palette is the
-project's own
+changes; *File → App settings… → Theme* overrides it explicitly. The top-level *Sidebar*
+menu contains the one whole-sidebar switch followed by checkboxes for each inspector
+section. The palette is the project's own
 deep-teal-and-amber brand palette (`docs/assets/anyinfer-palette.css`), rendered as a Qt
 stylesheet in [`demo_app/theme.py`](https://github.com/anthturner/AnyInfer/blob/main/src/demo_app/theme.py). The choice is persisted with the rest of the
 demo's settings.

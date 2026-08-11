@@ -23,7 +23,7 @@ from PySide6.QtGui import QColor, QPalette
 
 __all__ = [
     "CUSTOM_THEMES",
-    "CUSTOM_THEMES_MENU",
+    "CUSTOM_THEME_CHOICES",
     "CUSTOM_THEME_LABELS",
     "DEFAULT_THEME_CHOICES",
     "THEME_CHOICES",
@@ -41,7 +41,7 @@ DEFAULT_THEME_CHOICES: tuple[tuple[str, str], ...] = (
     ("light", "Light"),
     ("dark", "Dark"),
 )
-"""``(preference value, menu label)`` pairs for the OS-following defaults, in menu order."""
+"""``(preference value, display label)`` pairs for the OS-following defaults."""
 
 # docs/assets/anyinfer-palette.css — brand constants shared by the light and dark themes.
 _TEAL = "#2C7A6F"
@@ -200,17 +200,15 @@ CUSTOM_THEME_LABELS: dict[str, str] = {
     "ocean": "Ocean",
     "sunset": "Sunset",
 }
-"""Custom palette key -> menu label, kept separate so `CUSTOM_THEMES` stays pure data."""
+"""Custom palette key -> display label, kept separate so `CUSTOM_THEMES` stays pure data."""
 
-CUSTOM_THEMES_MENU: tuple[tuple[str, str], ...] = tuple(
+CUSTOM_THEME_CHOICES: tuple[tuple[str, str], ...] = tuple(
     (key, CUSTOM_THEME_LABELS[key]) for key in CUSTOM_THEMES
 )
-"""``(preference value, menu label)`` pairs for the custom palettes, in menu order."""
+"""``(preference value, display label)`` pairs for the custom palettes."""
 
-THEME_CHOICES: tuple[tuple[str, str], ...] = (*DEFAULT_THEME_CHOICES, *CUSTOM_THEMES_MENU)
-"""Every ``(preference value, menu label)`` pair, defaults first, for callers that want a
-flat list; `_build_menu()` renders the two groups —
-custom themes first, defaults after a separator — instead of using this directly."""
+THEME_CHOICES: tuple[tuple[str, str], ...] = (*DEFAULT_THEME_CHOICES, *CUSTOM_THEME_CHOICES)
+"""Every ``(preference value, display label)`` pair, with defaults first."""
 
 _active: dict[str, str] = dict(_LIGHT)
 _active_is_dark: bool = False
@@ -281,7 +279,17 @@ QPushButton:default {
 }
 QPushButton:default:hover { background: $gold; border-color: $gold; }
 QPushButton:default:disabled { background: $surface; border-color: $border; color: $muted; }
-QPushButton#IconButton { padding: 4px; border-radius: 6px; border: none; background: transparent; }
+/* Compact icon controls set their own hit-target size. Reset the generic button minima
+   here: otherwise Qt adds the 30px content minimum to this rule's padding, silently turns
+   a 24-26px control into a 38px one, and centres its glyph below the surrounding row. */
+QPushButton#IconButton {
+    min-width: 0;
+    min-height: 0;
+    padding: 4px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+}
 QPushButton#IconButton:hover { background: $accent_bg; border: 1px solid $accent_border; }
 /* A disclosure reads as a label you can click, not as a command: chrome here would give
    "Advanced" the same weight as the fields it is there to keep out of the way. */

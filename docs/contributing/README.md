@@ -15,6 +15,14 @@ python workspace.py check                          # every gate CI runs
 
 Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI.
 
+When the repository root is opened in VS Code, accept the recommended Python, Python
+Environments, Ruff, and mypy extensions. The automatic `Bootstrap venv` task creates the
+same repo-local `.venv` with the host's `py -3`/`python` (Windows) or `python3`
+(macOS/Linux) interpreter and installs the dev environment; that interpreter must be Python
+3.11+. The checked-in editor settings refer to the venv directory rather than a
+platform-specific executable, so the same configuration resolves on Windows, macOS, and
+Linux.
+
 ## The task runner
 
 [`workspace.py`](https://github.com/anthturner/AnyInfer/blob/main/workspace.py) is the one entry point for routine commands. It works

@@ -59,6 +59,7 @@ class MCPServer:
             (``env://``, ``credential://``) and are resolved and registered for redaction
             before the process starts.
         headers: Extra request headers for an HTTP server, where authentication goes.
+            Values may use the same credential references as ``env``.
         cwd: Working directory for a spawned server.
         timeout_s: How long any one call may take.
         allow_tools: If non-empty, only these tool names are exposed.
@@ -82,13 +83,44 @@ class MCPServer:
             ToolLoopError: If neither or both of ``command`` and ``url`` are supplied, or
                 the name is blank.
         """
-        if not self.name.strip():
+        if not isinstance(self.name, str) or not self.name.strip():
             raise ToolLoopError("an MCP server needs a name to namespace its tools")
+        if self.command and any(
+            not isinstance(part, str) or not part for part in self.command
+        ):
+            raise ToolLoopError(
+                f"MCP server {self.name!r} command entries must be non-empty strings"
+            )
+        if self.url is not None and (
+            not isinstance(self.url, str) or not self.url.strip()
+        ):
+            raise ToolLoopError(f"MCP server {self.name!r} url must be a non-empty string")
         if bool(self.command) == bool(self.url):
             raise ToolLoopError(
                 f"MCP server {self.name!r} needs exactly one of command= or url=",
                 hint="command=(...) spawns a stdio server; url=... reaches one over HTTP",
             )
+        if (
+            isinstance(self.timeout_s, bool)
+            or not isinstance(self.timeout_s, int | float)
+            or self.timeout_s <= 0
+        ):
+            raise ToolLoopError(f"MCP server {self.name!r} timeout_s must be positive")
+        for label, values in (("env", self.env), ("headers", self.headers)):
+            if not isinstance(values, Mapping) or not all(
+                isinstance(key, str)
+                and bool(key)
+                and isinstance(value, str)
+                for key, value in values.items()
+            ):
+                raise ToolLoopError(
+                    f"MCP server {self.name!r} {label} must map non-empty strings to strings"
+                )
+        for label, names in (("allow_tools", self.allow_tools), ("deny_tools", self.deny_tools)):
+            if any(not isinstance(name, str) or not name for name in names):
+                raise ToolLoopError(
+                    f"MCP server {self.name!r} {label} entries must be non-empty strings"
+                )
 
     def exposes(self, tool_name: str) -> bool:
         """Whether this server's filters permit exposing ``tool_name``."""
@@ -122,8 +154,8 @@ class MCPToolset:
 
         Args:
             servers: The servers to connect to.
-            resolver: Credential resolver for ``env`` values; the default chain resolves
-                ``env://`` and, with the keyring extra, ``credential://``.
+            resolver: Credential resolver for ``env`` and HTTP-header values; the default
+                chain resolves ``env://`` and, with the keyring extra, ``credential://``.
             client_version: Version to report in the handshake; defaults to the installed
                 package version.
             transport_factory: Test seam — called with the server to build its transport.
@@ -136,6 +168,20 @@ class MCPToolset:
                 with a protocol version this client does not speak.
         """
         from .. import __version__
+
+        seen_names: set[str] = set()
+        repeated_names: set[str] = set()
+        for server in servers:
+            if server.name in seen_names:
+                repeated_names.add(server.name)
+            seen_names.add(server.name)
+        duplicate_names = sorted(repeated_names)
+        if duplicate_names:
+            rendered = ", ".join(repr(name) for name in duplicate_names)
+            raise ToolLoopError(
+                f"MCP server names must be unique; repeated: {rendered}",
+                hint="server names namespace discovered tools",
+            )
 
         chain = resolver or default_resolver()
         version = client_version or __version__
@@ -188,7 +234,10 @@ class MCPToolset:
 def _build_transport(server: MCPServer, resolver: ResolverChain) -> MCPTransport:
     """Build the transport a server description asks for, resolving its credentials."""
     if server.url is not None:
-        return HTTPTransport(server.url, headers=dict(server.headers))
+        headers = {
+            key: resolver.resolve(value) or "" for key, value in server.headers.items()
+        }
+        return HTTPTransport(server.url, headers=headers)
 
     # Environment values are credential-shaped: resolve references and register them for
     # redaction before they reach a process listing, an error, or an event.

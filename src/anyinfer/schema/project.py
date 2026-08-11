@@ -40,8 +40,8 @@ def repetition_safe_projection(schema: Mapping[str, Any]) -> Mapping[str, Any]:
     Returns:
         A deep copy with the offending keywords removed.
     """
-    stripped = _strip(copy.deepcopy(dict(schema)))
-    assert isinstance(stripped, dict)  # a dict in always yields a dict out
+    stripped = copy.deepcopy(dict(schema))
+    _strip(stripped)
     return stripped
 
 

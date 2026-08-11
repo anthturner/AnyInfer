@@ -261,8 +261,10 @@ configuration the loader accepts. Two consequences are worth knowing:
   format is JSON, so a generated file explains itself in something the loader accepts;
   reading it back changes nothing.
 
-The writer emits credential *references* exactly as they were given. It never resolves
-one, so no code path exists by which `dump_config` could write key material.
+The writer emits credential settings exactly as they were given and never resolves a
+reference. An `env://` or `credential://` value therefore stays safe to store, while a
+literal credential stays literal. Review configurations constructed programmatically with
+literal secrets before writing or committing them; `anyinfer init` itself writes references.
 
 ## File format
 
@@ -293,7 +295,8 @@ used, so parsing a config never prints or expands a secret.
 Set `enabled` to `false` to keep a provider entry in a file without loading it. The demo app
 uses that facility and writes its own UI fields alongside the shared fields; the SDK, CLI,
 and sidecar deliberately ignore those known demo-only fields (at the root: `targets`,
-`system_prompt`, `theme`, and `context_window_tokens`).
+`system_prompt`, `theme`, `context_window_tokens`, and
+`ignore_runtime_hardware_constraints`).
 
 ### The `adapter` key
 
@@ -322,6 +325,32 @@ engine behind it, which is what lets one engine be configured more than once:
 
 Omitting `adapter` keeps the single-instance spelling exactly as before: the `id` is both
 the engine selector and the instance id. A duplicate `id` fails fast with a `ConfigError`.
+
+### Provider `limits`
+
+Request pacing is configured per provider instance because two accounts at the same
+provider have independent allowances:
+
+```json
+{
+  "providers": [
+    {
+      "id": "openai",
+      "limits": {
+        "max_concurrent": 4,
+        "requests_per_minute": 120,
+        "min_interval_s": 0.1,
+        "respect_headers": true,
+        "reserve_fraction": 0.1
+      }
+    }
+  ]
+}
+```
+
+Omitting `limits` disables pacing. An empty object opts into provider-reported rate-limit
+headers without imposing a local fixed limit. Values are validated by `RateLimits`; unknown
+keys and nonpositive or out-of-range values fail during configuration loading.
 
 ### The `context` block
 
@@ -386,6 +415,26 @@ as before. Set `"enabled": false` to keep a tuned block switched off.
 Sidecar callers can override it per request with the `anyinfer_history` field; see
 [the sidecar](../serve/README.md).
 
+### The `cache` block
+
+Prompt-cache placement is opt-in because it changes provider billing and retention:
+
+```json
+{
+  "cache": {
+    "mode": "auto",
+    "min_segment_tokens": 1024,
+    "max_marks": 4,
+    "include_tools": true,
+    "include_system": true
+  }
+}
+```
+
+Omitting the block disables placement. An empty object enables the default `CachePolicy`;
+`auto` chooses the strongest mechanism the resolved target offers. See
+[prompt caching](../concepts/caching.md) for the mechanism and billing semantics.
+
 ### The `arena` and `arenas` blocks
 
 Arena policies fan one request out to fixed targets and select only after the candidates
@@ -416,6 +465,38 @@ Unknown keys fail validation. `anyinfer run --arena-name review-panel` and a sid
 string of `review-panel` resolve the named policy without moving orchestration into either
 frontend. See [Arena runs](../concepts/arena.md) for cost ceilings, selection rules, tool
 loops, and the response evidence envelope.
+
+### The `mcp` block
+
+MCP entries are inert server descriptions. Loading the file never starts a subprocess or
+opens a connection:
+
+```json
+{
+  "mcp": [
+    {
+      "name": "files",
+      "command": ["mcp-server-filesystem", "./docs"],
+      "env": {"MCP_TOKEN": "env://MCP_TOKEN"},
+      "deny_tools": ["write_file"]
+    },
+    {
+      "name": "search",
+      "url": "https://tools.example.invalid/mcp",
+      "headers": {"authorization": "env://SEARCH_MCP_TOKEN"},
+      "timeout_s": 15,
+      "allow_tools": ["search"]
+    }
+  ]
+}
+```
+
+Every entry needs a unique `name` and exactly one of `command` or `url`. `command`,
+`allow_tools`, and `deny_tools` are string lists; `env` and `headers` map non-empty strings
+to strings; and `timeout_s` must be positive. Credential references in both `env` and
+`headers` resolve only when `MCPToolset.connect()` is called and are registered for
+redaction. See [the tool-loop guide](../guides/tool-loop.md#tools-from-an-mcp-server)
+for discovery, trust boundaries, and the intentionally unsupported MCP surfaces.
 
 The sidecar can advertise instance-scoped targets from `/v1/models` by writing them in
 instance terms:

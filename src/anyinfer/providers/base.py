@@ -3,8 +3,8 @@
 An adapter **only translates**. It receives a fully-resolved `WireRequest` — concrete
 model, chosen mechanism, projected schema, translated reasoning effort, merged options — and
 yields normalized events. It never retries, never validates a schema, never measures TTFT,
-and never consults routing policy: all of that is the core's job, which is what keeps nine
-adapters thin enough for one conformance suite to cover.
+and never consults routing policy: all of that is the core's job, which is what keeps the
+adapter inventory thin enough for one conformance suite to cover.
 
 If you find yourself adding control flow to an adapter, stop and move it to the core.
 """
@@ -32,6 +32,18 @@ __all__ = [
     "SupportsDiagnostics",
     "WireRequest",
 ]
+
+
+def _encode_function_tool(tool: ToolSpec) -> dict[str, Any]:
+    """Encode a tool in the OpenAI-compatible function wrapper shared by several dialects."""
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": dict(tool.parameters),
+        },
+    }
 
 
 @dataclass(frozen=True, slots=True)

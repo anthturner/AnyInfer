@@ -200,8 +200,11 @@ def plan_server(
     gpu_layers = 999 if accelerated else 0
     if accelerated:
         primary = hardware.primary_accelerator
-        assert primary is not None
-        rationale.append(f"offloading all layers to the {primary.kind} device")
+        if primary is None:
+            gpu_layers = 0
+            rationale.append("accelerator details unavailable; running on the CPU")
+        else:
+            rationale.append(f"offloading all layers to the {primary.kind} device")
     else:
         rationale.append("no accelerator detected; running entirely on the CPU")
 

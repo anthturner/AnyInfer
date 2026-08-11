@@ -32,7 +32,7 @@ from ..types.messages import (
 from ..types.requests import Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data, data_url, media_subtype
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
 
@@ -254,14 +254,7 @@ class OpenAICompatAdapter:
         return encoded
 
     def _encode_tool(self, tool: ToolSpec) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": dict(tool.parameters),
-            },
-        }
+        return _encode_function_tool(tool)
 
     def _encode_tool_choice(self, choice: str) -> Any:
         if choice in ("auto", "none", "required"):

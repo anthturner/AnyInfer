@@ -2,7 +2,7 @@
 
 Cassettes capture real provider traffic once, then replay it forever. They are the second
 conformance mode (fakes prove we handle *shapes*; cassettes prove we handle *what a provider
-actually sent*), and they let CI verify nine adapters without nine sets of credentials.
+actually sent*), and they let CI verify adapters without a live credential set for each one.
 
 Recorded bodies pass through the redaction registry before hitting disk, so a cassette
 committed to the repository cannot carry a key.
@@ -145,8 +145,10 @@ class CassetteTransport(httpx2.AsyncBaseTransport):
         return self._replay(request)
 
     async def _record_request(self, request: httpx2.Request) -> httpx2.Response:
-        assert self._inner is not None
-        response = await self._inner.handle_async_request(request)
+        inner = self._inner
+        if inner is None:
+            raise RuntimeError("cassette recording requires an inner HTTP transport")
+        response = await inner.handle_async_request(request)
         body = await response.aread()
         await response.aclose()
         self._cassette.append(

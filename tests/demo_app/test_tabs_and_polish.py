@@ -12,13 +12,16 @@ from PySide6.QtCore import QEventLoop, QTimer
 
 from demo_app.config import default_config
 from demo_app.conversation import gist_title
+from demo_app.fake_provider import DEMO_PROVIDER_ID
 
 
 @pytest.fixture
-def window(qapp: object):
+def window(qapp: object, wait_for_models):
     from demo_app.main_window import MainWindow
 
     built = MainWindow(default_config())
+    if not built._engine_bar.target():
+        wait_for_models(built._engine, DEMO_PROVIDER_ID)
     yield built
     built.close()
 
@@ -326,6 +329,46 @@ class TestRenderingFixes:
         assert window.minimumHeight() == 640
         assert window._target_section.height() == HEADER_HEIGHT
         assert window._tools_section.height() == HEADER_HEIGHT
+
+    def test_compact_disclosure_icon_is_centred_in_its_header(self, qapp: object):
+        from PySide6.QtCore import QSize
+        from PySide6.QtWidgets import QLabel
+
+        from demo_app import theme
+        from demo_app.widgets.collapsible_section import CollapsibleSection
+
+        section = CollapsibleSection("Telemetry", QLabel("body"))
+        section.setStyleSheet(theme.stylesheet(theme.resolve_theme(qapp, "light")))
+        section.resize(320, 96)
+        section.show()
+        qapp.processEvents()
+
+        toggle = section._toggle
+        assert toggle.size() == QSize(26, 26)
+        assert abs(toggle.geometry().center().y() - toggle.parentWidget().rect().center().y()) <= 1
+
+    def test_collapsed_inspector_headers_are_anchored_to_the_top(self, window, qapp: object):
+        from demo_app.widgets.collapsible_section import HEADER_HEIGHT
+
+        window.resize(1200, 800)
+        window.show()
+        qapp.processEvents()
+        for section in window._inspector_sections.values():
+            section.set_minimized(True)
+        qapp.processEvents()
+
+        visible_sections = list(window._inspector_sections.values())
+        handle_width = window._inspector_splitter.handleWidth()
+        assert [section.geometry().y() for section in visible_sections] == [
+            index * (HEADER_HEIGHT + handle_width) for index in range(len(visible_sections))
+        ]
+        assert window._inspector_bottom_spacer.isVisible()
+        assert window._inspector_bottom_spacer.height() > HEADER_HEIGHT
+
+        visible_sections[0].set_minimized(False)
+        qapp.processEvents()
+        assert not window._inspector_bottom_spacer.isVisible()
+        assert visible_sections[0].height() > HEADER_HEIGHT
 
     def test_tab_close_button_has_a_twenty_pixel_hit_target(self, qapp: object):
         from PySide6.QtCore import QSize

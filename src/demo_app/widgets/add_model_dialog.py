@@ -33,7 +33,7 @@ from anyinfer.registry import ProviderRegistry
 
 from ..config import DemoConfig, ProviderConfig
 
-__all__ = ["AddModelChoice", "AddModelDialog"]
+__all__ = ["AddModelChoice", "AddModelDialog", "catalog_model_choice"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +67,30 @@ def _pull_reference(entry: CatalogEntryFit, provider_id: str) -> str:
     channel = getattr(entry.model, provider_id.replace("-", "_"), None)
     tag = getattr(channel, "tag", "")
     return tag if isinstance(tag, str) else ""
+
+
+def catalog_model_choice(
+    entry: CatalogEntryFit,
+    provider: ProviderConfig,
+    registry: ProviderRegistry,
+) -> AddModelChoice | None:
+    """Resolve a catalog row to the operation declared by one provider instance."""
+    if not registry.has(provider.provider_id):
+        return None
+    descriptor = registry.get(provider.provider_id)
+    pulling = descriptor.model_puller is not None
+    model_ref = _pull_reference(entry, provider.provider_id) if pulling else entry.id
+    engine = None if pulling else _acquisition_engine(entry, provider.provider_id)
+    if not model_ref or (not pulling and engine is None):
+        return None
+    return AddModelChoice(
+        operation="pull" if pulling else "acquire",
+        instance_id=provider.instance_id,
+        provider_id=provider.provider_id,
+        model_id=entry.id,
+        model_ref=model_ref,
+        acquisition_engine=engine,
+    )
 
 
 def _nearest_existing(path: Path) -> Path:
@@ -266,14 +290,12 @@ class AddModelDialog(QDialog):
             if self._registry.get(provider.provider_id).model_puller is not None:
                 empty_text += " Enter an exact model id above to ask that engine to pull it."
         else:
-            descriptor = (
-                self._registry.get(provider.provider_id) if provider is not None else None
-            )
+            descriptor = self._registry.get(provider.provider_id) if provider is not None else None
             if descriptor is not None and descriptor.model_puller is not None and query:
                 empty_text = (
                     "No shipped catalog model matches. Choose Pull to ask "
                     f"{descriptor.display_name} "
-                    f'to fetch “{query}” from its own model index.'
+                    f"to fetch “{query}” from its own model index."
                 )
             else:
                 empty_text = "No catalog models match this search."
@@ -313,15 +335,13 @@ class AddModelDialog(QDialog):
             and self._registry.get(provider.provider_id).model_puller is not None
         )
         size = entry.model.est_file_bytes
-        disk_problem = (
+        first_reason = entry.fit.reasons[0] if entry.fit.reasons else "No fit reason reported."
+        if (
             not puller
             and size is not None
             and self._free_disk_bytes is not None
             and size * 1.1 > self._free_disk_bytes
-        )
-        first_reason = entry.fit.reasons[0] if entry.fit.reasons else "No fit reason reported."
-        if disk_problem:
-            assert size is not None
+        ):
             return (
                 "Do not use — disk",
                 False,
@@ -365,10 +385,8 @@ class AddModelDialog(QDialog):
                 else ""
             )
             return
-        model_ref = _pull_reference(entry, provider.provider_id) if pulling else entry.id
-        engine = None if pulling else _acquisition_engine(entry, provider.provider_id)
-        valid = bool(model_ref) and (pulling or engine is not None)
-        self._add.setEnabled(valid)
+        choice = catalog_model_choice(entry, provider, self._registry)
+        self._add.setEnabled(choice is not None)
         self._add.setText("Pull" if pulling else "Download")
         recommendation, _reasonable, why = self._recommendation(entry)
         self._detail.setText(f"<b>{recommendation}.</b> {why}")
@@ -393,9 +411,8 @@ class AddModelDialog(QDialog):
             )
             self.accept()
             return
-        model_ref = _pull_reference(entry, provider.provider_id) if pulling else entry.id
-        engine = None if pulling else _acquisition_engine(entry, provider.provider_id)
-        if not model_ref or (not pulling and engine is None):
+        choice = catalog_model_choice(entry, provider, self._registry)
+        if choice is None:
             return
         recommendation, reasonable, why = self._recommendation(entry)
         if not reasonable:
@@ -406,14 +423,7 @@ class AddModelDialog(QDialog):
             )
             if confirmed != QMessageBox.StandardButton.Yes:
                 return
-        self._choice = AddModelChoice(
-            operation="pull" if pulling else "acquire",
-            instance_id=provider.instance_id,
-            provider_id=provider.provider_id,
-            model_id=entry.id,
-            model_ref=model_ref,
-            acquisition_engine=engine,
-        )
+        self._choice = choice
         self.accept()
 
     @staticmethod

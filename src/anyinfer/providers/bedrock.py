@@ -118,7 +118,8 @@ class BedrockAdapter:
         """Build the per-request auth headers: a bearer key, or a SigV4 signature."""
         if self._api_key:
             return {"authorization": f"Bearer {self._api_key}"}
-        assert self._credentials is not None  # guaranteed by __init__
+        if self._credentials is None:
+            raise ConfigError("bedrock AWS credentials are unavailable", provider=self.provider_id)
         return sigv4_headers(
             credentials=self._credentials,
             method=method,

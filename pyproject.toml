@@ -117,7 +117,10 @@ target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D"]
+select = [
+  "E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D",
+  "S101",
+]
 ignore = [
   "RUF012",  # ClassVar annotations on mutable class attrs — descriptors are frozen by convention
   "B008",    # function call in default arg; not used; dataclass field() is fine
@@ -132,7 +135,11 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "SIM117"]
+"tests/*" = [
+  "E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "SIM117", "S101",
+]
+# Assertions are the public conformance kit's failure protocol, not runtime invariants.
+"src/anyinfer/testing/*" = ["S101"]
 # The conformance matrix uses ✅/➖/❌ deliberately; they are the published symbols.
 # workspace.py renders the matrix page, so its template strings carry them too, as do the
 # certification command and the provider scaffold that quote the same matrix vocabulary.

@@ -6,14 +6,17 @@ from dataclasses import replace
 
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
     QGroupBox,
     QLabel,
     QVBoxLayout,
     QWidget,
 )
 
+from .. import theme
 from ..config import DemoConfig
 
 __all__ = ["AppSettingsDialog"]
@@ -35,6 +38,23 @@ class AppSettingsDialog(QDialog):
         )
         intro.setWordWrap(True)
         outer.addWidget(intro)
+
+        appearance = QGroupBox("Appearance")
+        appearance_layout = QFormLayout(appearance)
+        self._theme_combo = QComboBox()
+        for key, label in theme.DEFAULT_THEME_CHOICES:
+            self._theme_combo.addItem(label, key)
+        self._theme_combo.insertSeparator(self._theme_combo.count())
+        for key, label in theme.CUSTOM_THEME_CHOICES:
+            self._theme_combo.addItem(label, key)
+        current_theme = self._theme_combo.findData(config.theme)
+        self._theme_combo.setCurrentIndex(max(0, current_theme))
+        self._theme_combo.setAccessibleName("Theme")
+        self._theme_combo.setToolTip(
+            "Follow the operating system appearance or use an explicit AnyInfer palette."
+        )
+        appearance_layout.addRow("Theme:", self._theme_combo)
+        outer.addWidget(appearance)
 
         local = QGroupBox("Local inference")
         local_layout = QVBoxLayout(local)
@@ -68,5 +88,6 @@ class AppSettingsDialog(QDialog):
         """Return the original configuration with the edited preferences replaced."""
         return replace(
             self._config,
+            theme=str(self._theme_combo.currentData()),
             ignore_runtime_hardware_constraints=self._ignore_runtime_hardware.isChecked(),
         )

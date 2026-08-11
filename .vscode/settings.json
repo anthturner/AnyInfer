@@ -1,15 +1,13 @@
 {
-  // The repo-local venv (docs/contributing/README.md). On macOS/Linux the path
-  // does not resolve and the Python extension falls back to auto-discovering .venv.
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
-  "python.terminal.activateEnvironment": true,
-  "python.terminal.activateEnvInCurrentTerminal": true,
+  // A directory, rather than an OS-specific executable: the Python extension resolves
+  // .venv/Scripts/python.exe on Windows and .venv/bin/python on macOS/Linux.
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
 
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": ["tests"],
 
-  // Use the versions pinned in the venv, not the extensions' bundled copies, so the
-  // editor agrees with `workspace check` and CI.
+  // Use the versions installed in the venv, not the extensions' bundled copies, so the
+  // editor agrees with `workspace check`.
   "ruff.importStrategy": "fromEnvironment",
   "mypy-type-checker.importStrategy": "fromEnvironment",
 

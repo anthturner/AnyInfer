@@ -2,7 +2,7 @@
 
 The catalog says what a model *should* support and discovery says what a provider *claims*.
 Neither is a measurement, and for the compatibility surface the difference matters most —
-eighty-six preset endpoints and every self-hosted OpenAI-compatible server inherit a
+the preset registry and every self-hosted OpenAI-compatible server inherit a
 descriptor's default feature set, which is a reasonable guess and nothing more. A server
 that accepts ``response_format`` and quietly ignores it looks identical to one that honors
 it, right up until a schema silently stops being enforced.

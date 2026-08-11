@@ -21,6 +21,49 @@ def qapp():
 
 
 @pytest.fixture(autouse=True)
+def close_top_level_widgets(qapp):
+    """Keep the session-scoped Qt application from retaining UI state between tests."""
+    yield
+    for widget in qapp.topLevelWidgets():
+        widget.close()
+        widget.deleteLater()
+    qapp.processEvents()
+
+
+@pytest.fixture
+def wait_for_models():
+    """Return a waiter for one provider's background model discovery."""
+    from PySide6.QtCore import QEventLoop, QTimer
+
+    def wait(engine, provider_id: str, timeout_ms: int = 15_000):
+        loop = QEventLoop()
+        outcome: dict[str, object] = {}
+
+        def on_listed(done_provider: str, models: object) -> None:
+            if done_provider == provider_id:
+                outcome["models"] = models
+                loop.quit()
+
+        def on_failed(failed_provider: str, message: str, _error: object) -> None:
+            if failed_provider == provider_id:
+                outcome["error"] = message
+                loop.quit()
+
+        engine.models_listed.connect(on_listed)
+        engine.discovery_failed.connect(on_failed)
+        QTimer.singleShot(timeout_ms, loop.quit)
+        loop.exec()
+
+        if "error" in outcome:
+            raise AssertionError(f"model discovery failed: {outcome['error']}")
+        if "models" not in outcome:
+            raise AssertionError("model discovery timed out")
+        return outcome["models"]
+
+    return wait
+
+
+@pytest.fixture(autouse=True)
 def isolated_config_path(tmp_path, monkeypatch):
     """Redirect the demo's config file into the test's tmp dir.
 

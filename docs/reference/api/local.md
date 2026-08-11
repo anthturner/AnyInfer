@@ -35,6 +35,22 @@ from anyinfer import local
 
 </div>
 
+## Resource sampling and storage
+
+Lightweight host metrics used by benchmarks and local-capacity reporting.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.local.ResourceSample
+
+::: anyinfer.local.SystemSampler
+
+::: anyinfer.local.StorageProfile
+
+::: anyinfer.local.storage_profile
+
+</div>
+
 ## Backends
 
 <div class="anyinfer-api-block" markdown>

@@ -20,6 +20,7 @@ from anyinfer.catalog.model import Catalog
 from anyinfer.errors import ConfigError, LocalRuntimeError
 from anyinfer.local.hardware import Accelerator, HardwareProfile
 from anyinfer.local.server import ManagedServer, ServerHandle
+from anyinfer.local.store import ModelStore, StoreEntry
 from anyinfer.local.tuning import ServerPlan
 from anyinfer.providers.llama_cpp import LlamaCppAdapter, LlamaCppOptions
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
@@ -354,11 +355,20 @@ async def test_closing_the_adapter_stops_the_supervisor(tmp_path: Path) -> None:
 # ---- discovery -----------------------------------------------------------------------
 
 
-async def test_list_models_reports_catalog_artifacts(tmp_path: Path) -> None:
-    """Local discovery means "what could run", not "what is loaded"."""
+async def test_list_models_reports_only_downloaded_catalog_artifacts(tmp_path: Path) -> None:
+    """The catalog is a download surface; discovery is the installed inventory."""
     fake = FakeOpenAIServer()
     adapter, _ = _adapter(tmp_path, fake)
     try:
+        assert await adapter.list_models() == []
+        ModelStore(tmp_path).register(
+            StoreEntry(
+                id="installed-test-model",
+                model_id="test-model-family",
+                variant_id="test-model",
+                engine="llama.cpp",
+            )
+        )
         models = await adapter.list_models()
     finally:
         await adapter.aclose()

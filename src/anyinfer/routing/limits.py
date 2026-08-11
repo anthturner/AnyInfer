@@ -340,13 +340,15 @@ class RateLimiter:
                 self._semaphore.release()
 
     async def _acquire_semaphore(self) -> None:
-        assert self._semaphore is not None
-        if self._semaphore.locked():
+        semaphore = self._semaphore
+        if semaphore is None:
+            return
+        if semaphore.locked():
             started = self._clock()
-            await self._semaphore.acquire()
+            await semaphore.acquire()
             self._report(self._clock() - started, "concurrency")
             return
-        await self._semaphore.acquire()
+        await semaphore.acquire()
 
     async def _wait_for_turn(self) -> None:
         """Apply the rate bucket, the minimum interval, and any provider-stated window."""

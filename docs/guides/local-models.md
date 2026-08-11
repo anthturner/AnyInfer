@@ -101,6 +101,10 @@ result = client.generate(
 )
 ```
 
+`client.models("llama-cpp")` likewise lists only models registered in the local store.
+Browse `client.local_catalog("llama-cpp")` when you want the larger set that can be
+downloaded; catalog availability is not presented as installed inventory.
+
 If no runtime is installed yet, ask for the small one:
 
 ```console

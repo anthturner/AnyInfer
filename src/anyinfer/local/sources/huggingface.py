@@ -244,7 +244,8 @@ class HuggingFaceResolver:
         self, ref: SourceRef, revision: str, tree: Sequence[Mapping[str, Any]]
     ) -> tuple[tuple[RemoteFile, ...], tuple[str, ...]]:
         """Choose the files this reference names, safely."""
-        assert ref.repo is not None
+        if ref.repo is None:
+            raise LocalRuntimeError("a Hugging Face source needs a repository id")
         by_path = {str(e.get("path", "")): e for e in tree if e.get("type") == "file"}
         warnings: list[str] = []
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import html
 import json
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any
 
 from .types.requests import ArenaPolicy, ResolvedTarget
@@ -89,9 +88,10 @@ def select_candidates(
         return min(valid, key=lambda item: item.elapsed_ms), "fastest", None, None
     if strategy == "cheapest":
         priced = [
-            candidate
+            (candidate, generation.usage.cost_usd)
             for candidate in valid
-            if candidate.generation is not None and candidate.generation.usage.cost_usd is not None
+            if (generation := candidate.generation) is not None
+            and generation.usage.cost_usd is not None
         ]
         if not priced:
             return (
@@ -101,12 +101,7 @@ def select_candidates(
                 ("arena.strategy cheapest degraded because every candidate cost is unknown"),
             )
 
-        def cost(candidate: Candidate) -> Decimal:
-            assert candidate.generation is not None
-            assert candidate.generation.usage.cost_usd is not None
-            return candidate.generation.usage.cost_usd
-
-        return min(priced, key=cost), "cheapest", None, None
+        return min(priced, key=lambda item: item[1])[0], "cheapest", None, None
     if strategy == "consensus":
         if not has_schema:
             return (
@@ -117,8 +112,10 @@ def select_candidates(
             )
         groups: dict[str, list[Candidate]] = {}
         for candidate in valid:
-            assert candidate.generation is not None
-            key = canonical_json(candidate.generation.structured)
+            generation = candidate.generation
+            if generation is None:  # defensive: ``valid`` already excludes this
+                continue
+            key = canonical_json(generation.structured)
             groups.setdefault(key, []).append(candidate)
         largest = max(groups.values(), key=len)
         return largest[0], "consensus", len(largest), None

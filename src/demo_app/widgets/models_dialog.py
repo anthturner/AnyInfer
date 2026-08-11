@@ -48,7 +48,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLineEdit,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -75,7 +74,7 @@ from anyinfer.types.capabilities import DiscoveredModel
 from ..config import DemoConfig
 from ..engine import Engine, RuntimeInstallProgress
 from ..fake_provider import DEMO_PROVIDER_ID
-from .add_model_dialog import AddModelDialog
+from .add_model_dialog import AddModelChoice, AddModelDialog, catalog_model_choice
 from .icons import brand_icon
 from .sdk_help import SdkHelpButton
 from .tab_widget import BorderedTabWidget
@@ -116,6 +115,37 @@ _FIT_LABELS = {
 Worth spelling out rather than printing the enum: "cpu" is not a failure and "tight" is not
 a refusal, and a bare lowercase word next to a green tick reads like one or the other.
 """
+
+_FAMILY_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("deepseek", "DeepSeek"),
+    ("devstral", "Mistral"),
+    ("ministral", "Mistral"),
+    ("mixtral", "Mistral"),
+    ("mistral", "Mistral"),
+    ("qwen", "Qwen"),
+    ("qwq", "Qwen"),
+    ("llama", "Llama"),
+    ("phi", "Phi"),
+    ("gemma", "Gemma"),
+    ("granite", "Granite"),
+    ("falcon", "Falcon"),
+    ("glm", "GLM"),
+    ("gpt-oss", "GPT-OSS"),
+    ("hermes", "Hermes"),
+    ("olmo", "OLMo"),
+    ("smollm", "SmolLM"),
+    ("starcoder", "StarCoder"),
+)
+"""Stable broad-family labels used to group catalog and engine-owned model ids."""
+
+
+def _family_label(family_or_model_id: str) -> str:
+    """Return a broad display family from catalog metadata or an external model id."""
+    candidate = family_or_model_id.rsplit("/", 1)[-1].casefold()
+    for prefix, label in _FAMILY_PREFIXES:
+        if candidate.startswith(prefix) or f"-{prefix}" in candidate:
+            return label
+    return "Other"
 
 
 def _bytes(count: int | None) -> str:
@@ -242,8 +272,7 @@ class _HardwareCard(QFrame):
         self._details.setText("<br>".join(details))
         show_gauge = total is not None and total > 0 and available is not None
         self._gauge.setVisible(show_gauge)
-        if show_gauge:
-            assert total is not None and available is not None
+        if total is not None and total > 0 and available is not None:
             fraction = max(0.0, min(1.0, available / total))
             self._gauge.setValue(round(fraction * 1000))
             self._gauge.setFormat(f"{_bytes(available)} available of {_bytes(total)}")
@@ -807,6 +836,8 @@ class _CatalogPanel(QWidget):
     """Emitted when the user asks the host application to enable llama.cpp defaults."""
     add_requested = Signal()
     """Emitted when the user wants to search or name a model to install."""
+    action_requested = Signal(object, bool)
+    """Emitted with a resolved model operation and whether it is only a dry run."""
 
     def __init__(self, engine: Engine, config: DemoConfig) -> None:
         super().__init__()
@@ -815,6 +846,7 @@ class _CatalogPanel(QWidget):
         self._store_entries: tuple[StoreEntry, ...] = ()
         self._provider_models: dict[str, tuple[DiscoveredModel, ...]] = {}
         self._provider_engines: dict[str, str] = {}
+        self._config = config
         self._llama_cpp_ready = False
 
         layout = QVBoxLayout(self)
@@ -863,9 +895,18 @@ class _CatalogPanel(QWidget):
         controls.addWidget(SdkHelpButton("catalog"))
         layout.addLayout(controls)
 
-        self._table = QTableWidget(0, 7)
+        self._table = QTableWidget(0, 8)
         self._table.setHorizontalHeaderLabels(
-            ["Model", "Size", "Context", "Fit", "Engines", "Installed For", "License"]
+            [
+                "Model",
+                "Family",
+                "Size",
+                "Context",
+                "Fit",
+                "Engines",
+                "Installed For",
+                "License",
+            ]
         )
         self._table.setAccessibleName("Model catalog")
         self._table.verticalHeader().setVisible(False)
@@ -873,10 +914,12 @@ class _CatalogPanel(QWidget):
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for column in (1, 2, 3, 4, 5, 6):
+        for column in (1, 2, 3, 4, 5, 6, 7):
             self._table.horizontalHeader().setSectionResizeMode(
                 column, QHeaderView.ResizeMode.ResizeToContents
             )
+        self._table.setSortingEnabled(True)
+        self._table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
         layout.addWidget(self._table, 1)
 
@@ -920,6 +963,7 @@ class _CatalogPanel(QWidget):
 
     def set_providers(self, config: DemoConfig) -> None:
         """Gate catalog acquisition on an enabled llama.cpp provider instance."""
+        self._config = config
         self._llama_cpp_ready = _llama_cpp_enabled(config)
         self._provider_notice.set_ready(self._llama_cpp_ready)
         self._on_selection_changed()
@@ -990,18 +1034,19 @@ class _CatalogPanel(QWidget):
         return value if isinstance(value, str) else ""
 
     def selected_engine(self) -> str | None:
-        """The engine filter's current value, or ``None`` when unfiltered.
-
-        Passed through to acquisition so a model offered by both llama.cpp and Ollama is
-        fetched for the one the user was looking at.
-        """
+        """The provider filter's current value, or ``None`` when unfiltered."""
         data = self._engine_filter.currentData()
         return data if isinstance(data, str) and data else None
 
     def _repopulate(self) -> None:
         view = self._view
+        sort_column = self._table.horizontalHeader().sortIndicatorSection()
+        sort_order = self._table.horizontalHeader().sortIndicatorOrder()
+        sorting_enabled = self._table.isSortingEnabled()
+        self._table.setSortingEnabled(False)
         self._table.setRowCount(0)
         if view is None:
+            self._table.setSortingEnabled(sorting_enabled)
             return
         wanted = self._engine_filter.currentData()
         entries = view.runnable if self._runnable_only.isChecked() else view.entries
@@ -1020,15 +1065,16 @@ class _CatalogPanel(QWidget):
             )
             name.setToolTip(entry.model.description or entry.id)
             self._table.setItem(row, 0, name)
-            self._table.setItem(row, 1, QTableWidgetItem(_bytes(entry.model.est_file_bytes)))
+            self._table.setItem(row, 1, QTableWidgetItem(_family_label(entry.model.family)))
+            self._table.setItem(row, 2, QTableWidgetItem(_bytes(entry.model.est_file_bytes)))
             context = entry.model.context_window
-            self._table.setItem(row, 2, QTableWidgetItem(f"{context:,}" if context else "—"))
+            self._table.setItem(row, 3, QTableWidgetItem(f"{context:,}" if context else "—"))
             fit = QTableWidgetItem(_FIT_LABELS.get(entry.fit.level, entry.fit.level))
             fit.setToolTip("\n".join(entry.fit.reasons) or entry.fit.level)
-            self._table.setItem(row, 3, fit)
-            self._set_engine_marks(row, 4, entry.channels)
-            self._set_engine_marks(row, 5, self._installed_for(entry.id, entry))
-            self._table.setItem(row, 6, QTableWidgetItem(entry.model.license))
+            self._table.setItem(row, 4, fit)
+            self._set_engine_marks(row, 5, entry.channels)
+            self._set_engine_marks(row, 6, self._installed_for(entry.id, entry))
+            self._table.setItem(row, 7, QTableWidgetItem(entry.model.license))
 
         external_rows: dict[tuple[str, str], DiscoveredModel | StoreEntry] = {}
         for item in self._store_entries:
@@ -1054,14 +1100,13 @@ class _CatalogPanel(QWidget):
                 item.id
                 for item in self._store_entries
                 if item.model_id == model_id
-                and (
-                    "llama-cpp" if item.engine in ("llama.cpp", "llama-cpp") else item.engine
-                )
+                and ("llama-cpp" if item.engine in ("llama.cpp", "llama-cpp") else item.engine)
                 == provider_id
             )
             name.setData(Qt.ItemDataRole.UserRole + 1, store_ids)
             name.setToolTip("Installed model not present in AnyInfer's shipped catalog.")
             self._table.setItem(row, 0, name)
+            self._table.setItem(row, 1, QTableWidgetItem(_family_label(model_id)))
             local = (
                 source.capabilities.local
                 if isinstance(source, DiscoveredModel) and source.capabilities is not None
@@ -1070,27 +1115,30 @@ class _CatalogPanel(QWidget):
             size = (
                 local.artifact_size_bytes
                 if local is not None
-                else source.total_bytes if isinstance(source, StoreEntry) else None
+                else source.total_bytes
+                if isinstance(source, StoreEntry)
+                else None
             )
-            self._table.setItem(row, 1, QTableWidgetItem(_bytes(size)))
+            self._table.setItem(row, 2, QTableWidgetItem(_bytes(size)))
             discovered_context = (
                 source.capabilities.context_window
                 if isinstance(source, DiscoveredModel) and source.capabilities is not None
                 else None
             )
-            context_value = (
-                discovered_context.value if discovered_context is not None else None
-            )
+            context_value = discovered_context.value if discovered_context is not None else None
             self._table.setItem(
-                row, 2, QTableWidgetItem(f"{context_value:,}" if context_value else "—")
+                row, 3, QTableWidgetItem(f"{context_value:,}" if context_value else "—")
             )
-            self._table.setItem(row, 3, QTableWidgetItem("Installed · fit not cataloged"))
-            self._set_engine_marks(row, 4, (provider_id,))
+            self._table.setItem(row, 4, QTableWidgetItem("Installed · fit not cataloged"))
             self._set_engine_marks(row, 5, (provider_id,))
+            self._set_engine_marks(row, 6, (provider_id,))
             license_text = (
                 source.license if isinstance(source, StoreEntry) else "Managed by engine"
             )
-            self._table.setItem(row, 6, QTableWidgetItem(license_text or "—"))
+            self._table.setItem(row, 7, QTableWidgetItem(license_text or "—"))
+        self._table.setSortingEnabled(sorting_enabled)
+        if sorting_enabled:
+            self._table.sortItems(sort_column, sort_order)
         self._on_selection_changed()
 
     def _catalog_entry_for_provider_model(self, provider_id: str, model_id: str) -> Any:
@@ -1118,6 +1166,7 @@ class _CatalogPanel(QWidget):
 
     def _set_engine_marks(self, row: int, column: int, engines: Sequence[str]) -> None:
         """Render branded local-engine marks while preserving hover and accessibility names."""
+        self._table.setItem(row, column, QTableWidgetItem(", ".join(engines) or "—"))
         holder = QWidget()
         marks = QHBoxLayout(holder)
         marks.setContentsMargins(4, 0, 4, 0)
@@ -1131,9 +1180,7 @@ class _CatalogPanel(QWidget):
             else:
                 label.setPixmap(icon.pixmap(42, 22))
                 if normalized == "ollama":
-                    label.setStyleSheet(
-                        "background: white; border-radius: 3px; padding: 2px;"
-                    )
+                    label.setStyleSheet("background: white; border-radius: 3px; padding: 2px;")
             display = "llama.cpp" if normalized == "llama-cpp" else engine
             label.setToolTip(display)
             label.setAccessibleName(display)
@@ -1146,9 +1193,12 @@ class _CatalogPanel(QWidget):
     def _on_selection_changed(self) -> None:
         model_id = self.selected_model()
         entry = self._entry(model_id)
-        can_acquire = entry is not None and self._llama_cpp_ready
-        self._plan.setEnabled(can_acquire)
-        self._download.setEnabled(can_acquire)
+        choice = self._selected_add_choice()
+        can_execute = choice is not None and (bool(choice.instance_id) or self._llama_cpp_ready)
+        pulling = choice is not None and choice.operation == "pull"
+        self._plan.setEnabled(can_execute and not pulling)
+        self._download.setEnabled(can_execute)
+        self._download.setText("Pull" if pulling else "Download")
         self._remove.setEnabled(bool(self._selected_store_entry_ids()))
         # The reasons are the library's own words for its verdict, and they carry the
         # numbers ("needs 6.4 GiB of VRAM; 12.7 GiB is budgeted") that make it checkable.
@@ -1159,17 +1209,37 @@ class _CatalogPanel(QWidget):
             return None
         return next((e for e in self._view.entries if e.id == model_id), None)
 
+    def _selected_add_choice(self) -> AddModelChoice | None:
+        """Resolve the selected provider channel to its declared model operation."""
+        entry = self._entry(self.selected_model())
+        if entry is None:
+            return None
+        provider_id = self.selected_engine()
+        if provider_id is None:
+            if not entry.model.variants:
+                return None
+            return AddModelChoice("acquire", "", "", entry.id, entry.id)
+        provider = next(
+            (
+                candidate
+                for candidate in self._config.enabled_providers()
+                if candidate.provider_id == provider_id
+            ),
+            None,
+        )
+        if provider is None:
+            return None
+        return catalog_model_choice(entry, provider, self._engine.registry)
+
     def _on_plan(self) -> None:
-        model_id = self.selected_model()
-        if model_id:
-            self._engine.acquire_model(
-                _PLAN_KEY, model_id, engine=self.selected_engine(), dry_run=True
-            )
+        choice = self._selected_add_choice()
+        if choice is not None and choice.operation == "acquire":
+            self.action_requested.emit(choice, True)
 
     def _on_download(self) -> None:
-        model_id = self.selected_model()
-        if model_id:
-            self._engine.acquire_model(_ACQUIRE_KEY, model_id, engine=self.selected_engine())
+        choice = self._selected_add_choice()
+        if choice is not None:
+            self.action_requested.emit(choice, False)
 
     def _selected_store_entry_ids(self) -> tuple[str, ...]:
         items = self._table.selectedItems()
@@ -1186,152 +1256,6 @@ class _CatalogPanel(QWidget):
         if not entry_ids:
             return
         entry_id = entry_ids[0]
-        confirmed = QMessageBox.question(
-            self,
-            "Remove model",
-            f"Delete the weights for {entry_id}?\n\nThey can be downloaded again later.",
-        )
-        if confirmed == QMessageBox.StandardButton.Yes:
-            self._engine.remove_model(_REMOVE_KEY, entry_id)
-
-
-class _InstalledPanel(QWidget):
-    """What is already on disk, and what removing it would free."""
-
-    add_requested = Signal()
-
-    def __init__(self, engine: Engine) -> None:
-        super().__init__()
-        self._engine = engine
-        self._store_entries: tuple[StoreEntry, ...] = ()
-        self._provider_models: dict[str, tuple[DiscoveredModel, ...]] = {}
-        self._provider_engines: dict[str, str] = {}
-
-        layout = QVBoxLayout(self)
-        caption = QLabel(
-            "Models available across AnyInfer's store and every enabled local engine. "
-            "Owner identifies who controls the files and therefore which removal "
-            "operation is safe."
-        )
-        caption.setWordWrap(True)
-        layout.addWidget(caption)
-
-        self._table = QTableWidget(0, 6)
-        self._table.setHorizontalHeaderLabels(
-            ["Model", "Variant", "Owner", "Quantization", "Size", "License"]
-        )
-        self._table.setAccessibleName("Installed models")
-        self._table.verticalHeader().setVisible(False)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self._table.itemSelectionChanged.connect(self._on_selection_changed)
-        layout.addWidget(self._table, 1)
-
-        self._empty = QLabel("<i>No local models found — choose Add to search sources.</i>")
-        self._empty.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(self._empty)
-
-        buttons = QHBoxLayout()
-        self._add = QPushButton("Add…")
-        self._add.setToolTip(
-            "Search verified Hugging Face artifacts and engine-owned model indexes."
-        )
-        self._add.clicked.connect(self.add_requested)
-        buttons.addWidget(self._add)
-        self._remove = QPushButton("Remove")
-        self._remove.setEnabled(False)
-        self._remove.setToolTip("Delete these weights and drop them from the store index.")
-        self._remove.clicked.connect(self._on_remove)
-        buttons.addWidget(self._remove)
-        buttons.addStretch(1)
-        buttons.addWidget(SdkHelpButton("acquisition"))
-        layout.addLayout(buttons)
-
-    def refresh(self) -> None:
-        """Re-read the store index."""
-        self._engine.installed_models(_INSTALLED_KEY)
-
-    def on_installed(self, entries: Sequence[StoreEntry]) -> None:
-        """Adopt a freshly read store listing."""
-        self._store_entries = tuple(entries)
-        self._repopulate()
-
-    def set_provider_instances(self, instances: dict[str, str]) -> None:
-        """Track enabled local provider instances and discard stale discoveries."""
-        self._provider_engines = dict(instances)
-        self._provider_models = {
-            instance: models
-            for instance, models in self._provider_models.items()
-            if instance in instances
-        }
-        self._repopulate()
-
-    def on_provider_models(self, instance_id: str, models: Sequence[DiscoveredModel]) -> None:
-        """Adopt models reported by one provider-owned local service."""
-        if instance_id not in self._provider_engines:
-            return
-        self._provider_models[instance_id] = tuple(models)
-        self._repopulate()
-
-    def _repopulate(self) -> None:
-        """Merge AnyInfer-owned and provider-owned inventories without changing ownership."""
-        self._table.setRowCount(0)
-        for entry in self._store_entries:
-            row = self._table.rowCount()
-            self._table.insertRow(row)
-            name = QTableWidgetItem(entry.model_id)
-            name.setData(Qt.ItemDataRole.UserRole, entry.id)
-            name.setToolTip(entry.directory)
-            self._table.setItem(row, 0, name)
-            self._table.setItem(row, 1, QTableWidgetItem(entry.variant_id))
-            self._table.setItem(row, 2, QTableWidgetItem(entry.engine))
-            self._table.setItem(row, 3, QTableWidgetItem(entry.quantization or "—"))
-            total = sum(f.size_bytes for f in entry.files) if entry.files else None
-            self._table.setItem(row, 4, QTableWidgetItem(_bytes(total)))
-            self._table.setItem(row, 5, QTableWidgetItem(entry.license or "—"))
-
-        for instance_id, models in sorted(self._provider_models.items()):
-            provider_id = self._provider_engines.get(instance_id, instance_id)
-            for model in models:
-                row = self._table.rowCount()
-                self._table.insertRow(row)
-                name = QTableWidgetItem(model.id)
-                name.setToolTip(
-                    f"Managed by {instance_id}; AnyInfer does not own or remove these files."
-                )
-                self._table.setItem(row, 0, name)
-                self._table.setItem(row, 1, QTableWidgetItem("Provider-managed"))
-                owner = (
-                    instance_id if instance_id == provider_id else f"{instance_id} ({provider_id})"
-                )
-                self._table.setItem(row, 2, QTableWidgetItem(owner))
-                local = model.capabilities.local if model.capabilities is not None else None
-                quantization = local.quantization if local is not None else None
-                size = local.artifact_size_bytes if local is not None else None
-                self._table.setItem(row, 3, QTableWidgetItem(quantization or "—"))
-                self._table.setItem(row, 4, QTableWidgetItem(_bytes(size)))
-                self._table.setItem(row, 5, QTableWidgetItem("Managed by engine"))
-
-        self._empty.setVisible(self._table.rowCount() == 0)
-        self._on_selection_changed()
-
-    def _selected_entry_id(self) -> str:
-        items = self._table.selectedItems()
-        if not items:
-            return ""
-        cell = self._table.item(items[0].row(), 0)
-        value = cell.data(Qt.ItemDataRole.UserRole) if cell else None
-        return value if isinstance(value, str) else ""
-
-    def _on_selection_changed(self) -> None:
-        self._remove.setEnabled(bool(self._selected_entry_id()))
-
-    def _on_remove(self) -> None:
-        entry_id = self._selected_entry_id()
-        if not entry_id:
-            return
         confirmed = QMessageBox.question(
             self,
             "Remove model",
@@ -1563,17 +1487,11 @@ class _RuntimePanel(QWidget):
             return
         configured = self._configured_runtime()
         wanted = (
-            configured
-            if configured != "auto"
-            else _default_runtime_kind(self._report.hardware)
+            configured if configured != "auto" else _default_runtime_kind(self._report.hardware)
         )
         index = self._runtime_choice.findData(wanted)
         model = self._runtime_choice.model()
-        if (
-            isinstance(model, QStandardItemModel)
-            and index >= 0
-            and model.item(index).isEnabled()
-        ):
+        if isinstance(model, QStandardItemModel) and index >= 0 and model.item(index).isEnabled():
             self._runtime_choice.setCurrentIndex(index)
 
     def _configure_backend_choices(self) -> None:
@@ -1680,82 +1598,6 @@ class _RuntimePanel(QWidget):
         self._update_install_button()
 
 
-class _PullPanel(QWidget):
-    """Ask an engine that owns its own store to make a model available.
-
-    A different operation from acquisition, with a different owner for the result, so it
-    gets its own panel rather than a second button on the catalog. Only engines whose
-    descriptor declares a model puller are offered, which is the registry answering
-    "who can do this", instead of this file keeping a list of engine names.
-    """
-
-    def __init__(self, engine: Engine, config: DemoConfig) -> None:
-        super().__init__()
-        self._engine = engine
-
-        layout = QVBoxLayout(self)
-        caption = QLabel(
-            "Engines with their own model store — Ollama and its kin — download weights "
-            "themselves, under their own name and into their own directory. AnyInfer asks; "
-            "it does not fetch, index, or remove them."
-        )
-        caption.setWordWrap(True)
-        layout.addWidget(caption)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Engine:"))
-        self._instances = QComboBox()
-        self._instances.setAccessibleName("Engine to pull with")
-        row.addWidget(self._instances)
-
-        row.addWidget(QLabel("Model:"))
-        self._model = QLineEdit()
-        self._model.setPlaceholderText("qwen3:8b")
-        self._model.setAccessibleName("Model to pull")
-        self._model.returnPressed.connect(self._on_pull)
-        row.addWidget(self._model, 1)
-
-        self._pull = QPushButton("Pull")
-        self._pull.clicked.connect(self._on_pull)
-        row.addWidget(self._pull)
-        row.addWidget(SdkHelpButton("acquisition"))
-        layout.addLayout(row)
-
-        self._empty = QLabel()
-        self._empty.setWordWrap(True)
-        layout.addWidget(self._empty)
-        layout.addStretch(1)
-
-        self.set_providers(config)
-
-    def set_providers(self, config: DemoConfig) -> None:
-        """Offer the configured instances whose engine can pull."""
-        registry = self._engine.registry
-        self._instances.clear()
-        for provider in config.enabled_providers():
-            if not registry.has(provider.provider_id):
-                continue
-            if registry.get(provider.provider_id).model_puller is None:
-                continue
-            self._instances.addItem(provider.instance_id, provider.instance_id)
-        usable = self._instances.count() > 0
-        self._pull.setEnabled(usable)
-        self._model.setEnabled(usable)
-        self._empty.setText(
-            ""
-            if usable
-            else "<i>No configured engine manages its own model store. Add Ollama under "
-            "Provider settings to use this.</i>"
-        )
-        self._empty.setTextFormat(Qt.TextFormat.RichText)
-
-    def _on_pull(self) -> None:
-        instance = self._instances.currentData()
-        model = self._model.text().strip()
-        if isinstance(instance, str) and instance and model:
-            self._engine.pull_model(_PULL_KEY, instance, model)
-
-
 class _RuntimeReport:
     """What one runtime inventory read found.
 
@@ -1835,6 +1677,7 @@ class ModelsDialog(QDialog):
         self._catalog = _CatalogPanel(engine, config)
         self._catalog.quick_llama_setup_requested.connect(self.quick_llama_setup_requested)
         self._catalog.add_requested.connect(self._on_add_model)
+        self._catalog.action_requested.connect(self._dispatch_model_choice)
         self._runtimes = _RuntimePanel(engine, config)
         self._runtimes.quick_llama_setup_requested.connect(self.quick_llama_setup_requested)
         self._runtimes.runtime_selected.connect(self.runtime_selection_requested)
@@ -1851,12 +1694,18 @@ class ModelsDialog(QDialog):
 
         self._status = QLabel("Ready.")
         self._status.setWordWrap(True)
-        outer.addWidget(self._status)
+        self._status.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.reject)
-        buttons.accepted.connect(self.accept)
-        outer.addWidget(buttons)
+        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        self._buttons.rejected.connect(self.reject)
+        self._buttons.accepted.connect(self.accept)
+
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.setSpacing(12)
+        footer.addWidget(self._status, 1, Qt.AlignmentFlag.AlignVCenter)
+        footer.addWidget(self._buttons, 0, Qt.AlignmentFlag.AlignVCenter)
+        outer.addLayout(footer)
 
         engine.task_done.connect(self._on_task_done)
         engine.task_failed.connect(self._on_task_failed)
@@ -1889,19 +1738,30 @@ class ModelsDialog(QDialog):
         choice = dialog.choice()
         if choice is None:
             return
+        self._dispatch_model_choice(choice)
+
+    def _dispatch_model_choice(self, choice: object, dry_run: bool = False) -> None:
+        """Send a resolved catalog action through the matching SDK operation."""
+        if not isinstance(choice, AddModelChoice):
+            return
         if choice.operation == "pull":
             self._engine.pull_model(_PULL_KEY, choice.instance_id, choice.model_ref)
             self._status.setText(f"Asking {choice.instance_id} to pull {choice.model_ref}…")
             return
+        key = _PLAN_KEY if dry_run else _ACQUIRE_KEY
         self._engine.acquire_model(
-            _ACQUIRE_KEY,
+            key,
             choice.model_id,
             engine=choice.acquisition_engine,
+            dry_run=dry_run,
         )
-        self._status.setText(
-            f"Downloading {choice.model_id} for {choice.acquisition_engine} from its "
-            "verified catalog source…"
-        )
+        if dry_run:
+            self._status.setText(f"Planning the download for {choice.model_id}…")
+        else:
+            self._status.setText(
+                f"Downloading {choice.model_id} for {choice.acquisition_engine or 'the best fit'} "
+                "from its verified catalog source…"
+            )
 
     # ---- engine callbacks --------------------------------------------------------------
 
@@ -1927,6 +1787,7 @@ class ModelsDialog(QDialog):
                 else f"{result.entry_id} was not removed."
             )
             self._engine.installed_models(_INSTALLED_KEY)
+            self._refresh_local_provider_models()
         elif key == _INSTALL_RUNTIME_KEY and isinstance(result, InstallReport):
             self._runtimes.on_install_finished(result)
             verb = "Already installed" if result.reused else "Installed"
@@ -1973,6 +1834,10 @@ class ModelsDialog(QDialog):
             f"{_bytes(report.downloaded_bytes)} fetched.{warnings}"
         )
         self._engine.installed_models(_INSTALLED_KEY)
+        # llama.cpp discovery is intentionally the installed inventory. Refreshing it
+        # here updates both this dialog and the main model picker immediately after the
+        # store changes, without making either UI reconstruct catalog semantics.
+        self._refresh_local_provider_models()
 
     def _on_progress(self, progress: object) -> None:
         """Drive the progress bar from the library's own acquisition snapshots."""

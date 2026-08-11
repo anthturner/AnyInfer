@@ -291,13 +291,14 @@ def _part_to_json(part: ContentPart) -> dict[str, Any]:
         # picker can own a separate asset store; silently embedding binary request data in
         # conversation JSON would violate the existing persistence contract.
         return {"kind": "attachment_omitted", "media_type": part.media_type}
-    assert isinstance(part, ToolResult)
-    return {
-        "kind": "tool_result",
-        "call_id": part.call_id,
-        "content": part.content,
-        "is_error": part.is_error,
-    }
+    if isinstance(part, ToolResult):
+        return {
+            "kind": "tool_result",
+            "call_id": part.call_id,
+            "content": part.content,
+            "is_error": part.is_error,
+        }
+    raise TypeError(f"unsupported conversation content part: {type(part).__name__}")
 
 
 def _message_from_json(data: Mapping[str, Any]) -> Message:

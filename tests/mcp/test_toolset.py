@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 import anyinfer as ai
+from anyinfer.credentials import default_resolver
 from anyinfer.errors import ToolLoopError
 from anyinfer.mcp import NAMESPACE_SEPARATOR, MCPServer, MCPToolset
 from anyinfer.mcp.protocol import (
@@ -15,6 +16,8 @@ from anyinfer.mcp.protocol import (
     read_initialize,
     read_result,
 )
+from anyinfer.mcp.toolset import _build_transport
+from anyinfer.mcp.transport import HTTPTransport
 from anyinfer.testing import FakeMCPServer, FakeMCPTool
 
 
@@ -57,6 +60,18 @@ def test_an_error_object_becomes_an_exception() -> None:
         read_result({"jsonrpc": "2.0", "id": 1, "error": {"code": -32601, "message": "nope"}})
 
     assert "-32601" in str(caught.value) or "32601" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        {"code": "-32601", "message": "wrong type"},
+        {"code": -32601, "message": ["wrong type"]},
+    ],
+)
+def test_a_malformed_error_object_is_refused(error: object) -> None:
+    with pytest.raises(ToolLoopError, match="malformed JSON-RPC error"):
+        read_result({"jsonrpc": "2.0", "id": 1, "error": error})
 
 
 def test_a_message_with_neither_result_nor_error_is_refused() -> None:
@@ -277,6 +292,42 @@ def test_a_server_needs_exactly_one_transport() -> None:
         MCPServer(name="fs")
     with pytest.raises(ToolLoopError):
         MCPServer(name="fs", command=("x",), url="http://x.invalid")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"name": ""},
+        {"command": ("",), "url": None},
+        {"timeout_s": 0},
+        {"headers": {"authorization": 42}},
+        {"env": {"": "secret"}},
+        {"allow_tools": ("",)},
+    ],
+)
+def test_server_descriptions_reject_invalid_values(overrides: dict[str, object]) -> None:
+    with pytest.raises(ToolLoopError):
+        _server(**overrides)
+
+
+async def test_server_names_must_be_unique_before_connecting() -> None:
+    with pytest.raises(ToolLoopError, match="must be unique"):
+        await MCPToolset.connect(_server(), _server())
+
+
+async def test_http_header_credentials_are_resolved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANYINFER_TEST_MCP_TOKEN", "resolved-secret")
+    transport = _build_transport(
+        _server(headers={"authorization": "env://ANYINFER_TEST_MCP_TOKEN"}),
+        default_resolver(),
+    )
+    assert isinstance(transport, HTTPTransport)
+    try:
+        assert transport._client.headers["authorization"] == "resolved-secret"
+    finally:
+        await transport.aclose()
 
 
 def test_a_server_needs_a_name() -> None:

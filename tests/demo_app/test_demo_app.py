@@ -122,6 +122,25 @@ class TestConfig:
         finally:
             dialog.close()
 
+    def test_app_settings_offers_and_returns_every_theme(self, qapp: object):
+        from demo_app import theme
+        from demo_app.widgets.app_settings_dialog import AppSettingsDialog
+
+        dialog = AppSettingsDialog(replace(default_config(), theme="forest"))
+        try:
+            offered = {
+                dialog._theme_combo.itemData(index)
+                for index in range(dialog._theme_combo.count())
+                if dialog._theme_combo.itemData(index) is not None
+            }
+            assert offered == {key for key, _label in theme.THEME_CHOICES}
+            assert dialog._theme_combo.currentData() == "forest"
+
+            dialog._theme_combo.setCurrentIndex(dialog._theme_combo.findData("dark"))
+            assert dialog.result_config().theme == "dark"
+        finally:
+            dialog.close()
+
     def test_shared_identity_spelling_round_trips_without_redundancy(self):
         config = DemoConfig(
             providers=(
@@ -1248,12 +1267,15 @@ class TestMainWindow:
         finally:
             window.close()
 
-    def test_send_streams_an_answer_into_the_transcript(self, qapp: object):
+    def test_send_streams_an_answer_into_the_transcript(self, qapp: object, wait_for_models):
         """The whole path, driven as a user drives it: type, send, watch it stream."""
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
+            if not window._engine_bar.target():
+                wait_for_models(window._engine, DEMO_PROVIDER_ID)
+            assert window._engine_bar.target() == "demo-fake:reliable"
             window._composer.set_text("What is AnyInfer?")
             window._on_send()
             _drain(window._engine)
@@ -1294,11 +1316,15 @@ class TestMainWindow:
         finally:
             window.close()
 
-    def test_new_chat_persists_the_previous_conversation_to_disk(self, qapp: object):
+    def test_new_chat_persists_the_previous_conversation_to_disk(
+        self, qapp: object, wait_for_models
+    ):
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
+            if not window._engine_bar.target():
+                wait_for_models(window._engine, DEMO_PROVIDER_ID)
             window._composer.set_text("Persist me.")
             window._on_send()
             _drain(window._engine)
@@ -1316,11 +1342,15 @@ class TestMainWindow:
         finally:
             window.close()
 
-    def test_open_saved_restores_a_conversation_in_a_tab(self, qapp: object, monkeypatch):
+    def test_open_saved_restores_a_conversation_in_a_tab(
+        self, qapp: object, monkeypatch, wait_for_models
+    ):
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
+            if not window._engine_bar.target():
+                wait_for_models(window._engine, DEMO_PROVIDER_ID)
             window._composer.set_text("Remember this.")
             window._on_send()
             _drain(window._engine)
@@ -1339,11 +1369,13 @@ class TestMainWindow:
         finally:
             window.close()
 
-    def test_deleting_a_conversation_removes_its_file(self, qapp: object):
+    def test_deleting_a_conversation_removes_its_file(self, qapp: object, wait_for_models):
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
+            if not window._engine_bar.target():
+                wait_for_models(window._engine, DEMO_PROVIDER_ID)
             window._composer.set_text("Delete me.")
             window._on_send()
             _drain(window._engine)
@@ -1407,12 +1439,15 @@ class TestMainWindow:
         finally:
             window.close()
 
-    def test_view_menu_has_one_sidebar_flyout(self, qapp: object):
+    def test_sidebar_is_a_top_level_menu(self, qapp: object):
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
-            assert window._sidebar_menu.title() == "Sidebar"
+            menu_titles = {action.text().replace("&", "") for action in window.menuBar().actions()}
+            assert "Sidebar" in menu_titles
+            assert "View" not in menu_titles
+            assert window._sidebar_menu.title().replace("&", "") == "Sidebar"
             actions = window._sidebar_menu.actions()
             assert actions[0].text() == "Show Sidebar"
             assert actions[1].isSeparator()
@@ -1434,7 +1469,7 @@ class TestMainWindow:
         path = tmp_path / "custom" / "session.json"
         window = MainWindow(default_config(), config_path=path)
         try:
-            window._set_theme("dark")  # persists preferences
+            window._apply_app_settings(replace(window._engine.config, theme="dark"))
             assert path.exists(), "the save went somewhere other than the session's path"
             assert DemoConfig.load(path).theme == "dark"
         finally:
@@ -1467,25 +1502,18 @@ class TestMainWindow:
 
         window = MainWindow(default_config())
         try:
-            window._set_theme("ocean")
+            window._apply_app_settings(replace(window._engine.config, theme="ocean"))
             assert window._theme == "ocean"
             assert theme.color("bg") == theme.CUSTOM_THEMES["ocean"]["bg"]
         finally:
             window.close()
 
-    def test_theme_menu_stays_in_sync_with_the_active_theme(self, qapp: object):
-        """Every theme change, including programmatic ones, checks exactly one action."""
+    def test_every_theme_survives_config_round_trip(self):
         from demo_app import theme
-        from demo_app.main_window import MainWindow
 
-        window = MainWindow(default_config())
-        try:
-            for key, _label in theme.THEME_CHOICES:
-                window._set_theme(key)
-                checked = [k for k, a in window._theme_actions.items() if a.isChecked()]
-                assert checked == [key]
-        finally:
-            window.close()
+        for key, _label in theme.THEME_CHOICES:
+            config = replace(default_config(), theme=key)
+            assert DemoConfig.from_json(config.to_json()).theme == key
 
 
 class TestEngineBar:
@@ -1762,7 +1790,7 @@ class TestTheme:
         from demo_app import theme
 
         default_keys = {key for key, _ in theme.DEFAULT_THEME_CHOICES}
-        custom_keys = {key for key, _ in theme.CUSTOM_THEMES_MENU}
+        custom_keys = {key for key, _ in theme.CUSTOM_THEME_CHOICES}
         assert default_keys.isdisjoint(custom_keys)
         assert custom_keys == set(theme.CUSTOM_THEMES)
 

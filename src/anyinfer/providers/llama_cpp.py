@@ -116,8 +116,8 @@ def _as_bool(key: str, value: Any) -> bool:
     )
 
 
-RuntimeChoice = Literal["auto", "cuda", "vulkan", "metal", "rocm", "cpu"]
-_RUNTIME_CHOICES: tuple[RuntimeChoice, ...] = (
+_RuntimeChoice = Literal["auto", "cuda", "vulkan", "metal", "rocm", "cpu"]
+_RUNTIME_CHOICES: tuple[_RuntimeChoice, ...] = (
     "auto",
     "cuda",
     "vulkan",
@@ -127,7 +127,7 @@ _RUNTIME_CHOICES: tuple[RuntimeChoice, ...] = (
 )
 
 
-def _as_runtime(key: str, value: Any) -> RuntimeChoice:
+def _as_runtime(key: str, value: Any) -> _RuntimeChoice:
     """Read an automatic or named installed runtime backend."""
     text = str(value).strip().lower() or "auto"
     if text not in _RUNTIME_CHOICES:
@@ -190,7 +190,7 @@ class LlamaCppOptions:
 
     catalog: Catalog | None = None
     binary: str = "llama-server"
-    runtime: RuntimeChoice = "auto"
+    runtime: _RuntimeChoice = "auto"
     model_dir: Path | None = None
     posture: Posture = "balanced"
     hardware: HardwareProfile | None = None
@@ -395,11 +395,11 @@ class LlamaCppAdapter:
     # ---- adapter contract ------------------------------------------------------------
 
     async def list_models(self) -> Sequence[DiscoveredModel]:
-        """List the catalog artifacts this provider can serve.
+        """List downloaded catalog artifacts this provider can serve.
 
-        Discovery here means "what could be run", not "what is loaded": a local provider's
-        inventory is the catalog plus what is on disk, and reporting only resident models
-        would hide everything the user could choose.
+        The catalog describes what can be acquired; model discovery describes what is
+        ready to select now. Keeping those surfaces distinct prevents an application from
+        presenting a large download as if it were already installed.
         """
         catalog = self._options.catalog
         if catalog is None:
@@ -410,10 +410,8 @@ class LlamaCppAdapter:
             for entry in installed
             if entry.engine in ("llama.cpp", "llama-cpp") and entry.variant_id
         }
-        ordered_ids = sorted(installed_ids & catalog.artifacts.keys())
-        ordered_ids.extend(sorted(catalog.artifacts.keys() - installed_ids))
         models: list[DiscoveredModel] = []
-        for artifact_id in ordered_ids:
+        for artifact_id in sorted(installed_ids & catalog.artifacts.keys()):
             artifact = catalog.artifacts[artifact_id]
             models.append(
                 DiscoveredModel(
@@ -655,7 +653,7 @@ descriptor = ProviderDescriptor(
     ),
     default_capabilities=ModelCapabilities(features=Sourced(_LLAMA_FEATURES, "default")),
     supports_sessions=True,
-    model_inventory="available",
+    model_inventory="installed",
     uses_catalog=True,
     reports_diagnostics=True,
     grammar_needs_prompt_injection=True,

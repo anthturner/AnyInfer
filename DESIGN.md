@@ -54,10 +54,9 @@ requests in, typed event streams or validated results out, across cloud and loca
 
 ### Non-goals (v1)
 - **No daemon in the core.** The core is a library; nothing listens on a socket by default.
-  However, an **OpenAI-compatible loopback serve frontend** (`anyinfer.serve`, `[serve]`
-  extra) is an explicitly *architecture-guaranteed* future module — see §22 and ADR-009.
-  v1 core ships without it; the invariants that make it a thin projection are enforced
-  from M0.
+  The implemented **OpenAI-compatible loopback serve frontend** (`anyinfer.serve`, `[serve]`
+  extra) is an optional frontend over that library — see §22 and ADR-009. Its wire-codec
+  boundary and the invariants that keep it a thin projection are enforced in tests.
 - **Not an agent framework.** A tool-execution loop is provided (late in v1), but no planning,
   memory, or multi-agent constructs. *Clarified:*
   `anyinfer.context.distill` is a bounded, deterministic map/reduce fan-out — fixed
@@ -493,6 +492,14 @@ id/alias rejection at registration).
 | `copilot` | `github-copilot-sdk` (extra) | `auto` sentinel; session resume; usage from events |
 | `m365-copilot` | httpx2 + interactive Entra | interactive-auth-only — degraded headless story, documented |
 | `llama-cpp` | supervised `llama-server`, openai-compat dialect | see §12; loopback only |
+| `gemini` | httpx2, native `generateContent` | thinking levels, discovered windows |
+| `deepseek` | httpx2, chat completions | separate reasoning channel and cache accounting |
+| `xai` | httpx2, chat completions | provider-reported cost and discovered pricing |
+| `vertex` | httpx2, native `generateContent` | project-scoped GCP auth and addressing |
+| `bedrock` | httpx2, Converse + event stream | SigV4/API-key auth and binary stream framing |
+| `cohere` | httpx2, native v2 chat | grounded generation and thinking channel |
+| `lm-studio` | httpx2, native discovery + chat | quantization and residency discovery |
+| `nebius` | httpx2, chat completions | live pricing, context, and quantization discovery |
 
 ## 9. Structured output
 
@@ -766,7 +773,7 @@ alias = ai.local.recommend_alias(hw)  # e.g. "large" on a 24 GB GPU
 result = client.generate(prompt, target=alias)  # llama-cpp: download → tune → serve → answer
 
 
-# --- tool loop (late v1) ---
+# --- bounded tool loop ---
 @ai.tool
 def read_file(path: str) -> str:
     """Read a project file."""
@@ -804,18 +811,19 @@ src/anyinfer/
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
   local/                 # hardware.py metrics.py backends.py runtimes.py runtimes.json tuning.py
-                         # services.py engine-managed model pulls
-                         # fit.py variants.py artifacts.py downloads.py
+                         # services.py discovery.py fit.py variants.py artifacts.py downloads.py
                          # acquire.py store.py sources/ server.py recommend.py
   providers/             # base.py sse.py openai_compat.py openai.py anthropic.py
                          # ollama.py openrouter.py azure_foundry.py copilot.py
-                         # m365_copilot.py llama_cpp.py
+                         # m365_copilot.py llama_cpp.py gemini.py deepseek.py xai.py
+                         # vertex.py bedrock.py cohere.py lm_studio.py nebius.py presets.py
   context/               # corpus reduction: documents.py rank.py structure.py
                          # envelope.py select.py tiers.py pack.py distill.py
                          # settings.py dedup.py compact.py history.py
-  testing/               # conformance.py fakes.py cassettes.py
-  cli.py                 # run, verify, benchmark, doctor, providers, models, runtime,
-                         # context, sidecar
+  mcp/                   # protocol.py transport.py toolset.py
+  testing/               # conformance.py scripted.py fakes.py cassettes.py plugin.py
+  cli.py                 # init, agents-md, run, verify, benchmark, doctor, providers,
+                         # models, runtime, context, mcp, conform, serve
   serve/                 # openai_codec.py app.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
@@ -823,11 +831,12 @@ contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§2
 docs/                    # provider guides, published site sources (§25)
 ```
 
-**Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]` github-copilot-sdk ·
-`[azure]` azure-identity(+broker) · `[keyring]` keyring · `[otel]` opentelemetry-api ·
-`[local]` download/tuning helpers (llama-server binaries fetched at runtime, never pip deps) ·
-`[serve]` ASGI server deps for the OpenAI-compatible frontend (§22) ·
-`[all]`. Missing-extra errors raise `ConfigError` with an install hint.
+**Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]`
+github-copilot-sdk · `[azure]` azure-identity · `[vertex]` cryptography · `[keyring]`
+keyring · `[otel]` opentelemetry-api · `[serve]` ASGI server deps · `[demo]` PySide6 and
+Markdown · `[mcp]` an explicit dependency-free feature marker · `[all]`. The complete local
+subsystem is core; llama-server binaries and model weights are runtime-fetched, never pip
+dependencies. Missing-extra errors raise `ConfigError` with an install hint.
 
 ## 19. MVP scope and roadmap
 
@@ -870,12 +879,15 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    keep_alive).~~ *Resolved:* `client.session(target)` returns an opaque,
    target-bound handle threaded through `generate()`/`stream()`; it never changes an answer,
    and the three capable providers each exploit it differently behind one shape.
-3. **Cancellation semantics** across the sync facade (KeyboardInterrupt → loop-thread task
-   cancellation → httpx2 stream close → llama-server survival). Must be specified in M0.
+3. ~~**Cancellation semantics** across the sync facade.~~ *Resolved:* an interrupt cancels
+   the loop-thread future, early stream exit closes the async iterator, and facade shutdown
+   cancels outstanding tasks with bounded waits. Dedicated tests cover early exit and thread
+   stress; supervised local servers survive request cancellation.
 4. **Default catalog contents and update cadence** — which models, who bumps them, does a
    catalog update constitute a library release? (Risk R6.)
-5. **M365 Copilot headless story** — interactive-only auth may make it conformance-exempt for
-   CI; degraded-mode contract TBD in M3.
+5. ~~**M365 Copilot headless story.**~~ *Resolved as a documented degraded mode:* auth is
+   interactive-only, the adapter is exempt from credentialed headless live runs, and its
+   fixed capability surface is covered offline.
 6. ~~**Ollama GPU-spill warning + observed-VRAM checks** — capability layer or
    Ollama-adapter warnings?~~ *Resolved:* adapter-reported runtime
    diagnostics, declared on the descriptor and surfaced on `Generation.warnings` plus a
@@ -884,7 +896,8 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 ## 21. Risks and complexity traps
 
 - **R1 — sync facade correctness** (streaming iterators, cancellation, thread affinity).
-  Mitigate: specify in M0, test under KeyboardInterrupt and thread stress from day one.
+  Mitigated by the background-loop ownership rules, bounded cancellation, early-exit tests,
+  and thread-stress coverage; retain those as release gates.
 - **R2 — multi-provider conformance drift**, now across seventeen dedicated adapters plus a
   preset registry. Mitigate: cassette CI + nightly live runs; the matrix doc is the source
   of truth for "native vs emulated vs unsupported", and presets are covered by
@@ -1334,9 +1347,9 @@ versioned docs (mike) so published SDK versions keep matching docs; docs build i
 
 1. **Quickstart** — install to first `generate()` in under five minutes; the three-line
    sync example, then streaming, then an alias target.
-2. **Installation matrix** — extras (`[copilot]`, `[azure]`, `[keyring]`, `[otel]`,
-   `[local]`, `[serve]`, `[all]`), Python/OS support, and the serve-binary download table
-   for users who want no Python at all.
+2. **Installation matrix** — extras (`[copilot]`, `[azure]`, `[vertex]`, `[keyring]`,
+   `[otel]`, `[mcp]`, `[serve]`, `[demo]`, `[all]`), Python/OS support, the core local
+   subsystem, and the serve-binary download table for users who want no Python at all.
 3. **Choosing an integration path** — decision page: embed the SDK (sync or async) vs run
    the `anyinfer-serve` binary and point existing OpenAI clients at it; latency, deployment,
    and capability trade-offs of each.

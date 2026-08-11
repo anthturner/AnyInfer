@@ -133,7 +133,7 @@ class TestSetupFieldRendering:
     def test_local_model_inventory_scope_is_declared_by_providers(self):
         from anyinfer.registry import default_registry
 
-        assert default_registry.get("llama-cpp").model_inventory == "available"
+        assert default_registry.get("llama-cpp").model_inventory == "installed"
         assert default_registry.get("ollama").model_inventory == "installed"
         assert default_registry.get("vllm").model_inventory == "served"
 
@@ -149,6 +149,27 @@ class TestSetupFieldRendering:
 
 
 class TestModelsDialog:
+    def test_store_count_shares_a_centred_footer_row_with_close(
+        self, engine: Engine, qapp: object
+    ):
+        from PySide6.QtWidgets import QDialogButtonBox
+
+        from demo_app.widgets.models_dialog import ModelsDialog
+
+        dialog = ModelsDialog(engine, default_config())
+        try:
+            dialog._status.setText("2 model(s) in the store.")
+            dialog.show()
+            qapp.processEvents()
+
+            close = dialog._buttons.button(QDialogButtonBox.StandardButton.Close)
+            assert close is not None
+            status_center = dialog._status.mapTo(dialog, dialog._status.rect().center()).y()
+            close_center = close.mapTo(dialog, close.rect().center()).y()
+            assert abs(status_center - close_center) <= 1
+        finally:
+            dialog.close()
+
     def test_runtimes_share_the_llama_setup_gate_and_limit_backends(
         self, engine: Engine, qapp: object
     ):
@@ -219,9 +240,7 @@ class TestModelsDialog:
         finally:
             panel.close()
 
-    def test_runtime_panel_can_select_an_installed_backend(
-        self, engine: Engine, qapp: object
-    ):
+    def test_runtime_panel_can_select_an_installed_backend(self, engine: Engine, qapp: object):
         from anyinfer.local.hardware import HardwareProfile
         from anyinfer.local.runtimes import InstallReport, RuntimeManifest
         from demo_app.widgets.models_dialog import _RuntimePanel, _RuntimeReport
@@ -343,6 +362,71 @@ class TestModelsDialog:
         finally:
             dialog.close()
 
+    def test_catalog_buttons_dispatch_qwen_through_the_selected_engine_operation(
+        self, engine: Engine, qapp: object
+    ):
+        from PySide6.QtCore import Qt
+
+        from anyinfer import load_default_catalog
+        from anyinfer._client.models import build_catalog_view
+        from anyinfer.local.hardware import HardwareProfile
+        from demo_app.config import DemoConfig
+        from demo_app.widgets.add_model_dialog import AddModelChoice
+        from demo_app.widgets.models_dialog import _CatalogPanel
+
+        config = DemoConfig(
+            providers=(
+                ProviderConfig("llama-cpp", enabled=True),
+                ProviderConfig("ollama", enabled=True),
+            )
+        )
+        panel = _CatalogPanel(engine, config)
+        requested: list[tuple[AddModelChoice, bool]] = []
+        panel.action_requested.connect(lambda choice, dry_run: requested.append((choice, dry_run)))
+
+        def select_qwen() -> None:
+            row = next(
+                row
+                for row in range(panel._table.rowCount())
+                if panel._table.item(row, 0).data(Qt.ItemDataRole.UserRole) == "qwen3-4b"
+            )
+            panel._table.selectRow(row)
+
+        try:
+            panel.on_catalog(
+                build_catalog_view(
+                    load_default_catalog(),
+                    hardware=HardwareProfile("linux", "x86_64"),
+                    detect_backend=False,
+                )
+            )
+
+            panel._engine_filter.setCurrentIndex(panel._engine_filter.findData("ollama"))
+            select_qwen()
+            assert panel._download.text() == "Pull"
+            assert panel._download.isEnabled()
+            assert not panel._plan.isEnabled()
+            panel._download.click()
+            ollama_choice, dry_run = requested.pop()
+            assert not dry_run
+            assert ollama_choice.operation == "pull"
+            assert ollama_choice.instance_id == "ollama"
+            assert ollama_choice.model_ref == "qwen3:4b"
+
+            panel._engine_filter.setCurrentIndex(panel._engine_filter.findData("llama-cpp"))
+            select_qwen()
+            assert panel._download.text() == "Download"
+            assert panel._download.isEnabled()
+            assert panel._plan.isEnabled()
+            panel._plan.click()
+            llama_choice, dry_run = requested.pop()
+            assert dry_run
+            assert llama_choice.operation == "acquire"
+            assert llama_choice.model_id == "qwen3-4b"
+            assert llama_choice.acquisition_engine == "llama.cpp"
+        finally:
+            panel.close()
+
     def test_catalog_keeps_non_catalog_provider_models_and_branded_ownership(
         self, engine: Engine, qapp: object
     ):
@@ -390,9 +474,10 @@ class TestModelsDialog:
                 for row in range(panel._table.rowCount())
                 if panel._table.item(row, 0).text() == "not-in-the-shipped-catalog:latest"
             )
-            assert panel._table.item(row, 1).text() == "5.0 GiB"
-            engines = panel._table.cellWidget(row, 4)
-            installed_for = panel._table.cellWidget(row, 5)
+            assert panel._table.item(row, 1).text() == "Other"
+            assert panel._table.item(row, 2).text() == "5.0 GiB"
+            engines = panel._table.cellWidget(row, 5)
+            installed_for = panel._table.cellWidget(row, 6)
             assert engines.findChild(QLabel).accessibleName() == "ollama"
             assert installed_for.findChild(QLabel).toolTip() == "ollama"
             panel._table.selectRow(row)
@@ -529,6 +614,8 @@ class TestModelsDialog:
         self, engine: Engine, qapp: object, monkeypatch: pytest.MonkeyPatch
     ):
         """Real catalog data on purpose: a fake one would test the table, not the wiring."""
+        from PySide6.QtCore import Qt
+
         from anyinfer import load_default_catalog
         from anyinfer._client.models import build_catalog_view
         from anyinfer.local.hardware import HardwareProfile
@@ -548,8 +635,27 @@ class TestModelsDialog:
             )
             dialog._catalog.on_catalog(view)
             assert dialog._catalog._table.rowCount() > 0
+            assert dialog._catalog._table.horizontalHeaderItem(1).text() == "Family"
+            family_by_id = {
+                dialog._catalog._table.item(row, 0).data(
+                    Qt.ItemDataRole.UserRole
+                ): dialog._catalog._table.item(row, 1).text()
+                for row in range(dialog._catalog._table.rowCount())
+            }
+            assert family_by_id["qwen3-4b"] == "Qwen"
+            assert family_by_id["deepseek-r1-distill-qwen-1.5b"] == "DeepSeek"
+            assert family_by_id["llama-3.2-1b-instruct"] == "Llama"
+            assert family_by_id["phi-4"] == "Phi"
+            assert family_by_id["mistral-small-3.2"] == "Mistral"
+
+            dialog._catalog._table.sortItems(1, Qt.SortOrder.DescendingOrder)
+            families = [
+                dialog._catalog._table.item(row, 1).text()
+                for row in range(dialog._catalog._table.rowCount())
+            ]
+            assert families == sorted(families, reverse=True)
             # The verdict stays checkable: its tooltip is the library's own reasons for it.
-            fit_cell = dialog._catalog._table.item(0, 3)
+            fit_cell = dialog._catalog._table.item(0, 4)
             assert fit_cell is not None
             assert fit_cell.toolTip()
         finally:
@@ -698,7 +804,7 @@ class TestRequestOptions:
         finally:
             window.close()
 
-    def test_session_reuse_is_reported_rather_than_assumed(self, qapp: object):
+    def test_session_reuse_is_reported_rather_than_assumed(self, qapp: object, wait_for_models):
         """Report the reuse verdict rather than implying the conversation was resumed.
 
         The fake provider keeps no session, so the honest answer is ``unsupported``.
@@ -707,6 +813,8 @@ class TestRequestOptions:
 
         window = MainWindow(default_config())
         try:
+            if not window._engine_bar.target():
+                wait_for_models(window._engine, DEMO_PROVIDER_ID)
             window._reuse_session.setChecked(True)
             window._composer.set_text("hello")
             window._on_send()
@@ -755,13 +863,15 @@ class TestHistoryAndCachePolicies:
         finally:
             window.close()
 
-    def test_policies_travel_on_the_generation_spec(self, qapp: object):
+    def test_policies_travel_on_the_generation_spec(self, qapp: object, wait_for_models):
         """What the dropdowns say is what the engine is handed — nothing in between."""
         from demo_app.config import default_config
         from demo_app.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
+            if not window._engine_bar.target():
+                wait_for_models(window._engine, DEMO_PROVIDER_ID)
             window._history.setCurrentIndex(window._history.findData("last_resort"))
             window._cache.setCurrentIndex(window._cache.findData("explicit"))
             captured = {}

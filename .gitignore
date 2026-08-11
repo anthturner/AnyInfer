@@ -29,6 +29,5 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Local working notes and drafts
-#plans/
+# Agent worktrees
 .claude/worktrees/

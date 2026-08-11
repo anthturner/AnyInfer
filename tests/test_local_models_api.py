@@ -13,11 +13,12 @@ from pathlib import Path
 import pytest
 
 import anyinfer as ai
-from anyinfer._client.models import build_catalog_view, engine_for_provider
+from anyinfer._client.models import build_catalog_view, choose_variant, engine_for_provider
 from anyinfer._client.providers import AdapterPool, ProviderSettings
 from anyinfer.catalog import load_default_catalog
 from anyinfer.local.hardware import HardwareProfile
 from anyinfer.local.server import is_loopback
+from anyinfer.local.store import StoreEntry
 from anyinfer.registry import default_registry
 
 GIB = 1024**3
@@ -25,12 +26,22 @@ GIB = 1024**3
 
 async def test_client_supplies_its_catalog_to_llama_cpp_discovery(tmp_path: Path) -> None:
     """The default demo setup needs no unserializable catalog object in provider options."""
+    artifact_id = sorted(load_default_catalog().artifacts)[0]
     client = ai.AsyncClient(
-        [ai.ProviderSettings.of("llama-cpp", options={"model_dir": tmp_path})]
+        [ai.ProviderSettings.of("llama-cpp", options={"model_dir": tmp_path})],
+        model_dir=tmp_path,
     )
     try:
+        client.model_store.register(
+            StoreEntry(
+                id="installed-for-discovery",
+                model_id=artifact_id,
+                variant_id=artifact_id,
+                engine="llama.cpp",
+            )
+        )
         models = await client.models("llama-cpp")
-        assert models
+        assert [model.id for model in models] == [artifact_id]
     finally:
         await client.aclose()
 
@@ -198,6 +209,26 @@ def test_provider_ids_map_to_engines() -> None:
     assert engine_for_provider("vllm") == "vllm"
     assert engine_for_provider("openai") is None
     assert engine_for_provider(None) is None
+
+
+def test_an_engine_owned_catalog_channel_points_to_pull_instead_of_contradicting_itself() -> None:
+    entry = load_default_catalog().model("qwen3-4b")
+
+    with pytest.raises(ai.ConfigError) as excinfo:
+        choose_variant(
+            entry,
+            engine="ollama",
+            hardware=None,
+            backend=None,
+            prefs=None,
+            variant_id=None,
+        )
+
+    assert "no downloadable weight variants for ollama" in str(excinfo.value)
+    assert excinfo.value.hint is not None
+    assert "downloadable variant engines: llama.cpp" in excinfo.value.hint
+    assert "pull_model('ollama', 'qwen3:4b')" in excinfo.value.hint
+    assert "available on: llama-cpp, ollama" not in str(excinfo.value)
 
 
 # ---- the client surface --------------------------------------------------------------------

@@ -91,7 +91,16 @@ class ProviderConfig:
         }
 
 
-_THEME_PREFERENCES = ("system", "light", "dark")
+_THEME_PREFERENCES = (
+    "system",
+    "light",
+    "dark",
+    "slate",
+    "rose",
+    "forest",
+    "ocean",
+    "sunset",
+)
 
 _SERVE_SETTING_KEYS = ("base_url", "api_key", "api_version")
 """`ProviderSettings` fields a serve config spells at the top level of an entry.
@@ -134,7 +143,7 @@ class DemoConfig:
     targets: tuple[str, ...] = ("demo-fake:reliable",)
     system_prompt: str = ""
     theme: str = "system"
-    """Appearance preference: ``system`` (follow the OS), ``light``, or ``dark``."""
+    """OS-following, light/dark, or named custom appearance preference."""
     context_window_tokens: int | None = None
     """Manual context-window override in tokens; ``None`` means auto-detect."""
     ignore_runtime_hardware_constraints: bool = False

@@ -1444,7 +1444,8 @@ class AsyncClient:
                 if policy.strategy == "synthesize" and judge_generation is not None
                 else winner.generation
             )
-            assert promoted is not None
+            if promoted is None:
+                raise RuntimeError("arena selected a candidate without a generation")
             self._emit(
                 ArenaCompleted(
                     arena_id,
@@ -1562,8 +1563,10 @@ class AsyncClient:
                 estimated_usd=total,
             )
         if spend.max_total_usd is not None:
-            assert self._ledger is not None
-            accepted, spent, reserved = self._ledger.reserve(arena_id, total, spend.max_total_usd)
+            ledger = self._ledger
+            if ledger is None:
+                raise RuntimeError("a cumulative spend policy requires a spend ledger")
+            accepted, spent, reserved = ledger.reserve(arena_id, total, spend.max_total_usd)
             if not accepted:
                 raise SpendLimitError(
                     f"this client has spent {spent}, reserved {reserved}, and this "
@@ -1800,7 +1803,8 @@ class AsyncClient:
                 if policy.strategy == "synthesize" and verdict is not None
                 else winner.generation
             )
-            assert promoted is not None
+            if promoted is None:
+                raise RuntimeError("arena selected a candidate without a generation")
             self._emit(
                 ArenaCompleted(
                     arena_id,
@@ -2759,8 +2763,10 @@ class AsyncClient:
                 continue
 
             if errors:
-                assert request.schema is not None
-                partial, missing = partial_object(active_buffer.text, request.schema.json_schema)
+                schema = request.schema
+                if schema is None:
+                    raise RuntimeError("schema validation failed for a request without a schema")
+                partial, missing = partial_object(active_buffer.text, schema.json_schema)
                 raise SchemaViolationError(
                     f"response did not match the required schema: {errors[0]}",
                     raw_text=active_buffer.text,
@@ -3014,8 +3020,10 @@ class AsyncClient:
             )
 
         if policy.max_total_usd is not None:
-            assert self._ledger is not None
-            accepted, spent, reserved = self._ledger.reserve(
+            ledger = self._ledger
+            if ledger is None:
+                raise RuntimeError("a cumulative spend policy requires a spend ledger")
+            accepted, spent, reserved = ledger.reserve(
                 request_id, estimate, policy.max_total_usd
             )
             if not accepted:

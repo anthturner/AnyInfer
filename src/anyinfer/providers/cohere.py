@@ -32,7 +32,7 @@ from ..types.messages import Message, Text, ToolCall, ToolResult
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import has_multimodal, unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
 
@@ -213,14 +213,7 @@ class CohereAdapter:
         return {"role": message.role, "content": text}
 
     def _encode_tool(self, tool: ToolSpec) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": dict(tool.parameters),
-            },
-        }
+        return _encode_function_tool(tool)
 
     # ---- buffered path ---------------------------------------------------------------
 

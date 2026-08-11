@@ -2,7 +2,7 @@
 
 Used to stack several panels (Telemetry, Structured output, Providers) in one
 `QSplitter` where minimizing one gives the others more room, without
-fully hiding it the way the View menu's show/hide checkboxes do — collapsing here always
+fully hiding it the way the Sidebar menu's show/hide checkboxes do — collapsing here always
 leaves the header visible so the section can be restored with one click.
 """
 

@@ -140,10 +140,15 @@ def read_result(message: Mapping[str, Any]) -> Mapping[str, Any]:
     if "error" in message:
         error = message["error"]
         if isinstance(error, Mapping):
-            code = int(error.get("code", 0))
+            code = error.get("code")
+            error_message = error.get("message")
+            if isinstance(code, bool) or not isinstance(code, int) or not isinstance(
+                error_message, str
+            ):
+                raise ToolLoopError("an MCP server sent a malformed JSON-RPC error object")
             raise JSONRPCError(
                 code,
-                str(error.get("message", "")),
+                error_message,
                 error.get("data"),
                 hint=("the server does not expose a tool surface" if code == -32601 else None),
             )
@@ -175,7 +180,8 @@ def read_initialize(result: Mapping[str, Any]) -> ServerInfo:
     Raises:
         ToolLoopError: If the server answered with a revision this client does not speak.
     """
-    negotiated = str(result.get("protocolVersion", ""))
+    negotiated_raw = result.get("protocolVersion")
+    negotiated = negotiated_raw if isinstance(negotiated_raw, str) else ""
     if negotiated not in ACCEPTED_PROTOCOL_VERSIONS:
         accepted = ", ".join(sorted(ACCEPTED_PROTOCOL_VERSIONS))
         raise ToolLoopError(

@@ -138,7 +138,9 @@ Tool names are namespaced by their server (`fs__read_file`) so two servers offer
 ```
 
 Loading a configuration file never starts a server — the entries are inert descriptions
-until you connect them. Inspect what a server offers without running anything:
+until you connect them. Both stdio `env` values and HTTP `headers` values accept `env://`
+and `credential://` references; they resolve and register for redaction only on connect.
+Inspect what a server offers without running anything:
 
 ```bash
 anyinfer mcp list --config anyinfer.json
