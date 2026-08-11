@@ -368,6 +368,112 @@ def build_parser() -> argparse.ArgumentParser:
             "Content-free: shape, counts, and decisions, never prompt or reply text"
         ),
     )
+    embed = subcommands.add_parser(
+        "embed",
+        help="embed text into vectors",
+        description=(
+            "Embed one or more texts and print the resulting vectors. Input is a single "
+            "positional argument, one text per line from --file/stdin, or one JSON object "
+            "per line ({'text': ...}) from --jsonl."
+        ),
+    )
+    embed.add_argument("text", nargs="?", help="a single text to embed")
+    embed.add_argument(
+        "--config", type=Path, help="JSON config file describing providers and routes"
+    )
+    embed.add_argument(
+        "--target", default=None, help="where to send it: an alias, or 'provider:model'"
+    )
+    embed.add_argument(
+        "--route",
+        action="append",
+        default=[],
+        metavar="TARGET",
+        help="ordered fallback target, repeatable; overrides --target",
+    )
+    embed.add_argument(
+        "--file", type=Path, default=None, metavar="PATH", help="newline-delimited texts"
+    )
+    embed.add_argument(
+        "--jsonl",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="JSON Lines file, one {'text': ...} object per line",
+    )
+    embed.add_argument(
+        "--input-type",
+        choices=("query", "document", "classification", "clustering"),
+        default=None,
+        help="what the embedded text will be used for, on models that distinguish it",
+    )
+    embed.add_argument("--dimensions", type=int, default=None, help="requested vector length")
+    embed.add_argument(
+        "--timeout", type=float, default=None, metavar="SECONDS", help="per-request timeout"
+    )
+    embed.add_argument(
+        "--json",
+        action="store_true",
+        help="emit one JSON object with vectors, space, usage, and timing",
+    )
+    embed.add_argument(
+        "--out", type=Path, default=None, metavar="PATH", help="write JSON output to a file"
+    )
+
+    rerank = subcommands.add_parser(
+        "rerank",
+        help="rank documents by relevance to a query",
+        description=(
+            "Rank documents against a query and print them best-first. Documents come "
+            "from repeated --document flags, one per line from --file, or one JSON "
+            "object per line ({'id': ..., 'text': ...}) from --jsonl."
+        ),
+    )
+    rerank.add_argument("query", help="the query every document is scored against")
+    rerank.add_argument(
+        "--document",
+        action="append",
+        default=[],
+        metavar="TEXT",
+        dest="documents",
+        help="a document to rank, repeatable; ids are assigned in order",
+    )
+    rerank.add_argument(
+        "--config", type=Path, help="JSON config file describing providers and routes"
+    )
+    rerank.add_argument(
+        "--target", default=None, help="where to send it: an alias, or 'provider:model'"
+    )
+    rerank.add_argument(
+        "--route",
+        action="append",
+        default=[],
+        metavar="TARGET",
+        help="ordered fallback target, repeatable; overrides --target",
+    )
+    rerank.add_argument(
+        "--file", type=Path, default=None, metavar="PATH", help="newline-delimited documents"
+    )
+    rerank.add_argument(
+        "--jsonl",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="JSON Lines file, one {'id': ..., 'text': ...} object per line",
+    )
+    rerank.add_argument("--top-n", type=int, default=None, metavar="N", help="return only top N")
+    rerank.add_argument(
+        "--timeout", type=float, default=None, metavar="SECONDS", help="per-request timeout"
+    )
+    rerank.add_argument(
+        "--json",
+        action="store_true",
+        help="emit one JSON object with ranked items, usage, and timing",
+    )
+    rerank.add_argument(
+        "--out", type=Path, default=None, metavar="PATH", help="write JSON output to a file"
+    )
+
     compare = subcommands.add_parser(
         "compare",
         help="compare how one request behaves across targets without sending it",
@@ -704,6 +810,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _serve(args)
         if args.command == "run":
             return _run(args)
+        if args.command == "embed":
+            return _embed(args)
+        if args.command == "rerank":
+            return _rerank(args)
         if args.command == "compare":
             return _compare(args)
         if args.command == "init":
@@ -1261,6 +1371,284 @@ def _run(args: argparse.Namespace) -> int:
         client.close()
 
     return _emit_result(generation, args, streamed=streaming)
+
+
+def _embed(args: argparse.Namespace) -> int:
+    """Embed one or more texts and print the resulting vectors.
+
+    Collection is the CLI's job — the core receives text, never a path to open. Terminal
+    output never dumps raw vector floats unless the caller asked for `--json`, since a
+    printed 1536-float vector is not something a human reads.
+
+    Returns:
+        A process exit code.
+    """
+    from . import Client, Route
+
+    inputs = _collect_embed_inputs(args)
+    if inputs is None:
+        return 2
+    if not inputs:
+        print(
+            "nothing to embed: give a text argument, --file, --jsonl, or pipe on stdin",
+            file=sys.stderr,
+        )
+        return 2
+
+    config = _config(args.config)
+    settings, configured_route = list(config.providers), config.route
+    route = Route(targets=tuple(args.route)) if args.route else configured_route
+    target = None if args.route else args.target
+    if not settings:
+        print(
+            "no providers configured: pass --config pointing at a JSON file with a "
+            "'providers' list (see `anyinfer providers` for what each one needs)",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = Client(settings, route=route)
+    try:
+        result = client.embed(
+            inputs,
+            target=target,
+            route=route if args.route else None,
+            input_type=args.input_type,
+            dimensions=args.dimensions,
+            timeout_s=args.timeout,
+        )
+    except AnyInferError as exc:
+        return _report_error(exc)
+    finally:
+        client.close()
+
+    return _emit_embed_result(result, args)
+
+
+def _collect_embed_inputs(args: argparse.Namespace) -> list[str] | None:
+    """Assemble embedding inputs from the positional text, --file, --jsonl, or stdin.
+
+    Returns ``None`` on a usage error (already reported), an empty list when nothing was
+    given at all, or the collected texts otherwise.
+    """
+    sources = [
+        value
+        for value in (args.text, args.file, args.jsonl)
+        if value not in (None, "")
+    ]
+    if len(sources) > 1:
+        print("give at most one of: text argument, --file, --jsonl", file=sys.stderr)
+        return None
+
+    if args.text:
+        return [args.text]
+    if args.file is not None:
+        try:
+            lines = args.file.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            print(f"cannot read {args.file}: {exc}", file=sys.stderr)
+            return None
+        return [line for line in lines if line.strip()]
+    if args.jsonl is not None:
+        return _read_jsonl_field(args.jsonl, "text")
+
+    if not sys.stdin.isatty():
+        piped = sys.stdin.read()
+        return [line for line in piped.splitlines() if line.strip()]
+    return []
+
+
+def _read_jsonl_field(path: Path, field: str) -> list[str] | None:
+    """Read one JSON object per line, collecting a required string field from each."""
+    try:
+        raw_lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"cannot read {path}: {exc}", file=sys.stderr)
+        return None
+    values: list[str] = []
+    for lineno, line in enumerate(raw_lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError as exc:
+            print(f"{path}:{lineno}: invalid JSON: {exc}", file=sys.stderr)
+            return None
+        if not isinstance(entry, dict) or field not in entry:
+            print(f"{path}:{lineno}: missing required field {field!r}", file=sys.stderr)
+            return None
+        values.append(str(entry[field]))
+    return values
+
+
+def _emit_embed_result(result: Any, args: argparse.Namespace) -> int:
+    """Print an `EmbeddingResult`, respecting the `--json`/`--out` output contract."""
+    if args.json or args.out is not None:
+        payload = {
+            "target": str(result.target),
+            "space": {
+                "provider_id": result.space.provider_id,
+                "model": result.space.model,
+                "dimensions": result.space.dimensions,
+                "normalized": result.space.normalized,
+            },
+            "vectors": [list(v.values) for v in result.vectors],
+            "usage": {
+                "input_tokens": result.usage.input_tokens,
+                "total_tokens": result.usage.total_tokens,
+            },
+            "timing_ms": result.timing.total_ms,
+            "warnings": list(result.warnings),
+        }
+        text = json.dumps(payload, indent=2)
+        if args.out is not None:
+            args.out.write_text(text + "\n", encoding="utf-8")
+        else:
+            print(text)
+        return 0
+
+    print(
+        f"{len(result.vectors)} vector(s), {result.space.dimensions} dim, "
+        f"target={result.target}",
+        file=sys.stderr,
+    )
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    return 0
+
+
+def _rerank(args: argparse.Namespace) -> int:
+    """Rank documents by relevance to a query and print them best-first.
+
+    Returns:
+        A process exit code.
+    """
+    from . import Client, Route
+
+    documents = _collect_rerank_documents(args)
+    if documents is None:
+        return 2
+    if not documents:
+        print(
+            "nothing to rank: give --document (repeatable), --file, --jsonl, or pipe on "
+            "stdin",
+            file=sys.stderr,
+        )
+        return 2
+
+    config = _config(args.config)
+    settings, configured_route = list(config.providers), config.route
+    route = Route(targets=tuple(args.route)) if args.route else configured_route
+    target = None if args.route else args.target
+    if not settings:
+        print(
+            "no providers configured: pass --config pointing at a JSON file with a "
+            "'providers' list (see `anyinfer providers` for what each one needs)",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = Client(settings, route=route)
+    try:
+        result = client.rerank(
+            args.query,
+            documents,
+            target=target,
+            route=route if args.route else None,
+            top_n=args.top_n,
+            timeout_s=args.timeout,
+        )
+    except AnyInferError as exc:
+        return _report_error(exc)
+    finally:
+        client.close()
+
+    return _emit_rerank_result(result, args)
+
+
+def _collect_rerank_documents(args: argparse.Namespace) -> list[Any] | None:
+    """Assemble `RerankDocument`s from --document, --file, --jsonl, or stdin."""
+    from . import RerankDocument
+
+    sources = [bool(args.documents), args.file is not None, args.jsonl is not None]
+    if sum(sources) > 1:
+        print("give at most one of: --document, --file, --jsonl", file=sys.stderr)
+        return None
+
+    if args.documents:
+        return [RerankDocument(id=str(i), text=t) for i, t in enumerate(args.documents)]
+    if args.file is not None:
+        try:
+            lines = args.file.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            print(f"cannot read {args.file}: {exc}", file=sys.stderr)
+            return None
+        return [
+            RerankDocument(id=str(i), text=line)
+            for i, line in enumerate(lines)
+            if line.strip()
+        ]
+    if args.jsonl is not None:
+        return _read_jsonl_documents(args.jsonl)
+
+    if not sys.stdin.isatty():
+        piped = sys.stdin.read()
+        lines = [line for line in piped.splitlines() if line.strip()]
+        return [RerankDocument(id=str(i), text=line) for i, line in enumerate(lines)]
+    return []
+
+
+def _read_jsonl_documents(path: Path) -> list[Any] | None:
+    """Read one {'id', 'text'} object per line into `RerankDocument`s."""
+    from . import RerankDocument
+
+    try:
+        raw_lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"cannot read {path}: {exc}", file=sys.stderr)
+        return None
+    documents: list[Any] = []
+    for lineno, line in enumerate(raw_lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError as exc:
+            print(f"{path}:{lineno}: invalid JSON: {exc}", file=sys.stderr)
+            return None
+        if not isinstance(entry, dict) or "text" not in entry:
+            print(f"{path}:{lineno}: missing required field 'text'", file=sys.stderr)
+            return None
+        doc_id = str(entry.get("id", lineno - 1))
+        documents.append(RerankDocument(id=doc_id, text=str(entry["text"])))
+    return documents
+
+
+def _emit_rerank_result(result: Any, args: argparse.Namespace) -> int:
+    """Print a `RerankResult`, respecting the `--json`/`--out` output contract."""
+    if args.json or args.out is not None:
+        payload = {
+            "target": str(result.target),
+            "items": [
+                {"document_id": item.document_id, "score": item.score, "index": item.index}
+                for item in result.items
+            ],
+            "usage": {
+                "input_tokens": result.usage.input_tokens,
+                "total_tokens": result.usage.total_tokens,
+            },
+            "timing_ms": result.timing.total_ms,
+        }
+        text = json.dumps(payload, indent=2)
+        if args.out is not None:
+            args.out.write_text(text + "\n", encoding="utf-8")
+        else:
+            print(text)
+        return 0
+
+    for rank, item in enumerate(result.items, start=1):
+        print(f"{rank}. [{item.document_id}] {item.score:.4f}")
+    return 0
 
 
 def _dry_run(client: Any, messages: Any, call: dict[str, Any], args: argparse.Namespace) -> int:

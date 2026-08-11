@@ -19,10 +19,11 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from .errors import ConfigError
 from .types.capabilities import ModelCapabilities, RateLimitHeaders, TokenCalibration
+from .types.operations import EmbeddingCapabilities, InferenceOperation, RerankCapabilities
 from .types.requests import CacheMechanism, ReasoningEffort
 
 if TYPE_CHECKING:
-    from .providers.base import ProviderAdapter, ProviderConfig
+    from .providers.base import ProviderConfig, ProviderLifecycle
 
 __all__ = [
     "ENTRY_POINT_GROUP",
@@ -44,8 +45,13 @@ __all__ = [
 ENTRY_POINT_GROUP = "anyinfer.providers"
 """Entry-point group third-party adapters advertise themselves under."""
 
-AdapterFactory = Callable[["ProviderConfig"], "ProviderAdapter"]
-"""Builds an adapter instance from resolved provider configuration."""
+AdapterFactory = Callable[["ProviderConfig"], "ProviderLifecycle"]
+"""Builds an adapter instance from resolved provider configuration.
+
+Typed to the common `ProviderLifecycle` base rather than the generation-capable
+`ProviderAdapter`, since a retrieval-only adapter implements only the operations its
+descriptor declares — it need not implement `generate` at all.
+"""
 
 ReasoningTranslator = Callable[[ReasoningEffort | None], Mapping[str, Any]]
 """Translates normalized reasoning effort into provider wire fields."""
@@ -406,6 +412,29 @@ class ProviderDescriptor:
 
     default_capabilities: ModelCapabilities = ModelCapabilities()
     """Capabilities assumed for any model without a more specific source."""
+
+    operations: frozenset[InferenceOperation] = frozenset({"generation"})
+    """Which inference operations this provider's adapter implements.
+
+    Defaults to generation-only, which is every existing adapter's actual behavior — this
+    field is purely additive. A provider declaring ``"embedding"`` must build an adapter
+    satisfying `anyinfer.providers.base.EmbedsText`; the client checks this when the
+    adapter is first constructed rather than trusting the declaration blindly.
+    """
+
+    static_embedding_capabilities: Mapping[str, EmbeddingCapabilities] = field(
+        default_factory=dict
+    )
+    """Per-model embedding capabilities declared ahead of time, keyed by model id.
+
+    Populated only for models the provider actually embeds with; empty for a
+    generation-only provider."""
+
+    static_rerank_capabilities: Mapping[str, RerankCapabilities] = field(default_factory=dict)
+    """Per-model rerank capabilities declared ahead of time, keyed by model id.
+
+    Populated only for models the provider actually reranks with; empty for a
+    generation-only provider."""
 
     token_calibration: TokenCalibration = TokenCalibration()
     """How much this provider's transport inflates the prompt it is billed for.

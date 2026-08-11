@@ -57,6 +57,42 @@ def test_quickstart_streaming() -> None:
     assert final.timing.total_ms >= 0
 
 
+async def test_quickstart_embed_and_rerank() -> None:
+    """docs/guides/quickstart.md — the embeddings and reranking section."""
+    from anyinfer.registry import ProviderRegistry
+    from anyinfer.testing import FakeEmbeddingRerankProvider
+
+    registry = ProviderRegistry(load_builtins=False, load_entry_points=False)
+    fake = FakeEmbeddingRerankProvider(
+        "quickstart-fake",
+        embedding_dimensions={"nomic-embed-text": 8},
+        rerank_models=["rerank-v3.5"],
+    )
+    fake.register(registry)
+    client = ai.AsyncClient(
+        providers=[ai.ProviderSettings.of("quickstart-fake")],
+        registry=registry,
+        use_default_catalog=False,
+    )
+    try:
+        result = await client.embed(
+            ["Why is the sky blue?", "Why is the grass green?"],
+            target="quickstart-fake:nomic-embed-text",
+        )
+        assert result.space.dimensions == 8
+        assert len(result.vectors) == 2
+
+        ranked = await client.rerank(
+            "capital of France",
+            ["Paris is the capital of France.", "Berlin is the capital of Germany."],
+            target="quickstart-fake:rerank-v3.5",
+        )
+        assert len(ranked.items) == 2
+        assert ranked.items[0].score >= ranked.items[1].score
+    finally:
+        await client.aclose()
+
+
 async def test_quickstart_structured_output() -> None:
     """docs/guides/quickstart.md — schema with repair."""
     summary_schema = {

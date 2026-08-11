@@ -31,6 +31,19 @@ unreachable without a real outage.
 
 </div>
 
+## Fake embedding and rerank providers
+
+An in-process fake implementing `EmbedsText`/`ReranksText` directly — there is no wire
+dialect to reproduce for these operations, so this fake needs no mock transport.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.testing.FakeEmbeddingRerankProvider
+
+::: anyinfer.testing.ScriptedEmbeddingFailure
+
+</div>
+
 ## Fake MCP server
 
 An in-process Model Context Protocol server, for testing a tool loop fed by

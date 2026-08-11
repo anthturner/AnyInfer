@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import Any, Literal
 
 from .._usage import merge_usage
 from ..arena import ArenaResult, Candidate, candidate_envelope, select_candidates
@@ -102,7 +102,7 @@ from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
 from ..manifest import DroppedParameter, ManifestBuilder, RunManifest
-from ..providers.base import AdapterFinal, ProviderAdapter
+from ..providers.base import AdapterFinal, GeneratesText, ProviderAdapter, ProviderLifecycle
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.attempts import AttemptBuffer
 from ..routing.health import HealthCache
@@ -140,9 +140,18 @@ from ..types.messages import (
     system,
     user,
 )
+from ..types.operations import (
+    EmbeddingRequest,
+    EmbeddingResult,
+    EmbeddingSpace,
+    RerankDocument,
+    RerankRequest,
+    RerankResult,
+)
 from ..types.requests import (
     DEFAULT_MAX_INPUT_BYTES,
     DEFAULT_MAX_INPUT_PART_BYTES,
+    DEFAULT_MAX_RESPONSE_BYTES,
     ArenaPolicy,
     CachePolicy,
     GenerationRequest,
@@ -182,6 +191,7 @@ from .models import (
     build_catalog_view,
     locate_catalog_model,
 )
+from .operations import dispatch_embed, dispatch_rerank
 from .providers import AdapterPool, ProviderSettings
 from .tools import (
     DEFAULT_MAX_ROUNDS,
@@ -629,6 +639,12 @@ class AsyncClient:
             )
 
         adapter = await self._pool.get(resolved.provider_id)
+        if not isinstance(adapter, GeneratesText):
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} does not support generation",
+                provider=resolved.provider_id,
+                hint="feature probes only apply to targets that generate text",
+            )
         descriptor = self._pool.descriptor_for(resolved.provider_id)
         results: list[FeatureProbe] = []
         usage = Usage()
@@ -1193,6 +1209,147 @@ class AsyncClient:
         resolved_route = self._resolve_route(target, route, session)
         return await self._generate_request(
             request, resolved_route, session=session, manifest=manifest
+        )
+
+    async def embed(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        input_type: Literal["query", "document", "classification", "clustering"] | None = None,
+        dimensions: int | None = None,
+        expected_space: EmbeddingSpace | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        retain_raw: bool | None = None,
+    ) -> EmbeddingResult:
+        """Embed one or more texts into vectors.
+
+        Args:
+            inputs: A single text, or an ordered sequence of texts to embed. Duplicates
+                are preserved exactly.
+            target: A single target, as for `generate()`.
+            route: A fallback chain, as for `generate()`. Embedding fallback is
+                same-target-only by default: cross-target retries are attempted only when
+                every target shares a caller-asserted embedding-space compatibility id.
+            input_type: What the embedded text will be used for, when the target model
+                distinguishes it.
+            dimensions: Requested output dimensionality, for models supporting native
+                dimensionality reduction.
+            expected_space: An `anyinfer.EmbeddingSpace` the result must match; a
+                successful-but-incompatible response is rejected rather than returned.
+            timeout_s: Per-attempt wall-clock budget.
+            provider_options: Escape hatch, namespaced by provider id.
+            metadata: Caller-supplied labels carried through telemetry.
+            max_response_bytes: Hard cap on one provider response body.
+            retain_raw: Keep the provider's raw response payload on the result. Defaults
+                to the client's ``retain_raw`` setting.
+
+        Returns:
+            The assembled `EmbeddingResult`.
+
+        Raises:
+            anyinfer.errors.AllTargetsFailedError: Every target failed.
+            anyinfer.errors.ConfigError: The resolved target does not support embedding,
+                or its response fails the embedding-space safety check.
+        """
+        texts = (inputs,) if isinstance(inputs, str) else tuple(inputs)
+        request = EmbeddingRequest(
+            inputs=texts,
+            input_type=input_type,
+            dimensions=dimensions,
+            expected_space=expected_space,
+            timeout_s=timeout_s,
+            max_response_bytes=max_response_bytes
+            if max_response_bytes is not None
+            else DEFAULT_MAX_RESPONSE_BYTES,
+            metadata=metadata or {},
+            provider_options=provider_options or {},
+        )
+        resolved_route = self._resolve_route(target, route, None)
+        return await dispatch_embed(
+            request,
+            resolved_route,
+            pool=self._pool,
+            registry=self._registry,
+            catalog=self._catalog,
+            configured_providers=self._pool.configured_ids,
+            health=self._health,
+            emit=self._emit,
+            retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
+        )
+
+    async def rerank(
+        self,
+        query: str,
+        documents: Sequence[str | RerankDocument],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        top_n: int | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        return_documents: bool = False,
+        retain_raw: bool | None = None,
+    ) -> RerankResult:
+        """Rank documents by relevance to a query.
+
+        Args:
+            query: The query text every document is scored against.
+            documents: Document texts, or `anyinfer.RerankDocument` values carrying
+                caller-owned ids. Plain strings are assigned ids ``"0"``, ``"1"``, ...
+                in order.
+            target: A single target, as for `generate()`.
+            route: A fallback chain, as for `generate()`.
+            top_n: Return only the top N ranked items.
+            timeout_s: Per-attempt wall-clock budget.
+            provider_options: Escape hatch, namespaced by provider id.
+            metadata: Caller-supplied labels carried through telemetry.
+            max_response_bytes: Hard cap on one provider response body.
+            return_documents: Echo document text back on each ranked item.
+            retain_raw: Keep the provider's raw response payload on the result. Defaults
+                to the client's ``retain_raw`` setting.
+
+        Returns:
+            The assembled `RerankResult`.
+
+        Raises:
+            anyinfer.errors.AllTargetsFailedError: Every target failed.
+            anyinfer.errors.ConfigError: The resolved target does not support reranking,
+                or its response names a document index outside the request.
+        """
+        docs = tuple(
+            doc if isinstance(doc, RerankDocument) else RerankDocument(id=str(i), text=doc)
+            for i, doc in enumerate(documents)
+        )
+        request = RerankRequest(
+            query=query,
+            documents=docs,
+            top_n=top_n,
+            timeout_s=timeout_s,
+            max_response_bytes=max_response_bytes
+            if max_response_bytes is not None
+            else DEFAULT_MAX_RESPONSE_BYTES,
+            metadata=metadata or {},
+            provider_options=provider_options or {},
+            return_documents=return_documents,
+        )
+        resolved_route = self._resolve_route(target, route, None)
+        return await dispatch_rerank(
+            request,
+            resolved_route,
+            pool=self._pool,
+            registry=self._registry,
+            catalog=self._catalog,
+            configured_providers=self._pool.configured_ids,
+            health=self._health,
+            emit=self._emit,
+            retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
         )
 
     async def _generate_request(
@@ -2259,6 +2416,12 @@ class AsyncClient:
                 continue
 
             adapter = await self._pool.get(resolved.provider_id)
+            if not isinstance(adapter, GeneratesText):
+                raise ConfigError(
+                    f"provider {resolved.provider_id!r} does not support generation",
+                    provider=resolved.provider_id,
+                    hint="choose a target whose provider declares the 'generation' operation",
+                )
             descriptor = self._pool.descriptor_for(resolved.provider_id)
             capabilities = self._capabilities_for(descriptor, resolved)
             if builder is not None:
@@ -3175,7 +3338,7 @@ def _verification_detail(error: Exception) -> str:
 
 
 async def _collect_diagnostics(
-    adapter: ProviderAdapter, descriptor: ProviderDescriptor
+    adapter: ProviderLifecycle, descriptor: ProviderDescriptor
 ) -> Sequence[Diagnostic]:
     """Ask a provider what it noticed about itself, tolerating anything it does.
 

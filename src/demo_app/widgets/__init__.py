@@ -12,6 +12,7 @@ from .chat_view import (
 )
 from .collapsible_section import CollapsibleSection
 from .composer import Composer
+from .embeddings_panel import EmbeddingsPanel
 from .engine_bar import ContextWindowRow, EngineBar
 from .help_dialogs import AboutDialog, LicensesDialog
 from .metrics import StatusMetrics
@@ -36,6 +37,7 @@ __all__ = [
     "Composer",
     "ContextWindowRow",
     "ConversationTabs",
+    "EmbeddingsPanel",
     "EngineBar",
     "LibraryMapDialog",
     "LicensesDialog",

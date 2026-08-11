@@ -533,6 +533,42 @@ TOPICS: dict[str, HelpTopic] = {
             demo_source="src/demo_app/widgets/tools_panel.py",
         ),
         HelpTopic(
+            key="embeddings",
+            title="Embeddings and rerank",
+            summary=(
+                "Client.embed() and Client.rerank() are typed, routed operations distinct "
+                "from generation — neither is folded into GenerationRequest. Embed turns "
+                "text into vectors and returns the EmbeddingSpace that identifies which "
+                "model produced them, so a caller can tell whether two results are safely "
+                "comparable. Rerank scores a caller-owned document set against a query and "
+                "preserves each document's original index and id, so a malformed provider "
+                "response can never be silently attributed to the wrong document."
+            ),
+            api=(
+                "Client.embed",
+                "Client.rerank",
+                "EmbeddingRequest",
+                "EmbeddingResult",
+                "EmbeddingSpace",
+                "EmbeddingVector",
+                "RerankRequest",
+                "RerankResult",
+                "RerankDocument",
+                "RankedItem",
+            ),
+            snippet=(
+                "result = client.embed([\"hello\", \"world\"], target=target)\n"
+                "print(result.space.dimensions, len(result.vectors))\n"
+                "\n"
+                "ranked = client.rerank(\n"
+                '    "capital of France",\n'
+                '    ["Paris is the capital of France.", "Berlin is in Germany."],\n'
+                "    target=target,\n"
+                ")"
+            ),
+            demo_source="src/demo_app/widgets/embeddings_panel.py",
+        ),
+        HelpTopic(
             key="errors",
             title="Errors with hints",
             summary=(

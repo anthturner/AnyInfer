@@ -550,6 +550,18 @@ class Engine(QObject):
         signals.task_failed.connect(self.task_failed)
         self._task_pool.start(_TaskJob(key, fn, signals))
 
+    def embed_text(self, key: str, texts: Sequence[str], target: str) -> None:
+        """Embed one or more texts, reporting the `EmbeddingResult` under ``key``."""
+        client = self.client()
+        self.run_task(key, lambda: client.embed(list(texts), target=target))
+
+    def rerank_documents(
+        self, key: str, query: str, documents: Sequence[str], target: str
+    ) -> None:
+        """Rank documents against a query, reporting the `RerankResult` under ``key``."""
+        client = self.client()
+        self.run_task(key, lambda: client.rerank(query, list(documents), target=target))
+
     def local_catalog(
         self, key: str, provider_id: str | None, *, posture: Posture = "balanced"
     ) -> None:

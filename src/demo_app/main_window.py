@@ -62,6 +62,7 @@ from .widgets import (
     AppSettingsDialog,
     CollapsibleSection,
     Composer,
+    EmbeddingsPanel,
     EngineBar,
     LibraryMapDialog,
     LicensesDialog,
@@ -94,6 +95,7 @@ _SECTION_ICONS: dict[str, str] = {
     "providers": "server",
     "target": "target",
     "tools": "tool",
+    "embeddings": "book",
 }
 """Inspector section key → Tabler icon used by its header."""
 
@@ -472,12 +474,23 @@ class MainWindow(QMainWindow):
         self._tools_section.set_minimized(True)
         self._inspector_splitter.addWidget(self._tools_section)
 
+        self._embeddings = EmbeddingsPanel(self._engine)
+        self._embeddings_section = CollapsibleSection(
+            strings.EMBEDDINGS_TITLE,
+            self._embeddings,
+            help_topic="embeddings",
+            icon=_SECTION_ICONS["embeddings"],
+        )
+        self._embeddings_section.set_minimized(True)
+        self._inspector_splitter.addWidget(self._embeddings_section)
+
         self._inspector_sections: dict[str, CollapsibleSection] = {
             "telemetry": self._telemetry_section,
             "structured": self._schema_section,
             "providers": self._providers_section,
             "target": self._target_section,
             "tools": self._tools_section,
+            "embeddings": self._embeddings_section,
         }
         # A splitter distributes surplus height between its handles when every visible
         # child is fixed at its collapsed height. This invisible final child absorbs that
@@ -493,19 +506,22 @@ class MainWindow(QMainWindow):
         for section in self._inspector_sections.values():
             section.minimized_changed.connect(self._sync_inspector_bottom_spacer)
 
-        self._inspector_splitter.setSizes([280, 280, 220, HEADER_HEIGHT, HEADER_HEIGHT, 0])
+        self._inspector_splitter.setSizes(
+            [280, 280, 220, HEADER_HEIGHT, HEADER_HEIGHT, HEADER_HEIGHT, 0]
+        )
         layout.addWidget(self._inspector_splitter, 1)
 
-        # Both panels act on whatever engine/model the bar currently points at.
+        # All three panels act on whatever engine/model the bar currently points at.
         self._engine_bar.changed.connect(self._sync_inspector_targets)
         self._sync_inspector_targets()
         return pane
 
     def _sync_inspector_targets(self) -> None:
-        """Point the target inspector and tools panel at the bar's current selection."""
+        """Point the target inspector, tools panel, and embeddings panel at the bar's target."""
         target = self._engine_bar.target()
         self._target_inspector.set_target(target)
         self._tools.set_target(target)
+        self._embeddings.set_target(target)
 
     def _sync_inspector_bottom_spacer(self, *_args: object) -> None:
         """Put surplus splitter height below an entirely collapsed visible stack."""

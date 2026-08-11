@@ -51,6 +51,12 @@ requests in, typed event streams or validated results out, across cloud and loca
 10. **Context engineering tied to dispatch.** Token budgets, cost ranges, deterministic
     reduction, and bounded distillation use the same provenance-tagged target capabilities as
     pre-dispatch gating and context-overflow routing; omissions and uncertainty stay visible.
+11. **Stateless embedding and reranking as first-class operations.** `EmbeddingRequest →
+    EmbeddingResult` and `RerankRequest → RerankResult` receive the same batteries as
+    generation — typed async APIs and a sync facade, target resolution and routing,
+    retries and health gating, capability provenance, usage/pricing/telemetry, and fake/
+    cassette/live conformance — without becoming a vector database or a retrieval
+    framework (see §28).
 
 ### Non-goals (v1)
 - **No daemon in the core.** The core is a library; nothing listens on a socket by default.
@@ -89,10 +95,15 @@ requests in, typed event streams or validated results out, across cloud and loca
   boundary as pacing-informed routing and is a reversal to argue. Non-OpenAI operations
   exposed by the sidecar live under `/v1/anyinfer/*`; they remain projections over public
   client APIs, never a second policy layer.
-- **No embeddings, image generation, audio output, or fine-tuning APIs.** Generation still
-  produces text and tool calls only. Multimodal *inputs* — images, documents, and audio
-  content attached to a generation request — are implemented as typed message parts; they
-  do not introduce a second inference primitive or any multimodal output API.
+- **No image generation, audio output, or fine-tuning APIs.** Generation still produces text
+  and tool calls only. Multimodal *inputs* — images, documents, and audio content attached to
+  a generation request — are implemented as typed message parts; they do not introduce a
+  second inference primitive or any multimodal output API. *Amended (§28):* embeddings and
+  reranking are no longer excluded — they are stateless inference operations distinct from
+  generation, scoped narrowly to text in the first release. AnyInfer remains an inference
+  layer, never a vector database, corpus store, or retrieval framework: it produces vectors
+  and relevance rankings and does not decide what an application indexes, persists,
+  retrieves, or deletes.
 - **No cross-provider continuation of interrupted streams.** A continuation would need to
   replay a provider's partial assistant output into another target without duplicating or
   revising it. The feasibility gate was rechecked on **2026-08-10** and required verified
@@ -935,6 +946,14 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 - **R7 — Copilot `auto` sentinel** breaking "model is a known string" assumptions —
   conjunction-of-capabilities rule (§7) must be enforced in the capability assembler, not
   ad hoc per caller.
+- **R10 — Embedding-space mismatch and retrieval-scope creep** (§28). A silently-wrong
+  fallback embedding target is a correctness failure disguised as a success, worse than an
+  ordinary provider error because nothing in the response signals it (ADR-018's whole
+  reason to exist). Mitigate: same-target-only retries by default, refuse-before-send on
+  unknown equivalence, conformance tests asserting the refusal. Separately, "batteries
+  included" pressure will keep inviting a built-in vector database; the boundary in §28 and
+  the scale ceiling in `plans/VECTOR_STORE_ADDON.md` §2 exist to keep that pressure from
+  quietly expanding the core's product definition.
 
 ## 22. Serve frontend: OpenAI-compatible loopback federation
 
@@ -968,8 +987,9 @@ frontend is a wire codec plus an ASGI app around an `AsyncClient`.
   `GenerationRequest` fields; `temperature`/`top_p`/`max_tokens`/`stop` → `Sampling`;
   unrecognized extra-body fields → `provider_options` passthrough (namespaced), so OpenAI
   clients keep the escape hatch. Usage blocks and `finish_reason` come from `Generation`.
-- Out of scope for the frontend: endpoints AnyInfer itself doesn't model (embeddings, images,
-  audio, files) return 404 with a clear error body.
+- Out of scope for the frontend: endpoints AnyInfer itself doesn't model (images, audio,
+  files) return 404 with a clear error body. `POST /v1/embeddings` and
+  `POST /v1/anyinfer/rerank` are modeled endpoints as of §28 — see that section.
 
 **Invariants enforced from M0 so this stays a thin projection (conformance-tested):**
 1. `GenerationRequest` remains a **superset** of the OpenAI chat-completions request surface
@@ -1262,6 +1282,51 @@ projector artifact. Image generation, speech output, transcription endpoints, em
 and fine-tuning remain non-goals.
 
 
+### ADR-017 — Embedding and reranking are operation-typed, not a `ProviderAdapter` superset
+
+**Decision.** Generation, embedding, and reranking are three separately typed operations. The
+provider contract splits into a lifecycle every adapter implements (`list_models`, `health`,
+`aclose`) plus operation protocols an adapter opts into individually: `GeneratesText.generate`,
+`EmbedsText.embed`, `ReranksText.rerank`. A descriptor declares which operations its adapter
+supports; the registry validates the built object actually satisfies each declared protocol.
+One adapter instance and one connection pool may serve several operations when a single
+provider offers more than one; a retrieval-only provider needs no dummy `generate()`.
+`GenerationRequest` never grows embedding or rerank fields — each operation keeps its own
+request/result types, sharing only genuinely operation-neutral shapes (`ResolvedTarget`, the
+shape of `Usage`, `AttemptRecord`). **Why.** `ProviderAdapter` as originally specified
+requires every provider to generate text, which cannot represent a retrieval-only runtime
+(a hosted reranker, a TEI deployment) without a dummy method that lies about what the
+provider does. Folding embedding/rerank fields into `GenerationRequest` would also make the
+core's most central type a union of unrelated inference shapes, which ADR-003's "adapters
+only translate" discipline exists specifically to prevent generation code from becoming.
+**Consequences.** Model discovery must stop filtering out embedding-only and rerank-only
+models as "not chat models." Capability assembly gains per-operation capability records
+(`EmbeddingCapabilities`, `RerankCapabilities`) beside `ModelCapabilities`, both provenance-
+tagged on the same terms as §7. Third-party entry-point discovery, scaffolding, and
+certification must validate declared-vs-implemented protocols per operation rather than
+assuming every registered provider can generate.
+
+### ADR-018 — Embedding-space identity gates cross-target fallback
+
+**Decision.** Every embedding result carries an `EmbeddingSpace` (provider, model, revision
+when pinned, dimensions, input-intent sensitivity, normalization, and an optional caller-
+asserted compatibility id). Embedding routes retry on the same resolved target only by
+default; cross-target fallback is refused unless both targets share a trusted compatibility
+id or the caller explicitly opts into an unsafe fallback, which is recorded on the result and
+in telemetry. When equivalence is unknown, the request fails before a fallback is sent, with
+an actionable hint — the core never guesses that two models are interchangeable. Reranking
+gets ordinary fallback (there is no persisted "index" to invalidate), but scores from
+separate attempts are never merged or compared. **Why.** A query embedded with a fallback
+model produces numbers that look exactly as plausible as the primary model's, and will
+silently fail to find anything in an index built against the primary model's space. That
+failure mode is worse than an ordinary provider error because nothing about the response
+signals it went wrong — routing safety here has to be a refusal, not a warning.
+**Consequences.** `capabilities/pricing.json`-style bundled data cannot assert cross-provider
+embedding equivalence; only an application-supplied `compatibility_id` can. Batching must
+preserve one embedding space per request (a split request's batches all target the same
+resolved target). The context-reduction ranker boundary (ADR-011) may accept an embedding-
+backed ranker built on this guarantee once §9's `ER.6.9` decision is exercised.
+
 ## 24. Provider conformance test matrix (draft)
 
 **Contract snapshots and drift checking.** Each provider's exact wire dependencies
@@ -1522,3 +1587,48 @@ an arena with any failed candidate reports its aggregate usage as unknown rather
 summing only successful candidates into a falsely authoritative total. Calls, successful
 candidate usage, and attempt trails remain visible; provider invoices remain authoritative
 for failed-attempt billing.
+
+## 28. Embedding and reranking operations (`EmbeddingRequest`/`RerankRequest`)
+
+*Amends §2 goal 11 and the multimodal non-goal.* Full implementation plan:
+[plans/EMBEDDING_RERANKING_SUPPORT.md](plans/EMBEDDING_RERANKING_SUPPORT.md).
+
+Embeddings and reranking are stateless inference operations, typed and routed on the same
+terms as generation (ADR-017) but never folded into `GenerationRequest`. `EmbeddingRequest`
+carries non-empty ordered text inputs, an optional input intent (`query`/`document`/
+`classification`/`clustering`), optional requested dimensionality, and an optional
+`expected_space` contract; `EmbeddingResult` returns vectors in input order alongside the
+concrete `EmbeddingSpace` that produced them. `RerankRequest` carries a query and a
+caller-owned ordered document collection (opaque ids, unique per request); `RerankResult`
+preserves original index and document id on every ranked item so a malformed provider
+response can never be silently attributed to the wrong document.
+
+**Batching is core policy, never adapter behavior** (extending ADR-003): a `BatchPolicy`
+bounds concurrency and whether splitting is allowed at all; splitting only occurs from a
+discovered, cataloged, probed, or override limit — an unknown limit means one bounded
+request, never a guessed provider maximum. Embedding batch failure is all-or-error: a
+partial internal-batch failure never becomes an `EmbeddingResult` missing vectors. Reranking
+is not naively batched and concatenated, because scores from separate document batches are
+not assumed globally comparable (ADR-018) unless a provider documents otherwise.
+
+**Retrieval-infrastructure boundary.** AnyInfer produces vectors and rankings; it does not
+persist them, build an index, crawl a corpus, or decide what an application sends to a model.
+A small, separately-packaged, single-process vector store may exist as an optional add-on
+built entirely on these public types (tracked in
+[plans/VECTOR_STORE_ADDON.md](plans/VECTOR_STORE_ADDON.md)), explicitly scoped to
+personal/prototype-sized corpora and never marketed as a scalable or clustered vector
+database — that remains a deployment the application brings, fed by this operation layer the
+same way any other consumer is.
+
+**Sidecar.** `POST /v1/embeddings` is a shared OpenAI-compatible codec, implemented
+alongside (not inside) the chat-completions codec, over `AsyncClient.embed`. Reranking has no
+established OpenAI-shaped wire dialect, so the sidecar exposes an AnyInfer-native
+`POST /v1/anyinfer/rerank` route rather than emulating a specific vendor's rerank endpoint.
+Both inherit the existing loopback-only, redaction, and payload-privacy rules (§12, §14) and
+add request-size limits suited to large document/vector payloads. Both remain thin wire
+codecs over public client APIs, never a second policy layer, on the same terms ADR-009
+establishes for chat completions.
+
+**Context reduction boundary unchanged.** `anyinfer.context.select()` may accept a caller-
+supplied semantic ranker built on `embed()`, but its default stays lexical and offline
+(ADR-011); nothing here makes an embedding provider a hidden dependency of context reduction.

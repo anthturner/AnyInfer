@@ -203,6 +203,28 @@ async with ai.AsyncClient(
             ...
 ```
 
+## Embeddings and reranking
+
+Two operations alongside generation — typed and routed the same way, but never folded into
+`GenerationRequest`:
+
+```python
+result = client.embed(["Why is the sky blue?", "Why is the grass green?"], target="ollama:nomic-embed-text")
+print(result.space.dimensions, len(result.vectors))
+
+ranked = client.rerank(
+    "capital of France",
+    ["Paris is the capital of France.", "Berlin is the capital of Germany."],
+    target="cohere:rerank-v3.5",
+)
+for item in ranked.items:
+    print(item.document_id, item.score)
+```
+
+AnyInfer produces vectors and relevance rankings; it never persists them or builds an index.
+See [embeddings and reranking](../concepts/embeddings.md) for the embedding-space safety
+rule that governs fallback.
+
 ## Running a local model
 
 ```python

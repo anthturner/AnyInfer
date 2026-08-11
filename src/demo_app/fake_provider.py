@@ -32,12 +32,20 @@ from typing import Any
 import httpx2
 
 from anyinfer.registry import ProviderRegistry
-from anyinfer.testing import ScriptedFailure, ScriptedModel, ScriptedProvider
+from anyinfer.testing import (
+    FakeEmbeddingRerankProvider,
+    ScriptedFailure,
+    ScriptedModel,
+    ScriptedProvider,
+)
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
 
 __all__ = [
+    "DEMO_EMBEDDING_MODEL",
+    "DEMO_EMBEDDING_PROVIDER_ID",
     "DEMO_MODELS",
     "DEMO_PROVIDER_ID",
+    "DEMO_RERANK_MODEL",
     "DEMO_TOOL_CALL",
     "TOOL_MODEL",
     "DemoFakeBackend",
@@ -49,6 +57,20 @@ DEMO_PROVIDER_ID = "demo-fake"
 
 DEMO_MODELS: tuple[str, ...] = ("reliable", "flaky", "slow", "tools")
 """Model ids the offline provider serves, each with a different personality."""
+
+DEMO_EMBEDDING_PROVIDER_ID = "demo-fake-embed"
+"""Provider id the demo registers its offline embedding/rerank endpoint under.
+
+Kept separate from `DEMO_PROVIDER_ID` because the two operations need genuinely different
+in-process fakes (`FakeEmbeddingRerankProvider` implements `EmbedsText`/`ReranksText`
+directly rather than an HTTP dialect) — mirroring how a real deployment might point
+embeddings at a different service than chat."""
+
+DEMO_EMBEDDING_MODEL = "embed-small"
+"""Model id the offline embedding fake serves."""
+
+DEMO_RERANK_MODEL = "rerank-small"
+"""Model id the offline rerank fake serves."""
 
 TOOL_MODEL = "tools"
 """The model id whose scripted answer to a plain request is a tool call."""
@@ -205,7 +227,7 @@ def _build(*, json_mode: bool) -> ScriptedProvider:
 
 
 def register_demo_provider(registry: ProviderRegistry) -> None:
-    """Register the offline provider on ``registry``, replacing any prior registration.
+    """Register the offline providers on ``registry``, replacing any prior registration.
 
     Args:
         registry: The registry the demo's client will use. A demo-owned registry rather
@@ -213,3 +235,8 @@ def register_demo_provider(registry: ProviderRegistry) -> None:
             for an embedding application.
     """
     _build(json_mode=False).register(registry)
+    FakeEmbeddingRerankProvider(
+        DEMO_EMBEDDING_PROVIDER_ID,
+        embedding_dimensions={DEMO_EMBEDDING_MODEL: 32},
+        rerank_models=[DEMO_RERANK_MODEL],
+    ).register(registry)

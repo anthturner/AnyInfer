@@ -21,7 +21,7 @@ from collections.abc import Callable, Coroutine, Iterator, Mapping, Sequence
 from concurrent.futures import Future
 from pathlib import Path
 from types import TracebackType
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 from ..benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
@@ -53,6 +53,7 @@ from ..routing.policy import Route
 from ..session import Session
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
+from ..types.operations import EmbeddingResult, EmbeddingSpace, RerankDocument, RerankResult
 from ..types.requests import (
     ArenaPolicy,
     CachePolicy,
@@ -691,6 +692,72 @@ class Client:
                 max_input_bytes=max_input_bytes,
                 session=session,
                 manifest=manifest,
+            )
+        )
+
+    def embed(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        input_type: Literal["query", "document", "classification", "clustering"] | None = None,
+        dimensions: int | None = None,
+        expected_space: EmbeddingSpace | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        retain_raw: bool | None = None,
+    ) -> EmbeddingResult:
+        """Embed one or more texts into vectors. See `AsyncClient.embed()`."""
+        self._ensure_open()
+        return self._loop.run(
+            self._async.embed(
+                inputs,
+                target=target,
+                route=route,
+                input_type=input_type,
+                dimensions=dimensions,
+                expected_space=expected_space,
+                timeout_s=timeout_s,
+                provider_options=provider_options,
+                metadata=metadata,
+                max_response_bytes=max_response_bytes,
+                retain_raw=retain_raw,
+            )
+        )
+
+    def rerank(
+        self,
+        query: str,
+        documents: Sequence[str | RerankDocument],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        top_n: int | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        return_documents: bool = False,
+        retain_raw: bool | None = None,
+    ) -> RerankResult:
+        """Rank documents by relevance to a query. See `AsyncClient.rerank()`."""
+        self._ensure_open()
+        return self._loop.run(
+            self._async.rerank(
+                query,
+                documents,
+                target=target,
+                route=route,
+                top_n=top_n,
+                timeout_s=timeout_s,
+                provider_options=provider_options,
+                metadata=metadata,
+                max_response_bytes=max_response_bytes,
+                return_documents=return_documents,
+                retain_raw=retain_raw,
             )
         )
 

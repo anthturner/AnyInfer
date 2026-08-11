@@ -151,6 +151,7 @@ nav:
       - The event stream: concepts/events.md
       - Routing: concepts/routing.md
       - Structured output: concepts/structured-output.md
+      - Embeddings and reranking: concepts/embeddings.md
       - Sessions: concepts/sessions.md
       - Capabilities and provenance: concepts/capabilities.md
       - Token estimation and context budgets: concepts/budgeting.md
@@ -201,6 +202,7 @@ nav:
           - Clients and streams: reference/api/client.md
           - Requests and messages: reference/api/requests.md
           - Results and stream events: reference/api/results.md
+          - Embeddings and reranking: reference/api/embeddings.md
           - Routing: reference/api/routing.md
           - Capabilities: reference/api/capabilities.md
           - Context reduction: reference/api/context.md

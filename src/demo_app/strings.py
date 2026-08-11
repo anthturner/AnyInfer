@@ -11,6 +11,7 @@ from __future__ import annotations
 __all__ = [
     "CANCEL",
     "COMPOSER_PLACEHOLDER",
+    "EMBEDDINGS_TITLE",
     "LOCAL_INFERENCE",
     "OPEN_SAVED",
     "PROVIDERS_TITLE",
@@ -53,6 +54,7 @@ STRUCTURED_TITLE = "Structured output"
 PROVIDERS_TITLE = "Providers"
 TARGET_TITLE = "Target inspector"
 TOOLS_TITLE = "Tool loop"
+EMBEDDINGS_TITLE = "Embeddings and rerank"
 LOCAL_INFERENCE = "Local Inference…"
 REFRESH = "Refresh"
 SETTINGS = "Provider settings…"

@@ -26,6 +26,13 @@ from typing import Any
 
 from ..errors import AnyInferError, SchemaViolationError
 from ..types.events import StreamEnded
+from ..types.operations import RerankDocument
+from .embeddings_codec import (
+    embedding_request_from_openai,
+    embeddings_response,
+    rerank_request_from_body,
+    rerank_response,
+)
 from .openai_codec import (
     chunk_from_event,
     completion_from_generation,
@@ -192,6 +199,53 @@ def create_app(
             }
         )
 
+    async def embeddings(request: Any) -> Any:
+        """Serve ``POST /v1/embeddings`` as an OpenAI-compatible codec over `AsyncClient.embed`."""
+        guard = _check_auth(request, auth_token, starlette)
+        if guard is not None:
+            return guard
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 — any malformed body is one error to the client
+            return _error(starlette, 400, "request body must be valid JSON")
+        if not isinstance(body, Mapping):
+            return _error(starlette, 400, "request body must be a JSON object")
+
+        try:
+            target, inputs, kwargs = embedding_request_from_openai(body)
+        except ValueError as exc:
+            return _error(starlette, 400, str(exc))
+
+        try:
+            result = await client.embed(inputs, target=target, **kwargs)
+        except AnyInferError as exc:
+            return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
+        return starlette.JSONResponse(embeddings_response(result, model=target))
+
+    async def rerank(request: Any) -> Any:
+        """Serve ``POST /v1/anyinfer/rerank`` as a codec over `AsyncClient.rerank`."""
+        guard = _check_auth(request, auth_token, starlette)
+        if guard is not None:
+            return guard
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            return _error(starlette, 400, "request body must be valid JSON")
+        if not isinstance(body, Mapping):
+            return _error(starlette, 400, "request body must be a JSON object")
+
+        try:
+            target, query, documents, kwargs = rerank_request_from_body(body)
+        except ValueError as exc:
+            return _error(starlette, 400, str(exc))
+
+        rerank_documents = [RerankDocument(id=doc_id, text=text) for doc_id, text in documents]
+        try:
+            result = await client.rerank(query, rerank_documents, target=target, **kwargs)
+        except AnyInferError as exc:
+            return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
+        return starlette.JSONResponse(rerank_response(result, model=target))
+
     async def health(request: Any) -> Any:
         """Serve ``GET /health``: liveness only, requiring no authentication."""
         return starlette.JSONResponse({"status": "ok"})
@@ -201,13 +255,18 @@ def create_app(
         return _error(
             starlette,
             404,
-            f"{request.url.path} is not supported: AnyInfer models text generation only",
+            (
+                f"{request.url.path} is not supported: AnyInfer models text generation, "
+                "embeddings, and reranking only"
+            ),
             "not_found",
         )
 
     routes = [
         starlette.Route("/health", health, methods=["GET"]),
         starlette.Route("/v1/chat/completions", chat_completions, methods=["POST"]),
+        starlette.Route("/v1/embeddings", embeddings, methods=["POST"]),
+        starlette.Route("/v1/anyinfer/rerank", rerank, methods=["POST"]),
         starlette.Route("/v1/models", models, methods=["GET"]),
         starlette.Route("/v1/anyinfer/compare", compare_targets, methods=["POST"]),
         starlette.Route("/v1/{rest:path}", unsupported, methods=["GET", "POST"]),

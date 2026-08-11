@@ -18,6 +18,7 @@ the failure mode AnyInfer exists to eliminate.
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: tool calls</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: health</span>
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: discovery</span>
+<span class="anyinfer-badge anyinfer-badge-yes">:material-check: embeddings</span>
 </div>
 
 ## Setup
@@ -88,6 +89,21 @@ The same text lands on `result.warnings` for any request that hit it, and as a
 `ProviderDiagnostic` event. Costs nothing: `/api/ps` is a local read, never a generation.
 A model within 5% of full residency is not reported — Ollama's own sizes wobble by a few
 megabytes, and a warning on every healthy load is one nobody reads.
+
+## Embeddings
+
+Ollama's native `POST /api/embed` is a batch-capable embedding endpoint, distinct from the
+older deprecated `POST /api/embeddings` (singular-input) route this adapter does not speak.
+
+```python
+result = client.embed(["Why is the sky blue?", "Why is the grass green?"], target="ollama:nomic-embed-text")
+print(result.space.dimensions, len(result.vectors))
+```
+
+Batch input is native — every text in one call is sent as one array, not simulated with
+repeated requests. Requested `dimensions` are forwarded when the model supports native
+dimensionality reduction. There is no reranking support for this provider; Ollama documents
+no native rerank endpoint.
 
 ## Provider options
 

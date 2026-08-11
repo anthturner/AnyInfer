@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from ..types.capabilities import DiscoveredModel, Health
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
 from ..types.messages import Message
+from ..types.operations import EmbeddingInputIntent
 from ..types.requests import Sampling, ToolSpec
 from ..types.results import Diagnostic, FinishReason, Mechanism, Usage
 
@@ -27,9 +28,19 @@ if TYPE_CHECKING:
 __all__ = [
     "AdapterEvent",
     "AdapterFinal",
+    "EmbeddingWireRequest",
+    "EmbeddingWireResult",
+    "EmbedsText",
+    "GeneratesText",
     "ProviderAdapter",
     "ProviderConfig",
+    "ProviderLifecycle",
+    "RerankWireDocument",
+    "RerankWireRequest",
+    "RerankWireResult",
+    "ReranksText",
     "SupportsDiagnostics",
+    "WireRankedItem",
     "WireRequest",
 ]
 
@@ -169,15 +180,202 @@ AdapterEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate | Adapte
 
 
 @runtime_checkable
+class ProviderLifecycle(Protocol):
+    """The lifecycle every provider adapter implements, regardless of which operations it supports.
+
+    Three methods, no more: discovery, health, and cleanup. An adapter additionally
+    implements one or more of `GeneratesText`, `EmbedsText`, `ReranksText` — whichever
+    operations its descriptor declares support for (see `ProviderDescriptor.operations`).
+    A retrieval-only adapter (a hosted reranker with no chat endpoint) implements this plus
+    `ReranksText` and nothing else; it needs no dummy `generate()`.
+    """
+
+    async def list_models(self) -> Sequence[DiscoveredModel]:
+        """Enumerate models this provider offers."""
+        ...
+
+    async def health(self) -> Health:
+        """Cheap readiness probe consulted by the router's health gate."""
+        ...
+
+    async def aclose(self) -> None:
+        """Release transports and any supervised resources."""
+        ...
+
+
+@runtime_checkable
+class GeneratesText(Protocol):
+    """A provider adapter that can generate text.
+
+    `generate()` is the single generation entry point and always yields events — a
+    buffered provider emits one delta plus a final, and the core drains it for
+    non-streaming callers. Adapters may implement it either as an ``async def`` generator
+    or as a plain method returning an async iterator; both satisfy this signature.
+    """
+
+    def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
+        """Run one generation, yielding normalized events.
+
+        Raises:
+            anyinfer.errors.ProviderError: With ``retryable``/``retry_after_s`` set. Adapters
+                classify; the router decides.
+        """
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingWireRequest:
+    """An embedding request, fully resolved for one provider.
+
+    Attributes:
+        model: The concrete model id.
+        inputs: Texts to embed, in the exact order the response must preserve.
+        input_type: Requested input intent, already validated against what this provider
+            accepts; ``None`` when no intent is asserted or the provider ignores the concept.
+        dimensions: Requested output dimensionality, or ``None`` for the model's default.
+        timeout_s: Per-attempt wall clock.
+        max_response_bytes: Cap on the response body.
+        extra_options: ``provider_options[this_provider]``, passed through verbatim.
+    """
+
+    model: str
+    inputs: tuple[str, ...]
+    input_type: EmbeddingInputIntent | None = None
+    dimensions: int | None = None
+    timeout_s: float = 120.0
+    max_response_bytes: int = 1_048_576
+    extra_options: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingWireResult:
+    """What an adapter returns from one embedding call.
+
+    Attributes:
+        vectors: Raw vector components, in input order. Validated into `EmbeddingVector`
+            by the core, not the adapter.
+        model: The concrete model id the provider reports serving the request, when it
+            reports one; falls back to the requested model otherwise.
+        dimensions: The vector length actually returned, when the provider states it
+            separately from the vector data.
+        normalized: Whether the provider states these vectors are unit-normalized.
+        usage: Usage the provider reported for this call, when any.
+        raw: The provider payload, attached unconditionally; the core retains it only when
+            the request opted in.
+    """
+
+    vectors: tuple[tuple[float, ...], ...]
+    model: str | None = None
+    dimensions: int | None = None
+    normalized: bool | None = None
+    usage: Usage | None = None
+    raw: Any | None = None
+
+
+@runtime_checkable
+class EmbedsText(Protocol):
+    """A provider adapter that can embed text into vectors."""
+
+    async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Run one embedding call, buffered — embeddings are never streamed.
+
+        Raises:
+            anyinfer.errors.ProviderError: With ``retryable``/``retry_after_s`` set.
+        """
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class RerankWireDocument:
+    """One document sent to a provider's rerank call.
+
+    Attributes:
+        index: Position in the original request, so the adapter's translation cannot lose
+            it even when the provider's own response omits echoing an id.
+        text: The document text.
+    """
+
+    index: int
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class RerankWireRequest:
+    """A rerank request, fully resolved for one provider.
+
+    Attributes:
+        model: The concrete model id.
+        query: The query text.
+        documents: Documents to rank, indexed by their position in the original request.
+        top_n: Requested result truncation, or ``None`` for every document ranked.
+        timeout_s: Per-attempt wall clock.
+        max_response_bytes: Cap on the response body.
+        extra_options: ``provider_options[this_provider]``, passed through verbatim.
+    """
+
+    model: str
+    query: str
+    documents: tuple[RerankWireDocument, ...]
+    top_n: int | None = None
+    timeout_s: float = 120.0
+    max_response_bytes: int = 1_048_576
+    extra_options: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class WireRankedItem:
+    """One ranked document as a provider reported it.
+
+    Attributes:
+        index: The document's position in `RerankWireRequest.documents`, as the provider
+            reported it. The core validates this is in range and unique before trusting it.
+        score: The provider's relevance score.
+    """
+
+    index: int
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
+class RerankWireResult:
+    """What an adapter returns from one rerank call.
+
+    Attributes:
+        items: Ranked documents as the provider returned them, in the provider's own
+            result order. The core validates index integrity before building `RankedItem`s.
+        model: The concrete model id the provider reports serving the request, when it
+            reports one.
+        usage: Usage the provider reported for this call, when any.
+        raw: The provider payload, attached unconditionally.
+    """
+
+    items: tuple[WireRankedItem, ...]
+    model: str | None = None
+    usage: Usage | None = None
+    raw: Any | None = None
+
+
+@runtime_checkable
+class ReranksText(Protocol):
+    """A provider adapter that can rerank documents against a query."""
+
+    async def rerank(self, req: RerankWireRequest) -> RerankWireResult:
+        """Run one rerank call, buffered — reranking is never streamed.
+
+        Raises:
+            anyinfer.errors.ProviderError: With ``retryable``/``retry_after_s`` set.
+        """
+        ...
+
+
+@runtime_checkable
 class ProviderAdapter(Protocol):
-    """What every provider adapter implements.
+    """What every text-generation provider adapter implements.
 
-    Four methods, no more. `generate()` is the single generation entry point and always
-    yields events — a buffered provider emits one delta plus a final, and the core drains it
-    for non-streaming callers.
-
-    Adapters may implement ``generate`` either as an ``async def`` generator or as a plain
-    method returning an async iterator; both satisfy this signature.
+    Structurally this is `ProviderLifecycle` plus `GeneratesText`, kept as one combined name
+    so the seventeen existing generation adapters need no change. A new adapter that only
+    embeds or only reranks implements `ProviderLifecycle` plus `EmbedsText`/`ReranksText`
+    instead.
     """
 
     async def list_models(self) -> Sequence[DiscoveredModel]:

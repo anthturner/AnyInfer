@@ -38,6 +38,7 @@ from .scripted import (
     ScriptedModel,
     ScriptedProvider,
 )
+from .scripted_operations import FakeEmbeddingRerankProvider, ScriptedEmbeddingFailure
 
 __all__ = [
     "CONFORMANCE_CASES",
@@ -50,6 +51,7 @@ __all__ = [
     "ConformanceCase",
     "ConformanceHarness",
     "FailureKind",
+    "FakeEmbeddingRerankProvider",
     "FakeGeminiServer",
     "FakeMCPServer",
     "FakeMCPTool",
@@ -57,6 +59,7 @@ __all__ = [
     "FakeOpenAIServer",
     "FakeResponse",
     "Interaction",
+    "ScriptedEmbeddingFailure",
     "ScriptedFailure",
     "ScriptedModel",
     "ScriptedProvider",

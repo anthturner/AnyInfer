@@ -610,3 +610,93 @@ conformance case, not only in this plan.
 
 - **2026-08-11:** Initial plan drafted from the current implementation and product-owner
   direction. No production code changed. Owner interview questions Q1-Q6 remain open.
+- **2026-08-11 (implementation pass):** Owner decisions resolved — Q1: Ollama/llama.cpp is
+  the near-term real target, but the milestone was implemented to keep other providers
+  addable without core changes. Q2/vector store: stateless-only in core; a small,
+  explicitly non-scalable optional add-on package is tracked separately in
+  `plans/VECTOR_STORE_ADDON.md`, not started. Q3: implemented core + SDK + CLI + sidecar +
+  demo app together in one pass, per owner direction ("everything at once"). Q4: sidecar
+  rerank is AnyInfer-native only (`POST /v1/anyinfer/rerank`); no Cohere-compatibility
+  codec was added. Q5 (unsafe embedding fallback escape hatch) and Q6 (novice aliases like
+  `embed-small`) remain unresolved and unimplemented.
+
+  **Delivered and tested** (governance amendments in `DESIGN.md` §2, §23 ADR-017/ADR-018,
+  §28, risk R10; full details in code):
+  - Core types: `InferenceOperation`, `EmbeddingRequest`/`Result`/`Vector`/`Space`,
+    `RerankRequest`/`Result`/`Document`/`RankedItem`, `EmbeddingCapabilities`,
+    `RerankCapabilities`, `BatchPolicy` (§4, partially — see gaps below).
+  - Provider contract split into `ProviderLifecycle` + `GeneratesText`/`EmbedsText`/
+    `ReranksText`, with `ProviderDescriptor.operations` and build-time validation that a
+    descriptor's declared operations are actually implemented (§5, ER.2.1-ER.2.5).
+  - Embedding-space cross-target fallback safety guard: same-target-only by default,
+    `expected_space` rejection, incompatible-fallback warning (§6, ER.3.1-ER.3.6) — the
+    unsafe opt-in escape hatch (Q5, ER.3.3's second clause) was **not** implemented.
+  - Routing/dispatch (`_client/operations.py`): target resolution, retry/backoff, health
+    gate, fallback, attempt trail, telemetry reuse (`RequestStarted`/`TargetResolved`/
+    `AttemptStarted`/`AttemptCompleted`/`RetryScheduled`/`FallbackTriggered`/
+    `RequestCompleted`/`RequestFailed`) — reused generation's event types rather than
+    adding operation-specific ones (partial ER.8.1/ER.8.2).
+  - `AsyncClient.embed`/`rerank` and `Client.embed`/`rerank` sync facade (§9, ER.6.1-ER.6.5
+    only — `models()`/`capabilities()`/`compare()`/`verify()`/benchmark surfaces from
+    ER.6.6 were **not** extended for the new operations).
+  - Ollama `POST /api/embed` adapter, contract-verified live against
+    `docs.ollama.com/api/embed` and the GitHub `api.md` on 2026-08-11 (`contracts/ollama.md`
+    updated; error-shape and batch-limit specifics remain explicitly flagged unverified).
+  - Shared OpenAI-compatible `/v1/embeddings` dialect (`providers/openai_compat_embeddings.py`)
+    as a mixin, float and base64 vector decoding, kept alongside not inside the chat codec
+    (ER.2.9-ER.2.11) — **not yet wired into any concrete preset's descriptor** (ER.2.12/
+    ER.2.13 undone; a provider must opt in explicitly and none currently do besides Ollama's
+    own native dialect).
+  - CLI `anyinfer embed` / `anyinfer rerank` (text/file/JSONL input, JSON output, `--out`)
+    (§12 CLI, ER.9.1-ER.9.3, ER.9.5).
+  - Sidecar `POST /v1/embeddings` and `POST /v1/anyinfer/rerank` (§12 sidecar,
+    ER.9.6/ER.9.7) — model-listing distinction by operation (ER.9.9), compatibility-alias
+    decision (ER.9.8, Q4 resolved as "no"), and PyInstaller-bundle smoke tests (ER.9.11)
+    were **not** done.
+  - Demo app `EmbeddingsPanel` wired into the inspector sidebar, backed by an in-process
+    fake provider (`FakeEmbeddingRerankProvider`) added to `anyinfer.testing` and the demo's
+    offline fake registry (§12 demo, ER.9.12-ER.9.15).
+  - Docs: concepts page, API reference page, Ollama provider-page section, quickstart
+    section (§15, ER.12.1/ER.12.2 partial, ER.12.3 partial, ER.12.4 not done — no complete
+    standalone application example, ER.12.7 done in the concepts page).
+  - Tests: ~120 new tests across types, provider protocols, routing/dispatch, the Ollama and
+    OpenAI-compat adapters, the CLI, the sidecar, and the demo app; full project test suite,
+    mypy, ruff, mkdocs --strict, and import-linter architecture contracts all pass with zero
+    new failures (one pre-existing, unrelated demo-app sort-order test failure confirmed
+    present on a clean checkout before this work started).
+
+  **Explicitly not done in this pass** — real gaps, not implied by the above:
+  - Core-owned batching (`BatchPolicy` exists as a type but request splitting across
+    provider-verified limits is **not implemented** — every request is sent as one call;
+    §7/ER.4.1-ER.4.8 remain undone).
+  - Cohere, Azure, Gemini, Vertex, Bedrock, LM Studio, Voyage AI, Jina AI, and llama-server
+    embedding/reranking (§8 Milestones A-C beyond Ollama and the generic OpenAI-compat
+    dialect) — none implemented.
+  - Config/catalog extensions for operation-specific named routes, catalog model-operation
+    metadata, novice aliases (§10, all of ER.7.1-ER.7.8).
+  - Manifests are not populated for embed/rerank results (`EmbeddingResult.manifest` and
+    `RerankResult.manifest` stay `None` always) — `anyinfer.manifest` was not extended.
+  - OTel bridge mapping, benchmark metrics, spend-ledger integration for the new operations
+    (§11, ER.8.3-ER.8.8) — untouched.
+  - The full conformance-kit treatment from §14 (ER.11.1-ER.11.5, ER.11.15-ER.11.18):
+    scripted-provider-style conformance *cases* registered in the shared harness, cassette
+    recordings, and drift-check coverage were not added — the new tests are conventional
+    pytest suites, not entries in `anyinfer.testing.conformance`.
+  - Third-party entry-point/scaffolding/certification updates for operation-specific
+    adapters (ER.2.7).
+  - PyInstaller standalone-bundle smoke tests for the new sidecar routes (ER.9.11).
+  - The release acceptance criteria in §17 are **not** met as a whole: only one hosted-shape
+    dialect (OpenAI-compatible, unattached to a live preset) and one local target (Ollama)
+    exist, cassette/live conformance modes were not exercised, and the standalone-binary
+    smoke tests were not run.
+
+  Net effect: this pass proves the full architecture end-to-end through one real local
+  provider and reuses that proof for a shared hosted dialect, across every stated frontend,
+  but is a vertical slice — not the complete milestone. Treat the "explicitly not done"
+  list above as the next actionable increment of this plan, not as background risk.
+
+  Note: the per-item `[ ]`/`[x]` checkboxes throughout sections 4-14 were **not**
+  individually updated to match this log, to avoid mismarking an item under time pressure.
+  This log is the authoritative account of what shipped in this pass; treat any checkbox
+  as unverified until it is checked against the "delivered and tested" / "explicitly not
+  done" lists above.

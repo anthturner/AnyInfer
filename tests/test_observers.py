@@ -258,7 +258,11 @@ async def test_adapter_lifecycle_events_share_the_client_dispatcher() -> None:
     from anyinfer.registry import ProviderDescriptor
 
     registry = ProviderRegistry(load_builtins=False, load_entry_points=False)
-    registry.register(ProviderDescriptor(id="probe", display_name="Probe", factory=_Probe))
+    registry.register(
+        ProviderDescriptor(
+            id="probe", display_name="Probe", factory=_Probe, operations=frozenset()
+        )
+    )
     pool = AdapterPool(
         [ai.ProviderSettings.of("probe")], registry=registry, events=captured.append
     )

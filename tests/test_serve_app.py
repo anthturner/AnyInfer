@@ -405,15 +405,19 @@ def test_models_also_requires_the_token() -> None:
 # ---- unsupported surface -------------------------------------------------------------
 
 
-@pytest.mark.parametrize("path", ["/v1/embeddings", "/v1/images/generations", "/v1/audio"])
+@pytest.mark.parametrize("path", ["/v1/images/generations", "/v1/audio"])
 def test_unmodelled_endpoints_return_a_clear_404(path: str) -> None:
-    """AnyInfer models text generation only; the rest must say so plainly (§22)."""
+    """AnyInfer models text generation, embeddings, and reranking; the rest says so plainly.
+
+    ``/v1/embeddings`` moved out of this list once it became a real modeled endpoint
+    (see test_serve_embeddings.py) — it now 200s rather than 404ing.
+    """
     server = FakeOpenAIServer()
     http, _ = _client(server)
 
     response = http.post(path, json={})
     assert response.status_code == 404
-    assert "text generation only" in response.json()["error"]["message"]
+    assert "text generation, embeddings, and reranking only" in response.json()["error"]["message"]
 
 
 def test_missing_model_field_is_a_400() -> None:

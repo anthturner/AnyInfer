@@ -18,7 +18,13 @@ from ..credentials import ResolverChain, default_resolver
 from ..errors import ConfigError, CredentialError
 from ..events.telemetry import TelemetryEvent
 from ..local.server import is_loopback
-from ..providers.base import ProviderAdapter, ProviderConfig
+from ..providers.base import (
+    EmbedsText,
+    GeneratesText,
+    ProviderConfig,
+    ProviderLifecycle,
+    ReranksText,
+)
 from ..registry import ProviderDescriptor, ProviderRegistry, normalize_provider_id
 from ..routing.limits import GoverningTransport, RateLimiter
 from ..types.requests import RateLimits
@@ -122,7 +128,7 @@ class AdapterPool:
             self._settings[instance_id] = setting
             self._order.append(instance_id)
             self._register_alias(setting)
-        self._adapters: dict[str, ProviderAdapter] = {}
+        self._adapters: dict[str, ProviderLifecycle] = {}
         self._limiters: dict[str, RateLimiter] = {}
         self._lock = asyncio.Lock()
 
@@ -252,7 +258,7 @@ class AdapterPool:
             return "local"
         return "local" if is_loopback(base_url) else "remote"
 
-    async def get(self, provider_id: str) -> ProviderAdapter:
+    async def get(self, provider_id: str) -> ProviderLifecycle:
         """Return the adapter for a provider instance, building it on first use.
 
         Raises:
@@ -270,7 +276,7 @@ class AdapterPool:
             self._adapters[key] = adapter
             return adapter
 
-    def _build(self, provider_id: str) -> ProviderAdapter:
+    def _build(self, provider_id: str) -> ProviderLifecycle:
         descriptor = self._registry.get(provider_id)
         settings = self._settings.get(provider_id) or ProviderSettings(provider_id=provider_id)
 
@@ -303,7 +309,33 @@ class AdapterPool:
             transport=self._govern(provider_id, descriptor, settings),
             events=self._events,
         )
-        return descriptor.factory(config)
+        adapter = descriptor.factory(config)
+        self._validate_operations(provider_id, descriptor, adapter)
+        return adapter
+
+    def _validate_operations(
+        self, provider_id: str, descriptor: ProviderDescriptor, adapter: ProviderLifecycle
+    ) -> None:
+        """Fail fast when a descriptor claims an operation its adapter object cannot do.
+
+        A declared-but-unsatisfied operation is a provider-authoring bug, not a runtime
+        condition to route around — catching it at first build keeps a broken descriptor
+        from surfacing as a confusing `AttributeError` deep inside the router instead.
+        """
+        checks: dict[str, type] = {
+            "generation": GeneratesText,
+            "embedding": EmbedsText,
+            "rerank": ReranksText,
+        }
+        for operation in descriptor.operations:
+            protocol = checks.get(operation)
+            if protocol is not None and not isinstance(adapter, protocol):
+                raise ConfigError(
+                    f"provider {provider_id!r} declares support for {operation!r} but its "
+                    f"adapter does not implement {protocol.__name__}",
+                    provider=provider_id,
+                    hint="fix the descriptor's operations set or the adapter's factory",
+                )
 
     def _govern(
         self,
