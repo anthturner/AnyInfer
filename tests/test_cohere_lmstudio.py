@@ -686,3 +686,41 @@ async def test_lm_studio_conformance() -> None:
     results = await run_conformance(LM_STUDIO_HARNESS)
     failures = [r for r in results if not r.passed and not r.skipped]
     assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+async def test_lm_studio_embeds_through_the_compatible_dialect() -> None:
+    """The mixin composes into the LM Studio adapter; /v1/embeddings round-trips."""
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path.endswith("/v1/embeddings")
+        body = json.loads(request.content)
+        inputs = body["input"] if isinstance(body["input"], list) else [body["input"]]
+        return httpx2.Response(
+            200,
+            json={
+                "object": "list",
+                "data": [
+                    {"object": "embedding", "index": i, "embedding": [0.1, 0.2]}
+                    for i in range(len(inputs))
+                ],
+                "model": body["model"],
+                "usage": {"prompt_tokens": len(inputs), "total_tokens": len(inputs)},
+            },
+        )
+
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "lm-studio",
+                base_url="http://127.0.0.1:1234/v1",
+                transport=httpx2.MockTransport(handler),
+            )
+        ],
+        use_default_catalog=False,
+    )
+    try:
+        result = await client.embed(["a", "b"], target="lm-studio:nomic-embed")
+        assert len(result.vectors) == 2
+        assert result.space.provider_id == "lm-studio"
+    finally:
+        await client.aclose()

@@ -28,6 +28,7 @@ _BUILTIN_MODULES: tuple[str, ...] = (
     "ollama",
     "tei",
     "voyage",
+    "jina",
     "openrouter",
     "azure_foundry",
     "copilot",

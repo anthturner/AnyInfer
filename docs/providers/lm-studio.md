@@ -109,3 +109,17 @@ OpenAI-compatible server works through [`openai-compat`](openai-compat.md).
 - [The local subsystem](../concepts/local.md): hardware detection and supervision.
 
 </div>
+
+## Embeddings
+
+Embedding models loaded in LM Studio serve through the OpenAI-compatible dialect:
+
+```python
+result = client.embed(["hello"], target="lm-studio:text-embedding-nomic-embed-text-v1.5")
+```
+
+`client.models("lm-studio", operation="embedding")` lists which loaded models embed —
+the native listing's `type` field distinguishes them, so nothing is guessed. LM Studio
+documents no request limits for the endpoint; for large corpora set
+`BatchPolicy.max_items_override` to a size your machine handles.
+

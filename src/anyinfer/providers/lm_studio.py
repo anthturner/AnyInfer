@@ -33,6 +33,7 @@ from ..types.operations import InferenceOperation
 from ..types.requests import ReasoningEffort
 from .base import ProviderConfig
 from .openai_compat import OpenAICompatAdapter
+from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 
 __all__ = ["LMStudioAdapter", "descriptor"]
 
@@ -43,7 +44,7 @@ _NATIVE_MODELS_PATH = "/api/v1/models"
 """The native listing, relative to the server root rather than the ``/v1`` prefix."""
 
 
-class LMStudioAdapter(OpenAICompatAdapter):
+class LMStudioAdapter(OpenAICompatEmbeddingsMixin, OpenAICompatAdapter):
     """Adapter for LM Studio's local server, with native model discovery."""
 
     def __init__(self, config: ProviderConfig) -> None:
@@ -209,6 +210,10 @@ descriptor = ProviderDescriptor(
     locality="local",
     default_base_url=_DEFAULT_BASE_URL,
     requires_base_url=False,
+    # /v1/embeddings verified against lmstudio.ai/docs/app/api/endpoints/openai on
+    # 2026-08-12; per-model limits are whatever the loaded model imposes, so no static
+    # embedding capabilities are declared — discovery tags which models embed.
+    operations=frozenset({"generation", "embedding"}),
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

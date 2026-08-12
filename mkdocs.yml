@@ -195,6 +195,7 @@ nav:
       - Ollama: providers/ollama.md
       - Text Embeddings Inference: providers/tei.md
       - Voyage AI: providers/voyage.md
+      - Jina AI: providers/jina.md
       - llama.cpp: providers/llama-cpp.md
       - OpenAI-compatible: providers/openai-compat.md
   - Reference:

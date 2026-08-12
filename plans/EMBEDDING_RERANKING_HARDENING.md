@@ -1091,3 +1091,20 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   unverified markers (error-body shape, per-model dimensions) + watchlist; provider
   docs page; 7 wire/e2e tests. Gates all clean. Remaining in BH.I.3: Azure, Vertex,
   Bedrock, LM Studio, llama-server, Jina.
+- **2026-08-12 (Track I — fifth increment, delivered and tested):** LM Studio
+  embeddings and Jina AI. **LM Studio** (ER.5.10's remainder): `/v1/embeddings`
+  availability verified against lmstudio.ai's endpoint list (2026-08-12); the shared
+  OpenAI-compatible embeddings mixin composes into the existing adapter; the descriptor
+  declares `{generation, embedding}` with *no* static capabilities — the loaded model
+  decides, and the native listing's `type` field already tags which models embed at
+  `discovered` provenance. **Jina AI** (ER.5.13): dedicated retrieval-only adapter —
+  embeddings with Jina's full `task` vocabulary (all four normalized intents map;
+  clustering→`separation` is a deliberate, contract-recorded mapping), Matryoshka
+  `dimensions`, index-ordered response parsing; rerank with native `top_n` and
+  `results[]` positional-index mapping; **no request ceilings are documented** ("batches
+  internally"), so none are invented — the sanity ceilings govern and the contract says
+  so. Response shapes corroborated from Jina's own model publications (the interactive
+  reference is JS-blocked, recorded as such); the contract carries an explicit
+  not-live-verified watchlist. `list_models()` honestly empty + labeled reachability
+  health, like Voyage. 8 LM Studio/Jina tests. Gates all clean. Remaining in BH.I.3:
+  Azure, Vertex, Bedrock, llama-server.
