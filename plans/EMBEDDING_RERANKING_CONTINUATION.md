@@ -156,7 +156,7 @@ Embeddings go through `InvokeModel` (NOT Converse):
 VERIFY all body shapes at `docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html`
 and the Cohere-on-Bedrock page. Reuse the adapter's SigV4 signing for the new path.
 
-### T4 — llama-server embeddings (BH.I.3 / ER.5.11)
+### T4 — llama-server embeddings (BH.I.3 / ER.5.11) — BLOCKED, no live llama-server in this environment
 
 **Gated on a live contract check by its own rule** — documentation is not sufficient.
 Recipe: acquire a small embedding GGUF through the existing `local/` machinery (e.g.
@@ -424,3 +424,9 @@ feature-complete bar:
   recorded in the contract watchlist for a future session with a working fetch. All gates
   green. T4 (llama-server, live-gated) is next — flagging to the owner that it needs a
   local GGUF + running llama-server, which this session cannot provide.
+- **2026-08-12:** T4 confirmed blocked, not attempted: this sandbox has no `llama-server`
+  binary and no path to download a GGUF, and the task is explicitly gated on a live
+  contract check by its own rule ("documentation is not sufficient"). Guessing the wire
+  shape from documentation would violate the task's own stated gate, so it is left
+  undone rather than shipped unverified. Skipping to T5, which is pure discovery/research
+  and needs no live server.
