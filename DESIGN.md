@@ -1591,7 +1591,7 @@ for failed-attempt billing.
 ## 28. Embedding and reranking operations (`EmbeddingRequest`/`RerankRequest`)
 
 *Amends §2 goal 11 and the multimodal non-goal.* Full implementation plan:
-[plans/EMBEDDING_RERANKING_HARDENING.md](plans/EMBEDDING_RERANKING_HARDENING.md).
+[plans/EMBEDDING_RERANKING_CONTINUATION.md](plans/EMBEDDING_RERANKING_CONTINUATION.md).
 
 Embeddings and reranking are stateless inference operations, typed and routed on the same
 terms as generation (ADR-017) but never folded into `GenerationRequest`. `EmbeddingRequest`

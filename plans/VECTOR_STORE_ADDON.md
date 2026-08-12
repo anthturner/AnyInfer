@@ -2,7 +2,7 @@
 
 > **Status:** proposed; not started. The `embed()`/`rerank()` public surfaces this package
 > is built entirely on landed 2026-08-11; the remaining embedding/reranking work is
-> consolidated in [EMBEDDING_RERANKING_HARDENING.md](EMBEDDING_RERANKING_HARDENING.md) and
+> consolidated in [EMBEDDING_RERANKING_CONTINUATION.md](EMBEDDING_RERANKING_CONTINUATION.md) and
 > none of it blocks this package's core design, though batching (its Track A) will matter
 > for bulk indexing performance.
 > **Plan date:** 2026-08-11.
@@ -13,10 +13,10 @@
 
 ## 1. Why this is a separate package, not a client of the core roadmap
 
-`EMBEDDING_RERANKING_HARDENING.md` §2 (the scope boundary carried over from the original
-support plan) explicitly excludes vector databases, ANN indexes, persistence, and corpus
-lifecycle from AnyInfer core, and its decisions record (§16, D-3) keeps the resolution to
-stay stateless-inference-only. That boundary is deliberate, not an oversight to patch
+`EMBEDDING_RERANKING_CONTINUATION.md` §9 (the scope boundary carried forward from the
+original support plan) explicitly excludes vector databases, ANN indexes, persistence, and
+corpus lifecycle from AnyInfer core, and its decisions record (§10, D-3) keeps the
+resolution to stay stateless-inference-only. That boundary is deliberate, not an oversight to patch
 later: the moment AnyInfer core takes a dependency on a storage engine or an indexing
 algorithm, "one adapter per provider" stops being the whole story, because now there is a
 second axis (which store, which index type, which persistence format) that behaves nothing

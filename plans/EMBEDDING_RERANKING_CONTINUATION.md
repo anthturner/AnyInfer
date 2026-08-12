@@ -2,16 +2,20 @@
 
 > **Status:** ready to execute; written 2026-08-12 at the end of the session that landed
 > commits `1a47675..f18d415` (18 commits on `develop`).
-> **Authority:** working notes for the next session. The item-by-item tracker remains
-> [EMBEDDING_RERANKING_HARDENING.md](EMBEDDING_RERANKING_HARDENING.md) — its §19 progress
-> log has fourteen dated entries and is the record; check items off **there**. This file
-> exists to eliminate the discovery phase: every fact below was verified during the
-> prior session and can be trusted without re-derivation (re-verify only where a line
-> number matters and the file has since changed).
+> **Authority:** the single live embedding/reranking plan. Its predecessor —
+> `plans/EMBEDDING_RERANKING_HARDENING.md`, the consolidated tracker whose Tracks D
+> through H (and five Track I increments) are fully implemented — was deleted to keep
+> one plan; its complete text, per-item checkboxes, and fourteen-entry progress log are
+> preserved in git history (last version at commit `4e1802e`). The still-binding pieces
+> (scope boundary, decisions record, remaining acceptance bar) are carried forward in
+> §9-§11 below; record new progress in §12. Everything else in this file exists to
+> eliminate the discovery phase: every fact was verified during the prior session and
+> can be trusted without re-derivation (re-verify only where a line number matters and
+> the file has since changed).
 
 ## 1. Standing owner decisions (do not re-ask)
 
-- **Scope:** all tracks, sequentially. Every §16 decision in the tracker is resolved.
+- **Scope:** all tracks, sequentially. Every decision is resolved — see §10.
 - **Commits:** one commit per gate-passing increment, directly on `develop` — standing
   authorization. Commit messages end with the Claude co-author trailer.
 - **Cohere trial key:** `COHERE.key` at the repo root (gitignored). Load into
@@ -295,10 +299,91 @@ result type). Cohere discovery now lists embedding models, so the
 ## 8. Session start checklist for the next thread
 
 1. `git log --oneline develop | head -20` — confirm you're at/after `f18d415`.
-2. Read the tracker's §19 (progress log) tail + this file. Do NOT re-scout what §4-§7
-   already state.
+2. Read this file. Do NOT re-scout what §4-§7 already state; the full historical
+   tracker is in git history if archaeology is ever needed.
 3. Re-verify the pytest baseline (still exactly the one demo-app failure).
 4. Pick up at T1 (Azure) unless the owner redirects; each T-item is one gate-passing
    commit in the established recipe.
-5. Update BOTH this file's task list (strike completed T-items) and the tracker's
-   checkboxes + §19 log as you land increments.
+5. Strike completed T-items in §5 and add a dated entry to §12's progress log as
+   you land increments — with the same "delivered and tested" / "explicitly not done"
+   honesty the deleted tracker's log applied to itself.
+
+## 9. Scope boundary (binding, carried forward)
+
+Reproduced because `plans/VECTOR_STORE_ADDON.md` cites it, and it remains the line the
+owner drew.
+
+**Included:** text embeddings (scalar and batch); query/document intent where providers
+distinguish it; provider-native dimensionality reduction; reranking one query against a
+caller-supplied ordered document collection (text plus caller-owned ids/metadata; only
+text sent unless a provider option asks for more); usage, provider-native billing units,
+centrally computed cost when pricing is known, timing, attempt trails, warnings,
+optional raw retention; core-owned batching against verified limits; operation-aware
+discovery, capabilities, routing, and fallback; semantic ranker injection into context
+reduction via the client-side helper (`anyinfer.semantic_ranker` — shipped).
+
+**Excluded:** vector databases, ANN indexes, persistence, corpus lifecycle, retrieval
+services (the optional add-on lives in `plans/VECTOR_STORE_ADDON.md`); automatic
+embedding of `ContextDocument` values; opaque automatic model selection; cross-model
+vector conversion; training/fine-tuning/evaluation; image/audio/multimodal embeddings in
+this milestone; streaming vectors or incremental rerank results (both operations are
+buffered).
+
+## 10. Decisions record (binding; all resolved)
+
+- **D-1** Embeddings and reranking are core inference primitives, not provider options.
+- **D-2** Text-first; multimodal is a later extension.
+- **D-3** AnyInfer owns stateless inference, never a vector store or corpus lifecycle
+  (the add-on package is `plans/VECTOR_STORE_ADDON.md`).
+- **D-4** Provider support is declared per operation; retrieval-only providers are
+  first-class (TEI, Voyage, and Jina now exist as proof).
+- **D-5** Cross-target embedding fallback requires provable space equivalence —
+  *implemented*: refused pre-dispatch unless identical `provider:model`, with the
+  `allow_incompatible_fallback` opt-in that always warns.
+- **D-6** Buffered operations only; no streaming embed/rerank contract.
+- **D-7** Batching is centralized core policy; adapters only translate.
+- **D-8** Separate-batch rerank scores are never assumed globally comparable —
+  *implemented* as `rerank_cross_batch` refuse-by-default with a mandatory warning.
+- **D-9** Sidecar rerank is AnyInfer-native only (`POST /v1/anyinfer/rerank`); no
+  Cohere/`/v1/rerank` compatibility codec unless a named integration needs one.
+- **D-10** Context reduction stays lexical/offline by default.
+- **D-11** Semantic rankers reach `context.select()` via the client-side convenience
+  helper — *implemented* (`anyinfer.semantic_ranker`, `SemanticRanker` protocol in the
+  leaf context package).
+- **D-12** The unsafe-fallback escape hatch exists, unmistakably named, off by default
+  — *implemented* (Track D).
+- **D-13** `Usage` stays operation-neutral; billed search units are never encoded as
+  tokens — *implemented* (`Usage.search_units`, `Pricing.per_search_unit`).
+- **D-14** Novice aliases (`embed-small` etc.): "no, not yet" — revisit only when each
+  alias resolves to one verified hosted **and** one verified local target.
+- **D-15** No new exception types: the four embed/rerank failure classes raise
+  `ConfigError` with distinguishing messages; documenting those message contracts in
+  the error catalog is part of T10.
+- **D-16** Demo copy/save buttons and PyInstaller bundle smoke tests are deliberately
+  deferred to the release push (the smoke tests need macOS/Windows CI).
+- Per-provider evidence questions (normalized vectors? intent spellings? stable model
+  ids? trustworthy limits? billing units?) are answered in dated contract snapshots as
+  each provider lands — never in this plan alone.
+
+## 11. Remaining acceptance bar
+
+The hardening bar (Tracks D/A/B/C) was met on 2026-08-12. Still open from the
+feature-complete bar:
+
+- [ ] At least one hosted and one local embedding target — and one hosted rerank target
+  — pass fake, **cassette, and live** conformance (fake ✓ everywhere; Cohere cassettes
+  ✓; live lanes and remaining cassettes are T7).
+- [ ] Usage, **cost**, spend policy tested for both operations end to end (cost blocks
+  on T6's pricing entries).
+- [ ] Standalone sidecar bundles pass `/v1/embeddings` and rerank smoke tests on macOS,
+  Linux, and Windows (D-16; release push).
+- [ ] Generated provider indexes and the conformance matrix make no unsupported claims
+  (holds today; re-check as T1-T5 land).
+- [ ] All public symbols documented; examples run offline; every gate passes (holds
+  today; keep it true).
+
+## 12. Progress log
+
+- **2026-08-12:** Handoff written; predecessor tracker deleted with its record
+  preserved in git history (last version at `4e1802e`). Nothing implemented under this
+  plan yet — T1 (Azure embeddings) is next.
