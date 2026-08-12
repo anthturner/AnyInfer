@@ -438,6 +438,68 @@ def test_example_compare_targets_spends_nothing() -> None:
     assert provider.requests == []
 
 
+def test_example_semantic_search_shape() -> None:
+    """docs/examples/semantic-search.md — embed, rank in memory, and rerank agree."""
+    import math
+
+    from anyinfer.testing import FakeEmbeddingRerankProvider
+
+    provider = FakeEmbeddingRerankProvider(
+        "offline", embedding_dimensions={"embed-small": 8}, rerank_models=["rerank-small"]
+    )
+    registry = ai.ProviderRegistry(load_builtins=False, load_entry_points=False)
+    provider.register(registry)
+    embed_target = "offline:embed-small"
+    rerank_target = "offline:rerank-small"
+
+    corpus = [
+        "The moon landing happened in 1969",
+        "Sourdough bread needs a live starter",
+        "Apollo 11 was the spacecraft that carried astronauts to the moon",
+    ]
+
+    def cosine_similarity(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+        dot = sum(x * y for x, y in zip(a, b, strict=True))
+        norm_a = math.sqrt(sum(x * x for x in a))
+        norm_b = math.sqrt(sum(y * y for y in b))
+        return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
+
+    with ai.Client(
+        [ai.ProviderSettings.of(provider.provider_id)],
+        registry=registry,
+        use_default_catalog=False,
+    ) as client:
+        corpus_embedded = client.embed(corpus, target=embed_target, input_type="document")
+        query_embedded = client.embed(
+            "Apollo spacecraft that reached the moon", target=embed_target, input_type="query"
+        )
+        query_vector = query_embedded.vectors[0].values
+
+        # The fake produces a deterministic pseudo-embedding (a hash of the text), not a
+        # semantically meaningful one — proving the *mechanics* (consistent dimensions,
+        # a self-similarity of 1.0, a total order from the similarity function) is what
+        # an offline shape test can honestly claim about a fake provider. A real
+        # embedding model is what makes the ranking itself meaningful; the reranker
+        # below — whose fake scores by genuine lexical overlap — is what demonstrates
+        # that part end to end.
+        assert len({len(v.values) for v in corpus_embedded.vectors}) == 1
+        assert math.isclose(cosine_similarity(query_vector, query_vector), 1.0)
+        ranked = sorted(
+            zip(corpus, corpus_embedded.vectors, strict=True),
+            key=lambda pair: cosine_similarity(query_vector, pair[1].values),
+            reverse=True,
+        )
+        scores = [cosine_similarity(query_vector, vec.values) for _, vec in ranked]
+        assert scores == sorted(scores, reverse=True)
+
+        reranked = client.rerank(
+            "Apollo spacecraft that reached the moon", corpus, target=rerank_target
+        )
+        assert corpus[reranked.items[0].index] == (
+            "Apollo 11 was the spacecraft that carried astronauts to the moon"
+        )
+
+
 async def test_example_tool_agent_shape() -> None:
     """docs/examples/local-tool-agent.md — a tool with a defaulted parameter."""
 

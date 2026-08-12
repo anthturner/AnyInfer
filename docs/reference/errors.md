@@ -69,6 +69,36 @@ ConfigError: the copilot provider requires the github-copilot-sdk extra
     Read `error.hint`; it names the exact target spelling, alias, or install command to
     use next.
 
+### Embedding and rerank message contracts (D-15)
+
+`embed()` and `rerank()` raise no new exception types — every operation-specific
+refusal is a `ConfigError` with a distinguishing message, per the decisions record in
+`plans/EMBEDDING_RERANKING_CONTINUATION.md` §10 (D-15). The four message shapes, verbatim
+from `_client/operations.py`:
+
+```
+ConfigError: provider 'groq' does not support embedding
+  (hint: choose a target whose provider declares the 'embedding' operation)
+
+ConfigError: embedding fallback to voyage:voyage-3-lite refused: it cannot be proven to
+share an embedding space with the route's primary target openai:text-embedding-3-small
+  (hint: vectors from a different embedding space fail silently when compared; keep
+   embedding routes on one provider:model, or set allow_incompatible_fallback=True to
+   accept incomparable vectors)
+
+ConfigError: provider 'openai' does not support reranking
+  (hint: choose a target whose provider declares the 'rerank' operation)
+
+ConfigError: rerank document count 1500 exceeds the resolved batch limit of 1000, and
+scores from separate rerank calls are not globally comparable
+  (hint: reduce the documents, or set BatchPolicy.rerank_cross_batch=True to accept a
+   concatenation of chunk-local rankings — the result will say so in a warning)
+```
+
+Batch-size refusals share a fifth, operation-neutral shape (`... exceeds the resolved
+batch limit of {n} and BatchPolicy.allow_split is False`) reused for both operations
+rather than duplicated per-operation text.
+
 </div>
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>

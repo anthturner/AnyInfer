@@ -200,10 +200,16 @@ inverse document frequency, plus two signals that matter in a code corpus; a que
 in the **path** outweighs the same term in the body, and anchor files (`README`,
 `pyproject.toml`, `ARCHITECTURE`) get a small bonus.
 
-**There are no embeddings.** That is a deliberate boundary, not an oversight: embeddings
-would mean a model dependency, an index to build and invalidate, and a whole class of
-failure the slim core avoids. If you need semantic retrieval, rank yourself and pass the
-result as pinned documents; `context.rank()` is public precisely so it can be replaced.
+**The built-in ranker has no embeddings.** That is a deliberate boundary, not an
+oversight: embeddings in the default lexical path would mean a model dependency, an
+index to build and invalidate, and a whole class of failure the slim core avoids. If you
+need semantic retrieval, `anyinfer.semantic_ranker()` is the first-party bridge — it
+wraps a `SemanticRanker` (typically AnyInfer's own `embed()`/`rerank()`, or any embedding
+index you already run) into the same `Ranker` protocol `context.select()` expects, so
+semantic and lexical ranking compose through one interface rather than requiring a
+separate pinned-documents path. See
+[the API reference](../reference/api/context.md#anyinfer.semantic_ranker). `context.rank()`
+itself stays lexical-only and is public precisely so it can be replaced or wrapped.
 
 Three settings close part of the gap without an index or a model:
 
