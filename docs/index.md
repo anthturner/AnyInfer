@@ -46,6 +46,32 @@ The core depends on only `httpx2` and `jsonschema`. Provider SDKs, the sidecar, 
 demo app are optional extras. Local inference is part of the core. See
 [installation and extras](guides/installation.md).
 
+## What makes this different
+
+Most libraries in this space solve *provider switching* — one function, many APIs, one
+response shape. AnyInfer solves the problem that starts right after: being correct about
+what you sent, what you got back, what it cost, and what quietly didn't happen. Four things
+you won't find bundled together anywhere else:
+
+- **Your fallback chain has a real test, with no credentials and no network.** The test kit
+  ships with the library — script a 503, a malformed schema response, a rate limit — and
+  assert on the recovery, not on a mock of your own wrapper.
+  [→ Testing your app](guides/testing-your-app.md)
+- **Every number says where it came from.** A context window, a price, a feature flag is
+  tagged catalogued, discovered, probed, or defaulted — never silently guessed.
+  [→ Capabilities and provenance](concepts/capabilities.md)
+- **Portability is a test result, not a claim.** `compare()` reports exactly what a fixed
+  request becomes on a different target — dropped parameters, weaker mechanisms, cost
+  deltas — before you spend anything, and you can diff two snapshots of it in CI.
+  [→ Comparing targets](guides/comparing-targets.md)
+- **A confidentiality story nobody else in this market ships.** Encrypted-at-rest prompt
+  templates, a zero-retention orchestration relay, and — the genuinely novel part — one
+  function that tells your application whether a box can back local inference with a real
+  hardware-attested guarantee, honest about exactly what it can and can't promise yet.
+  [→ Confidentiality tiers](guides/confidentiality-tiers.md)
+
+**→ [Read the full case, with runnable proof for every claim](why-anyinfer.md).**
+
 ## What AnyInfer gives you
 
 Applications that talk to more than one model provider accumulate the same layer every

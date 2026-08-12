@@ -90,6 +90,11 @@ result validation inside one testable boundary:
   library, so your fallback chain, repair budget, and reduction settings have offline tests
   that run in CI with no credentials, including the failures you cannot provoke on demand:
   rate limits, truncated streams, malformed structured answers, refusals, timeouts.
+- **A confidentiality story nobody else in this market ships.** Encrypted-at-rest prompt
+  templates, a zero-retention orchestration relay, and a portable capability check that
+  tells your application whether a box can back local inference with a real
+  hardware-attested guarantee — see [confidentiality
+  tiers](https://anyinfer.dev/guides/confidentiality-tiers/).
 - **Slim by construction.** Mandatory dependencies are `httpx2` and `jsonschema`. Everything
   else is an extra.
 
