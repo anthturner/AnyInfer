@@ -31,3 +31,4 @@ Thumbs.db
 
 # Agent worktrees
 .claude/worktrees/
+COHERE.key
