@@ -241,7 +241,7 @@ result type). Cohere discovery now lists embedding models, so the
 - Error-catalog staleness check (D-15 chose ConfigError-with-documented-messages; the
   message contracts should be listed there).
 
-### T11 — Catalog + init (Track G deferred bits)
+### T11 — Catalog + init (Track G deferred bits) — init/sidecar bits DONE 2026-08-12, catalog schema still open
 
 - Catalog schema lands **together with the first pinned embedding-model entries** (the
   deferral reason: schema with zero entries is dead surface). Touch points:
@@ -519,3 +519,38 @@ feature-complete bar:
   sections of the error catalog, and local-embeddings/fallback-configuration content
   beyond what the new example's prose already covers — left for a future pass rather
   than padded out to claim the checklist item complete. All gates green.
+- **2026-08-12:** T11 partially delivered and tested (`3045adb`, `098d93d`) — the init and
+  sidecar bits, not the catalog schema. `DiscoveredProvider` gained an additive
+  `embedding_models` field (the flat `models` field is unchanged, so no existing caller's
+  expectations move); `_stamps_embedding()` populates it only when a listing positively
+  tagged a model's operations (LM Studio, Cohere do this today), never inferred from
+  generic model ids. `anyinfer init` now writes `operation_routes={"embedding": ...}`
+  when that evidence exists, via `_init_operation_routes()` mirroring `_init_route()`'s
+  own "no evidence, nothing written" rule — tested against both the positive and negative
+  case. The sidecar's `/v1/embeddings` and `/v1/anyinfer/rerank` now support the
+  `anyinfer_manifest` extension, reusing `openai_codec.wants_manifest` rather than a
+  second implementation; caught a real bug while wiring it in — `AsyncClient` defaults to
+  `manifests=True`, so `result.manifest` is never `None` regardless of whether the
+  request asked to see it, meaning the render must be gated on the request flag
+  (`include_manifest`), not on manifest presence, exactly mirroring chat completions'
+  own separation of "computed" from "shown." **Not done:** the catalog schema landing
+  with pinned embedding entries (nomic-embed-text, bge-large) — a larger, separable
+  effort (schema changes across `pin_catalog.py`/`catalog/model.py`/
+  `validate_catalog.py` plus real artifact data) left for a dedicated session. All gates
+  green. This closes out every T-item in §5 that this session's tools and environment
+  could reach.
+- **2026-08-12, session summary:** T1-T3, T5, T8 fully delivered; T4 confirmed blocked
+  (no live llama-server); T6, T7, T9-T11 partially delivered with the specific gaps
+  named in each entry above rather than papered over. 15 gate-passing commits plus 15
+  plan-status commits, every one green on the full gate list (pytest, mypy, ruff,
+  lint-imports, mkdocs --strict). One real, previously-unverified bug found and fixed
+  along the way: **no embed()/rerank() implementation anywhere enforced
+  `max_response_bytes`** (T9) — every provider was vulnerable to a response bomb on
+  those two operations despite the generation path being protected everywhere. What's
+  left for the next session, in the order it's likely worth tackling: T6's pricing data
+  entries (mechanism is done, needs a session with working browser-rendered fetch, or
+  the owner supplying current prices directly); the catalog schema + first pinned
+  embedding entries (T11); live/cassette conformance lanes and the embed/rerank-specific
+  byte-cap and retry-after conformance cases (T7); T4 whenever a llama-server + GGUF
+  becomes available; and the remaining docs guides beyond what `embeddings.md` and the
+  new example already cover (T10).
