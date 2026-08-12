@@ -165,7 +165,8 @@ the other side.
 | Dated upstream contract snapshots + drift audit | Yes (20) | Rare | Rare | Rare | Rare |
 | Mandatory dependencies | 2 | Varies | N/A | N/A | Typically many |
 | Central keys, org quotas, admin plane | **No; use a gateway** | No | Yes | No | No |
-| Retrieval / vector index | **No** | No | No | No | Often yes |
+| Embeddings and reranking as typed, routed inference ops | Yes | Varies | Varies | Varies | Often via a plugin |
+| Retrieval / vector index / corpus persistence | **No** | No | No | No | Often yes |
 | Prompt templates, chains, agents | **No** | No | No | No | Yes; that is its job |
 | High-throughput GPU serving | **No** | No | No | Some | No |
 
@@ -199,6 +200,39 @@ offline against in-process fakes, and every code example in this documentation i
 in CI against those same fakes, so none of it can quietly rot.
 
 ---
+
+## On the horizon: confidential execution
+
+Everything above this line ships today and is checkable with the commands in the previous
+section. This one is different — it's in active design, not yet implemented, and this
+section will be corrected or removed the moment that stops being true. It's included because
+the gap it targets is real and worth naming honestly rather than saving for a launch post.
+
+BYOK inference has an asymmetry nobody selling a client-side SDK talks about: your
+application's prompts, prompt templates, and orchestration logic run entirely on
+infrastructure your customer controls. You can protect their data from you — that part is
+solved, and it's most of what "BYOK" already means. Protecting *your own* prompt engineering
+and orchestration IP from a customer who owns the machine it runs on is a fundamentally
+harder problem, and today the honest answer for most vendors is "you can't, so nobody
+architects for it."
+
+The underlying hardware capability to do better than that already exists: AMD SEV-SNP and
+Intel TDX confidential VMs, and NVIDIA's confidential-computing mode on H100 GPUs, can
+attest that a workload is running unmodified and isolated even from an operator with root on
+the box. Cloud vendors ship this (Azure and Google Cloud both have GA confidential-GPU
+offerings), and researchers are actively experimenting with wrapping local models in it. What
+doesn't exist yet, anywhere we've found, is that capability exposed as a **portable,
+honestly-tiered check inside a multi-provider BYOK library** — one function an application
+can call to learn, on whatever hardware a customer actually has, whether it can get a real
+attested-execution guarantee for local inference, with no silent downgrade when it can't.
+That integration — not the cryptography underneath it — is the part nobody else is building,
+and it's a natural extension of AnyInfer already treating a local model as a first-class,
+supervised target rather than a separate product (§4 above).
+
+This is being scoped, not shipped: what it can honestly claim depends on deployment specifics
+(which cloud, which CPU/GPU pairing, CPU-only versus GPU-offloaded inference) that this page
+will not gloss over once it lands, the same discipline applied to provenance and conformance
+elsewhere on this page.
 
 ## Who this is for
 

@@ -41,6 +41,14 @@ Point the same call at a local model by changing one string:
 result = client.generate(prompt, target="ollama:qwen3:8b")  # "medium" is a catalog alias
 ```
 
+Embeddings and reranking are the same client, the same routing, and the same batching —
+never a bolted-on provider option:
+
+```python
+vectors = client.embed(["first passage", "second passage"], target="ollama:nomic-embed-text")
+ranked = client.rerank("which passage answers the question", passages, target="cohere:rerank-v3.5")
+```
+
 ---
 
 ## Why this exists
@@ -62,6 +70,11 @@ result validation inside one testable boundary:
 - **Structured output is a contract.** A request carrying a schema always returns a
   client-side-validated result, using the strongest mechanism the provider offers
   (grammar → json_schema → json_mode → prompt), with an opt-in bounded repair loop.
+- **Embeddings and reranking are inference primitives, not provider options.**
+  `client.embed()`/`client.rerank()` are typed, routed, batched, and cost-tracked exactly
+  like generation — with a safety rule generation does not need: a fallback that cannot
+  be proven to share the primary target's vector space is refused before dispatch, not
+  silently served as a wrong-but-plausible vector.
 - **Context engineering is part of dispatch.** A provenance-aware budget estimates input,
   output reserve, headroom, and cost before a call. Deterministic reducers fit approved
   corpora to that budget and report exactly what they omitted; hierarchical distillation
@@ -179,6 +192,12 @@ The dedicated adapters, each handling provider-specific protocol or discovery be
 See the [complete provider list](https://anyinfer.dev/providers/all/),
 the [provider guides](https://anyinfer.dev/providers/) and the
 [conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
+
+Embeddings and/or reranking are live today on OpenAI, Azure AI Foundry, Google Vertex AI,
+AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio, and four
+OpenAI-compatible presets (Together AI, Fireworks AI, DeepInfra, Mistral) — see
+[Embeddings and reranking](https://anyinfer.dev/concepts/embeddings/) and the
+[semantic-search example](https://anyinfer.dev/examples/semantic-search/).
 
 ## Integration paths
 

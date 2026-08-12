@@ -61,6 +61,10 @@ AnyInfer is that layer, extracted and made rigorous:
 - **Structured output is a contract.** A request carrying a schema always returns a
   client-side-validated result, using the strongest mechanism the provider offers
   (grammar → json_schema → json_mode → prompt), with an opt-in bounded repair loop.
+- **Embeddings and reranking are inference primitives, not provider options.**
+  `client.embed()`/`client.rerank()` are typed, routed, batched, and cost-tracked exactly
+  like generation, with a fallback safety rule generation does not need: a target that
+  cannot be proven to share the primary target's vector space is refused before dispatch.
 - **Context engineering is connected to dispatch.** Preflight budgets, cost ranges,
   deterministic reduction, and hierarchical distillation all use the target's actual
   capability data and report uncertainty or omission instead of hiding it.
@@ -83,6 +87,11 @@ and declarative presets, from frontier APIs to local engines.
 
 See the [provider guides](providers/README.md) and the
 [conformance matrix](reference/conformance-matrix.md) for exactly what each supports.
+
+Embeddings and reranking are live today on OpenAI, Azure AI Foundry, Google Vertex AI,
+AWS Bedrock, Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio, and four
+OpenAI-compatible presets — see [embeddings and reranking](concepts/embeddings.md) and
+the [semantic-search example](examples/semantic-search.md).
 
 ## Next steps
 
