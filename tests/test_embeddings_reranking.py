@@ -1253,3 +1253,24 @@ async def test_embed_warns_when_declared_capabilities_ignore_the_intent() -> Non
             await bare_client.aclose()
     finally:
         await client.aclose()
+
+
+async def test_operation_route_serves_embed_without_a_target() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    registry = _empty_registry()
+    fake.register(registry)
+    client = ai.AsyncClient(
+        providers=[ai.ProviderSettings.of("fake-embed")],
+        registry=registry,
+        use_default_catalog=False,
+        route=Route(targets=("fake-embed:not-an-embedder",)),
+        operation_routes={"embedding": Route(targets=("fake-embed:small",))},
+    )
+    try:
+        result = await client.embed(["hello"])
+        assert result.target.model == "small"
+        # An explicit target still wins over the configured operation route.
+        explicit = await client.embed(["hello"], target="fake-embed:small")
+        assert explicit.target.model == "small"
+    finally:
+        await client.aclose()

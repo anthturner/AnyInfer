@@ -933,6 +933,7 @@ def _serve_run(args: argparse.Namespace) -> int:
     client = AsyncClient(
         settings,
         route=route,
+        operation_routes=config.operation_routes,
         history=config.history,
         cache=config.cache,
         arena=config.arena,
@@ -1225,6 +1226,7 @@ def _compare(args: argparse.Namespace) -> int:
     client = Client(
         list(config.providers),
         route=config.route,
+        operation_routes=config.operation_routes,
         repair=Repair(max_attempts=args.repair) if args.repair is not None else None,
         history=config.history,
         cache=config.cache,
@@ -1364,6 +1366,7 @@ def _run(args: argparse.Namespace) -> int:
     client = Client(
         settings,
         route=route,
+        operation_routes=config.operation_routes,
         repair=Repair(max_attempts=args.repair) if args.repair is not None else None,
         history=config.history,
         cache=config.cache,
@@ -1445,7 +1448,7 @@ def _embed(args: argparse.Namespace) -> int:
         )
         return 2
 
-    client = Client(settings, route=route)
+    client = Client(settings, route=route, operation_routes=config.operation_routes)
     try:
         result = client.embed(
             inputs,
@@ -1588,7 +1591,7 @@ def _rerank(args: argparse.Namespace) -> int:
         )
         return 2
 
-    client = Client(settings, route=route)
+    client = Client(settings, route=route, operation_routes=config.operation_routes)
     try:
         result = client.rerank(
             args.query,
@@ -2787,7 +2790,11 @@ def _context_budget(args: argparse.Namespace, config: AnyInferConfig) -> int | N
 
     from . import Client
 
-    with Client(list(config.providers), route=config.route) as client:
+    with Client(
+        list(config.providers),
+        route=config.route,
+        operation_routes=config.operation_routes,
+    ) as client:
         computed = client.budget([], target=args.target)
     remaining = computed.remaining_tokens
     if remaining is None or remaining < 1:
@@ -2990,6 +2997,7 @@ def _conform(args: argparse.Namespace) -> int:
         return AsyncClient(
             list(config.providers),
             route=config.route,
+            operation_routes=config.operation_routes,
             history=config.history,
             cache=config.cache,
         )

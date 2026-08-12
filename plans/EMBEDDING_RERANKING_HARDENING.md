@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D, A, B, C, E, and F landed 2026-08-12 (see §19); G is next.
+> **Status:** in progress — Tracks D, A, B, C, E, F, and G landed 2026-08-12 (see §19); H is next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -537,15 +537,15 @@ Blocked on Track B for real billing facts (Cohere search units are the forcing c
 Cross-cutting per AGENTS.md: schema, loader, writer, examples, migration, and reference
 docs move in one change.
 
-- [ ] **BH.G.1** Operation-specific named routes in the config schema (ER.7.2/ER.7.3) —
+- [x] **BH.G.1** Operation-specific named routes in the config schema (ER.7.2/ER.7.3) —
   an embedding route must not be selectable for generation or vice versa; extend loader,
   writer, examples, and migration together.
 - [ ] **BH.G.2** Catalog schema: model operations, embedding dimensions, normalization,
   input intents, local artifact/runtime compatibility, verified pricing (ER.7.4) — then
   extend the pin/refresh scripts (ER.7.6); never hand-edit pinned values.
-- [ ] **BH.G.3** `anyinfer init` and generic setup UIs discover usable operation models
+- [~] **BH.G.3** `anyinfer init` and generic setup UIs discover usable operation models
   without prompting for descriptor-supplied fields (ER.7.7).
-- [ ] **BH.G.4** Provenance-tag `EmbeddingSpace.compatibility_id` (ER.7.8) — it is
+- [-] **BH.G.4** Provenance-tag `EmbeddingSpace.compatibility_id` (ER.7.8) — it is
   caller-supplied and never guessed today (good), but carries no `Sourced[T]` provenance;
   a config-supplied equivalence must be distinguishable from a caller-asserted one.
 
@@ -965,3 +965,25 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   embedding capabilities show no intent support (or a different intent set), the
   result carries a warning — a target with no declared capabilities stays silent,
   because unknown support is never turned into a warning by guesswork.
+- **2026-08-12 (Track G — delivered and tested):** Operation routes in configuration.
+  New top-level config key `operation_routes` keyed `"embedding"`/`"rerank"` — a
+  `generation` key is rejected with a hint, so an embedding route can never be selected
+  for generation by key confusion (ER.7.2's exact worry); loader validation, writer
+  round-trip (corpus extended), both client constructors (`operation_routes=`), an
+  `embed()`/`rerank()` resolution rule (explicit target/route → operation route →
+  `default_route`, whose targets dispatch still gates on declared operations), all
+  seven CLI client-construction sites, and the configuration reference page — the
+  cross-cutting rule's SDK/CLI/sidecar/docs/tests set in one change. Deliberately not
+  done, with reasons recorded: **BH.G.2** (catalog schema) — schema fields with zero
+  pinned entries and zero consumers are exactly the dead surface the 2026-08-12 audit
+  criticized in the first pass, so the catalog's `operations`/dimensions fields land
+  together with the first pinned embedding-model entries and their `pin_catalog.py`
+  support in one change; **BH.G.3** stays `[~]` — the config key and client mechanism
+  exist, and `anyinfer init` auto-writing operation routes from discovery evidence is a
+  follow-up (today only LM Studio's native listing provides typed per-model operation
+  evidence; Ollama's listing cannot distinguish embedding models without guessing);
+  **BH.G.4** resolved `[-]` — a provenance tag on `compatibility_id` distinguishes
+  sources, and exactly one source exists today (caller-supplied via `expected_space`,
+  which is `override` by definition), so the tag would distinguish nothing; it becomes
+  meaningful the day a config/catalog equivalence source exists, and is deferred until
+  then.

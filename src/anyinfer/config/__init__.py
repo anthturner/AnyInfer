@@ -57,6 +57,7 @@ _ROOT_KEYS = frozenset(
         "format_version",
         "providers",
         "default_route",
+        "operation_routes",
         "context",
         "history",
         "cache",
@@ -112,6 +113,11 @@ class AnyInferConfig:
         mcp: Model Context Protocol servers described by the optional ``mcp`` block. These
             are inert descriptions: loading a file never spawns a process or opens a
             socket. Pass them to `anyinfer.mcp.MCPToolset.connect` when tools are wanted.
+        operation_routes: Per-operation default routes from the optional
+            ``operation_routes`` block, keyed ``"embedding"``/``"rerank"``. An
+            embedding route can never be selected for generation or vice versa —
+            generation's default stays ``default_route``. Pass to `Client` or
+            `AsyncClient` as ``operation_routes=``.
     """
 
     providers: tuple[ProviderSettings, ...] = ()
@@ -123,6 +129,7 @@ class AnyInferConfig:
     arena: ArenaPolicy | None = None
     arenas: Mapping[str, ArenaPolicy] = field(default_factory=dict)
     mcp: tuple[MCPServer, ...] = ()
+    operation_routes: Mapping[str, Route] = field(default_factory=dict)
 
 
 def load_config(
@@ -223,6 +230,7 @@ def loads_config(
         providers.append(setting)
 
     route = _parse_route(data.get("default_route"), source)
+    operation_routes = _parse_operation_routes(data.get("operation_routes"), source)
     context = _parse_context(data.get("context"), source)
     history = _parse_history(data.get("history"), source)
     cache = _parse_cache(data.get("cache"), source)
@@ -239,6 +247,7 @@ def loads_config(
         arena=arena,
         arenas=arenas,
         mcp=mcp,
+        operation_routes=operation_routes,
     )
 
 
@@ -286,6 +295,11 @@ def dumps_config(config: AnyInferConfig, *, comments: bool = False) -> str:
         document["providers"] = providers
     if config.route is not None:
         document["default_route"] = list(config.route.targets)
+    if config.operation_routes:
+        document["operation_routes"] = {
+            operation: list(route.targets)
+            for operation, route in config.operation_routes.items()
+        }
     if config.context != DEFAULT_TUNING:
         document["context"] = _changed_fields(config.context, ContextTuning())
     if config.history is not None:
@@ -849,6 +863,45 @@ def _parse_route(value: Any, source: str) -> Route | None:
     if not all(isinstance(target, str) and target.strip() for target in value):
         raise _error(source, "every 'default_route' entry must be a non-empty string")
     return Route(targets=tuple(value))
+
+
+_OPERATION_ROUTE_KEYS = frozenset({"embedding", "rerank"})
+"""Operations that may carry their own default route.
+
+Generation deliberately has no entry here: its default stays ``default_route``, so an
+embedding route can never be selected for a generation request by key confusion —
+the two vocabularies do not overlap.
+"""
+
+
+def _parse_operation_routes(value: Any, source: str) -> Mapping[str, Route]:
+    """Validate the optional per-operation default routes."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise _error(source, "'operation_routes' must be an object keyed by operation")
+    routes: dict[str, Route] = {}
+    for operation, targets in value.items():
+        if operation not in _OPERATION_ROUTE_KEYS:
+            raise _error(
+                source,
+                f"'operation_routes' has unknown operation {operation!r}",
+                hint=(
+                    "valid keys are 'embedding' and 'rerank'; the generation default "
+                    "belongs in 'default_route'"
+                ),
+            )
+        if not isinstance(targets, list) or not targets:
+            raise _error(
+                source, f"'operation_routes.{operation}' must be a non-empty list of targets"
+            )
+        if not all(isinstance(target, str) and target.strip() for target in targets):
+            raise _error(
+                source,
+                f"every 'operation_routes.{operation}' entry must be a non-empty string",
+            )
+        routes[operation] = Route(targets=tuple(targets))
+    return routes
 
 
 def _unknown_keys(

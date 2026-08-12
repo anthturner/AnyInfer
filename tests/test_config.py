@@ -333,6 +333,14 @@ ROUND_TRIP_DOCUMENTS: list[dict[str, object]] = [
         ],
         "default_route": ["openai:gpt-5", "work-azure:gpt-4o"],
     },
+    {
+        "providers": [{"id": "cohere", "api_key": "env://CO_API_KEY"}],
+        "default_route": ["cohere:command-a-03-2025"],
+        "operation_routes": {
+            "embedding": ["cohere:embed-v4.0"],
+            "rerank": ["cohere:rerank-v3.5"],
+        },
+    },
     {"providers": [{"id": "ollama", "base_url": "http://127.0.0.1:11434", "limits": {}}]},
     {"history": {}},
     {"history": {"mode": "proactive", "keep_recent": 2, "keep_system": False}},
@@ -411,3 +419,26 @@ def test_a_value_json_cannot_hold_is_refused_rather_than_mangled() -> None:
     settings = ai.ProviderSettings.of("openai", options={"callback": object()})
     with pytest.raises(ai.ConfigError, match="cannot be written as JSON"):
         ai.dumps_config(ai.AnyInferConfig(providers=(settings,)))
+
+
+def test_operation_routes_parse_into_routes() -> None:
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "providers": [{"id": "cohere", "api_key": "env://CO_API_KEY"}],
+                "operation_routes": {"embedding": ["cohere:embed-v4.0"]},
+            }
+        )
+    )
+    assert config.operation_routes["embedding"].targets == ("cohere:embed-v4.0",)
+    assert "rerank" not in config.operation_routes
+
+
+def test_operation_routes_reject_generation_key() -> None:
+    with pytest.raises(ai.ConfigError, match="unknown operation 'generation'"):
+        ai.loads_config(json.dumps({"operation_routes": {"generation": ["openai:gpt-5"]}}))
+
+
+def test_operation_routes_reject_empty_target_list() -> None:
+    with pytest.raises(ai.ConfigError, match="non-empty list"):
+        ai.loads_config(json.dumps({"operation_routes": {"embedding": []}}))

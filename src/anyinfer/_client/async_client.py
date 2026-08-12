@@ -312,6 +312,7 @@ class AsyncClient:
         registry: ProviderRegistry | None = None,
         catalog: Catalog | None = None,
         route: Route | None = None,
+        operation_routes: Mapping[str, Route] | None = None,
         observers: Sequence[Observer] | None = None,
         resolver: ResolverChain | None = None,
         retain_raw: bool = False,
@@ -346,6 +347,7 @@ class AsyncClient:
             events=self._emit,
         )
         self._default_route = route
+        self._operation_routes: dict[str, Route] = dict(operation_routes or {})
         self._health = HealthCache()
         self._capabilities = CapabilityStore(
             pricing=pricing_table,
@@ -1487,7 +1489,7 @@ class AsyncClient:
             provider_options=provider_options or {},
             batch=batch if batch is not None else BatchPolicy(),
         )
-        resolved_route = self._resolve_route(target, route, None)
+        resolved_route = self._resolve_operation_route(target, route, "embedding")
         request_id = uuid.uuid4().hex
         self._check_operation_spend(
             operation="embedding", route=resolved_route, texts=texts, request_id=request_id
@@ -1580,7 +1582,7 @@ class AsyncClient:
             batch=batch if batch is not None else BatchPolicy(),
             return_documents=return_documents,
         )
-        resolved_route = self._resolve_route(target, route, None)
+        resolved_route = self._resolve_operation_route(target, route, "rerank")
         request_id = uuid.uuid4().hex
         self._check_operation_spend(
             operation="rerank", route=resolved_route, texts=None, request_id=request_id
@@ -3393,6 +3395,26 @@ class AsyncClient:
             return self._capabilities_for(descriptor, resolved)
         except (AnyInferError, ValueError):
             return None
+
+    def _resolve_operation_route(
+        self,
+        target: Target | None,
+        route: Route | Target | Sequence[Target] | None,
+        operation: InferenceOperation,
+    ) -> Route:
+        """The route one embed/rerank call uses.
+
+        An explicit target or route always wins. With neither, the operation's own
+        configured default applies before the generation ``default_route`` — so an
+        embedding route is never selected for generation (different lookup entirely)
+        and a generation default only serves an embed/rerank call if its targets
+        actually declare the operation, which dispatch enforces.
+        """
+        if route is None and target is None:
+            configured = self._operation_routes.get(operation)
+            if configured is not None:
+                return configured
+        return self._resolve_route(target, route, None)
 
     def _embedding_capabilities_of(self, resolved: ResolvedTarget) -> Any:
         """Static embedding capabilities layered under anything a probe measured."""

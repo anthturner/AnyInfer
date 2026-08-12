@@ -435,6 +435,32 @@ Omitting the block disables placement. An empty object enables the default `Cach
 `auto` chooses the strongest mechanism the resolved target offers. See
 [prompt caching](../concepts/caching.md) for the mechanism and billing semantics.
 
+### The `operation_routes` block
+
+Embedding and reranking calls get their own default routes, so a client configured for
+chat fallback never accidentally embeds with it:
+
+```json
+{
+  "default_route": ["anthropic:claude-sonnet-4-5", "ollama:qwen3:8b"],
+  "operation_routes": {
+    "embedding": ["cohere:embed-v4.0", "ollama:nomic-embed-text"],
+    "rerank": ["cohere:rerank-v3.5"]
+  }
+}
+```
+
+Valid keys are `embedding` and `rerank` — the generation default belongs in
+`default_route`, and the loader rejects a `generation` key here so the two can never be
+confused. `embed()` and `rerank()` use the matching entry when the caller names no
+target; an explicit `target=` or `route=` argument always wins. With no entry configured,
+they fall through to `default_route`, whose targets must actually declare the operation
+or the call is refused before dispatch.
+
+Note that an embedding fallback chain is still held to the embedding-space safety rule:
+targets that are not the identical `provider:model` are refused unless you opt in — see
+[Embeddings and reranking](../concepts/embeddings.md).
+
 ### The `arena` and `arenas` blocks
 
 Arena policies fan one request out to fixed targets and select only after the candidates
