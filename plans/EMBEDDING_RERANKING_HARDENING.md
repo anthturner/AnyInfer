@@ -641,11 +641,11 @@ several verify them.
 - [ ] **BH.K.2** One complete runnable application example owning its own tiny in-memory
   similarity computation explicitly (ER.12.4) — demonstrating the inference/retrieval
   boundary rather than blurring it.
-- [ ] **BH.K.3** Sweep the remaining reference pages (ER.12.5): installation matrix,
+- [~] **BH.K.3** Sweep the remaining reference pages (ER.12.5): installation matrix,
   integration-paths page, configuration reference, CLI reference (the `embed`/`rerank`
   commands exist but are documented only in `--help`), sidecar endpoint list, error
   catalog staleness.
-- [ ] **BH.K.4** Regenerate `llms.txt`, agent instructions, and `anyinfer agents-md` from
+- [x] **BH.K.4** Regenerate `llms.txt`, agent instructions, and `anyinfer agents-md` from
   canonical metadata (ER.12.6) — generated, never hand-authored; no ADR identifiers in
   outward text.
 - [ ] **BH.K.5** Audit all public docs for stray "embeddings: no" claims (ER.0.7's
@@ -1027,3 +1027,12 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   remaining provider tail (BH.I.2 presets, BH.I.3's TEI/Azure/Gemini/Vertex/Bedrock/
   LM Studio/llama-server/Voyage/Jina, BH.I.4 Ollama loose ends) is untouched — each is
   its own research-first change per this track's own rules.
+- **2026-08-12 (Track K — first increment, delivered):** The CLI guide gained an
+  "Embedding and reranking" section (`anyinfer embed`/`rerank` usage, input sources,
+  safe-output behavior, `--trace`/`--trace-json`, the `operation_routes` default) and
+  the verify section documents `--operation` (BH.K.3, partial — installation matrix,
+  integration-paths page, and an error-catalog staleness check remain). BH.K.4
+  verified `[x]`: `llms.txt` regenerates with every docs build, `anyinfer agents-md`
+  generates on demand from installed metadata, and `tests/test_agent_instructions.py`
+  passes — there is no stale committed artifact to refresh. Still open: task guides
+  (BH.K.1), the standalone runnable example (BH.K.2), the stray-claims audit (BH.K.5).

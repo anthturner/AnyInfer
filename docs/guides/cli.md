@@ -257,6 +257,31 @@ Nothing is sent. Where a figure is not known it says so rather than guessing; an
 context window prints `unknown`, never a plausible default. `--json` emits the same
 information for scripts.
 
+## Embedding and reranking
+
+`anyinfer embed` and `anyinfer rerank` are the operation counterparts of `run`:
+
+```console
+$ anyinfer embed "how does retry backoff work" --target cohere:embed-v4.0 --json
+$ anyinfer embed --file corpus.txt --target ollama:nomic-embed-text --out vectors.json
+$ anyinfer rerank "which doc covers backoff" --file docs.txt --top-n 3 --target cohere:rerank-v3.5
+```
+
+Plain output prints a one-line summary to stderr — vector counts, never thousands of
+floats; the full vectors only appear with `--json` or `--out`. Inputs come from a
+positional argument, `--file` (newline-delimited), `--jsonl`, or stdin. Both commands
+accept `--trace` / `--trace-json` for the run manifest, exactly like `run`:
+
+```console
+$ anyinfer embed "hello" --target cohere:embed-v4.0 --trace-json | jq .operation
+"embedding"
+```
+
+Requests larger than the target's verified batch limit are split and re-assembled by the
+core — nothing to configure at the command line. A configured
+`operation_routes` block supplies the default target when `--target` is omitted (see the
+[configuration reference](../reference/configuration.md)).
+
 ## Checking a target actually works
 
 `anyinfer verify` sends one tiny request and reports what came back; the thing a health
@@ -265,7 +290,11 @@ for inference:
 
 ```bash
 anyinfer verify ollama:qwen3:8b --config anyinfer.json
+anyinfer verify cohere:embed-v4.0 --operation embedding --config anyinfer.json
 ```
+
+`--operation embedding` (or `rerank`) proves the operation the same way — one tiny real
+call, judged on the vector or ranking that came back instead of a chat reply.
 
 ```text
 ok        ollama:qwen3:8b
