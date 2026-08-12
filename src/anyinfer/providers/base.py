@@ -260,6 +260,8 @@ class EmbeddingWireResult:
             separately from the vector data.
         normalized: Whether the provider states these vectors are unit-normalized.
         usage: Usage the provider reported for this call, when any.
+        phases: Provider-reported phase timings in milliseconds (e.g. model load), on the
+            same terms as `AdapterFinal.phases`.
         raw: The provider payload, attached unconditionally; the core retains it only when
             the request opted in.
     """
@@ -269,6 +271,7 @@ class EmbeddingWireResult:
     dimensions: int | None = None
     normalized: bool | None = None
     usage: Usage | None = None
+    phases: Mapping[str, float] = field(default_factory=dict)
     raw: Any | None = None
 
 

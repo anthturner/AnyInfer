@@ -597,13 +597,13 @@ specialists. The ordering below is sequencing, not optionality.
   because its chat endpoint is OpenAI-compatible. The 86-preset audit (ER.5.14) proceeds
   incrementally; unverified presets simply stay generation-only, which is the correct
   conservative default.
-- [ ] **BH.I.3** Milestone providers, each its own change: Hugging Face TEI (ER.5.5,
+- [~] **BH.I.3** Milestone providers, each its own change: Hugging Face TEI (ER.5.5,
   externally managed local, OpenAI-compatible embed + native rerank), Azure (ER.5.6),
   Gemini (ER.5.7), Vertex (ER.5.8), Bedrock (ER.5.9), LM Studio (ER.5.10), llama-server
   embeddings behind a live contract check with acquisition staying in `local/` (ER.5.11),
   Voyage AI (ER.5.12), Jina AI (ER.5.13), named local presets for verified TEI/vLLM/SGLang
   deployments (ER.5.15).
-- [ ] **BH.I.4** Ollama loose ends from the audit: surface `total_duration`/
+- [x] **BH.I.4** Ollama loose ends from the audit: surface `total_duration`/
   `load_duration` on `EmbeddingWireResult` (read but dropped today), and re-verify the
   model-pulling hook on the embeddings path specifically.
 
@@ -1036,3 +1036,28 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   generates on demand from installed metadata, and `tests/test_agent_instructions.py`
   passes — there is no stale committed artifact to refresh. Still open: task guides
   (BH.K.1), the standalone runnable example (BH.K.2), the stray-claims audit (BH.K.5).
+- **2026-08-12 (Track I — second increment, delivered and tested):** Ollama loose ends
+  (BH.I.4): `EmbeddingWireResult` gained a `phases` field; Ollama's embed surfaces
+  `load_duration`/`total_duration` under the same phase names generation uses
+  (`model_load_ms`/`provider_total_ms`), threaded into `Timing.phases` on the
+  single-call path; the pull path needed no change — pulling is an explicit
+  operation-agnostic client method, and the embed 404's "pull it first" hint was
+  already tested. **TEI (Hugging Face Text Embeddings Inference)** — the first
+  retrieval-only builtin, declaring `{embedding, rerank}` and no generation at all.
+  Verified from the project's OpenAPI spec + quick tour (2026-08-12; the rendered
+  Swagger reference is JS-only, recorded as such): native `POST /embed` (batch-native,
+  `normalize` defaults true — reported on results from what was actually sent, never
+  guessed), `POST /rerank` (`{index, score}` positional → caller-index mapping; **no
+  native `top_n`** and no stated result order, so the adapter sorts descending and
+  truncates — recorded in the snapshot as a deterministic translation), `GET /info`
+  discovery deriving the single model's operation from `model_type` with `discovered`
+  provenance (both tagged-object and plain-string spellings accepted), TEI's
+  `{error, error_type}` body with 413/422/424/429. One-model-per-server semantics
+  documented (target model is advisory; two servers = two configured instances).
+  `contracts/tei.md` written with an explicit not-yet-live-verified watchlist;
+  provider docs page + nav + generated provider index entries; conformance harness
+  where every generation flag is honestly False and all four operation cases pass —
+  the matrix's first retrieval-only row. 11 wire/e2e tests. Setup-spec invariants
+  (placeholder/env-var pairing, advanced endpoint) satisfied. Gates all clean.
+  BH.I.3 now `[~]`: TEI done; Azure/Gemini/Vertex/Bedrock/LM Studio/llama-server/
+  Voyage/Jina remain.

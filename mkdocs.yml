@@ -193,6 +193,7 @@ nav:
       - OpenRouter: providers/openrouter.md
       - Nebius Token Factory: providers/nebius.md
       - Ollama: providers/ollama.md
+      - Text Embeddings Inference: providers/tei.md
       - llama.cpp: providers/llama-cpp.md
       - OpenAI-compatible: providers/openai-compat.md
   - Reference:

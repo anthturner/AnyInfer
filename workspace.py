@@ -1037,6 +1037,7 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     import test_nebius
     import test_ollama
     import test_presets
+    import test_tei
 
     harnesses = {
         "openai-compat": test_conformance.HARNESS,
@@ -1045,6 +1046,7 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "cohere": test_cohere_lmstudio.HARNESS,
         "lm-studio": test_cohere_lmstudio.LM_STUDIO_HARNESS,
         "nebius": test_nebius.HARNESS,
+        "tei": test_tei.HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed

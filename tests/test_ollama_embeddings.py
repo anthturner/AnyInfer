@@ -118,3 +118,16 @@ async def test_embed_rejects_missing_embeddings_key() -> None:
             await adapter.embed(EmbeddingWireRequest(model="m", inputs=("a",)))
     finally:
         await adapter.aclose()
+
+
+async def test_embed_surfaces_phase_timings() -> None:
+    """load/total durations arrive in the same phase vocabulary generation uses."""
+    adapter = _adapter(_embed_response)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(model="nomic-embed-text", inputs=("hello",))
+        )
+        assert result.phases["model_load_ms"] == pytest.approx(1019500 / 1_000_000)
+        assert result.phases["provider_total_ms"] == pytest.approx(14143917 / 1_000_000)
+    finally:
+        await adapter.aclose()

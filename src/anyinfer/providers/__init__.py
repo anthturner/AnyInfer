@@ -26,6 +26,7 @@ _BUILTIN_MODULES: tuple[str, ...] = (
     "xai",
     "lm_studio",
     "ollama",
+    "tei",
     "openrouter",
     "azure_foundry",
     "copilot",

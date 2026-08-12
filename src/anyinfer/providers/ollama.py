@@ -496,11 +496,23 @@ class OllamaAdapter:
         if isinstance(prompt_eval_count, int):
             usage = Usage(input_tokens=prompt_eval_count)
 
+        # Same phase names generation uses; /api/embed reports no prefill/decode split
+        # (contracts/ollama.md), so only these two exist to carry.
+        phases: dict[str, float] = {}
+        for source_name, phase_name in (
+            ("load_duration", "model_load_ms"),
+            ("total_duration", "provider_total_ms"),
+        ):
+            value = payload.get(source_name)
+            if isinstance(value, int | float) and not isinstance(value, bool) and value >= 0:
+                phases[phase_name] = float(value) / _NS_PER_MS
+
         return EmbeddingWireResult(
             vectors=tuple(vectors),
             model=model if isinstance(model, str) else None,
             dimensions=len(vectors[0]) if vectors else None,
             usage=usage,
+            phases=phases,
             raw=payload,
         )
 

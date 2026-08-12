@@ -857,7 +857,7 @@ async def _call_embed(
     started = time.monotonic()
     result = await adapter.embed(wire_request)
     total_ms = (time.monotonic() - started) * 1000.0
-    return result, Timing(started_at=started, total_ms=total_ms)
+    return result, Timing(started_at=started, total_ms=total_ms, phases=dict(result.phases))
 
 
 async def _call_rerank(
