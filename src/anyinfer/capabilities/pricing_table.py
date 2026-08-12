@@ -11,6 +11,13 @@ it, an application's ``override`` beats everything, and a model with no entry ke
 Freshness is opt-in and explicit. The library never fetches anything implicitly; a repo
 workflow keeps the upstream file current, and `fetch_pricing()` lets an application
 pull that file on its own schedule and hand it to a client.
+
+An entry may optionally carry ``per_search_unit`` (a decimal string, same rule as the
+token rates) for rerank providers billed per search rather than per token; embedding
+and rerank cost computation is `anyinfer.capabilities.pricing.compute_operation_cost`,
+which reads only the field relevant to its operation (input-token rate for embeddings,
+``per_search_unit`` for rerank) — an entry missing the field it needs simply prices
+that operation as unknown rather than guessing.
 """
 
 from __future__ import annotations
@@ -148,12 +155,17 @@ def _parse_entry(provider_id: str, raw: Any) -> PricingEntry:
         raise ConfigError(
             f"pricing entry for {provider_id!r} is missing field {missing.args[0]!r}"
         ) from None
+    per_search_unit_raw = raw.get("per_search_unit")
+    per_search_unit = (
+        _parse_rate(per_search_unit_raw) if per_search_unit_raw is not None else None
+    )
     return PricingEntry(
         model=model,
         pricing=Pricing(
             input_per_1m=input_rate,
             output_per_1m=output_rate,
             currency=str(raw.get("currency", "USD")),
+            per_search_unit=per_search_unit,
         ),
         last_verified=last_verified,
         source=source,

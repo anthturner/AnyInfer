@@ -101,6 +101,63 @@ def test_lookup_provenance_is_catalog() -> None:
     assert priced is not None and priced.provenance == "catalog"
 
 
+def test_per_search_unit_parses_when_present_and_stays_none_when_absent() -> None:
+    table = PricingTable.from_mapping(
+        {
+            "format_version": 1,
+            "providers": {
+                "cohere": [
+                    {
+                        "model": "rerank-v3.5",
+                        "input_per_1m": "0",
+                        "output_per_1m": "0",
+                        "per_search_unit": "2.00",
+                        "last_verified": "2026-08-07",
+                        "source": "https://example.invalid/prices",
+                    }
+                ],
+                "openai": [
+                    {
+                        "model": "text-embedding-3-small",
+                        "input_per_1m": "0.02",
+                        "output_per_1m": "0",
+                        "last_verified": "2026-08-07",
+                        "source": "https://example.invalid/prices",
+                    }
+                ],
+            },
+        }
+    )
+    reranked = table.lookup("cohere", "rerank-v3.5")
+    assert reranked is not None
+    assert reranked.value.per_search_unit == Decimal("2.00")
+
+    embedded = table.lookup("openai", "text-embedding-3-small")
+    assert embedded is not None
+    assert embedded.value.per_search_unit is None
+
+
+def test_per_search_unit_rejects_a_negative_rate() -> None:
+    with pytest.raises(ConfigError):
+        PricingTable.from_mapping(
+            {
+                "format_version": 1,
+                "providers": {
+                    "cohere": [
+                        {
+                            "model": "rerank-v3.5",
+                            "input_per_1m": "0",
+                            "output_per_1m": "0",
+                            "per_search_unit": "-1",
+                            "last_verified": "2026-08-07",
+                            "source": "https://example.invalid/prices",
+                        }
+                    ]
+                },
+            }
+        )
+
+
 # ---- table validation ----------------------------------------------------------------
 
 
