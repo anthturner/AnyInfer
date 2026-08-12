@@ -195,7 +195,7 @@ is data + parsing:
 3. The demo panel's cost display lights up automatically once entries exist (ER.9.13).
 4. ER.11.12: mixed generation/embed/rerank rate-pacing test.
 
-### T7 — Conformance/harness remainder (Track H, BH.H.1/H.2/H.3/H.5)
+### T7 — Conformance/harness remainder (Track H, BH.H.1/H.2/H.3/H.5) — two cases DONE 2026-08-12, live lanes still open
 
 - Port the never-harness-registered behaviors into `CONFORMANCE_CASES`: intent
   translation, normalization metadata, byte caps, retry-after, cancellation,
@@ -208,7 +208,7 @@ is data + parsing:
 - `testing/scaffold.py`/`certify.py` extension beyond the conformance-table comment
   (BH.H.3): scaffold could emit optional EmbedsText/ReranksText stubs.
 
-### T8 — `compare()` embedding dimensions (Track F remainder, BH.F.4)
+### T8 — `compare()` embedding dimensions (Track F remainder, BH.F.4) — DONE 2026-08-12
 
 `AsyncClient.compare()` (:~2155) is generation-shaped (builds a GenerationRequest;
 dimensions: context fit, mechanism ladder, cache, cost). An embedding comparison needs
@@ -459,3 +459,26 @@ feature-complete bar:
   do not assume" appears throughout this file for a reason), so pricing.json is
   untouched. A session with working browser-rendered fetch (or the owner supplying the
   numbers directly) can complete this in minutes once the mechanism exists.
+- **2026-08-12:** T7 partially delivered and tested (`e5e6969`) — two new conformance
+  cases (`rerank_duplicate_text`, `embedding_normalization_probe`), both reusing the
+  existing "default" scenario so no provider's `build_client` factory needed changes;
+  confirmed via the regenerated matrix (cohere/tei/ollama pick up both as passes, every
+  other row skips honestly). Byte-cap/retry-after for the embed/rerank paths and
+  cancellation-in-conformance are explicitly not done — each needs new scenario strings
+  threaded through every provider's harness factory, real multi-file work rather than a
+  quick add. Live Ollama/Voyage/Jina/TEI lanes need infrastructure this session doesn't
+  have. The scaffold EmbedsText/ReranksText stub extension is explicitly optional per the
+  plan's own wording and was skipped to prioritize the harder items.
+- **2026-08-12:** T8 delivered and tested (`35f6414`). Made the deferred design call:
+  `EmbeddingTargetComparison` is a separate type from `TargetComparison`, not an optional
+  section on it — generation's mechanism-rung/cache/structured-output fields have no
+  embedding counterpart, so grafting them together would mean every embedding comparison
+  carries a dozen always-`None` fields. `compare_embedding()` reports declared
+  dimensions/batch-limit/token-limit/intents/normalized, a cost range built from the same
+  `compute_operation_cost()` the spend gate already trusts, and a `fits` verdict against
+  the declared ceilings — all without dispatching. An unsupported `input_type` or a
+  provider that never declared the embedding operation surfaces as data (a note, or
+  `resolvable=False`), matching `compare()`'s own unresolvable-target discipline. Both
+  `AsyncClient` and the sync `Client` expose it; `to_dict`/`from_dict` round-trip. Caught
+  and fixed a docstring-gate failure along the way (every public symbol needs a `:::`
+  directive somewhere in `docs/`) — a real gate doing its job, not a false positive.
