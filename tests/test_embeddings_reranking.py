@@ -1225,3 +1225,31 @@ def test_sync_facade_embed_from_many_threads() -> None:
         assert len(fake.embed_requests) == 24
     finally:
         client.close()
+
+
+async def test_embed_warns_when_declared_capabilities_ignore_the_intent() -> None:
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        embedding_capabilities={
+            "small": ai.EmbeddingCapabilities(max_batch_inputs=96, input_intents=())
+        },
+    )
+    client = _client_with_fake(fake)
+    try:
+        result = await client.embed(
+            ["hello"], target="fake-embed:small", input_type="query"
+        )
+        assert any("does not distinguish" in w for w in result.warnings)
+        # No declared capabilities at all -> unknown support -> no invented warning.
+        bare = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+        bare_client = _client_with_fake(bare)
+        try:
+            silent = await bare_client.embed(
+                ["hello"], target="fake-embed:small", input_type="query"
+            )
+            assert silent.warnings == ()
+        finally:
+            await bare_client.aclose()
+    finally:
+        await client.aclose()

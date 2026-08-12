@@ -376,6 +376,21 @@ async def dispatch_embed(
         limit = _effective_batch_limit(
             request.batch, declared.max_batch_inputs if declared is not None else None
         )
+        if request.input_type is not None and declared is not None:
+            # `input_intents` is declared-empty when the model verifiably has no intent
+            # concept (the field's documented semantics) — the caller's intent silently
+            # doing nothing is exactly the degradation that must be recorded, not hidden.
+            if declared.input_intents == ():
+                warnings.append(
+                    f"{resolved} does not distinguish embedding input intents; "
+                    f"input_type={request.input_type!r} has no effect on this target"
+                )
+            elif request.input_type not in declared.input_intents:
+                warnings.append(
+                    f"{resolved} does not support input_type={request.input_type!r} "
+                    f"(supported: {', '.join(declared.input_intents)}); the provider's "
+                    "own handling applies"
+                )
         chunks = _plan_chunks(
             item_count=len(request.inputs),
             limit=limit,

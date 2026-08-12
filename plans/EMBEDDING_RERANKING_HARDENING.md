@@ -628,7 +628,7 @@ several verify them.
   output (ER.11.14's redaction half).
 - [~] **BH.J.6** Sidecar concurrency and disconnect-mid-request cancellation tests
   (ER.11.13's remainder).
-- [ ] **BH.J.7** Warn on silently dropped request fields: Ollama ignores `input_type`
+- [x] **BH.J.7** Warn on silently dropped request fields: Ollama ignores `input_type`
   today with no signal (fact 13) — emit a result warning (or `ParameterDropped`-style
   event) when an adapter cannot honor a requested intent.
 
@@ -961,5 +961,7 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   8-thread sync-facade stress (BH.J.2), and 16-way concurrent sidecar embeddings
   (BH.J.6's concurrency half — disconnect-mid-request remains). Still open in this
   track: response-bomb enforcement tests, mixed-operation rate pacing (ER.11.12), the
-  CLI redaction proof, `ParameterDropped`-style warnings for silently ignored
-  `input_type` (BH.J.7).
+  CLI redaction proof. BH.J.7 landed in a follow-up: when a target's *declared*
+  embedding capabilities show no intent support (or a different intent set), the
+  result carries a warning — a target with no declared capabilities stays silent,
+  because unknown support is never turned into a warning by guesswork.
