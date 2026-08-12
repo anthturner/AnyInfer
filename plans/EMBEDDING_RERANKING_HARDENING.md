@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D, A, B, C, E, F, G, and H landed 2026-08-12 (see §19); I is next.
+> **Status:** in progress — Tracks D through H landed 2026-08-12, plus Track I's first increment (see §19); the provider tail (BH.I.2-I.4), Track J's remainder, and Track K are next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -587,7 +587,7 @@ sources or live traffic, never training-data memory.
 OpenAI attach + presets, TEI + local runtimes, the big-cloud adapters, and the
 specialists. The ordering below is sequencing, not optionality.
 
-- [ ] **BH.I.1** Attach OpenAI embeddings for real (ER.5.2): wire the proven
+- [x] **BH.I.1** Attach OpenAI embeddings for real (ER.5.2): wire the proven
   `openai_compat_embeddings` mixin into the concrete OpenAI adapter/preset descriptor,
   verify against the live endpoint, snapshot the contract. The dialect is tested; no
   concrete provider opts in today.
@@ -1011,3 +1011,19 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   BH.H.1/H.2); certification-manifest/entry-point extensions beyond the scaffold
   comment (BH.H.3); an Ollama live lane (BH.H.5 — its 2026-08-11 verification remains
   documentation research).
+- **2026-08-12 (Track I — first increment, delivered and tested):** OpenAI embeddings
+  attached for real (BH.I.1). Verified live against
+  `developers.openai.com/api/reference` (the `platform.openai.com` mirror was
+  bot-blocked, recorded as such): 2,048 inputs per request, 8,192 tokens per input,
+  300k tokens summed, `dimensions` on text-embedding-3+, and **no input-intent field
+  anywhere in the schema** — so the static capabilities declare an empty intent set and
+  a caller's `input_type` produces the ignored-intent warning. `OpenAIAdapter` composes
+  the proven `OpenAICompatEmbeddingsMixin`; the descriptor declares
+  `{generation, embedding}` plus static capabilities for the three embedding models
+  (dimensions stay `None` — the current docs don't state them, and a remembered number
+  is not a verified one). Contract snapshot extended with dated sections and a
+  watchlist entry; provider docs page gained an Embeddings section; an end-to-end test
+  proves a 2,500-input request splits 2,048+452 through the real adapter wiring. The
+  remaining provider tail (BH.I.2 presets, BH.I.3's TEI/Azure/Gemini/Vertex/Bedrock/
+  LM Studio/llama-server/Voyage/Jina, BH.I.4 Ollama loose ends) is untouched — each is
+  its own research-first change per this track's own rules.

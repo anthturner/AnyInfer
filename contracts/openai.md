@@ -65,8 +65,36 @@ Verified 2026-08-09 against https://developers.openai.com/api/docs/guides/rate-l
   hold back requests the key itself could still make.
 - 429 responses also carry `Retry-After`, which the router already honours on the way down.
 
+### Embeddings request fields (`POST /v1/embeddings`, verified 2026-08-12)
+- Verified against `developers.openai.com/api/reference/resources/embeddings/methods/create`
+  (the `platform.openai.com` mirror was bot-blocked on the verification date and is noted
+  as such rather than assumed).
+- `model` (required; `text-embedding-3-small`/`text-embedding-3-large`/
+  `text-embedding-ada-002`), `input` (string or array; **at most 2,048 array entries**,
+  **8,192 tokens per input**, and **300,000 tokens summed per request**),
+  `encoding_format` (`float`/`base64`), `dimensions` (text-embedding-3 and later only),
+  `user`.
+- **There is no input-intent field anywhere in the request schema** — the adapter's
+  static capabilities declare an empty intent set, so a caller's `input_type` produces
+  the ignored-intent warning rather than silently doing nothing.
+- The adapter sends `model`, `input` (scalar collapses to a bare string), and
+  `dimensions` when requested, via the shared OpenAI-compatible embeddings dialect
+  (`providers/openai_compat_embeddings.py`, float and base64 decoding both verified in
+  its own tests).
+
+### Embeddings response fields (`POST /v1/embeddings`, verified 2026-08-12)
+- `object: "list"`, `data[]` with `embedding`/`index`/`object: "embedding"`, `model`,
+  `usage` with `prompt_tokens`/`total_tokens`.
+- **Unverified:** default output dimensions per model — the current reference and model
+  pages do not state them, so `EmbeddingCapabilities.dimensions` stays `None` rather
+  than carrying a remembered number. Embedding pricing appears on the model pages
+  ($0.02/1M for 3-small, $0.13/1M for 3-large, 2026-08-12) but enters `pricing.json`
+  only through the pricing pipeline, never by hand.
+
 ## Watchlist
 - Rate-limit header names and the duration format of the reset values
 - Responses API evolves quickly: new event types, `text.format` schema-mode changes
 - Chat-completions deprecation posture for first-party API
 - Model catalog churn (gpt-5 family) affecting bundled capability catalog + pricing
+- Embeddings: the 2,048-input / 8,192-token / 300k-summed-token limits, and whether the
+  reference starts stating per-model default dimensions (unverified today)

@@ -38,11 +38,13 @@ from ..types.messages import (
     ToolCall,
     ToolResult,
 )
+from ..types.operations import EmbeddingCapabilities
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data, data_url, media_subtype
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 from .sse import iter_sse
 
 __all__ = ["OpenAIAdapter", "descriptor"]
@@ -55,7 +57,7 @@ _INCOMPLETE_REASONS: Mapping[str, FinishReason] = {
 }
 
 
-class OpenAIAdapter:
+class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
     """Adapter for the OpenAI Responses API."""
 
     provider_id: ClassVar[str] = "openai"
@@ -468,6 +470,18 @@ Recorded in ``contracts/openai.md``. The project-scoped variants
 bucket than the one a single client's requests draw from.
 """
 
+_STATIC_EMBEDDING_CAPABILITIES = {
+    # Verified against developers.openai.com/api/reference (embeddings/create) on
+    # 2026-08-12: at most 2,048 inputs per request, 8,192 tokens per input, and no
+    # input-intent concept anywhere in the request schema (hence the declared-empty
+    # intents). Default dimensions are not stated in the reference, so they stay None.
+    model: EmbeddingCapabilities(
+        max_batch_inputs=2_048, max_input_tokens=8_192, input_intents=()
+    )
+    for model in ("text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002")
+}
+
+
 descriptor = ProviderDescriptor(
     id="openai",
     display_name="OpenAI",
@@ -475,6 +489,8 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=_DEFAULT_BASE_URL,
     requires_base_url=False,
+    operations=frozenset({"generation", "embedding"}),
+    static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

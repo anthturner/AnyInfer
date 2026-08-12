@@ -157,3 +157,51 @@ def test_decode_embedding_value_rejects_wrong_length() -> None:
     bad = base64.b64encode(b"\x00\x01\x02").decode("ascii")
     with pytest.raises(ProviderError, match="whole number"):
         decode_embedding_value(bad)
+
+
+# ---- the concrete OpenAI adapter serves the dialect --------------------------------------
+
+
+async def test_openai_adapter_embeds_end_to_end_with_batching() -> None:
+    """The dedicated adapter composes the dialect, and core batching splits at 2,048."""
+    import anyinfer as ai
+
+    calls: list[int] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content)
+        inputs = body["input"] if isinstance(body["input"], list) else [body["input"]]
+        calls.append(len(inputs))
+        return httpx2.Response(
+            200,
+            json={
+                "object": "list",
+                "data": [
+                    {"object": "embedding", "index": i, "embedding": [0.1, 0.2]}
+                    for i in range(len(inputs))
+                ],
+                "model": body["model"],
+                "usage": {"prompt_tokens": len(inputs), "total_tokens": len(inputs)},
+            },
+        )
+
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings(
+                provider_id="openai",
+                api_key="test-key",
+                transport=httpx2.MockTransport(handler),
+            )
+        ],
+        use_default_catalog=False,
+    )
+    try:
+        result = await client.embed(
+            [f"t{i}" for i in range(2_500)], target="openai:text-embedding-3-small"
+        )
+        assert len(result.vectors) == 2_500
+        assert calls == [2_048, 452]
+        assert result.usage.input_tokens == 2_500
+        assert result.space.model == "text-embedding-3-small"
+    finally:
+        await client.aclose()
