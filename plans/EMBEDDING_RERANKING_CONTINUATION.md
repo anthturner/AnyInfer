@@ -141,7 +141,7 @@ which surface applies per model). Research target:
 task_type values mirror Gemini's legacy list (RETRIEVAL_QUERY etc.) — map like
 `gemini.py`'s `_TASK_TYPES`.
 
-### T3 — Bedrock embeddings (BH.I.3)
+### T3 — Bedrock embeddings (BH.I.3) — Titan DONE 2026-08-12, Cohere-on-Bedrock and Rerank still open
 
 `providers/bedrock.py` exists (Converse API, SigV4 or API key, binary event framing).
 Embeddings go through `InvokeModel` (NOT Converse):
@@ -410,3 +410,17 @@ feature-complete bar:
   in the contract watchlist, not assumed: the API reference nav also lists an
   `embedContent` method that the how-to guide doesn't document or use. All gates green.
   T3 (Bedrock) is next.
+- **2026-08-12:** T3 partially delivered and tested (`0e29978`) — Titan Text Embeddings
+  V2 only, as the plan recommended ("scope Titan embed first"). Converse has no
+  embeddings surface at all, so `BedrockAdapter.embed()` is separate machinery against
+  `InvokeModel`, reusing only auth headers and the model-path quoting helper. Titan
+  accepts exactly one `inputText` per call (no batch field in its schema, confirmed live)
+  — declared `max_batch_inputs=1`; the adapter loops one `InvokeModel` call per input and
+  sums `inputTextTokenCount`, so it stays correct even if called with more than one input
+  directly. **Explicitly not implemented:** Cohere-on-Bedrock embeddings — a live fetch
+  of `model-parameters-cohere-embed.html` returned no usable content this session, and
+  the plan's recorded shape was not independently verified, so it was left undone rather
+  than guessed and shipped. Bedrock's separate Rerank action is also unresearched. Both
+  recorded in the contract watchlist for a future session with a working fetch. All gates
+  green. T4 (llama-server, live-gated) is next — flagging to the owner that it needs a
+  local GGUF + running llama-server, which this session cannot provide.
