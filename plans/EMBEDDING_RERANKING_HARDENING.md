@@ -1,6 +1,10 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D through H landed 2026-08-12, plus five Track I increments (OpenAI, TEI+Ollama, Gemini, Voyage, LM Studio+Jina) and first J/K increments (see §19). Next: BH.I.3's remainder (Azure, Vertex, Bedrock — auth-heavy research; llama-server — requires a live pinned-runtime contract check), BH.I.2 presets, and the J/H/E/F/K remainders.
+> **Status:** in progress — Tracks D through H landed 2026-08-12, plus five Track I increments.
+> **Continuation notes:** [EMBEDDING_RERANKING_CONTINUATION.md](EMBEDDING_RERANKING_CONTINUATION.md)
+> carries the discovery-minimizing handoff for the remaining items (verified fact cache,
+> file/line map, recipes, traps) — read it before starting a new session.
+> Previously: Tracks D through H landed 2026-08-12, plus five Track I increments (OpenAI, TEI+Ollama, Gemini, Voyage, LM Studio+Jina) and first J/K increments (see §19). Next: BH.I.3's remainder (Azure, Vertex, Bedrock — auth-heavy research; llama-server — requires a live pinned-runtime contract check), BH.I.2 presets, and the J/H/E/F/K remainders.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
