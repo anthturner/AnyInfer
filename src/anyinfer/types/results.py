@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
@@ -104,6 +104,8 @@ class Usage:
 
         Later usage reports win; ``None`` never overwrites a known value. Streaming
         providers report usage incrementally, so the router merges rather than replaces.
+        This is an overlay, not addition — to total usage across the internal batches of
+        one request, use `Usage.sum()`.
         """
         return Usage(
             input_tokens=_pick(self.input_tokens, other.input_tokens),
@@ -115,12 +117,44 @@ class Usage:
             cost_usd=_pick(self.cost_usd, other.cost_usd),
         )
 
+    @classmethod
+    def sum(cls, parts: Sequence[Usage]) -> Usage:
+        """Total usage across the internal batches of one logical request.
+
+        A field totals only when every part reports it; if any part is unknown, the
+        total stays ``None`` — a partial sum would understate spend while reading as
+        authoritative. An empty ``parts`` is all-unknown.
+        """
+        return Usage(
+            input_tokens=_sum_known(p.input_tokens for p in parts),
+            output_tokens=_sum_known(p.output_tokens for p in parts),
+            total_tokens=_sum_known(p.total_tokens for p in parts),
+            cache_read_tokens=_sum_known(p.cache_read_tokens for p in parts),
+            cache_write_tokens=_sum_known(p.cache_write_tokens for p in parts),
+            reasoning_tokens=_sum_known(p.reasoning_tokens for p in parts),
+            cost_usd=_sum_known_decimal(p.cost_usd for p in parts),
+        )
+
 
 _T = TypeVar("_T")
 
 
 def _pick(current: _T | None, incoming: _T | None) -> _T | None:
     return current if incoming is None else incoming
+
+
+def _sum_known(values: Iterable[int | None]) -> int | None:
+    collected = list(values)
+    if not collected or any(v is None for v in collected):
+        return None
+    return sum(v for v in collected if v is not None)
+
+
+def _sum_known_decimal(values: Iterable[Decimal | None]) -> Decimal | None:
+    collected = list(values)
+    if not collected or any(v is None for v in collected):
+        return None
+    return sum((v for v in collected if v is not None), Decimal(0))
 
 
 @dataclass(frozen=True, slots=True)

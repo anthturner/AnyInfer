@@ -109,6 +109,16 @@ own: it only happens against a verified limit, and an embedding batch failure is
 automatically split across documents and concatenated, because scores from separate document
 batches are not assumed globally comparable unless a provider documents otherwise.
 
+An oversized embedding request against a target with a verified batch limit is split into
+ordered chunks, dispatched concurrently, and re-assembled in input order. When no verified
+limit exists, a request up to a bounded default goes out as a single call, and anything
+larger is refused with an actionable error — AnyInfer never guesses a provider maximum.
+The `batch=` parameter on `embed()` and `rerank()` takes an `anyinfer.BatchPolicy`:
+`max_concurrency` bounds parallel chunks, `allow_split=False` refuses splitting outright,
+`max_items_override` supplies a limit you have verified yourself, and
+`rerank_cross_batch=True` is the explicit opt-in for chunk-local rerank rankings — the
+result then always carries a warning saying the scores are not one global ordering.
+
 ## Frontends
 
 The sidecar exposes `POST /v1/embeddings` as an OpenAI-compatible codec, and

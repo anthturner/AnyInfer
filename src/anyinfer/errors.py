@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any, Literal
 
 from .redaction import redact
+from .types.operations import BatchFailure
 from .types.results import DETAIL_MAX_CHARS, AttemptRecord, ErrorInfo
 
 __all__ = [
@@ -303,6 +304,10 @@ class AllTargetsFailedError(AnyInferError):
 
     Attributes:
         attempts: The complete routing trail, in order, including skipped targets.
+        batch_failures: Per-internal-batch outcomes when the failed request had been
+            split by core-owned batching — including the batches that succeeded, so a
+            caller can see exactly what was spent before the failure. Empty for an
+            unsplit request.
     """
 
     def __init__(
@@ -310,10 +315,12 @@ class AllTargetsFailedError(AnyInferError):
         detail: str = "all routing targets failed",
         *,
         attempts: tuple[AttemptRecord, ...] = (),
+        batch_failures: tuple[BatchFailure, ...] = (),
         hint: str | None = None,
     ) -> None:
         super().__init__(detail, hint=hint)
         self.attempts = attempts
+        self.batch_failures = batch_failures
 
 
 class LocalRuntimeError(AnyInferError):

@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** proposed; implementation of the tracks below has not started.
+> **Status:** in progress — Tracks D and A landed 2026-08-12 (see §19); B is next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -232,7 +232,7 @@ gate, and the embedding-space check stay as they are.
 
 ### Design
 
-- [ ] **BH.A.1** Resolve the effective per-request limit at dispatch time, in priority
+- [x] **BH.A.1** Resolve the effective per-request limit at dispatch time, in priority
   order: an explicit caller override on `BatchPolicy` (new field — e.g.
   `max_inputs_override`/`max_documents_override`) beats the resolved target's
   `EmbeddingCapabilities.max_batch_inputs`/`RerankCapabilities.max_documents` (read via
@@ -242,15 +242,15 @@ gate, and the embedding-space check stay as they are.
   constants (fact 1): they must **not** become implied provider ceilings — either enforce
   them as local pre-dispatch sanity bounds (BH.A.8) or delete them; do not leave them
   exported and meaningless.
-- [ ] **BH.A.2** When the input/document count exceeds the resolved limit and
+- [x] **BH.A.2** When the input/document count exceeds the resolved limit and
   `allow_split=True`, split into ordered chunks no larger than the limit and dispatch with
   concurrency bounded by `BatchPolicy.max_concurrency`, using `asyncio.Semaphore` +
   `gather` (the house idiom, fact 9).
-- [ ] **BH.A.3** When `allow_split=False` and the request exceeds the limit, raise
+- [x] **BH.A.3** When `allow_split=False` and the request exceeds the limit, raise
   `ConfigError` locally before any provider call — matching
   `EmbeddingRequest.__post_init__`'s "never sent, never billed, never retried" precedent
   (`operations.py:284-294`).
-- [ ] **BH.A.4** Embedding aggregation: preserve vector order across concurrently
+- [x] **BH.A.4** Embedding aggregation: preserve vector order across concurrently
   completing chunks (original request positions, not arrival order). Failure is
   all-or-error (ER.4.4/ER.10.5): if any chunk exhausts its retry budget, the whole call
   raises `AllTargetsFailedError` extended with a new optional
@@ -259,22 +259,22 @@ gate, and the embedding-space check stay as they are.
   exactly the right shape and zero consumers. No `EmbeddingResult` with holes, ever. The
   post-dispatch vector-count check (`operations.py:240-246`) must validate the *merged*
   result against the *original* request.
-- [ ] **BH.A.5** Rerank aggregation is deliberately **not symmetric**: per
+- [x] **BH.A.5** Rerank aggregation is deliberately **not symmetric**: per
   `BatchPolicy.rerank_cross_batch` (default `False`), an over-limit rerank request is
   refused locally unless the caller opts in, in which case chunks are reranked
   independently, results concatenated chunk-locally (never globally re-sorted), and a
   **mandatory warning** on `RerankResult.warnings` states that cross-batch scores are not
   a provider-certified global ordering. This is the correctness rule ADR-018's sibling
   decision (§16, D-8) exists to protect, not a batching nuance.
-- [ ] **BH.A.6** Aggregate usage by **summing** across chunks — `Usage.merge()` is an
+- [x] **BH.A.6** Aggregate usage by **summing** across chunks — `Usage.merge()` is an
   overlay and unusable here (fact 3). Add a small explicit helper (e.g. `Usage.sum()`
   classmethod: fields sum when all known, stay `None` if any chunk's value is unknown —
   never understate spend by treating unknown as zero, ER.4.6). Aggregate timing and
   warnings alongside.
-- [ ] **BH.A.7** Emit one `RequestStarted`/`RequestCompleted`/`RequestFailed` set per
+- [x] **BH.A.7** Emit one `RequestStarted`/`RequestCompleted`/`RequestFailed` set per
   logical `embed()`/`rerank()` call regardless of chunk count; per-chunk
   `AttemptStarted` (and, once Track C adds it, `AttemptCompleted`) events are expected.
-- [ ] **BH.A.8** Size bounds (ER.4.7/ER.4.8): give `EmbeddingRequest`/`RerankRequest` an
+- [x] **BH.A.8** Size bounds (ER.4.7/ER.4.8): give `EmbeddingRequest`/`RerankRequest` an
   operation-appropriate `max_response_bytes` default (the generation default is too small
   for large float-vector batches — today they reuse it unchanged), and bound vector count,
   dimensions, document count, and total response bytes *before allocation* so an unbounded
@@ -283,22 +283,22 @@ gate, and the embedding-space check stay as they are.
 
 ### Tests
 
-- [ ] **BH.A.9** Limit-resolution priority (override > capability > unknown-never-split)
+- [x] **BH.A.9** Limit-resolution priority (override > capability > unknown-never-split)
   using `FakeEmbeddingRerankProvider` — its constructor
   (`testing/scripted_operations.py:101-110`) does not accept static capabilities today, so
   extend it (that is a confirmed subtask, not a maybe).
-- [ ] **BH.A.10** Order preservation across 3 chunks with staggered fake completion
+- [x] **BH.A.10** Order preservation across 3 chunks with staggered fake completion
   latency.
-- [ ] **BH.A.11** All-or-error: one chunk fails after retries → whole call raises with
+- [x] **BH.A.11** All-or-error: one chunk fails after retries → whole call raises with
   every chunk's outcome visible in `batch_failures`; no silent discard of the successes'
   existence.
-- [ ] **BH.A.12** `allow_split=False` over-limit → local raise, `fake.embed_requests == []`.
-- [ ] **BH.A.13** Rerank cross-batch: default refusal; opt-in with non-empty warning;
+- [x] **BH.A.12** `allow_split=False` over-limit → local raise, `fake.embed_requests == []`.
+- [x] **BH.A.13** Rerank cross-batch: default refusal; opt-in with non-empty warning;
   items chunk-locally sorted, never globally re-sorted (a global re-sort would assert a
   false comparability claim).
-- [ ] **BH.A.14** Cancellation mid-batch (ER.11.9's hardest case): cancelling a split
+- [x] **BH.A.14** Cancellation mid-batch (ER.11.9's hardest case): cancelling a split
   `embed()` cancels in-flight chunks and never returns partial success.
-- [ ] **BH.A.15** CLI and sidecar smoke: one oversized request through `anyinfer embed`
+- [x] **BH.A.15** CLI and sidecar smoke: one oversized request through `anyinfer embed`
   and `POST /v1/embeddings` against a fake with a small declared `max_batch_inputs` —
   regression guard that batching is reachable from every frontend with zero
   frontend-specific code.
@@ -802,3 +802,32 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   confirmed in scope for this run. Track B: approved to spend trial quota on live smokes
   and early cassettes. BH.F.7: resolved as *build* minimal embed/rerank probes, not
   defer.
+- **2026-08-12 (Track A — delivered and tested):** Core-owned batching is real.
+  `dispatch_embed`/`dispatch_rerank` resolve the per-call limit (BatchPolicy
+  `max_items_override` → `static_embedding_capabilities`/`static_rerank_capabilities` →
+  unknown), split over-limit requests into ordered chunks dispatched under an
+  `asyncio.Semaphore`, and re-assemble in input order. Unknown limit + over-ceiling is a
+  local refusal (the previously dead `DEFAULT_MAX_*` constants are now those ceilings,
+  their docstrings rewritten to say so). Embedding failure is all-or-error:
+  `AllTargetsFailedError` gained `batch_failures: tuple[BatchFailure, ...]` (the
+  previously dead `BatchFailure` type, now constructed), recording every chunk's outcome
+  including succeeded spend; no cross-target fallback after a partial batch. Rerank
+  over-limit is refused unless `rerank_cross_batch=True`, which concatenates chunk-local
+  rankings (indexes validated per chunk, duplicates checked across chunks, `top_n`
+  chunk-local) with a mandatory warning. `Usage.sum()` added (summing, None-propagating —
+  `merge()` is an overlay and was unusable here, fact 3). One
+  `RequestStarted`/`RequestCompleted` per logical call, `AttemptStarted` per chunk
+  attempt (verified by an event-collector test). Operation-specific response caps:
+  `DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES` (64 MiB) / `DEFAULT_MAX_RERANK_RESPONSE_BYTES`
+  (8 MiB) replace generation's 1 MiB default on both request types (BH.A.8's byte half;
+  deeper decode-side bounds remain Track J's response-bomb work).
+  `FakeEmbeddingRerankProvider` accepts `embedding_capabilities`/`rerank_capabilities`;
+  `embed()`/`rerank()` expose `batch=` on both clients; `docs/concepts/embeddings.md`
+  documents the shipped knobs. 17 new tests: limit priority, order preservation under
+  staggered completion, all-or-error trail, local refusals, cancellation mid-batch,
+  event parity, rerank refusal/opt-in/chunk-local `top_n`, and CLI + sidecar smoke
+  proving batching needs zero frontend code. Gates: full pytest (only the documented
+  pre-existing demo-app failure), mypy, ruff, `lint-imports` 4/4, `mkdocs --strict` all
+  clean. Explicitly not done: token/byte-aware splitting (out of scope by design),
+  spend reservation across chunks (Track E, BH.E.5), per-chunk `AttemptCompleted`
+  (Track C, BH.C.1).

@@ -18,12 +18,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from .requests import DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_TIMEOUT_S, ResolvedTarget
+from .requests import DEFAULT_TIMEOUT_S, ResolvedTarget
 from .results import AttemptRecord, Timing, Usage
 
 __all__ = [
     "DEFAULT_MAX_DOCUMENTS",
     "DEFAULT_MAX_EMBEDDING_INPUTS",
+    "DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES",
+    "DEFAULT_MAX_RERANK_RESPONSE_BYTES",
     "BatchFailure",
     "BatchPolicy",
     "EmbeddingCapabilities",
@@ -54,10 +56,34 @@ default, recorded as a warning rather than silently substituted.
 """
 
 DEFAULT_MAX_EMBEDDING_INPUTS = 2_048
-"""Default ceiling on `EmbeddingRequest.inputs` length before core-owned batching engages."""
+"""Sanity ceiling on `EmbeddingRequest.inputs` when no verified provider limit exists.
+
+When the resolved target declares no batch limit and the caller supplies no override,
+a request up to this size is sent as one call and anything larger is refused locally —
+splitting it would require inventing a provider maximum, which AnyInfer never guesses.
+"""
 
 DEFAULT_MAX_DOCUMENTS = 1_000
-"""Default ceiling on `RerankRequest.documents` length before core-owned batching engages."""
+"""Sanity ceiling on `RerankRequest.documents` when no verified provider limit exists.
+
+Same rule as `DEFAULT_MAX_EMBEDDING_INPUTS`: one call up to this size, a local refusal
+beyond it, never a guessed split size.
+"""
+
+DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES = 64 * 1024 * 1024
+"""Cap on one embedding response body.
+
+Float-vector batches dwarf chat responses — 2,048 inputs of 1,536 dimensions is tens of
+megabytes of JSON — so embedding requests default to a larger cap than generation's
+`DEFAULT_MAX_RESPONSE_BYTES` rather than failing on ordinary batches.
+"""
+
+DEFAULT_MAX_RERANK_RESPONSE_BYTES = 8 * 1024 * 1024
+"""Cap on one rerank response body.
+
+Rankings are small (indexes and scores) unless document text is echoed back; this covers
+`return_documents=True` over large batches with room to spare.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,20 +239,28 @@ class BatchPolicy:
             provider offers no documented globally-comparable batch contract. Off by
             default because concatenating scores from separate rerank calls is not a valid
             global ordering unless the provider says otherwise.
+        max_items_override: Caller-supplied ceiling on items per provider call — inputs
+            for embedding, documents for reranking. Beats any provider-declared limit;
+            useful when a provider misbehaves below its documented maximum, or to enable
+            splitting against a target with no verified limit. ``None`` defers to the
+            resolved target's verified capability.
     """
 
     max_concurrency: int = 4
     allow_split: bool = True
     rerank_cross_batch: bool = False
+    max_items_override: int | None = None
 
     def __post_init__(self) -> None:
-        """Reject a policy with a non-positive concurrency bound.
+        """Reject a non-positive concurrency bound or item ceiling.
 
         Raises:
-            ValueError: If ``max_concurrency`` is less than 1.
+            ValueError: If ``max_concurrency`` or ``max_items_override`` is less than 1.
         """
         if self.max_concurrency < 1:
             raise ValueError("batch policy max_concurrency must be at least 1")
+        if self.max_items_override is not None and self.max_items_override < 1:
+            raise ValueError("batch policy max_items_override must be at least 1 when set")
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,7 +296,9 @@ class EmbeddingRequest:
             set, a successful but incompatible provider response is rejected rather than
             returned, per the cross-space safety rule.
         timeout_s: Per-attempt wall-clock budget; ``None`` means `DEFAULT_TIMEOUT_S`.
-        max_response_bytes: Hard cap on one provider response body.
+        max_response_bytes: Hard cap on one provider response body. Defaults to
+            `DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES` — vector batches are far larger than
+            chat responses.
         metadata: Caller-supplied, opaque request metadata carried through telemetry.
         provider_options: Escape hatch, namespaced by provider id, passed through verbatim
             to the matching adapter and consulted by no core logic.
@@ -279,7 +315,7 @@ class EmbeddingRequest:
     dimensions: int | None = None
     expected_space: EmbeddingSpace | None = None
     timeout_s: float | None = None
-    max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES
+    max_response_bytes: int = DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES
     metadata: Mapping[str, str] = field(default_factory=dict)
     provider_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     batch: BatchPolicy = BatchPolicy()
@@ -372,7 +408,7 @@ class RerankRequest:
     documents: tuple[RerankDocument, ...]
     top_n: int | None = None
     timeout_s: float | None = None
-    max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES
+    max_response_bytes: int = DEFAULT_MAX_RERANK_RESPONSE_BYTES
     metadata: Mapping[str, str] = field(default_factory=dict)
     provider_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     batch: BatchPolicy = BatchPolicy()

@@ -39,6 +39,27 @@ def _client(fake: FakeEmbeddingRerankProvider, **app_kwargs: object) -> TestClie
 # ---- embeddings ---------------------------------------------------------------------
 
 
+def test_embeddings_oversized_request_batches_transparently() -> None:
+    """Core-owned batching is reachable through the sidecar with zero frontend code."""
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        embedding_capabilities={"small": ai.EmbeddingCapabilities(max_batch_inputs=2)},
+    )
+    http = _client(fake)
+
+    response = http.post(
+        "/v1/embeddings",
+        json={"model": "fake-embed:small", "input": ["a", "b", "c", "d", "e"]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["data"]) == 5
+    assert [item["index"] for item in body["data"]] == [0, 1, 2, 3, 4]
+    assert [len(req.inputs) for req in fake.embed_requests] == [2, 2, 1]
+
+
 def test_embeddings_scalar_input() -> None:
     fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
     http = _client(fake)

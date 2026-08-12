@@ -18,7 +18,7 @@ import functools
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from ..errors import AllTargetsFailedError, ConfigError, ProviderError
 from ..events.telemetry import (
@@ -42,11 +42,16 @@ from ..providers.base import (
 from ..routing.health import HealthCache
 from ..routing.policy import Route, backoff_delay
 from ..types.operations import (
+    DEFAULT_MAX_DOCUMENTS,
+    DEFAULT_MAX_EMBEDDING_INPUTS,
+    BatchFailure,
+    BatchPolicy,
     EmbeddingRequest,
     EmbeddingResult,
     EmbeddingSpace,
     EmbeddingVector,
     RankedItem,
+    RerankDocument,
     RerankRequest,
     RerankResult,
 )
@@ -64,6 +69,7 @@ if TYPE_CHECKING:
 __all__ = ["dispatch_embed", "dispatch_rerank"]
 
 _WireResultT = TypeVar("_WireResultT")
+_BatchOutcomeT = TypeVar("_BatchOutcomeT")
 
 
 def _resolve(
@@ -139,6 +145,127 @@ async def _attempt_with_retry(
     )
 
 
+def _effective_batch_limit(policy: BatchPolicy, declared: int | None) -> int | None:
+    """The per-call item limit that applies: caller override, else verified capability.
+
+    ``None`` means no limit is known — and an unknown limit is never guessed
+    (DESIGN.md §28): the request goes out as one call if it is under the sanity
+    ceiling, and is refused locally otherwise.
+    """
+    if policy.max_items_override is not None:
+        return policy.max_items_override
+    return declared
+
+
+def _plan_chunks(
+    *,
+    item_count: int,
+    limit: int | None,
+    default_ceiling: int,
+    provider_id: str,
+    unit: str,
+) -> list[slice] | None:
+    """Decide how a request is dispatched against the resolved limit.
+
+    Returns ``None`` for a single unsplit call, or the ordered chunk slices when the
+    request exceeds a known limit — permission to actually split is the caller's check,
+    since embedding and reranking gate it differently.
+
+    Raises:
+        anyinfer.errors.ConfigError: The limit is unknown and the request exceeds the
+            sanity ceiling; splitting it would require inventing a provider maximum.
+    """
+    if limit is None:
+        if item_count > default_ceiling:
+            raise ConfigError(
+                f"{unit} count {item_count} exceeds the sanity ceiling of "
+                f"{default_ceiling} and provider {provider_id!r} declares no verified "
+                "batch limit",
+                provider=provider_id,
+                hint=(
+                    "AnyInfer never guesses a provider maximum; set "
+                    "BatchPolicy.max_items_override to a limit you have verified, or use "
+                    "a target whose descriptor declares one"
+                ),
+            )
+        return None
+    if item_count <= limit:
+        return None
+    return [slice(start, min(start + limit, item_count)) for start in range(0, item_count, limit)]
+
+
+async def _run_bounded(
+    thunks: Sequence[Callable[[], Awaitable[_BatchOutcomeT]]],
+    *,
+    max_concurrency: int,
+) -> list[_BatchOutcomeT | BaseException]:
+    """Run chunk dispatches with bounded concurrency, collecting every outcome.
+
+    Results come back in submission order regardless of completion order, which is what
+    makes downstream order preservation trivial. Exceptions are collected rather than
+    raised so the caller can report every chunk's outcome (all-or-error, ER-style),
+    not just the first failure's.
+    """
+    semaphore = asyncio.Semaphore(max_concurrency)
+
+    async def _bounded(thunk: Callable[[], Awaitable[_BatchOutcomeT]]) -> _BatchOutcomeT:
+        async with semaphore:
+            return await thunk()
+
+    return await asyncio.gather(*(_bounded(t) for t in thunks), return_exceptions=True)
+
+
+def _batch_failure_report(
+    resolved: ResolvedTarget,
+    outcomes: Sequence[object],
+    chunk_sizes: Sequence[int],
+    all_attempts: list[AttemptRecord],
+    *,
+    emit: EmitFn,
+    request_id: str,
+    health: HealthCache,
+) -> AllTargetsFailedError:
+    """Build the all-or-error failure for a split request with at least one failed chunk.
+
+    Successful chunks are recorded too — their spend already happened and hiding it
+    would understate what the failure cost.
+    """
+    batch_failures: list[BatchFailure] = []
+    first_error: ProviderError | None = None
+    for index, outcome in enumerate(outcomes):
+        if isinstance(outcome, ProviderError):
+            first_error = first_error or outcome
+            all_attempts.extend(_pending_attempts(resolved, outcome))
+            batch_failures.append(
+                BatchFailure(
+                    batch_index=index,
+                    item_count=chunk_sizes[index],
+                    succeeded=False,
+                    error=outcome.detail,
+                )
+            )
+        else:
+            success = cast("tuple[object, Timing, list[AttemptRecord]]", outcome)
+            all_attempts.extend(success[2])
+            batch_failures.append(
+                BatchFailure(batch_index=index, item_count=chunk_sizes[index], succeeded=True)
+            )
+    if first_error is None:  # pragma: no cover — caller guarantees a failed chunk
+        raise RuntimeError("batch failure report built with no failed chunk")
+    health.mark_failed(resolved, first_error.detail)
+    emit(RequestFailed(request_id=request_id, error=first_error.snapshot()))
+    failed = sum(1 for b in batch_failures if not b.succeeded)
+    return AllTargetsFailedError(
+        f"{failed} of {len(batch_failures)} internal batches failed for {resolved}",
+        attempts=tuple(all_attempts),
+        batch_failures=tuple(batch_failures),
+        hint=(
+            "batched requests are all-or-error; batch_failures records every chunk's "
+            "outcome, including the spend of the ones that succeeded"
+        ),
+    )
+
+
 def _same_space_target(candidate: ResolvedTarget, primary: ResolvedTarget) -> bool:
     """Whether two resolved targets are provably the same embedding space before dispatch.
 
@@ -211,34 +338,120 @@ async def dispatch_embed(
                 hint="choose a target whose provider declares the 'embedding' operation",
             )
 
-        embed_call = functools.partial(_call_embed, adapter, resolved, request)
-        try:
-            wire_result, timing, attempts = await _attempt_with_retry(
-                resolved=resolved,
-                route=route,
-                request_id=request_id,
-                emit=emit,
-                call=embed_call,
+        declared = (
+            registry.get(resolved.provider_id)
+            .static_embedding_capabilities.get(resolved.model, None)
+        )
+        limit = _effective_batch_limit(
+            request.batch, declared.max_batch_inputs if declared is not None else None
+        )
+        chunks = _plan_chunks(
+            item_count=len(request.inputs),
+            limit=limit,
+            default_ceiling=DEFAULT_MAX_EMBEDDING_INPUTS,
+            provider_id=resolved.provider_id,
+            unit="embedding input",
+        )
+        if chunks is not None and not request.batch.allow_split:
+            raise ConfigError(
+                f"embedding input count {len(request.inputs)} exceeds the resolved batch "
+                f"limit of {limit} and BatchPolicy.allow_split is False",
+                provider=resolved.provider_id,
+                hint="reduce the request, raise the verified limit override, or allow splitting",
             )
-        except ProviderError as exc:
-            health.mark_failed(resolved, exc.detail)
-            all_attempts.extend(_pending_attempts(resolved, exc))
-            last_error = exc
-            if position + 1 < len(route.targets):
-                emit(
-                    FallbackTriggered(
-                        request_id=request_id,
-                        from_target=resolved,
-                        to_target=route.targets[position + 1],
-                        error=exc.snapshot(),
-                    )
+
+        if chunks is None:
+            embed_call = functools.partial(_call_embed, adapter, resolved, request, request.inputs)
+            try:
+                wire_result, timing, attempts = await _attempt_with_retry(
+                    resolved=resolved,
+                    route=route,
+                    request_id=request_id,
+                    emit=emit,
+                    call=embed_call,
                 )
-            continue
+            except ProviderError as exc:
+                health.mark_failed(resolved, exc.detail)
+                all_attempts.extend(_pending_attempts(resolved, exc))
+                last_error = exc
+                if position + 1 < len(route.targets):
+                    emit(
+                        FallbackTriggered(
+                            request_id=request_id,
+                            from_target=resolved,
+                            to_target=route.targets[position + 1],
+                            error=exc.snapshot(),
+                        )
+                    )
+                continue
+            health.mark_healthy(resolved)
+            all_attempts.extend(attempts)
+            wire_results = [wire_result]
+            total_timing = timing
+        else:
+            chunk_inputs = [request.inputs[s] for s in chunks]
+            batch_started = time.monotonic()
+            outcomes = await _run_bounded(
+                [
+                    functools.partial(
+                        _attempt_with_retry,
+                        resolved=resolved,
+                        route=route,
+                        request_id=request_id,
+                        emit=emit,
+                        call=functools.partial(_call_embed, adapter, resolved, request, inputs),
+                    )
+                    for inputs in chunk_inputs
+                ],
+                max_concurrency=request.batch.max_concurrency,
+            )
+            for outcome in outcomes:
+                if isinstance(outcome, BaseException) and not isinstance(outcome, ProviderError):
+                    raise outcome
+            if any(isinstance(outcome, ProviderError) for outcome in outcomes):
+                # All-or-error: a partially embedded batch is never a result (ER.4.4).
+                # No cross-target fallback either — re-running the succeeded chunks on
+                # another target would double their spend invisibly.
+                raise _batch_failure_report(
+                    resolved,
+                    outcomes,
+                    [len(inputs) for inputs in chunk_inputs],
+                    all_attempts,
+                    emit=emit,
+                    request_id=request_id,
+                    health=health,
+                )
+            health.mark_healthy(resolved)
+            wire_results = []
+            for chunk_index, outcome in enumerate(outcomes):
+                if isinstance(outcome, BaseException):  # pragma: no cover — excluded above
+                    raise outcome
+                chunk_wire, _chunk_timing, chunk_attempts = outcome
+                all_attempts.extend(chunk_attempts)
+                if len(chunk_wire.vectors) != len(chunk_inputs[chunk_index]):
+                    raise ConfigError(
+                        f"provider {resolved.provider_id!r} returned "
+                        f"{len(chunk_wire.vectors)} vectors for a batch of "
+                        f"{len(chunk_inputs[chunk_index])} inputs",
+                        provider=resolved.provider_id,
+                        hint="this is a provider-side contract violation; report it upstream",
+                    )
+                wire_results.append(chunk_wire)
+            total_timing = Timing(
+                started_at=batch_started,
+                total_ms=(time.monotonic() - batch_started) * 1000.0,
+            )
 
-        health.mark_healthy(resolved)
-        all_attempts.extend(attempts)
-
-        space = _build_space(resolved, request, wire_result)
+        space = _build_space(resolved, request, wire_results[0])
+        for later in wire_results[1:]:
+            later_space = _build_space(resolved, request, later)
+            if later_space != space:
+                raise ConfigError(
+                    f"provider {resolved.provider_id!r} reported inconsistent embedding "
+                    "spaces across the internal batches of one request",
+                    provider=resolved.provider_id,
+                    hint="this is a provider-side contract violation; report it upstream",
+                )
         if request.expected_space is not None and not space.compatible_with(
             request.expected_space
         ):
@@ -258,7 +471,9 @@ async def dispatch_embed(
                 "comparable with vectors from that target"
             )
 
-        vectors = tuple(EmbeddingVector(values=v) for v in wire_result.vectors)
+        vectors = tuple(
+            EmbeddingVector(values=v) for wire in wire_results for v in wire.vectors
+        )
         if len(vectors) != len(request.inputs):
             raise ConfigError(
                 f"provider {resolved.provider_id!r} returned {len(vectors)} vectors for "
@@ -267,17 +482,26 @@ async def dispatch_embed(
                 hint="this is a provider-side contract violation; report it upstream",
             )
 
-        usage = wire_result.usage or Usage()
-        emit(RequestCompleted(request_id=request_id, target=resolved, usage=usage, timing=timing))
+        usage = Usage.sum([wire.usage or Usage() for wire in wire_results])
+        emit(
+            RequestCompleted(
+                request_id=request_id, target=resolved, usage=usage, timing=total_timing
+            )
+        )
+        raw: object | None = None
+        if retain_raw:
+            raw = wire_results[0].raw if len(wire_results) == 1 else tuple(
+                wire.raw for wire in wire_results
+            )
         return EmbeddingResult(
             vectors=vectors,
             target=resolved,
             space=space,
             usage=usage,
-            timing=timing,
+            timing=total_timing,
             attempts=tuple(all_attempts),
             warnings=tuple(warnings),
-            raw=wire_result.raw if retain_raw else None,
+            raw=raw,
         )
 
     error_info = last_error.snapshot() if last_error is not None else None
@@ -308,6 +532,7 @@ async def dispatch_rerank(
     request_id = uuid.uuid4().hex
     emit(RequestStarted(request_id=request_id, targets=route.targets))
     all_attempts: list[AttemptRecord] = []
+    warnings: list[str] = []
     last_error: ProviderError | None = None
 
     for position, target in enumerate(route.targets):
@@ -328,43 +553,170 @@ async def dispatch_rerank(
                 hint="choose a target whose provider declares the 'rerank' operation",
             )
 
-        rerank_call = functools.partial(_call_rerank, adapter, resolved, request)
-        try:
-            wire_result, timing, attempts = await _attempt_with_retry(
-                resolved=resolved,
-                route=route,
-                request_id=request_id,
-                emit=emit,
-                call=rerank_call,
-            )
-        except ProviderError as exc:
-            health.mark_failed(resolved, exc.detail)
-            all_attempts.extend(_pending_attempts(resolved, exc))
-            last_error = exc
-            if position + 1 < len(route.targets):
-                emit(
-                    FallbackTriggered(
-                        request_id=request_id,
-                        from_target=resolved,
-                        to_target=route.targets[position + 1],
-                        error=exc.snapshot(),
-                    )
+        declared = (
+            registry.get(resolved.provider_id)
+            .static_rerank_capabilities.get(resolved.model, None)
+        )
+        limit = _effective_batch_limit(
+            request.batch, declared.max_documents if declared is not None else None
+        )
+        chunks = _plan_chunks(
+            item_count=len(request.documents),
+            limit=limit,
+            default_ceiling=DEFAULT_MAX_DOCUMENTS,
+            provider_id=resolved.provider_id,
+            unit="rerank document",
+        )
+        if chunks is not None:
+            if not request.batch.allow_split:
+                raise ConfigError(
+                    f"rerank document count {len(request.documents)} exceeds the resolved "
+                    f"batch limit of {limit} and BatchPolicy.allow_split is False",
+                    provider=resolved.provider_id,
+                    hint=(
+                        "reduce the request, raise the verified limit override, or allow "
+                        "splitting"
+                    ),
                 )
-            continue
+            if not request.batch.rerank_cross_batch:
+                raise ConfigError(
+                    f"rerank document count {len(request.documents)} exceeds the resolved "
+                    f"batch limit of {limit}, and scores from separate rerank calls are "
+                    "not globally comparable",
+                    provider=resolved.provider_id,
+                    hint=(
+                        "reduce the documents, or set BatchPolicy.rerank_cross_batch=True "
+                        "to accept a concatenation of chunk-local rankings — the result "
+                        "will say so in a warning"
+                    ),
+                )
 
+        if chunks is None:
+            rerank_call = functools.partial(
+                _call_rerank, adapter, resolved, request, tuple(enumerate(request.documents))
+            )
+            try:
+                wire_result, timing, attempts = await _attempt_with_retry(
+                    resolved=resolved,
+                    route=route,
+                    request_id=request_id,
+                    emit=emit,
+                    call=rerank_call,
+                )
+            except ProviderError as exc:
+                health.mark_failed(resolved, exc.detail)
+                all_attempts.extend(_pending_attempts(resolved, exc))
+                last_error = exc
+                if position + 1 < len(route.targets):
+                    emit(
+                        FallbackTriggered(
+                            request_id=request_id,
+                            from_target=resolved,
+                            to_target=route.targets[position + 1],
+                            error=exc.snapshot(),
+                        )
+                    )
+                continue
+            health.mark_healthy(resolved)
+            all_attempts.extend(attempts)
+            items = _validate_ranked_items(resolved, request, wire_result)
+            usage = wire_result.usage or Usage()
+            emit(
+                RequestCompleted(
+                    request_id=request_id, target=resolved, usage=usage, timing=timing
+                )
+            )
+            return RerankResult(
+                items=items,
+                target=resolved,
+                usage=usage,
+                timing=timing,
+                attempts=tuple(all_attempts),
+                warnings=tuple(warnings),
+                raw=wire_result.raw if retain_raw else None,
+            )
+
+        chunk_pairs = [
+            tuple((index, request.documents[index]) for index in range(s.start, s.stop))
+            for s in chunks
+        ]
+        batch_started = time.monotonic()
+        outcomes = await _run_bounded(
+            [
+                functools.partial(
+                    _attempt_with_retry,
+                    resolved=resolved,
+                    route=route,
+                    request_id=request_id,
+                    emit=emit,
+                    call=functools.partial(_call_rerank, adapter, resolved, request, pairs),
+                )
+                for pairs in chunk_pairs
+            ],
+            max_concurrency=request.batch.max_concurrency,
+        )
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException) and not isinstance(outcome, ProviderError):
+                raise outcome
+        if any(isinstance(outcome, ProviderError) for outcome in outcomes):
+            # All-or-error, same rule as embedding batches (ER.4.4/ER.10.5).
+            raise _batch_failure_report(
+                resolved,
+                outcomes,
+                [len(pairs) for pairs in chunk_pairs],
+                all_attempts,
+                emit=emit,
+                request_id=request_id,
+                health=health,
+            )
         health.mark_healthy(resolved)
-        all_attempts.extend(attempts)
 
-        items = _validate_ranked_items(resolved, request, wire_result)
-        usage = wire_result.usage or Usage()
-        emit(RequestCompleted(request_id=request_id, target=resolved, usage=usage, timing=timing))
+        seen: set[int] = set()
+        ranked: list[RankedItem] = []
+        usages: list[Usage] = []
+        raws: list[object] = []
+        for chunk_index, outcome in enumerate(outcomes):
+            if isinstance(outcome, BaseException):  # pragma: no cover — excluded above
+                raise outcome
+            chunk_wire, _chunk_timing, chunk_attempts = outcome
+            all_attempts.extend(chunk_attempts)
+            allowed = {index for index, _ in chunk_pairs[chunk_index]}
+            ranked.extend(
+                _validate_ranked_items(
+                    resolved, request, chunk_wire, allowed_indexes=allowed, seen=seen
+                )
+            )
+            usages.append(chunk_wire.usage or Usage())
+            raws.append(chunk_wire.raw)
+        cross_batch_warning = (
+            f"rerank request was split into {len(chunk_pairs)} batches of at most "
+            f"{limit} documents for {resolved}; scores are comparable only within each "
+            "batch — this result concatenates chunk-local rankings and is not a "
+            "provider-certified global ordering"
+        )
+        if request.top_n is not None:
+            cross_batch_warning += (
+                f"; top_n={request.top_n} was applied within each batch, not globally"
+            )
+        warnings.append(cross_batch_warning)
+        usage = Usage.sum(usages)
+        total_timing = Timing(
+            started_at=batch_started,
+            total_ms=(time.monotonic() - batch_started) * 1000.0,
+        )
+        emit(
+            RequestCompleted(
+                request_id=request_id, target=resolved, usage=usage, timing=total_timing
+            )
+        )
         return RerankResult(
-            items=items,
+            items=tuple(ranked),
             target=resolved,
             usage=usage,
-            timing=timing,
+            timing=total_timing,
             attempts=tuple(all_attempts),
-            raw=wire_result.raw if retain_raw else None,
+            warnings=tuple(warnings),
+            raw=tuple(raws) if retain_raw else None,
         )
 
     error_info = last_error.snapshot() if last_error is not None else None
@@ -379,11 +731,14 @@ def _pending_attempts(resolved: ResolvedTarget, exc: ProviderError) -> list[Atte
 
 
 async def _call_embed(
-    adapter: EmbedsText, resolved: ResolvedTarget, request: EmbeddingRequest
+    adapter: EmbedsText,
+    resolved: ResolvedTarget,
+    request: EmbeddingRequest,
+    inputs: tuple[str, ...],
 ) -> tuple[EmbeddingWireResult, Timing]:
     wire_request = EmbeddingWireRequest(
         model=resolved.model,
-        inputs=request.inputs,
+        inputs=inputs,
         input_type=request.input_type,
         dimensions=request.dimensions,
         timeout_s=request.effective_timeout_s,
@@ -397,13 +752,16 @@ async def _call_embed(
 
 
 async def _call_rerank(
-    adapter: ReranksText, resolved: ResolvedTarget, request: RerankRequest
+    adapter: ReranksText,
+    resolved: ResolvedTarget,
+    request: RerankRequest,
+    documents: tuple[tuple[int, RerankDocument], ...],
 ) -> tuple[RerankWireResult, Timing]:
     wire_request = RerankWireRequest(
         model=resolved.model,
         query=request.query,
         documents=tuple(
-            RerankWireDocument(index=i, text=doc.text) for i, doc in enumerate(request.documents)
+            RerankWireDocument(index=index, text=doc.text) for index, doc in documents
         ),
         top_n=request.top_n,
         timeout_s=request.effective_timeout_s,
@@ -431,22 +789,40 @@ def _build_space(
 
 
 def _validate_ranked_items(
-    resolved: ResolvedTarget, request: RerankRequest, wire_result: RerankWireResult
+    resolved: ResolvedTarget,
+    request: RerankRequest,
+    wire_result: RerankWireResult,
+    *,
+    allowed_indexes: set[int] | None = None,
+    seen: set[int] | None = None,
 ) -> tuple[RankedItem, ...]:
     """Turn wire-reported indexes into `RankedItem`s, trusting nothing malformed.
 
+    For a split request, ``allowed_indexes`` restricts one chunk's result to the
+    documents that chunk was actually asked to rank, and ``seen`` is shared across
+    chunks so a duplicate cannot hide by arriving in two different batches.
+
     Raises:
-        anyinfer.errors.ConfigError: The provider returned an out-of-range or duplicate
-            document index. AnyInfer never guesses which document a malformed result meant.
+        anyinfer.errors.ConfigError: The provider returned an out-of-range, out-of-batch,
+            or duplicate document index. AnyInfer never guesses which document a
+            malformed result meant.
     """
     doc_count = len(request.documents)
-    seen: set[int] = set()
+    seen = set() if seen is None else seen
     items: list[RankedItem] = []
     for wire_item in wire_result.items:
         if not (0 <= wire_item.index < doc_count):
             raise ConfigError(
                 f"provider {resolved.provider_id!r} returned an out-of-range document "
                 f"index {wire_item.index} for a request with {doc_count} documents",
+                provider=resolved.provider_id,
+                hint="this is a provider-side contract violation; report it upstream",
+            )
+        if allowed_indexes is not None and wire_item.index not in allowed_indexes:
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} returned document index "
+                f"{wire_item.index}, which is outside the internal batch it was asked "
+                "to rank",
                 provider=resolved.provider_id,
                 hint="this is a provider-side contract violation; report it upstream",
             )

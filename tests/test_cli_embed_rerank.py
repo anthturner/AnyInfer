@@ -89,6 +89,45 @@ def test_embed_plain_output_reports_summary_to_stderr(
     assert "1 vector(s)" in captured.err
 
 
+def test_embed_oversized_request_batches_transparently(
+    config: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Core-owned batching is reachable from the CLI with zero frontend code."""
+    from anyinfer import EmbeddingCapabilities
+
+    fake = FakeEmbeddingRerankProvider(
+        "cli-fake",
+        embedding_dimensions={"embed-model": 4},
+        embedding_capabilities={"embed-model": EmbeddingCapabilities(max_batch_inputs=2)},
+    )
+    fake.register(default_registry)
+    try:
+        _stdin(monkeypatch, None)
+        inputs_file = tmp_path / "inputs.txt"
+        inputs_file.write_text("one\ntwo\nthree\nfour\nfive\n", encoding="utf-8")
+        code = main(
+            [
+                "embed",
+                "--file",
+                str(inputs_file),
+                "--config",
+                str(config),
+                "--target",
+                "cli-fake:embed-model",
+                "--json",
+            ]
+        )
+        assert code == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert len(payload["vectors"]) == 5
+        assert [len(req.inputs) for req in fake.embed_requests] == [2, 2, 1]
+    finally:
+        default_registry.unregister("cli-fake")
+
+
 def test_embed_reads_newline_delimited_file(
     config: Path,
     fake_provider: FakeEmbeddingRerankProvider,

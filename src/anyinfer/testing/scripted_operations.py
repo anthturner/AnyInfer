@@ -25,7 +25,7 @@ from ..providers.base import (
 )
 from ..registry import ProviderDescriptor, ProviderRegistry, ProviderSetupSpec, SetupField
 from ..types.capabilities import DiscoveredModel, Health
-from ..types.operations import InferenceOperation
+from ..types.operations import EmbeddingCapabilities, InferenceOperation, RerankCapabilities
 from ..types.results import Usage
 
 __all__ = [
@@ -92,6 +92,11 @@ class FakeEmbeddingRerankProvider:
             id.
         normalized: Whether vectors this provider produces are reported as unit-normalized.
         locality: Recorded on the descriptor.
+        embedding_capabilities: Static `EmbeddingCapabilities` recorded on the descriptor,
+            keyed by model id — the way tests declare a verified batch limit
+            (``max_batch_inputs``) for core-owned batching to resolve.
+        rerank_capabilities: Static `RerankCapabilities` recorded on the descriptor,
+            keyed by model id (``max_documents`` drives rerank batching).
 
     Attributes:
         embed_requests: Every `EmbeddingWireRequest` received, oldest first.
@@ -107,12 +112,16 @@ class FakeEmbeddingRerankProvider:
         embedding_failures: Mapping[str, Sequence[ScriptedEmbeddingFailure]] | None = None,
         normalized: bool = True,
         locality: Literal["hosted", "local", "remote"] = "local",
+        embedding_capabilities: Mapping[str, EmbeddingCapabilities] | None = None,
+        rerank_capabilities: Mapping[str, RerankCapabilities] | None = None,
     ) -> None:
         self.provider_id = provider_id
         self._embedding_dimensions = dict(embedding_dimensions or {"fake-embed-small": 8})
         self._rerank_models = set(rerank_models)
         self._normalized = normalized
         self._locality = locality
+        self._embedding_capabilities = dict(embedding_capabilities or {})
+        self._rerank_capabilities = dict(rerank_capabilities or {})
         self._failures: dict[str, list[ScriptedEmbeddingFailure]] = {
             model: list(failures) for model, failures in (embedding_failures or {}).items()
         }
@@ -149,6 +158,8 @@ class FakeEmbeddingRerankProvider:
                 ),
             ),
             operations=self.operations(),
+            static_embedding_capabilities=self._embedding_capabilities,
+            static_rerank_capabilities=self._rerank_capabilities,
         )
 
     def register(self, registry: ProviderRegistry) -> ProviderRegistry:

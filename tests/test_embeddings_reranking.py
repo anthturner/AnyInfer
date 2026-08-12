@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 import anyinfer as ai
 from anyinfer.providers.base import (
+    EmbeddingWireRequest,
     EmbeddingWireResult,
     EmbedsText,
     ProviderLifecycle,
@@ -490,3 +493,238 @@ def test_sync_client_embed_and_rerank() -> None:
         assert len(ranked.items) == 2
     finally:
         client.close()
+
+
+# ---- Core-owned batching ----------------------------------------------------------------
+
+
+def _capable_fake(limit: int = 2, **kwargs: object) -> FakeEmbeddingRerankProvider:
+    return FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        embedding_capabilities={"small": ai.EmbeddingCapabilities(max_batch_inputs=limit)},
+        **kwargs,  # type: ignore[arg-type]
+    )
+
+
+async def test_embed_splits_against_declared_batch_limit() -> None:
+    fake = _capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        result = await client.embed(["a", "b", "c", "d", "e"], target="fake-embed:small")
+        assert len(result.vectors) == 5
+        assert [len(req.inputs) for req in fake.embed_requests] == [2, 2, 1]
+        assert result.usage.input_tokens == 5
+    finally:
+        await client.aclose()
+
+
+async def test_embed_batch_override_beats_declared_limit() -> None:
+    fake = _capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        await client.embed(
+            ["a", "b", "c", "d", "e"],
+            target="fake-embed:small",
+            batch=ai.BatchPolicy(max_items_override=4),
+        )
+        assert [len(req.inputs) for req in fake.embed_requests] == [4, 1]
+    finally:
+        await client.aclose()
+
+
+async def test_embed_unknown_limit_sends_one_request() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    client = _client_with_fake(fake)
+    try:
+        await client.embed(["a"] * 50, target="fake-embed:small")
+        assert len(fake.embed_requests) == 1
+    finally:
+        await client.aclose()
+
+
+async def test_embed_unknown_limit_over_ceiling_is_refused_locally() -> None:
+    from anyinfer.types.operations import DEFAULT_MAX_EMBEDDING_INPUTS
+
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    client = _client_with_fake(fake)
+    try:
+        with pytest.raises(ai.ConfigError, match="sanity ceiling"):
+            await client.embed(
+                ["x"] * (DEFAULT_MAX_EMBEDDING_INPUTS + 1), target="fake-embed:small"
+            )
+        assert fake.embed_requests == []
+    finally:
+        await client.aclose()
+
+
+async def test_embed_allow_split_false_refuses_locally() -> None:
+    fake = _capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        with pytest.raises(ai.ConfigError, match="allow_split is False"):
+            await client.embed(
+                ["a", "b", "c"],
+                target="fake-embed:small",
+                batch=ai.BatchPolicy(allow_split=False),
+            )
+        assert fake.embed_requests == []
+    finally:
+        await client.aclose()
+
+
+async def test_embed_batch_preserves_order_under_staggered_completion() -> None:
+    fake = _capable_fake(limit=2)
+    inner = fake.embed
+
+    async def staggered(req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        delay = 0.05 if req.inputs[0] == "t0" else 0.0
+        await asyncio.sleep(delay)
+        return await inner(req)
+
+    fake.embed = staggered  # type: ignore[method-assign]
+    client = _client_with_fake(fake)
+    reference_fake = FakeEmbeddingRerankProvider(
+        "fake-embed", embedding_dimensions={"small": 4}
+    )
+    reference_client = _client_with_fake(reference_fake)
+    texts = ["t0", "t1", "t2", "t3", "t4"]
+    try:
+        result = await client.embed(
+            texts, target="fake-embed:small", batch=ai.BatchPolicy(max_concurrency=3)
+        )
+        for position, text in enumerate(texts):
+            reference = await reference_client.embed([text], target="fake-embed:small")
+            assert result.vectors[position].values == reference.vectors[0].values
+    finally:
+        await client.aclose()
+        await reference_client.aclose()
+
+
+async def test_embed_batch_failure_is_all_or_error_with_batch_trail() -> None:
+    fake = _capable_fake(
+        limit=2,
+        embedding_failures={
+            "small": [ScriptedEmbeddingFailure(kind="rate-limit", retry_after_s=0.0)]
+        },
+    )
+    client = _client_with_fake(fake)
+    try:
+        route = Route(
+            targets=("fake-embed:small",), retry=Retry(max_attempts=1, backoff_base_s=0.0)
+        )
+        with pytest.raises(ai.AllTargetsFailedError) as excinfo:
+            await client.embed(["a", "b", "c", "d", "e"], route=route)
+        failures = excinfo.value.batch_failures
+        assert len(failures) == 3
+        assert sum(1 for f in failures if not f.succeeded) == 1
+        assert sum(f.item_count for f in failures) == 5
+        assert "internal batches failed" in str(excinfo.value)
+    finally:
+        await client.aclose()
+
+
+async def test_embed_batch_emits_one_logical_request() -> None:
+    class _Collector:
+        def __init__(self) -> None:
+            self.names: list[str] = []
+
+        def on_event(self, event: object) -> None:
+            self.names.append(type(event).__name__)
+
+    fake = _capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    collector = _Collector()
+    client.subscribe(collector)
+    try:
+        await client.embed(["a", "b", "c", "d", "e"], target="fake-embed:small")
+        assert collector.names.count("RequestStarted") == 1
+        assert collector.names.count("RequestCompleted") == 1
+        assert collector.names.count("AttemptStarted") == 3
+    finally:
+        await client.aclose()
+
+
+async def test_embed_batch_cancellation_returns_no_partial_result() -> None:
+    fake = _capable_fake(limit=1)
+    inner = fake.embed
+
+    async def slow(req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        await asyncio.sleep(0.2)
+        return await inner(req)
+
+    fake.embed = slow  # type: ignore[method-assign]
+    client = _client_with_fake(fake)
+    try:
+        task = asyncio.create_task(
+            client.embed(
+                ["a", "b", "c"],
+                target="fake-embed:small",
+                batch=ai.BatchPolicy(max_concurrency=1),
+            )
+        )
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert len(fake.embed_requests) < 3
+    finally:
+        await client.aclose()
+
+
+def _rerank_capable_fake(limit: int = 2) -> FakeEmbeddingRerankProvider:
+    return FakeEmbeddingRerankProvider(
+        "fake-embed",
+        rerank_models=["rr"],
+        rerank_capabilities={"rr": ai.RerankCapabilities(max_documents=limit)},
+    )
+
+
+async def test_rerank_over_limit_is_refused_by_default() -> None:
+    fake = _rerank_capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        with pytest.raises(ai.ConfigError, match="not globally comparable"):
+            await client.rerank("q", ["d1", "d2", "d3"], target="fake-embed:rr")
+        assert fake.rerank_requests == []
+    finally:
+        await client.aclose()
+
+
+async def test_rerank_cross_batch_opt_in_concatenates_chunk_local_rankings() -> None:
+    fake = _rerank_capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        # Scores against "alpha beta": d0=0, d1=0.5, d2=1.0, d3=0, d4=0.5.
+        # Chunks of 2: [d0, d1], [d2, d3], [d4]. A global re-sort would put d2 first;
+        # chunk-local ordering keeps chunk one's items ahead of it.
+        docs = ["gamma delta", "alpha gamma", "alpha beta", "delta", "beta gamma"]
+        result = await client.rerank(
+            "alpha beta",
+            docs,
+            target="fake-embed:rr",
+            batch=ai.BatchPolicy(rerank_cross_batch=True),
+        )
+        assert [item.index for item in result.items] == [1, 0, 2, 3, 4]
+        assert result.warnings
+        assert "not a provider-certified global ordering" in result.warnings[0]
+    finally:
+        await client.aclose()
+
+
+async def test_rerank_cross_batch_top_n_is_chunk_local_and_warned() -> None:
+    fake = _rerank_capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        docs = ["gamma delta", "alpha gamma", "alpha beta", "delta", "beta gamma"]
+        result = await client.rerank(
+            "alpha beta",
+            docs,
+            target="fake-embed:rr",
+            top_n=1,
+            batch=ai.BatchPolicy(rerank_cross_batch=True),
+        )
+        assert [item.index for item in result.items] == [1, 2, 4]
+        assert "applied within each batch" in result.warnings[0]
+    finally:
+        await client.aclose()

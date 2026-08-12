@@ -53,7 +53,13 @@ from ..routing.policy import Route
 from ..session import Session
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
-from ..types.operations import EmbeddingResult, EmbeddingSpace, RerankDocument, RerankResult
+from ..types.operations import (
+    BatchPolicy,
+    EmbeddingResult,
+    EmbeddingSpace,
+    RerankDocument,
+    RerankResult,
+)
 from ..types.requests import (
     ArenaPolicy,
     CachePolicy,
@@ -705,6 +711,7 @@ class Client:
         dimensions: int | None = None,
         expected_space: EmbeddingSpace | None = None,
         allow_incompatible_fallback: bool = False,
+        batch: BatchPolicy | None = None,
         timeout_s: float | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
@@ -722,6 +729,7 @@ class Client:
                 dimensions=dimensions,
                 expected_space=expected_space,
                 allow_incompatible_fallback=allow_incompatible_fallback,
+                batch=batch,
                 timeout_s=timeout_s,
                 provider_options=provider_options,
                 metadata=metadata,
@@ -738,6 +746,7 @@ class Client:
         target: Target | None = None,
         route: Route | Target | Sequence[Target] | None = None,
         top_n: int | None = None,
+        batch: BatchPolicy | None = None,
         timeout_s: float | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
@@ -754,6 +763,7 @@ class Client:
                 target=target,
                 route=route,
                 top_n=top_n,
+                batch=batch,
                 timeout_s=timeout_s,
                 provider_options=provider_options,
                 metadata=metadata,

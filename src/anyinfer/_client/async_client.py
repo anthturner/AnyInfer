@@ -141,6 +141,9 @@ from ..types.messages import (
     user,
 )
 from ..types.operations import (
+    DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES,
+    DEFAULT_MAX_RERANK_RESPONSE_BYTES,
+    BatchPolicy,
     EmbeddingRequest,
     EmbeddingResult,
     EmbeddingSpace,
@@ -151,7 +154,6 @@ from ..types.operations import (
 from ..types.requests import (
     DEFAULT_MAX_INPUT_BYTES,
     DEFAULT_MAX_INPUT_PART_BYTES,
-    DEFAULT_MAX_RESPONSE_BYTES,
     ArenaPolicy,
     CachePolicy,
     GenerationRequest,
@@ -1221,6 +1223,7 @@ class AsyncClient:
         dimensions: int | None = None,
         expected_space: EmbeddingSpace | None = None,
         allow_incompatible_fallback: bool = False,
+        batch: BatchPolicy | None = None,
         timeout_s: float | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
@@ -1248,6 +1251,9 @@ class AsyncClient:
                 that cannot be proven to share the primary target's embedding space. Off
                 by default because wrong-space vectors fail silently when compared; a
                 result served this way always carries a warning naming both targets.
+            batch: Core-owned batching policy. A request larger than the target's
+                verified batch limit is split into ordered chunks and re-assembled in
+                input order; an unknown limit is never guessed — see `anyinfer.BatchPolicy`.
             timeout_s: Per-attempt wall-clock budget.
             provider_options: Escape hatch, namespaced by provider id.
             metadata: Caller-supplied labels carried through telemetry.
@@ -1274,9 +1280,10 @@ class AsyncClient:
             timeout_s=timeout_s,
             max_response_bytes=max_response_bytes
             if max_response_bytes is not None
-            else DEFAULT_MAX_RESPONSE_BYTES,
+            else DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES,
             metadata=metadata or {},
             provider_options=provider_options or {},
+            batch=batch if batch is not None else BatchPolicy(),
         )
         resolved_route = self._resolve_route(target, route, None)
         return await dispatch_embed(
@@ -1299,6 +1306,7 @@ class AsyncClient:
         target: Target | None = None,
         route: Route | Target | Sequence[Target] | None = None,
         top_n: int | None = None,
+        batch: BatchPolicy | None = None,
         timeout_s: float | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
@@ -1316,6 +1324,10 @@ class AsyncClient:
             target: A single target, as for `generate()`.
             route: A fallback chain, as for `generate()`.
             top_n: Return only the top N ranked items.
+            batch: Core-owned batching policy. A rerank request larger than the target's
+                verified document limit is refused rather than split, unless
+                ``BatchPolicy.rerank_cross_batch`` explicitly accepts chunk-local
+                rankings — scores from separate calls are not globally comparable.
             timeout_s: Per-attempt wall-clock budget.
             provider_options: Escape hatch, namespaced by provider id.
             metadata: Caller-supplied labels carried through telemetry.
@@ -1343,9 +1355,10 @@ class AsyncClient:
             timeout_s=timeout_s,
             max_response_bytes=max_response_bytes
             if max_response_bytes is not None
-            else DEFAULT_MAX_RESPONSE_BYTES,
+            else DEFAULT_MAX_RERANK_RESPONSE_BYTES,
             metadata=metadata or {},
             provider_options=provider_options or {},
+            batch=batch if batch is not None else BatchPolicy(),
             return_documents=return_documents,
         )
         resolved_route = self._resolve_route(target, route, None)
