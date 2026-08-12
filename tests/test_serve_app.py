@@ -665,3 +665,68 @@ def test_a_malformed_history_extension_is_a_400() -> None:
 
     assert response.status_code == 400
     assert "anyinfer_history" in response.text
+
+
+# ---- disconnect mid-stream releases the provider connection --------------------------
+
+
+class _FakeUnderlyingStream:
+    """Stands in for `AsyncStream`: yields scripted events, tracks whether it was closed."""
+
+    def __init__(self, events: list[object]) -> None:
+        self._events = iter(events)
+        self.closed = False
+
+    def __aiter__(self) -> _FakeUnderlyingStream:
+        return self
+
+    async def __anext__(self) -> object:
+        try:
+            return next(self._events)
+        except StopIteration:
+            raise StopAsyncIteration from None
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class _FakeStreamingClient:
+    """Stands in for `AsyncClient`: `.stream(...)` returns one scripted fake stream."""
+
+    def __init__(self, events: list[object]) -> None:
+        self.underlying = _FakeUnderlyingStream(events)
+
+    def stream(self, *args: object, **kwargs: object) -> _FakeUnderlyingStream:
+        return self.underlying
+
+
+async def test_client_disconnect_mid_stream_closes_the_provider_connection() -> None:
+    """ASGI closes the SSE generator on disconnect; the provider stream must follow.
+
+    Without an explicit close, the only thing that would eventually release the
+    upstream connection is garbage collection — not deterministic, and not something a
+    gateway serving real traffic can rely on. This drives `_stream_chunks` directly as
+    an async generator (the same object `StreamingResponse` iterates), consumes one
+    event, then closes it early exactly as Starlette does when a client disconnects.
+    """
+    from anyinfer.serve.app import _stream_chunks
+    from anyinfer.types.events import TextDelta
+
+    fake_client = _FakeStreamingClient([TextDelta("partial")])
+    request = ai.GenerationRequest(messages=(ai.user("hi"),))
+
+    generator = _stream_chunks(
+        fake_client,
+        "openai-compat:m",
+        request,
+        {},
+        completion_id="chatcmpl-test",
+        created=0,
+        model="openai-compat:m",
+    )
+    first = await generator.__anext__()
+    assert b"partial" in first
+
+    await generator.aclose()
+
+    assert fake_client.underlying.closed is True

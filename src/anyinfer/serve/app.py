@@ -333,40 +333,50 @@ async def _stream_chunks(
     include_manifest = _wants_manifest_quietly(body)
 
     try:
-        async for event in stream:
-            chunk = chunk_from_event(
-                event, model=model, completion_id=completion_id, created=created
-            )
-            if chunk is not None:
-                yield _sse(chunk)
-            if isinstance(event, StreamEnded):
-                for terminal in final_chunk(
-                    event.result,
-                    model=model,
-                    completion_id=completion_id,
-                    created=created,
-                    include_usage=include_usage,
-                ):
-                    yield _sse(terminal)
-                if include_manifest:
-                    frame = manifest_chunk(
+        try:
+            async for event in stream:
+                chunk = chunk_from_event(
+                    event, model=model, completion_id=completion_id, created=created
+                )
+                if chunk is not None:
+                    yield _sse(chunk)
+                if isinstance(event, StreamEnded):
+                    for terminal in final_chunk(
                         event.result,
                         model=model,
                         completion_id=completion_id,
                         created=created,
-                    )
-                    if frame is not None:
-                        yield _sse(frame)
-    except AnyInferError as exc:
-        yield _sse(
-            {
-                "error": {
-                    "message": str(exc),
-                    "type": type(exc).__name__,
-                    "code": getattr(exc, "http_status", None),
+                        include_usage=include_usage,
+                    ):
+                        yield _sse(terminal)
+                    if include_manifest:
+                        frame = manifest_chunk(
+                            event.result,
+                            model=model,
+                            completion_id=completion_id,
+                            created=created,
+                        )
+                        if frame is not None:
+                            yield _sse(frame)
+        except AnyInferError as exc:
+            yield _sse(
+                {
+                    "error": {
+                        "message": str(exc),
+                        "type": type(exc).__name__,
+                        "code": getattr(exc, "http_status", None),
+                    }
                 }
-            }
-        )
+            )
+    finally:
+        # ASGI closes this generator (raising GeneratorExit here) the moment a client
+        # disconnects mid-stream, without waiting for the loop above to finish on its
+        # own. Without this, the underlying provider request — and, on a route with a
+        # fallback chain, any AsyncStream still holding a live connection — would only
+        # ever be released by garbage collection, not deterministically at disconnect
+        # time. `aclose()` is idempotent, so this costs nothing on the normal
+        # ran-to-completion path.
+        await stream.aclose()
     yield b"data: [DONE]\n\n"
 
 

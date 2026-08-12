@@ -16,6 +16,7 @@ import pytest
 from anyinfer.cli import main
 from anyinfer.registry import default_registry
 from anyinfer.testing import FakeEmbeddingRerankProvider
+from anyinfer.testing.scripted_operations import ScriptedEmbeddingFailure
 
 
 @pytest.fixture
@@ -399,3 +400,59 @@ def test_embed_trace_json_emits_an_operation_manifest(
     assert manifest["complete"] is True
     assert manifest["embedding_space"]["provider_id"] == "cli-fake"
     assert manifest["route"]["resolved"] == "cli-fake:embed-model"
+
+
+# ---- error output stays bounded -----------------------------------------------------
+
+
+def test_embed_error_detail_on_stderr_is_length_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A provider echoing an oversized, credential-shaped detail must not flood stderr.
+
+    `AnyInferError` already redacts and truncates `detail` to 512 characters at
+    construction (`errors.py`) — this proves that discipline actually reaches the CLI's
+    error path (`_report_error`), which prints `exc.detail` directly with no output-side
+    bound of its own. A provider that echoed back a caller's document text — including
+    something credential-shaped a caller embedded — could otherwise dump an unbounded
+    amount of caller data straight to the terminal.
+    """
+    credential_shaped = "sk-test-" + "a1b2c3d4" * 20  # far longer than 512 chars total
+    huge_detail = f"rejected input containing {credential_shaped}" * 5
+    fake = FakeEmbeddingRerankProvider(
+        "cli-fake-noisy",
+        embedding_dimensions={"embed-model": 4},
+        embedding_failures={
+            # More than the default retry budget, so the CLI actually reports failure
+            # instead of quietly succeeding on a retried attempt.
+            "embed-model": [ScriptedEmbeddingFailure(message=huge_detail) for _ in range(5)]
+        },
+    )
+    fake.register(default_registry)
+    noisy_config = tmp_path / "noisy_config.json"
+    noisy_config.write_text(
+        json.dumps({"providers": [{"id": "cli-fake-noisy", "adapter": "cli-fake-noisy"}]}),
+        encoding="utf-8",
+    )
+    try:
+        _stdin(monkeypatch, None)
+        code = main(
+            [
+                "embed",
+                "hello",
+                "--config",
+                str(noisy_config),
+                "--target",
+                "cli-fake-noisy:embed-model",
+            ]
+        )
+    finally:
+        default_registry.unregister("cli-fake-noisy")
+
+    assert code == 1
+    err = capsys.readouterr().err
+    # The scripted message alone exceeds 512 chars, so it can only appear intact if the
+    # bound was not applied — any single stderr line staying well under that proves it.
+    assert all(len(line) < 600 for line in err.splitlines())
