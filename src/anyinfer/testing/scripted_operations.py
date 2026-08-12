@@ -24,7 +24,7 @@ from ..providers.base import (
     WireRankedItem,
 )
 from ..registry import ProviderDescriptor, ProviderRegistry, ProviderSetupSpec, SetupField
-from ..types.capabilities import DiscoveredModel, Health
+from ..types.capabilities import DiscoveredModel, Health, ModelCapabilities, Pricing, Sourced
 from ..types.operations import EmbeddingCapabilities, InferenceOperation, RerankCapabilities
 from ..types.results import Usage
 
@@ -97,6 +97,8 @@ class FakeEmbeddingRerankProvider:
             (``max_batch_inputs``) for core-owned batching to resolve.
         rerank_capabilities: Static `RerankCapabilities` recorded on the descriptor,
             keyed by model id (``max_documents`` drives rerank batching).
+        pricing: Trusted per-model pricing recorded on the descriptor (provenance
+            ``"catalog"``), so cost computation and spend ceilings can be tested offline.
 
     Attributes:
         embed_requests: Every `EmbeddingWireRequest` received, oldest first.
@@ -114,6 +116,7 @@ class FakeEmbeddingRerankProvider:
         locality: Literal["hosted", "local", "remote"] = "local",
         embedding_capabilities: Mapping[str, EmbeddingCapabilities] | None = None,
         rerank_capabilities: Mapping[str, RerankCapabilities] | None = None,
+        pricing: Mapping[str, Pricing] | None = None,
     ) -> None:
         self.provider_id = provider_id
         self._embedding_dimensions = dict(embedding_dimensions or {"fake-embed-small": 8})
@@ -122,6 +125,7 @@ class FakeEmbeddingRerankProvider:
         self._locality = locality
         self._embedding_capabilities = dict(embedding_capabilities or {})
         self._rerank_capabilities = dict(rerank_capabilities or {})
+        self._pricing = dict(pricing or {})
         self._failures: dict[str, list[ScriptedEmbeddingFailure]] = {
             model: list(failures) for model, failures in (embedding_failures or {}).items()
         }
@@ -160,6 +164,10 @@ class FakeEmbeddingRerankProvider:
             operations=self.operations(),
             static_embedding_capabilities=self._embedding_capabilities,
             static_rerank_capabilities=self._rerank_capabilities,
+            static_capabilities={
+                model: ModelCapabilities(pricing=Sourced(price, "catalog"))
+                for model, price in self._pricing.items()
+            },
         )
 
     def register(self, registry: ProviderRegistry) -> ProviderRegistry:

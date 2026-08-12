@@ -374,3 +374,28 @@ async def test_client_rerank_end_to_end() -> None:
         assert result.items[0].document_id == "2"
     finally:
         await client.aclose()
+
+
+async def test_rerank_search_units_land_on_their_own_usage_field() -> None:
+    """Live rerank responses carry only billed_units.search_units — never token counts."""
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200,
+            json={
+                "results": [{"index": 0, "relevance_score": 0.5}],
+                "meta": {"billed_units": {"search_units": 2}},
+            },
+        )
+    )
+    try:
+        result = await adapter.rerank(
+            RerankWireRequest(
+                model="m", query="q", documents=(RerankWireDocument(index=0, text="d"),)
+            )
+        )
+        assert result.usage is not None
+        assert result.usage.search_units == 2
+        assert result.usage.input_tokens is None
+        assert result.usage.output_tokens is None
+    finally:
+        await adapter.aclose()

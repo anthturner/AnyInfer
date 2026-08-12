@@ -371,6 +371,7 @@ class UsageFacet:
             for this target. Never zero for an unpriced call.
         estimated_fields: Usage fields that were derived rather than reported, each with
             the method used.
+        search_units: Provider-native billed search units (reranking), where reported.
     """
 
     input_tokens: int | None = None
@@ -381,6 +382,7 @@ class UsageFacet:
     reasoning_tokens: int | None = None
     cost_usd: str | None = None
     estimated_fields: Mapping[str, str] = field(default_factory=dict)
+    search_units: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -586,6 +588,7 @@ def build_operation_manifest(
             cache_write_tokens=usage.cache_write_tokens,
             reasoning_tokens=usage.reasoning_tokens,
             cost_usd=str(usage.cost_usd) if usage.cost_usd is not None else None,
+            search_units=usage.search_units,
         ),
         timing=TimingFacet(total_ms=timing.total_ms, phases=dict(timing.phases)),
         notes=tuple(warnings),
@@ -1392,6 +1395,7 @@ def manifest_json_schema() -> dict[str, Any]:
                     "reasoning_tokens": {"type": ["integer", "null"]},
                     "cost_usd": {"type": ["string", "null"]},
                     "estimated_fields": {"type": "object"},
+                    "search_units": {"type": ["integer", "null"]},
                 },
             },
             "timing": {

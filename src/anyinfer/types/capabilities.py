@@ -193,6 +193,10 @@ class Pricing:
             ``None`` when the rate is not recorded. Several providers charge a *premium*
             for a write, so this is not assumed to be a discount.
         currency: Currency code the prices are quoted in.
+        per_search_unit: Price per one billed search unit, for rerank providers that bill
+            by searches rather than tokens. ``None`` when the provider does not bill this
+            way or the rate is not recorded — a rerank cost stays unknown rather than
+            being priced through an invented token equivalence.
     """
 
     input_per_1m: Decimal
@@ -200,6 +204,7 @@ class Pricing:
     cache_read_per_1m: Decimal | None = None
     cache_write_per_1m: Decimal | None = None
     currency: str = "USD"
+    per_search_unit: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)

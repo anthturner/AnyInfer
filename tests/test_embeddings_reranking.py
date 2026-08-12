@@ -799,3 +799,144 @@ async def test_rerank_manifest_records_warnings_as_notes() -> None:
         assert m.notes and "global ordering" in m.notes[0]
     finally:
         await client.aclose()
+
+
+# ---- pricing, billable units, and spend ceilings --------------------------------------
+
+
+def test_usage_sum_and_merge_carry_search_units() -> None:
+    from anyinfer.types.results import Usage
+
+    a = Usage(search_units=1)
+    b = Usage(search_units=2)
+    assert Usage.sum([a, b]).search_units == 3
+    assert a.merge(b).search_units == 2
+    assert Usage.sum([a, Usage()]).search_units is None  # unknown part -> unknown total
+
+
+def test_rerank_cost_computed_from_search_units() -> None:
+    from decimal import Decimal
+
+    from anyinfer.capabilities.pricing import compute_operation_cost
+    from anyinfer.types.capabilities import ModelCapabilities, Pricing, Sourced
+    from anyinfer.types.results import Usage
+
+    caps = ModelCapabilities(
+        pricing=Sourced(
+            Pricing(
+                input_per_1m=Decimal("0"),
+                output_per_1m=Decimal("0"),
+                per_search_unit=Decimal("0.002"),
+            ),
+            "catalog",
+        )
+    )
+    assert compute_operation_cost(Usage(search_units=2), caps, "rerank") == Decimal("0.004")
+    # No search units reported -> unknown, never token-priced by an invented equivalence.
+    assert compute_operation_cost(Usage(input_tokens=50), caps, "rerank") is None
+
+
+async def test_embed_cost_computed_from_trusted_pricing() -> None:
+    from decimal import Decimal
+
+    from anyinfer.types.capabilities import Pricing
+
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        pricing={"small": Pricing(input_per_1m=Decimal("100"), output_per_1m=Decimal("0"))},
+    )
+    client = _client_with_fake(fake)
+    try:
+        result = await client.embed(["a", "b", "c", "d", "e"], target="fake-embed:small")
+        assert result.usage.input_tokens == 5
+        assert result.usage.cost_usd == Decimal("0.0005")
+        assert result.manifest is not None
+        assert result.manifest.usage.cost_usd is not None
+        assert Decimal(result.manifest.usage.cost_usd) == Decimal("0.0005")
+    finally:
+        await client.aclose()
+
+
+def _spend_client(
+    fake: FakeEmbeddingRerankProvider, policy: ai.SpendPolicy, ledger: object
+) -> ai.AsyncClient:
+    registry = _empty_registry()
+    fake.register(registry)
+    return ai.AsyncClient(
+        providers=[ai.ProviderSettings.of(fake.provider_id)],
+        registry=registry,
+        use_default_catalog=False,
+        spend=policy,
+        ledger=ledger,  # type: ignore[arg-type]
+    )
+
+
+async def test_embed_total_spend_ceiling_refuses_the_request_that_crosses_it() -> None:
+    from decimal import Decimal
+
+    from anyinfer.capabilities.ledger import SpendLedger
+    from anyinfer.types.capabilities import Pricing
+
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        pricing={"small": Pricing(input_per_1m=Decimal("100"), output_per_1m=Decimal("0"))},
+    )
+    ledger = SpendLedger()
+    client = _spend_client(fake, ai.SpendPolicy(max_total_usd=Decimal("0.0007")), ledger)
+    try:
+        first = await client.embed(["a", "b", "c", "d", "e"], target="fake-embed:small")
+        assert first.usage.cost_usd == Decimal("0.0005")
+        assert ledger.totals().cost == Decimal("0.0005")
+        with pytest.raises(ai.SpendLimitError):
+            await client.embed(["a", "b", "c", "d", "e"], target="fake-embed:small")
+        assert len(fake.embed_requests) == 1  # the refused request never dispatched
+    finally:
+        await client.aclose()
+
+
+async def test_rerank_unknown_cost_is_refused_when_the_policy_says_so() -> None:
+    from anyinfer.capabilities.ledger import SpendLedger
+
+    fake = FakeEmbeddingRerankProvider("fake-embed", rerank_models=["rr"])
+    ledger = SpendLedger()
+    client = _spend_client(fake, ai.SpendPolicy(on_unknown="refuse"), ledger)
+    try:
+        with pytest.raises(ai.SpendLimitError, match="cannot be estimated"):
+            await client.rerank("q", ["d1", "d2"], target="fake-embed:rr")
+        assert fake.rerank_requests == []
+    finally:
+        await client.aclose()
+
+
+async def test_embed_spend_reservation_is_released_on_failure() -> None:
+    from decimal import Decimal
+
+    from anyinfer.capabilities.ledger import SpendLedger
+    from anyinfer.types.capabilities import Pricing
+
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        pricing={"small": Pricing(input_per_1m=Decimal("100"), output_per_1m=Decimal("0"))},
+        embedding_failures={
+            "small": [ScriptedEmbeddingFailure(kind="rate-limit", retry_after_s=0.0)]
+        },
+    )
+    ledger = SpendLedger()
+    client = _spend_client(fake, ai.SpendPolicy(max_total_usd=Decimal("0.0007")), ledger)
+    try:
+        route = Route(
+            targets=("fake-embed:small",),
+            retry=Retry(max_attempts=1, backoff_base_s=0.0),
+            health_gate=False,
+        )
+        with pytest.raises(ai.AllTargetsFailedError):
+            await client.embed(["a", "b", "c", "d", "e"], route=route)
+        assert ledger.reserved() == Decimal(0)
+        # With the reservation released, the retry fits under the ceiling and succeeds.
+        result = await client.embed(["a", "b", "c", "d", "e"], route=route)
+        assert result.usage.cost_usd == Decimal("0.0005")
+    finally:
+        await client.aclose()

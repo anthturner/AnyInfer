@@ -39,7 +39,7 @@ from ..capabilities.cache import CachePlan, plan_cache
 from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
 from ..capabilities.gating import check_context_fit
 from ..capabilities.ledger import SpendLedger, SpendTotals
-from ..capabilities.pricing import TRUSTED_PROVENANCE, with_cost
+from ..capabilities.pricing import TRUSTED_PROVENANCE, compute_operation_cost, with_cost
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import (
     DEFAULT_PROBE_FEATURES,
@@ -147,6 +147,7 @@ from ..types.operations import (
     EmbeddingRequest,
     EmbeddingResult,
     EmbeddingSpace,
+    InferenceOperation,
     RerankDocument,
     RerankRequest,
     RerankResult,
@@ -1289,19 +1290,30 @@ class AsyncClient:
             batch=batch if batch is not None else BatchPolicy(),
         )
         resolved_route = self._resolve_route(target, route, None)
-        return await dispatch_embed(
-            request,
-            resolved_route,
-            pool=self._pool,
-            registry=self._registry,
-            catalog=self._catalog,
-            configured_providers=self._pool.configured_ids,
-            health=self._health,
-            emit=self._emit,
-            retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
-            manifest=self._manifests if manifest is None else manifest,
-            anyinfer_version=_version(),
+        request_id = uuid.uuid4().hex
+        self._check_operation_spend(
+            operation="embedding", route=resolved_route, texts=texts, request_id=request_id
         )
+        try:
+            return await dispatch_embed(
+                request,
+                resolved_route,
+                pool=self._pool,
+                registry=self._registry,
+                catalog=self._catalog,
+                configured_providers=self._pool.configured_ids,
+                health=self._health,
+                emit=self._emit,
+                retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
+                manifest=self._manifests if manifest is None else manifest,
+                anyinfer_version=_version(),
+                capabilities_for=self._operation_capabilities,
+                request_id=request_id,
+            )
+        except BaseException:
+            if self._ledger is not None:
+                self._ledger.release(request_id)
+            raise
 
     async def rerank(
         self,
@@ -1370,19 +1382,30 @@ class AsyncClient:
             return_documents=return_documents,
         )
         resolved_route = self._resolve_route(target, route, None)
-        return await dispatch_rerank(
-            request,
-            resolved_route,
-            pool=self._pool,
-            registry=self._registry,
-            catalog=self._catalog,
-            configured_providers=self._pool.configured_ids,
-            health=self._health,
-            emit=self._emit,
-            retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
-            manifest=self._manifests if manifest is None else manifest,
-            anyinfer_version=_version(),
+        request_id = uuid.uuid4().hex
+        self._check_operation_spend(
+            operation="rerank", route=resolved_route, texts=None, request_id=request_id
         )
+        try:
+            return await dispatch_rerank(
+                request,
+                resolved_route,
+                pool=self._pool,
+                registry=self._registry,
+                catalog=self._catalog,
+                configured_providers=self._pool.configured_ids,
+                health=self._health,
+                emit=self._emit,
+                retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
+                manifest=self._manifests if manifest is None else manifest,
+                anyinfer_version=_version(),
+                capabilities_for=self._operation_capabilities,
+                request_id=request_id,
+            )
+        except BaseException:
+            if self._ledger is not None:
+                self._ledger.release(request_id)
+            raise
 
     async def _generate_request(
         self,
@@ -3163,6 +3186,89 @@ class AsyncClient:
                 provider=resolved.provider_id,
                 hint="choose a model whose capabilities include the required input modality",
             )
+
+    def _operation_capabilities(self, resolved: ResolvedTarget) -> ModelCapabilities | None:
+        """Assembled capabilities for one embed/rerank target, or ``None`` when unknown."""
+        try:
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+            return self._capabilities_for(descriptor, resolved)
+        except (AnyInferError, ValueError):
+            return None
+
+    def _check_operation_spend(
+        self,
+        *,
+        operation: InferenceOperation,
+        route: Route,
+        texts: Sequence[str] | None,
+        request_id: str,
+    ) -> None:
+        """Refuse an embed/rerank call that would cross this client's spending ceiling.
+
+        Embedding costs are estimated from the caller's texts at the first target's
+        trusted input rate. Rerank costs are never estimated — search-unit billing has no
+        verified request-shape formula, and a guessed estimate would enforce nothing
+        while appearing to — so ``on_unknown`` governs rerank calls.
+
+        Raises:
+            SpendLimitError: When a ceiling would be crossed, or when the cost cannot be
+                known and the policy says not to spend blind.
+        """
+        policy = self._spend_policy
+        if policy is None or not policy.active:
+            return
+        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
+
+        estimate: Decimal | None = None
+        if operation == "embedding" and texts is not None and route.targets:
+            try:
+                resolved = self.resolve(route.targets[0])
+                capabilities = self._operation_capabilities(resolved)
+            except (AnyInferError, ValueError):
+                capabilities = None
+            if capabilities is not None:
+                tokens = sum(self._estimator.estimate(t).tokens for t in texts)
+                estimate = compute_operation_cost(
+                    Usage(input_tokens=tokens), capabilities, "embedding"
+                )
+
+        if estimate is None:
+            if policy.on_unknown == "refuse":
+                raise SpendLimitError(
+                    f"the cost of this {operation} request cannot be estimated",
+                    limit_usd=policy.max_request_usd or policy.max_total_usd,
+                    spent_usd=spent,
+                    hint=(
+                        "this target has no trusted pricing (rerank costs are never "
+                        "estimated); set on_unknown='allow' to send it anyway, or supply "
+                        "pricing as a capability override"
+                    ),
+                )
+            return
+
+        if policy.max_request_usd is not None and estimate > policy.max_request_usd:
+            raise SpendLimitError(
+                f"this {operation} request could cost {estimate}, above the per-request "
+                f"ceiling of {policy.max_request_usd}",
+                limit_usd=policy.max_request_usd,
+                spent_usd=spent,
+                estimated_usd=estimate,
+            )
+
+        if policy.max_total_usd is not None:
+            ledger = self._ledger
+            if ledger is None:
+                raise RuntimeError("a cumulative spend policy requires a spend ledger")
+            accepted, spent, reserved = ledger.reserve(request_id, estimate, policy.max_total_usd)
+            if not accepted:
+                raise SpendLimitError(
+                    f"this client has spent {spent}, reserved {reserved}, and this "
+                    f"{operation} request could cost {estimate}, above the total "
+                    f"ceiling {policy.max_total_usd}",
+                    limit_usd=policy.max_total_usd,
+                    spent_usd=spent,
+                    estimated_usd=estimate,
+                )
 
     def _check_spend(
         self,

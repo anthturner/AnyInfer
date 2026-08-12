@@ -18,8 +18,9 @@ import functools
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
+from ..capabilities.pricing import with_operation_cost
 from ..errors import AllTargetsFailedError, ConfigError, ProviderError
 from ..events.telemetry import (
     AttemptCompleted,
@@ -306,6 +307,8 @@ async def dispatch_embed(
     retain_raw: bool,
     manifest: bool = False,
     anyinfer_version: str = "",
+    capabilities_for: Callable[[ResolvedTarget], Any] | None = None,
+    request_id: str | None = None,
 ) -> EmbeddingResult:
     """Route and dispatch one embedding request, honoring the embedding-space safety rule.
 
@@ -316,7 +319,7 @@ async def dispatch_embed(
             proven to share the route's primary target's embedding space and
             ``allow_incompatible_fallback`` was not set.
     """
-    request_id = uuid.uuid4().hex
+    request_id = request_id or uuid.uuid4().hex
     emit(RequestStarted(request_id=request_id, targets=route.targets, operation="embedding"))
     all_attempts: list[AttemptRecord] = []
     warnings: list[str] = []
@@ -500,6 +503,8 @@ async def dispatch_embed(
             )
 
         usage = Usage.sum([wire.usage or Usage() for wire in wire_results])
+        if capabilities_for is not None:
+            usage = with_operation_cost(usage, capabilities_for(resolved), "embedding")
         emit(
             RequestCompleted(
                 request_id=request_id, target=resolved, usage=usage, timing=total_timing
@@ -554,6 +559,8 @@ async def dispatch_rerank(
     retain_raw: bool,
     manifest: bool = False,
     anyinfer_version: str = "",
+    capabilities_for: Callable[[ResolvedTarget], Any] | None = None,
+    request_id: str | None = None,
 ) -> RerankResult:
     """Route and dispatch one rerank request.
 
@@ -562,7 +569,7 @@ async def dispatch_rerank(
         anyinfer.errors.ConfigError: A provider returned a malformed ranking (out-of-range
             or duplicate document indexes).
     """
-    request_id = uuid.uuid4().hex
+    request_id = request_id or uuid.uuid4().hex
     emit(RequestStarted(request_id=request_id, targets=route.targets, operation="rerank"))
     all_attempts: list[AttemptRecord] = []
     warnings: list[str] = []
@@ -654,6 +661,8 @@ async def dispatch_rerank(
             all_attempts.extend(attempts)
             items = _validate_ranked_items(resolved, request, wire_result)
             usage = wire_result.usage or Usage()
+            if capabilities_for is not None:
+                usage = with_operation_cost(usage, capabilities_for(resolved), "rerank")
             emit(
                 RequestCompleted(
                     request_id=request_id, target=resolved, usage=usage, timing=timing
@@ -746,6 +755,8 @@ async def dispatch_rerank(
             )
         warnings.append(cross_batch_warning)
         usage = Usage.sum(usages)
+        if capabilities_for is not None:
+            usage = with_operation_cost(usage, capabilities_for(resolved), "rerank")
         total_timing = Timing(
             started_at=batch_started,
             total_ms=(time.monotonic() - batch_started) * 1000.0,

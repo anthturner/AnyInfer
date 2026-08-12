@@ -81,6 +81,9 @@ class Usage:
         reasoning_tokens: Tokens spent on hidden reasoning/thinking, where reported.
         cost_usd: Cost of the call in US dollars, computed from per-token pricing when
             pricing is known.
+        search_units: Provider-native billed search units (reranking). A distinct
+            billing dimension with its own field on purpose — a search unit is never a
+            token count, and encoding one as the other would fabricate usage.
     """
 
     input_tokens: int | None = None
@@ -90,6 +93,7 @@ class Usage:
     cache_write_tokens: int | None = None
     reasoning_tokens: int | None = None
     cost_usd: Decimal | None = None
+    search_units: int | None = None
 
     def normalized(self) -> Usage:
         """Fill ``total_tokens`` from input + output when both are known."""
@@ -115,6 +119,7 @@ class Usage:
             cache_write_tokens=_pick(self.cache_write_tokens, other.cache_write_tokens),
             reasoning_tokens=_pick(self.reasoning_tokens, other.reasoning_tokens),
             cost_usd=_pick(self.cost_usd, other.cost_usd),
+            search_units=_pick(self.search_units, other.search_units),
         )
 
     @classmethod
@@ -133,6 +138,7 @@ class Usage:
             cache_write_tokens=_sum_known(p.cache_write_tokens for p in parts),
             reasoning_tokens=_sum_known(p.reasoning_tokens for p in parts),
             cost_usd=_sum_known_decimal(p.cost_usd for p in parts),
+            search_units=_sum_known(p.search_units for p in parts),
         )
 
 

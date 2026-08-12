@@ -639,12 +639,16 @@ def _parse_usage(payload: Any) -> Usage | None:
         return int(value) if isinstance(value, float) and value.is_integer() else None
 
     cached = payload.get("cached_tokens")
+    billed = payload.get("billed_units")
     usage = Usage(
         input_tokens=field(source, "input_tokens"),
         output_tokens=field(source, "output_tokens"),
         cache_read_tokens=cached
         if isinstance(cached, int) and not isinstance(cached, bool)
         else None,
+        # Search units live only under billed_units and are their own billing
+        # dimension — carried on their own field, never mapped into token counts.
+        search_units=field(billed, "search_units") if isinstance(billed, Mapping) else None,
     )
     return usage if usage != Usage() else None
 

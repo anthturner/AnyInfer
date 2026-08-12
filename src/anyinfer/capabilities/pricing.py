@@ -23,7 +23,15 @@ from ..types.capabilities import ModelCapabilities, Pricing, Provenance, Sourced
 from ..types.results import Usage
 from .estimate import RequestEstimate
 
-__all__ = ["TRUSTED_PROVENANCE", "CostEstimate", "compute_cost", "estimate_cost", "with_cost"]
+__all__ = [
+    "TRUSTED_PROVENANCE",
+    "CostEstimate",
+    "compute_cost",
+    "compute_operation_cost",
+    "estimate_cost",
+    "with_cost",
+    "with_operation_cost",
+]
 
 TRUSTED_PROVENANCE: frozenset[Provenance] = frozenset(
     {"catalog", "discovered", "probed", "override"}
@@ -156,6 +164,57 @@ def with_cost(usage: Usage, capabilities: ModelCapabilities | None) -> Usage:
     if usage.cost_usd is not None:
         return usage
     cost = compute_cost(usage, capabilities)
+    if cost is None:
+        return usage
+    return replace(usage, cost_usd=cost)
+
+
+def compute_operation_cost(
+    usage: Usage, capabilities: ModelCapabilities | None, operation: str
+) -> Decimal | None:
+    """Compute the cost of one embedding or rerank call.
+
+    Embeddings are priced on the input side alone — an embedding call has no generated
+    tokens, so `compute_cost`'s both-sides-known rule would leave every embedding
+    unpriced forever. Reranking is priced only through billed search units against a
+    recorded per-unit rate: a rerank provider that reports no tokens is never priced
+    through an invented token equivalence.
+
+    Args:
+        usage: Reported usage for the call.
+        capabilities: Assembled capabilities, whose ``pricing`` field supplies the rates.
+        operation: ``"embedding"`` or ``"rerank"``; anything else defers to
+            `compute_cost`.
+
+    Returns:
+        The cost in the pricing currency, or ``None`` when it cannot be known.
+    """
+    if capabilities is None or capabilities.pricing is None:
+        return None
+    if capabilities.pricing.provenance not in TRUSTED_PROVENANCE:
+        return None
+    pricing: Pricing = capabilities.pricing.value
+    if operation == "embedding":
+        if usage.input_tokens is None:
+            return None
+        return Decimal(usage.input_tokens) / _PER_MILLION * pricing.input_per_1m
+    if operation == "rerank":
+        if usage.search_units is None or pricing.per_search_unit is None:
+            return None
+        return Decimal(usage.search_units) * pricing.per_search_unit
+    return compute_cost(usage, capabilities)
+
+
+def with_operation_cost(
+    usage: Usage, capabilities: ModelCapabilities | None, operation: str
+) -> Usage:
+    """Return ``usage`` with `cost_usd` filled in for an embedding or rerank call.
+
+    Same authority rule as `with_cost`: a provider-reported cost is never overwritten.
+    """
+    if usage.cost_usd is not None:
+        return usage
+    cost = compute_operation_cost(usage, capabilities, operation)
     if cost is None:
         return usage
     return replace(usage, cost_usd=cost)

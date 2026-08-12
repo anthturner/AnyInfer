@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D, A, B, and C landed 2026-08-12 (see §19); E is next.
+> **Status:** in progress — Tracks D, A, B, C, and E landed 2026-08-12 (see §19); F is next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -481,22 +481,22 @@ attempt-level events, and produce no manifest.
 
 Blocked on Track B for real billing facts (Cohere search units are the forcing case).
 
-- [ ] **BH.E.1** Represent provider-native billable units first-class with stable names
+- [x] **BH.E.1** Represent provider-native billable units first-class with stable names
   and exact numeric types (ER.1.21) — a deliberate design, not a `dict[str, float]` grab
   bag; `cost_usd` stays the only normalized spend field. Record the ER.1.20 decision
   explicitly (in `Usage`'s docstring or DESIGN.md §28): `Usage` remains operation-neutral,
   search units are never encoded as fake tokens.
-- [ ] **BH.E.2** Add embedding pricing (input-token based) and rerank pricing (token,
+- [~] **BH.E.2** Add embedding pricing (input-token based) and rerank pricing (token,
   request, document, or search-unit based) to the pricing data without forcing one
   invented unit (ER.1.22) — entries go through the pricing refresh scripts, never
   hand-edited (AGENTS.md).
-- [ ] **BH.E.3** Compute `cost_usd` for embed/rerank results where pricing is known;
+- [x] **BH.E.3** Compute `cost_usd` for embed/rerank results where pricing is known;
   unknown stays `None`, never inferred from a sibling model (ER.1.24 stays honored).
-- [ ] **BH.E.4** Extend spend ledgers and ceilings to the new operations (ER.1.23) —
+- [x] **BH.E.4** Extend spend ledgers and ceilings to the new operations (ER.1.23) —
   today there is no ceiling enforcement whatsoever for embed/rerank calls.
-- [ ] **BH.E.5** Spend reservations across Track A's concurrent chunks so bounded
+- [x] **BH.E.5** Spend reservations across Track A's concurrent chunks so bounded
   concurrency cannot overshoot a caller's ceiling unnoticed (ER.8.8).
-- [ ] **BH.E.6** Tests: rate pacing and spend across mixed generation/embed/rerank calls
+- [~] **BH.E.6** Tests: rate pacing and spend across mixed generation/embed/rerank calls
   (ER.11.12); demo panel shows cost once it exists (the ER.9.13 gap was a consequence of
   pricing, not a UI omission).
 
@@ -722,14 +722,14 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
 
 - [x] Cross-space embedding fallback is refused before dispatch by default, with a tested
   explicit opt-in. *(Track D, 2026-08-12.)*
-- [ ] A caller can `embed()`/`rerank()` past a provider's declared limit and get a
+- [x] A caller can `embed()`/`rerank()` past a provider's declared limit and get a
   correct, order-preserved result or an honest all-or-error failure, without knowing the
   limit themselves.
-- [ ] Cohere passes the same class of wire-mapping and end-to-end tests Ollama has, with
+- [x] Cohere passes the same class of wire-mapping and end-to-end tests Ollama has, with
   a dated, cited contract snapshot.
-- [ ] `embed()`/`rerank()` calls appear in OTel with a correct non-generation operation
+- [x] `embed()`/`rerank()` calls appear in OTel with a correct non-generation operation
   name and produce a manifest on request, content-free by default.
-- [ ] The full suite (`pytest`, `mypy`, `ruff`, `mkdocs build --strict`, `lint-imports`)
+- [x] The full suite (`pytest`, `mypy`, `ruff`, `mkdocs build --strict`, `lint-imports`)
   passes with zero new failures against a freshly re-verified baseline (do not assume the
   2026-08-11 "one pre-existing unrelated failure" baseline still holds).
 
@@ -889,3 +889,30 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   BH.C.6 sidecar `anyinfer_manifest` extension for `/v1/embeddings` (optional stretch,
   skipped — noted per its own terms); BH.C.9 benchmark metrics (its own text says land
   last and lowest priority — deferred to a later session, still open).
+- **2026-08-12 (Track E — delivered and tested):** Pricing, billable units, and spend.
+  `Usage.search_units` added — a distinct billing dimension, never a token count (D-13
+  now recorded in the field's own docstring); `merge()`/`sum()` and the manifest
+  `UsageFacet` carry it; Cohere's `_parse_usage` populates it from `billed_units`, so
+  live rerank calls now report usage. `Pricing.per_search_unit` added.
+  `compute_operation_cost`/`with_operation_cost` price embeddings on the input side
+  alone (generation's both-sides rule left every embedding unpriced forever) and rerank
+  only via search units × a recorded per-unit rate — never an invented token
+  equivalence. The dispatchers fill `cost_usd` through a client-supplied capabilities
+  hook, which means the `SpendLedger` (already an event observer) records embed/rerank
+  spend with zero new plumbing. Spend ceilings: `_check_operation_spend` mirrors
+  generation's gate — embedding costs estimated from the caller's texts at the first
+  target's trusted input rate; rerank costs never estimated (no verified search-unit
+  formula — `on_unknown` governs); `max_request_usd` checked; `max_total_usd` reserved
+  under the request id *before any chunk dispatches*, which is what makes bounded-
+  concurrency batches unable to overshoot (BH.E.5) — released on failure, retired by
+  `record()` on completion. `FakeEmbeddingRerankProvider` accepts trusted `pricing` for
+  offline cost/spend tests. Tests: search-unit sum/merge/parse, embedding cost against
+  trusted pricing (result + manifest), rerank per-unit cost, total-ceiling refusal with
+  zero dispatch, refuse-on-unknown for rerank, reservation release on failure. Gates
+  all clean (one pre-existing demo failure; goldens regenerated for the additive
+  facet field). BH.E.2 stays `[~]`: the *mechanism* is complete, but real pricing-table
+  entries for embed/rerank models must come through the pricing-refresh pipeline
+  (never hand-edited) — extending that pipeline is its own follow-on change. BH.E.6
+  stays `[~]`: spend tests are in; mixed-operation rate-pacing tests (ER.11.12's other
+  half) remain with Track J; the demo's cost display lights up automatically once real
+  pricing entries exist.
