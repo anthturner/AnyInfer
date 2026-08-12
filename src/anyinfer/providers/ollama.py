@@ -56,7 +56,13 @@ from .base import (
     WireRequest,
     _encode_function_tool,
 )
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import (
+    build_client,
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+)
 from .sse import iter_ndjson
 
 __all__ = ["SESSION_KEEP_ALIVE", "OllamaAdapter", "descriptor"]
@@ -454,6 +460,7 @@ class OllamaAdapter:
         if response.status_code >= 400:
             body = response.content
             raise self._classify(response.status_code, body, response.headers, req)
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         return self._parse_embedding_response(req, response.json())
 
     def _build_embedding_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]:

@@ -40,7 +40,7 @@ from ..types.results import Usage
 from .base import EmbeddingWireRequest, EmbeddingWireResult, ProviderConfig
 from .cloud_auth import GoogleTokenSource
 from .gemini import _GEMINI_FEATURES, GeminiAdapter, _translate_reasoning
-from .http import classify_status, map_transport_error, read_error_detail
+from .http import check_response_size, classify_status, map_transport_error, read_error_detail
 
 __all__ = ["VertexAdapter", "descriptor"]
 
@@ -162,6 +162,7 @@ class VertexAdapter(GeminiAdapter):
                 detail=read_error_detail(response.content),
                 headers=response.headers,
             )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         return self._parse_embed_response(req, response.json())
 
     def _parse_embed_response(

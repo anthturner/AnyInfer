@@ -34,7 +34,13 @@ from .base import (
     RerankWireResult,
     WireRankedItem,
 )
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import (
+    build_client,
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+)
 
 __all__ = ["VoyageAdapter", "descriptor"]
 
@@ -115,6 +121,7 @@ class VoyageAdapter:
                 headers=response.headers,
                 phase="generate",
             )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         return self._parse_embed_response(req, response.json())
 
     def _parse_embed_response(
@@ -194,6 +201,7 @@ class VoyageAdapter:
                 headers=response.headers,
                 phase="generate",
             )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         return self._parse_rerank_response(req, response.json())
 
     def _parse_rerank_response(self, req: RerankWireRequest, payload: Any) -> RerankWireResult:

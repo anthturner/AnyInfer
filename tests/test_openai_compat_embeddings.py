@@ -9,7 +9,7 @@ import struct
 import httpx2
 import pytest
 
-from anyinfer.errors import ProviderError
+from anyinfer.errors import ProviderError, StreamProtocolError
 from anyinfer.providers.base import EmbeddingWireRequest, ProviderConfig
 from anyinfer.providers.openai_compat import OpenAICompatAdapter
 from anyinfer.providers.openai_compat_embeddings import (
@@ -138,6 +138,26 @@ async def test_embed_maps_http_error_status() -> None:
     try:
         with pytest.raises(AuthError):
             await adapter.embed(EmbeddingWireRequest(model="m", inputs=("a",)))
+    finally:
+        await adapter.aclose()
+
+
+def _oversized_response(request: httpx2.Request) -> httpx2.Response:
+    padding = "x" * 200
+    return httpx2.Response(
+        200,
+        json={"data": [{"index": 0, "embedding": [0.1]}], "model": "m", "padding": padding},
+    )
+
+
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    """A response bomb must be refused, not parsed — same rule the generate() paths use."""
+    adapter = _adapter(_oversized_response)
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(model="m", inputs=("a",), max_response_bytes=32)
+            )
     finally:
         await adapter.aclose()
 

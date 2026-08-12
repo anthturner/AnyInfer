@@ -131,3 +131,20 @@ async def test_embed_surfaces_phase_timings() -> None:
         assert result.phases["provider_total_ms"] == pytest.approx(14143917 / 1_000_000)
     finally:
         await adapter.aclose()
+
+
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200, json={"embeddings": [[0.1]], "padding": "x" * 200}
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(model="m", inputs=("a",), max_response_bytes=32)
+            )
+    finally:
+        await adapter.aclose()

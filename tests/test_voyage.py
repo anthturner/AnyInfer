@@ -198,3 +198,50 @@ async def test_client_embed_and_rerank_end_to_end() -> None:
         assert [item.index for item in ranked.items] == [0, 1]
     finally:
         await client.aclose()
+
+
+# ---- response bombs -----------------------------------------------------------------
+
+
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200,
+            json={"data": [{"index": 0, "embedding": [0.1]}], "padding": "x" * 200},
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(model="m", inputs=("a",), max_response_bytes=32)
+            )
+    finally:
+        await adapter.aclose()
+
+
+async def test_rerank_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200,
+            json={
+                "data": [{"index": 0, "relevance_score": 0.5}],
+                "padding": "x" * 200,
+            },
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.rerank(
+                RerankWireRequest(
+                    model="m",
+                    query="q",
+                    documents=(RerankWireDocument(index=0, text="d"),),
+                    max_response_bytes=32,
+                )
+            )
+    finally:
+        await adapter.aclose()

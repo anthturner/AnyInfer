@@ -156,6 +156,21 @@ async def test_embed_vector_count_mismatch_is_rejected() -> None:
         await adapter.aclose()
 
 
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(200, json=[[0.1] + [0.0] * 50])
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(model="m", inputs=("a",), max_response_bytes=32)
+            )
+    finally:
+        await adapter.aclose()
+
+
 async def test_error_body_maps_with_retry_after() -> None:
     adapter = _adapter(_server("rate_limited"))
     try:
@@ -211,6 +226,28 @@ async def test_rerank_applies_top_n_client_side() -> None:
         )
         assert len(result.items) == 1
         assert result.items[0].index == 1
+    finally:
+        await adapter.aclose()
+
+
+async def test_rerank_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200, json=[{"index": 0, "score": 0.5, "padding": "x" * 200}]
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.rerank(
+                RerankWireRequest(
+                    model="m",
+                    query="q",
+                    documents=(RerankWireDocument(index=0, text="d"),),
+                    max_response_bytes=32,
+                )
+            )
     finally:
         await adapter.aclose()
 

@@ -50,7 +50,13 @@ from .base import (
     WireRequest,
     _encode_function_tool,
 )
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import (
+    build_client,
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+)
 from .sse import iter_sse
 
 __all__ = ["CohereAdapter", "descriptor"]
@@ -442,6 +448,7 @@ class CohereAdapter:
                 headers=response.headers,
                 phase="generate",
             )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         return self._parse_embed_response(req, response.json())
 
     def _build_embed_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]:
@@ -528,6 +535,7 @@ class CohereAdapter:
                 headers=response.headers,
                 phase="generate",
             )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         return self._parse_rerank_response(req, response.json())
 
     def _parse_rerank_response(self, req: RerankWireRequest, payload: Any) -> RerankWireResult:

@@ -20,17 +20,40 @@ from ..errors import (
     ProviderError,
     ProviderUnavailableError,
     RateLimitError,
+    StreamProtocolError,
     TransportError,
     is_retryable_status,
 )
 
 __all__ = [
     "build_client",
+    "check_response_size",
     "classify_status",
     "map_transport_error",
     "parse_retry_after",
     "read_error_detail",
 ]
+
+
+def check_response_size(content: bytes, max_bytes: int, *, provider: str) -> None:
+    """Reject a buffered response body that exceeds its byte cap.
+
+    A buffered (non-streaming) call has already paid for the whole body by the time this
+    runs — ``httpx2`` read it all before returning ``response.content`` — so this cannot
+    prevent the read itself. What it prevents is *parsing* an oversized body as if it were
+    trustworthy: the same "reject rather than silently truncate" rule the streaming byte
+    cap (`anyinfer.providers.sse`) and every generation adapter's buffered path already
+    enforce, extended to embed()/rerank() so a response bomb on those paths gets refused
+    with a typed error instead of overwhelming the JSON parser or the caller's memory.
+
+    Raises:
+        anyinfer.errors.StreamProtocolError: The body exceeds ``max_bytes``.
+    """
+    if len(content) > max_bytes:
+        raise StreamProtocolError(
+            f"response exceeded max_response_bytes ({max_bytes} bytes)",
+            provider=provider,
+        )
 
 
 def build_client(

@@ -26,7 +26,7 @@ import httpx2
 from ..errors import ProviderError
 from ..types.results import Usage
 from .base import EmbeddingWireRequest, EmbeddingWireResult
-from .http import map_transport_error
+from .http import check_response_size, map_transport_error
 
 if TYPE_CHECKING:
     from typing import Protocol
@@ -117,6 +117,7 @@ class OpenAICompatEmbeddingsMixin:
                 response.headers,
                 "generate",
             )
+        check_response_size(response.content, req.max_response_bytes, provider=host.provider_id)
         return self._parse_embedding_response(req, response.json())
 
     def _build_embedding_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]:

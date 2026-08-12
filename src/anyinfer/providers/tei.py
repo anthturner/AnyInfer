@@ -33,7 +33,7 @@ from .base import (
     RerankWireResult,
     WireRankedItem,
 )
-from .http import build_client, classify_status, map_transport_error
+from .http import build_client, check_response_size, classify_status, map_transport_error
 
 __all__ = ["TEIAdapter", "descriptor"]
 
@@ -144,6 +144,7 @@ class TEIAdapter:
                 headers=response.headers,
                 phase="generate",
             )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         body = response.json()
         if not isinstance(body, list):
             raise ProviderError("embed response is not an array of vectors", phase="validate")
@@ -197,6 +198,7 @@ class TEIAdapter:
                 headers=response.headers,
                 phase="generate",
             )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
         body = response.json()
         if not isinstance(body, list):
             raise ProviderError("rerank response is not an array of ranks", phase="validate")

@@ -399,3 +399,56 @@ async def test_rerank_search_units_land_on_their_own_usage_field() -> None:
         assert result.usage.output_tokens is None
     finally:
         await adapter.aclose()
+
+
+# ---- response bombs -----------------------------------------------------------------
+
+
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200,
+            json={
+                "embeddings": {"float": [[0.1]]},
+                "texts": ["a"],
+                "padding": "x" * 200,
+            },
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(
+                    model="m", inputs=("a",), input_type="document", max_response_bytes=32
+                )
+            )
+    finally:
+        await adapter.aclose()
+
+
+async def test_rerank_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200,
+            json={
+                "results": [{"index": 0, "relevance_score": 0.5}],
+                "padding": "x" * 200,
+            },
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.rerank(
+                RerankWireRequest(
+                    model="m",
+                    query="q",
+                    documents=(RerankWireDocument(index=0, text="d"),),
+                    max_response_bytes=32,
+                )
+            )
+    finally:
+        await adapter.aclose()

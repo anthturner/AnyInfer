@@ -571,6 +571,27 @@ async def test_embed_issues_one_invoke_per_input_and_sums_tokens() -> None:
     assert result.usage.input_tokens == 10
 
 
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _bedrock(
+        lambda request: httpx2.Response(
+            200, json={"embedding": [0.1], "padding": "x" * 200}
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(
+                    model="amazon.titan-embed-text-v2:0",
+                    inputs=("hi",),
+                    max_response_bytes=32,
+                )
+            )
+    finally:
+        await adapter.aclose()
+
+
 # ---- vertex --------------------------------------------------------------------------
 
 
@@ -787,3 +808,26 @@ async def test_embed_forwards_output_dimensionality() -> None:
     body = json.loads(seen[0].content)
     assert body["instances"] == [{"content": "hi"}, {"content": "there"}]
     assert body["parameters"] == {"outputDimensionality": 256}
+
+
+async def test_vertex_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _vertex(
+        lambda request: httpx2.Response(
+            200,
+            json={
+                "predictions": [{"embeddings": {"values": [0.1]}}],
+                "padding": "x" * 200,
+            },
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(
+                    model="gemini-embedding-001", inputs=("hi",), max_response_bytes=32
+                )
+            )
+    finally:
+        await adapter.aclose()

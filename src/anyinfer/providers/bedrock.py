@@ -63,7 +63,13 @@ from .base import (
 )
 from .cloud_auth import AwsCredentials, resolve_aws_credentials, sigv4_headers
 from .eventstream import EventStreamMessage, iter_event_stream
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import (
+    build_client,
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+)
 
 __all__ = ["BedrockAdapter", "descriptor"]
 
@@ -242,6 +248,9 @@ class BedrockAdapter:
                     detail=read_error_detail(response.content),
                     headers=response.headers,
                 )
+            check_response_size(
+                response.content, req.max_response_bytes, provider=self.provider_id
+            )
 
             try:
                 parsed = json.loads(response.content)

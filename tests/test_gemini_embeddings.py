@@ -164,3 +164,21 @@ async def test_client_embed_end_to_end_with_intent_warning() -> None:
         assert any("does not distinguish" in w for w in result.warnings)
     finally:
         await client.aclose()
+
+
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _adapter(
+        lambda request: httpx2.Response(
+            200,
+            json={"embeddings": [{"values": [0.1]}], "padding": "x" * 200},
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(model="m", inputs=("a",), max_response_bytes=32)
+            )
+    finally:
+        await adapter.aclose()
