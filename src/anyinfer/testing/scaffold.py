@@ -216,10 +216,14 @@ dependencies = ["anyinfer"]
 {provider_id} = "{package}:provider"
 
 # Cases this adapter cannot support, declared rather than passed on a command line so the
-# claim is reviewable. Every unlisted case defaults to supported.
+# claim is reviewable. Every unlisted generation case defaults to supported; the
+# embedding and rerank cases default to unsupported and are opted into here once the
+# adapter implements the protocol and its descriptor declares the operation.
 [tool.anyinfer.conformance]
 # reasoning = false
 # retry_after = false
+# embedding = true
+# rerank = true
 """
 
 _CONTRACT = """# {provider_id} — Protocol Contract

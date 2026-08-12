@@ -101,6 +101,11 @@ class Capabilities:
         retry_after: Rate limiting surfaces as a retryable, recorded attempt.
         error_mapping: Provider failures map to typed errors with a correct retry flag.
         byte_cap: An oversized response is rejected rather than silently truncated.
+        embedding: `embed()` returns ordered, uniform, finite vectors. Defaults to
+            ``False`` — most adapters generate only, and an operation nobody declared
+            must skip rather than fail.
+        rerank: `rerank()` returns descending, identity-preserving rankings. Defaults to
+            ``False`` for the same reason.
     """
 
     list_models: bool = True
@@ -116,6 +121,8 @@ class Capabilities:
     retry_after: bool = True
     error_mapping: bool = True
     byte_cap: bool = True
+    embedding: bool = False
+    rerank: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,11 +142,23 @@ class ConformanceHarness:
     model: str
     build_client: Callable[[str], Awaitable[AsyncClient]]
     supports: Capabilities = Capabilities()
+    embedding_model: str | None = None
+    rerank_model: str | None = None
 
     @property
     def target(self) -> str:
         """The target string for this harness."""
         return f"{self.provider_id}:{self.model}"
+
+    @property
+    def embedding_target(self) -> str:
+        """The embedding target, falling back to the generation model."""
+        return f"{self.provider_id}:{self.embedding_model or self.model}"
+
+    @property
+    def rerank_target(self) -> str:
+        """The rerank target, falling back to the generation model."""
+        return f"{self.provider_id}:{self.rerank_model or self.model}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -391,6 +410,49 @@ async def _case_unknown_finish_reason(client: AsyncClient, h: ConformanceHarness
     )
 
 
+async def _case_embedding(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.embed(
+        ["alpha", "beta", "gamma"], target=h.embedding_target, input_type="document"
+    )
+    assert len(result.vectors) == 3, f"expected 3 vectors, got {len(result.vectors)}"
+    lengths = {len(vector) for vector in result.vectors}
+    assert len(lengths) == 1, f"vectors have inconsistent dimensions: {lengths}"
+    assert lengths.pop() > 0, "vectors are empty"
+    assert result.space.provider_id, "result carries no embedding-space provider"
+    assert result.space.model, "result carries no embedding-space model"
+
+
+async def _case_embedding_duplicates(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.embed(
+        ["same text", "same text", "different"], target=h.embedding_target, input_type="document"
+    )
+    assert len(result.vectors) == 3, "duplicate inputs were not preserved positionally"
+
+
+async def _case_rerank(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.rerank(
+        "which text is about the moon landing",
+        ["the moon landing happened in 1969", "a recipe for sourdough bread"],
+        target=h.rerank_target,
+    )
+    assert len(result.items) == 2, f"expected 2 ranked items, got {len(result.items)}"
+    scores = [item.score for item in result.items]
+    assert scores == sorted(scores, reverse=True), f"scores are not descending: {scores}"
+    assert {item.document_id for item in result.items} == {"0", "1"}, (
+        "caller document identity was not preserved"
+    )
+
+
+async def _case_rerank_top_n(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.rerank(
+        "which text is about the moon landing",
+        ["the moon landing happened in 1969", "a recipe for bread", "tax law"],
+        target=h.rerank_target,
+        top_n=1,
+    )
+    assert len(result.items) == 1, f"top_n=1 returned {len(result.items)} items"
+
+
 CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
     ConformanceCase("list_models", "default", "list_models", _case_list_models),
     ConformanceCase("health", "default", "health", _case_health),
@@ -415,6 +477,12 @@ CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
     ConformanceCase(
         "unknown_finish_reason", "odd_finish", "non_streaming", _case_unknown_finish_reason
     ),
+    ConformanceCase("embedding", "default", "embedding", _case_embedding),
+    ConformanceCase(
+        "embedding_duplicates", "default", "embedding", _case_embedding_duplicates
+    ),
+    ConformanceCase("rerank", "default", "rerank", _case_rerank),
+    ConformanceCase("rerank_top_n", "default", "rerank", _case_rerank_top_n),
 )
 """Every conformance case, in matrix order."""
 

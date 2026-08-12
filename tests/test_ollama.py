@@ -431,7 +431,9 @@ HARNESS = ConformanceHarness(
     provider_id="ollama",
     model="qwen3:8b",
     build_client=_build_client,
-    supports=Capabilities(),
+    # Rerank stays off: Ollama documents no rerank endpoint (contracts/ollama.md).
+    supports=Capabilities(embedding=True),
+    embedding_model="nomic-embed-text",
 )
 
 

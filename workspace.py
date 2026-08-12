@@ -1001,6 +1001,10 @@ _MATRIX_FOOTER = f"""
 | `retry_after` | A rate-limited attempt is retried and recorded. |
 | `byte_cap` | An oversized response is rejected rather than silently truncated. |
 | `unknown_finish_reason` | An unrecognized finish reason normalizes instead of crashing. |
+| `embedding` | One vector per input, uniform non-zero dimensions, a space identity. |
+| `embedding_duplicates` | Duplicate inputs come back positionally, never deduplicated. |
+| `rerank` | Rankings descend, and caller document identity survives the round trip. |
+| `rerank_top_n` | `top_n` truncates the ranking to the requested size. |
 
 ## Modes
 

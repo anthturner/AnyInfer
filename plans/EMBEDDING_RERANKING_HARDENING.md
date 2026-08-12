@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D, A, B, C, E, F, and G landed 2026-08-12 (see §19); H is next.
+> **Status:** in progress — Tracks D, A, B, C, E, F, G, and H landed 2026-08-12 (see §19); I is next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -554,25 +554,25 @@ docs move in one change.
 The 2026-08-11 pass wrote conventional pytest suites; the conformance *kit* — the shared
 parametrized harness third-party adapters run — was never extended.
 
-- [ ] **BH.H.1** Register embedding conformance cases in `anyinfer.testing.conformance`
+- [~] **BH.H.1** Register embedding conformance cases in `anyinfer.testing.conformance`
   (ER.11.1): scalar/batch ordering, duplicates, dimensions, float/base64 decode, usage,
   error mapping (already proven ad hoc — port them), plus the never-covered behaviors:
   input-intent translation, normalization metadata, byte caps, retry-after timing,
   cancellation.
-- [ ] **BH.H.2** Register rerank conformance cases (ER.11.2): index/id preservation,
+- [~] **BH.H.2** Register rerank conformance cases (ER.11.2): index/id preservation,
   descending finite scores, `top_n`, malformed indexes (port), plus
   duplicate-text-distinct-ids, byte caps, retry-after, cancellation.
-- [ ] **BH.H.3** Extend third-party certification manifests and scaffolding for
+- [~] **BH.H.3** Extend third-party certification manifests and scaffolding for
   operation-specific adapters (ER.2.7/ER.11.4): `testing/scaffold.py`, `testing/certify.py`,
   and the registry entry-point loader.
-- [ ] **BH.H.4** Operation-aware conformance matrix generation (ER.11.5) — one generated
+- [x] **BH.H.4** Operation-aware conformance matrix generation (ER.11.5) — one generated
   matrix or per-operation views; either way generated from descriptors so docs cannot
   overstate coverage (also closes ER.5.16).
-- [ ] **BH.H.5** Record sanitized cassettes for each implemented dialect (ER.11.15, via
+- [~] **BH.H.5** Record sanitized cassettes for each implemented dialect (ER.11.15, via
   `ANYINFER_RECORD_CASSETTES`) and stand up the opt-in live lanes (ER.11.16) — including
   a live lane for Ollama's embed endpoint (its 2026-08-11 verification was documentation
   research, not live traffic) and Cohere's once Track B lands (BH.B.13).
-- [ ] **BH.H.6** Extend drift-check coverage (`contracts/DRIFT-CHECK.md`) to the new wire
+- [x] **BH.H.6** Extend drift-check coverage (`contracts/DRIFT-CHECK.md`) to the new wire
   surfaces (ER.11.17) so `contracts/ollama.md`'s embeddings watchlist and
   `contracts/cohere.md`'s new sections are actually audited on the next drift pass.
 
@@ -987,3 +987,27 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   which is `override` by definition), so the tag would distinguish nothing; it becomes
   meaningful the day a config/catalog equivalence source exists, and is deferred until
   then.
+- **2026-08-12 (Track H — delivered and tested):** Conformance kit extended to the new
+  operations. `Capabilities` gains `embedding`/`rerank` flags **defaulting False** (an
+  operation nobody declared skips as ➖ rather than failing every existing harness);
+  `ConformanceHarness` gains `embedding_model`/`rerank_model` overrides; four cases
+  registered (`embedding`, `embedding_duplicates`, `rerank`, `rerank_top_n`) and
+  enabled on the Cohere harness (fake server taught `/v2/embed` + `/v2/rerank`) and the
+  Ollama harness (embedding only — Ollama documents no rerank endpoint;
+  `FakeOllamaServer` taught `/api/embed`). The generated conformance matrix gains the
+  four columns automatically plus footer descriptions; regenerated. **Real sanitized
+  cassettes recorded and committed** (`tests/cassettes/cohere_{embed,rerank}.json`,
+  recorded live 2026-08-12 with the trial key, replayed offline in CI, verified free of
+  credentials) — the repo's first committed cassettes. Recording surfaced and fixed a
+  real `CassetteTransport` bug: `aread()` returns decoded bytes but content-encoding/
+  length headers were kept, double-decompressing every gzip response — recording against
+  any real compressed endpoint was broken until now (the fake servers never compress,
+  which is why it never bit). Scaffold's conformance-table template documents the
+  opt-in flags with the default-False caveat. BH.H.6 verified: `DRIFT-CHECK.md` is
+  snapshot-generic (it fetches every URL under each contract's Upstream sources), so
+  the new cohere embed/rerank sections are drift-audited by construction. Still open
+  (`[~]`): harness-registered cases for intent translation, normalization metadata,
+  byte caps, retry-after, and cancellation (covered today as conventional pytest,
+  BH.H.1/H.2); certification-manifest/entry-point extensions beyond the scaffold
+  comment (BH.H.3); an Ollama live lane (BH.H.5 — its 2026-08-11 verification remains
+  documentation research).

@@ -151,18 +151,26 @@ class CassetteTransport(httpx2.AsyncBaseTransport):
         response = await inner.handle_async_request(request)
         body = await response.aread()
         await response.aclose()
+        # `aread()` returns *decoded* bytes, so the content-transformation headers no
+        # longer describe the body we hold — keeping them would make every consumer
+        # (including the re-wrapped response below) try to decompress plain text.
+        headers = {
+            k: v
+            for k, v in response.headers.items()
+            if k.lower() not in ("content-encoding", "content-length", "transfer-encoding")
+        }
         self._cassette.append(
             Interaction(
                 method=request.method,
                 url=str(request.url),
                 request_body=request.content.decode("utf-8", errors="replace"),
                 status=response.status_code,
-                headers=dict(response.headers),
+                headers=headers,
                 body=body.decode("utf-8", errors="replace"),
             )
         )
         return httpx2.Response(
-            response.status_code, headers=response.headers, content=body, request=request
+            response.status_code, headers=headers, content=body, request=request
         )
 
     def _replay(self, request: httpx2.Request) -> httpx2.Response:

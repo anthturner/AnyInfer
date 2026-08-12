@@ -457,6 +457,18 @@ class FakeOllamaServer:
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
+        if path.endswith("/api/embed"):
+            body = json.loads(request.content or b"{}")
+            raw_input = body.get("input", [])
+            inputs = raw_input if isinstance(raw_input, list) else [raw_input]
+            return httpx2.Response(
+                200,
+                json={
+                    "model": body.get("model", ""),
+                    "embeddings": [[0.1, 0.2, 0.3, 0.4] for _ in inputs],
+                    "prompt_eval_count": len(inputs),
+                },
+            )
         if path.endswith("/api/tags"):
             return httpx2.Response(
                 200,

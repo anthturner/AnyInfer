@@ -431,6 +431,30 @@ def _cohere_server(scenario: str) -> Any:
                     ]
                 },
             )
+        if request.url.path.endswith("/v2/embed"):
+            texts = json.loads(request.content)["texts"]
+            return httpx2.Response(
+                200,
+                json={
+                    "embeddings": {"float": [[0.1, 0.2, 0.3] for _ in texts]},
+                    "meta": {"tokens": {"input_tokens": len(texts)}},
+                },
+            )
+        if request.url.path.endswith("/v2/rerank"):
+            body = json.loads(request.content)
+            ranked = [
+                {"index": i, "relevance_score": 1.0 - i * 0.4}
+                for i in range(len(body["documents"]))
+            ]
+            if body.get("top_n") is not None:
+                ranked = ranked[: body["top_n"]]
+            return httpx2.Response(
+                200,
+                json={
+                    "results": ranked,
+                    "meta": {"billed_units": {"search_units": 1}},
+                },
+            )
         calls = state["calls"]
         state["calls"] += 1
         streaming = json.loads(request.content or b"{}").get("stream")
@@ -563,7 +587,9 @@ HARNESS = ConformanceHarness(
     model="command-a",
     build_client=_build_cohere_client,
     # The fake has no thinking channel of its own; the dialect test above covers it.
-    supports=Capabilities(reasoning=False),
+    supports=Capabilities(reasoning=False, embedding=True, rerank=True),
+    embedding_model="embed-english-light-v3.0",
+    rerank_model="rerank-v3.5",
 )
 
 
