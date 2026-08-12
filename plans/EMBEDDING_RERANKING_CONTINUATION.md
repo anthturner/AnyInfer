@@ -112,7 +112,7 @@ python scripts/generate_provider_index.py     # docs/providers/all.md (after add
 
 ## 5. Remaining tasks, in recommended order
 
-### T1 — Azure OpenAI / AI Foundry embeddings (BH.I.3)
+### T1 — Azure OpenAI / AI Foundry embeddings (BH.I.3) — DONE 2026-08-12
 
 `providers/azure_foundry.py` exists (generation): deployment-addressed paths and
 `api-version` pinning; raises ConfigError when the `[azure]` extra is missing (:40, :81).
@@ -387,3 +387,14 @@ feature-complete bar:
 - **2026-08-12:** Handoff written; predecessor tracker deleted with its record
   preserved in git history (last version at `4e1802e`). Nothing implemented under this
   plan yet — T1 (Azure embeddings) is next.
+- **2026-08-12:** T1 delivered and tested (`a4afa7e`). `AzureFoundryAdapter` composes
+  `OpenAICompatEmbeddingsMixin`; `embeddings_path` carries `api-version` the same way
+  `chat_path`/`models_path` already did. Verified live against
+  learn.microsoft.com/azure/ai-foundry/openai/how-to/embeddings (fetched 2026-08-12):
+  v1 surface is `POST {base_url}/embeddings`, deployment-addressed via `model` exactly
+  like chat — no Azure-specific body fields. Limits (2,048 inputs / 8,192 tokens-input /
+  300k tokens-aggregate) match OpenAI's own and are documented in the contract and
+  provider docs, but explicitly **not** declared as `static_embedding_capabilities`
+  since Azure model ids are tenant-chosen deployment names, not a fixed catalog —
+  keying static limits by an unknowable id would be a silent wrong answer. All gates
+  green. T2 (Vertex AI) is next.
