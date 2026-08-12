@@ -179,7 +179,7 @@ upstream that `/v1/embeddings` exists (start with together/fireworks/mistral/dee
 `contracts/openai-compat-presets.md` with dates, and enable only the verified ones.
 Unverified presets stay generation-only (the correct default).
 
-### T6 — Pricing pipeline entries (Track E remainder, BH.E.2)
+### T6 — Pricing pipeline entries (Track E remainder, BH.E.2) — mechanism DONE 2026-08-12, data entries still open
 
 Mechanism is DONE (`Pricing.per_search_unit`, `compute_operation_cost`); what's missing
 is data + parsing:
@@ -444,3 +444,18 @@ feature-complete bar:
   deliberately remains generation-only, including ones whose underlying engine (vLLM,
   etc.) is known to serve embeddings in general — a specific deployment can't be verified
   from a static table. All gates green. T6 (pricing pipeline) is next.
+- **2026-08-12:** T6 partially delivered and tested (`0413bd6`) — mechanism only.
+  `_parse_entry` in `pricing_table.py` now reads an optional `per_search_unit` field
+  (same non-negative-decimal-string validation as the token rates); `Pricing` and
+  `compute_operation_cost` already had the plumbing from the prior session, so this
+  closes the one actual gap. **Explicitly not done: the data entries.** Every pricing
+  source the item named was unreachable this session — openai.com/api/pricing and
+  help.openai.com 403'd, and cohere.com/pricing, voyageai.com, and jina.ai render their
+  price figures through client-side JS the available fetch tooling could not execute
+  (confirmed by dumping raw HTML and grepping for `$`/`per million`/`search unit` — the
+  numbers genuinely are not in the served document). Copying the plan's own
+  "prices observed 2026-08-12" figures without independently re-verifying them would be
+  exactly the kind of unverified copy the plan's own instructions warn against ("VERIFY,
+  do not assume" appears throughout this file for a reason), so pricing.json is
+  untouched. A session with working browser-rendered fetch (or the owner supplying the
+  numbers directly) can complete this in minutes once the mechanism exists.
