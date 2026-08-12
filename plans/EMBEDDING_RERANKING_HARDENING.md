@@ -1075,3 +1075,19 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   Contract snapshot + watchlist + provider docs page updated; 7 wire/e2e tests. Gates
   all clean. Remaining in BH.I.3: Azure, Vertex, Bedrock, LM Studio, llama-server,
   Voyage, Jina.
+- **2026-08-12 (Track I — fourth increment, delivered and tested):** Voyage AI — the
+  hosted retrieval-only specialist (ER.5.12). Verified live (docs.voyageai.com
+  embeddings + reranker references, 2026-08-12): OpenAI-*shaped* but not compatible
+  where it matters (`input_type`, `output_dimension`, rerank's `top_k`, no listing
+  endpoint), so a dedicated adapter. Embeddings: 1,000-input ceiling declared for all
+  nine documented models; only `query`/`document` intents exist — the other two are
+  never sent and warn via declared capabilities; entries are ordered by their reported
+  index with out-of-range/duplicate indexes rejected; usage is `total_tokens` only,
+  never assumed into `input_tokens`. Rerank: the 1,000-document limit is a **hard cap**
+  (not a recommendation like Cohere's); `top_n` translates to `top_k`; positional
+  indexes map back to caller indexes. `list_models()` is honestly empty (no listing
+  API exists — reporting the static set would fake `discovered` provenance) and
+  `health()` is a labeled reachability probe. Contract snapshot with explicit
+  unverified markers (error-body shape, per-model dimensions) + watchlist; provider
+  docs page; 7 wire/e2e tests. Gates all clean. Remaining in BH.I.3: Azure, Vertex,
+  Bedrock, LM Studio, llama-server, Jina.

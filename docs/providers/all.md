@@ -5,7 +5,7 @@ icon: material/format-list-bulleted
 # Every provider
 
 This is AnyInfer's compatibility inventory, not its primary value proposition:
-**104 providers** comprising 18 dedicated adapters with provider-specific
+**105 providers** comprising 19 dedicated adapters with provider-specific
 behavior and 86 presets over the shared OpenAI-compatible adapter. Each is a
 first-class target prefix: `groq:`, `vllm:`, `bedrock:`.
 
@@ -51,6 +51,7 @@ own adapter and guide.
 | [OpenRouter](openrouter.md) | `openrouter:` | Hosted | Router across upstreams, discovered per-model pricing |
 | [Text Embeddings Inference](tei.md) | `tei:` / `text-embeddings-inference:` | Local | Local embeddings and reranking; retrieval-only, one model per server |
 | [Google Vertex AI](vertex.md) | `vertex:` / `vertex-ai:` / `google-vertex:` | Hosted | Gemini with GCP auth; project-scoped addressing |
+| [Voyage AI](voyage.md) | `voyage:` / `voyageai:` | Hosted | Specialist embeddings and reranking; query/document intents |
 | [xAI (Grok)](xai.md) | `xai:` / `grok:` | Hosted | Provider-reported cost, discovered pricing |
 
 ## Presets
