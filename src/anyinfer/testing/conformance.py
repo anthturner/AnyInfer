@@ -453,6 +453,38 @@ async def _case_rerank_top_n(client: AsyncClient, h: ConformanceHarness) -> None
     assert len(result.items) == 1, f"top_n=1 returned {len(result.items)} items"
 
 
+async def _case_rerank_duplicate_text(client: AsyncClient, h: ConformanceHarness) -> None:
+    """Identical document text under distinct caller ids must not collapse.
+
+    A rerank implementation that deduplicates by text (rather than treating each caller
+    document as independently identified) would silently drop one of two otherwise
+    distinct entries — the id is the identity, never the text.
+    """
+    from ..types.operations import RerankDocument
+
+    result = await client.rerank(
+        "which text is about the moon landing",
+        [
+            RerankDocument(id="first", text="the moon landing happened in 1969"),
+            RerankDocument(id="second", text="the moon landing happened in 1969"),
+        ],
+        target=h.rerank_target,
+    )
+    assert len(result.items) == 2, (
+        f"expected 2 ranked items for 2 distinct ids, got {len(result.items)}"
+    )
+    assert {item.document_id for item in result.items} == {"first", "second"}, (
+        "duplicate-text documents lost their distinct caller-assigned ids"
+    )
+
+
+async def _case_embedding_normalization_probe(client: AsyncClient, h: ConformanceHarness) -> None:
+    """`probe_embedding()` must measure real dimensions from one small live call."""
+    report = await client.probe_embedding(target=h.embedding_target, record=False)
+    assert report.dimensions > 0, "probed dimensions must be positive"
+    assert isinstance(report.normalized, bool), "normalization must be a measured bool"
+
+
 CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
     ConformanceCase("list_models", "default", "list_models", _case_list_models),
     ConformanceCase("health", "default", "health", _case_health),
@@ -483,6 +515,15 @@ CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
     ),
     ConformanceCase("rerank", "default", "rerank", _case_rerank),
     ConformanceCase("rerank_top_n", "default", "rerank", _case_rerank_top_n),
+    ConformanceCase(
+        "rerank_duplicate_text", "default", "rerank", _case_rerank_duplicate_text
+    ),
+    ConformanceCase(
+        "embedding_normalization_probe",
+        "default",
+        "embedding",
+        _case_embedding_normalization_probe,
+    ),
 )
 """Every conformance case, in matrix order."""
 
