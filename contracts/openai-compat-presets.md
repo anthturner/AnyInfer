@@ -177,11 +177,19 @@ one.
   from non-reasoning models). Docs pages loaded did not state a separate billing rate for
   reasoning tokens (they are counted in token usage; no separate reasoning price published on
   the pricing page).
+- Embeddings (verified live 2026-08-12, docs.together.ai/reference/embeddings):
+  `POST /v1/embeddings`, `model`/`input` request, `data[].embedding`/`model`/`object`
+  response. **No `usage` block documented** — `embed()` results carry no usage for this
+  preset. Listed models: WhereIsAI/UAE-Large-V1, BAAI/bge-large-en-v1.5,
+  BAAI/bge-base-en-v1.5, togethercomputer/m2-bert-80M-8k-retrieval. Declared in
+  `presets.py` as `embeddings=True`; wire mapping is otherwise the unmodified shared
+  `openai_compat_embeddings.py` dialect.
 - Sources (verified 2026-08-07):
   - https://docs.together.ai/docs/openai-api-compatibility
   - https://www.together.ai/pricing
   - https://docs.together.ai/reference/models-1
   - https://docs.together.ai/docs/serverless-models
+  - https://docs.together.ai/reference/embeddings (embeddings, verified 2026-08-12)
 
 ## fireworks — Fireworks AI
 
@@ -221,6 +229,13 @@ one.
   reasoning context across turns. On the Anthropic-compatible endpoint, thinking is exposed as
   content blocks with block.type == 'thinking'. Reasoning tokens are part of normal output token
   usage; no separate reasoning price published on the serverless pricing page.
+- Embeddings (verified live 2026-08-12, docs.fireworks.ai): `POST /v1/embeddings` under
+  the same `/inference/v1` root as chat; `model`/`input` request, response carries
+  `data`/`model`/`usage` — fully OpenAI-shaped, unlike Together's usage-less response.
+  Documented model: `nomic-ai/nomic-embed-text-v1.5` (8,192 tokens, configurable output
+  dimensions — but the shared dialect only forwards `dimensions`, not any
+  Fireworks-specific dimension parameter name, since none was found in the fetched
+  content; verify before relying on dimension truncation). Declared `embeddings=True`.
 - Sources (verified 2026-08-07):
   - https://docs.fireworks.ai/tools-sdks/openai-compatibility
   - https://docs.fireworks.ai/serverless/pricing
@@ -228,6 +243,8 @@ one.
   - https://docs.fireworks.ai/guides/querying-text-models
   - https://docs.fireworks.ai/api-reference/post-chatcompletions
   - https://docs.fireworks.ai/api-reference/anthropic-messages
+  - https://docs.fireworks.ai/api-reference/creates-an-embedding-vector-representing-the-input-text
+    (embeddings, verified 2026-08-12)
 
 ## deepinfra — DeepInfra
 
@@ -258,6 +275,13 @@ one.
   produce a reasoning trace alongside the response by default; model API docs show it on
   assistant messages as reasoning_content (OpenAI-compatible format). Billing: 'Reasoning tokens
   count toward output token billing.' Params are no-ops on non-reasoning models.
+- Embeddings (verified live 2026-08-12, docs.deepinfra.com/apis/embeddings):
+  `POST https://api.deepinfra.com/v1/openai/embeddings` — under the preset's existing
+  base URL, so the shared dialect's default `{base}/embeddings` path resolves correctly
+  with no override needed. `model`/`input`/`encoding_format` ("float" only) request;
+  `data[].embedding`/`model`/`usage.prompt_tokens` response. Models: Qwen3 Embedding
+  family, BAAI/bge, sentence-transformers, and more (browse the models page). Declared
+  `embeddings=True`.
 - Sources (verified 2026-08-07):
   - https://docs.deepinfra.com/chat/overview
   - https://docs.deepinfra.com/chat/streaming
@@ -265,6 +289,7 @@ one.
   - https://docs.deepinfra.com/integrations/anthropic
   - https://docs.deepinfra.com/api-reference/models/models-list
   - https://deepinfra.com/pricing
+  - https://docs.deepinfra.com/apis/embeddings (embeddings, verified 2026-08-12)
 
 ## novita — Novita AI
 
@@ -377,6 +402,18 @@ one.
   model. No separate reasoning-token billing or separate reasoning delta field is documented —
   no reasoning_content-style channel appears in the chat completions reference, so assume
   reasoning is billed as normal output tokens until docs say otherwise.
+- Embeddings (verified live 2026-08-12, docs.mistral.ai/api/endpoint/embeddings):
+  `POST /v1/embeddings`, model `mistral-embed`. `model`/`input` request as usual, plus
+  Mistral-specific extras beyond the shared dialect: `output_dimension` (int, **not**
+  the shared dialect's `dimensions` field name — a `dimensions=` request through
+  `client.embed()` is therefore silently ignored on the wire for this preset; use
+  `provider_options={"mistral": {"output_dimension": N}}`), `output_dtype`
+  (float/int8/uint8/binary/ubinary), `encoding_format` (float/base64), `metadata`.
+  Response: `data[].{embedding,index,object}`, `model`, `usage`. Max inputs per request
+  and default dimensionality were not stated in the fetched content — not assumed.
+  Declared `embeddings=True` despite the field-name mismatch, since the base wire shape
+  (model/input in, data[].embedding out) still works; only native dimension truncation
+  needs the escape hatch.
 - Sources (verified 2026-08-07):
   - https://docs.mistral.ai/api/
   - https://mistral.ai/pricing/
@@ -384,6 +421,7 @@ one.
   - https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04
   - https://docs.mistral.ai/models/model-cards/mistral-large-3-25-12
   - https://docs.mistral.ai/models/model-cards/codestral-25-08
+  - https://docs.mistral.ai/api/endpoint/embeddings (embeddings, verified 2026-08-12)
 
 ## perplexity — Perplexity Sonar
 

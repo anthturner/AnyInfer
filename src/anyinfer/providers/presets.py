@@ -38,11 +38,13 @@ from ..types.capabilities import Feature, Health, ModelCapabilities, Sourced
 from ..types.requests import ReasoningEffort
 from .base import ProviderConfig, WireRequest
 from .openai_compat import OpenAICompatAdapter
+from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 
 __all__ = [
     "COMPAT_PRESETS",
     "CompatPreset",
     "PresetCompatAdapter",
+    "PresetEmbeddingAdapter",
     "ReasoningStyle",
     "preset_descriptors",
 ]
@@ -109,6 +111,11 @@ class CompatPreset:
             same documentation-only rule.
         default_port: Port used by the local host shorthand (``myhost`` →
             ``http://myhost:PORT``).
+        embeddings: Whether this preset's `/v1/embeddings` endpoint has been verified
+            against the provider's own documentation (contract snapshot,
+            `contracts/openai-compat-presets.md`) — **not** inferred from chat
+            compatibility. Off by default: an unverified preset is generation-only, the
+            correct default per the plan (BH.I.2) rather than an optimistic guess.
         note: One-line quirk summary, rendered into the generated provider index.
     """
 
@@ -132,6 +139,7 @@ class CompatPreset:
     default_temperature: float | None = None
     default_top_p: float | None = None
     default_port: int | None = None
+    embeddings: bool = False
     note: str = ""
 
 
@@ -176,6 +184,16 @@ class PresetCompatAdapter(OpenAICompatAdapter):
         if not self._preset.models_listing:
             return Health(ok=True, detail="no cheap readiness probe; failures surface on use")
         return await super().health()
+
+
+class PresetEmbeddingAdapter(OpenAICompatEmbeddingsMixin, PresetCompatAdapter):
+    """A preset adapter whose provider has a verified `/v1/embeddings` endpoint.
+
+    A separate class rather than a flag on `PresetCompatAdapter`: the embeddings mixin
+    must never apply to a preset that hasn't been verified to speak it, and a distinct
+    factory type makes that opt-in structural rather than a runtime check that could
+    silently pass for the wrong preset.
+    """
 
 
 def _translate_effort(effort: ReasoningEffort | None) -> Mapping[str, Any]:
@@ -272,7 +290,11 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         key_env="TOGETHER_API_KEY",
         features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE | Feature.REASONING,
         reasoning="effort-min-low",
-        note="Large open-model catalog; org/model ids (e.g. deepseek-ai/…).",
+        embeddings=True,
+        note="Large open-model catalog; org/model ids (e.g. deepseek-ai/…). "
+        "/v1/embeddings verified 2026-08-12 (docs.together.ai/reference/embeddings); "
+        "response carries no usage block, so embed() usage stays unset for this "
+        "provider.",
     ),
     CompatPreset(
         id="fireworks",
@@ -282,8 +304,11 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         key_env="FIREWORKS_API_KEY",
         features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE | Feature.REASONING,
         reasoning="effort",
+        embeddings=True,
         note="Model ids look like accounts/fireworks/models/…; over-long max_tokens is "
-        "silently truncated unless context_length_exceeded_behavior='error'.",
+        "silently truncated unless context_length_exceeded_behavior='error'. "
+        "/v1/embeddings verified 2026-08-12 (docs.fireworks.ai), OpenAI-shaped "
+        "including usage.",
     ),
     CompatPreset(
         id="deepinfra",
@@ -292,7 +317,10 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         key_env="DEEPINFRA_API_KEY",
         features=_DEFAULT_FEATURES | Feature.JSON_MODE | Feature.REASONING,
         reasoning="effort-min-low",
-        note="Pay-per-token open models; service_tier extension for priority/flex.",
+        embeddings=True,
+        note="Pay-per-token open models; service_tier extension for priority/flex. "
+        "/v1/openai/embeddings verified 2026-08-12 (docs.deepinfra.com/apis/embeddings), "
+        "OpenAI-shaped including usage.prompt_tokens.",
     ),
     CompatPreset(
         id="novita",
@@ -439,7 +467,13 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         key_env="MISTRAL_API_KEY",
         features=_DEFAULT_FEATURES | Feature.JSON_SCHEMA | Feature.JSON_MODE | Feature.REASONING,
         reasoning="effort",
-        note="Uses random_seed instead of seed; safe_prompt via provider_options.",
+        embeddings=True,
+        note="Uses random_seed instead of seed; safe_prompt via provider_options. "
+        "/v1/embeddings (mistral-embed) verified 2026-08-12 (docs.mistral.ai) — but "
+        "its dimensionality parameter is spelled output_dimension, not the shared "
+        "dialect's dimensions, so requesting dimensions= on this preset is silently "
+        "ignored on the wire; use provider_options={'mistral': {'output_dimension': "
+        "N}} instead.",
     ),
     CompatPreset(
         id="perplexity",
@@ -1271,14 +1305,20 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
 
 def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
     """Materialize one preset into a registrable descriptor."""
+    adapter_class = PresetEmbeddingAdapter if preset.embeddings else PresetCompatAdapter
     return ProviderDescriptor(
         id=preset.id,
         display_name=preset.display_name,
         aliases=preset.aliases,
-        factory=partial(PresetCompatAdapter, preset=preset),
+        factory=partial(adapter_class, preset=preset),
         locality=preset.locality,
         default_base_url=preset.base_url,
         requires_base_url=preset.requires_base_url,
+        operations=(
+            frozenset({"generation", "embedding"})
+            if preset.embeddings
+            else frozenset({"generation"})
+        ),
         setup=_setup_spec(preset),
         default_capabilities=ModelCapabilities(
             features=Sourced(preset.features, "default"),

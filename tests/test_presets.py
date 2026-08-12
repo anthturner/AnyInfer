@@ -12,6 +12,7 @@ from anyinfer.providers.presets import (
     COMPAT_PRESETS,
     CompatPreset,
     PresetCompatAdapter,
+    PresetEmbeddingAdapter,
     preset_descriptors,
 )
 from anyinfer.registry import ProviderRegistry
@@ -499,3 +500,73 @@ def test_regional_presets_declare_no_model_listing() -> None:
     """
     for preset_id in ("volcengine", "hunyuan", "spark"):
         assert PRESETS_BY_ID[preset_id].models_listing is False, preset_id
+
+
+# ---- embeddings (T5: verified-only opt-in) --------------------------------------------
+
+
+def _embedding_adapter(preset_id: str, handler, **config_kwargs) -> PresetEmbeddingAdapter:
+    from anyinfer.providers.base import ProviderConfig
+
+    preset = PRESETS_BY_ID[preset_id]
+    assert preset.embeddings, f"{preset_id} has not been verified for embeddings"
+    return PresetEmbeddingAdapter(
+        ProviderConfig(
+            provider_id=preset_id,
+            base_url=preset.base_url or "https://fake.invalid/v1",
+            transport=httpx2.MockTransport(handler),
+            **config_kwargs,
+        ),
+        preset=preset,
+    )
+
+
+def test_only_the_verified_four_presets_declare_embeddings() -> None:
+    """Unverified presets stay generation-only — the correct default (plan BH.I.2)."""
+    embedding_ids = {p.id for p in COMPAT_PRESETS if p.embeddings}
+    assert embedding_ids == {"together", "fireworks", "mistral", "deepinfra"}
+
+
+def test_embedding_presets_declare_the_operation_and_adapter() -> None:
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    for preset_id in ("together", "fireworks", "mistral", "deepinfra"):
+        descriptor = registry.get(preset_id)
+        assert descriptor.operations == frozenset({"generation", "embedding"})
+    for preset_id in ("groq", "cerebras"):
+        descriptor = registry.get(preset_id)
+        assert descriptor.operations == frozenset({"generation"})
+
+
+async def test_a_verified_preset_embeds_through_the_shared_dialect() -> None:
+    seen: list[dict] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(json.loads(request.content))
+        return httpx2.Response(
+            200,
+            json={
+                "data": [{"index": 0, "embedding": [0.1, 0.2]}],
+                "model": "togethercomputer/m2-bert-80M-8k-retrieval",
+            },
+        )
+
+    adapter = _embedding_adapter("together", handler, api_key="k")
+    try:
+        from anyinfer.providers.base import EmbeddingWireRequest
+
+        result = await adapter.embed(
+            EmbeddingWireRequest(
+                model="togethercomputer/m2-bert-80M-8k-retrieval", inputs=("hi",)
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0]["model"] == "togethercomputer/m2-bert-80M-8k-retrieval"
+    assert result.vectors[0] == pytest.approx((0.1, 0.2))
+
+
+def test_an_unverified_preset_has_no_embed_method() -> None:
+    """A PresetCompatAdapter has no embed() at all — the structural opt-in guard."""
+    assert not hasattr(PresetCompatAdapter, "embed")
+    assert hasattr(PresetEmbeddingAdapter, "embed")
