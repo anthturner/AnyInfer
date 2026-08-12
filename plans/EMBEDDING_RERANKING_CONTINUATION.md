@@ -168,7 +168,7 @@ response shape. Then: compose `OpenAICompatEmbeddingsMixin` onto the llama-cpp a
 write a native `embed()`; declare operations; extend `contracts/llama-cpp.md` with a
 LIVE-verified section (this one can genuinely say so).
 
-### T5 — Preset embedding verification (BH.I.2)
+### T5 — Preset embedding verification (BH.I.2) — DONE 2026-08-12 (four presets)
 
 **Discovery step (real, ~15 min):** read `providers/presets.py` to learn what a
 `CompatPreset` carries and how `preset_descriptors()` builds factories — the mechanical
@@ -430,3 +430,17 @@ feature-complete bar:
   shape from documentation would violate the task's own stated gate, so it is left
   undone rather than shipped unverified. Skipping to T5, which is pure discovery/research
   and needs no live server.
+- **2026-08-12:** T5 delivered and tested (`63a3e74`). Read `presets.py` first (the
+  discovery step the plan called for): the mechanical opt-in question resolved to a new
+  `CompatPreset.embeddings: bool` field plus a distinct `PresetEmbeddingAdapter` class
+  (mixes `OpenAICompatEmbeddingsMixin` onto the shared adapter) — structural rather than
+  a runtime check, so an unverified preset has no `embed()` method to accidentally call.
+  Verified all four candidates the plan named (together/fireworks/mistral/deepinfra) live
+  against their own docs and enabled every one — no false negatives. Recorded per-preset
+  wire quirks rather than assuming uniformity: Together's response has no `usage` block;
+  Mistral's dimension control is `output_dimension`, not the shared dialect's
+  `dimensions`, so `dimensions=` silently no-ops there and both the contract and the
+  provider docs page say so with the escape-hatch workaround. Every other preset
+  deliberately remains generation-only, including ones whose underlying engine (vLLM,
+  etc.) is known to serve embeddings in general — a specific deployment can't be verified
+  from a static table. All gates green. T6 (pricing pipeline) is next.
