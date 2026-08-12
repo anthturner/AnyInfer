@@ -101,6 +101,11 @@ class Capabilities:
         retry_after: Rate limiting surfaces as a retryable, recorded attempt.
         error_mapping: Provider failures map to typed errors with a correct retry flag.
         byte_cap: An oversized response is rejected rather than silently truncated.
+        embedding: `embed()` returns ordered, uniform, finite vectors. Defaults to
+            ``False`` — most adapters generate only, and an operation nobody declared
+            must skip rather than fail.
+        rerank: `rerank()` returns descending, identity-preserving rankings. Defaults to
+            ``False`` for the same reason.
     """
 
     list_models: bool = True
@@ -116,6 +121,8 @@ class Capabilities:
     retry_after: bool = True
     error_mapping: bool = True
     byte_cap: bool = True
+    embedding: bool = False
+    rerank: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,11 +142,23 @@ class ConformanceHarness:
     model: str
     build_client: Callable[[str], Awaitable[AsyncClient]]
     supports: Capabilities = Capabilities()
+    embedding_model: str | None = None
+    rerank_model: str | None = None
 
     @property
     def target(self) -> str:
         """The target string for this harness."""
         return f"{self.provider_id}:{self.model}"
+
+    @property
+    def embedding_target(self) -> str:
+        """The embedding target, falling back to the generation model."""
+        return f"{self.provider_id}:{self.embedding_model or self.model}"
+
+    @property
+    def rerank_target(self) -> str:
+        """The rerank target, falling back to the generation model."""
+        return f"{self.provider_id}:{self.rerank_model or self.model}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,9 +221,7 @@ async def _case_non_streaming(client: AsyncClient, h: ConformanceHarness) -> Non
     result = await client.generate("Say hello.", target=h.target)
     assert result.text, "a non-streaming generation must produce text"
     assert result.target.provider_id == h.provider_id
-    assert result.finish_reason in {
-        "stop", "length", "tool_calls", "content_filter", "other"
-    }
+    assert result.finish_reason in {"stop", "length", "tool_calls", "content_filter", "other"}
 
 
 async def _case_streaming(client: AsyncClient, h: ConformanceHarness) -> None:
@@ -233,12 +250,11 @@ async def _case_event_ordering(client: AsyncClient, h: ConformanceHarness) -> No
     )
 
     content_types = (TextDelta, ReasoningDelta, ToolCallDelta)
-    first_content = next(
-        (i for i, e in enumerate(events) if isinstance(e, content_types)), None
-    )
+    first_content = next((i for i, e in enumerate(events) if isinstance(e, content_types)), None)
     if first_content is not None:
         first_tokens = [
-            i for i, e in enumerate(events)
+            i
+            for i, e in enumerate(events)
             if isinstance(e, TimingMark) and e.name == "first_token"
         ]
         assert len(first_tokens) == 1, "exactly one first_token mark (guarantee 2)"
@@ -248,9 +264,7 @@ async def _case_event_ordering(client: AsyncClient, h: ConformanceHarness) -> No
 
     failures = [i for i, e in enumerate(events) if isinstance(e, AttemptFailed)]
     if failures and first_content is not None:
-        assert max(failures) < first_content, (
-            "AttemptFailed events precede content (guarantee 1)"
-        )
+        assert max(failures) < first_content, "AttemptFailed events precede content (guarantee 1)"
 
 
 async def _case_ttft(client: AsyncClient, h: ConformanceHarness) -> None:
@@ -294,9 +308,7 @@ async def _case_usage_survives_streaming(client: AsyncClient, h: ConformanceHarn
 
 
 async def _case_tool_calls(client: AsyncClient, h: ConformanceHarness) -> None:
-    result = await client.generate(
-        "Look up the key 'alpha'.", target=h.target, tools=[PROBE_TOOL]
-    )
+    result = await client.generate("Look up the key 'alpha'.", target=h.target, tools=[PROBE_TOOL])
     assert result.tool_calls, "the provider must surface tool calls"
     call = result.tool_calls[0]
     assert call.id, "every tool call needs an id (synthesized if the provider omits one)"
@@ -393,9 +405,133 @@ async def _case_byte_cap(client: AsyncClient, h: ConformanceHarness) -> None:
 async def _case_unknown_finish_reason(client: AsyncClient, h: ConformanceHarness) -> None:
     """``finish_reason`` is an open enum; an unrecognized value must not break reassembly."""
     result = await client.generate("Say hello.", target=h.target)
-    assert result.finish_reason in {
-        "stop", "length", "tool_calls", "content_filter", "other"
-    }, "unknown finish reasons must normalize, not propagate"
+    assert result.finish_reason in {"stop", "length", "tool_calls", "content_filter", "other"}, (
+        "unknown finish reasons must normalize, not propagate"
+    )
+
+
+async def _case_embedding(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.embed(
+        ["alpha", "beta", "gamma"], target=h.embedding_target, input_type="document"
+    )
+    assert len(result.vectors) == 3, f"expected 3 vectors, got {len(result.vectors)}"
+    lengths = {len(vector) for vector in result.vectors}
+    assert len(lengths) == 1, f"vectors have inconsistent dimensions: {lengths}"
+    assert lengths.pop() > 0, "vectors are empty"
+    assert result.space.provider_id, "result carries no embedding-space provider"
+    assert result.space.model, "result carries no embedding-space model"
+
+
+async def _case_embedding_duplicates(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.embed(
+        ["same text", "same text", "different"], target=h.embedding_target, input_type="document"
+    )
+    assert len(result.vectors) == 3, "duplicate inputs were not preserved positionally"
+
+
+async def _case_rerank(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.rerank(
+        "which text is about the moon landing",
+        ["the moon landing happened in 1969", "a recipe for sourdough bread"],
+        target=h.rerank_target,
+    )
+    assert len(result.items) == 2, f"expected 2 ranked items, got {len(result.items)}"
+    scores = [item.score for item in result.items]
+    assert scores == sorted(scores, reverse=True), f"scores are not descending: {scores}"
+    assert {item.document_id for item in result.items} == {"0", "1"}, (
+        "caller document identity was not preserved"
+    )
+
+
+async def _case_rerank_top_n(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.rerank(
+        "which text is about the moon landing",
+        ["the moon landing happened in 1969", "a recipe for bread", "tax law"],
+        target=h.rerank_target,
+        top_n=1,
+    )
+    assert len(result.items) == 1, f"top_n=1 returned {len(result.items)} items"
+
+
+async def _case_rerank_duplicate_text(client: AsyncClient, h: ConformanceHarness) -> None:
+    """Identical document text under distinct caller ids must not collapse.
+
+    A rerank implementation that deduplicates by text (rather than treating each caller
+    document as independently identified) would silently drop one of two otherwise
+    distinct entries — the id is the identity, never the text.
+    """
+    from ..types.operations import RerankDocument
+
+    result = await client.rerank(
+        "which text is about the moon landing",
+        [
+            RerankDocument(id="first", text="the moon landing happened in 1969"),
+            RerankDocument(id="second", text="the moon landing happened in 1969"),
+        ],
+        target=h.rerank_target,
+    )
+    assert len(result.items) == 2, (
+        f"expected 2 ranked items for 2 distinct ids, got {len(result.items)}"
+    )
+    assert {item.document_id for item in result.items} == {"first", "second"}, (
+        "duplicate-text documents lost their distinct caller-assigned ids"
+    )
+
+
+async def _case_embedding_normalization_probe(client: AsyncClient, h: ConformanceHarness) -> None:
+    """`probe_embedding()` must measure real dimensions from one small live call."""
+    report = await client.probe_embedding(target=h.embedding_target, record=False)
+    assert report.dimensions > 0, "probed dimensions must be positive"
+    assert isinstance(report.normalized, bool), "normalization must be a measured bool"
+
+
+async def _case_embedding_byte_cap(client: AsyncClient, h: ConformanceHarness) -> None:
+    from ..errors import AllTargetsFailedError, StreamProtocolError
+
+    try:
+        await client.embed(
+            ["alpha"], target=h.embedding_target, input_type="document", max_response_bytes=64
+        )
+    except (AllTargetsFailedError, StreamProtocolError):
+        return
+    raise AssertionError(
+        "an oversized embedding response must be rejected, not truncated silently"
+    )
+
+
+async def _case_rerank_byte_cap(client: AsyncClient, h: ConformanceHarness) -> None:
+    from ..errors import AllTargetsFailedError, StreamProtocolError
+
+    try:
+        await client.rerank(
+            "which text is about the moon landing",
+            ["a document"],
+            target=h.rerank_target,
+            max_response_bytes=64,
+        )
+    except (AllTargetsFailedError, StreamProtocolError):
+        return
+    raise AssertionError("an oversized rerank response must be rejected, not truncated silently")
+
+
+async def _case_embedding_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.embed(["alpha"], target=h.embedding_target, input_type="document")
+    assert result.attempts, "the attempt trail must be populated"
+    retried = [a for a in result.attempts if a.outcome == "retried"]
+    assert retried, "a rate-limited embed attempt must be recorded as retried"
+    assert retried[0].error is not None
+    assert retried[0].error.retryable is True
+
+
+async def _case_rerank_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.rerank(
+        "which text is about the moon landing", ["doc a", "doc b"], target=h.rerank_target
+    )
+    assert result.attempts, "the attempt trail must be populated"
+    retried = [a for a in result.attempts if a.outcome == "retried"]
+    assert retried, "a rate-limited rerank attempt must be recorded as retried"
+    assert retried[0].error is not None
+    assert retried[0].error.retryable is True
 
 
 CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
@@ -422,6 +558,27 @@ CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
     ConformanceCase(
         "unknown_finish_reason", "odd_finish", "non_streaming", _case_unknown_finish_reason
     ),
+    ConformanceCase("embedding", "default", "embedding", _case_embedding),
+    ConformanceCase(
+        "embedding_duplicates", "default", "embedding", _case_embedding_duplicates
+    ),
+    ConformanceCase("rerank", "default", "rerank", _case_rerank),
+    ConformanceCase("rerank_top_n", "default", "rerank", _case_rerank_top_n),
+    ConformanceCase(
+        "rerank_duplicate_text", "default", "rerank", _case_rerank_duplicate_text
+    ),
+    ConformanceCase(
+        "embedding_normalization_probe",
+        "default",
+        "embedding",
+        _case_embedding_normalization_probe,
+    ),
+    ConformanceCase("embedding_byte_cap", "oversized", "embedding", _case_embedding_byte_cap),
+    ConformanceCase("rerank_byte_cap", "oversized", "rerank", _case_rerank_byte_cap),
+    ConformanceCase(
+        "embedding_retry_after", "rate_limited", "embedding", _case_embedding_retry_after
+    ),
+    ConformanceCase("rerank_retry_after", "rate_limited", "rerank", _case_rerank_retry_after),
 )
 """Every conformance case, in matrix order."""
 

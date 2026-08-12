@@ -67,9 +67,7 @@ def test_manifest_extension_is_opt_in_and_stock_body_is_unchanged() -> None:
     }
 
     stock = http.post("/v1/chat/completions", json=base).json()
-    extended = http.post(
-        "/v1/chat/completions", json={**base, "anyinfer_manifest": True}
-    ).json()
+    extended = http.post("/v1/chat/completions", json={**base, "anyinfer_manifest": True}).json()
 
     assert "anyinfer_manifest" not in stock
     manifest = extended.pop("anyinfer_manifest")
@@ -113,8 +111,10 @@ def test_target_grammar_works_as_a_model_string() -> None:
 
     response = http.post(
         "/v1/chat/completions",
-        json={"model": "openai-compat:some:model", "messages": [{"role": "user",
-                                                                 "content": "hi"}]},
+        json={
+            "model": "openai-compat:some:model",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
     )
     assert response.status_code == 200
     assert server.requests[0]["model"] == "some:model"
@@ -251,7 +251,8 @@ def test_streaming_produces_a_reconstructable_chunk_sequence() -> None:
     assert body.rstrip().endswith("data: [DONE]")
 
     finishes = [
-        c for c in chunks
+        c
+        for c in chunks
         if c.get("choices") and c["choices"][0].get("finish_reason")  # type: ignore[index,union-attr]
     ]
     assert len(finishes) == 1
@@ -294,7 +295,7 @@ def test_streaming_manifest_frame_precedes_done() -> None:
     ) as response:
         body = "".join(response.iter_text())
 
-    assert body.index('\"anyinfer_manifest\"') < body.index("data: [DONE]")
+    assert body.index('"anyinfer_manifest"') < body.index("data: [DONE]")
     frames = _parse_sse(body)
     manifest_frames = [frame for frame in frames if "anyinfer_manifest" in frame]
     assert len(manifest_frames) == 1
@@ -377,16 +378,22 @@ def test_bearer_token_is_enforced() -> None:
     body = {"model": "openai-compat:m", "messages": [{"role": "user", "content": "hi"}]}
 
     assert http.post("/v1/chat/completions", json=body).status_code == 401
-    assert http.post(
-        "/v1/chat/completions",
-        json=body,
-        headers={"authorization": "Bearer wrong-token-value"},
-    ).status_code == 401
-    assert http.post(
-        "/v1/chat/completions",
-        json=body,
-        headers={"authorization": "Bearer secret-token-value"},
-    ).status_code == 200
+    assert (
+        http.post(
+            "/v1/chat/completions",
+            json=body,
+            headers={"authorization": "Bearer wrong-token-value"},
+        ).status_code
+        == 401
+    )
+    assert (
+        http.post(
+            "/v1/chat/completions",
+            json=body,
+            headers={"authorization": "Bearer secret-token-value"},
+        ).status_code
+        == 200
+    )
 
 
 def test_models_also_requires_the_token() -> None:
@@ -398,15 +405,19 @@ def test_models_also_requires_the_token() -> None:
 # ---- unsupported surface -------------------------------------------------------------
 
 
-@pytest.mark.parametrize("path", ["/v1/embeddings", "/v1/images/generations", "/v1/audio"])
+@pytest.mark.parametrize("path", ["/v1/images/generations", "/v1/audio"])
 def test_unmodelled_endpoints_return_a_clear_404(path: str) -> None:
-    """AnyInfer models text generation only; the rest must say so plainly (§22)."""
+    """AnyInfer models text generation, embeddings, and reranking; the rest says so plainly.
+
+    ``/v1/embeddings`` moved out of this list once it became a real modeled endpoint
+    (see test_serve_embeddings.py) — it now 200s rather than 404ing.
+    """
     server = FakeOpenAIServer()
     http, _ = _client(server)
 
     response = http.post(path, json={})
     assert response.status_code == 404
-    assert "text generation only" in response.json()["error"]["message"]
+    assert "text generation, embeddings, and reranking only" in response.json()["error"]["message"]
 
 
 def test_missing_model_field_is_a_400() -> None:
@@ -626,9 +637,7 @@ def test_a_request_can_ask_for_compaction_the_gateway_did_not_configure() -> Non
     client, _ = _compaction_client(server)
     response = client.post(
         "/v1/chat/completions",
-        json=_oversized_body(
-            anyinfer_history={"mode": "proactive", "keep_recent": 1}
-        ),
+        json=_oversized_body(anyinfer_history={"mode": "proactive", "keep_recent": 1}),
     )
 
     assert response.status_code == 200
@@ -640,9 +649,7 @@ def test_a_request_can_refuse_the_gateways_policy() -> None:
     client, _ = _compaction_client(
         server, history=ai.HistoryPolicy(mode="proactive", keep_recent=1)
     )
-    response = client.post(
-        "/v1/chat/completions", json=_oversized_body(anyinfer_history=False)
-    )
+    response = client.post("/v1/chat/completions", json=_oversized_body(anyinfer_history=False))
 
     assert response.status_code >= 400, "the caller chose the error over a shortened history"
     assert not server.requests
@@ -658,3 +665,68 @@ def test_a_malformed_history_extension_is_a_400() -> None:
 
     assert response.status_code == 400
     assert "anyinfer_history" in response.text
+
+
+# ---- disconnect mid-stream releases the provider connection --------------------------
+
+
+class _FakeUnderlyingStream:
+    """Stands in for `AsyncStream`: yields scripted events, tracks whether it was closed."""
+
+    def __init__(self, events: list[object]) -> None:
+        self._events = iter(events)
+        self.closed = False
+
+    def __aiter__(self) -> _FakeUnderlyingStream:
+        return self
+
+    async def __anext__(self) -> object:
+        try:
+            return next(self._events)
+        except StopIteration:
+            raise StopAsyncIteration from None
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class _FakeStreamingClient:
+    """Stands in for `AsyncClient`: `.stream(...)` returns one scripted fake stream."""
+
+    def __init__(self, events: list[object]) -> None:
+        self.underlying = _FakeUnderlyingStream(events)
+
+    def stream(self, *args: object, **kwargs: object) -> _FakeUnderlyingStream:
+        return self.underlying
+
+
+async def test_client_disconnect_mid_stream_closes_the_provider_connection() -> None:
+    """ASGI closes the SSE generator on disconnect; the provider stream must follow.
+
+    Without an explicit close, the only thing that would eventually release the
+    upstream connection is garbage collection — not deterministic, and not something a
+    gateway serving real traffic can rely on. This drives `_stream_chunks` directly as
+    an async generator (the same object `StreamingResponse` iterates), consumes one
+    event, then closes it early exactly as Starlette does when a client disconnects.
+    """
+    from anyinfer.serve.app import _stream_chunks
+    from anyinfer.types.events import TextDelta
+
+    fake_client = _FakeStreamingClient([TextDelta("partial")])
+    request = ai.GenerationRequest(messages=(ai.user("hi"),))
+
+    generator = _stream_chunks(
+        fake_client,
+        "openai-compat:m",
+        request,
+        {},
+        completion_id="chatcmpl-test",
+        created=0,
+        model="openai-compat:m",
+    )
+    first = await generator.__anext__()
+    assert b"partial" in first
+
+    await generator.aclose()
+
+    assert fake_client.underlying.closed is True

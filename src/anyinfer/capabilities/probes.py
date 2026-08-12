@@ -2,7 +2,7 @@
 
 The catalog says what a model *should* support and discovery says what a provider *claims*.
 Neither is a measurement, and for the compatibility surface the difference matters most —
-eighty-six preset endpoints and every self-hosted OpenAI-compatible server inherit a
+the preset registry and every self-hosted OpenAI-compatible server inherit a
 descriptor's default feature set, which is a reasonable guess and nothing more. A server
 that accepts ``response_format`` and quietly ignores it looks identical to one that honors
 it, right up until a schema silently stops being enforced.
@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from ..types.capabilities import Feature, ModelCapabilities, Sourced
+from ..types.operations import EmbeddingCapabilities
 from ..types.requests import ResolvedTarget, ToolSpec
 from ..types.results import Mechanism, Usage
 
@@ -38,6 +39,7 @@ __all__ = [
     "PROBE_MAX_OUTPUT_TOKENS",
     "PROBE_SCHEMA",
     "PROBE_TOOL",
+    "EmbeddingProbeReport",
     "FeatureProbe",
     "ProbeOutcome",
     "ProbeReport",
@@ -160,6 +162,32 @@ class ProbeReport:
         return f"{self.target}: {'; '.join(parts) or 'nothing conclusive'}"
 
 
+@dataclass(frozen=True, slots=True)
+class EmbeddingProbeReport:
+    """What one tiny real embedding call measured about a target.
+
+    A measurement, not a claim: the dimensions are the length of a vector the provider
+    actually returned, and ``normalized`` is whether that vector's L2 norm measured 1.0
+    within tolerance. One sample cannot prove normalization *policy*, but a norm far
+    from 1.0 disproves it, and a norm of exactly 1.0 on real output is how every
+    normalized model presents — both directions earn ``probed`` provenance.
+
+    Attributes:
+        target: The resolved target the probe embedded against.
+        dimensions: Vector length the call returned.
+        normalized: Whether the sampled vector was unit-norm within 1e-3.
+        capabilities: The measured facts as an `EmbeddingCapabilities`, ready for the
+            probed layer.
+        usage: What the probe cost, as reported.
+    """
+
+    target: ResolvedTarget
+    dimensions: int
+    normalized: bool
+    capabilities: EmbeddingCapabilities
+    usage: Usage
+
+
 def mechanism_for(feature: Feature) -> Mechanism | None:
     """The structured-output mechanism a feature probe must force, if any.
 
@@ -178,7 +206,7 @@ def probe_prompt(feature: Feature) -> str:
     """The request text for one probe.
 
     Mechanical scaffolding for a library-owned operation, like the verification probe and
-    the repair re-prompt — never application prose.
+    the repair re-prompt; never application prose.
     """
     if feature is Feature.TOOLS:
         return "The user mentioned the colour blue. Record it with the tool provided."

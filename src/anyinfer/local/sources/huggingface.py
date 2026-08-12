@@ -244,7 +244,8 @@ class HuggingFaceResolver:
         self, ref: SourceRef, revision: str, tree: Sequence[Mapping[str, Any]]
     ) -> tuple[tuple[RemoteFile, ...], tuple[str, ...]]:
         """Choose the files this reference names, safely."""
-        assert ref.repo is not None
+        if ref.repo is None:
+            raise LocalRuntimeError("a Hugging Face source needs a repository id")
         by_path = {str(e.get("path", "")): e for e in tree if e.get("type") == "file"}
         warnings: list[str] = []
 
@@ -407,7 +408,7 @@ def _digest_of(entry: Mapping[str, Any]) -> tuple[str, DigestKind]:
 
     LFS objects carry a sha256 in ``lfs.oid``; small files carry a git blob sha1 in ``oid``.
     Both are trust-on-first-use — we trust the API for *what the bytes should be*, then
-    verify the bytes against it — which is a real improvement over trusting the transfer.
+    verify the bytes against it, which is a real improvement over trusting the transfer.
     """
     lfs = entry.get("lfs")
     if isinstance(lfs, Mapping):

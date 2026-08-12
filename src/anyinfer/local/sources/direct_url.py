@@ -114,8 +114,7 @@ class DirectUrlResolver:
                     RemoteFile(
                         path=name,
                         url=url,
-                        size_bytes=ref.sizes.get(name)
-                        or await self._head_size(http, url, token),
+                        size_bytes=ref.sizes.get(name) or await self._head_size(http, url, token),
                         digest=digest.lower(),
                         digest_kind="sha256" if digest else "none",
                     )
@@ -141,9 +140,7 @@ class DirectUrlResolver:
         """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         try:
-            response = await client.request(
-                "HEAD", url, headers=headers, follow_redirects=True
-            )
+            response = await client.request("HEAD", url, headers=headers, follow_redirects=True)
         except httpx2.HTTPError:
             return None
         if response.status_code >= 400:

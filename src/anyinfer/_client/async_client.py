@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import contextvars
+import math
 import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
@@ -19,13 +20,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import Any, Literal
 
 from .._usage import merge_usage
 from ..arena import ArenaResult, Candidate, candidate_envelope, select_candidates
 from ..benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
+    BenchmarkSample,
     Measurement,
     MeasurementStore,
     benchmark_prompt,
@@ -38,7 +40,12 @@ from ..capabilities.cache import CachePlan, plan_cache
 from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
 from ..capabilities.gating import check_context_fit
 from ..capabilities.ledger import SpendLedger, SpendTotals
-from ..capabilities.pricing import TRUSTED_PROVENANCE, with_cost
+from ..capabilities.pricing import (
+    TRUSTED_PROVENANCE,
+    CostEstimate,
+    compute_operation_cost,
+    with_cost,
+)
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import (
     DEFAULT_PROBE_FEATURES,
@@ -46,6 +53,7 @@ from ..capabilities.probes import (
     PROBE_SCHEMA,
     PROBE_TOOL,
     PROBEABLE_FEATURES,
+    EmbeddingProbeReport,
     FeatureProbe,
     ProbeOutcome,
     ProbeReport,
@@ -55,7 +63,7 @@ from ..capabilities.probes import (
 )
 from ..catalog.model import Catalog, TargetEntry
 from ..catalog.resolve import load_default_catalog, resolve_target
-from ..compare import TargetComparison
+from ..compare import EmbeddingTargetComparison, TargetComparison
 from ..context.select import select as select_context
 from ..context_request import ContextRequest, ContextSummary
 from ..credentials import ResolverChain
@@ -95,12 +103,13 @@ from ..events.telemetry import (
 )
 from ..local.acquire import AcquisitionReport, ProgressSink
 from ..local.hardware import HardwareProfile, probe_signature
+from ..local.metrics import ResourceSample, SystemSampler
 from ..local.services import PULL_TIMEOUT_S, PullReport, PullRequest
 from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
 from ..manifest import DroppedParameter, ManifestBuilder, RunManifest
-from ..providers.base import AdapterFinal, ProviderAdapter
+from ..providers.base import AdapterFinal, GeneratesText, ProviderAdapter, ProviderLifecycle
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.attempts import AttemptBuffer
 from ..routing.health import HealthCache
@@ -137,6 +146,20 @@ from ..types.messages import (
     Text,
     system,
     user,
+)
+from ..types.operations import (
+    DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES,
+    DEFAULT_MAX_RERANK_RESPONSE_BYTES,
+    BatchPolicy,
+    EmbeddingCapabilities,
+    EmbeddingInputIntent,
+    EmbeddingRequest,
+    EmbeddingResult,
+    EmbeddingSpace,
+    InferenceOperation,
+    RerankDocument,
+    RerankRequest,
+    RerankResult,
 )
 from ..types.requests import (
     DEFAULT_MAX_INPUT_BYTES,
@@ -180,6 +203,7 @@ from .models import (
     build_catalog_view,
     locate_catalog_model,
 )
+from .operations import dispatch_embed, dispatch_rerank
 from .providers import AdapterPool, ProviderSettings
 from .tools import (
     DEFAULT_MAX_ROUNDS,
@@ -252,17 +276,17 @@ class AsyncClient:
             and only on the estimate's floor, so a heuristic never refuses a request
             that might have fit.
         history: Conversation-compaction policy applied when a request outgrows its
-            target's window. ``None`` — the default — never compacts. This is the
+            target's window. ``None`` — the default; never compacts. This is the
             client's half of the overflow answer; ``Route.context_window_targets`` is
             the other half, and the policy's ``mode`` decides which is tried first.
         spend: Ceiling on what this client may spend, checked before dispatch.
-            ``None`` — the default — never refuses anything. Not an organization
+            ``None`` — the default; never refuses anything. Not an organization
             quota: it governs this client object in this process and nothing else.
         ledger: Spend rollup to record into. One is created automatically when
             ``spend`` is set; supply your own to share a total between clients or to
             read it without a policy in force.
         cache: Prompt-cache placement applied to every request that does not carry its
-            own. ``None`` — the default — never engages a provider's cache, because
+            own. ``None`` — the default; never engages a provider's cache, because
             caching changes what a provider bills and how long it keeps a copy of the
             prompt. A request's own ``cache`` overrides this.
             Every frontend built on this client inherits it.
@@ -281,7 +305,7 @@ class AsyncClient:
             because some unrelated telemetry sink asked for it.
         capability_overrides: Deliberate corrections keyed by ``"provider:model"``.
             Every supplied field is applied at ``override`` provenance — the strongest
-            layer, outranking discovery and probes — so a wrong upstream number can
+            layer, outranking discovery and probes, so a wrong upstream number can
             always be fixed locally.
         model_dir: Where acquired model weights are stored. Defaults to the per-OS data
             directory, overridable with ``ANYINFER_MODEL_DIR``.
@@ -294,6 +318,7 @@ class AsyncClient:
         registry: ProviderRegistry | None = None,
         catalog: Catalog | None = None,
         route: Route | None = None,
+        operation_routes: Mapping[str, Route] | None = None,
         observers: Sequence[Observer] | None = None,
         resolver: ResolverChain | None = None,
         retain_raw: bool = False,
@@ -315,18 +340,20 @@ class AsyncClient:
     ) -> None:
         self._registry = registry or default_registry
         self._events = EventDispatcher(list(observers or []))
+        if catalog is None and use_default_catalog:
+            catalog = load_default_catalog()
+        self._catalog = catalog
         self._pool = AdapterPool(
             list(providers or []),
             registry=self._registry,
+            catalog=self._catalog,
             resolver=resolver,
             # Lifecycle telemetry from adapters (server start/stop, download progress)
             # flows through the same dispatcher as request-path events.
             events=self._emit,
         )
-        if catalog is None and use_default_catalog:
-            catalog = load_default_catalog()
-        self._catalog = catalog
         self._default_route = route
+        self._operation_routes: dict[str, Route] = dict(operation_routes or {})
         self._health = HealthCache()
         self._capabilities = CapabilityStore(
             pricing=pricing_table,
@@ -402,13 +429,71 @@ class AsyncClient:
 
     # ---- discovery -------------------------------------------------------------------
 
-    async def models(self, provider_id: str) -> Sequence[DiscoveredModel]:
-        """List a provider's models, recording what they report about capabilities."""
+    async def models(
+        self, provider_id: str, *, operation: InferenceOperation | None = None
+    ) -> Sequence[DiscoveredModel]:
+        """List a provider's models, recording what they report about capabilities.
+
+        Args:
+            provider_id: The configured provider to list.
+            operation: Keep only models *known* to serve this operation — via a
+                discovered operation tag, or the descriptor's static embedding/rerank
+                capability tables. A model whose operations are unknown is included only
+                for ``"generation"`` on a generation-capable provider (the pre-filter
+                behaviour); for embedding and rerank, unknown support is never guessed
+                into the listing. ``None`` lists everything.
+        """
         adapter = await self._pool.get(provider_id)
         models = await adapter.list_models()
         canonical = self._registry.resolve_alias(provider_id)
         self._capabilities.record_discovery(canonical, models)
-        return models
+        if operation is None:
+            return models
+        descriptor = self._pool.descriptor_for(provider_id)
+        static_ids: frozenset[str] = frozenset()
+        if operation == "embedding":
+            static_ids = frozenset(descriptor.static_embedding_capabilities)
+        elif operation == "rerank":
+            static_ids = frozenset(descriptor.static_rerank_capabilities)
+
+        def _serves(model: DiscoveredModel) -> bool:
+            tagged = model.capabilities.operations if model.capabilities is not None else None
+            if tagged is not None:
+                return operation in tagged.value
+            if model.id in static_ids:
+                return True
+            return operation == "generation" and "generation" in descriptor.operations
+
+        return tuple(m for m in models if _serves(m))
+
+    def operations_for(self, target: Target) -> frozenset[InferenceOperation]:
+        """Which inference operations the resolved target is *known* to serve.
+
+        Model-level facts win: a discovered operation tag, else membership in the
+        descriptor's static embedding/rerank capability tables. A model with no
+        model-level facts on a generation-capable provider reports ``{"generation"}`` —
+        the assumption every listing made before operations existed — and never has
+        embedding or rerank support guessed in.
+
+        Args:
+            target: A target string or catalog alias; resolved without dispatching.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved at all.
+        """
+        resolved = self.resolve(target)
+        capabilities = self._operation_capabilities(resolved)
+        if capabilities is not None and capabilities.operations is not None:
+            return capabilities.operations.value
+        descriptor = self._pool.descriptor_for(resolved.provider_id)
+        known: set[InferenceOperation] = set()
+        if resolved.model in descriptor.static_embedding_capabilities:
+            known.add("embedding")
+        if resolved.model in descriptor.static_rerank_capabilities:
+            known.add("rerank")
+        if not known and "generation" in descriptor.operations:
+            known.add("generation")
+        return frozenset(known)
 
     async def health(self, provider_id: str) -> Health:
         """Probe a provider's readiness."""
@@ -455,7 +540,7 @@ class AsyncClient:
         Every request is independent by default, which is right for one-shot work and
         wrong for a conversation. Providers that can carry state between turns each save
         something different — Copilot keeps the conversation server-side, llama.cpp keeps
-        the model and its KV cache resident, Ollama keeps the model loaded — and a session
+        the model and its KV cache resident, Ollama keeps the model loaded, and a session
         is how a caller says "these requests belong together" without having to know which.
 
         A session never changes an answer; it is a performance and cost optimization.
@@ -489,6 +574,7 @@ class AsyncClient:
         target: Target,
         *,
         timeout_s: float = 60.0,
+        operation: InferenceOperation = "generation",
     ) -> Verification:
         """Prove a target works by asking it something, end to end.
 
@@ -510,6 +596,10 @@ class AsyncClient:
         Args:
             target: The target to verify. A catalog alias resolves as usual.
             timeout_s: Wall clock for the probe.
+            operation: Which operation to prove. ``"embedding"`` embeds one tiny probe
+                text and judges the vector; ``"rerank"`` ranks two probe documents.
+                Both spend one deliberately small real request, exactly like the
+                generation probe.
 
         Returns:
             The `Verification`, whose ``reached``
@@ -521,6 +611,8 @@ class AsyncClient:
         """
         resolved = self.resolve(target)
         started = time.monotonic()
+        if operation != "generation":
+            return await self._verify_operation(target, resolved, operation, timeout_s, started)
         try:
             # No retries and no fallback: a probe reports what this target did, and a
             # chain that quietly answered from somewhere else would report a working
@@ -569,6 +661,136 @@ class AsyncClient:
             mechanism=result.structured_mechanism,
             usage=result.usage,
             diagnostics=await self._safe_diagnostics(result.target.provider_id),
+        )
+
+    async def _verify_operation(
+        self,
+        target: Target,
+        resolved: ResolvedTarget,
+        operation: InferenceOperation,
+        timeout_s: float,
+        started: float,
+    ) -> Verification:
+        """Verify an embedding or rerank target with one deliberately tiny real call.
+
+        Same contract as the generation probe: no retries, no fallback, and a provider
+        problem is the answer rather than an exception. A target whose provider does not
+        declare the operation reports not-reached with the refusal's own hint.
+        """
+        try:
+            if operation == "embedding":
+                embedded = await self.embed(
+                    ["anyinfer verification probe"],
+                    route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+                    input_type="document",
+                    timeout_s=timeout_s,
+                    manifest=False,
+                )
+                dimensions = len(embedded.vectors[0])
+                return Verification(
+                    target=embedded.target,
+                    ok=True,
+                    reached=True,
+                    latency_ms=(time.monotonic() - started) * 1000.0,
+                    detail=f"embedded one probe text into {dimensions} dimensions",
+                    usage=embedded.usage,
+                    diagnostics=await self._safe_diagnostics(embedded.target.provider_id),
+                )
+            ranked = await self.rerank(
+                "which document mentions verification",
+                ["this one mentions verification", "an unrelated sentence about weather"],
+                route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+                top_n=1,
+                timeout_s=timeout_s,
+                manifest=False,
+            )
+            ok = len(ranked.items) >= 1
+            return Verification(
+                target=ranked.target,
+                ok=ok,
+                reached=True,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=(
+                    "ranked two probe documents"
+                    if ok
+                    else "the provider returned no ranked items for two documents"
+                ),
+                usage=ranked.usage,
+                diagnostics=await self._safe_diagnostics(ranked.target.provider_id),
+            )
+        except ConfigError as error:
+            # A local refusal — the provider does not declare the operation, or the
+            # request could never be sent. Nothing was spent; nothing was reached.
+            return Verification(
+                target=resolved,
+                ok=False,
+                reached=False,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=error.detail,
+                diagnostics=await self._safe_diagnostics(resolved.provider_id),
+            )
+        except (AllTargetsFailedError, ProviderError) as error:
+            return Verification(
+                target=resolved,
+                ok=False,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=_verification_detail(error),
+                diagnostics=await self._safe_diagnostics(resolved.provider_id),
+            )
+
+    async def probe_embedding(
+        self,
+        target: Target,
+        *,
+        timeout_s: float = 30.0,
+        record: bool = True,
+    ) -> EmbeddingProbeReport:
+        """Measure an embedding target with one tiny real call.
+
+        Embedding capability tables only carry what a provider documents; a self-hosted
+        or preset endpoint often documents nothing. This spends one deliberately small
+        request and measures what came back — the vector length, and whether it was
+        unit-normalized — recording both at ``probed`` provenance so later calls (and
+        `capabilities_for` consumers) see measured facts instead of blanks.
+
+        **This costs money and time**, exactly like `probe()`: opt-in, one round trip.
+
+        Args:
+            target: The embedding target to measure.
+            timeout_s: Wall clock for the probe call.
+            record: Store the findings at ``probed`` provenance.
+
+        Returns:
+            The `EmbeddingProbeReport` with the measured facts.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved, or its
+                provider does not declare the embedding operation.
+            anyinfer.errors.AllTargetsFailedError: If the probe call itself failed.
+        """
+        result = await self.embed(
+            ["anyinfer embedding probe"],
+            route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+            input_type="document",
+            timeout_s=timeout_s,
+            manifest=False,
+        )
+        vector = result.vectors[0]
+        norm = math.sqrt(sum(v * v for v in vector.values))
+        normalized = abs(norm - 1.0) <= 1e-3
+        capabilities = EmbeddingCapabilities(
+            dimensions=len(vector), normalized=normalized
+        )
+        if record:
+            self._capabilities.record_embedding_probe(
+                result.target.provider_id, result.target.model, capabilities
+            )
+        return EmbeddingProbeReport(
+            target=result.target,
+            dimensions=len(vector),
+            normalized=normalized,
+            capabilities=capabilities,
+            usage=result.usage,
         )
 
     async def probe(
@@ -626,6 +848,12 @@ class AsyncClient:
             )
 
         adapter = await self._pool.get(resolved.provider_id)
+        if not isinstance(adapter, GeneratesText):
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} does not support generation",
+                provider=resolved.provider_id,
+                hint="feature probes only apply to targets that generate text",
+            )
         descriptor = self._pool.descriptor_for(resolved.provider_id)
         results: list[FeatureProbe] = []
         usage = Usage()
@@ -662,7 +890,7 @@ class AsyncClient:
         Deliberately not routed: a probe asks what *this* target does, so a retry or a
         fallback answering from somewhere else would record a measurement of the wrong
         model. It also has to force a mechanism the capability ladder would not choose —
-        that is the entire point — which it does by handing the wire builder a synthetic
+        that is the entire point, which it does by handing the wire builder a synthetic
         capability set claiming exactly the feature under test.
         """
         wanted = Feature.STREAMING if feature is Feature.STREAMING else feature
@@ -721,13 +949,14 @@ class AsyncClient:
         output_tokens: int = BENCHMARK_OUTPUT_TOKENS,
         timeout_s: float = 120.0,
         store: MeasurementStore | None = None,
+        progress: Callable[[BenchmarkSample], None] | None = None,
     ) -> Measurement:
         """Measure what a target actually does, with one deterministic request.
 
         Capabilities describe a model; none of them says how fast it is *here*. For local
         inference that is the number that decides everything — the same weights on the same
         GPU differ by an order of magnitude depending on what else is resident and how many
-        layers ended up offloaded — and it is the number an application needs to pick a
+        layers ended up offloaded, and it is the number an application needs to pick a
         default model or explain a slow session.
 
         Prefill and decode are reported separately, because a machine can be fast at one
@@ -747,6 +976,8 @@ class AsyncClient:
             timeout_s: Wall clock for the request.
             store: An application-owned store to record the result in. Omitted, the
                 measurement is returned and forgotten.
+            progress: Optional sink for live token-rate and local host-utilization samples.
+                Token counts are estimated until the terminal provider usage arrives.
 
         Returns:
             The `Measurement`, whose rates are
@@ -758,12 +989,75 @@ class AsyncClient:
                 unmeasurable target is a failure, unlike an unverifiable one.
         """
         resolved = self.resolve(target)
-        result = await self.generate(
-            benchmark_prompt(prompt_tokens),
-            route=Route(targets=(target,), retry=Retry(max_attempts=1)),
-            sampling=Sampling(max_output_tokens=output_tokens, temperature=0.0),
-            timeout_s=timeout_s,
+        started = time.monotonic()
+        estimated_bytes = 0
+        decoding = False
+        stop_sampling = asyncio.Event()
+        sampler = (
+            SystemSampler()
+            if self._pool.locality_for(resolved.provider_id) == "local"
+            else None
         )
+
+        def publish(sample: BenchmarkSample) -> None:
+            if progress is None:
+                return
+            try:
+                progress(sample)
+            except Exception:  # noqa: BLE001 — an observer must not break the measurement
+                return
+
+        async def sample_live() -> None:
+            previous_tokens = 0
+            previous_at = started
+            while not stop_sampling.is_set():
+                resources = (
+                    await asyncio.to_thread(sampler.sample)
+                    if sampler is not None
+                    else ResourceSample()
+                )
+                now = time.monotonic()
+                tokens = estimated_bytes // 4
+                interval = now - previous_at
+                if not decoding:
+                    # No output during load/prefill is a measured zero, and preserving it
+                    # makes the warm-up interval visible instead of starting the chart at
+                    # the first decoded token.
+                    rate = 0.0
+                elif interval > 0 and tokens >= previous_tokens:
+                    rate = (tokens - previous_tokens) / interval
+                else:
+                    rate = None
+                publish(
+                    BenchmarkSample(
+                        elapsed_ms=(now - started) * 1000.0,
+                        phase="decode" if decoding else "warmup",
+                        estimated_output_tokens=tokens,
+                        output_tokens_per_s=rate,
+                        resources=resources,
+                    )
+                )
+                previous_tokens, previous_at = tokens, now
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(stop_sampling.wait(), timeout=0.25)
+
+        sample_task = asyncio.create_task(sample_live()) if progress is not None else None
+        try:
+            async with self.stream(
+                benchmark_prompt(prompt_tokens),
+                route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+                sampling=Sampling(max_output_tokens=output_tokens, temperature=0.0),
+                timeout_s=timeout_s,
+            ) as stream:
+                async for event in stream:
+                    if isinstance(event, TextDelta):
+                        decoding = True
+                        estimated_bytes += len(event.text.encode("utf-8"))
+            result = stream.result
+        finally:
+            stop_sampling.set()
+            if sample_task is not None:
+                await sample_task
         measurement = measurement_from(
             identity_for(
                 result.target,
@@ -781,6 +1075,20 @@ class AsyncClient:
         )
         if store is not None:
             store.record(measurement)
+        final_resources = (
+            await asyncio.to_thread(sampler.sample)
+            if sampler is not None
+            else ResourceSample()
+        )
+        publish(
+            BenchmarkSample(
+                elapsed_ms=measurement.total_ms,
+                phase="complete",
+                estimated_output_tokens=measurement.output_tokens or estimated_bytes // 4,
+                output_tokens_per_s=measurement.decode_tokens_per_s,
+                resources=final_resources,
+            )
+        )
         return measurement
 
     def _host_signature(self, provider_id: str) -> str | None:
@@ -1026,7 +1334,7 @@ class AsyncClient:
         """Find an acquired model on disk, with advisory launch arguments.
 
         No network I/O. Verification is shallow by default — size and modification time
-        against the index — because re-hashing forty gigabytes on every lookup would be
+        against the index, because re-hashing forty gigabytes on every lookup would be
         absurd; ``verify=True`` forces the full check.
         """
         return locate_catalog_model(
@@ -1112,6 +1420,200 @@ class AsyncClient:
             request, resolved_route, session=session, manifest=manifest
         )
 
+    async def embed(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        input_type: Literal["query", "document", "classification", "clustering"] | None = None,
+        dimensions: int | None = None,
+        expected_space: EmbeddingSpace | None = None,
+        allow_incompatible_fallback: bool = False,
+        batch: BatchPolicy | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        retain_raw: bool | None = None,
+        manifest: bool | None = None,
+    ) -> EmbeddingResult:
+        """Embed one or more texts into vectors.
+
+        Args:
+            inputs: A single text, or an ordered sequence of texts to embed. Duplicates
+                are preserved exactly.
+            target: A single target, as for `generate()`.
+            route: A fallback chain, as for `generate()`. Embedding fallback is
+                safe-by-default: a fallback target is dispatched only when it is the
+                identical ``provider:model`` as the route's primary target; anything else
+                is refused before any request is sent, unless
+                ``allow_incompatible_fallback`` is set.
+            input_type: What the embedded text will be used for, when the target model
+                distinguishes it.
+            dimensions: Requested output dimensionality, for models supporting native
+                dimensionality reduction.
+            expected_space: An `anyinfer.EmbeddingSpace` the result must match; a
+                successful-but-incompatible response is rejected rather than returned.
+            allow_incompatible_fallback: Explicit opt-in permitting fallback to a target
+                that cannot be proven to share the primary target's embedding space. Off
+                by default because wrong-space vectors fail silently when compared; a
+                result served this way always carries a warning naming both targets.
+            batch: Core-owned batching policy. A request larger than the target's
+                verified batch limit is split into ordered chunks and re-assembled in
+                input order; an unknown limit is never guessed — see `anyinfer.BatchPolicy`.
+            timeout_s: Per-attempt wall-clock budget.
+            provider_options: Escape hatch, namespaced by provider id.
+            metadata: Caller-supplied labels carried through telemetry.
+            max_response_bytes: Hard cap on one provider response body.
+            retain_raw: Keep the provider's raw response payload on the result. Defaults
+                to the client's ``retain_raw`` setting.
+            manifest: Overrides the client's manifest setting for this one call;
+                ``None`` inherits it.
+
+        Returns:
+            The assembled `EmbeddingResult`.
+
+        Raises:
+            anyinfer.errors.AllTargetsFailedError: Every target failed.
+            anyinfer.errors.ConfigError: The resolved target does not support embedding,
+                its response fails the embedding-space safety check, or an incompatible
+                fallback was refused before dispatch.
+        """
+        texts = (inputs,) if isinstance(inputs, str) else tuple(inputs)
+        request = EmbeddingRequest(
+            inputs=texts,
+            input_type=input_type,
+            dimensions=dimensions,
+            expected_space=expected_space,
+            allow_incompatible_fallback=allow_incompatible_fallback,
+            timeout_s=timeout_s,
+            max_response_bytes=max_response_bytes
+            if max_response_bytes is not None
+            else DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES,
+            metadata=metadata or {},
+            provider_options=provider_options or {},
+            batch=batch if batch is not None else BatchPolicy(),
+        )
+        resolved_route = self._resolve_operation_route(target, route, "embedding")
+        request_id = uuid.uuid4().hex
+        self._check_operation_spend(
+            operation="embedding", route=resolved_route, texts=texts, request_id=request_id
+        )
+        try:
+            return await dispatch_embed(
+                request,
+                resolved_route,
+                pool=self._pool,
+                registry=self._registry,
+                catalog=self._catalog,
+                configured_providers=self._pool.configured_ids,
+                health=self._health,
+                emit=self._emit,
+                retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
+                manifest=self._manifests if manifest is None else manifest,
+                anyinfer_version=_version(),
+                capabilities_for=self._operation_capabilities,
+                embedding_capabilities_for=self._embedding_capabilities_of,
+                request_id=request_id,
+            )
+        except BaseException:
+            if self._ledger is not None:
+                self._ledger.release(request_id)
+            raise
+
+    async def rerank(
+        self,
+        query: str,
+        documents: Sequence[str | RerankDocument],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        top_n: int | None = None,
+        batch: BatchPolicy | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        return_documents: bool = False,
+        retain_raw: bool | None = None,
+        manifest: bool | None = None,
+    ) -> RerankResult:
+        """Rank documents by relevance to a query.
+
+        Args:
+            query: The query text every document is scored against.
+            documents: Document texts, or `anyinfer.RerankDocument` values carrying
+                caller-owned ids. Plain strings are assigned ids ``"0"``, ``"1"``, ...
+                in order.
+            target: A single target, as for `generate()`.
+            route: A fallback chain, as for `generate()`.
+            top_n: Return only the top N ranked items.
+            batch: Core-owned batching policy. A rerank request larger than the target's
+                verified document limit is refused rather than split, unless
+                ``BatchPolicy.rerank_cross_batch`` explicitly accepts chunk-local
+                rankings — scores from separate calls are not globally comparable.
+            timeout_s: Per-attempt wall-clock budget.
+            provider_options: Escape hatch, namespaced by provider id.
+            metadata: Caller-supplied labels carried through telemetry.
+            max_response_bytes: Hard cap on one provider response body.
+            return_documents: Echo document text back on each ranked item.
+            retain_raw: Keep the provider's raw response payload on the result. Defaults
+                to the client's ``retain_raw`` setting.
+            manifest: Overrides the client's manifest setting for this one call;
+                ``None`` inherits it.
+
+        Returns:
+            The assembled `RerankResult`.
+
+        Raises:
+            anyinfer.errors.AllTargetsFailedError: Every target failed.
+            anyinfer.errors.ConfigError: The resolved target does not support reranking,
+                or its response names a document index outside the request.
+        """
+        docs = tuple(
+            doc if isinstance(doc, RerankDocument) else RerankDocument(id=str(i), text=doc)
+            for i, doc in enumerate(documents)
+        )
+        request = RerankRequest(
+            query=query,
+            documents=docs,
+            top_n=top_n,
+            timeout_s=timeout_s,
+            max_response_bytes=max_response_bytes
+            if max_response_bytes is not None
+            else DEFAULT_MAX_RERANK_RESPONSE_BYTES,
+            metadata=metadata or {},
+            provider_options=provider_options or {},
+            batch=batch if batch is not None else BatchPolicy(),
+            return_documents=return_documents,
+        )
+        resolved_route = self._resolve_operation_route(target, route, "rerank")
+        request_id = uuid.uuid4().hex
+        self._check_operation_spend(
+            operation="rerank", route=resolved_route, texts=None, request_id=request_id
+        )
+        try:
+            return await dispatch_rerank(
+                request,
+                resolved_route,
+                pool=self._pool,
+                registry=self._registry,
+                catalog=self._catalog,
+                configured_providers=self._pool.configured_ids,
+                health=self._health,
+                emit=self._emit,
+                retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
+                manifest=self._manifests if manifest is None else manifest,
+                anyinfer_version=_version(),
+                capabilities_for=self._operation_capabilities,
+                request_id=request_id,
+            )
+        except BaseException:
+            if self._ledger is not None:
+                self._ledger.release(request_id)
+            raise
+
     async def _generate_request(
         self,
         request: GenerationRequest,
@@ -1123,7 +1625,7 @@ class AsyncClient:
         """Run one ordinary route; arena branches reuse this exact path."""
         request_id, builder = self._new_run(request, route, manifest)
         # Closed explicitly: returning out of `async for` abandons the generator, and its
-        # cleanup — which is what unregisters the run — would then wait for a collection.
+        # cleanup, which is what unregisters the run — would then wait for a collection.
         async with contextlib.aclosing(
             self._routed_stream(
                 request,
@@ -1361,7 +1863,8 @@ class AsyncClient:
                 if policy.strategy == "synthesize" and judge_generation is not None
                 else winner.generation
             )
-            assert promoted is not None
+            if promoted is None:
+                raise RuntimeError("arena selected a candidate without a generation")
             self._emit(
                 ArenaCompleted(
                     arena_id,
@@ -1479,8 +1982,10 @@ class AsyncClient:
                 estimated_usd=total,
             )
         if spend.max_total_usd is not None:
-            assert self._ledger is not None
-            accepted, spent, reserved = self._ledger.reserve(arena_id, total, spend.max_total_usd)
+            ledger = self._ledger
+            if ledger is None:
+                raise RuntimeError("a cumulative spend policy requires a spend ledger")
+            accepted, spent, reserved = ledger.reserve(arena_id, total, spend.max_total_usd)
             if not accepted:
                 raise SpendLimitError(
                     f"this client has spent {spent}, reserved {reserved}, and this "
@@ -1497,7 +2002,7 @@ class AsyncClient:
         """Mint a correlation id and, unless manifests are off, the builder to go with it.
 
         The builder is created *here* rather than inside the routed generator so a
-        streaming caller holds it before the first event is produced — which is what makes
+        streaming caller holds it before the first event is produced, which is what makes
         a cancelled stream still able to answer for itself.
         """
         request_id = uuid.uuid4().hex
@@ -1717,7 +2222,8 @@ class AsyncClient:
                 if policy.strategy == "synthesize" and verdict is not None
                 else winner.generation
             )
-            assert promoted is not None
+            if promoted is None:
+                raise RuntimeError("arena selected a candidate without a generation")
             self._emit(
                 ArenaCompleted(
                     arena_id,
@@ -1788,7 +2294,7 @@ class AsyncClient:
     def spend(self) -> SpendTotals:
         """What this client has spent so far.
 
-        Returns zeros — never ``None`` — when no ledger is attached, so a caller reading
+        Returns zeros; never ``None``, when no ledger is attached, so a caller reading
         this never has to branch on whether accounting was switched on. Check
         `SpendTotals.unknown_requests` before treating the figure as complete: requests
         against a target with no trusted pricing are counted there rather than being
@@ -2039,6 +2545,150 @@ class AsyncClient:
             )
         return tuple(results)
 
+    async def compare_embedding(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        targets: Sequence[Target],
+        input_type: EmbeddingInputIntent | None = None,
+        refresh: bool = False,
+    ) -> tuple[EmbeddingTargetComparison, ...]:
+        """Compare how one embedding request would behave across targets, without dispatching.
+
+        Results preserve caller order and are never ranked. With ``refresh=False`` (the
+        default), no adapter is constructed and no network is touched; ``refresh=True``
+        may list models to refresh discovered capabilities, exactly as `compare()`.
+        """
+        texts = (inputs,) if isinstance(inputs, str) else tuple(inputs)
+
+        resolved_items: list[tuple[str, ResolvedTarget | None, str]] = []
+        refresh_ids: list[str] = []
+        for requested in targets:
+            spelling = str(requested)
+            try:
+                resolved = self.resolve(requested)
+                reason = self._pool.configuration_reason(resolved.provider_id) or ""
+            except (ConfigError, ValueError) as exc:
+                resolved_items.append((spelling, None, str(exc)))
+                continue
+            resolved_items.append((spelling, resolved, reason))
+            if refresh and not reason and resolved.provider_id not in refresh_ids:
+                refresh_ids.append(resolved.provider_id)
+
+        refresh_errors: dict[str, str] = {}
+        for provider_id in refresh_ids:
+            try:
+                await self.models(provider_id)
+            except Exception as exc:  # noqa: BLE001 — failure is comparison data
+                refresh_errors[provider_id] = str(exc)
+
+        results: list[EmbeddingTargetComparison] = []
+        for requested, item_resolved, reason in resolved_items:
+            if item_resolved is None or reason:
+                results.append(
+                    EmbeddingTargetComparison(
+                        requested=requested,
+                        resolved=item_resolved,
+                        resolvable=False,
+                        reason=reason or "target could not be resolved",
+                    )
+                )
+                continue
+            resolved = item_resolved
+            if resolved.provider_id in refresh_errors:
+                results.append(
+                    EmbeddingTargetComparison(
+                        requested=requested,
+                        resolved=resolved,
+                        resolvable=False,
+                        reason=(
+                            "capability refresh failed: " + refresh_errors[resolved.provider_id]
+                        ),
+                    )
+                )
+                continue
+
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+            if "embedding" not in descriptor.operations:
+                results.append(
+                    EmbeddingTargetComparison(
+                        requested=requested,
+                        resolved=resolved,
+                        resolvable=False,
+                        reason=(
+                            f"{resolved.provider_id!r} does not declare the embedding operation"
+                        ),
+                    )
+                )
+                continue
+
+            model_capabilities = self._capabilities_for(descriptor, resolved)
+            embedding_capabilities = (
+                self._embedding_capabilities_of(resolved) or EmbeddingCapabilities()
+            )
+
+            fits: bool | None = None
+            if embedding_capabilities.max_batch_inputs is not None:
+                fits = len(texts) <= embedding_capabilities.max_batch_inputs
+            if embedding_capabilities.max_input_tokens is not None:
+                token_fits = all(
+                    self._estimator.estimate(t).tokens <= embedding_capabilities.max_input_tokens
+                    for t in texts
+                )
+                fits = token_fits if fits is None else (fits and token_fits)
+
+            cost: CostEstimate | None = None
+            floor_tokens = sum(self._estimator.estimate(t).floor for t in texts)
+            planning_tokens = sum(self._estimator.estimate(t).tokens for t in texts)
+            low_cost = compute_operation_cost(
+                Usage(input_tokens=floor_tokens), model_capabilities, "embedding"
+            )
+            high_cost = compute_operation_cost(
+                Usage(input_tokens=planning_tokens), model_capabilities, "embedding"
+            )
+            if low_cost is not None and high_cost is not None:
+                currency = (
+                    model_capabilities.pricing.value.currency
+                    if model_capabilities.pricing is not None
+                    else "USD"
+                )
+                cost = CostEstimate(low=low_cost, high=high_cost, currency=currency)
+
+            notes: list[str] = []
+            if (
+                input_type is not None
+                and embedding_capabilities.input_intents
+                and input_type not in embedding_capabilities.input_intents
+            ):
+                notes.append(
+                    f"{input_type!r} is not among the intents this model documents: "
+                    f"{embedding_capabilities.input_intents}"
+                )
+
+            provenance = {
+                name: sourced.provenance
+                for name, sourced in (("pricing", model_capabilities.pricing),)
+                if sourced is not None
+            }
+
+            results.append(
+                EmbeddingTargetComparison(
+                    requested=requested,
+                    resolved=resolved,
+                    fits=fits,
+                    dimensions=embedding_capabilities.dimensions,
+                    dimension_choices=embedding_capabilities.dimension_choices,
+                    max_batch_inputs=embedding_capabilities.max_batch_inputs,
+                    max_input_tokens=embedding_capabilities.max_input_tokens,
+                    input_intents=embedding_capabilities.input_intents,
+                    normalized=embedding_capabilities.normalized,
+                    cost=cost,
+                    capability_provenance=provenance,
+                    notes=tuple(notes),
+                )
+            )
+        return tuple(results)
+
     def _capabilities_for(
         self, descriptor: ProviderDescriptor, resolved: ResolvedTarget
     ) -> ModelCapabilities:
@@ -2075,7 +2725,7 @@ class AsyncClient:
         `Route`, one target string, or a sequence of targets forming a fallback chain.
 
         An open session names a target of its own, and a caller who has one rarely wants to
-        repeat it on every turn — so it stands in when nothing more specific was given. It
+        repeat it on every turn, so it stands in when nothing more specific was given. It
         never *overrides* anything: a session is about reuse, not routing.
         """
         if route is not None:
@@ -2172,6 +2822,12 @@ class AsyncClient:
                 continue
 
             adapter = await self._pool.get(resolved.provider_id)
+            if not isinstance(adapter, GeneratesText):
+                raise ConfigError(
+                    f"provider {resolved.provider_id!r} does not support generation",
+                    provider=resolved.provider_id,
+                    hint="choose a target whose provider declares the 'generation' operation",
+                )
             descriptor = self._pool.descriptor_for(resolved.provider_id)
             capabilities = self._capabilities_for(descriptor, resolved)
             if builder is not None:
@@ -2293,7 +2949,7 @@ class AsyncClient:
                 )
 
             if not pending and not compacted and isinstance(last_error, ContextLengthError):
-                # Every target — including the overflow chain — is exhausted and the
+                # Every target, including the overflow chain — is exhausted and the
                 # request still does not fit anywhere. Only now is losing history the
                 # better answer than failing, which is what `last_resort` means. One
                 # pass only: a second would be compacting an already-compacted request.
@@ -2645,7 +3301,7 @@ class AsyncClient:
                 and not (stream and yielded_content)
             ):
                 # A refusal with a configured content-policy chain redirects instead of
-                # completing — but never after the consumer has already seen streamed
+                # completing, but never after the consumer has already seen streamed
                 # text from this attempt, where a silent restart would contradict it.
                 chain = content_chain()
                 if chain:
@@ -2676,8 +3332,10 @@ class AsyncClient:
                 continue
 
             if errors:
-                assert request.schema is not None
-                partial, missing = partial_object(active_buffer.text, request.schema.json_schema)
+                schema = request.schema
+                if schema is None:
+                    raise RuntimeError("schema validation failed for a request without a schema")
+                partial, missing = partial_object(active_buffer.text, schema.json_schema)
                 raise SchemaViolationError(
                     f"response did not match the required schema: {errors[0]}",
                     raw_text=active_buffer.text,
@@ -2880,6 +3538,123 @@ class AsyncClient:
                 hint="choose a model whose capabilities include the required input modality",
             )
 
+    def _operation_capabilities(self, resolved: ResolvedTarget) -> ModelCapabilities | None:
+        """Assembled capabilities for one embed/rerank target, or ``None`` when unknown."""
+        try:
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+            return self._capabilities_for(descriptor, resolved)
+        except (AnyInferError, ValueError):
+            return None
+
+    def _resolve_operation_route(
+        self,
+        target: Target | None,
+        route: Route | Target | Sequence[Target] | None,
+        operation: InferenceOperation,
+    ) -> Route:
+        """The route one embed/rerank call uses.
+
+        An explicit target or route always wins. With neither, the operation's own
+        configured default applies before the generation ``default_route`` — so an
+        embedding route is never selected for generation (different lookup entirely)
+        and a generation default only serves an embed/rerank call if its targets
+        actually declare the operation, which dispatch enforces.
+        """
+        if route is None and target is None:
+            configured = self._operation_routes.get(operation)
+            if configured is not None:
+                return configured
+        return self._resolve_route(target, route, None)
+
+    def _embedding_capabilities_of(self, resolved: ResolvedTarget) -> Any:
+        """Static embedding capabilities layered under anything a probe measured."""
+        try:
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+        except (AnyInferError, ValueError):
+            return None
+        static = descriptor.static_embedding_capabilities.get(resolved.model)
+        probed = self._capabilities.embedding_probed_for(
+            resolved.provider_id, resolved.model
+        )
+        if static is not None and probed is not None:
+            return static.overlay(probed)
+        return probed if probed is not None else static
+
+    def _check_operation_spend(
+        self,
+        *,
+        operation: InferenceOperation,
+        route: Route,
+        texts: Sequence[str] | None,
+        request_id: str,
+    ) -> None:
+        """Refuse an embed/rerank call that would cross this client's spending ceiling.
+
+        Embedding costs are estimated from the caller's texts at the first target's
+        trusted input rate. Rerank costs are never estimated — search-unit billing has no
+        verified request-shape formula, and a guessed estimate would enforce nothing
+        while appearing to — so ``on_unknown`` governs rerank calls.
+
+        Raises:
+            SpendLimitError: When a ceiling would be crossed, or when the cost cannot be
+                known and the policy says not to spend blind.
+        """
+        policy = self._spend_policy
+        if policy is None or not policy.active:
+            return
+        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
+
+        estimate: Decimal | None = None
+        if operation == "embedding" and texts is not None and route.targets:
+            try:
+                resolved = self.resolve(route.targets[0])
+                capabilities = self._operation_capabilities(resolved)
+            except (AnyInferError, ValueError):
+                capabilities = None
+            if capabilities is not None:
+                tokens = sum(self._estimator.estimate(t).tokens for t in texts)
+                estimate = compute_operation_cost(
+                    Usage(input_tokens=tokens), capabilities, "embedding"
+                )
+
+        if estimate is None:
+            if policy.on_unknown == "refuse":
+                raise SpendLimitError(
+                    f"the cost of this {operation} request cannot be estimated",
+                    limit_usd=policy.max_request_usd or policy.max_total_usd,
+                    spent_usd=spent,
+                    hint=(
+                        "this target has no trusted pricing (rerank costs are never "
+                        "estimated); set on_unknown='allow' to send it anyway, or supply "
+                        "pricing as a capability override"
+                    ),
+                )
+            return
+
+        if policy.max_request_usd is not None and estimate > policy.max_request_usd:
+            raise SpendLimitError(
+                f"this {operation} request could cost {estimate}, above the per-request "
+                f"ceiling of {policy.max_request_usd}",
+                limit_usd=policy.max_request_usd,
+                spent_usd=spent,
+                estimated_usd=estimate,
+            )
+
+        if policy.max_total_usd is not None:
+            ledger = self._ledger
+            if ledger is None:
+                raise RuntimeError("a cumulative spend policy requires a spend ledger")
+            accepted, spent, reserved = ledger.reserve(request_id, estimate, policy.max_total_usd)
+            if not accepted:
+                raise SpendLimitError(
+                    f"this client has spent {spent}, reserved {reserved}, and this "
+                    f"{operation} request could cost {estimate}, above the total "
+                    f"ceiling {policy.max_total_usd}",
+                    limit_usd=policy.max_total_usd,
+                    spent_usd=spent,
+                    estimated_usd=estimate,
+                )
+
     def _check_spend(
         self,
         request: GenerationRequest,
@@ -2931,8 +3706,10 @@ class AsyncClient:
             )
 
         if policy.max_total_usd is not None:
-            assert self._ledger is not None
-            accepted, spent, reserved = self._ledger.reserve(
+            ledger = self._ledger
+            if ledger is None:
+                raise RuntimeError("a cumulative spend policy requires a spend ledger")
+            accepted, spent, reserved = ledger.reserve(
                 request_id, estimate, policy.max_total_usd
             )
             if not accepted:
@@ -2972,7 +3749,7 @@ class AsyncClient:
 
         An implicit-caching provider only helps if the prefix is identical between turns.
         A timestamp in the system block, or tools serialized in a different order each
-        time, silently produces a hit rate of zero — and the only evidence is a
+        time, silently produces a hit rate of zero, and the only evidence is a
         ``cache_read_tokens`` that never rises, which nobody is watching. Comparing the
         prefix signature across requests to the same target turns that into a diagnostic.
 
@@ -3002,7 +3779,7 @@ class AsyncClient:
         """Dispatch a telemetry event to observers and to the run's manifest builder.
 
         The builder is normally found by correlation — every request-path event carries a
-        ``request_id`` — and passed explicitly only for the handful of events that carry
+        ``request_id``, and passed explicitly only for the handful of events that carry
         none, where correlation would have to guess between concurrent runs.
         """
         if self._builders:
@@ -3023,7 +3800,7 @@ def _judge_probe(
     """Read what came back from a probe the provider accepted.
 
     Acceptance alone proves nothing — the failure this whole layer exists to catch is a
-    server that takes ``response_format`` and ignores it — so each feature is judged on
+    server that takes ``response_format`` and ignores it, so each feature is judged on
     whether the *answer* shows the mechanism worked. Anything short of that is
     inconclusive rather than a verdict, because one reply cannot separate a weak model
     from an ignored parameter.
@@ -3084,7 +3861,7 @@ def _verification_detail(error: Exception) -> str:
 
 
 async def _collect_diagnostics(
-    adapter: ProviderAdapter, descriptor: ProviderDescriptor
+    adapter: ProviderLifecycle, descriptor: ProviderDescriptor
 ) -> Sequence[Diagnostic]:
     """Ask a provider what it noticed about itself, tolerating anything it does.
 

@@ -24,13 +24,15 @@ Two ways to authenticate. A **Bedrock API key** is the simplest:
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "bedrock",
-        api_key="env://AWS_BEARER_TOKEN_BEDROCK",
-        options={"region": "us-east-1"},
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "bedrock",
+            api_key="env://AWS_BEARER_TOKEN_BEDROCK",
+            options={"region": "us-east-1"},
+        ),
+    ]
+)
 
 result = client.generate(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5")
 ```
@@ -65,7 +67,7 @@ colon only, so everything after `bedrock:` is the model.
 ## Streaming is binary
 
 `ConverseStream` answers with AWS's `vnd.amazon.eventstream` framing and offers no SSE or
-JSON alternative. AnyInfer decodes it — including verifying both frame checksums — so
+JSON alternative. AnyInfer decodes it, including verifying both frame checksums — so
 from your side it is an ordinary stream:
 
 ```python
@@ -91,7 +93,7 @@ constrains tool input:
 ```python
 result = client.generate(article, target="bedrock:amazon.nova-pro-v1:0", schema=SUMMARY)
 print(result.structured["headline"])
-print(result.structured_mechanism)   # "json_schema"
+print(result.structured_mechanism)  # "json_schema"
 ```
 
 ## Reasoning
@@ -100,8 +102,7 @@ Converse has no reasoning parameter of its own; extended thinking is a model-spe
 field, so normalized effort travels in `additionalModelRequestFields`:
 
 ```python
-result = client.generate(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5",
-                         reasoning="high")
+result = client.generate(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5", reasoning="high")
 ```
 
 Thinking text arrives as `ReasoningDelta` events and stays out of `result.text`. Models
@@ -116,10 +117,12 @@ tier — passes through:
 client.generate(
     prompt,
     target="bedrock:us.anthropic.claude-sonnet-4-5",
-    provider_options={"bedrock": {
-        "additionalModelRequestFields": {"top_k": 40},
-        "guardrailConfig": {"guardrailIdentifier": "gr-123", "guardrailVersion": "1"},
-    }},
+    provider_options={
+        "bedrock": {
+            "additionalModelRequestFields": {"top_k": 40},
+            "guardrailConfig": {"guardrailIdentifier": "gr-123", "guardrailVersion": "1"},
+        }
+    },
 )
 ```
 
@@ -145,12 +148,34 @@ Converse image, document, and audio blocks are used directly. Inline inputs are 
 remote image/document references must be S3 URIs. The selected model still decides which
 block types it accepts.
 
+## Embeddings
+
+Converse has no embeddings surface at all, so this goes through the older `InvokeModel`
+action instead — a separate code path from generation, sharing only auth and addressing:
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="bedrock:amazon.titan-embed-text-v2:0",
+)
+```
+
+Titan Text Embeddings V2 accepts **one `inputText` per call**, a real limit of the model
+(there is no batch field in its request schema) — the adapter declares
+`max_batch_inputs=1` so the core's batching policy fans a multi-text call into one
+`InvokeModel` request per input automatically. `dimensions=` requests native truncation
+to `1024` (default), `512`, or `256`. There is no `input_type`/intent concept on this
+model.
+
+Cohere Embed on Bedrock and Bedrock's separate Rerank action are not yet implemented —
+see the contract snapshot's watchlist.
+
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
 - [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/bedrock.md)
-- [Anthropic](anthropic.md) — Claude direct, without the Bedrock layer.
-- [Routing](../concepts/routing.md) — retries and fallback across regions or providers.
+- [Anthropic](anthropic.md): Claude direct, without the Bedrock layer.
+- [Routing](../concepts/routing.md): retries and fallback across regions or providers.
 
 </div>

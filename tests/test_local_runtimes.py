@@ -44,7 +44,9 @@ def _arch() -> str:
     )
 
 
-def _profile(*, cuda: bool = False, capability: str = "8.9", driver: str = "580.0") -> HardwareProfile:
+def _profile(
+    *, cuda: bool = False, capability: str = "8.9", driver: str = "580.0"
+) -> HardwareProfile:
     accelerators: tuple[Accelerator, ...] = ()
     if cuda:
         accelerators = (
@@ -156,6 +158,20 @@ def test_cuda_wins_when_installed_and_nvidia_is_present(tmp_path: Path) -> None:
     assert chosen.kind == "cuda"
 
 
+def test_an_explicit_installed_runtime_overrides_the_automatic_ranking(tmp_path: Path) -> None:
+    _install(tmp_path, "cuda")
+    _install(tmp_path, "vulkan")
+    chosen = select_backend(_profile(cuda=True), preferred="vulkan", runtime_root=tmp_path)
+    assert chosen is not None
+    assert chosen.kind == "vulkan"
+
+
+def test_an_explicit_missing_runtime_is_actionable(tmp_path: Path) -> None:
+    _install(tmp_path, "vulkan")
+    with pytest.raises(LocalRuntimeError, match=r"cpu.*not installed"):
+        select_backend(_profile(), preferred="cpu", runtime_root=tmp_path)
+
+
 def test_deleting_the_cuda_manifest_falls_back_to_vulkan_and_says_so(tmp_path: Path) -> None:
     _install(tmp_path, "cuda")
     _install(tmp_path, "vulkan")
@@ -181,9 +197,7 @@ def test_a_manifest_validated_variant_outranks_a_name_inferred_one(tmp_path: Pat
     other.mkdir(parents=True)
     (other / "llama-server").write_text("#!/bin/sh\n", encoding="utf-8")
 
-    found = available_backends(
-        search_paths=[other], hardware=_profile(), runtime_root=tmp_path
-    )
+    found = available_backends(search_paths=[other], hardware=_profile(), runtime_root=tmp_path)
     assert found[0].detail.startswith("installed runtime variant")
 
 
@@ -268,7 +282,9 @@ def test_the_default_variant_is_never_cuda() -> None:
 # `sys.platform` is narrowed by mypy and makes the branch below it read as dead code).
 # Patch the call the function actually makes, or these silently assert nothing on Linux
 # and Windows while failing outright on a macOS runner.
-def test_a_gpu_machine_defaults_to_the_vendor_neutral_build(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_gpu_machine_defaults_to_the_vendor_neutral_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("anyinfer.local.runtimes.platform.system", lambda: "Linux")
     assert default_runtime_kind(_profile(cuda=True)) == "vulkan"
 
@@ -298,9 +314,7 @@ def _hostile_archive() -> bytes:
 
 def _serving(payload: bytes) -> httpx2.Client:
     def handler(request: httpx2.Request) -> httpx2.Response:
-        return httpx2.Response(
-            200, content=payload, headers={"content-length": str(len(payload))}
-        )
+        return httpx2.Response(200, content=payload, headers={"content-length": str(len(payload))})
 
     return httpx2.Client(transport=httpx2.MockTransport(handler))
 
@@ -337,7 +351,9 @@ def test_installing_unpacks_verifies_and_writes_a_manifest(tmp_path: Path) -> No
 def test_a_second_install_reuses_a_valid_one(tmp_path: Path) -> None:
     payload = _zip_archive()
     table = _table(artifacts=(_artifact(payload),))
-    install_runtime("vulkan", hardware=_profile(), root=tmp_path, table=table, client=_serving(payload))
+    install_runtime(
+        "vulkan", hardware=_profile(), root=tmp_path, table=table, client=_serving(payload)
+    )
     again = install_runtime(
         "vulkan", hardware=_profile(), root=tmp_path, table=table, client=_serving(payload)
     )

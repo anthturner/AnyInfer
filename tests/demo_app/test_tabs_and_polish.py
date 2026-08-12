@@ -1,7 +1,7 @@
 """Round-two UI behaviours: tabs, snapping, morphing controls, and the help polish.
 
 The heart of this file is the tab suite — several conversations at once, each stream
-landing in the transcript that started it — because that is the claim the tabbed UI
+landing in the transcript that started it, because that is the claim the tabbed UI
 makes and the one worth proving.
 """
 
@@ -12,13 +12,16 @@ from PySide6.QtCore import QEventLoop, QTimer
 
 from demo_app.config import default_config
 from demo_app.conversation import gist_title
+from demo_app.fake_provider import DEMO_PROVIDER_ID
 
 
 @pytest.fixture
-def window(qapp: object):
+def window(qapp: object, wait_for_models):
     from demo_app.main_window import MainWindow
 
     built = MainWindow(default_config())
+    if not built._engine_bar.target():
+        wait_for_models(built._engine, DEMO_PROVIDER_ID)
     yield built
     built.close()
 
@@ -108,7 +111,7 @@ class TestTabs:
         saved_id = page.conversation.id
         assert (window._conversations_dir / f"{saved_id}.json").exists()
 
-        window._on_delete_conversation(saved_id)
+        window._on_tab_delete(window._tabs.indexOf(page))
         assert window._tabs.index_of_key(saved_id) == -1
         assert not (window._conversations_dir / f"{saved_id}.json").exists()
         assert window._tabs.count() >= 1  # never zero tabs
@@ -121,37 +124,61 @@ class TestTabs:
         assert window._tabs.count() == 1
         assert window._tabs.current_page().messages == []
 
-    def test_selecting_a_saved_conversation_reopens_it_in_a_tab(self, window):
+    def test_open_saved_reopens_a_conversation_in_a_tab(self, window, monkeypatch):
         window._composer.set_text("Remember this thread")
         window._on_send()
         page = window._tabs.current_page()
         _drain_keys(window, {page.key})
         saved_id = page.conversation.id
+        saved_path = window._conversations_dir / f"{saved_id}.json"
         window._on_tab_close(window._tabs.indexOf(page))
 
-        window._on_conversation_selected(saved_id)
+        monkeypatch.setattr(
+            "demo_app.main_window.QFileDialog.getOpenFileName",
+            lambda *_args, **_kwargs: (str(saved_path), "JSON"),
+        )
+        window._on_open_saved()
         assert window._tabs.current_page().conversation.id == saved_id
         assert "Remember this thread" in window._chat.transcript_text()
 
 
+class TestTabMenu:
+    def test_open_saved_is_available_even_without_a_tab_under_the_pointer(self, qapp: object):
+        from demo_app.widgets.chat_tabs import ConversationTabs
+
+        tabs = ConversationTabs()
+        menu, actions = tabs._make_context_menu(-1)
+        assert actions["open"].text() == "Open Saved…"
+        assert actions["open"].isEnabled()
+        assert [action.text() for action in menu.actions()[:2]] == ["New", "Open Saved…"]
+        assert not tabs.documentMode()
+
+
+class TestSharedTabBorders:
+    def test_conversations_use_the_shared_bordered_tab_widget(self, qapp: object):
+        from demo_app.widgets.chat_tabs import ConversationTabs
+        from demo_app.widgets.tab_widget import BorderedTabWidget
+
+        tabs = ConversationTabs()
+        assert isinstance(tabs, BorderedTabWidget)
+        assert tabs._pane_outline.geometry() == tabs.rect()
+        assert tabs.tabPosition() == tabs.TabPosition.North
+
+    def test_outline_refresh_is_deferred_until_tab_geometry_settles(self, qapp: object):
+        from demo_app.widgets.tab_widget import BorderedTabWidget
+
+        tabs = BorderedTabWidget()
+        tabs.update_tab_outline()
+        assert tabs._outline_timer.isActive()
+
+
 class TestSidebarSnap:
-    """The snap handlers, fed sub-threshold widths directly.
+    """The inspector snap handler, fed a sub-threshold width directly.
 
     ``setSizes`` cannot produce those widths in a test — Qt clamps to the children's
-    minimum sizes — so the reported sizes are shadowed for the call, exactly as a
+    minimum sizes, so the reported sizes are shadowed for the call, exactly as a
     mid-drag ``splitterMoved`` would report them.
     """
-
-    def test_left_sidebar_snaps_shut_below_the_threshold(self, window):
-        window.show()
-        splitter = window._outer_splitter
-        splitter.sizes = lambda: [80, 1000]  # what a drag past the threshold reports
-        try:
-            window._on_outer_splitter_moved(0, 1)
-        finally:
-            del splitter.sizes
-        assert splitter.sizes()[0] == 0
-        assert window._left_sidebar_action.isChecked() is False
 
     def test_right_sidebar_snaps_shut_below_the_threshold(self, window):
         window.show()
@@ -164,15 +191,18 @@ class TestSidebarSnap:
         assert splitter.sizes()[1] == 0
         assert window._right_sidebar_action.isChecked() is False
 
-    def test_wide_drags_do_not_snap(self, window):
-        window.show()
-        before = window._outer_splitter.sizes()
-        window._on_outer_splitter_moved(0, 1)  # real (wide) sizes: nothing to snap
-        assert window._outer_splitter.sizes() == before
-        assert window._left_sidebar_action.isChecked() is True
-
 
 class TestBubblePolish:
+    def test_transcript_and_message_bodies_never_scroll_horizontally(self, qapp: object):
+        from PySide6.QtCore import Qt
+
+        from demo_app.widgets.chat_view import MessageBubble, MessageList
+
+        transcript = MessageList()
+        bubble = MessageBubble("assistant", "demo-fake:reliable")
+        assert transcript.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        assert bubble._body.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+
     def test_assistant_header_reveals_target_on_hover(self, qapp: object):
         from demo_app.widgets.chat_view import MessageBubble
 
@@ -182,6 +212,13 @@ class TestBubblePolish:
         assert "ollama:gpt-oss:20b" in bubble._header_label.text()
         bubble._render_header(hovered=False)
         assert "ollama" not in bubble._header_label.text()
+
+    def test_welcome_cards_share_a_minimum_height(self, qapp: object):
+        from demo_app.widgets.chat_view import _WelcomeCard
+
+        short = _WelcomeCard("Short", "One line")
+        long = _WelcomeCard("Longer title that wraps", "A much longer description " * 4)
+        assert short.minimumHeight() == long.minimumHeight() >= 120
 
 
 class TestDefaultsSurfaced:
@@ -251,14 +288,143 @@ class TestDefaultsSurfaced:
         assert "not reported" in window._temperature.toolTip()
 
 
-class TestSectionMenuIcons:
-    def test_hidden_sections_wear_their_icon_in_the_menu(self, window):
+class TestSectionMenuChecks:
+    def test_sidebar_sections_use_checkmarks_without_replacement_icons(self, window):
         action = window._section_actions["telemetry"]
-        assert action.icon().isNull()  # visible → checkmark only
+        assert action.isCheckable()
+        assert action.isChecked()
+        assert action.icon().isNull()
         action.setChecked(False)
-        assert not action.icon().isNull()  # hidden → the section's icon
+        assert action.icon().isNull()
         action.setChecked(True)
         assert action.icon().isNull()
+
+
+class TestRequestOptionsGrid:
+    def test_options_start_collapsed(self, window):
+        assert window._request_options_section.minimized
+        assert window._request_options_section._content.isHidden()
+
+    def test_options_are_arranged_as_three_rows_of_three(self, window):
+        layout = window._request_options_grid
+        positions = sorted(
+            (layout.getItemPosition(i)[0], layout.getItemPosition(i)[1])
+            for i in range(layout.count())
+        )
+        assert positions == [(row, column) for row in range(3) for column in range(3)]
+        assert window._temperature.minimumWidth() >= 120
+        assert window._top_p.minimumWidth() >= 120
+        assert window._max_output_tokens.minimumWidth() >= 120
+
+    def test_session_control_uses_the_same_control_row_height(self, window):
+        expected = max(window._history.sizeHint().height(), window._cache.sizeHint().height())
+        assert window._reuse_session.minimumHeight() >= expected
+
+
+class TestRenderingFixes:
+    def test_window_and_collapsed_inspector_sections_keep_usable_minima(self, window):
+        from demo_app.widgets.collapsible_section import HEADER_HEIGHT
+
+        assert window.minimumWidth() == 960
+        assert window.minimumHeight() == 640
+        assert window._target_section.height() == HEADER_HEIGHT
+        assert window._tools_section.height() == HEADER_HEIGHT
+
+    def test_compact_disclosure_icon_is_centred_in_its_header(self, qapp: object):
+        from PySide6.QtCore import QSize
+        from PySide6.QtWidgets import QLabel
+
+        from demo_app import theme
+        from demo_app.widgets.collapsible_section import CollapsibleSection
+
+        section = CollapsibleSection("Telemetry", QLabel("body"))
+        section.setStyleSheet(theme.stylesheet(theme.resolve_theme(qapp, "light")))
+        section.resize(320, 96)
+        section.show()
+        qapp.processEvents()
+
+        toggle = section._toggle
+        assert toggle.size() == QSize(26, 26)
+        assert abs(toggle.geometry().center().y() - toggle.parentWidget().rect().center().y()) <= 1
+
+    def test_collapsed_inspector_headers_are_anchored_to_the_top(self, window, qapp: object):
+        from demo_app.widgets.collapsible_section import HEADER_HEIGHT
+
+        window.resize(1200, 800)
+        window.show()
+        qapp.processEvents()
+        for section in window._inspector_sections.values():
+            section.set_minimized(True)
+        qapp.processEvents()
+
+        visible_sections = list(window._inspector_sections.values())
+        handle_width = window._inspector_splitter.handleWidth()
+        assert [section.geometry().y() for section in visible_sections] == [
+            index * (HEADER_HEIGHT + handle_width) for index in range(len(visible_sections))
+        ]
+        assert window._inspector_bottom_spacer.isVisible()
+        assert window._inspector_bottom_spacer.height() > HEADER_HEIGHT
+
+        visible_sections[0].set_minimized(False)
+        qapp.processEvents()
+        assert not window._inspector_bottom_spacer.isVisible()
+        assert visible_sections[0].height() > HEADER_HEIGHT
+
+    def test_tab_close_button_has_a_twenty_pixel_hit_target(self, qapp: object):
+        from PySide6.QtCore import QSize
+        from PySide6.QtWidgets import QTabBar, QToolButton
+
+        from demo_app.conversation import Conversation
+        from demo_app.widgets.chat_tabs import ChatPage, ConversationTabs
+
+        tabs = ConversationTabs()
+        index = tabs.add_page(ChatPage(Conversation.new()), "Chat")
+        button = tabs.tabBar().tabButton(index, QTabBar.ButtonPosition.RightSide)
+        assert isinstance(button, QToolButton)
+        assert button.size() == QSize(20, 20)
+        assert button.iconSize() == QSize(12, 12)
+
+    def test_model_items_expose_the_full_label_as_a_tooltip(self, window):
+        from PySide6.QtCore import Qt
+
+        from anyinfer.types.capabilities import DiscoveredModel
+
+        model_id = "organization/a-very-long-model-identifier-that-does-not-fit"
+        window._engine_bar.on_models_listed("demo-fake", [DiscoveredModel(model_id)])
+        combo = window._engine_bar._model
+        assert combo.minimumContentsLength() >= 20
+        assert combo.itemData(0, Qt.ItemDataRole.ToolTipRole) == combo.itemText(0)
+
+    def test_hint_and_notice_styles_use_secondary_surfaces(self, qapp: object):
+        from demo_app import theme
+
+        stylesheet = theme.stylesheet(theme.resolve_theme(qapp, "light"))
+        assert "QLabel#HintText" in stylesheet
+        assert "border-left: 3px solid" in stylesheet
+
+    def test_hardware_marks_choose_contrast_from_their_background(self, qapp: object):
+        from demo_app.widgets.models_dialog import _contrasting_text_color
+
+        assert _contrasting_text_color("#ffffff") == "#000000"
+        assert _contrasting_text_color("#000000") == "#ffffff"
+
+    def test_required_mark_uses_the_active_danger_token(self, qapp: object):
+        from anyinfer.registry import SetupField
+        from demo_app import theme
+        from demo_app.widgets.settings_dialog import _field_label
+
+        label = _field_label(SetupField("api_key", "API key", "secret", required=True))
+        assert theme.color("danger") in label.text()
+        assert "#d13438" not in label.text()
+
+    def test_telemetry_events_use_separate_badge_and_detail_columns(self, qapp: object):
+        from demo_app.widgets.telemetry_view import _RequestCard
+
+        card = _RequestCard("request-id", ("demo-fake:reliable",))
+        card.add_event(object())
+        row = card._events.itemAt(0).widget()
+        assert row is not None
+        assert row.layout().count() == 2
 
 
 class TestHelpDialogPolish:
@@ -294,7 +460,6 @@ class TestHelpDialogPolish:
 
     def test_about_dialog_reports_the_sdk_version(self, qapp: object):
         import anyinfer
-
         from demo_app.widgets.help_dialogs import AboutDialog
 
         dialog = AboutDialog()

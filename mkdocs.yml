@@ -118,6 +118,8 @@ nav:
   - Integrate:
       - guides/README.md
       - Why AnyInfer: why-anyinfer.md
+      - Confidentiality tiers: guides/confidentiality-tiers.md
+      - SOC 2 control mapping: guides/soc2-mapping.md
       - When to use AnyInfer: guides/when-to-use.md
       - Quickstart: guides/quickstart.md
       - Choosing an integration path: guides/integration-paths.md
@@ -137,6 +139,7 @@ nav:
           - Test your application offline: guides/testing-your-app.md
           - Compare targets without spending: guides/comparing-targets.md
           - Add your own provider: guides/custom-providers.md
+          - Embed, store, and query a small corpus: guides/vector-store.md
       - Operations:
           - Run a model locally: guides/local-inference.md
           - Choose and download a local model: guides/local-models.md
@@ -151,6 +154,7 @@ nav:
       - The event stream: concepts/events.md
       - Routing: concepts/routing.md
       - Structured output: concepts/structured-output.md
+      - Embeddings and reranking: concepts/embeddings.md
       - Sessions: concepts/sessions.md
       - Capabilities and provenance: concepts/capabilities.md
       - Token estimation and context budgets: concepts/budgeting.md
@@ -173,6 +177,7 @@ nav:
       - Distill a corpus: examples/distill-a-corpus.md
       - Regression-test fallback and repair: examples/golden-manifest.md
       - Compare targets without spending: examples/compare-targets.md
+      - Semantic search over a small corpus: examples/semantic-search.md
   - Providers:
       - providers/README.md
       - Every provider: providers/all.md
@@ -192,6 +197,9 @@ nav:
       - OpenRouter: providers/openrouter.md
       - Nebius Token Factory: providers/nebius.md
       - Ollama: providers/ollama.md
+      - Text Embeddings Inference: providers/tei.md
+      - Voyage AI: providers/voyage.md
+      - Jina AI: providers/jina.md
       - llama.cpp: providers/llama-cpp.md
       - OpenAI-compatible: providers/openai-compat.md
   - Reference:
@@ -201,6 +209,9 @@ nav:
           - Clients and streams: reference/api/client.md
           - Requests and messages: reference/api/requests.md
           - Results and stream events: reference/api/results.md
+          - Embeddings and reranking: reference/api/embeddings.md
+          - Portability diff tool: reference/api/compare-diff.md
+          - Vector store add-on: reference/api/vector-store.md
           - Routing: reference/api/routing.md
           - Capabilities: reference/api/capabilities.md
           - Context reduction: reference/api/context.md

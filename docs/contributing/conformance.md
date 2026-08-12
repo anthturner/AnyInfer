@@ -46,10 +46,10 @@ fragments reassemble by index rather than by arrival order.
 ## Declaring what you cannot do
 
 ```python
-supports=Capabilities(reasoning=False, tools=False)
+supports = Capabilities(reasoning=False, tools=False)
 ```
 
-An unsupported case is reported `skipped` and renders as ➖ — an honest, documented
+An unsupported case is reported `skipped` and renders as ➖ — an explicit, documented
 limitation. It is deliberately *not* a pass, so the matrix cannot overstate a provider.
 
 ## Three modes

@@ -345,9 +345,7 @@ async def test_attempt_timeout_is_a_typed_retryable_transport_error() -> None:
         with pytest.raises(ai.AllTargetsFailedError) as excinfo:
             await client.generate(
                 "hi",
-                route=ai.Route(
-                    targets=("openai-compat:m",), retry=ai.Retry(max_attempts=1)
-                ),
+                route=ai.Route(targets=("openai-compat:m",), retry=ai.Retry(max_attempts=1)),
                 timeout_s=0.05,
             )
 

@@ -37,12 +37,14 @@ The bundled catalog ships `small`, `medium`, and `large`. Which provider serves 
 determined by **the order you configured providers**:
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of("ollama"),        # tried first
-    ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("ollama"),  # tried first
+        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+    ]
+)
 
-client.generate(prompt, target="medium")      # -> ollama:qwen3:4b
+client.generate(prompt, target="medium")  # -> ollama:qwen3:4b
 ```
 
 Reverse that list and `medium` resolves to Anthropic instead. The rule is deliberately
@@ -51,7 +53,7 @@ or chosen for you, so the same code makes the same choice every time.
 
 ### Why aliases exist
 
-They let an application offer "pick a size" instead of "pick a model id" — and they let you
+They let an application offer "pick a size" instead of "pick a model id", and they let you
 change which model backs a tier without touching application code. Catalog entries are data;
 application code refers to tiers.
 
@@ -79,7 +81,7 @@ print(resolved.provider_id, resolved.model, resolved.via_alias)
 
 Resolving a target says it is *spelled* correctly. It says nothing about whether the
 credential behind it can generate, whether the model id exists at that endpoint, or whether
-the deployment has capacity — and a health probe does not either, because everything a
+the deployment has capacity, and a health probe does not either, because everything a
 health probe touches can be fine while inference still fails.
 
 `verify()` spends one deliberately tiny request to find out, and reports rather than raises:
@@ -87,10 +89,10 @@ health probe touches can be fine while inference still fails.
 ```python
 result = client.verify("openai:gpt-5")
 
-result.ok         # answered, in the shape asked for, with the expected content
-result.reached    # answered at all
-result.detail     # what went wrong, when something did
-result.target     # which model actually served it — meaningful for "auto"
+result.ok  # answered, in the shape asked for, with the expected content
+result.reached  # answered at all
+result.detail  # what went wrong, when something did
+result.target  # which model actually served it — meaningful for "auto"
 ```
 
 The two booleans are separate on purpose, because the fixes are different:
@@ -113,15 +115,17 @@ Applications overlay their own catalog; app entries win:
 ```python
 from anyinfer.catalog import Catalog
 
-overlay = Catalog.from_mapping({
-    "format_version": 1,
-    "aliases": {
-        "medium": {
-            "description": "our pinned medium tier",
-            "targets": {"anthropic": {"model": "claude-sonnet-4-5"}},
-        }
-    },
-})
+overlay = Catalog.from_mapping(
+    {
+        "format_version": 1,
+        "aliases": {
+            "medium": {
+                "description": "our pinned medium tier",
+                "targets": {"anthropic": {"model": "claude-sonnet-4-5"}},
+            }
+        },
+    }
+)
 
 client = ai.Client(providers, catalog=ai.load_default_catalog().overlay(overlay))
 ```
@@ -155,7 +159,7 @@ This is enforced by a round-trip test, not just intended.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Routing](routing.md) — a `Route` is an ordered list of targets plus policy.
-- [Capabilities](capabilities.md) — what is known about a resolved model.
+- [Routing](routing.md): a `Route` is an ordered list of targets plus policy.
+- [Capabilities](capabilities.md): what is known about a resolved model.
 
 </div>

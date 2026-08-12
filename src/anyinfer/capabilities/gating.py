@@ -1,6 +1,6 @@
 """Pre-dispatch context-window gating.
 
-Fail fast — or let the router fall back — when a request provably cannot fit the target's
+Fail fast, or let the router fall back, when a request provably cannot fit the target's
 context window, instead of paying a round trip to learn the same thing. Two rules keep the
 gate honest:
 

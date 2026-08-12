@@ -53,9 +53,7 @@ async def test_done_sentinel_terminates() -> None:
 
 async def test_comment_lines_are_ignored() -> None:
     """OpenRouter sends ``: OPENROUTER PROCESSING`` keep-alives."""
-    events = await _collect_sse(
-        b": OPENROUTER PROCESSING\n\n" b'data: {"a": 1}\n\n' b": keep-alive\n\n"
-    )
+    events = await _collect_sse(b': OPENROUTER PROCESSING\n\ndata: {"a": 1}\n\n: keep-alive\n\n')
     assert events == [{"a": 1}]
 
 

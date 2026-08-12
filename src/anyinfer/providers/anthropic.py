@@ -563,7 +563,7 @@ _RATE_LIMIT_HEADERS = RateLimitHeaders(
 
 Recorded in ``contracts/anthropic.md``. The ``tokens`` pair is read rather than the
 separate ``input-tokens`` and ``output-tokens`` pairs because Anthropic documents it as the
-*most restrictive* limit currently in effect — which is the one a client about to send a
+*most restrictive* limit currently in effect, which is the one a client about to send a
 request needs, and the only one whose meaning does not change with the tier.
 """
 

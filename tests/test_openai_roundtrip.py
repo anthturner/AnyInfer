@@ -2,7 +2,7 @@
 
 These run from M0 even though the server ships in M5, because the four invariants they
 enforce are *core* obligations. If a core type change breaks one of these, the serve
-frontend would stop being a thin projection — which is the failure this suite exists to
+frontend would stop being a thin projection, which is the failure this suite exists to
 catch early.
 """
 
@@ -159,9 +159,7 @@ def test_unrecognized_fields_reach_provider_options() -> None:
 
 
 def test_unknown_top_level_fields_are_preserved() -> None:
-    _, request, _ = request_from_openai(
-        {"model": "m", "messages": [], "some_new_field": 7}
-    )
+    _, request, _ = request_from_openai({"model": "m", "messages": [], "some_new_field": 7})
     assert request.provider_options["*"] == {"some_new_field": 7}
 
 
@@ -211,7 +209,8 @@ async def test_event_stream_reconstructs_a_chunk_sequence() -> None:
     assert text == "Hello, world!", "chunks must reconstruct the full text"
 
     finish_chunks = [
-        c for c in chunks
+        c
+        for c in chunks
         if c["choices"] and c["choices"][0].get("finish_reason")  # type: ignore[index,union-attr]
     ]
     assert len(finish_chunks) == 1, "exactly one chunk carries the finish reason"
@@ -239,7 +238,8 @@ async def test_tool_call_chunks_carry_index_and_fragments() -> None:
         result = stream.result
 
     tool_chunks = [
-        c for c in chunks
+        c
+        for c in chunks
         if c["choices"] and "tool_calls" in c["choices"][0]["delta"]  # type: ignore[index,operator]
     ]
     assert tool_chunks, "tool calls must produce chunks"
@@ -271,10 +271,13 @@ async def test_non_streaming_completion_shape() -> None:
 def test_anyinfer_only_events_have_no_openai_equivalent() -> None:
     """Timing marks and attempt records are ours; the OpenAI wire cannot carry them."""
     assert chunk_from_event(ai.TimingMark("first_token", 12.0), model="m") is None
-    assert chunk_from_event(
-        ai.AttemptFailed(ai.AttemptRecord(ai.ResolvedTarget("p", "m"), "failed")),
-        model="m",
-    ) is None
+    assert (
+        chunk_from_event(
+            ai.AttemptFailed(ai.AttemptRecord(ai.ResolvedTarget("p", "m"), "failed")),
+            model="m",
+        )
+        is None
+    )
 
 
 def test_other_finish_reason_maps_into_openais_closed_set() -> None:
@@ -282,7 +285,10 @@ def test_other_finish_reason_maps_into_openais_closed_set() -> None:
     from anyinfer.serve.openai_codec import OPENAI_FINISH_REASONS
 
     assert set(OPENAI_FINISH_REASONS.values()) <= {
-        "stop", "length", "tool_calls", "content_filter"
+        "stop",
+        "length",
+        "tool_calls",
+        "content_filter",
     }
 
 

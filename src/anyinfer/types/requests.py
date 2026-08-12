@@ -171,7 +171,7 @@ class ToolAnnotations:
     """Behavioural hints a tool source advertises about a tool.
 
     **Untrusted by construction.** These arrive from whatever declared the tool — a Model
-    Context Protocol server, most often — and the protocol that defines them says plainly
+    Context Protocol server, most often, and the protocol that defines them says plainly
     that a client must not treat them as guarantees. AnyInfer honours that: a hint may gate
     an *optimization*, and it may never gate a security decision. Nothing is granted more
     access, skipped, or auto-approved because a server called it read-only.
@@ -255,7 +255,7 @@ class HistoryPolicy:
 
     A prompt that outgrows the window has two possible answers: send it somewhere with a
     bigger window, or make it smaller. The router has always owned the first
-    (``Route.context_window_targets``). This owns the second, at the same layer — so the
+    (``Route.context_window_targets``). This owns the second, at the same layer, so the
     Python API, the command line, and the OpenAI-compatible frontend all behave the same
     way, because all three are the same client wearing different skins.
 

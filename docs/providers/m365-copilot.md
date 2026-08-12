@@ -22,12 +22,14 @@ pip install "anyinfer[azure]"
 ```
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "m365-copilot",
-        options={"tenant_id": "...", "client_id": "..."},
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "m365-copilot",
+            options={"tenant_id": "...", "client_id": "..."},
+        ),
+    ]
+)
 result = client.generate(prompt, target="m365-copilot:m365-copilot")
 ```
 
@@ -41,7 +43,7 @@ Consequences, stated plainly:
 
 - It cannot run headless, in CI, or in a container without a human present.
 - It is exempt from live conformance testing.
-- `health()` deliberately does *not* trigger a sign-in — a health probe that opens a browser
+- `health()` deliberately does *not* trigger a sign-in: a health probe that opens a browser
   window would be a hostile surprise, and the router calls it speculatively.
 
 If you already hold a token, supply it and skip the interactive flow:
@@ -76,7 +78,7 @@ class Watch:
             log.warning("%s ignored %s", event.target, event.parameter)
 ```
 
-This is the whole point of that event: a `temperature=0` that had no effect is otherwise
+That event matters: a `temperature=0` that had no effect is otherwise
 indistinguishable from one that worked.
 
 ## One repair attempt, never a loop
@@ -91,7 +93,10 @@ ignored parameter is:
 
 ```python
 result = client.generate(
-    prompt, target="m365-copilot:default", schema=PERSON, repair=ai.Repair(max_attempts=3),
+    prompt,
+    target="m365-copilot:default",
+    schema=PERSON,
+    repair=ai.Repair(max_attempts=3),
 )
 # ParameterDropped(parameter="repair.max_attempts", reason="... at most 1 ... 3 requested")
 ```
@@ -102,7 +107,7 @@ when the shape matters more than the M365 grounding does.
 
 ## Notes
 
-- Citations and attributions are retained on `result.raw` rather than normalized — build
+- Citations and attributions are retained on `result.raw` rather than normalized: build
   the client with `retain_raw=True` to keep them, since raw payloads are discarded by
   default. v1 has no typed model for them, and inventing one would freeze a shape before
   it is understood.
@@ -113,7 +118,7 @@ when the shape matters more than the M365 grounding does.
 
 If you need automation, streaming, tools, or sampling control, use another provider. This
 adapter exists so that applications with a genuine M365 Copilot requirement can reach it
-through the same interface — not because it is a good default.
+through the same interface; not because it is a good default.
 
 ## Wire contract
 

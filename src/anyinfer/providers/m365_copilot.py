@@ -76,7 +76,7 @@ class M365CopilotAdapter:
 
         Raises:
             ConfigError: If the ``[azure]`` extra is absent, or no interactive session is
-                possible — which is the expected outcome in CI and headless deployments.
+                possible, which is the expected outcome in CI and headless deployments.
         """
         if self._token:
             return self._token

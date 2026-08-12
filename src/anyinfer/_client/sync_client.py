@@ -17,15 +17,16 @@ import atexit
 import contextlib
 import queue
 import threading
-from collections.abc import Coroutine, Iterator, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Iterator, Mapping, Sequence
 from concurrent.futures import Future
 from pathlib import Path
 from types import TracebackType
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 from ..benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
+    BenchmarkSample,
     Measurement,
     MeasurementStore,
 )
@@ -33,9 +34,9 @@ from ..capabilities.budget import ContextBudget
 from ..capabilities.estimate import TokenEstimator
 from ..capabilities.ledger import SpendLedger, SpendTotals
 from ..capabilities.pricing_table import PricingTable
-from ..capabilities.probes import ProbeReport
+from ..capabilities.probes import EmbeddingProbeReport, ProbeReport
 from ..catalog.model import Catalog
-from ..compare import TargetComparison
+from ..compare import EmbeddingTargetComparison, TargetComparison
 from ..context_request import ContextRequest
 from ..credentials import ResolverChain
 from ..errors import ConfigError
@@ -52,6 +53,15 @@ from ..routing.policy import Route
 from ..session import Session
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
+from ..types.operations import (
+    BatchPolicy,
+    EmbeddingInputIntent,
+    EmbeddingResult,
+    EmbeddingSpace,
+    InferenceOperation,
+    RerankDocument,
+    RerankResult,
+)
 from ..types.requests import (
     ArenaPolicy,
     CachePolicy,
@@ -174,7 +184,7 @@ class SyncStream:
         self._result: Generation | None = None
         self._closed = False
         # Built here rather than inside the pump so the caller's thread holds the stream
-        # object — and therefore its manifest — before the first event exists. Nothing in
+        # object, and therefore its manifest — before the first event exists. Nothing in
         # `AsyncClient.stream()` awaits, and an async generator binds no loop until it is
         # first iterated, so constructing it off the loop thread is safe.
         self._async_stream = factory()
@@ -288,6 +298,7 @@ class Client:
         registry: ProviderRegistry | None = None,
         catalog: Catalog | None = None,
         route: Route | None = None,
+        operation_routes: Mapping[str, Route] | None = None,
         observers: Sequence[Observer] | None = None,
         resolver: ResolverChain | None = None,
         retain_raw: bool = False,
@@ -314,6 +325,7 @@ class Client:
                 registry=registry,
                 catalog=catalog,
                 route=route,
+            operation_routes=operation_routes,
                 observers=observers,
                 resolver=resolver,
                 retain_raw=retain_raw,
@@ -383,10 +395,12 @@ class Client:
 
     # ---- discovery -------------------------------------------------------------------
 
-    def models(self, provider_id: str) -> Sequence[DiscoveredModel]:
-        """List a provider's models."""
+    def models(
+        self, provider_id: str, *, operation: InferenceOperation | None = None
+    ) -> Sequence[DiscoveredModel]:
+        """List a provider's models. See `AsyncClient.models`."""
         self._ensure_open()
-        return self._loop.run(self._async.models(provider_id))
+        return self._loop.run(self._async.models(provider_id, operation=operation))
 
     def health(self, provider_id: str) -> Health:
         """Probe a provider's readiness."""
@@ -439,6 +453,7 @@ class Client:
         output_tokens: int = BENCHMARK_OUTPUT_TOKENS,
         timeout_s: float = 120.0,
         store: MeasurementStore | None = None,
+        progress: Callable[[BenchmarkSample], None] | None = None,
     ) -> Measurement:
         """Measure what a target actually does, with one deterministic request.
 
@@ -452,6 +467,7 @@ class Client:
                 output_tokens=output_tokens,
                 timeout_s=timeout_s,
                 store=store,
+                progress=progress,
             )
         )
 
@@ -472,13 +488,34 @@ class Client:
             self._async.probe(target, features=features, timeout_s=timeout_s, record=record)
         )
 
-    def verify(self, target: Target, *, timeout_s: float = 60.0) -> Verification:
+    def verify(
+        self,
+        target: Target,
+        *,
+        timeout_s: float = 60.0,
+        operation: InferenceOperation = "generation",
+    ) -> Verification:
         """Prove a target works by asking it something, end to end.
 
         See `AsyncClient.verify`.
         """
         self._ensure_open()
-        return self._loop.run(self._async.verify(target, timeout_s=timeout_s))
+        return self._loop.run(
+            self._async.verify(target, timeout_s=timeout_s, operation=operation)
+        )
+
+    def probe_embedding(
+        self,
+        target: Target,
+        *,
+        timeout_s: float = 30.0,
+        record: bool = True,
+    ) -> EmbeddingProbeReport:
+        """Measure an embedding target with one real call. See `AsyncClient.probe_embedding`."""
+        self._ensure_open()
+        return self._loop.run(
+            self._async.probe_embedding(target, timeout_s=timeout_s, record=record)
+        )
 
     # ---- local models ----------------------------------------------------------------
 
@@ -636,6 +673,28 @@ class Client:
             )
         )
 
+    def compare_embedding(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        targets: Sequence[Target],
+        input_type: EmbeddingInputIntent | None = None,
+        refresh: bool = False,
+    ) -> tuple[EmbeddingTargetComparison, ...]:
+        """Compare embedding request portability without dispatching.
+
+        See `AsyncClient.compare_embedding`.
+        """
+        self._ensure_open()
+        return self._loop.run(
+            self._async.compare_embedding(
+                inputs,
+                targets=targets,
+                input_type=input_type,
+                refresh=refresh,
+            )
+        )
+
     # ---- generation ------------------------------------------------------------------
 
     def generate(
@@ -687,6 +746,82 @@ class Client:
                 max_input_part_bytes=max_input_part_bytes,
                 max_input_bytes=max_input_bytes,
                 session=session,
+                manifest=manifest,
+            )
+        )
+
+    def embed(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        input_type: Literal["query", "document", "classification", "clustering"] | None = None,
+        dimensions: int | None = None,
+        expected_space: EmbeddingSpace | None = None,
+        allow_incompatible_fallback: bool = False,
+        batch: BatchPolicy | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        retain_raw: bool | None = None,
+        manifest: bool | None = None,
+    ) -> EmbeddingResult:
+        """Embed one or more texts into vectors. See `AsyncClient.embed()`."""
+        self._ensure_open()
+        return self._loop.run(
+            self._async.embed(
+                inputs,
+                target=target,
+                route=route,
+                input_type=input_type,
+                dimensions=dimensions,
+                expected_space=expected_space,
+                allow_incompatible_fallback=allow_incompatible_fallback,
+                batch=batch,
+                timeout_s=timeout_s,
+                provider_options=provider_options,
+                metadata=metadata,
+                max_response_bytes=max_response_bytes,
+                retain_raw=retain_raw,
+                manifest=manifest,
+            )
+        )
+
+    def rerank(
+        self,
+        query: str,
+        documents: Sequence[str | RerankDocument],
+        *,
+        target: Target | None = None,
+        route: Route | Target | Sequence[Target] | None = None,
+        top_n: int | None = None,
+        batch: BatchPolicy | None = None,
+        timeout_s: float | None = None,
+        provider_options: Mapping[str, Mapping[str, Any]] | None = None,
+        metadata: Mapping[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        return_documents: bool = False,
+        retain_raw: bool | None = None,
+        manifest: bool | None = None,
+    ) -> RerankResult:
+        """Rank documents by relevance to a query. See `AsyncClient.rerank()`."""
+        self._ensure_open()
+        return self._loop.run(
+            self._async.rerank(
+                query,
+                documents,
+                target=target,
+                route=route,
+                top_n=top_n,
+                batch=batch,
+                timeout_s=timeout_s,
+                provider_options=provider_options,
+                metadata=metadata,
+                max_response_bytes=max_response_bytes,
+                return_documents=return_documents,
+                retain_raw=retain_raw,
                 manifest=manifest,
             )
         )

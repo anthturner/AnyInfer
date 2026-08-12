@@ -12,6 +12,7 @@ from anyinfer.providers.presets import (
     COMPAT_PRESETS,
     CompatPreset,
     PresetCompatAdapter,
+    PresetEmbeddingAdapter,
     preset_descriptors,
 )
 from anyinfer.registry import ProviderRegistry
@@ -106,7 +107,7 @@ def test_presets_without_a_default_base_url_require_one() -> None:
 
 
 def test_local_presets_default_to_loopback() -> None:
-    """A local engine's default must be loopback — but it may have no default at all.
+    """A local engine's default must be loopback, but it may have no default at all.
 
     KServe is addressed by a cluster service host and Foundry Local picks its port at
     service start, so neither has a loopback address to guess. Those declare
@@ -169,8 +170,7 @@ async def test_moonshot_renames_the_output_token_parameter() -> None:
             200,
             json={
                 "choices": [
-                    {"message": {"role": "assistant", "content": "ok"},
-                     "finish_reason": "stop"}
+                    {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
                 ]
             },
         )
@@ -212,11 +212,7 @@ async def test_errors_are_attributed_to_the_preset_id() -> None:
         return httpx2.Response(401, json={"error": {"message": "bad key"}})
 
     client = ai.AsyncClient(
-        [
-            ai.ProviderSettings.of(
-                "groq", api_key="bad", transport=httpx2.MockTransport(handler)
-            )
-        ]
+        [ai.ProviderSettings.of("groq", api_key="bad", transport=httpx2.MockTransport(handler))]
     )
     async with client:
         with pytest.raises(ai.AllTargetsFailedError) as excinfo:
@@ -233,9 +229,7 @@ def test_reasoning_translators_produce_the_documented_wire_fields() -> None:
     assert registry.get("parasail").reasoning_translator("minimal") == {
         "reasoning_effort": "low"
     }, "three-level providers clamp minimal onto their lowest documented level"
-    assert registry.get("parasail").reasoning_translator("high") == {
-        "reasoning_effort": "high"
-    }
+    assert registry.get("parasail").reasoning_translator("high") == {"reasoning_effort": "high"}
     assert registry.get("mistral").reasoning_translator("minimal") == {
         "reasoning_effort": "minimal"
     }
@@ -336,12 +330,8 @@ def test_endpoints_corrected_by_re_verification_stay_corrected() -> None:
 def test_requesty_spells_its_lowest_effort_min_not_minimal() -> None:
     """Requesty documents `min`; `minimal` is a near-homograph it does not accept."""
     registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
-    assert registry.get("requesty").reasoning_translator("minimal") == {
-        "reasoning_effort": "min"
-    }
-    assert registry.get("requesty").reasoning_translator("high") == {
-        "reasoning_effort": "high"
-    }
+    assert registry.get("requesty").reasoning_translator("minimal") == {"reasoning_effort": "min"}
+    assert registry.get("requesty").reasoning_translator("high") == {"reasoning_effort": "high"}
 
 
 async def test_perplexity_declares_tools_as_ignored() -> None:
@@ -378,8 +368,7 @@ def _server_for(scenario: str) -> FakeOpenAIServer:
     if scenario == "rate_limited":
         return FakeOpenAIServer(
             [
-                FakeResponse(status=429, error_message="slow down",
-                             headers={"retry-after": "0"}),
+                FakeResponse(status=429, error_message="slow down", headers={"retry-after": "0"}),
                 FakeResponse(text="recovered"),
             ]
         )
@@ -511,3 +500,73 @@ def test_regional_presets_declare_no_model_listing() -> None:
     """
     for preset_id in ("volcengine", "hunyuan", "spark"):
         assert PRESETS_BY_ID[preset_id].models_listing is False, preset_id
+
+
+# ---- embeddings (T5: verified-only opt-in) --------------------------------------------
+
+
+def _embedding_adapter(preset_id: str, handler, **config_kwargs) -> PresetEmbeddingAdapter:
+    from anyinfer.providers.base import ProviderConfig
+
+    preset = PRESETS_BY_ID[preset_id]
+    assert preset.embeddings, f"{preset_id} has not been verified for embeddings"
+    return PresetEmbeddingAdapter(
+        ProviderConfig(
+            provider_id=preset_id,
+            base_url=preset.base_url or "https://fake.invalid/v1",
+            transport=httpx2.MockTransport(handler),
+            **config_kwargs,
+        ),
+        preset=preset,
+    )
+
+
+def test_only_the_verified_four_presets_declare_embeddings() -> None:
+    """Unverified presets stay generation-only — the correct default (plan BH.I.2)."""
+    embedding_ids = {p.id for p in COMPAT_PRESETS if p.embeddings}
+    assert embedding_ids == {"together", "fireworks", "mistral", "deepinfra"}
+
+
+def test_embedding_presets_declare_the_operation_and_adapter() -> None:
+    registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
+    for preset_id in ("together", "fireworks", "mistral", "deepinfra"):
+        descriptor = registry.get(preset_id)
+        assert descriptor.operations == frozenset({"generation", "embedding"})
+    for preset_id in ("groq", "cerebras"):
+        descriptor = registry.get(preset_id)
+        assert descriptor.operations == frozenset({"generation"})
+
+
+async def test_a_verified_preset_embeds_through_the_shared_dialect() -> None:
+    seen: list[dict] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(json.loads(request.content))
+        return httpx2.Response(
+            200,
+            json={
+                "data": [{"index": 0, "embedding": [0.1, 0.2]}],
+                "model": "togethercomputer/m2-bert-80M-8k-retrieval",
+            },
+        )
+
+    adapter = _embedding_adapter("together", handler, api_key="k")
+    try:
+        from anyinfer.providers.base import EmbeddingWireRequest
+
+        result = await adapter.embed(
+            EmbeddingWireRequest(
+                model="togethercomputer/m2-bert-80M-8k-retrieval", inputs=("hi",)
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0]["model"] == "togethercomputer/m2-bert-80M-8k-retrieval"
+    assert result.vectors[0] == pytest.approx((0.1, 0.2))
+
+
+def test_an_unverified_preset_has_no_embed_method() -> None:
+    """A PresetCompatAdapter has no embed() at all — the structural opt-in guard."""
+    assert not hasattr(PresetCompatAdapter, "embed")
+    assert hasattr(PresetEmbeddingAdapter, "embed")

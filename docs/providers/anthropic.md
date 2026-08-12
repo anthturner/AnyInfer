@@ -18,9 +18,11 @@ The Messages API over raw `httpx2`. Registered as `anthropic`, with the alias `c
 ## Setup
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+    ]
+)
 result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")
 ```
 
@@ -50,7 +52,7 @@ than naming levels:
 | `high` | 16384 tokens |
 
 Thinking arrives as `ReasoningDelta` events. It **starts the first-token clock** — the model
-is working and the user sees activity — but is excluded from the answer text.
+is working and the user sees activity, but is excluded from the answer text.
 
 ## Structured output
 

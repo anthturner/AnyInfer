@@ -55,8 +55,10 @@
     "reductions": []
   },
   "dropped": [],
+  "embedding_space": null,
   "format": "1",
   "notes": [],
+  "operation": "generation",
   "payloads": null,
   "request": {
     "char_count": 6,
@@ -136,6 +138,7 @@
     "input_tokens": 11,
     "output_tokens": 7,
     "reasoning_tokens": null,
+    "search_units": null,
     "total_tokens": 18
   }
 }

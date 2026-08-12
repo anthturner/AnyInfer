@@ -3,7 +3,7 @@
 Deliberately the **native** ``/api/chat`` dialect rather than Ollama's ``/v1``
 OpenAI-compatibility layer. The native API is strictly more capable for our purposes: it
 carries grammar-enforced structured output via ``format``, per-phase nanosecond timings,
-``keep_alive`` session retention, and reasoning via ``think`` — and the ``/v1`` layer
+``keep_alive`` session retention, and reasoning via ``think``, and the ``/v1`` layer
 *silently discards* parameters it does not implement, which is the failure mode AnyInfer
 exists to eliminate.
 
@@ -47,8 +47,22 @@ from ..types.messages import (
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import Diagnostic, FinishReason, Usage
 from ._multimodal import base64_data, unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    EmbeddingWireRequest,
+    EmbeddingWireResult,
+    ProviderConfig,
+    WireRequest,
+    _encode_function_tool,
+)
+from .http import (
+    build_client,
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+)
 from .sse import iter_ndjson
 
 __all__ = ["SESSION_KEEP_ALIVE", "OllamaAdapter", "descriptor"]
@@ -199,7 +213,7 @@ class OllamaAdapter:
         does.
 
         Reads ``/api/ps`` only — the same endpoint `loaded_models()` uses, no generation
-        cost — and reports nothing at all when the server is unreachable or too old to
+        cost, and reports nothing at all when the server is unreachable or too old to
         answer, because an advisory that guesses is worse than one that stays quiet.
         """
         reports: list[Diagnostic] = []
@@ -288,9 +302,13 @@ class OllamaAdapter:
         status: int,
         body: bytes,
         headers: Mapping[str, str],
-        req: WireRequest,
+        req: WireRequest | EmbeddingWireRequest,
     ) -> ProviderError:
-        """Map an Ollama error, distinguishing "model not pulled" from other 404s."""
+        """Map an Ollama error, distinguishing "model not pulled" from other 404s.
+
+        Shared between generation and embedding calls — both wire request shapes carry
+        ``model``, which is all this needs to build the pull hint.
+        """
         detail = read_error_detail(body)
         if status == 404 and "not found" in detail.lower():
             return ModelNotFoundError(
@@ -375,14 +393,7 @@ class OllamaAdapter:
         return encoded
 
     def _encode_tool(self, tool: ToolSpec) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": dict(tool.parameters),
-            },
-        }
+        return _encode_function_tool(tool)
 
     def _events_from_message(self, message: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Translate one NDJSON object into events."""
@@ -429,6 +440,88 @@ class OllamaAdapter:
 
         if message.get("done") is True:
             state.absorb_final(message)
+
+    # ---- embeddings ------------------------------------------------------------------
+
+    async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Run one embedding call against ``POST /api/embed``.
+
+        See ``contracts/ollama.md`` for the verified request/response fields. Batch input
+        is native to this endpoint — every text in one request is sent as one array, not
+        simulated with repeated calls.
+        """
+        payload = self._build_embedding_payload(req)
+        try:
+            response = await self._client.post(
+                "/api/embed", json=payload, timeout=req.timeout_s
+            )
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            body = response.content
+            raise self._classify(response.status_code, body, response.headers, req)
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
+        return self._parse_embedding_response(req, response.json())
+
+    def _build_embedding_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": req.model,
+            "input": list(req.inputs) if len(req.inputs) != 1 else req.inputs[0],
+        }
+        if req.dimensions is not None:
+            payload["dimensions"] = req.dimensions
+        payload.update(req.extra_options)
+        return payload
+
+    def _parse_embedding_response(
+        self, req: EmbeddingWireRequest, payload: Any
+    ) -> EmbeddingWireResult:
+        if not isinstance(payload, Mapping):
+            raise ProviderError("embeddings response is not a JSON object", phase="validate")
+        embeddings = payload.get("embeddings")
+        if not isinstance(embeddings, list):
+            raise ProviderError(
+                "embeddings response is missing an 'embeddings' array", phase="validate"
+            )
+        if len(embeddings) != len(req.inputs):
+            raise ProviderError(
+                f"embeddings response returned {len(embeddings)} vectors for "
+                f"{len(req.inputs)} inputs",
+                phase="validate",
+            )
+        vectors: list[tuple[float, ...]] = []
+        for entry in embeddings:
+            if not isinstance(entry, list):
+                raise ProviderError(
+                    "embeddings response contains a non-array vector", phase="validate"
+                )
+            vectors.append(tuple(float(v) for v in entry))
+
+        model = payload.get("model")
+        prompt_eval_count = payload.get("prompt_eval_count")
+        usage = None
+        if isinstance(prompt_eval_count, int):
+            usage = Usage(input_tokens=prompt_eval_count)
+
+        # Same phase names generation uses; /api/embed reports no prefill/decode split
+        # (contracts/ollama.md), so only these two exist to carry.
+        phases: dict[str, float] = {}
+        for source_name, phase_name in (
+            ("load_duration", "model_load_ms"),
+            ("total_duration", "provider_total_ms"),
+        ):
+            value = payload.get(source_name)
+            if isinstance(value, int | float) and not isinstance(value, bool) and value >= 0:
+                phases[phase_name] = float(value) / _NS_PER_MS
+
+        return EmbeddingWireResult(
+            vectors=tuple(vectors),
+            model=model if isinstance(model, str) else None,
+            dimensions=len(vectors[0]) if vectors else None,
+            usage=usage,
+            phases=phases,
+            raw=payload,
+        )
 
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
@@ -576,7 +669,9 @@ descriptor = ProviderDescriptor(
     # Ollama keeps its own store and downloader, so acquisition here means asking it to
     # pull. The implementation lives in local/, never in this adapter.
     model_puller=_pull_model,
+    model_inventory="installed",
     reports_diagnostics=True,
     grammar_needs_prompt_injection=True,
+    operations=frozenset({"generation", "embedding"}),
 )
 """Descriptor for the Ollama provider."""

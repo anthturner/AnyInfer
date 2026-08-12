@@ -73,6 +73,7 @@ def show(progress):
             end="",
         )
 
+
 report = client.acquire_model("qwen2.5-coder-14b-instruct", progress=show)
 print(f"\n{report.plan.quantization} at {report.entry.handle}")
 ```
@@ -100,6 +101,10 @@ result = client.generate(
 )
 ```
 
+`client.models("llama-cpp")` likewise lists only models registered in the local store.
+Browse `client.local_catalog("llama-cpp")` when you want the larger set that can be
+downloaded; catalog availability is not presented as installed inventory.
+
 If no runtime is installed yet, ask for the small one:
 
 ```console
@@ -121,8 +126,8 @@ build.
 
 ```python
 located = client.locate_model("qwen2.5-coder-14b-instruct")
-print(located.path)               # no network I/O
-print(located.launch_hints)       # {'engine': 'llama.cpp', 'ctx_size': 32768, …}
+print(located.path)  # no network I/O
+print(located.launch_hints)  # {'engine': 'llama.cpp', 'ctx_size': 32768, …}
 ```
 
 ```console
@@ -139,12 +144,10 @@ bandwidth for is not a decision a library should make.
 Point Ollama at a remote host and AnyInfer stops pretending it knows the hardware:
 
 ```python
-client = ai.Client(
-    [ai.ProviderSettings.of("ollama", base_url="http://192.168.1.50:11434")]
-)
+client = ai.Client([ai.ProviderSettings.of("ollama", base_url="http://192.168.1.50:11434")])
 
 view = client.local_catalog("ollama")
-view.hardware_source        # 'unavailable'
+view.hardware_source  # 'unavailable'
 ```
 
 Ask the user for the host's specifications and pass them back:
@@ -155,7 +158,7 @@ from anyinfer import local
 specs = local.HardwareProfile.from_user_input(ram_gb=64, vram_gb=24, accelerator="cuda")
 view = client.local_catalog("ollama", hardware=specs)
 
-view.hardware_source        # 'provided'
+view.hardware_source  # 'provided'
 ```
 
 The fits are now real, and `view.notes` says they came from supplied specifications rather
@@ -174,6 +177,6 @@ client.generate("…", target="medium")
 
 ## What to read next
 
-- [The model catalog](../concepts/catalog.md) — fit levels, channels, and categories.
-- [Acquiring models](../concepts/models.md) — verification, resume, and the store layout.
-- [Run a model locally](local-inference.md) — tuning, supervision, and admission control.
+- [The model catalog](../concepts/catalog.md): fit levels, channels, and categories.
+- [Acquiring models](../concepts/models.md): verification, resume, and the store layout.
+- [Run a model locally](local-inference.md): tuning, supervision, and admission control.

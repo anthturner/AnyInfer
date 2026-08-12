@@ -109,7 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     serve = subcommands.add_parser("serve", help="run the OpenAI-compatible HTTP frontend")
     _add_serve_flags(serve)
     # A subparser group that is *not* required, so `anyinfer serve` with no verb keeps
-    # running the server — which is the command everything else documents.
+    # running the server, which is the command everything else documents.
     serve_commands = serve.add_subparsers(dest="serve_command", required=False)
 
     serve_install = serve_commands.add_parser(
@@ -368,6 +368,144 @@ def build_parser() -> argparse.ArgumentParser:
             "Content-free: shape, counts, and decisions, never prompt or reply text"
         ),
     )
+    embed = subcommands.add_parser(
+        "embed",
+        help="embed text into vectors",
+        description=(
+            "Embed one or more texts and print the resulting vectors. Input is a single "
+            "positional argument, one text per line from --file/stdin, or one JSON object "
+            "per line ({'text': ...}) from --jsonl."
+        ),
+    )
+    embed.add_argument("text", nargs="?", help="a single text to embed")
+    embed.add_argument(
+        "--config", type=Path, help="JSON config file describing providers and routes"
+    )
+    embed.add_argument(
+        "--target", default=None, help="where to send it: an alias, or 'provider:model'"
+    )
+    embed.add_argument(
+        "--route",
+        action="append",
+        default=[],
+        metavar="TARGET",
+        help="ordered fallback target, repeatable; overrides --target",
+    )
+    embed.add_argument(
+        "--file", type=Path, default=None, metavar="PATH", help="newline-delimited texts"
+    )
+    embed.add_argument(
+        "--jsonl",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="JSON Lines file, one {'text': ...} object per line",
+    )
+    embed.add_argument(
+        "--input-type",
+        choices=("query", "document", "classification", "clustering"),
+        default=None,
+        help="what the embedded text will be used for, on models that distinguish it",
+    )
+    embed.add_argument("--dimensions", type=int, default=None, help="requested vector length")
+    embed.add_argument(
+        "--trace",
+        action="store_true",
+        help="print the run manifest to stderr: route, attempts, usage, and timing",
+    )
+    embed.add_argument(
+        "--trace-json",
+        nargs="?",
+        const="-",
+        default=None,
+        metavar="PATH",
+        help=(
+            "write the run manifest as JSON to PATH, or to stdout when given no value. "
+            "Content-free: never input text, document text, or vectors"
+        ),
+    )
+    embed.add_argument(
+        "--timeout", type=float, default=None, metavar="SECONDS", help="per-request timeout"
+    )
+    embed.add_argument(
+        "--json",
+        action="store_true",
+        help="emit one JSON object with vectors, space, usage, and timing",
+    )
+    embed.add_argument(
+        "--out", type=Path, default=None, metavar="PATH", help="write JSON output to a file"
+    )
+
+    rerank = subcommands.add_parser(
+        "rerank",
+        help="rank documents by relevance to a query",
+        description=(
+            "Rank documents against a query and print them best-first. Documents come "
+            "from repeated --document flags, one per line from --file, or one JSON "
+            "object per line ({'id': ..., 'text': ...}) from --jsonl."
+        ),
+    )
+    rerank.add_argument("query", help="the query every document is scored against")
+    rerank.add_argument(
+        "--document",
+        action="append",
+        default=[],
+        metavar="TEXT",
+        dest="documents",
+        help="a document to rank, repeatable; ids are assigned in order",
+    )
+    rerank.add_argument(
+        "--config", type=Path, help="JSON config file describing providers and routes"
+    )
+    rerank.add_argument(
+        "--target", default=None, help="where to send it: an alias, or 'provider:model'"
+    )
+    rerank.add_argument(
+        "--route",
+        action="append",
+        default=[],
+        metavar="TARGET",
+        help="ordered fallback target, repeatable; overrides --target",
+    )
+    rerank.add_argument(
+        "--file", type=Path, default=None, metavar="PATH", help="newline-delimited documents"
+    )
+    rerank.add_argument(
+        "--jsonl",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="JSON Lines file, one {'id': ..., 'text': ...} object per line",
+    )
+    rerank.add_argument("--top-n", type=int, default=None, metavar="N", help="return only top N")
+    rerank.add_argument(
+        "--trace",
+        action="store_true",
+        help="print the run manifest to stderr: route, attempts, usage, and timing",
+    )
+    rerank.add_argument(
+        "--trace-json",
+        nargs="?",
+        const="-",
+        default=None,
+        metavar="PATH",
+        help=(
+            "write the run manifest as JSON to PATH, or to stdout when given no value. "
+            "Content-free: never input text, document text, or vectors"
+        ),
+    )
+    rerank.add_argument(
+        "--timeout", type=float, default=None, metavar="SECONDS", help="per-request timeout"
+    )
+    rerank.add_argument(
+        "--json",
+        action="store_true",
+        help="emit one JSON object with ranked items, usage, and timing",
+    )
+    rerank.add_argument(
+        "--out", type=Path, default=None, metavar="PATH", help="write JSON output to a file"
+    )
+
     compare = subcommands.add_parser(
         "compare",
         help="compare how one request behaves across targets without sending it",
@@ -410,9 +548,9 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument(
         "--target",
         action="append",
-        required=True,
         metavar="TARGET",
-        help="target to compare, repeatable; results preserve this order",
+        help="target to compare, repeatable; results preserve this order — required unless "
+        "--snapshot, --diff, or --diff-request selects one of the fixture-driven modes",
     )
     compare.add_argument("--json", action="store_true", help="emit JSON records")
     compare.add_argument(
@@ -420,6 +558,37 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="refresh provider model listings before comparing (may contact providers)",
     )
+    compare.add_argument(
+        "--fixtures",
+        type=Path,
+        metavar="PATH",
+        help="a compare_diff fixture file — for --snapshot, or the ad hoc --diff-request mode",
+    )
+    compare.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="write a compare_diff snapshot of --fixtures to --out, instead of comparing live",
+    )
+    compare.add_argument(
+        "--out",
+        type=Path,
+        metavar="PATH",
+        help="where --snapshot writes its output",
+    )
+    compare.add_argument(
+        "--diff",
+        nargs=2,
+        metavar=("BASELINE", "CURRENT"),
+        help="diff two snapshot files written by --snapshot; exit 1 if they differ (CI-friendly)",
+    )
+    compare.add_argument(
+        "--diff-request",
+        metavar="ID",
+        help="ad hoc portability report: a fixture id from --fixtures, compared live between "
+        "--diff-target-a and --diff-target-b, no snapshot file needed",
+    )
+    compare.add_argument("--diff-target-a", metavar="TARGET")
+    compare.add_argument("--diff-target-b", metavar="TARGET")
 
     init = subcommands.add_parser(
         "init",
@@ -468,7 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Print a short instruction fragment describing how AnyInfer is actually "
             "called, for a coding agent working in a repository that uses it. Rendered "
             "from live introspection — the provider counts come from the registry, the "
-            "extras from installed metadata, the version from the package — so it cannot "
+            "extras from installed metadata, the version from the package, so it cannot "
             "describe an API this release does not have. It writes nothing: redirect it "
             "yourself, e.g. `anyinfer agents-md >> AGENTS.md`."
         ),
@@ -507,6 +676,12 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--config", type=Path, help="path to a configuration file")
     verify.add_argument(
         "--timeout", type=float, default=60.0, help="seconds to wait for each answer"
+    )
+    verify.add_argument(
+        "--operation",
+        choices=("generation", "embedding", "rerank"),
+        default="generation",
+        help="which operation to prove; embedding and rerank send one tiny real request too",
     )
     verify.add_argument("--json", action="store_true", help="emit machine-readable output")
 
@@ -704,6 +879,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _serve(args)
         if args.command == "run":
             return _run(args)
+        if args.command == "embed":
+            return _embed(args)
+        if args.command == "rerank":
+            return _rerank(args)
         if args.command == "compare":
             return _compare(args)
         if args.command == "init":
@@ -785,6 +964,7 @@ def _serve_run(args: argparse.Namespace) -> int:
     client = AsyncClient(
         settings,
         route=route,
+        operation_routes=config.operation_routes,
         history=config.history,
         cache=config.cache,
         arena=config.arena,
@@ -1035,7 +1215,25 @@ def _confirm(question: str, args: argparse.Namespace) -> bool:
 
 
 def _compare(args: argparse.Namespace) -> int:
-    """Compare a request across targets without dispatching it."""
+    """Compare a request across targets without dispatching it.
+
+    Dispatches to the portability diff tool (`anyinfer.compare_diff`) first when
+    ``--snapshot``, ``--diff``, or ``--diff-request`` was given; otherwise runs the
+    original single ad hoc comparison.
+    """
+    if args.diff is not None:
+        return _compare_diff_files(args)
+    if args.snapshot:
+        return _compare_snapshot(args)
+    if args.diff_request is not None:
+        return _compare_diff_request(args)
+    if not args.target:
+        print(
+            "--target is required (or use --snapshot, --diff, or --diff-request)",
+            file=sys.stderr,
+        )
+        return 2
+
     from . import Client, Repair, Sampling, SchemaSpec
     from .types.requests import CachePolicy
 
@@ -1077,6 +1275,7 @@ def _compare(args: argparse.Namespace) -> int:
     client = Client(
         list(config.providers),
         route=config.route,
+        operation_routes=config.operation_routes,
         repair=Repair(max_attempts=args.repair) if args.repair is not None else None,
         history=config.history,
         cache=config.cache,
@@ -1128,6 +1327,111 @@ def _compare(args: argparse.Namespace) -> int:
     print("  ".join(name.ljust(widths[index]) for index, name in enumerate(headings)))
     for row in rows:
         print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
+    return 0
+
+
+def _compare_snapshot(args: argparse.Namespace) -> int:
+    """`anyinfer compare --snapshot`: write a compare_diff snapshot to --out."""
+    from . import Client
+    from . import compare_diff as cd
+
+    if args.fixtures is None or args.out is None:
+        print("--snapshot needs --fixtures and --out", file=sys.stderr)
+        return 2
+
+    fixtures = cd.load_fixtures(args.fixtures)
+    config = _config(args.config)
+    if not config.providers:
+        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+        return 2
+    client = Client(
+        list(config.providers), route=config.route, operation_routes=config.operation_routes
+    )
+    try:
+        snapshot = cd.snapshot(fixtures, client=client)
+    finally:
+        client.close()
+
+    args.out.write_text(json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8")
+    print(f"wrote {len(fixtures)} fixture(s) to {args.out}")
+    return 0
+
+
+def _compare_diff_files(args: argparse.Namespace) -> int:
+    """`anyinfer compare --diff BASELINE CURRENT`: structural diff, no client needed."""
+    from . import compare_diff as cd
+
+    baseline_path, current_path = args.diff
+    try:
+        baseline = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+        current = json.loads(Path(current_path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        print(f"could not read snapshot file: {exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(f"snapshot file is not valid JSON: {exc}", file=sys.stderr)
+        return 2
+
+    report = cd.diff(baseline, current)
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "fixture_id": e.fixture_id,
+                        "target": e.target,
+                        "kind": e.kind,
+                        "field": e.field,
+                        "before": e.before,
+                        "after": e.after,
+                        "summary": e.summary,
+                    }
+                    for e in report.entries
+                ],
+                indent=2,
+            )
+        )
+    else:
+        print(cd.render_text(report))
+    return 1 if not report.is_empty else 0
+
+
+def _compare_diff_request(args: argparse.Namespace) -> int:
+    """`anyinfer compare --diff-request ID --diff-target-a A --diff-target-b B`.
+
+    The ad hoc, no-baseline-file "should I move from A to B" report for one fixture.
+    """
+    from . import Client
+    from . import compare_diff as cd
+
+    if args.fixtures is None or args.diff_target_a is None or args.diff_target_b is None:
+        print(
+            "--diff-request needs --fixtures, --diff-target-a, and --diff-target-b",
+            file=sys.stderr,
+        )
+        return 2
+
+    fixtures = cd.load_fixtures(args.fixtures)
+    matches = [f for f in fixtures if f.id == args.diff_request]
+    if not matches:
+        print(f"no fixture with id {args.diff_request!r} in {args.fixtures}", file=sys.stderr)
+        return 2
+
+    config = _config(args.config)
+    if not config.providers:
+        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+        return 2
+    client = Client(
+        list(config.providers), route=config.route, operation_routes=config.operation_routes
+    )
+    try:
+        report = cd.diff_targets(
+            matches[0], args.diff_target_a, args.diff_target_b, client=client
+        )
+    finally:
+        client.close()
+
+    print(cd.render_text(report))
     return 0
 
 
@@ -1216,6 +1520,7 @@ def _run(args: argparse.Namespace) -> int:
     client = Client(
         settings,
         route=route,
+        operation_routes=config.operation_routes,
         repair=Repair(max_attempts=args.repair) if args.repair is not None else None,
         history=config.history,
         cache=config.cache,
@@ -1263,11 +1568,293 @@ def _run(args: argparse.Namespace) -> int:
     return _emit_result(generation, args, streamed=streaming)
 
 
+def _embed(args: argparse.Namespace) -> int:
+    """Embed one or more texts and print the resulting vectors.
+
+    Collection is the CLI's job — the core receives text, never a path to open. Terminal
+    output never dumps raw vector floats unless the caller asked for `--json`, since a
+    printed 1536-float vector is not something a human reads.
+
+    Returns:
+        A process exit code.
+    """
+    from . import Client, Route
+
+    inputs = _collect_embed_inputs(args)
+    if inputs is None:
+        return 2
+    if not inputs:
+        print(
+            "nothing to embed: give a text argument, --file, --jsonl, or pipe on stdin",
+            file=sys.stderr,
+        )
+        return 2
+
+    config = _config(args.config)
+    settings, configured_route = list(config.providers), config.route
+    route = Route(targets=tuple(args.route)) if args.route else configured_route
+    target = None if args.route else args.target
+    if not settings:
+        print(
+            "no providers configured: pass --config pointing at a JSON file with a "
+            "'providers' list (see `anyinfer providers` for what each one needs)",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = Client(settings, route=route, operation_routes=config.operation_routes)
+    try:
+        result = client.embed(
+            inputs,
+            target=target,
+            route=route if args.route else None,
+            input_type=args.input_type,
+            dimensions=args.dimensions,
+            timeout_s=args.timeout,
+            manifest=True if (args.trace or args.trace_json is not None) else None,
+        )
+    except AnyInferError as exc:
+        return _report_error(exc)
+    finally:
+        client.close()
+
+    _emit_trace(result, args)
+    return _emit_embed_result(result, args)
+
+
+def _collect_embed_inputs(args: argparse.Namespace) -> list[str] | None:
+    """Assemble embedding inputs from the positional text, --file, --jsonl, or stdin.
+
+    Returns ``None`` on a usage error (already reported), an empty list when nothing was
+    given at all, or the collected texts otherwise.
+    """
+    sources = [
+        value
+        for value in (args.text, args.file, args.jsonl)
+        if value not in (None, "")
+    ]
+    if len(sources) > 1:
+        print("give at most one of: text argument, --file, --jsonl", file=sys.stderr)
+        return None
+
+    if args.text:
+        return [args.text]
+    if args.file is not None:
+        try:
+            lines = args.file.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            print(f"cannot read {args.file}: {exc}", file=sys.stderr)
+            return None
+        return [line for line in lines if line.strip()]
+    if args.jsonl is not None:
+        return _read_jsonl_field(args.jsonl, "text")
+
+    if not sys.stdin.isatty():
+        piped = sys.stdin.read()
+        return [line for line in piped.splitlines() if line.strip()]
+    return []
+
+
+def _read_jsonl_field(path: Path, field: str) -> list[str] | None:
+    """Read one JSON object per line, collecting a required string field from each."""
+    try:
+        raw_lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"cannot read {path}: {exc}", file=sys.stderr)
+        return None
+    values: list[str] = []
+    for lineno, line in enumerate(raw_lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError as exc:
+            print(f"{path}:{lineno}: invalid JSON: {exc}", file=sys.stderr)
+            return None
+        if not isinstance(entry, dict) or field not in entry:
+            print(f"{path}:{lineno}: missing required field {field!r}", file=sys.stderr)
+            return None
+        values.append(str(entry[field]))
+    return values
+
+
+def _emit_embed_result(result: Any, args: argparse.Namespace) -> int:
+    """Print an `EmbeddingResult`, respecting the `--json`/`--out` output contract."""
+    if args.json or args.out is not None:
+        payload = {
+            "target": str(result.target),
+            "space": {
+                "provider_id": result.space.provider_id,
+                "model": result.space.model,
+                "dimensions": result.space.dimensions,
+                "normalized": result.space.normalized,
+            },
+            "vectors": [list(v.values) for v in result.vectors],
+            "usage": {
+                "input_tokens": result.usage.input_tokens,
+                "total_tokens": result.usage.total_tokens,
+            },
+            "timing_ms": result.timing.total_ms,
+            "warnings": list(result.warnings),
+        }
+        text = json.dumps(payload, indent=2)
+        if args.out is not None:
+            args.out.write_text(text + "\n", encoding="utf-8")
+        else:
+            print(text)
+        return 0
+
+    print(
+        f"{len(result.vectors)} vector(s), {result.space.dimensions} dim, "
+        f"target={result.target}",
+        file=sys.stderr,
+    )
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    return 0
+
+
+def _rerank(args: argparse.Namespace) -> int:
+    """Rank documents by relevance to a query and print them best-first.
+
+    Returns:
+        A process exit code.
+    """
+    from . import Client, Route
+
+    documents = _collect_rerank_documents(args)
+    if documents is None:
+        return 2
+    if not documents:
+        print(
+            "nothing to rank: give --document (repeatable), --file, --jsonl, or pipe on "
+            "stdin",
+            file=sys.stderr,
+        )
+        return 2
+
+    config = _config(args.config)
+    settings, configured_route = list(config.providers), config.route
+    route = Route(targets=tuple(args.route)) if args.route else configured_route
+    target = None if args.route else args.target
+    if not settings:
+        print(
+            "no providers configured: pass --config pointing at a JSON file with a "
+            "'providers' list (see `anyinfer providers` for what each one needs)",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = Client(settings, route=route, operation_routes=config.operation_routes)
+    try:
+        result = client.rerank(
+            args.query,
+            documents,
+            target=target,
+            route=route if args.route else None,
+            top_n=args.top_n,
+            timeout_s=args.timeout,
+            manifest=True if (args.trace or args.trace_json is not None) else None,
+        )
+    except AnyInferError as exc:
+        return _report_error(exc)
+    finally:
+        client.close()
+
+    _emit_trace(result, args)
+    return _emit_rerank_result(result, args)
+
+
+def _collect_rerank_documents(args: argparse.Namespace) -> list[Any] | None:
+    """Assemble `RerankDocument`s from --document, --file, --jsonl, or stdin."""
+    from . import RerankDocument
+
+    sources = [bool(args.documents), args.file is not None, args.jsonl is not None]
+    if sum(sources) > 1:
+        print("give at most one of: --document, --file, --jsonl", file=sys.stderr)
+        return None
+
+    if args.documents:
+        return [RerankDocument(id=str(i), text=t) for i, t in enumerate(args.documents)]
+    if args.file is not None:
+        try:
+            lines = args.file.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            print(f"cannot read {args.file}: {exc}", file=sys.stderr)
+            return None
+        return [
+            RerankDocument(id=str(i), text=line)
+            for i, line in enumerate(lines)
+            if line.strip()
+        ]
+    if args.jsonl is not None:
+        return _read_jsonl_documents(args.jsonl)
+
+    if not sys.stdin.isatty():
+        piped = sys.stdin.read()
+        lines = [line for line in piped.splitlines() if line.strip()]
+        return [RerankDocument(id=str(i), text=line) for i, line in enumerate(lines)]
+    return []
+
+
+def _read_jsonl_documents(path: Path) -> list[Any] | None:
+    """Read one {'id', 'text'} object per line into `RerankDocument`s."""
+    from . import RerankDocument
+
+    try:
+        raw_lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"cannot read {path}: {exc}", file=sys.stderr)
+        return None
+    documents: list[Any] = []
+    for lineno, line in enumerate(raw_lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError as exc:
+            print(f"{path}:{lineno}: invalid JSON: {exc}", file=sys.stderr)
+            return None
+        if not isinstance(entry, dict) or "text" not in entry:
+            print(f"{path}:{lineno}: missing required field 'text'", file=sys.stderr)
+            return None
+        doc_id = str(entry.get("id", lineno - 1))
+        documents.append(RerankDocument(id=doc_id, text=str(entry["text"])))
+    return documents
+
+
+def _emit_rerank_result(result: Any, args: argparse.Namespace) -> int:
+    """Print a `RerankResult`, respecting the `--json`/`--out` output contract."""
+    if args.json or args.out is not None:
+        payload = {
+            "target": str(result.target),
+            "items": [
+                {"document_id": item.document_id, "score": item.score, "index": item.index}
+                for item in result.items
+            ],
+            "usage": {
+                "input_tokens": result.usage.input_tokens,
+                "total_tokens": result.usage.total_tokens,
+            },
+            "timing_ms": result.timing.total_ms,
+        }
+        text = json.dumps(payload, indent=2)
+        if args.out is not None:
+            args.out.write_text(text + "\n", encoding="utf-8")
+        else:
+            print(text)
+        return 0
+
+    for rank, item in enumerate(result.items, start=1):
+        print(f"{rank}. [{item.document_id}] {item.score:.4f}")
+    return 0
+
+
 def _dry_run(client: Any, messages: Any, call: dict[str, Any], args: argparse.Namespace) -> int:
     """Report the size, fit, and cost of a request without sending it.
 
     Answers the question a user asks *before* paying for a large prompt, using the same
-    budget calculator the client uses at dispatch — so what this prints is what the real
+    budget calculator the client uses at dispatch, so what this prints is what the real
     request would have been held to, not a second estimate of it.
     """
     arena = call.get("arena")
@@ -1720,7 +2307,10 @@ def _init(args: argparse.Namespace) -> int:
     settings, notes = _init_settings(found)
     target, recommendation = _init_target(settings, found, profile)
     route = _init_route(target, found)
-    config = AnyInferConfig(providers=tuple(settings), route=route)
+    operation_routes = _init_operation_routes(found)
+    config = AnyInferConfig(
+        providers=tuple(settings), route=route, operation_routes=operation_routes
+    )
 
     if args.json:
         payload = {
@@ -1733,6 +2323,7 @@ def _init(args: argparse.Namespace) -> int:
                     "base_url": entry.base_url,
                     "detail": entry.detail,
                     "models": list(entry.models),
+                    "embedding_models": list(entry.embedding_models),
                     "credential_ref": entry.credential_ref,
                 }
                 for entry in found
@@ -1744,6 +2335,10 @@ def _init(args: argparse.Namespace) -> int:
             },
             "target": target,
             "route": list(route.targets) if route else [],
+            "operation_routes": {
+                operation: list(op_route.targets)
+                for operation, op_route in operation_routes.items()
+            },
             "notes": notes,
             "config_path": str(config_path),
             "starter_path": str(starter_path),
@@ -1753,6 +2348,9 @@ def _init(args: argparse.Namespace) -> int:
         return 0
 
     _print_init_findings(profile, probed, found, recommendation, target, notes, args)
+    if operation_routes:
+        embedding_route = operation_routes["embedding"]
+        print(f"embedding  {embedding_route.targets[0]} (from what was discovered)")
     if not _confirm_init(config_path, starter_path, args):
         print("nothing written")
         return 0
@@ -1763,7 +2361,7 @@ def _init(args: argparse.Namespace) -> int:
     print(f"\nnext       python {starter_path}")
     print(f"           anyinfer verify --config {config_path}")
     # Said once, and nothing is edited: the generated file holds only credential
-    # references, so it is safe to commit — and repo hygiene files belong to the user.
+    # references, so it is safe to commit, and repo hygiene files belong to the user.
     print(
         f"\nnote       {config_path} holds only env:// references, never key material, "
         "so it is safe to commit"
@@ -1775,7 +2373,7 @@ def _init_settings(found: Any) -> tuple[list[Any], list[str]]:
     """Turn discovery evidence into provider settings, and note what it could not write.
 
     A provider whose endpoint is per-account cannot be configured from evidence alone —
-    knowing a key exists says nothing about which tenant it belongs to — so it becomes a
+    knowing a key exists says nothing about which tenant it belongs to, so it becomes a
     note rather than a half-written entry that fails at the first request.
     """
     from . import ProviderSettings, default_registry
@@ -1853,6 +2451,24 @@ def _init_route(target: str, found: Any) -> Any:
     from .routing import Route
 
     return Route(targets=(target,)) if found else None
+
+
+def _init_operation_routes(found: Any) -> dict[str, Any]:
+    """Write an ``embedding`` route only for providers discovery actually stamped.
+
+    `DiscoveredProvider.embedding_models` is populated only when the listing itself
+    tagged a model's operations (LM Studio, Cohere) — most listings say nothing about
+    embedding support, and staying silent there is correct: a config claiming an
+    embedding route nobody verified would fail on first use exactly like an invented
+    generation target would.
+    """
+    from .routing import Route
+
+    for entry in found:
+        if entry.evidence == "endpoint" and entry.embedding_models:
+            target = f"{entry.provider_id}:{entry.embedding_models[0]}"
+            return {"embedding": Route(targets=(target,))}
+    return {}
 
 
 def _write_init_files(
@@ -2059,7 +2675,7 @@ def _doctor(args: argparse.Namespace) -> int:
     for warning in profile.warnings:
         print(f"warning           {warning}")
 
-    # Pacing is invisible from the outside — a governed request just looks slow — so an
+    # Pacing is invisible from the outside — a governed request just looks slow, so an
     # operator asking "why is this slow" should be able to see the bounds in one place.
     for instance_id, summary in limits.items():
         print(f"rate limit        {instance_id}: {summary}")
@@ -2109,7 +2725,10 @@ def _verify(args: argparse.Namespace) -> int:
 
     client = Client(settings)
     try:
-        results = [client.verify(target, timeout_s=args.timeout) for target in targets]
+        results = [
+            client.verify(target, timeout_s=args.timeout, operation=args.operation)
+            for target in targets
+        ]
     finally:
         client.close()
 
@@ -2354,7 +2973,11 @@ def _context_budget(args: argparse.Namespace, config: AnyInferConfig) -> int | N
 
     from . import Client
 
-    with Client(list(config.providers), route=config.route) as client:
+    with Client(
+        list(config.providers),
+        route=config.route,
+        operation_routes=config.operation_routes,
+    ) as client:
         computed = client.budget([], target=args.target)
     remaining = computed.remaining_tokens
     if remaining is None or remaining < 1:
@@ -2454,6 +3077,7 @@ def _providers(args: argparse.Namespace) -> int:
                         "display_name": d.display_name,
                         "aliases": list(d.aliases),
                         "locality": d.locality,
+                        "operations": sorted(d.operations),
                         "requires_base_url": d.requires_base_url,
                         "fields": [
                             {
@@ -2482,6 +3106,8 @@ def _providers(args: argparse.Namespace) -> int:
     for descriptor in descriptors:
         aliases = f" (aliases: {', '.join(descriptor.aliases)})" if descriptor.aliases else ""
         print(f"{descriptor.id:<16} {descriptor.display_name}{aliases}")
+        if descriptor.operations != frozenset({"generation"}):
+            print(f"{'':<16} serves:   {', '.join(sorted(descriptor.operations))}")
         setup = descriptor.setup
         required = [f.key for f in setup.fields if f.required]
         if required:
@@ -2554,6 +3180,7 @@ def _conform(args: argparse.Namespace) -> int:
         return AsyncClient(
             list(config.providers),
             route=config.route,
+            operation_routes=config.operation_routes,
             history=config.history,
             cache=config.cache,
         )
@@ -2590,7 +3217,7 @@ def _mcp_list(args: argparse.Namespace) -> int:
     """Connect to each configured MCP server and report what it exposes.
 
     Discovery only. The command-line runner never executes tools — requested calls are
-    reported so a caller can run them — and connecting a tool source does not change that.
+    reported so a caller can run them, and connecting a tool source does not change that.
     What this answers is the question an operator actually has: is my server reachable, and
     what does it claim to offer?
     """

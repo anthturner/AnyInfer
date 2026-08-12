@@ -32,33 +32,33 @@ You are embedding AnyInfer in an application.
 
 **Getting started**
 
-1. [When to use AnyInfer](guides/when-to-use.md) — what it replaces, and what it
+1. [When to use AnyInfer](guides/when-to-use.md): what it replaces, and what it
    deliberately does not.
-2. [Quickstart](guides/quickstart.md) — install to first result.
-3. [Choosing an integration path](guides/integration-paths.md) — Python SDK, command-line
+2. [Quickstart](guides/quickstart.md): install to first result.
+3. [Choosing an integration path](guides/integration-paths.md): Python SDK, command-line
    tool, or sidecar.
-4. [Installation and extras](guides/installation.md) — which extras you need, and why the
+4. [Installation and extras](guides/installation.md): which extras you need, and why the
    core is deliberately small.
-5. [Shared configuration](reference/configuration.md) — one file for every integration path.
+5. [Shared configuration](reference/configuration.md): one file for every integration path.
 
 **Concepts** — read these once and the rest of the API explains itself.
 
-- [Targets and aliases](concepts/targets.md) — how `"medium"` and
+- [Targets and aliases](concepts/targets.md): how `"medium"` and
   `"anthropic:claude-sonnet-4-5"` both resolve.
-- [The event stream](concepts/events.md) — the one primitive everything else projects from.
+- [The event stream](concepts/events.md): the one primitive everything else projects from.
 - [Routing: retries, fallback, health](concepts/routing.md)
 - [Structured output and repair](concepts/structured-output.md)
-- [Capabilities and provenance](concepts/capabilities.md) — why every number says where it
+- [Capabilities and provenance](concepts/capabilities.md): why every number says where it
   came from.
-- [Token estimation and context budgets](concepts/budgeting.md) — fit and cost before
+- [Token estimation and context budgets](concepts/budgeting.md): fit and cost before
   dispatch.
-- [Context reduction](concepts/context-reduction.md) — reduce approved material and report
+- [Context reduction](concepts/context-reduction.md): reduce approved material and report
   omissions.
 - [Credentials and redaction](concepts/credentials.md)
 - [Telemetry and observers](concepts/telemetry.md)
-- [Run manifests](concepts/run-manifests.md) — hold, diff, and regression-test one call's decisions.
-- [Multimodal inputs](concepts/multimodal-inputs.md) — typed images, documents, and audio.
-- [The local subsystem](concepts/local.md) — hardware detection through supervised servers.
+- [Run manifests](concepts/run-manifests.md): hold, diff, and regression-test one call's decisions.
+- [Multimodal inputs](concepts/multimodal-inputs.md): typed images, documents, and audio.
+- [The local subsystem](concepts/local.md): hardware detection through supervised servers.
 
 **How-to guides** — task-shaped, copy-pasteable.
 
@@ -72,9 +72,9 @@ You are embedding AnyInfer in an application.
 - [Run the tool loop](guides/tool-loop.md)
 - [Fit a corpus to a context budget](guides/fitting-context.md)
 - [Keep the sidecar running across reboots](serve/running-as-a-service.md)
-- [Let a coding agent write the integration](guides/coding-agents.md) — and have it write
+- [Let a coding agent write the integration](guides/coding-agents.md), and have it write
   correct code rather than a plausible OpenAI clone
-- [Explore the pack-in demo app](guides/demo-app.md) — a PySide6 reference integration that
+- [Explore the pack-in demo app](guides/demo-app.md): a PySide6 reference integration that
   runs offline. Standalone builds are on the [downloads page](downloads.md).
 
 **Examples** — complete programs, exercised in CI.
@@ -101,27 +101,27 @@ You are embedding AnyInfer in an application.
 
 You are changing AnyInfer itself, or writing an adapter for it.
 
-- [Contributor guide](contributing/README.md) — setup, the quality gates, and what CI checks.
-- [Architecture](contributing/architecture.md) — the load-bearing rules and why they exist.
-- [Writing a provider adapter](contributing/writing-an-adapter.md) — including how to
+- [Contributor guide](contributing/README.md): setup, the quality gates, and what CI checks.
+- [Architecture](contributing/architecture.md): the load-bearing rules and why they exist.
+- [Writing a provider adapter](contributing/writing-an-adapter.md): including how to
   certify it against the conformance suite.
 - [The conformance suite](contributing/conformance.md)
 - [Provider contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md) and the
   [drift check](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md).
-- [Testing guide](contributing/testing.md) — fakes, cassettes, and what to test where.
-- [Branching and releases](contributing/releasing.md) — how a change becomes a release.
+- [Testing guide](contributing/testing.md): fakes, cassettes, and what to test where.
+- [Branching and releases](contributing/releasing.md): how a change becomes a release.
 
 ---
 
 ## Reference
 
-- [SDK reference](reference/api/README.md) — every public symbol, generated from the
+- [SDK reference](reference/api/README.md): every public symbol, generated from the
   docstrings (best read on the [published site](https://anyinfer.dev/reference/api/)).
-- [Error catalog](reference/errors.md) — every exception, when it is raised, and what its
+- [Error catalog](reference/errors.md): every exception, when it is raised, and what its
   `hint` will tell your user.
-- [Conformance matrix](reference/conformance-matrix.md) — what each provider actually
+- [Conformance matrix](reference/conformance-matrix.md): what each provider actually
   supports, generated from test results.
-- [Shared configuration](reference/configuration.md) — provider settings, environment
+- [Shared configuration](reference/configuration.md): provider settings, environment
   variables, and the common file format.
 - [Glossary](reference/glossary.md)
 
@@ -132,6 +132,6 @@ You are changing AnyInfer itself, or writing an adapter for it.
 The architecture is settled and written down. These are the sources of truth for *why*
 things are the way they are:
 
-- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture, module responsibilities, decision
+- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md): architecture, module responsibilities, decision
   rationale, open questions, and the risk register.
-- [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) — canonical repository automation instructions.
+- [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md): canonical repository automation instructions.

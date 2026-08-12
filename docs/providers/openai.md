@@ -22,9 +22,11 @@ Want the chat-completions dialect instead? Point [openai-compat](openai-compat.m
 ## Setup
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY"),
+    ]
+)
 result = client.generate(prompt, target="openai:gpt-5")
 ```
 
@@ -50,6 +52,24 @@ result.usage.reasoning_tokens
 
 Effort levels pass straight through: `minimal`, `low`, `medium`, `high`.
 
+## Embeddings
+
+The dedicated adapter serves `POST /v1/embeddings` through the shared OpenAI-compatible
+dialect:
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="openai:text-embedding-3-small",
+)
+```
+
+Requests larger than the API's 2,048-input ceiling are split by the core and
+re-assembled in input order. Requested `dimensions` are forwarded (text-embedding-3 and
+later). OpenAI's request schema has no input-intent concept, so passing `input_type`
+adds a warning to the result rather than silently doing nothing. There is no reranking
+endpoint on this API.
+
 ## Notes
 
 - System messages become the top-level `instructions` field.
@@ -59,7 +79,7 @@ Effort levels pass straight through: `minimal`, `low`, `medium`, `high`.
 ## Provider options
 
 ```python
-provider_options={"openai": {"store": False, "service_tier": "flex"}}
+provider_options = {"openai": {"store": False, "service_tier": "flex"}}
 ```
 
 ## Wire contract

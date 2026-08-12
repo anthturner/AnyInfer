@@ -29,9 +29,11 @@ from ..types.capabilities import (
     ModelCapabilities,
     Sourced,
 )
+from ..types.operations import InferenceOperation
 from ..types.requests import ReasoningEffort
 from .base import ProviderConfig
 from .openai_compat import OpenAICompatAdapter
+from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 
 __all__ = ["LMStudioAdapter", "descriptor"]
 
@@ -42,7 +44,7 @@ _NATIVE_MODELS_PATH = "/api/v1/models"
 """The native listing, relative to the server root rather than the ``/v1`` prefix."""
 
 
-class LMStudioAdapter(OpenAICompatAdapter):
+class LMStudioAdapter(OpenAICompatEmbeddingsMixin, OpenAICompatAdapter):
     """Adapter for LM Studio's local server, with native model discovery."""
 
     def __init__(self, config: ProviderConfig) -> None:
@@ -71,10 +73,13 @@ class LMStudioAdapter(OpenAICompatAdapter):
         if not isinstance(entries, list):
             return await super().list_models()
 
+        # Embedding models are listed too, tagged with their operation, rather than
+        # filtered out as non-chat — discovery reports what exists, not what one
+        # operation can use.
         models = [
             _parse_native_model(entry)
             for entry in entries
-            if isinstance(entry, Mapping) and entry.get("type") in (None, "llm")
+            if isinstance(entry, Mapping) and entry.get("type") in (None, "llm", "embedding")
         ]
         return models or await super().list_models()
 
@@ -119,16 +124,30 @@ class LMStudioAdapter(OpenAICompatAdapter):
 
 
 def _parse_native_model(entry: Mapping[str, Any]) -> DiscoveredModel:
-    """Read one native listing entry into discovered capabilities."""
-    features = Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.JSON_SCHEMA
-    capabilities = entry.get("capabilities")
-    if isinstance(capabilities, Mapping):
-        if capabilities.get("trained_for_tool_use"):
+    """Read one native listing entry into discovered capabilities.
+
+    The native listing's ``type`` distinguishes ``llm`` from ``embedding`` models, so
+    operations arrive with ``discovered`` provenance; generation feature flags are never
+    stamped onto an embedding model.
+    """
+    kind = entry.get("type")
+    operations: Sourced[frozenset[InferenceOperation]] | None = None
+    if kind == "embedding":
+        operations = Sourced(frozenset({"embedding"}), "discovered")
+    elif kind == "llm":
+        operations = Sourced(frozenset({"generation"}), "discovered")
+
+    features = Feature(0)
+    if kind != "embedding":
+        features = Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.JSON_SCHEMA
+        capabilities = entry.get("capabilities")
+        if isinstance(capabilities, Mapping):
+            if capabilities.get("trained_for_tool_use"):
+                features |= Feature.TOOLS
+            if capabilities.get("reasoning"):
+                features |= Feature.REASONING
+        else:
             features |= Feature.TOOLS
-        if capabilities.get("reasoning"):
-            features |= Feature.REASONING
-    else:
-        features |= Feature.TOOLS
 
     window = entry.get("max_context_length")
     context = (
@@ -150,6 +169,7 @@ def _parse_native_model(entry: Mapping[str, Any]) -> DiscoveredModel:
         capabilities=ModelCapabilities(
             context_window=context,
             features=Sourced(features, "discovered"),
+            operations=operations,
             local=LocalModelInfo(
                 artifact_size_bytes=size if isinstance(size, int) else None,
                 parameter_size=str(entry["params_string"])
@@ -190,6 +210,10 @@ descriptor = ProviderDescriptor(
     locality="local",
     default_base_url=_DEFAULT_BASE_URL,
     requires_base_url=False,
+    # /v1/embeddings verified against lmstudio.ai/docs/app/api/endpoints/openai on
+    # 2026-08-12; per-model limits are whatever the loaded model imposes, so no static
+    # embedding capabilities are declared — discovery tags which models embed.
+    operations=frozenset({"generation", "embedding"}),
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

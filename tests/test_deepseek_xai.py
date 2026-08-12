@@ -24,7 +24,9 @@ def _client(provider: str, handler: Any, **settings: Any) -> ai.AsyncClient:
     return ai.AsyncClient(
         [
             ai.ProviderSettings.of(
-                provider, api_key="test-key", transport=httpx2.MockTransport(handler),
+                provider,
+                api_key="test-key",
+                transport=httpx2.MockTransport(handler),
                 **settings,
             )
         ]
@@ -110,8 +112,7 @@ async def test_deepseek_buffered_reasoning_content_is_surfaced() -> None:
         events = [
             e
             async for e in adapter.generate(
-                WireRequest(model="deepseek-v4-pro", messages=(ai.user("hi"),),
-                            stream=False)
+                WireRequest(model="deepseek-v4-pro", messages=(ai.user("hi"),), stream=False)
             )
         ]
     finally:
@@ -124,9 +125,7 @@ async def test_deepseek_buffered_reasoning_content_is_surfaced() -> None:
 async def test_deepseek_cache_hit_tokens_become_cache_reads() -> None:
     """prompt_tokens = hits + misses, and only hits change the bill."""
     body = {
-        "choices": [
-            {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
-        ],
+        "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
         "usage": {
             "prompt_tokens": 100,
             "completion_tokens": 10,
@@ -144,9 +143,7 @@ async def test_deepseek_cache_hit_tokens_become_cache_reads() -> None:
 
 async def test_deepseek_reasoning_effort_enables_thinking() -> None:
     body = {
-        "choices": [
-            {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
-        ]
+        "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]
     }
     seen, handler = _capture(lambda r: httpx2.Response(200, json=body))
     async with _client("deepseek", handler) as client:
@@ -167,9 +164,7 @@ async def test_deepseek_declares_silently_ignored_sampling() -> None:
             recorded.append(event)
 
     body = {
-        "choices": [
-            {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
-        ]
+        "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]
     }
     client = ai.AsyncClient(
         [
@@ -197,9 +192,7 @@ async def test_deepseek_declares_silently_ignored_sampling() -> None:
 
 async def test_xai_renames_the_output_token_parameter() -> None:
     body = {
-        "choices": [
-            {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
-        ]
+        "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]
     }
     seen, handler = _capture(lambda r: httpx2.Response(200, json=body))
     async with _client("xai", handler) as client:
@@ -214,9 +207,7 @@ async def test_xai_renames_the_output_token_parameter() -> None:
 async def test_xai_reported_cost_wins_over_computed_pricing() -> None:
     """A provider-reported cost already includes tiering and tool fees."""
     body = {
-        "choices": [
-            {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
-        ],
+        "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
         "usage": {
             "prompt_tokens": 1000,
             "completion_tokens": 100,
@@ -275,9 +266,7 @@ async def test_xai_listing_falls_back_when_the_rich_endpoint_is_absent() -> None
 
 async def test_xai_reasoning_effort_passes_through() -> None:
     body = {
-        "choices": [
-            {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
-        ]
+        "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]
     }
     seen, handler = _capture(lambda r: httpx2.Response(200, json=body))
     async with _client("xai", handler) as client:
@@ -297,16 +286,22 @@ async def test_anthropic_adapter_serves_a_compatible_endpoint_by_base_url() -> N
         seen.append(request)
         events = [
             {"type": "message_start", "message": {"usage": {"input_tokens": 5}}},
-            {"type": "content_block_start", "index": 0,
-             "content_block": {"type": "text"}},
-            {"type": "content_block_delta", "index": 0,
-             "delta": {"type": "text_delta", "text": "hi from kimi"}},
-            {"type": "message_delta", "delta": {"stop_reason": "end_turn"},
-             "usage": {"output_tokens": 3}},
+            {"type": "content_block_start", "index": 0, "content_block": {"type": "text"}},
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "hi from kimi"},
+            },
+            {
+                "type": "message_delta",
+                "delta": {"stop_reason": "end_turn"},
+                "usage": {"output_tokens": 3},
+            },
             {"type": "message_stop"},
         ]
         return httpx2.Response(
-            200, content=sse_lines(events, done=False),
+            200,
+            content=sse_lines(events, done=False),
             headers={"content-type": "text/event-stream"},
         )
 
@@ -351,9 +346,7 @@ async def test_a_compatible_endpoint_can_register_under_its_own_id() -> None:
                 "kimi-messages",
                 api_key="k",
                 transport=httpx2.MockTransport(
-                    lambda r: httpx2.Response(
-                        401, json={"error": {"message": "bad key"}}
-                    )
+                    lambda r: httpx2.Response(401, json={"error": {"message": "bad key"}})
                 ),
             )
         ],

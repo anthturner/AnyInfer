@@ -21,11 +21,15 @@ telemetry, and shared configuration.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-    ai.ProviderSettings.of("ollama"),
-])
-result = client.generate("Summarize this release note:\n" + text, target="anthropic:claude-sonnet-4-5")
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+        ai.ProviderSettings.of("ollama"),
+    ]
+)
+result = client.generate(
+    "Summarize this release note:\n" + text, target="anthropic:claude-sonnet-4-5"
+)
 
 print(result.text)
 print(result.usage.output_tokens, "tokens in", result.timing.total_ms, "ms")
@@ -34,7 +38,15 @@ print(result.usage.output_tokens, "tokens in", result.timing.total_ms, "ms")
 Point the same call at a local model by changing one string:
 
 ```python
-result = client.generate(prompt, target="ollama:qwen3:8b")   # or "medium" — a catalog alias
+result = client.generate(prompt, target="ollama:qwen3:8b")  # "medium" is a catalog alias
+```
+
+Embeddings and reranking are the same client, the same routing, and the same batching —
+never a bolted-on provider option:
+
+```python
+vectors = client.embed(["first passage", "second passage"], target="ollama:nomic-embed-text")
+ranked = client.rerank("which passage answers the question", passages, target="cohere:rerank-v3.5")
 ```
 
 ---
@@ -51,13 +63,18 @@ keeps provider translation, local process ownership, context preparation, routin
 result validation inside one testable boundary:
 
 - **One primitive.** A `GenerationRequest` becomes a typed event stream. Non-streaming is
-  the drained stream. It is *not* an OpenAI-API clone — the OpenAI dialect is one edge
+  the drained stream. It is *not* an OpenAI-API clone. The OpenAI dialect is one edge
   format among several.
 - **Adapters only translate.** Retry, fallback, health gating, schema validation, repair,
   TTFT measurement, usage normalization, telemetry, and redaction live in the core, once.
 - **Structured output is a contract.** A request carrying a schema always returns a
   client-side-validated result, using the strongest mechanism the provider offers
   (grammar → json_schema → json_mode → prompt), with an opt-in bounded repair loop.
+- **Embeddings and reranking are inference primitives, not provider options.**
+  `client.embed()`/`client.rerank()` are typed, routed, batched, and cost-tracked exactly
+  like generation — with a safety rule generation does not need: a fallback that cannot
+  be proven to share the primary target's vector space is refused before dispatch, not
+  silently served as a wrong-but-plausible vector.
 - **Context engineering is part of dispatch.** A provenance-aware budget estimates input,
   output reserve, headroom, and cost before a call. Deterministic reducers fit approved
   corpora to that budget and report exactly what they omitted; hierarchical distillation
@@ -71,15 +88,20 @@ result validation inside one testable boundary:
   parameters or degraded mechanisms instead of hiding them.
 - **Your integration is testable.** A scripted provider and pytest fixtures ship with the
   library, so your fallback chain, repair budget, and reduction settings have offline tests
-  that run in CI with no credentials — including the failures you cannot provoke on demand:
+  that run in CI with no credentials, including the failures you cannot provoke on demand:
   rate limits, truncated streams, malformed structured answers, refusals, timeouts.
+- **A confidentiality story nobody else in this market ships.** Encrypted-at-rest prompt
+  templates, a zero-retention orchestration relay, and a portable capability check that
+  tells your application whether a box can back local inference with a real
+  hardware-attested guarantee — see [confidentiality
+  tiers](https://anyinfer.dev/guides/confidentiality-tiers/).
 - **Slim by construction.** Mandatory dependencies are `httpx2` and `jsonschema`. Everything
   else is an extra.
 
 ## When it is the right layer
 
-Use AnyInfer when your application needs to own a hybrid route — for example, a hosted
-model with a managed local fallback — or when context fit, structured results, attempt
+Use AnyInfer when your application needs to own a hybrid route, such as a hosted model
+with a managed local fallback, or when context fit, structured results, attempt
 history, and telemetry must retain the same meaning after the target changes.
 
 Use a simpler provider client when you only need cloud API switching. Use a gateway when
@@ -114,8 +136,8 @@ anyinfer init      # detect what is usable here, write anyinfer.json and starter
 python starter.py  # run it
 ```
 
-`init` reports only what it observed — a loopback engine that answered, a credential
-variable that is actually set — and writes detected keys as `env://` references rather
+`init` reports only what it observed: a loopback engine that answered or a credential
+variable that is actually set. It writes detected keys as `env://` references rather
 than values, so the file it generates is safe to commit. It installs nothing and never
 replaces a configuration you already have.
 
@@ -126,9 +148,9 @@ pip install "anyinfer[demo]"
 anyinfer-demo
 ```
 
-The [pack-in demo app](https://anyinfer.dev/guides/demo-app/) runs offline against in-process fakes, and
-shows streaming, routing with retry and fallback, structured output, and the telemetry
-event stream. Standalone builds for Windows, macOS, and Linux — no Python required — are
+The [pack-in demo app](https://anyinfer.dev/guides/demo-app/) runs offline against
+in-process fakes and shows streaming, routing with retry and fallback, structured output,
+and the telemetry event stream. Standalone builds for Windows, macOS, and Linux require no Python and are
 attached to [every release](https://github.com/anthturner/AnyInfer/releases/latest); see the
 [downloads page](https://anyinfer.dev/downloads/).
 
@@ -176,6 +198,12 @@ See the [complete provider list](https://anyinfer.dev/providers/all/),
 the [provider guides](https://anyinfer.dev/providers/) and the
 [conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
 
+Embeddings and/or reranking are live today on OpenAI, Azure AI Foundry, Google Vertex AI,
+AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio, and four
+OpenAI-compatible presets (Together AI, Fireworks AI, DeepInfra, Mistral) — see
+[Embeddings and reranking](https://anyinfer.dev/concepts/embeddings/) and the
+[semantic-search example](https://anyinfer.dev/examples/semantic-search/).
+
 ## Integration paths
 
 | Path | Best for | Entry point |
@@ -200,7 +228,7 @@ and [shared configuration](https://anyinfer.dev/reference/configuration/).
 
 ## Documentation
 
-**[anyinfer.dev](https://anyinfer.dev/)** — the published
+**[anyinfer.dev](https://anyinfer.dev/)** is the published
 site, including the generated [SDK reference](https://anyinfer.dev/reference/api/)
 and [runnable examples](https://anyinfer.dev/examples/). The same pages are
 browsable in-repo from the **[documentation index](https://github.com/anthturner/AnyInfer/blob/main/docs/README.md)**.
@@ -228,8 +256,8 @@ move before 1.0. Releases are published to
 [release strategy](https://anyinfer.dev/contributing/releasing/) has the
 details. The architecture is settled and documented:
 
-- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) — architecture, module responsibilities, decision rationale, open questions, and risks
-- [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) — canonical repository automation instructions
+- [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md): architecture, module responsibilities, decision rationale, open questions, and risks
+- [AGENTS.md](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md): canonical repository automation instructions
 
 ## License
 

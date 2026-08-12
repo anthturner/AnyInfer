@@ -2,7 +2,7 @@
 
 Cassettes capture real provider traffic once, then replay it forever. They are the second
 conformance mode (fakes prove we handle *shapes*; cassettes prove we handle *what a provider
-actually sent*), and they let CI verify nine adapters without nine sets of credentials.
+actually sent*), and they let CI verify adapters without a live credential set for each one.
 
 Recorded bodies pass through the redaction registry before hitting disk, so a cassette
 committed to the repository cannot carry a key.
@@ -145,22 +145,32 @@ class CassetteTransport(httpx2.AsyncBaseTransport):
         return self._replay(request)
 
     async def _record_request(self, request: httpx2.Request) -> httpx2.Response:
-        assert self._inner is not None
-        response = await self._inner.handle_async_request(request)
+        inner = self._inner
+        if inner is None:
+            raise RuntimeError("cassette recording requires an inner HTTP transport")
+        response = await inner.handle_async_request(request)
         body = await response.aread()
         await response.aclose()
+        # `aread()` returns *decoded* bytes, so the content-transformation headers no
+        # longer describe the body we hold — keeping them would make every consumer
+        # (including the re-wrapped response below) try to decompress plain text.
+        headers = {
+            k: v
+            for k, v in response.headers.items()
+            if k.lower() not in ("content-encoding", "content-length", "transfer-encoding")
+        }
         self._cassette.append(
             Interaction(
                 method=request.method,
                 url=str(request.url),
                 request_body=request.content.decode("utf-8", errors="replace"),
                 status=response.status_code,
-                headers=dict(response.headers),
+                headers=headers,
                 body=body.decode("utf-8", errors="replace"),
             )
         )
         return httpx2.Response(
-            response.status_code, headers=response.headers, content=body, request=request
+            response.status_code, headers=headers, content=body, request=request
         )
 
     def _replay(self, request: httpx2.Request) -> httpx2.Response:

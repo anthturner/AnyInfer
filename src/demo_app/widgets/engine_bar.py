@@ -34,7 +34,7 @@ from anyinfer.errors import AnyInferError
 from anyinfer.registry import ProviderRegistry
 from anyinfer.types.capabilities import DiscoveredModel, Sourced
 
-from ..config import DemoConfig
+from ..config import DemoConfig, ProviderConfig
 from .icons import themed_icon
 from .sdk_help import SdkHelpButton
 
@@ -178,7 +178,10 @@ class EngineBar(QFrame):
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self._registry = registry
         self._discovered: dict[str, list[DiscoveredModel]] = {}
-        self._model_drafts: dict[str, str] = {}
+        # Saved targets are preferences, not proof that a model belongs to an engine.
+        # Keep them out of the field until that engine's discovery result validates them.
+        self._pending_models: dict[str, str] = {}
+        self._provider_configs: dict[str, ProviderConfig] = {}
         # instance id → the engine it is an instance of, for looking up display names and
         # capability defaults that belong to the engine rather than the instance.
         self._engine_of: dict[str, str] = {}
@@ -194,11 +197,11 @@ class EngineBar(QFrame):
 
         layout.addWidget(QLabel("Model:"))
         self._model = QComboBox()
-        self._model.setEditable(True)
-        self._model.setToolTip(
-            "Models this engine reports, with their size when the engine says. "
-            "Type a name to use a model that is not listed."
+        self._model.setMinimumContentsLength(24)
+        self._model.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
         )
+        self._model.setToolTip("Models this engine reports, with their size when the engine says.")
         layout.addWidget(self._model, 3)
 
         self._refresh = QPushButton()
@@ -221,9 +224,9 @@ class EngineBar(QFrame):
 
         self._engine.currentIndexChanged.connect(self._on_engine_changed)
         self._model.currentTextChanged.connect(self._on_model_changed)
-        self._model.activated.connect(self._on_model_activated)
         self._context.changed.connect(self.changed)
         self._refresh.clicked.connect(self._request_refresh)
+        self._update_availability()
         self.reapply_theme()
 
     # ---- selection -------------------------------------------------------------------
@@ -247,23 +250,32 @@ class EngineBar(QFrame):
         return f"{provider}:{model}" if provider and model else ""
 
     def set_target(self, target: str) -> None:
-        """Select a saved target by instance id, keeping it verbatim if that id is gone.
+        """Select a target only after discovery confirms its engine and model.
 
-        An instance that is no longer enabled is inserted as a plain entry rather than
-        dropped, so a saved selection survives a settings round-trip visibly instead of
-        silently changing.
+        A saved model is held as a preference while discovery is pending. If it is not
+        among that engine's reported models, the first reported model wins instead.
         """
         provider, _, model = target.partition(":")
         index = self._engine.findData(provider)
         if index < 0:
-            label = self._instance_label(self._engine_for(provider), provider)
-            self._engine.addItem(label, provider)
-            index = self._engine.count() - 1
+            self._populate_models(self.provider_id())
+            self._refresh_context_hint()
+            self._update_availability()
+            self.changed.emit()
+            return
+        self._pending_models[provider] = model
+        self._engine.blockSignals(True)
         self._engine.setCurrentIndex(index)
-        self._populate_models(provider)
-        self._model.setCurrentText(model)
-        self._model_drafts[provider] = model
+        self._engine.blockSignals(False)
+        if provider in self._discovered:
+            self._populate_models(provider, preferred=model, select_first=True)
+            self._pending_models.pop(provider, None)
+        else:
+            self._populate_models(provider)
+            self.refresh_requested.emit(provider)
         self._refresh_context_hint()
+        self._update_availability()
+        self.changed.emit()
 
     def context_window_tokens(self) -> int | None:
         """The manual context-window override, or ``None`` when auto-detect is on."""
@@ -286,10 +298,16 @@ class EngineBar(QFrame):
         separately selectable entries rather than one that silently wins.
         """
         selected = self.provider_id()
+        configured = {provider.instance_id: provider for provider in config.enabled_providers()}
+        for instance_id in set(self._provider_configs) | set(self._discovered):
+            if self._provider_configs.get(instance_id) != configured.get(instance_id):
+                self._discovered.pop(instance_id, None)
+                self._pending_models.pop(instance_id, None)
+        self._provider_configs = configured
         self._engine.blockSignals(True)
         self._engine.clear()
         self._engine_of.clear()
-        for provider in config.enabled_providers():
+        for provider in configured.values():
             instance_id = provider.instance_id
             self._engine_of[instance_id] = provider.provider_id
             self._engine.addItem(
@@ -298,8 +316,14 @@ class EngineBar(QFrame):
         index = self._engine.findData(selected)
         self._engine.setCurrentIndex(max(0, index))
         self._engine.blockSignals(False)
-        self._populate_models(self.provider_id())
+        current = self.provider_id()
+        if current and current == selected:
+            self._populate_models(current, preferred=self.model(), select_first=True)
+        else:
+            self._populate_models(current, select_first=True)
         self._refresh_context_hint()
+        self._update_availability()
+        self.changed.emit()
 
     def _instance_label(self, provider_id: str, instance_id: str) -> str:
         """Label one instance: the engine's name, plus the alias when it has one.
@@ -314,8 +338,10 @@ class EngineBar(QFrame):
         """Adopt one provider's discovery results."""
         self._discovered[provider_id] = [m for m in models if isinstance(m, DiscoveredModel)]
         if provider_id == self.provider_id():
-            self._populate_models(provider_id)
+            preferred = self._pending_models.pop(provider_id, self.model())
+            self._populate_models(provider_id, preferred=preferred, select_first=True)
             self._refresh_context_hint()
+            self._update_availability()
         self.changed.emit()
 
     def reapply_theme(self) -> None:
@@ -353,33 +379,55 @@ class EngineBar(QFrame):
 
     def _on_engine_changed(self, _index: int) -> None:
         provider = self.provider_id()
-        self._populate_models(provider)
+        # A model id belongs to its engine. Never carry the previous engine's text into
+        # the new target: use the first cached discovery result, or leave the field blank
+        # while a fresh discovery runs.
+        preferred = self._pending_models.get(provider, "")
+        self._populate_models(provider, preferred=preferred, select_first=True)
+        if provider in self._discovered:
+            self._pending_models.pop(provider, None)
         if provider and provider not in self._discovered:
             self.refresh_requested.emit(provider)
         self._refresh_context_hint()
+        self._update_availability()
         self.changed.emit()
 
     def _on_model_changed(self, model: str) -> None:
-        provider = self.provider_id()
-        if provider:
-            self._model_drafts[provider] = model
         self._refresh_context_hint()
+        self._update_availability()
         self.changed.emit()
 
-    def _on_model_activated(self, index: int) -> None:
-        """Collapse a decorated "model — size" choice back to the plain model id."""
-        data = self._model.itemData(index)
-        if isinstance(data, str) and data:
-            self._model.setCurrentText(data)
-
-    def _populate_models(self, provider_id: str) -> None:
-        draft = self._model_drafts.get(provider_id, self._model.currentText().strip())
+    def _populate_models(
+        self,
+        provider_id: str,
+        *,
+        preferred: str = "",
+        select_first: bool = False,
+    ) -> None:
+        """Show one engine's cached models without leaking another engine's selection."""
+        models = self._discovered.get(provider_id, [])
         self._model.blockSignals(True)
         self._model.clear()
-        for discovered in self._discovered.get(provider_id, []):
-            self._model.addItem(_model_label(discovered), discovered.id)
-        self._model.setCurrentText(draft)
+        for discovered in models:
+            label = _model_label(discovered)
+            self._model.addItem(label, discovered.id)
+            self._model.setItemData(self._model.count() - 1, label, Qt.ItemDataRole.ToolTipRole)
+        selected = -1
+        if preferred:
+            selected = next(
+                (index for index, item in enumerate(models) if item.id == preferred), -1
+            )
+        if selected < 0 and select_first and models:
+            selected = 0
+        self._model.setCurrentIndex(selected)
         self._model.blockSignals(False)
+
+    def _update_availability(self) -> None:
+        """Disable target-dependent controls until their required selection exists."""
+        has_engine = bool(self.provider_id())
+        self._model.setEnabled(has_engine)
+        self._refresh.setEnabled(has_engine)
+        self._context.setEnabled(has_engine and bool(self.model()))
 
     def _refresh_context_hint(self) -> None:
         self._context.set_detected(self._context_window())
@@ -436,7 +484,7 @@ class EngineBar(QFrame):
         """What is known about the current selection's context window, if anything.
 
         Discovery outranks the descriptor's defaults, mirroring the library's provenance
-        ordering — and when nothing is known the answer is honestly ``None``.
+        ordering, and when nothing is known the answer is honestly ``None``.
         """
         provider, model = self.provider_id(), self.model()
         for discovered in self._discovered.get(provider, []):

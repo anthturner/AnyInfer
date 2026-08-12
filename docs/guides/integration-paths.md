@@ -33,6 +33,7 @@ Three supported production paths. They share the same core behavior and
 
 ```python
 import anyinfer as ai
+
 client = ai.Client([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")])
 ```
 
@@ -55,6 +56,7 @@ Then point any OpenAI-compatible client at it:
 
 ```python
 from openai import OpenAI
+
 client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="unused")
 client.chat.completions.create(model="ollama:qwen3:8b", messages=[...])
 ```
@@ -110,6 +112,7 @@ Nothing stops you embedding the SDK *and* exposing the frontend from the same pr
 
 ```python
 from anyinfer.serve import create_app
+
 app = create_app(async_client, auth_token=token)
 ```
 

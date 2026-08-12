@@ -7,13 +7,13 @@ match outweighs a body match, and well-known anchor files (README, pyproject.tom
 ARCHITECTURE) get a small bonus.
 
 **What this is not.** There are no embeddings and no semantic matching. That is a
-deliberate boundary — see the concept documentation — and the reason ranking is exposed as
+deliberate boundary — see the concept documentation, and the reason ranking is exposed as
 a function you can replace rather than hidden inside selection.
 
 Three optional settings narrow the gap without an index or a model. **Identifier
 splitting** tokenizes ``resolve_credentials`` as its parts as well as the whole, so a query
 phrased in words matches an identifier phrased in code. **Query expansion** ranks once,
-harvests distinctive terms from the strongest documents, and re-ranks — which does find
+harvests distinctive terms from the strongest documents, and re-ranks, which does find
 "login" from "authentication" whenever the two co-occur anywhere in the corpus. And
 **centrality** scores a document by its position in the corpus's own import graph, a
 query-independent signal that is what orders a corpus when the query is weak or absent.
@@ -30,6 +30,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import PurePosixPath
+from typing import Protocol
 
 from .documents import ContextDocument, RankCache
 from .settings import DEFAULT_TUNING, ContextTuning
@@ -41,6 +42,7 @@ __all__ = [
     "PATH_MATCH_WEIGHT",
     "STOP_WORDS",
     "TERM_SATURATION",
+    "SemanticRanker",
     "build_rank_cache",
     "expand_query",
     "query_terms",
@@ -187,7 +189,7 @@ def _split_identifier(raw: str) -> list[str]:
     """Break a compound identifier into its lowercase parts.
 
     Handles ``camelCase``, ``PascalCase``, ``SCREAMING_SNAKE``, and the acronym boundary
-    in ``HTTPServer`` — which splits as ``http`` and ``server``, not ``h`` and
+    in ``HTTPServer``, which splits as ``http`` and ``server``, not ``h`` and
     ``ttpserver``.
     """
     parts: list[str] = []
@@ -250,7 +252,7 @@ def score_document(
         cache: Corpus statistics covering this document.
 
     Returns:
-        A non-negative relevance score. Zero means nothing matched — which is still a
+        A non-negative relevance score. Zero means nothing matched, which is still a
         valid candidate, just an unranked one.
     """
     counts = cache.term_counts.get(document.path, Counter())
@@ -376,7 +378,7 @@ def salience(
 
     An edge runs from a document to every document whose filename stem it imports. The
     stationary distribution of a damped random walk over those edges answers "what does
-    this corpus depend on?" — which is query-independent, and therefore what orders a
+    this corpus depend on?", which is query-independent, and therefore what orders a
     corpus when the query is weak or missing entirely. Ranking with an empty query
     otherwise falls through to the path tie-break, which is arbitrary.
 
@@ -429,8 +431,7 @@ def salience(
                 incoming[target] += share
         spread = dangling / count
         scores = {
-            path: (1.0 - damping) * uniform + damping * (incoming[path] + spread)
-            for path in paths
+            path: (1.0 - damping) * uniform + damping * (incoming[path] + spread) for path in paths
         }
 
     ceiling = max(scores.values())
@@ -449,6 +450,24 @@ def _stem(path: str) -> str:
         parents = pure.parent.name
         return parents or pure.stem
     return pure.stem
+
+
+class SemanticRanker(Protocol):
+    """Caller-supplied relevance scoring for context reduction.
+
+    The default ranking is lexical and offline on purpose; this protocol is the opt-in
+    seam for a semantic ranker backed by a rerank model. Scores are keyed by
+    `ContextDocument.path` — a document absent from the mapping scores 0.0. Scores are
+    only compared against each other within one call, never persisted.
+
+    Implementations live *outside* this package (context reduction is a leaf consumer
+    and never imports the client); `anyinfer.semantic_ranker` builds one from a client
+    and a rerank target.
+    """
+
+    def scores(self, documents: Sequence[ContextDocument], query: str) -> Mapping[str, float]:
+        """Score every document's relevance to ``query``, keyed by document path."""
+        ...
 
 
 def rank(
@@ -470,7 +489,7 @@ def rank(
             and rebuilt when its tokenization disagrees with ``tuning``.
         tuning: Advanced settings. Defaults reproduce the plain lexical ranker.
         carry_over: Paths an earlier reduction already sent unchanged. Each receives
-            ``tuning.carry_over_bonus``, which keeps a turn's selection — and therefore
+            ``tuning.carry_over_bonus``, which keeps a turn's selection, and therefore
             its rendered prefix — stable enough for a prompt cache to hit.
 
     Returns:
@@ -478,8 +497,10 @@ def rank(
         pinned document precedes every unpinned one, then higher score, then shallower
         path, then path, then digest.
     """
-    cache = rank_cache if rank_cache is not None else build_rank_cache(
-        documents, split_identifiers=tuning.split_identifiers
+    cache = (
+        rank_cache
+        if rank_cache is not None
+        else build_rank_cache(documents, split_identifiers=tuning.split_identifiers)
     )
     if cache.split_identifiers != tuning.split_identifiers:
         cache = build_rank_cache(documents, split_identifiers=tuning.split_identifiers)

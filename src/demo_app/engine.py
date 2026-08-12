@@ -25,6 +25,7 @@ from typing import Any
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
 from anyinfer import (
+    BenchmarkSample,
     CachePolicy,
     Client,
     ContextBudget,
@@ -53,7 +54,7 @@ from anyinfer.types.results import Generation
 from .config import DemoConfig
 from .fake_provider import DemoFakeBackend, register_demo_provider
 
-__all__ = ["Engine", "GenerationSpec", "TelemetryRelay"]
+__all__ = ["Engine", "GenerationSpec", "RuntimeInstallProgress", "TelemetryRelay"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +78,15 @@ class GenerationSpec:
     """Opt-in conversation compaction; ``None`` sends the full transcript untouched."""
     cache: CachePolicy | None = None
     """Opt-in prompt-cache placement; ``None`` caches exactly nothing."""
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeInstallProgress:
+    """One llama.cpp runtime archive's download progress."""
+
+    artifact_id: str
+    downloaded_bytes: int
+    total_bytes: int | None = None
 
 
 class TelemetryRelay(QObject):
@@ -155,7 +165,7 @@ class _GenerateJob(QRunnable):
         """Execute the request, translating stream events into Qt signals.
 
         Exactly one terminal signal always fires — ``finished``, ``failed``, or
-        ``cancelled`` — so the engine's busy state can never be left dangling.
+        ``cancelled``, so the engine's busy state can never be left dangling.
         """
         try:
             with self._client.stream(
@@ -274,6 +284,8 @@ class Engine(QObject):
     task_done = Signal(str, object)  # (key, result)
     task_failed = Signal(str, str, object)  # (key, message, error)
     acquisition_progress = Signal(object)
+    runtime_install_progress = Signal(object)
+    benchmark_progress = Signal(str, int, object)  # (task key, one-based run, sample)
     busy_changed = Signal(bool)
 
     # Keyed twins of the generation signals, for callers running several conversations
@@ -293,7 +305,7 @@ class Engine(QObject):
     def __init__(self, config: DemoConfig) -> None:
         super().__init__()
         self._pool = QThreadPool(self)
-        # A few generations may run at once — one per conversation tab — because each
+        # A few generations may run at once — one per conversation tab, because each
         # tab owns its own transcript; the keys keep their event streams apart. The cap
         # stays small: this is a demo, not a load generator.
         self._pool.setMaxThreadCount(4)
@@ -416,7 +428,7 @@ class Engine(QObject):
         """Start a generation on the pool, identified by ``key``.
 
         A second call under the *same* key is ignored while that generation runs — one
-        stream per conversation — but different keys run concurrently. ``key`` may stay
+        stream per conversation, but different keys run concurrently. ``key`` may stay
         empty for callers with a single conversation; the empty string is a key like any
         other.
         """
@@ -431,9 +443,7 @@ class Engine(QObject):
         signals.text_delta.connect(self.text_delta)
         signals.text_delta.connect(lambda text, k=key: self.gen_text_delta.emit(k, text))
         signals.reasoning_delta.connect(self.reasoning_delta)
-        signals.reasoning_delta.connect(
-            lambda text, k=key: self.gen_reasoning_delta.emit(k, text)
-        )
+        signals.reasoning_delta.connect(lambda text, k=key: self.gen_reasoning_delta.emit(k, text))
         signals.first_token.connect(self.first_token)
         signals.first_token.connect(lambda ms, k=key: self.gen_first_token.emit(k, ms))
         signals.attempt_failed.connect(self.attempt_failed)
@@ -443,9 +453,7 @@ class Engine(QObject):
         signals.usage_update.connect(self.usage_update)
         signals.usage_update.connect(lambda usage, k=key: self.gen_usage_update.emit(k, usage))
         signals.finished.connect(lambda result, k=key: self._on_finished(k, result))
-        signals.failed.connect(
-            lambda message, error, k=key: self._on_failed(k, message, error)
-        )
+        signals.failed.connect(lambda message, error, k=key: self._on_failed(k, message, error))
         signals.cancelled.connect(lambda k=key: self._on_cancelled(k))
 
         job = _GenerateJob(self.client(), spec, signals, self._session_for(spec))
@@ -492,8 +500,7 @@ class Engine(QObject):
         return self._session.reuse if self._session is not None else ""
 
     def cancel(self, key: str | None = None) -> None:
-        """Cancel one keyed generation, or every in-flight generation when ``key`` is
-        ``None``."""
+        """Cancel one keyed generation, or all active generations if no key is given."""
         if key is None:
             for job in self._active.values():
                 job.cancel()
@@ -543,6 +550,18 @@ class Engine(QObject):
         signals.task_failed.connect(self.task_failed)
         self._task_pool.start(_TaskJob(key, fn, signals))
 
+    def embed_text(self, key: str, texts: Sequence[str], target: str) -> None:
+        """Embed one or more texts, reporting the `EmbeddingResult` under ``key``."""
+        client = self.client()
+        self.run_task(key, lambda: client.embed(list(texts), target=target))
+
+    def rerank_documents(
+        self, key: str, query: str, documents: Sequence[str], target: str
+    ) -> None:
+        """Rank documents against a query, reporting the `RerankResult` under ``key``."""
+        client = self.client()
+        self.run_task(key, lambda: client.rerank(query, list(documents), target=target))
+
     def local_catalog(
         self, key: str, provider_id: str | None, *, posture: Posture = "balanced"
     ) -> None:
@@ -560,7 +579,7 @@ class Engine(QObject):
     ) -> None:
         """Download a catalog model's weights, reporting progress as it goes.
 
-        ``dry_run`` resolves and plans the acquisition — which files, how many bytes, what
+        ``dry_run`` resolves and plans the acquisition, which files, how many bytes, what
         is already on disk — without fetching anything, so a UI can show the cost of a
         download before committing to it.
         """
@@ -576,6 +595,28 @@ class Engine(QObject):
         """Delete an acquired model from the store."""
         client = self.client()
         self.run_task(key, lambda: client.remove_model(entry_id))
+
+    def install_runtime(self, key: str, kind: str | None, *, force: bool = False) -> None:
+        """Install one llama.cpp runtime and relay its archive download progress."""
+        from anyinfer.local.hardware import detect
+        from anyinfer.local.runtimes import install_runtime
+
+        hardware = detect()
+
+        def progress(artifact_id: str, downloaded: int, total: int | None) -> None:
+            self.runtime_install_progress.emit(
+                RuntimeInstallProgress(artifact_id, downloaded, total)
+            )
+
+        self.run_task(
+            key,
+            lambda: install_runtime(
+                kind,  # type: ignore[arg-type]
+                hardware=hardware,
+                progress=progress,
+                force=force,
+            ),
+        )
 
     def pull_model(self, key: str, provider_id: str, model: str) -> None:
         """Tell an engine that keeps its own store to make a model available."""
@@ -600,7 +641,13 @@ class Engine(QObject):
     def benchmark(self, key: str, target: str) -> None:
         """Measure a target's latency and throughput with one deterministic request."""
         client = self.client()
-        self.run_task(key, lambda: client.benchmark(target))
+        self.run_task(
+            key,
+            lambda: client.benchmark(
+                target,
+                progress=lambda sample: self._emit_benchmark_sample(key, 1, sample),
+            ),
+        )
 
     def benchmark_pair(self, key: str, target: str) -> None:
         """Run two back-to-back benchmarks, so warm-up cost becomes observable.
@@ -608,16 +655,28 @@ class Engine(QObject):
         The library does not (yet) report whether a local engine had the model in memory
         when a benchmark ran, and this demo must not guess. What it *can* do is control
         the protocol: the second run is warm by construction — it starts the moment the
-        first finishes — while the first inherits whatever state the engine was in. Equal
+        first finishes, while the first inherits whatever state the engine was in. Equal
         numbers mean the engine was already warm; a large first-run TTFT is the load cost
         it absorbed. The pair is one task so nothing else can run between them.
         """
         client = self.client()
 
         def run() -> tuple[Measurement, Measurement]:
-            return (client.benchmark(target), client.benchmark(target))
+            first = client.benchmark(
+                target,
+                progress=lambda sample: self._emit_benchmark_sample(key, 1, sample),
+            )
+            second = client.benchmark(
+                target,
+                progress=lambda sample: self._emit_benchmark_sample(key, 2, sample),
+            )
+            return first, second
 
         self.run_task(key, run)
+
+    def _emit_benchmark_sample(self, key: str, run: int, sample: BenchmarkSample) -> None:
+        """Relay a live benchmark point from the client's loop thread into Qt."""
+        self.benchmark_progress.emit(key, run, sample)
 
     def diagnostics(self, key: str, provider_id: str) -> None:
         """Ask a provider what it has noticed about its own runtime."""

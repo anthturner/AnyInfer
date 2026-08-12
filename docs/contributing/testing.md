@@ -31,10 +31,13 @@ checked for all of them, not just the one you were looking at.
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
 
 server = FakeOpenAIServer(FakeResponse(text="hello", finish_reason="stop"))
-client = ai.AsyncClient([
-    ai.ProviderSettings.of("openai-compat", base_url="https://fake.invalid/v1",
-                            transport=server.transport()),
-])
+client = ai.AsyncClient(
+    [
+        ai.ProviderSettings.of(
+            "openai-compat", base_url="https://fake.invalid/v1", transport=server.transport()
+        ),
+    ]
+)
 ```
 
 Fakes are httpx2 transports: no ports, no cleanup races, identical on every platform. They
@@ -42,10 +45,12 @@ can be scripted for errors, malformed SSE, servers that ignore `stream`, omitted
 chunks, and multi-response sequences for retry and repair tests:
 
 ```python
-FakeOpenAIServer([
-    FakeResponse(status=503),                        # first attempt fails
-    FakeResponse(text="recovered"),                  # retry succeeds
-])
+FakeOpenAIServer(
+    [
+        FakeResponse(status=503),  # first attempt fails
+        FakeResponse(text="recovered"),  # retry succeeds
+    ]
+)
 ```
 
 Assert on what was actually sent:
@@ -71,8 +76,8 @@ transport = CassetteTransport(Cassette(path), record=False)
 **Name the behavior, not the function.**
 
 ```python
-def test_unknown_memory_is_not_confident() -> None: ...      # yes
-def test_recommend_alias_2() -> None: ...                    # no
+def test_unknown_memory_is_not_confident() -> None: ...  # yes
+def test_recommend_alias_2() -> None: ...  # no
 ```
 
 **Explain non-obvious assertions.** A one-line docstring on a test that encodes a subtle rule
@@ -101,5 +106,5 @@ suite exist because a comparable tool shipped that exact bug.
 
 `tests/test_local_server.py` spawns a fake `llama-server` (a Python script behind a
 platform-appropriate shim) rather than requiring a real llama.cpp build. It exercises the
-supervisor's genuine contract — spawn, poll, distinguish loading from failed, reap — and is
+supervisor's genuine contract — spawn, poll, distinguish loading from failed, reap, and is
 the slowest module in the suite for good reason.

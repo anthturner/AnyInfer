@@ -27,7 +27,9 @@ hide:
     ```python
     import anyinfer as ai
 
-    async with ai.AsyncClient([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]) as client:
+    async with ai.AsyncClient(
+        [ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]
+    ) as client:
         result = await client.generate(prompt, target="anthropic:claude-sonnet-4-5")
         print(result.text)
     ```
@@ -44,6 +46,32 @@ The core depends on only `httpx2` and `jsonschema`. Provider SDKs, the sidecar, 
 demo app are optional extras. Local inference is part of the core. See
 [installation and extras](guides/installation.md).
 
+## What makes this different
+
+Most libraries in this space solve *provider switching* — one function, many APIs, one
+response shape. AnyInfer solves the problem that starts right after: being correct about
+what you sent, what you got back, what it cost, and what quietly didn't happen. Four things
+you won't find bundled together anywhere else:
+
+- **Your fallback chain has a real test, with no credentials and no network.** The test kit
+  ships with the library — script a 503, a malformed schema response, a rate limit — and
+  assert on the recovery, not on a mock of your own wrapper.
+  [→ Testing your app](guides/testing-your-app.md)
+- **Every number says where it came from.** A context window, a price, a feature flag is
+  tagged catalogued, discovered, probed, or defaulted — never silently guessed.
+  [→ Capabilities and provenance](concepts/capabilities.md)
+- **Portability is a test result, not a claim.** `compare()` reports exactly what a fixed
+  request becomes on a different target — dropped parameters, weaker mechanisms, cost
+  deltas — before you spend anything, and you can diff two snapshots of it in CI.
+  [→ Comparing targets](guides/comparing-targets.md)
+- **A confidentiality story nobody else in this market ships.** Encrypted-at-rest prompt
+  templates, a zero-retention orchestration relay, and — the genuinely novel part — one
+  function that tells your application whether a box can back local inference with a real
+  hardware-attested guarantee, honest about exactly what it can and can't promise yet.
+  [→ Confidentiality tiers](guides/confidentiality-tiers.md)
+
+**→ [Read the full case, with runnable proof for every claim](why-anyinfer.md).**
+
 ## What AnyInfer gives you
 
 Applications that talk to more than one model provider accumulate the same layer every
@@ -59,6 +87,10 @@ AnyInfer is that layer, extracted and made rigorous:
 - **Structured output is a contract.** A request carrying a schema always returns a
   client-side-validated result, using the strongest mechanism the provider offers
   (grammar → json_schema → json_mode → prompt), with an opt-in bounded repair loop.
+- **Embeddings and reranking are inference primitives, not provider options.**
+  `client.embed()`/`client.rerank()` are typed, routed, batched, and cost-tracked exactly
+  like generation, with a fallback safety rule generation does not need: a target that
+  cannot be proven to share the primary target's vector space is refused before dispatch.
 - **Context engineering is connected to dispatch.** Preflight budgets, cost ranges,
   deterministic reduction, and hierarchical distillation all use the target's actual
   capability data and report uncertainty or omission instead of hiding it.
@@ -81,6 +113,11 @@ and declarative presets, from frontier APIs to local engines.
 
 See the [provider guides](providers/README.md) and the
 [conformance matrix](reference/conformance-matrix.md) for exactly what each supports.
+
+Embeddings and reranking are live today on OpenAI, Azure AI Foundry, Google Vertex AI,
+AWS Bedrock, Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio, and four
+OpenAI-compatible presets — see [embeddings and reranking](concepts/embeddings.md) and
+the [semantic-search example](examples/semantic-search.md).
 
 ## Next steps
 

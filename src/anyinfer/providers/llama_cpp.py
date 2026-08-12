@@ -8,7 +8,7 @@ This is why the target ``llama-cpp:qwen2.5-7b-instruct-q4-k-m`` behaves like any
 target: everything between "a model name" and "an HTTP endpoint" is handled here, once.
 
 Structured output is genuinely grammar-constrained here — llama.cpp compiles the schema to
-GBNF — but the grammar only *constrains* decoding; it does not tell the model what to
+GBNF, but the grammar only *constrains* decoding; it does not tell the model what to
 produce. The descriptor therefore sets ``grammar_needs_prompt_injection``, and the core also
 describes the schema in the prompt.
 """
@@ -19,7 +19,7 @@ import asyncio
 from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from ..catalog.model import Catalog
 from ..errors import ConfigError, LocalRuntimeError
@@ -31,7 +31,7 @@ from ..local.downloads import (
     download_artifact,
     verify_file,
 )
-from ..local.hardware import HardwareProfile, detect
+from ..local.hardware import AcceleratorKind, HardwareProfile, detect
 from ..local.server import ServerSupervisor
 from ..local.store import ModelStore, ResolvedModel
 from ..local.tuning import Posture, ServerPlan, TuningInputs, plan_server
@@ -116,7 +116,30 @@ def _as_bool(key: str, value: Any) -> bool:
     )
 
 
-_POSTURES = ("conservative", "balanced", "aggressive")
+_RuntimeChoice = Literal["auto", "cuda", "vulkan", "metal", "rocm", "cpu"]
+_RUNTIME_CHOICES: tuple[_RuntimeChoice, ...] = (
+    "auto",
+    "cuda",
+    "vulkan",
+    "metal",
+    "rocm",
+    "cpu",
+)
+
+
+def _as_runtime(key: str, value: Any) -> _RuntimeChoice:
+    """Read an automatic or named installed runtime backend."""
+    text = str(value).strip().lower() or "auto"
+    if text not in _RUNTIME_CHOICES:
+        raise ConfigError(
+            f"llama-cpp option {key!r} must be one of {', '.join(_RUNTIME_CHOICES)}",
+            provider="llama-cpp",
+            hint="select auto, cuda, vulkan, metal, rocm, or cpu",
+        )
+    return text
+
+
+_POSTURES: tuple[Posture, ...] = ("conservative", "balanced", "aggressive")
 
 
 def _as_posture(key: str, value: Any) -> Posture:
@@ -128,10 +151,11 @@ def _as_posture(key: str, value: Any) -> Posture:
             provider="llama-cpp",
             hint="pick a posture from the declared set",
         )
-    return text  # type: ignore[return-value]
+    return text
 
 
 _COERCIONS: Mapping[str, Any] = {
+    "runtime": _as_runtime,
     "model_dir": _as_path,
     "posture": _as_posture,
     "idle_ttl_s": _as_optional_float,
@@ -152,7 +176,8 @@ class LlamaCppOptions:
 
     Attributes:
         catalog: Catalog resolving artifact ids to pinned downloads.
-        binary: Path to ``llama-server``.
+        binary: Optional path to ``llama-server``. It overrides `runtime`.
+        runtime: Installed backend family, or ``"auto"`` for the best usable one.
         model_dir: Where artifacts are stored.
         posture: Tuning posture.
         hardware: Pre-detected hardware, to avoid re-probing.
@@ -165,6 +190,7 @@ class LlamaCppOptions:
 
     catalog: Catalog | None = None
     binary: str = "llama-server"
+    runtime: _RuntimeChoice = "auto"
     model_dir: Path | None = None
     posture: Posture = "balanced"
     hardware: HardwareProfile | None = None
@@ -204,9 +230,14 @@ class LlamaCppAdapter:
         self._config = config
         self._options = LlamaCppOptions.from_mapping(config.options)
         self._hardware = self._options.hardware
+        explicit_binary = bool(config.options.get("binary"))
+        runtime_backend: AcceleratorKind | None = None
+        if not explicit_binary and self._options.runtime != "auto":
+            runtime_backend = self._options.runtime
         self._supervisor = ServerSupervisor(
             binary=self._options.binary,
             hardware=self._hardware,
+            runtime_backend=runtime_backend,
             idle_ttl_s=self._options.idle_ttl_s,
             max_resident=self._options.max_resident,
             allow_remote_exposure=self._options.allow_remote_exposure,
@@ -224,7 +255,7 @@ class LlamaCppAdapter:
     # ---- resolution ------------------------------------------------------------------
 
     def _hardware_profile(self) -> HardwareProfile:
-        """Detect hardware once, then reuse it — and share it with the supervisor.
+        """Detect hardware once, then reuse it, and share it with the supervisor.
 
         The supervisor needs the profile for VRAM admission control and backend
         fallback, but detection stays lazy so building a client never probes hardware.
@@ -258,7 +289,7 @@ class LlamaCppAdapter:
         """Make sure an artifact is present and verified, downloading if permitted.
 
         The check is *verification*, not existence. A truncated or corrupted GGUF that an
-        older build — or a user — moved into place would otherwise be handed straight to
+        older build, or a user — moved into place would otherwise be handed straight to
         llama-server, which fails at load with an error that says nothing about the file.
         Cheap by default: the store compares size and modification time against its index
         and only re-hashes on a mismatch.
@@ -364,17 +395,23 @@ class LlamaCppAdapter:
     # ---- adapter contract ------------------------------------------------------------
 
     async def list_models(self) -> Sequence[DiscoveredModel]:
-        """List the catalog artifacts this provider can serve.
+        """List downloaded catalog artifacts this provider can serve.
 
-        Discovery here means "what could be run", not "what is loaded": a local provider's
-        inventory is the catalog plus what is on disk, and reporting only resident models
-        would hide everything the user could choose.
+        The catalog describes what can be acquired; model discovery describes what is
+        ready to select now. Keeping those surfaces distinct prevents an application from
+        presenting a large download as if it were already installed.
         """
         catalog = self._options.catalog
         if catalog is None:
             return []
+        installed = await asyncio.to_thread(self._store().list_installed)
+        installed_ids = {
+            entry.variant_id
+            for entry in installed
+            if entry.engine in ("llama.cpp", "llama-cpp") and entry.variant_id
+        }
         models: list[DiscoveredModel] = []
-        for artifact_id in sorted(catalog.artifacts):
+        for artifact_id in sorted(installed_ids & catalog.artifacts.keys()):
             artifact = catalog.artifacts[artifact_id]
             models.append(
                 DiscoveredModel(
@@ -415,7 +452,7 @@ class LlamaCppAdapter:
 
         The case worth catching is a GPU machine running a model entirely on the CPU.
         That happens for ordinary reasons — the weights plus KV cache did not fit
-        alongside something else already resident — and it is invisible from the result:
+        alongside something else already resident, and it is invisible from the result:
         the answer is correct and arrives an order of magnitude late.
 
         Reads the supervisor's own state, so it costs nothing and never touches the
@@ -475,7 +512,7 @@ class LlamaCppAdapter:
         with managed:
             # A cold start belongs to the request that paid for it. The supervisor holds
             # the figure until someone takes it, so exactly one request reports it and
-            # every later one is warm — which is what makes the signal mean anything.
+            # every later one is warm, which is what makes the signal mean anything.
             load_ms = managed.take_load_ms()
             delegate = await self._delegate_for(managed.base_url)
             # The supervised server is a plain OpenAI-compatible endpoint, so the whole
@@ -528,15 +565,26 @@ descriptor = ProviderDescriptor(
     setup=ProviderSetupSpec(
         fields=(
             SetupField(
+                key="runtime",
+                label="Default runtime",
+                kind="choice",
+                required=False,
+                default_value="auto",
+                choices=_RUNTIME_CHOICES,
+                help_text=(
+                    "Choose an installed accelerator backend, or auto to select the best "
+                    "runtime this machine can drive. An explicit binary path overrides it."
+                ),
+            ),
+            SetupField(
                 key="binary",
                 label="llama-server path",
                 kind="path",
                 required=False,
                 advanced=True,
-                default_value="llama-server",
                 help_text=(
-                    "The llama-server executable. A bare name is looked up on PATH; a "
-                    "full path pins one build."
+                    "Optional llama-server executable override. Leave blank to use the "
+                    "selected installed runtime."
                 ),
             ),
             SetupField(
@@ -605,6 +653,8 @@ descriptor = ProviderDescriptor(
     ),
     default_capabilities=ModelCapabilities(features=Sourced(_LLAMA_FEATURES, "default")),
     supports_sessions=True,
+    model_inventory="installed",
+    uses_catalog=True,
     reports_diagnostics=True,
     grammar_needs_prompt_injection=True,
 )

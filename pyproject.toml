@@ -35,6 +35,11 @@ otel = ["opentelemetry-api>=1.25"]
 # Installing boto3 or google-auth alongside is optional and, when present, preferred for
 # credential resolution. Signing a Vertex service-account JWT needs an RSA implementation.
 vertex = ["cryptography>=42"]
+# Tier 4 model-weight provenance verification (anyinfer.local.provenance) — signature
+# checking only, never signing; see the module docstring for why that boundary is
+# absolute. Same dependency `vertex` already takes; a separate extra so importing
+# anyinfer.local never pulls in crypto for callers who use neither.
+attest = ["cryptography>=42"]
 # Model Context Protocol tool sources. No dependencies: the protocol is spoken directly
 # against httpx2 and the standard library, the same call ADR-007 makes for provider
 # SDKs. The extra exists so importing anyinfer never pulls in subprocess-spawning code.
@@ -103,6 +108,7 @@ include = [
   "overrides",
   "scripts",
   "contracts",
+  "fixtures",
   "mkdocs.yml",
   "workspace.py",
   "README.md",
@@ -117,10 +123,13 @@ target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D"]
+select = [
+  "E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D",
+  "S101",
+]
 ignore = [
   "RUF012",  # ClassVar annotations on mutable class attrs — descriptors are frozen by convention
-  "B008",    # function call in default arg — not used; dataclass field() is fine
+  "B008",    # function call in default arg; not used; dataclass field() is fine
   "D203",    # incompatible with D211 (no blank line before class docstring)
   "D213",    # incompatible with D212 (summary on the first line)
   "D401",    # imperative-mood rule misfires on property and attribute docstrings
@@ -132,7 +141,11 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "SIM117"]
+"tests/*" = [
+  "E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "SIM117", "S101",
+]
+# Assertions are the public conformance kit's failure protocol, not runtime invariants.
+"src/anyinfer/testing/*" = ["S101"]
 # The conformance matrix uses ✅/➖/❌ deliberately; they are the published symbols.
 # workspace.py renders the matrix page, so its template strings carry them too, as do the
 # certification command and the provider scaffold that quote the same matrix vocabulary.
@@ -253,7 +266,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 # D28: context reduction composes the core's leaf surfaces and nothing else. distill
 # takes the client by structural Protocol, so even the one strategy that generates text
-# has no _client import — and no strategy can reach a provider, the wire, or the disk.
+# has no _client import, and no strategy can reach a provider, the wire, or the disk.
 name = "Context reduction is a leaf consumer"
 type = "forbidden"
 allow_indirect_imports = true

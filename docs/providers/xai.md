@@ -5,7 +5,7 @@ icon: material/alpha-x-box-outline
 
 # xAI (Grok)
 
-An OpenAI-compatible dialect whose distinctive value is **honest cost**: xAI reports the
+An OpenAI-compatible dialect whose distinctive value is **reported cost**: xAI reports the
 exact amount billed on every response, and its model listing carries real prices and
 context windows.
 
@@ -22,9 +22,11 @@ context windows.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of("xai", api_key="env://XAI_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("xai", api_key="env://XAI_API_KEY"),
+    ]
+)
 
 result = client.generate(prompt, target="xai:grok-4.5")
 ```
@@ -35,11 +37,11 @@ result = client.generate(prompt, target="xai:grok-4.5")
 
 Most providers give you token counts and leave the arithmetic to a price table. xAI
 returns `cost_in_usd_ticks` — the amount actually billed, including server-side tool
-fees and tiered pricing — and AnyInfer adopts it directly:
+fees and tiered pricing, and AnyInfer adopts it directly:
 
 ```python
 result = client.generate(prompt, target="xai:grok-4.5")
-print(result.usage.cost_usd)   # what you were charged, not an estimate
+print(result.usage.cost_usd)  # what you were charged, not an estimate
 ```
 
 That matters here because several of xAI's billing rules can't be reproduced from
@@ -59,7 +61,7 @@ for model in client.models("xai"):
 ```
 
 If that endpoint is unavailable, discovery degrades to the plain model listing — ids
-only — rather than failing.
+only, rather than failing.
 
 ## Reasoning
 
@@ -85,9 +87,7 @@ supported; the contract snapshot tracks that migration as the primary drift sign
 xAI also exposes a Messages endpoint:
 
 ```python
-ai.ProviderSettings.of(
-    "anthropic", base_url="https://api.x.ai", api_key="env://XAI_API_KEY"
-)
+ai.ProviderSettings.of("anthropic", base_url="https://api.x.ai", api_key="env://XAI_API_KEY")
 ```
 
 Use the native `xai:` provider unless you need Messages-dialect behavior — the reported
@@ -98,7 +98,7 @@ cost and discovered pricing above are only wired there.
 <div class="anyinfer-see-also" markdown>
 
 - [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/xai.md)
-- [Capabilities and provenance](../concepts/capabilities.md) — why discovered pricing
+- [Capabilities and provenance](../concepts/capabilities.md): why discovered pricing
   outranks the bundled table.
 
 </div>

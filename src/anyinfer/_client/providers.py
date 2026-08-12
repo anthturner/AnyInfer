@@ -13,11 +13,18 @@ from typing import Any, Literal
 
 import httpx2
 
+from ..catalog.model import Catalog
 from ..credentials import ResolverChain, default_resolver
 from ..errors import ConfigError, CredentialError
 from ..events.telemetry import TelemetryEvent
 from ..local.server import is_loopback
-from ..providers.base import ProviderAdapter, ProviderConfig
+from ..providers.base import (
+    EmbedsText,
+    GeneratesText,
+    ProviderConfig,
+    ProviderLifecycle,
+    ReranksText,
+)
 from ..registry import ProviderDescriptor, ProviderRegistry, normalize_provider_id
 from ..routing.limits import GoverningTransport, RateLimiter
 from ..types.requests import RateLimits
@@ -36,7 +43,7 @@ class ProviderSettings:
 
     Attributes:
         provider_id: Registered provider id or alias, e.g. ``"openai"`` or ``"claude"``.
-            This selects the *engine* — which adapter is built and how it talks.
+            This selects the *engine*, which adapter is built and how it talks.
         alias: Instance id, when this is one of several instances of ``provider_id``.
             Defaults to ``provider_id`` itself, which is the single-instance case.
         base_url: Endpoint override. Optional for providers with a default; required for
@@ -97,10 +104,12 @@ class AdapterPool:
         settings: list[ProviderSettings],
         *,
         registry: ProviderRegistry,
+        catalog: Catalog | None = None,
         resolver: ResolverChain | None = None,
         events: Callable[[TelemetryEvent], None] | None = None,
     ) -> None:
         self._registry = registry
+        self._catalog = catalog
         self._resolver = resolver or default_resolver()
         self._events = events
         self._settings: dict[str, ProviderSettings] = {}
@@ -119,7 +128,7 @@ class AdapterPool:
             self._settings[instance_id] = setting
             self._order.append(instance_id)
             self._register_alias(setting)
-        self._adapters: dict[str, ProviderAdapter] = {}
+        self._adapters: dict[str, ProviderLifecycle] = {}
         self._limiters: dict[str, RateLimiter] = {}
         self._lock = asyncio.Lock()
 
@@ -223,7 +232,7 @@ class AdapterPool:
         """This instance's transport override, if it was given one.
 
         Needed by operations that talk to a provider's endpoint without going through its
-        adapter — a model pull, for instance — so the fake-server and cassette test modes
+        adapter — a model pull, for instance, so the fake-server and cassette test modes
         intercept those the same way they intercept generation.
         """
         settings = self._settings.get(self._registry.resolve_alias(provider_id), None)
@@ -249,7 +258,7 @@ class AdapterPool:
             return "local"
         return "local" if is_loopback(base_url) else "remote"
 
-    async def get(self, provider_id: str) -> ProviderAdapter:
+    async def get(self, provider_id: str) -> ProviderLifecycle:
         """Return the adapter for a provider instance, building it on first use.
 
         Raises:
@@ -267,7 +276,7 @@ class AdapterPool:
             self._adapters[key] = adapter
             return adapter
 
-    def _build(self, provider_id: str) -> ProviderAdapter:
+    def _build(self, provider_id: str) -> ProviderLifecycle:
         descriptor = self._registry.get(provider_id)
         settings = self._settings.get(provider_id) or ProviderSettings(provider_id=provider_id)
 
@@ -285,7 +294,9 @@ class AdapterPool:
             )
 
         api_key = self._resolver.resolve(settings.api_key)
-        options = self._resolve_secret_options(descriptor, settings.options)
+        options = dict(self._resolve_secret_options(descriptor, settings.options))
+        if descriptor.uses_catalog and self._catalog is not None:
+            options.setdefault("catalog", self._catalog)
 
         config = ProviderConfig(
             provider_id=provider_id,
@@ -298,7 +309,33 @@ class AdapterPool:
             transport=self._govern(provider_id, descriptor, settings),
             events=self._events,
         )
-        return descriptor.factory(config)
+        adapter = descriptor.factory(config)
+        self._validate_operations(provider_id, descriptor, adapter)
+        return adapter
+
+    def _validate_operations(
+        self, provider_id: str, descriptor: ProviderDescriptor, adapter: ProviderLifecycle
+    ) -> None:
+        """Fail fast when a descriptor claims an operation its adapter object cannot do.
+
+        A declared-but-unsatisfied operation is a provider-authoring bug, not a runtime
+        condition to route around — catching it at first build keeps a broken descriptor
+        from surfacing as a confusing `AttributeError` deep inside the router instead.
+        """
+        checks: dict[str, type] = {
+            "generation": GeneratesText,
+            "embedding": EmbedsText,
+            "rerank": ReranksText,
+        }
+        for operation in descriptor.operations:
+            protocol = checks.get(operation)
+            if protocol is not None and not isinstance(adapter, protocol):
+                raise ConfigError(
+                    f"provider {provider_id!r} declares support for {operation!r} but its "
+                    f"adapter does not implement {protocol.__name__}",
+                    provider=provider_id,
+                    hint="fix the descriptor's operations set or the adapter's factory",
+                )
 
     def _govern(
         self,
@@ -313,7 +350,7 @@ class AdapterPool:
         transport ends up *inside* the governor, so pacing can be proven with no network.
 
         A provider that builds its own transport gets its limiter registered anyway — the
-        client applies concurrency around the call — and the limiter is skipped here because
+        client applies concurrency around the call, and the limiter is skipped here because
         there is nothing of ours to wrap.
         """
         limits = settings.limits
@@ -349,7 +386,7 @@ class AdapterPool:
 
         A provider that takes a second credential (Anthropic's OAuth token beside its API
         key) carries it in ``options``, which is otherwise passed through verbatim. Left
-        alone it would never reach the resolver — so ``env://`` would arrive at the
+        alone it would never reach the resolver, so ``env://`` would arrive at the
         adapter as the literal string, and a real token would never be registered for
         redaction. Driven off the setup spec's ``secret`` fields, so this stays true for
         any provider, including third-party ones, without naming one.

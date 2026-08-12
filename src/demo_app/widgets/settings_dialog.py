@@ -7,7 +7,7 @@ adapter that advertises itself through the ``anyinfer.providers`` entry-point gr
 shows up here, correctly rendered, without this file changing.
 
 The dialog configures *instances*, not engines. An engine can be added more than once —
-two Azure tenants, a local and a remote Ollama — and each instance carries an editable
+two Azure tenants, a local and a remote Ollama, and each instance carries an editable
 alias that becomes its id in a ``alias:model`` target. Only engines the user actually
 added appear; the registry is offered through a searchable dropdown instead of as a
 checklist of everything installed.
@@ -78,6 +78,7 @@ from anyinfer.providers.base import ProviderAdapter
 from anyinfer.providers.base import ProviderConfig as ProviderAdapterConfig
 from anyinfer.registry import ProviderDescriptor, ProviderRegistry, SetupField
 
+from .. import theme
 from ..config import DemoConfig, ProviderConfig
 from .icons import themed_icon
 
@@ -85,18 +86,16 @@ __all__ = ["ProviderSettingsDialog"]
 
 _REASONING_EFFORTS = ("", "minimal", "low", "medium", "high")
 
-_REQUIRED_MARK = "<span style='color:#d13438;'>*</span>"
-"""The red asterisk marking a mandatory field.
 
-Inline rather than themed, because a `QFormLayout` label carries no object name to hang a
-stylesheet rule on, and the mark has to read as "required" identically in both palettes.
-"""
+def _required_mark() -> str:
+    """Render the required marker from the active theme's danger token."""
+    return f"<span style='color:{theme.color('danger')};'>*</span>"
 
 
 def _field_label(setup_field: SetupField) -> QLabel:
     """Build a field's label, marking it when the provider declares it required."""
     label = QLabel(
-        f"{setup_field.label} {_REQUIRED_MARK}" if setup_field.required else setup_field.label
+        f"{setup_field.label} {_required_mark()}" if setup_field.required else setup_field.label
     )
     label.setTextFormat(Qt.TextFormat.RichText)
     if setup_field.required:
@@ -125,7 +124,7 @@ class _PathField(QWidget):
     """A line edit for a filesystem location, with a picker beside it.
 
     Typing stays possible — a path may not exist yet, and ``llama-server`` resolved off
-    PATH is a bare name rather than a location at all — so the browser fills the editor
+    PATH is a bare name rather than a location at all, so the browser fills the editor
     instead of replacing it.
     """
 
@@ -177,7 +176,7 @@ class _AdvancedFields(QWidget):
     """A disclosure holding the fields a provider already has a standard value for.
 
     Collapsed, it is one line; expanded, it is an ordinary form. The point is not to
-    hide anything — every field is still reachable and still saved — but to keep the
+    hide anything — every field is still reachable and still saved, but to keep the
     question a user is being asked ("what is your API key?") from arriving alongside four
     settings that are already correct.
     """
@@ -299,14 +298,11 @@ class _ProviderPanel(QWidget):
             # Every field this engine has already has a standard value, so there is
             # nothing to ask. Say so, rather than showing a form that looks unfinished.
             layout.addRow(
-                QLabel(
-                    "<i>Nothing to fill in — this engine runs on its standard "
-                    "settings.</i>"
-                )
+                QLabel("<i>Nothing to fill in — this engine runs on its standard settings.</i>")
             )
 
         if setup.requirement_note:
-            note = QLabel(f"<i>{_REQUIRED_MARK} {setup.requirement_note}</i>")
+            note = QLabel(f"<i>{_required_mark()} {setup.requirement_note}</i>")
             note.setTextFormat(Qt.TextFormat.RichText)
             note.setWordWrap(True)
             layout.addRow(note)
@@ -323,10 +319,7 @@ class _ProviderPanel(QWidget):
         self._advanced: _AdvancedFields | None = None
         if setup.advanced_fields:
             self._advanced = _AdvancedFields(
-                [
-                    (f, *self._build_field(f, config.values))
-                    for f in setup.advanced_fields
-                ]
+                [(f, *self._build_field(f, config.values)) for f in setup.advanced_fields]
             )
             self._editors.update(self._advanced.editors)
             outer.addWidget(self._advanced)
@@ -634,9 +627,7 @@ class ProviderSettingsDialog(QDialog):
         self._list_layout = QVBoxLayout(container)
         self._list_layout.setContentsMargins(4, 4, 4, 4)
         self._list_layout.setSpacing(10)
-        self._empty = QLabel(
-            "<i>No engines configured yet — pick one above and choose Add.</i>"
-        )
+        self._empty = QLabel("<i>No engines configured yet — pick one above and choose Add.</i>")
         self._empty.setTextFormat(Qt.TextFormat.RichText)
         self._list_layout.addWidget(self._empty)
         self._list_layout.addStretch(1)
@@ -702,9 +693,7 @@ class ProviderSettingsDialog(QDialog):
         """Add the engine named in the dropdown, by data or by typed display name."""
         descriptor = self._selected_descriptor()
         if descriptor is None:
-            self._error.setText(
-                f"No engine matches {self._engines.currentText().strip()!r}."
-            )
+            self._error.setText(f"No engine matches {self._engines.currentText().strip()!r}.")
             return
         self._error.clear()
         alias = unique_alias(descriptor.id, {row.alias() for row in self._rows})
@@ -749,7 +738,7 @@ class ProviderSettingsDialog(QDialog):
         """The engine descriptor behind one configuration.
 
         A configuration naming an engine that is no longer installed still has to render
-        — dropping it silently would delete the user's settings on the next save — so it
+        — dropping it silently would delete the user's settings on the next save, so it
         falls back to a minimal stand-in that declares no fields.
         """
         if self._registry.has(config.provider_id):

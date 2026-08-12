@@ -1,0 +1,339 @@
+{
+  "fixtures": {
+    "simple-chat": {
+      "anthropic:claude-sonnet-4-5": {
+        "budget": {
+          "context_window": null,
+          "estimate": {
+            "envelope": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "messages": {
+              "floor": 6,
+              "tokens": 27
+            },
+            "schema": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "tools": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "unpriced_parts": 0
+          },
+          "headroom_tokens": 0,
+          "output_reserve_tokens": 4096,
+          "pricing": {
+            "provenance": "catalog",
+            "value": {
+              "cache_read_per_1m": null,
+              "cache_write_per_1m": null,
+              "currency": "USD",
+              "input_per_1m": "3",
+              "output_per_1m": "15"
+            }
+          }
+        },
+        "cache": null,
+        "capability_provenance": {
+          "features": "default",
+          "pricing": "catalog"
+        },
+        "cost": {
+          "currency": "USD",
+          "high": "0.061521",
+          "low": "0.000018"
+        },
+        "dropped": [],
+        "fits": null,
+        "mechanism_rungs": [],
+        "notes": [],
+        "reason": "",
+        "requested": "anthropic:claude-sonnet-4-5",
+        "resolvable": true,
+        "resolved": "anthropic:claude-sonnet-4-5",
+        "structured_mechanism": null
+      },
+      "ollama:qwen3:8b": {
+        "budget": {
+          "context_window": null,
+          "estimate": {
+            "envelope": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "messages": {
+              "floor": 6,
+              "tokens": 27
+            },
+            "schema": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "tools": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "unpriced_parts": 0
+          },
+          "headroom_tokens": 0,
+          "output_reserve_tokens": 4096,
+          "pricing": {
+            "provenance": "catalog",
+            "value": {
+              "cache_read_per_1m": null,
+              "cache_write_per_1m": null,
+              "currency": "USD",
+              "input_per_1m": "0",
+              "output_per_1m": "0"
+            }
+          }
+        },
+        "cache": null,
+        "capability_provenance": {
+          "features": "default",
+          "pricing": "catalog"
+        },
+        "cost": {
+          "currency": "USD",
+          "high": "0.000000",
+          "low": "0.000000"
+        },
+        "dropped": [],
+        "fits": null,
+        "mechanism_rungs": [],
+        "notes": [],
+        "reason": "",
+        "requested": "ollama:qwen3:8b",
+        "resolvable": true,
+        "resolved": "ollama:qwen3:8b",
+        "structured_mechanism": null
+      },
+      "openai:gpt-4o": {
+        "budget": {
+          "context_window": null,
+          "estimate": {
+            "envelope": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "messages": {
+              "floor": 6,
+              "tokens": 27
+            },
+            "schema": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "tools": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "unpriced_parts": 0
+          },
+          "headroom_tokens": 0,
+          "output_reserve_tokens": 4096,
+          "pricing": {
+            "provenance": "catalog",
+            "value": {
+              "cache_read_per_1m": null,
+              "cache_write_per_1m": null,
+              "currency": "USD",
+              "input_per_1m": "2.5",
+              "output_per_1m": "10"
+            }
+          }
+        },
+        "cache": null,
+        "capability_provenance": {
+          "features": "default",
+          "pricing": "catalog"
+        },
+        "cost": {
+          "currency": "USD",
+          "high": "0.0410275",
+          "low": "0.0000150"
+        },
+        "dropped": [],
+        "fits": null,
+        "mechanism_rungs": [],
+        "notes": [],
+        "reason": "",
+        "requested": "openai:gpt-4o",
+        "resolvable": true,
+        "resolved": "openai:gpt-4o",
+        "structured_mechanism": null
+      }
+    },
+    "structured-summary": {
+      "anthropic:claude-sonnet-4-5": {
+        "budget": {
+          "context_window": null,
+          "estimate": {
+            "envelope": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "messages": {
+              "floor": 7,
+              "tokens": 25
+            },
+            "schema": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "tools": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "unpriced_parts": 0
+          },
+          "headroom_tokens": 0,
+          "output_reserve_tokens": 4096,
+          "pricing": {
+            "provenance": "catalog",
+            "value": {
+              "cache_read_per_1m": null,
+              "cache_write_per_1m": null,
+              "currency": "USD",
+              "input_per_1m": "3",
+              "output_per_1m": "15"
+            }
+          }
+        },
+        "cache": null,
+        "capability_provenance": {
+          "features": "default",
+          "pricing": "catalog"
+        },
+        "cost": {
+          "currency": "USD",
+          "high": "0.061515",
+          "low": "0.000021"
+        },
+        "dropped": [],
+        "fits": null,
+        "mechanism_rungs": [],
+        "notes": [],
+        "reason": "",
+        "requested": "anthropic:claude-sonnet-4-5",
+        "resolvable": true,
+        "resolved": "anthropic:claude-sonnet-4-5",
+        "structured_mechanism": null
+      },
+      "ollama:qwen3:8b": {
+        "budget": {
+          "context_window": null,
+          "estimate": {
+            "envelope": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "messages": {
+              "floor": 7,
+              "tokens": 25
+            },
+            "schema": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "tools": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "unpriced_parts": 0
+          },
+          "headroom_tokens": 0,
+          "output_reserve_tokens": 4096,
+          "pricing": {
+            "provenance": "catalog",
+            "value": {
+              "cache_read_per_1m": null,
+              "cache_write_per_1m": null,
+              "currency": "USD",
+              "input_per_1m": "0",
+              "output_per_1m": "0"
+            }
+          }
+        },
+        "cache": null,
+        "capability_provenance": {
+          "features": "default",
+          "pricing": "catalog"
+        },
+        "cost": {
+          "currency": "USD",
+          "high": "0.000000",
+          "low": "0.000000"
+        },
+        "dropped": [],
+        "fits": null,
+        "mechanism_rungs": [],
+        "notes": [],
+        "reason": "",
+        "requested": "ollama:qwen3:8b",
+        "resolvable": true,
+        "resolved": "ollama:qwen3:8b",
+        "structured_mechanism": null
+      },
+      "openai:gpt-4o": {
+        "budget": {
+          "context_window": null,
+          "estimate": {
+            "envelope": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "messages": {
+              "floor": 7,
+              "tokens": 25
+            },
+            "schema": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "tools": {
+              "floor": 0,
+              "tokens": 0
+            },
+            "unpriced_parts": 0
+          },
+          "headroom_tokens": 0,
+          "output_reserve_tokens": 4096,
+          "pricing": {
+            "provenance": "catalog",
+            "value": {
+              "cache_read_per_1m": null,
+              "cache_write_per_1m": null,
+              "currency": "USD",
+              "input_per_1m": "2.5",
+              "output_per_1m": "10"
+            }
+          }
+        },
+        "cache": null,
+        "capability_provenance": {
+          "features": "default",
+          "pricing": "catalog"
+        },
+        "cost": {
+          "currency": "USD",
+          "high": "0.0410225",
+          "low": "0.0000175"
+        },
+        "dropped": [],
+        "fits": null,
+        "mechanism_rungs": [],
+        "notes": [],
+        "reason": "",
+        "requested": "openai:gpt-4o",
+        "resolvable": true,
+        "resolved": "openai:gpt-4o",
+        "structured_mechanism": null
+      }
+    }
+  },
+  "schema_version": 1
+}

@@ -92,7 +92,7 @@ coherent runtime and correctness contract around them.
 
 ## Continue
 
-- [Why AnyInfer](../why-anyinfer.md) — the standout capabilities, with a dated comparison
+- [Why AnyInfer](../why-anyinfer.md): the standout capabilities, with a dated comparison
   by category and the commands that check each claim
 - [Choose an integration path](integration-paths.md)
 - [Run a local model end to end](local-inference.md)

@@ -19,13 +19,15 @@ externally-run llama-server, a corporate gateway, or OpenAI itself.
 ## Setup
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "openai-compat",
-        base_url="http://localhost:8000/v1",
-        api_key="env://MY_API_KEY",        # optional for keyless local servers
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "openai-compat",
+            base_url="http://localhost:8000/v1",
+            api_key="env://MY_API_KEY",  # optional for keyless local servers
+        ),
+    ]
+)
 result = client.generate(prompt, target="openai-compat:my-model")
 ```
 
@@ -59,7 +61,7 @@ code is unaffected.
 
 ## Known divergences
 
-- `max_tokens` vs `max_completion_tokens` — subclasses override this; the base sends
+- `max_tokens` vs `max_completion_tokens`: subclasses override this; the base sends
   `max_tokens`.
 - `stream_options.include_usage` is not universally implemented. Usage is simply absent when
   a server omits it, never fabricated.

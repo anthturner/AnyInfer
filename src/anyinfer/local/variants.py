@@ -1,7 +1,7 @@
 """Which quantization to acquire for *this* machine.
 
 The catalog lists a ladder; this picks a rung. The rule is the highest quality tier whose
-weights **and KV cache** fit the tuned memory budget — never the biggest file that happens
+weights **and KV cache** fit the tuned memory budget; never the biggest file that happens
 to fit, because a model that exactly fills VRAM leaves nothing for the cache and the server
 will not serve.
 
@@ -198,7 +198,7 @@ def evaluate_variants(
 ) -> tuple[VariantChoice | None, tuple[tuple[str, str], ...]]:
     """Choose a rung *and* return why every other rung was passed over.
 
-    The rejections matter even — especially — when nothing was chosen: "no quantization
+    The rejections matter even — especially, when nothing was chosen: "no quantization
     fits" is only useful advice if it comes with the numbers behind it. `select_variant`
     is the convenience wrapper for callers that only need the choice.
 

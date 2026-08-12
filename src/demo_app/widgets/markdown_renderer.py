@@ -9,16 +9,37 @@ intend to render.
 from __future__ import annotations
 
 import html as _html
-from xml.etree import ElementTree as ET
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
 
 import markdown
 
 __all__ = ["render_markdown"]
 
 _ALLOWED_TAGS = {
-    "p", "br", "strong", "em", "code", "pre", "ul", "ol", "li",
-    "h1", "h2", "h3", "h4", "a", "blockquote", "table", "thead",
-    "tbody", "tr", "th", "td", "hr", "span",
+    "p",
+    "br",
+    "strong",
+    "em",
+    "code",
+    "pre",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "a",
+    "blockquote",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "hr",
+    "span",
 }
 _ALLOWED_ATTRS = {"a": {"href"}}
 _VOID_TAGS = {"br", "hr"}
@@ -29,39 +50,72 @@ _md = markdown.Markdown(extensions=["fenced_code", "tables", "toc"], output_form
 def render_markdown(text: str) -> str:
     """Render ``text`` as sanitized HTML safe to pass to `QTextEdit.setHtml()`.
 
-    Falls back to escaped plain text if the Markdown output is not well-formed XML (which
-    ``markdown`` can produce for pathological input) rather than risk showing raw HTML.
+    Python-Markdown intentionally emits HTML rather than XML, including unclosed void tags
+    and named HTML entities. A tolerant parser sanitizes that output without turning an
+    otherwise valid message into escaped preformatted text.
     """
     _md.reset()
     raw_html = _md.convert(text)
-    try:
-        root = ET.fromstring(f"<root>{raw_html}</root>")
-    except ET.ParseError:
-        return f"<pre>{_html.escape(text)}</pre>"
-    return "".join(_render_children(root))
+    sanitizer = _AllowListHTMLParser()
+    sanitizer.feed(raw_html)
+    sanitizer.close()
+    return sanitizer.html
 
 
-def _render_children(element: ET.Element) -> list[str]:
-    """Render an element's children, dropping disallowed tags but keeping their content."""
-    parts: list[str] = []
-    if element.text:
-        parts.append(_html.escape(element.text))
-    for child in element:
-        parts.extend(_render_element(child))
-        if child.tail:
-            parts.append(_html.escape(child.tail))
-    return parts
+def _safe_href(value: str) -> bool:
+    """Allow ordinary web/mail links and local document fragments, never script URLs."""
+    compact = "".join(value.split())
+    scheme = urlsplit(compact).scheme.casefold()
+    return not scheme or scheme in {"http", "https", "mailto"}
 
 
-def _render_element(element: ET.Element) -> list[str]:
-    inner = _render_children(element)
-    if element.tag not in _ALLOWED_TAGS:
-        return inner  # unwrap: keep the content, drop the tag
-    attrs = "".join(
-        f' {name}="{_html.escape(value, quote=True)}"'
-        for name, value in element.attrib.items()
-        if name in _ALLOWED_ATTRS.get(element.tag, set())
-    )
-    if element.tag in _VOID_TAGS:
-        return [f"<{element.tag}{attrs}/>"]
-    return [f"<{element.tag}{attrs}>", *inner, f"</{element.tag}>"]
+class _AllowListHTMLParser(HTMLParser):
+    """Tolerant HTML parser that emits only the demo's small rendering allow-list."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._parts: list[str] = []
+        self._open_tags: list[str] = []
+
+    @property
+    def html(self) -> str:
+        """Return balanced sanitized HTML after parsing has completed."""
+        return "".join((*self._parts, *(f"</{tag}>" for tag in reversed(self._open_tags))))
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag = tag.casefold()
+        if tag not in _ALLOWED_TAGS:
+            return
+        rendered_attrs: list[str] = []
+        seen: set[str] = set()
+        for name, value in attrs:
+            name = name.casefold()
+            if name in seen or name not in _ALLOWED_ATTRS.get(tag, set()) or value is None:
+                continue
+            if tag == "a" and name == "href" and not _safe_href(value):
+                continue
+            seen.add(name)
+            rendered_attrs.append(f' {name}="{_html.escape(value, quote=True)}"')
+        self._parts.append(f"<{tag}{''.join(rendered_attrs)}>")
+        if tag not in _VOID_TAGS:
+            self._open_tags.append(tag)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        before = len(self._open_tags)
+        self.handle_starttag(tag, attrs)
+        if len(self._open_tags) > before:
+            opened = self._open_tags.pop()
+            self._parts.append(f"</{opened}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.casefold()
+        if tag not in self._open_tags:
+            return
+        while self._open_tags:
+            opened = self._open_tags.pop()
+            self._parts.append(f"</{opened}>")
+            if opened == tag:
+                break
+
+    def handle_data(self, data: str) -> None:
+        self._parts.append(_html.escape(data))

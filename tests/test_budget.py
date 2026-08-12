@@ -252,7 +252,9 @@ def test_check_context_fit_returns_the_budget_or_raises() -> None:
     budget = check_context_fit(_request("hi"), caps)
     assert budget.fits is True
     with pytest.raises(ContextLengthError):
-        check_context_fit(_request("x" * 10_000), ModelCapabilities(context_window=Sourced(64, "probed")))
+        check_context_fit(
+            _request("x" * 10_000), ModelCapabilities(context_window=Sourced(64, "probed"))
+        )
 
 
 # ---- client integration --------------------------------------------------------------
@@ -283,9 +285,7 @@ OVERSIZED_PROMPT = "word " * 400  # 2000 bytes: floor 250 tokens, far over a 64-
 
 async def test_gate_fails_fast_without_a_round_trip() -> None:
     server = FakeOpenAIServer(FakeResponse(text="never reached"))
-    async with make_multi_client(
-        [("tiny", server)], registry=_capacity_registry()
-    ) as client:
+    async with make_multi_client([("tiny", server)], registry=_capacity_registry()) as client:
         with pytest.raises(ai.AllTargetsFailedError) as excinfo:
             await client.generate(OVERSIZED_PROMPT, target="tiny:m")
 
@@ -330,9 +330,7 @@ async def test_unknown_window_never_gates() -> None:
 
 async def test_client_budget_is_a_pure_preflight() -> None:
     server = FakeOpenAIServer()
-    async with make_multi_client(
-        [("big", server)], registry=_capacity_registry()
-    ) as client:
+    async with make_multi_client([("big", server)], registry=_capacity_registry()) as client:
         budget = client.budget("plan around me", target="big:m")
 
     assert budget.context_window == Sourced(200_000, "catalog")
@@ -383,7 +381,7 @@ async def test_client_budget_applies_the_descriptor_calibration() -> None:
 
 async def test_calibration_never_gates_a_request_the_floor_permits() -> None:
     # A large multiplier pushes the planning estimate over a small window, but the gate
-    # reads the floor, which no calibration moves — so the provider still gets its say.
+    # reads the floor, which no calibration moves, so the provider still gets its say.
     from anyinfer.providers.openai_compat import OpenAICompatAdapter
 
     registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
@@ -394,9 +392,7 @@ async def test_calibration_never_gates_a_request_the_floor_permits() -> None:
             factory=OpenAICompatAdapter,
             requires_base_url=True,
             token_calibration=TokenCalibration(multiplier=8.0, overhead_tokens=4_000),
-            static_capabilities={
-                "m": ModelCapabilities(context_window=Sourced(2_000, "catalog"))
-            },
+            static_capabilities={"m": ModelCapabilities(context_window=Sourced(2_000, "catalog"))},
         )
     )
     server = FakeOpenAIServer(FakeResponse(text="dispatched"))

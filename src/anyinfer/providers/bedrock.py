@@ -18,6 +18,14 @@ Four things make this dialect unusual:
 
 Model-specific parameters that Converse does not model (Claude's ``top_k`` or extended
 thinking, for instance) pass through ``additionalModelRequestFields``.
+
+Embeddings are the one operation Converse does not offer at all — Bedrock only serves
+them through the older, per-model ``InvokeModel`` action. `embed()` therefore speaks
+Titan Text Embeddings V2's own body shape (``inputText``/``dimensions``/``normalize`` in,
+``embedding``/``inputTextTokenCount`` out), verified live 2026-08-12 against
+docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-titan-embed-text.html.
+Cohere-on-Bedrock embeddings and Bedrock's separate agent-runtime Rerank action are
+scoped out for now — see `contracts/bedrock.md`'s watchlist.
 """
 
 from __future__ import annotations
@@ -41,13 +49,27 @@ from ..types.messages import (
     ToolCall,
     ToolResult,
 )
+from ..types.operations import EmbeddingCapabilities
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data, media_subtype, neutral_filename, unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    EmbeddingWireRequest,
+    EmbeddingWireResult,
+    ProviderConfig,
+    WireRequest,
+)
 from .cloud_auth import AwsCredentials, resolve_aws_credentials, sigv4_headers
 from .eventstream import EventStreamMessage, iter_event_stream
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import (
+    build_client,
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+)
 
 __all__ = ["BedrockAdapter", "descriptor"]
 
@@ -118,7 +140,8 @@ class BedrockAdapter:
         """Build the per-request auth headers: a bearer key, or a SigV4 signature."""
         if self._api_key:
             return {"authorization": f"Bearer {self._api_key}"}
-        assert self._credentials is not None  # guaranteed by __init__
+        if self._credentials is None:
+            raise ConfigError("bedrock AWS credentials are unavailable", provider=self.provider_id)
         return sigv4_headers(
             credentials=self._credentials,
             method=method,
@@ -184,6 +207,85 @@ class BedrockAdapter:
         if self._api_key or self._credentials is not None:
             return Health(ok=True, detail=f"credentials present for {self._region}")
         return Health(ok=False, detail="no Bedrock API key or AWS credentials")
+
+    # ---- embedding -------------------------------------------------------------------
+
+    async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Run one or more Titan Text Embeddings V2 calls through ``InvokeModel``.
+
+        Titan accepts exactly one ``inputText`` per call — there is no batch field —
+        so this issues one `InvokeModel` request per input and reassembles them in
+        order. `max_batch_inputs=1` is declared for the model so the core's batching
+        policy keeps `req.inputs` to one item in normal operation; looping here keeps
+        the adapter correct even when called directly with more.
+        """
+        vectors: list[tuple[float, ...]] = []
+        total_tokens = 0
+        saw_token_count = False
+        last_payload: Any = None
+
+        for text in req.inputs:
+            body_fields: dict[str, Any] = {"inputText": text}
+            if req.dimensions is not None:
+                body_fields["dimensions"] = req.dimensions
+            body_fields.update(req.extra_options)
+            body = json.dumps(body_fields).encode("utf-8")
+
+            path = f"/model/{_quote_model(req.model)}/invoke"
+            try:
+                response = await self._client.post(
+                    path,
+                    content=body,
+                    headers=self._auth_headers(method="POST", path=path, body=body),
+                    timeout=req.timeout_s,
+                )
+            except httpx2.HTTPError as exc:
+                raise map_transport_error(exc, provider=self.provider_id) from exc
+            if response.status_code >= 400:
+                raise classify_status(
+                    response.status_code,
+                    provider=self.provider_id,
+                    detail=read_error_detail(response.content),
+                    headers=response.headers,
+                )
+            check_response_size(
+                response.content, req.max_response_bytes, provider=self.provider_id
+            )
+
+            try:
+                parsed = json.loads(response.content)
+            except ValueError as exc:
+                raise ProviderError(
+                    f"bedrock returned a non-JSON embedding body: {exc}",
+                    provider=self.provider_id,
+                    phase="validate",
+                ) from exc
+            if not isinstance(parsed, Mapping):
+                raise ProviderError(
+                    "titan embedding response is not a JSON object", phase="validate"
+                )
+            last_payload = parsed
+
+            embedding = parsed.get("embedding")
+            if not isinstance(embedding, list):
+                raise ProviderError(
+                    "titan embedding response is missing an 'embedding' array",
+                    phase="validate",
+                )
+            vectors.append(tuple(float(v) for v in embedding))
+
+            token_count = parsed.get("inputTextTokenCount")
+            if isinstance(token_count, int) and not isinstance(token_count, bool):
+                total_tokens += token_count
+                saw_token_count = True
+
+        usage = Usage(input_tokens=total_tokens) if saw_token_count else None
+        return EmbeddingWireResult(
+            vectors=tuple(vectors),
+            dimensions=len(vectors[0]) if vectors else None,
+            usage=usage,
+            raw=last_payload,
+        )
 
     # ---- generation ------------------------------------------------------------------
 
@@ -676,7 +778,7 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
 
     Converse has no reasoning field of its own; thinking is a model-specific parameter, so
     it travels in ``additionalModelRequestFields``. Bedrock forwards unknown fields to the
-    model, which ignores them — so this is harmless on models without thinking, and the
+    model, which ignores them, so this is harmless on models without thinking, and the
     escape hatch remains available for other spellings.
     """
     if effort is None:
@@ -709,6 +811,23 @@ _BEDROCK_FEATURES = (
 )
 
 
+_STATIC_EMBEDDING_CAPABILITIES = {
+    # Verified live 2026-08-12 against docs.aws.amazon.com/bedrock/latest/userguide/
+    # titan-embedding-models.html and model-parameters-titan-embed-text.html: 8,192
+    # max input tokens / 50,000 max input characters (whichever binds first — only the
+    # token ceiling is representable here); output 1,024 dims by default, 512 or 256 via
+    # `dimensions`; exactly one inputText per InvokeModel call. No task-type/intent
+    # concept in the request schema.
+    "amazon.titan-embed-text-v2:0": EmbeddingCapabilities(
+        dimensions=1_024,
+        dimension_choices=(1_024, 512, 256),
+        max_batch_inputs=1,
+        max_input_tokens=8_192,
+        input_intents=(),
+    ),
+}
+
+
 descriptor = ProviderDescriptor(
     id="bedrock",
     display_name="AWS Bedrock",
@@ -717,6 +836,8 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=None,
     requires_base_url=False,
+    operations=frozenset({"generation", "embedding"}),
+    static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

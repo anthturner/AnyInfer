@@ -46,7 +46,7 @@ from openai import OpenAI
 client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="unused")
 
 client.chat.completions.create(
-    model="ollama:qwen3:8b",                    # or "medium", or "anthropic:..."
+    model="ollama:qwen3:8b",  # or "medium", or "anthropic:..."
     messages=[{"role": "user", "content": "hi"}],
 )
 ```
@@ -68,7 +68,7 @@ flowchart LR
 ```
 
 No routing, validation, telemetry, credential, or local-inference code is duplicated. The
-frontend is a wire codec plus an ASGI app around a normal `AsyncClient` — and an
+frontend is a wire codec plus an ASGI app around a normal `AsyncClient`, and an
 architecture test enforces that it stays one.
 
 ## What it serves
@@ -128,7 +128,7 @@ absence of both response forms. See [run manifests](../concepts/run-manifests.md
   unauthenticated LLM gateway on a network is a credential laundering service.
 - Backend credentials never transit: the frontend authenticates *clients to itself*.
 - Standard redaction applies to logs; payload retention is off by default.
-- There are no configuration-execution endpoints of any kind — a deliberate response to how
+- There are no configuration-execution endpoints of any kind: a deliberate response to how
   comparable gateways have been compromised.
 
 === "Bash"
@@ -158,8 +158,7 @@ file and commands. See [running as a service](running-as-a-service.md).
 ```python
 from anyinfer.serve import create_app
 
-app = create_app(async_client, auth_token=token,
-                 expose_targets=("anthropic:claude-sonnet-4-5",))
+app = create_app(async_client, auth_token=token, expose_targets=("anthropic:claude-sonnet-4-5",))
 ```
 
 ## Behind a proxy
@@ -218,8 +217,8 @@ The sidecar, CLI, and Python SDK use the same
 <div class="anyinfer-see-also" markdown>
 
 - [Choosing an integration path](../guides/integration-paths.md)
-- [Run a prompt from the shell](../guides/cli.md) — the same config file, one prompt, no server
+- [Run a prompt from the shell](../guides/cli.md): the same config file, one prompt, no server
 - [Shared configuration](../reference/configuration.md)
-- [Running as a service](running-as-a-service.md) — surviving a reboot
+- [Running as a service](running-as-a-service.md): surviving a reboot
 
 </div>

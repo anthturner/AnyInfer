@@ -19,8 +19,7 @@ SMALL = [
 ]
 
 LARGE = [
-    _doc(f"src/mod{i}/file{i}.py", f"def function_{i}():\n    return {i}\n" * 40)
-    for i in range(6)
+    _doc(f"src/mod{i}/file{i}.py", f"def function_{i}():\n    return {i}\n" * 40) for i in range(6)
 ]
 
 
@@ -101,7 +100,8 @@ def test_a_token_overflow_skips_and_continues():
 def test_binding_constraints_use_a_fixed_order():
     reduction = select(LARGE, "function", max_tokens=200, max_documents=1, strategy="ranked")
     assert list(reduction.binding_constraints) == [
-        name for name in ("document count", "bytes", "tokens")
+        name
+        for name in ("document count", "bytes", "tokens")
         if name in reduction.binding_constraints
     ]
 
@@ -163,8 +163,7 @@ def test_an_observer_receives_a_content_free_event():
         def on_event(self, event: ai.TelemetryEvent) -> None:
             received.append(event)
 
-    reduction = select(LARGE, "function", max_tokens=300, strategy="ranked",
-                       observer=Recorder())
+    reduction = select(LARGE, "function", max_tokens=300, strategy="ranked", observer=Recorder())
 
     assert len(received) == 1
     event = received[0]

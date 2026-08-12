@@ -54,7 +54,11 @@ def _request(**overrides: object) -> GenerationRequest:
 
 def test_no_policy_means_no_plan() -> None:
     plan = plan_cache(
-        _request(), None, PLACEMENT_CAPABILITIES, _descriptor(cache_mechanism="explicit"), ESTIMATOR
+        _request(),
+        None,
+        PLACEMENT_CAPABILITIES,
+        _descriptor(cache_mechanism="explicit"),
+        ESTIMATOR,
     )
 
     assert not plan.active
@@ -74,9 +78,7 @@ def test_mode_off_means_no_plan() -> None:
 
 
 def test_a_provider_with_no_mechanism_gets_no_plan_and_says_why() -> None:
-    plan = plan_cache(
-        _request(), CachePolicy(), PLACEMENT_CAPABILITIES, _descriptor(), ESTIMATOR
-    )
+    plan = plan_cache(_request(), CachePolicy(), PLACEMENT_CAPABILITIES, _descriptor(), ESTIMATOR)
 
     assert not plan.active
     assert plan.reasons
@@ -101,9 +103,7 @@ def test_capabilities_without_placement_block_explicit_marks() -> None:
 
 
 def test_large_segments_earn_marks_in_wire_order() -> None:
-    request = _request(
-        tools=(ToolSpec(name="search", description=_long("tool"), parameters={}),)
-    )
+    request = _request(tools=(ToolSpec(name="search", description=_long("tool"), parameters={}),))
 
     plan = plan_cache(
         request,
@@ -154,9 +154,7 @@ def test_provider_floor_overrides_a_more_permissive_policy() -> None:
 
 
 def test_mark_budget_is_clamped_to_the_provider_ceiling() -> None:
-    request = _request(
-        tools=(ToolSpec(name="search", description=_long("tool"), parameters={}),)
-    )
+    request = _request(tools=(ToolSpec(name="search", description=_long("tool"), parameters={}),))
 
     plan = plan_cache(
         request,
@@ -193,9 +191,7 @@ def test_largest_segment_wins_a_scarce_budget() -> None:
 
 
 def test_include_flags_are_respected() -> None:
-    request = _request(
-        tools=(ToolSpec(name="search", description=_long("tool"), parameters={}),)
-    )
+    request = _request(tools=(ToolSpec(name="search", description=_long("tool"), parameters={}),))
 
     plan = plan_cache(
         request,

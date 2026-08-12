@@ -17,13 +17,13 @@ a count of what they *could not* price alongside what they could.
 ```python
 result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")
 
-result.usage.cost_usd          # Decimal, or None
+result.usage.cost_usd  # Decimal, or None
 result.usage.input_tokens
-result.usage.cache_read_tokens # served from the provider's prompt cache
+result.usage.cache_read_tokens  # served from the provider's prompt cache
 ```
 
 Cost is computed centrally from the pricing the capability layer assembled, so every
-provider reports it identically — and only from pricing whose provenance is trusted. A
+provider reports it identically, and only from pricing whose provenance is trusted. A
 descriptor-level fallback price is a placeholder, not a price, and never produces money.
 
 ## What this client has spent
@@ -51,8 +51,8 @@ Break it down by target, or by your own labels:
 ```python
 client.generate(prompt, target=..., metadata={"tenant": "acme", "feature": "summarize"})
 
-ledger.by_target()          # {"anthropic:claude-sonnet-4-5": SpendTotals(...)}
-ledger.by_label("tenant")   # {"acme": SpendTotals(...), "globex": SpendTotals(...)}
+ledger.by_target()  # {"anthropic:claude-sonnet-4-5": SpendTotals(...)}
+ledger.by_label("tenant")  # {"acme": SpendTotals(...), "globex": SpendTotals(...)}
 ```
 
 The library never interprets those labels — tenant, feature, job id are your vocabulary,
@@ -131,7 +131,7 @@ The library writes nothing on its own. If you want durability, own the file:
 
 ```python
 store = ai.SpendStore("~/.myapp/spend.json")
-store.accumulate(ledger)              # atomic; folds today's ledger into the stored total
+store.accumulate(ledger)  # atomic; folds today's ledger into the stored total
 store.load()["total"].cost
 ```
 

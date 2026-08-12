@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "interactions": [
+    {
+      "method": "POST",
+      "url": "https://api.cohere.com/v2/rerank",
+      "request_body": "{\"model\":\"rerank-v3.5\",\"query\":\"which text is about the moon landing\",\"documents\":[\"a recipe for sourdough bread\",\"the moon landing happened in 1969\"],\"top_n\":2}",
+      "status": 200,
+      "headers": {
+        "access-control-expose-headers": "X-Debug-Trace-ID",
+        "cache-control": "no-cache, no-store, no-transform, must-revalidate, private, max-age=0",
+        "content-type": "application/json",
+        "expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+        "pragma": "no-cache",
+        "vary": "Origin,Accept-Encoding",
+        "x-accel-expires": "0",
+        "x-debug-trace-id": "5a02d5a1828387a40a05cf51658d8db9",
+        "x-endpoint-monthly-call-limit": "1000",
+        "x-trial-endpoint-call-limit": "10",
+        "x-trial-endpoint-call-remaining": "9",
+        "date": "Wed, 12 Aug 2026 13:16:03 GMT",
+        "x-envoy-upstream-service-time": "115",
+        "server": "envoy",
+        "via": "1.1 google",
+        "alt-svc": "h3=\":443\"; ma=2592000"
+      },
+      "body": "{\"id\":\"838c7511-8a81-40fc-aefe-9926faa12c02\",\"results\":[{\"index\":1,\"relevance_score\":0.1856816},{\"index\":0,\"relevance_score\":0.028961461}],\"meta\":{\"api_version\":{\"version\":\"2\"},\"billed_units\":{\"search_units\":1}}}"
+    }
+  ]
+}

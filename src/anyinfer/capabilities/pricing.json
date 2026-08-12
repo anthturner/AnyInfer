@@ -64,6 +64,20 @@
         "last_verified": "2026-08-07",
         "source": "https://openrouter.ai/api/v1/models",
         "openrouter_id": "openai/gpt-4o"
+      },
+      {
+        "model": "text-embedding-3-small",
+        "input_per_1m": "0.02",
+        "output_per_1m": "0",
+        "last_verified": "2026-08-12",
+        "source": "https://developers.openai.com/api/docs/pricing"
+      },
+      {
+        "model": "text-embedding-3-large",
+        "input_per_1m": "0.13",
+        "output_per_1m": "0",
+        "last_verified": "2026-08-12",
+        "source": "https://developers.openai.com/api/docs/pricing"
       }
     ],
     "anthropic": [
@@ -2142,6 +2156,22 @@
         "output_per_1m": "4.0",
         "last_verified": "2026-08-07",
         "source": "https://avian.io/pricing/"
+      }
+    ],
+    "voyage": [
+      {
+        "model": "voyage-3",
+        "input_per_1m": "0.06",
+        "output_per_1m": "0",
+        "last_verified": "2026-08-12",
+        "source": "https://docs.voyageai.com/docs/pricing"
+      },
+      {
+        "model": "voyage-3-lite",
+        "input_per_1m": "0.02",
+        "output_per_1m": "0",
+        "last_verified": "2026-08-12",
+        "source": "https://docs.voyageai.com/docs/pricing"
       }
     ]
   }

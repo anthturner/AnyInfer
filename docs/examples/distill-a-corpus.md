@@ -14,9 +14,11 @@ the multiplier is never a surprise.
 import anyinfer as ai
 from anyinfer import context
 
-client = ai.AsyncClient([
-    ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
-])
+client = ai.AsyncClient(
+    [
+        ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
+    ]
+)
 
 result = await context.distill(
     changelog_text,
@@ -61,6 +63,7 @@ supply a `reducer` and the reduce call disappears entirely:
 ```python
 import json
 
+
 def merge_findings(notes):
     findings = []
     for note in notes:
@@ -69,6 +72,7 @@ def merge_findings(notes):
         except (ValueError, KeyError):
             continue
     return json.dumps({"findings": findings}, indent=2)
+
 
 result = await context.distill(
     documents,
@@ -82,7 +86,7 @@ result = await context.distill(
     reducer=merge_findings,
 )
 
-assert result.calls == result.chunk_count   # map phase only
+assert result.calls == result.chunk_count  # map phase only
 ```
 
 The map phase is still N calls; the reduce is free and reproducible.
@@ -112,12 +116,12 @@ result = await context.distill(
 ## Hierarchical reduce, when there are many notes
 
 With enough chunks, the notes themselves exceed the window. `distill` handles that by
-reducing in batches — sized by what actually fits, not by note count — and then reducing
+reducing in batches — sized by what actually fits, not by note count, and then reducing
 those summaries:
 
 ```python
 result = await context.distill(huge_corpus, question, client=client, target=target)
-print(result.reduce_depth)   # 1 for a single pass, higher when it recursed
+print(result.reduce_depth)  # 1 for a single pass, higher when it recursed
 ```
 
 A naive single-pass merge would simply overflow here.
@@ -128,7 +132,11 @@ Concurrency defaults to 4. A fan-out is somebody's rate limit:
 
 ```python
 result = await context.distill(
-    documents, question, client=client, target=target, concurrency=2,
+    documents,
+    question,
+    client=client,
+    target=target,
+    concurrency=2,
 )
 ```
 
@@ -140,7 +148,10 @@ belong — on your [`Route`](../concepts/routing.md), not duplicated inside the 
 ```python
 with ai.Client([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]) as client:
     result = context.distill_sync(
-        corpus, question, client=client, target="anthropic:claude-sonnet-4-5",
+        corpus,
+        question,
+        client=client,
+        target="anthropic:claude-sonnet-4-5",
     )
 ```
 
@@ -170,7 +181,10 @@ for module, surface in surfaces.items():
     digest_cache[key] = summary.text
 
 reduction = context.select(
-    documents, query, max_tokens=max_tokens, strategy="tiered",
+    documents,
+    query,
+    max_tokens=max_tokens,
+    strategy="tiered",
     module_digests=digests,
 )
 ```
@@ -182,7 +196,7 @@ cache itself stays app-side.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Context reduction](../concepts/context-reduction.md) — when to distill instead of select.
-- [Fitting a corpus to a budget](../guides/fitting-context.md) — the non-inference strategies.
+- [Context reduction](../concepts/context-reduction.md): when to distill instead of select.
+- [Fitting a corpus to a budget](../guides/fitting-context.md): the non-inference strategies.
 
 </div>

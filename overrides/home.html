@@ -15,7 +15,9 @@
       <img src="{{ 'assets/anyinfer-horizontal-dark.svg' | url }}#only-dark" alt="AnyInfer" width="440" decoding="async">
     </div>
     <p class="anyinfer-hero__tagline">
-      Application-owned hybrid inference, from hosted APIs to a supervised local model.
+      One typed inference layer for hosted APIs and a supervised local model — with a test
+      kit for your failure paths, provenance on every number, and a confidentiality story
+      no other BYOK library ships.
     </p>
     <div class="anyinfer-hero__ctas">
       <a href="{{ 'guides/quickstart/' | url }}" class="anyinfer-button anyinfer-button-primary">Quickstart</a>
@@ -58,10 +60,11 @@
       <p>Estimate fit and cost before dispatch, then reduce approved context with an
       explicit record of what was omitted.</p>
     </a>
-    <a class="anyinfer-card" href="{{ 'concepts/telemetry/' | url }}">
-      <h3>{% include ".icons/material/chart-line.svg" %} Observability</h3>
-      <p>Typed in-process telemetry, payload-free by default, with a lazy OpenTelemetry
-      bridge.</p>
+    <a class="anyinfer-card" href="{{ 'guides/confidentiality-tiers/' | url }}">
+      <h3>{% include ".icons/material/shield-lock-outline.svg" %} Confidentiality tiers</h3>
+      <p>Encrypted-at-rest templates, zero-retention orchestration, and one function that
+      tells you if a box can run a model under hardware attestation — honestly tiered,
+      nowhere else.</p>
     </a>
   </section>
 

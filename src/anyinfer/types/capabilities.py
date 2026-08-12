@@ -14,7 +14,10 @@ import math
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Flag, auto
-from typing import Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
+
+if TYPE_CHECKING:
+    from .operations import InferenceOperation
 
 __all__ = [
     "DiscoveredModel",
@@ -65,7 +68,7 @@ class TokenCalibration:
 
     Serialized request bytes are not what every provider counts. Some wrap the caller's
     messages in a transport of their own before the model ever sees them — a session API
-    that prepends its harness, a tool scaffold, a service-side system preamble — and then
+    that prepends its harness, a tool scaffold, a service-side system preamble, and then
     bill (and window-check) the inflated total. Estimating such a provider from message
     bytes alone under-counts every request, and the under-count is systematic rather than
     noise, so budgets stay optimistic right up to the overflow.
@@ -111,7 +114,7 @@ class RateLimitHeaders:
     """Which response headers a provider reports its rate-limit state in.
 
     Header names are wire facts and differ per provider, so they are declared on the
-    descriptor and recorded in that provider's contract snapshot — never branched on by
+    descriptor and recorded in that provider's contract snapshot; never branched on by
     provider id in the core.
 
     A provider whose dialect cannot be verified from its documentation declares nothing.
@@ -193,6 +196,10 @@ class Pricing:
             ``None`` when the rate is not recorded. Several providers charge a *premium*
             for a write, so this is not assumed to be a discount.
         currency: Currency code the prices are quoted in.
+        per_search_unit: Price per one billed search unit, for rerank providers that bill
+            by searches rather than tokens. ``None`` when the provider does not bill this
+            way or the rate is not recorded — a rerank cost stays unknown rather than
+            being priced through an invented token equivalence.
     """
 
     input_per_1m: Decimal
@@ -200,6 +207,7 @@ class Pricing:
     cache_read_per_1m: Decimal | None = None
     cache_write_per_1m: Decimal | None = None
     currency: str = "USD"
+    per_search_unit: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,10 +248,15 @@ class ModelCapabilities:
         default_top_p: The nucleus-sampling cutoff this provider applies when a request
             sends none, with provenance; ``None`` when undocumented.
         local: Facts about the local artifact, for locally-run models only.
+        operations: Which inference operations this model serves, with provenance;
+            ``None`` when unknown. Deliberately not a generation `Feature` flag — "can
+            embed" is a different operation, not a feature of chat — and deliberately
+            not invented from the provider-level operations set, which says what the
+            *adapter* speaks, not what one model does.
 
     The two sampling defaults exist so an application can say *what* "provider default"
     means instead of only that it is one. They are populated from a provider's own
-    documentation and nowhere else — never probed, never inferred from a sibling
+    documentation and nowhere else; never probed, never inferred from a sibling
     provider, never carried over from a model family. A provider whose documentation
     states no default keeps ``None`` indefinitely, and that is the correct final state for
     it rather than a gap waiting to be filled: an invented number presented beside a
@@ -257,6 +270,7 @@ class ModelCapabilities:
     default_temperature: Sourced[float] | None = None
     default_top_p: Sourced[float] | None = None
     local: LocalModelInfo | None = None
+    operations: Sourced[frozenset[InferenceOperation]] | None = None
 
     def overlay(self, other: ModelCapabilities) -> ModelCapabilities:
         """Layer ``other`` on top of this, field by field, stronger provenance winning.
@@ -272,6 +286,7 @@ class ModelCapabilities:
             default_temperature=_stronger(self.default_temperature, other.default_temperature),
             default_top_p=_stronger(self.default_top_p, other.default_top_p),
             local=other.local if other.local is not None else self.local,
+            operations=_stronger(self.operations, other.operations),
         )
 
 
@@ -314,6 +329,17 @@ def conjunction(candidates: list[ModelCapabilities]) -> ModelCapabilities:
         features &= cap.features.value
         provenance = _weaker(provenance, cap.features.provenance)
 
+    operations: Sourced[frozenset[InferenceOperation]] | None = None
+    known_operations = [c.operations for c in candidates if c.operations is not None]
+    if len(known_operations) == len(candidates):
+        # Intersection is the only safe claim; one unknown candidate makes it unknown.
+        op_values = known_operations[0].value
+        op_provenance = known_operations[0].provenance
+        for entry in known_operations[1:]:
+            op_values = op_values & entry.value
+            op_provenance = _weaker(op_provenance, entry.provenance)
+        operations = Sourced(frozenset(op_values), op_provenance)
+
     return ModelCapabilities(
         context_window=context,
         max_output_tokens=max_out,
@@ -322,6 +348,7 @@ def conjunction(candidates: list[ModelCapabilities]) -> ModelCapabilities:
         default_temperature=None,
         default_top_p=None,
         local=None,
+        operations=operations,
     )
 
 

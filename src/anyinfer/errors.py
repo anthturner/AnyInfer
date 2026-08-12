@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any, Literal
 
 from .redaction import redact
+from .types.operations import BatchFailure
 from .types.results import DETAIL_MAX_CHARS, AttemptRecord, ErrorInfo
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "AllTargetsFailedError",
     "AnyInferError",
     "AuthError",
+    "ConfidentialExecutionError",
     "ConfigError",
     "ContextLengthError",
     "CredentialError",
@@ -204,7 +206,7 @@ class SpendLimitError(AnyInferError):
     construction: the identical request refused once will be refused again, which is why
     the default retry predicate declines it alongside auth and context-length failures.
 
-    A ceiling is the caller's own policy on their own client — not an organization quota,
+    A ceiling is the caller's own policy on their own client; not an organization quota,
     which this library deliberately does not implement.
 
     Attributes:
@@ -303,6 +305,10 @@ class AllTargetsFailedError(AnyInferError):
 
     Attributes:
         attempts: The complete routing trail, in order, including skipped targets.
+        batch_failures: Per-internal-batch outcomes when the failed request had been
+            split by core-owned batching — including the batches that succeeded, so a
+            caller can see exactly what was spent before the failure. Empty for an
+            unsplit request.
     """
 
     def __init__(
@@ -310,11 +316,24 @@ class AllTargetsFailedError(AnyInferError):
         detail: str = "all routing targets failed",
         *,
         attempts: tuple[AttemptRecord, ...] = (),
+        batch_failures: tuple[BatchFailure, ...] = (),
         hint: str | None = None,
     ) -> None:
         super().__init__(detail, hint=hint)
         self.attempts = attempts
+        self.batch_failures = batch_failures
 
 
 class LocalRuntimeError(AnyInferError):
     """llama-server lifecycle failure, or runtime/model integrity problem."""
+
+
+class ConfidentialExecutionError(LocalRuntimeError):
+    """`ConfidentialExecutionAdapter` refused to execute: the attestable guarantee a
+    caller requested is not available on this host right now.
+
+    Fails closed by design — this is never raised as a courtesy warning alongside a
+    completed generation; the generation never happened. See
+    `anyinfer.local.attestation.confidential_execution_status` for the detection this
+    check is built on.
+    """  # noqa: D205

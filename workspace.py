@@ -534,6 +534,7 @@ _DOCSTRING_INHERITED_EXEMPT = frozenset(
 
 _PUBLIC_SURFACES = (
     "anyinfer",
+    "anyinfer.compare_diff",
     "anyinfer.context",
     "anyinfer.local",
     "anyinfer.serve",
@@ -544,7 +545,10 @@ _PUBLIC_SURFACES = (
 )
 """Namespaces that integrator or contributor documentation teaches directly."""
 
-_PUBLIC_EXTRA_SYMBOLS = ("anyinfer.providers.llama_cpp.LlamaCppOptions",)
+_PUBLIC_EXTRA_SYMBOLS = (
+    "anyinfer.providers.llama_cpp.LlamaCppOptions",
+    "anyinfer.providers.confidential_execution.ConfidentialExecutionAdapter",
+)
 """Documented public one-offs outside the surface modules."""
 
 
@@ -738,7 +742,7 @@ _MD_SKIP_DIRS = {
     "plans",
 }
 """Directories whose Markdown is generated, third-party, or internal working notes whose
-illustrative links are not meant to resolve — not ours to gate."""
+illustrative links are not meant to resolve; not ours to gate."""
 
 
 def _markdown_files() -> list[Path]:
@@ -790,7 +794,7 @@ def _build_docs_site() -> int:
     """Build the published site with the strict build the Pages deploy runs.
 
     One function behind both entry points — the ``docs-build`` gate phase and
-    ``workspace build docs`` — because a gate that runs a *different* build from the one
+    ``workspace build docs``, because a gate that runs a *different* build from the one
     that publishes is a gate that can pass while the deploy breaks.
     """
     return tool("mkdocs", "build", "--strict")
@@ -1001,6 +1005,10 @@ _MATRIX_FOOTER = f"""
 | `retry_after` | A rate-limited attempt is retried and recorded. |
 | `byte_cap` | An oversized response is rejected rather than silently truncated. |
 | `unknown_finish_reason` | An unrecognized finish reason normalizes instead of crashing. |
+| `embedding` | One vector per input, uniform non-zero dimensions, a space identity. |
+| `embedding_duplicates` | Duplicate inputs come back positionally, never deduplicated. |
+| `rerank` | Rankings descend, and caller document identity survives the round trip. |
+| `rerank_top_n` | `top_n` truncates the ranking to the requested size. |
 
 ## Modes
 
@@ -1033,6 +1041,7 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     import test_nebius
     import test_ollama
     import test_presets
+    import test_tei
 
     harnesses = {
         "openai-compat": test_conformance.HARNESS,
@@ -1041,6 +1050,7 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "cohere": test_cohere_lmstudio.HARNESS,
         "lm-studio": test_cohere_lmstudio.LM_STUDIO_HARNESS,
         "nebius": test_nebius.HARNESS,
+        "tei": test_tei.HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed
@@ -1296,7 +1306,7 @@ def _bundle_windows_icon(work_dir: Path) -> Path | None:
 
     The guard tests ``os.name`` rather than ``sys.platform`` on purpose. mypy narrows
     ``sys.platform`` to the host it runs on, so under ``warn_unreachable`` the whole body
-    below reads as dead code whenever the type check runs off Windows — which it does in
+    below reads as dead code whenever the type check runs off Windows, which it does in
     CI. ``os.name`` is the same test at runtime and carries no such narrowing.
     """
     if os.name != "nt":
@@ -1373,7 +1383,7 @@ def render_service_install_text(executable: Path) -> str:
     Rendered from `anyinfer.serve.service`, the same module ``anyinfer-serve install``
     uses, so the download and the command can never describe different service
     definitions. The executable path is the one this archive will be unpacked to, which
-    the archive cannot know — so it is rendered against a stated placeholder and the file
+    the archive cannot know, so it is rendered against a stated placeholder and the file
     says, twice, that running the command regenerates it with the real path.
     """
     from anyinfer.serve.service import ServiceRequest, render_service

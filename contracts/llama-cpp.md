@@ -42,7 +42,8 @@ code-survey basis.
   catalog vision artifact, `--ctx-size`, `--threads`,
   `--batch-size`, `--ubatch-size`, `--n-gpu-layers` (999 accelerated / 0 cpu),
   `--cache-type-k`, `--cache-type-v` (q8_0 under aggressive posture), `--no-kv-offload`
-  (when applicable), `--host 127.0.0.1`, `--port <ephemeral>`
+  (when applicable), `--flash-attn on` (accelerated), `--host 127.0.0.1`,
+  `--port <ephemeral>`
 - CLI flag names are a drift surface: verify against the pinned release's `--help`
 
 ## Watchlist

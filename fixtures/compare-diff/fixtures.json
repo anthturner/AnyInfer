@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "id": "structured-summary",
+      "request": {
+        "messages": [
+          {
+            "role": "user",
+            "text": "Summarize the attached quarterly report in three bullet points."
+          }
+        ]
+      },
+      "targets": ["openai:gpt-4o", "anthropic:claude-sonnet-4-5", "ollama:qwen3:8b"]
+    },
+    {
+      "id": "simple-chat",
+      "request": {
+        "messages": [
+          {"role": "system", "text": "You are a terse assistant."},
+          {"role": "user", "text": "What is the capital of France?"}
+        ]
+      },
+      "targets": ["openai:gpt-4o", "anthropic:claude-sonnet-4-5", "ollama:qwen3:8b"]
+    }
+  ]
+}

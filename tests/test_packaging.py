@@ -45,7 +45,7 @@ def test_the_sidecar_bundle_carries_its_service_instructions(tmp_path, monkeypat
     from anyinfer.serve.service import ServiceRequest, render_service
 
     # The renderer refuses an executable inside a temporary directory, which is exactly
-    # the guard SI.3 asks for — and exactly where pytest puts this fixture. Move the
+    # the guard SI.3 asks for, and exactly where pytest puts this fixture. Move the
     # notion of "temporary" out from under it so the guard stays armed for real paths.
     monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path / "elsewhere"))
 
@@ -65,5 +65,5 @@ def test_the_sidecar_bundle_carries_its_service_instructions(tmp_path, monkeypat
 def test_the_sidecar_bundle_info_points_at_those_instructions() -> None:
     """A file nobody is told about is a file nobody reads."""
     source = (ROOT / "workspace.py").read_text(encoding="utf-8")
-    marker = source.split("product=\"AnyInfer sidecar\"", 1)[1][:400]
+    marker = source.split('product="AnyInfer sidecar"', 1)[1][:400]
     assert "INSTALL.txt" in marker

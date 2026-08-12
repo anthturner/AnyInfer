@@ -1,5 +1,8 @@
 """Widgets for the AnyInfer demo, each demonstrating one part of the library."""
 
+from .add_model_dialog import AddModelChoice, AddModelDialog
+from .app_settings_dialog import AppSettingsDialog
+from .chat_tabs import ChatPage, ConversationTabs
 from .chat_view import (
     MessageBubble,
     MessageList,
@@ -7,10 +10,9 @@ from .chat_view import (
     TypingIndicator,
     WelcomeView,
 )
-from .chat_tabs import ChatPage, ConversationTabs
 from .collapsible_section import CollapsibleSection
 from .composer import Composer
-from .conversation_sidebar import ConversationSidebar
+from .embeddings_panel import EmbeddingsPanel
 from .engine_bar import ContextWindowRow, EngineBar
 from .help_dialogs import AboutDialog, LicensesDialog
 from .metrics import StatusMetrics
@@ -18,6 +20,7 @@ from .models_dialog import ModelsDialog
 from .schema_panel import EXAMPLE_SCHEMA, SchemaPanel
 from .sdk_help import LibraryMapDialog, SdkHelpButton, SdkHelpDialog
 from .settings_dialog import ProviderSettingsDialog
+from .tab_widget import BorderedTabWidget
 from .target_inspector import TargetInspector
 from .telemetry_view import TelemetryView
 from .tools_panel import ToolsPanel
@@ -25,15 +28,19 @@ from .tools_panel import ToolsPanel
 __all__ = [
     "EXAMPLE_SCHEMA",
     "AboutDialog",
+    "AddModelChoice",
+    "AddModelDialog",
+    "AppSettingsDialog",
+    "BorderedTabWidget",
     "ChatPage",
     "CollapsibleSection",
     "Composer",
     "ContextWindowRow",
-    "ConversationSidebar",
     "ConversationTabs",
+    "EmbeddingsPanel",
     "EngineBar",
-    "LicensesDialog",
     "LibraryMapDialog",
+    "LicensesDialog",
     "MessageBubble",
     "MessageList",
     "ModelsDialog",

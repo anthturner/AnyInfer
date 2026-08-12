@@ -75,9 +75,7 @@ def test_session_tokens_are_signed_and_sent():
 def test_model_ids_survive_path_encoding():
     """Inference-profile ids and ARNs carry colons that must not read as separators."""
     arn = "arn%3Aaws%3Abedrock%3Aus-east-1%3A1%3Ainference-profile%2Fx"
-    headers = _sign(
-        url=f"https://bedrock-runtime.us-east-1.amazonaws.com/model/{arn}/converse"
-    )
+    headers = _sign(url=f"https://bedrock-runtime.us-east-1.amazonaws.com/model/{arn}/converse")
     assert headers["authorization"].startswith("AWS4-HMAC-SHA256 ")
 
 
@@ -139,9 +137,7 @@ def test_an_explicit_token_is_used_verbatim():
 
 
 def test_a_missing_credential_source_is_actionable(monkeypatch):
-    monkeypatch.setattr(
-        GoogleTokenSource, "_from_google_auth", lambda self: None
-    )
+    monkeypatch.setattr(GoogleTokenSource, "_from_google_auth", lambda self: None)
     monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
 
     source = GoogleTokenSource(options={})
@@ -232,7 +228,9 @@ async def test_frames_decode_with_their_headers_and_payload():
 
 
 async def test_several_frames_in_one_chunk_all_decode():
-    raw = _frame("messageStart", {"role": "assistant"}) + _frame("messageStop", {"stopReason": "end_turn"})
+    raw = _frame("messageStart", {"role": "assistant"}) + _frame(
+        "messageStop", {"stopReason": "end_turn"}
+    )
     frames = await _decode(raw)
     assert [f.event_type for f in frames] == ["messageStart", "messageStop"]
 

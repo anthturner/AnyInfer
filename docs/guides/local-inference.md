@@ -32,7 +32,7 @@ recommendation = local.recommend_alias(profile, ai.load_default_catalog())
 ```
 
 Detection never raises. Anything it could not determine stays `None` on the profile —
-with the reason recorded in `profile.warnings` — because a guessed number would silently
+with the reason recorded in `profile.warnings`, because a guessed number would silently
 mis-tune the server.
 
 ## 2. Install a runtime
@@ -49,23 +49,28 @@ is a separate, much larger opt-in download:
 $ anyinfer runtime install cuda
 ```
 
+When more than one runtime is installed, llama.cpp selects the best usable backend by
+default. Pin one for a provider instance with `options={"runtime": "cuda"}` (or choose it
+on the demo application's Runtimes tab). An explicit `binary` path overrides that choice.
+
 Archives are pinned and hash-verified. This step is explicit because runtime downloads can
 be large; it does not install a background service.
 
 ## 3. Configure the provider
 
 ```python
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "llama-cpp",
-        options={
-            "catalog": ai.load_default_catalog(),
-            "posture": "balanced",         # conservative | balanced | aggressive
-            # "binary": "/custom/llama-server",  # optional override
-            "idle_ttl_s": 900,             # unload after 15 idle minutes
-        },
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "llama-cpp",
+            options={
+                "posture": "balanced",  # conservative | balanced | aggressive
+                # "binary": "/custom/llama-server",  # optional override
+                "idle_ttl_s": 900,  # unload after 15 idle minutes
+            },
+        ),
+    ]
+)
 ```
 
 ## 4. Generate
@@ -88,7 +93,10 @@ def progress(artifact_id, done, total):
     percent = f"{100 * done / total:.0f}%" if total else f"{done / 1e6:.0f} MB"
     print(f"\r{artifact_id}: {percent}", end="", flush=True)
 
-options = {"catalog": ai.load_default_catalog(), "progress": progress}
+
+client = ai.Client(
+    [ai.ProviderSettings.of("llama-cpp", options={"progress": progress})]
+)
 ```
 
 ## Use an alias instead
@@ -110,9 +118,7 @@ Now the same code runs a right-sized model on a laptop and on a workstation.
 The plan explains itself:
 
 ```python
-plan = local.plan_server(
-    profile, local.TuningInputs(parameter_size="7B"), posture="aggressive"
-)
+plan = local.plan_server(profile, local.TuningInputs(parameter_size="7B"), posture="aggressive")
 print("\n".join(plan.rationale))
 ```
 

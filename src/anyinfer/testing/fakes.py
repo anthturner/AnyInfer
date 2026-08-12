@@ -189,9 +189,7 @@ class FakeOpenAIServer:
             "id": "chatcmpl-fake",
             "object": "chat.completion",
             "model": "fake-model-small",
-            "choices": [
-                {"index": 0, "message": message, "finish_reason": response.finish_reason}
-            ],
+            "choices": [{"index": 0, "message": message, "finish_reason": response.finish_reason}],
         }
         if response.usage is not None:
             body["usage"] = dict(response.usage)
@@ -225,11 +223,7 @@ class FakeOpenAIServer:
             for fragment in chunk_text(args, self._chunk_size):
                 chunks.append(
                     self._delta_chunk(
-                        {
-                            "tool_calls": [
-                                {"index": index, "function": {"arguments": fragment}}
-                            ]
-                        }
+                        {"tool_calls": [{"index": index, "function": {"arguments": fragment}}]}
                     )
                 )
 
@@ -324,9 +318,7 @@ class FakeGeminiServer:
             404, json={"error": {"code": 404, "message": f"no such path: {path}"}}
         )
 
-    def _handle_generate(
-        self, request: httpx2.Request, *, streaming: bool
-    ) -> httpx2.Response:
+    def _handle_generate(self, request: httpx2.Request, *, streaming: bool) -> httpx2.Response:
         body = json.loads(request.content or b"{}")
         self.requests.append(body)
         index = min(self._call_index, len(self._responses) - 1)
@@ -349,13 +341,10 @@ class FakeGeminiServer:
             )
 
         if not streaming:
-            return httpx2.Response(
-                200, json=self._body(response, parts=self._all_parts(response))
-            )
+            return httpx2.Response(200, json=self._body(response, parts=self._all_parts(response)))
 
         chunks = [
-            self._body(response, parts=[part], usage=False)
-            for part in self._all_parts(response)
+            self._body(response, parts=[part], usage=False) for part in self._all_parts(response)
         ] or [self._body(response, parts=[{"text": ""}], usage=False)]
         chunks[-1]["candidates"][0]["finishReason"] = _GEMINI_FINISH.get(
             response.finish_reason, response.finish_reason.upper()
@@ -443,6 +432,7 @@ class FakeOllamaServer:
         models: Sequence[str] = ("qwen3:8b", "qwen2.5:3b"),
         loaded: Mapping[str, int] | None = None,
         chunk_size: int = 4,
+        embed_scenario: str | None = None,
     ) -> None:
         if responses is None:
             responses = [FakeResponse()]
@@ -453,6 +443,8 @@ class FakeOllamaServer:
         self._loaded = dict(loaded or {})
         self._chunk_size = chunk_size
         self._call_index = 0
+        self._embed_scenario = embed_scenario
+        self._embed_calls = 0
         self.requests: list[dict[str, Any]] = []
         self.pulled: list[str] = []
         self.pull_lines: list[dict[str, Any]] | None = None
@@ -468,6 +460,35 @@ class FakeOllamaServer:
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
+        if path.endswith("/api/embed"):
+            body = json.loads(request.content or b"{}")
+            raw_input = body.get("input", [])
+            inputs = raw_input if isinstance(raw_input, list) else [raw_input]
+            if self._embed_scenario == "rate_limited" and self._embed_calls == 0:
+                self._embed_calls += 1
+                return httpx2.Response(
+                    429,
+                    json={"error": "busy"},
+                    headers={"retry-after": "0"},
+                )
+            self._embed_calls += 1
+            if self._embed_scenario == "oversized":
+                return httpx2.Response(
+                    200,
+                    json={
+                        "model": body.get("model", ""),
+                        "embeddings": [[0.1] * 20_000 for _ in inputs],
+                        "prompt_eval_count": len(inputs),
+                    },
+                )
+            return httpx2.Response(
+                200,
+                json={
+                    "model": body.get("model", ""),
+                    "embeddings": [[0.1, 0.2, 0.3, 0.4] for _ in inputs],
+                    "prompt_eval_count": len(inputs),
+                },
+            )
         if path.endswith("/api/tags"):
             return httpx2.Response(
                 200,
@@ -511,10 +532,18 @@ class FakeOllamaServer:
             digest = "sha256:layer-one"
             lines = [
                 {"status": "pulling manifest"},
-                {"status": "pulling " + digest, "digest": digest,
-                 "total": 8_000_000, "completed": 4_000_000},
-                {"status": "pulling " + digest, "digest": digest,
-                 "total": 8_000_000, "completed": 8_000_000},
+                {
+                    "status": "pulling " + digest,
+                    "digest": digest,
+                    "total": 8_000_000,
+                    "completed": 4_000_000,
+                },
+                {
+                    "status": "pulling " + digest,
+                    "digest": digest,
+                    "total": 8_000_000,
+                    "completed": 8_000_000,
+                },
                 {"status": "verifying sha256 digest"},
                 {"status": "success"},
             ]

@@ -3,7 +3,7 @@
 The interesting part to demonstrate is that the *mechanism* is chosen by AnyInfer, not by
 the caller. The same schema becomes a decoding grammar on llama.cpp, a ``json_schema``
 response format on OpenAI, plain JSON mode elsewhere, and a prompt instruction as a last
-resort — and the result reports which one was used
+resort, and the result reports which one was used
 (`structured_mechanism`).
 
 Validation is always against the canonical schema regardless of mechanism, and a violation
@@ -47,6 +47,7 @@ EXAMPLE_SCHEMA = {
     "additionalProperties": False,
 }
 """A schema small enough to read and strict enough to actually reject bad output."""
+
 
 class SchemaPanel(QWidget):
     """Edits the structured-output contract and reports the outcome of the last one."""

@@ -167,7 +167,7 @@ class FileLock:
 
         The async engine runs several transfers on one loop, and a sibling task holding
         this lock can only release it by making progress. Sleeping the loop while waiting
-        would therefore deadlock rather than wait — so the poll is `asyncio.sleep`.
+        would therefore deadlock rather than wait, so the poll is `asyncio.sleep`.
 
         Raises:
             LocalRuntimeError: If the lock is still held after five minutes.
@@ -264,7 +264,7 @@ def download_artifact(
 
     # Progress is reported for the artifact as a whole. A sharded artifact whose counter
     # restarts at zero on every shard is worse than no progress bar, because a caller
-    # cannot tell a restart from a stall — so bytes already on disk are carried forward
+    # cannot tell a restart from a stall, so bytes already on disk are carried forward
     # and the total is the whole file set.
     artifact_total = artifact.total_size_bytes
     completed = 0

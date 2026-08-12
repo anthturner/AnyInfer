@@ -225,9 +225,7 @@ def test_a_console_script_is_preferred_and_takes_the_serve_verb() -> None:
 
 
 def test_writing_creates_the_definition_under_the_given_root(tmp_path: Path) -> None:
-    definition = render_service(
-        _request("linux", root=PurePosixPath(tmp_path.as_posix()))
-    )
+    definition = render_service(_request("linux", root=PurePosixPath(tmp_path.as_posix())))
     written = write_service(definition)
 
     assert written == (Path(definition.path),)
@@ -235,9 +233,7 @@ def test_writing_creates_the_definition_under_the_given_root(tmp_path: Path) -> 
 
 
 def test_writing_over_an_existing_definition_is_refused(tmp_path: Path) -> None:
-    definition = render_service(
-        _request("linux", root=PurePosixPath(tmp_path.as_posix()))
-    )
+    definition = render_service(_request("linux", root=PurePosixPath(tmp_path.as_posix())))
     write_service(definition)
 
     with pytest.raises(ConfigError, match="already exists"):

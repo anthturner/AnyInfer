@@ -20,7 +20,7 @@ Two rules are enforced at *generation* time rather than left to the running serv
   token, so a unit that would survive reboots as an unauthenticated LLM gateway cannot be
   produced at all;
 - the bearer token never appears in the definition body. It goes to a private environment
-  file, or on Windows — where a file mode means little — it is not written at all and the
+  file, or on Windows, where a file mode means little — it is not written at all and the
   operator is told to set the variable instead.
 """
 
@@ -103,7 +103,7 @@ class ServiceRequest:
         token: Bearer token clients must present. Written to a private environment file,
             never into the definition body.
         log_file: Where to send the server's output, or ``None``. Only Windows needs one —
-            systemd and launchd already have a log sink — and nothing rotates it.
+            systemd and launchd already have a log sink, and nothing rotates it.
         working_directory: Directory the service runs in; defaults to the config's parent,
             or the executable's.
         scope: ``user`` or ``system``; see `ServiceScope`.
@@ -258,13 +258,9 @@ def write_service(definition: ServiceDefinition, *, force: bool = False) -> tupl
         ConfigError: If a file exists and ``force`` is false, or cannot be written.
     """
     written: list[Path] = []
-    targets: list[tuple[Path, str, bool]] = [
-        (Path(definition.path), definition.content, False)
-    ]
+    targets: list[tuple[Path, str, bool]] = [(Path(definition.path), definition.content, False)]
     if definition.environment_path is not None and definition.environment_content:
-        targets.append(
-            (Path(definition.environment_path), definition.environment_content, True)
-        )
+        targets.append((Path(definition.environment_path), definition.environment_content, True))
 
     for path, _content, _private in targets:
         if path.exists() and not force:
@@ -279,9 +275,7 @@ def write_service(definition: ServiceDefinition, *, force: bool = False) -> tupl
                 # Created empty at 0600 before anything is written to it: writing first
                 # and tightening afterwards leaves a window in which the token is
                 # world-readable, which is the whole thing this mode exists to prevent.
-                descriptor = os.open(
-                    path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
-                )
+                descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
                 with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
                     handle.write(content)
                 path.chmod(0o600)
@@ -325,7 +319,7 @@ def _absolute_anywhere(path: PurePath) -> bool:
     """Whether a path is absolute under either convention.
 
     ``Path.is_absolute()`` answers for the interpreter's own platform, which would make a
-    Linux unit un-renderable from a Windows machine — and rendering is meant to be pure
+    Linux unit un-renderable from a Windows machine, and rendering is meant to be pure
     and platform-independent precisely so all three definitions can be tested from any
     one of them.
     """
@@ -410,7 +404,7 @@ def _systemd(request: ServiceRequest, executable: PurePath) -> ServiceDefinition
 
     The hardening directives are on rather than offered: this process reads a
     configuration file and speaks HTTP, so it has no business writing to the filesystem,
-    gaining privileges, or opening anything but IP sockets — and a default that has to be
+    gaining privileges, or opening anything but IP sockets, and a default that has to be
     turned on is a default nobody has.
     """
     scope = request.scope
@@ -478,8 +472,9 @@ def _systemd(request: ServiceRequest, executable: PurePath) -> ServiceDefinition
         status_commands=((*systemctl, "status", unit, "--no-pager"),),
         environment_path=env_path,
         environment_content=f"{TOKEN_ENV_VAR}={request.token}\n" if request.token else "",
-        notes=_notes(request, "journalctl --user -u " + unit if scope == "user"
-                     else "journalctl -u " + unit),
+        notes=_notes(
+            request, "journalctl --user -u " + unit if scope == "user" else "journalctl -u " + unit
+        ),
     )
 
 
@@ -511,9 +506,8 @@ def _launchd(request: ServiceRequest, executable: PurePath) -> ServiceDefinition
     )
 
     if request.token:
-        script = (
-            f"set -a; . {_quote(env_path)}; set +a; exec {_quote(executable)} "
-            + " ".join(_quote(argument) for argument in request.server_arguments)
+        script = f"set -a; . {_quote(env_path)}; set +a; exec {_quote(executable)} " + " ".join(
+            _quote(argument) for argument in request.server_arguments
         )
         program: list[str] = ["/bin/sh", "-c", script]
     else:
@@ -540,9 +534,7 @@ def _launchd(request: ServiceRequest, executable: PurePath) -> ServiceDefinition
         entries.append(("StandardOutPath", f"<string>{_xml(request.log_file)}</string>"))
         entries.append(("StandardErrorPath", f"<string>{_xml(request.log_file)}</string>"))
 
-    body = "\n".join(
-        f"    <key>{key}</key>\n    {value}" for key, value in entries
-    )
+    body = "\n".join(f"    <key>{key}</key>\n    {value}" for key, value in entries)
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
@@ -626,9 +618,7 @@ def _scheduled_task(request: ServiceRequest, executable: PurePath) -> ServiceDef
         "  </Actions>\n"
         "</Task>\n"
     )
-    notes = list(
-        _notes(request, "Task Scheduler > Task Scheduler Library, or --log-file")
-    )
+    notes = list(_notes(request, "Task Scheduler > Task Scheduler Library, or --log-file"))
     if request.token:
         # No environment file here. A file mode is close to meaningless on Windows, and a
         # weakly-protected secret file that looks protected is worse than telling the

@@ -20,7 +20,8 @@ def _ollama_client(server: FakeOllamaServer) -> ai.AsyncClient:
     return ai.AsyncClient(
         [
             ai.ProviderSettings.of(
-                "ollama", base_url="http://127.0.0.1:11434",
+                "ollama",
+                base_url="http://127.0.0.1:11434",
                 transport=server.transport(),
             )
         ]
@@ -44,15 +45,52 @@ def test_quickstart_first_call() -> None:
 def test_quickstart_streaming() -> None:
     """docs/guides/quickstart.md and guides/streaming.md — the streaming shape."""
     server = FakeOpenAIServer(FakeResponse(text="Streaming output."))
-    with make_sync_client(server) as client, client.stream(
-        "hi", target="openai-compat:m"
-    ) as stream:
+    with (
+        make_sync_client(server) as client,
+        client.stream("hi", target="openai-compat:m") as stream,
+    ):
         chunks = [e.text for e in stream if isinstance(e, ai.TextDelta)]
         final = stream.result
 
     assert "".join(chunks) == "Streaming output."
     assert final.usage.output_tokens is not None
     assert final.timing.total_ms >= 0
+
+
+async def test_quickstart_embed_and_rerank() -> None:
+    """docs/guides/quickstart.md — the embeddings and reranking section."""
+    from anyinfer.registry import ProviderRegistry
+    from anyinfer.testing import FakeEmbeddingRerankProvider
+
+    registry = ProviderRegistry(load_builtins=False, load_entry_points=False)
+    fake = FakeEmbeddingRerankProvider(
+        "quickstart-fake",
+        embedding_dimensions={"nomic-embed-text": 8},
+        rerank_models=["rerank-v3.5"],
+    )
+    fake.register(registry)
+    client = ai.AsyncClient(
+        providers=[ai.ProviderSettings.of("quickstart-fake")],
+        registry=registry,
+        use_default_catalog=False,
+    )
+    try:
+        result = await client.embed(
+            ["Why is the sky blue?", "Why is the grass green?"],
+            target="quickstart-fake:nomic-embed-text",
+        )
+        assert result.space.dimensions == 8
+        assert len(result.vectors) == 2
+
+        ranked = await client.rerank(
+            "capital of France",
+            ["Paris is the capital of France.", "Berlin is the capital of Germany."],
+            target="quickstart-fake:rerank-v3.5",
+        )
+        assert len(ranked.items) == 2
+        assert ranked.items[0].score >= ranked.items[1].score
+    finally:
+        await client.aclose()
 
 
 async def test_quickstart_structured_output() -> None:
@@ -82,9 +120,7 @@ async def test_quickstart_structured_output() -> None:
 
 async def test_quickstart_fallback_chain() -> None:
     """docs/guides/quickstart.md and guides/fallback.md — the attempt trail."""
-    server = FakeOpenAIServer(
-        [FakeResponse(status=503), FakeResponse(text="recovered")]
-    )
+    server = FakeOpenAIServer([FakeResponse(status=503), FakeResponse(text="recovered")])
     async with make_client(server) as client:
         result = await client.generate(
             "hi",
@@ -358,13 +394,15 @@ def test_example_golden_manifest_shape(
     """docs/examples/golden-manifest.md — assert routing behaviour, not prose."""
     from anyinfer.testing import ScriptedFailure, ScriptedModel
 
-    provider = anyinfer_scripted([
-        ScriptedModel(
-            "primary",
-            failures=(ScriptedFailure(status=503, retry_after_s=0.0),),
-        ),
-        ScriptedModel("fallback", structured={"answer": "stable"}),
-    ])
+    provider = anyinfer_scripted(
+        [
+            ScriptedModel(
+                "primary",
+                failures=(ScriptedFailure(status=503, retry_after_s=0.0),),
+            ),
+            ScriptedModel("fallback", structured={"answer": "stable"}),
+        ]
+    )
     client = anyinfer_client(provider)
     result = client.generate(
         "answer",
@@ -387,15 +425,9 @@ def test_example_compare_targets_spends_nothing() -> None:
     """docs/examples/compare-targets.md — two records and zero calls."""
     from anyinfer.testing import ScriptedModel, ScriptedProvider
 
-    provider = ScriptedProvider(
-        "offline", [ScriptedModel("small"), ScriptedModel("large")]
-    )
-    registry = provider.register(
-        ai.ProviderRegistry(load_builtins=False, load_entry_points=False)
-    )
-    with ai.Client(
-        [provider.settings()], registry=registry, use_default_catalog=False
-    ) as client:
+    provider = ScriptedProvider("offline", [ScriptedModel("small"), ScriptedModel("large")])
+    registry = provider.register(ai.ProviderRegistry(load_builtins=False, load_entry_points=False))
+    with ai.Client([provider.settings()], registry=registry, use_default_catalog=False) as client:
         results = client.compare(
             "Return an object",
             targets=[provider.target("small"), provider.target("large")],
@@ -404,6 +436,68 @@ def test_example_compare_targets_spends_nothing() -> None:
 
     assert [item.resolvable for item in results] == [True, True]
     assert provider.requests == []
+
+
+def test_example_semantic_search_shape() -> None:
+    """docs/examples/semantic-search.md — embed, rank in memory, and rerank agree."""
+    import math
+
+    from anyinfer.testing import FakeEmbeddingRerankProvider
+
+    provider = FakeEmbeddingRerankProvider(
+        "offline", embedding_dimensions={"embed-small": 8}, rerank_models=["rerank-small"]
+    )
+    registry = ai.ProviderRegistry(load_builtins=False, load_entry_points=False)
+    provider.register(registry)
+    embed_target = "offline:embed-small"
+    rerank_target = "offline:rerank-small"
+
+    corpus = [
+        "The moon landing happened in 1969",
+        "Sourdough bread needs a live starter",
+        "Apollo 11 was the spacecraft that carried astronauts to the moon",
+    ]
+
+    def cosine_similarity(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+        dot = sum(x * y for x, y in zip(a, b, strict=True))
+        norm_a = math.sqrt(sum(x * x for x in a))
+        norm_b = math.sqrt(sum(y * y for y in b))
+        return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
+
+    with ai.Client(
+        [ai.ProviderSettings.of(provider.provider_id)],
+        registry=registry,
+        use_default_catalog=False,
+    ) as client:
+        corpus_embedded = client.embed(corpus, target=embed_target, input_type="document")
+        query_embedded = client.embed(
+            "Apollo spacecraft that reached the moon", target=embed_target, input_type="query"
+        )
+        query_vector = query_embedded.vectors[0].values
+
+        # The fake produces a deterministic pseudo-embedding (a hash of the text), not a
+        # semantically meaningful one — proving the *mechanics* (consistent dimensions,
+        # a self-similarity of 1.0, a total order from the similarity function) is what
+        # an offline shape test can honestly claim about a fake provider. A real
+        # embedding model is what makes the ranking itself meaningful; the reranker
+        # below — whose fake scores by genuine lexical overlap — is what demonstrates
+        # that part end to end.
+        assert len({len(v.values) for v in corpus_embedded.vectors}) == 1
+        assert math.isclose(cosine_similarity(query_vector, query_vector), 1.0)
+        ranked = sorted(
+            zip(corpus, corpus_embedded.vectors, strict=True),
+            key=lambda pair: cosine_similarity(query_vector, pair[1].values),
+            reverse=True,
+        )
+        scores = [cosine_similarity(query_vector, vec.values) for _, vec in ranked]
+        assert scores == sorted(scores, reverse=True)
+
+        reranked = client.rerank(
+            "Apollo spacecraft that reached the moon", corpus, target=rerank_target
+        )
+        assert corpus[reranked.items[0].index] == (
+            "Apollo 11 was the spacecraft that carried astronauts to the moon"
+        )
 
 
 async def test_example_tool_agent_shape() -> None:
@@ -454,8 +548,15 @@ def test_provider_listing_matches_the_docs() -> None:
     """docs/providers/README.md — every documented provider is registered."""
     registered = set(ai.default_registry.known_ids())
     documented = {
-        "openai", "anthropic", "ollama", "llama-cpp", "openai-compat",
-        "openrouter", "azure-foundry", "copilot", "m365-copilot",
+        "openai",
+        "anthropic",
+        "ollama",
+        "llama-cpp",
+        "openai-compat",
+        "openrouter",
+        "azure-foundry",
+        "copilot",
+        "m365-copilot",
     }
     assert documented <= registered
 
@@ -476,8 +577,7 @@ def test_the_complete_provider_index_is_current() -> None:
 
     page = repo_root / "docs" / "providers" / "all.md"
     assert page.read_text(encoding="utf-8") == render(), (
-        "docs/providers/all.md is stale — "
-        "run `python scripts/generate_provider_index.py`"
+        "docs/providers/all.md is stale — run `python scripts/generate_provider_index.py`"
     )
 
 
@@ -485,7 +585,7 @@ def test_every_registered_provider_appears_in_the_complete_index() -> None:
     """No provider may ship without being listed somewhere a reader can find it.
 
     The generator renders from the registry, so this cannot fail while the generator is
-    correct — which is the point: it pins the *promise* the page makes (that it is
+    correct, which is the point: it pins the *promise* the page makes (that it is
     complete) rather than the mechanism, and would catch a future generator that
     silently filtered a category out.
     """
@@ -493,9 +593,9 @@ def test_every_registered_provider_appears_in_the_complete_index() -> None:
 
     from anyinfer.registry import ProviderRegistry
 
-    page = (
-        Path(__file__).resolve().parent.parent / "docs" / "providers" / "all.md"
-    ).read_text(encoding="utf-8")
+    page = (Path(__file__).resolve().parent.parent / "docs" / "providers" / "all.md").read_text(
+        encoding="utf-8"
+    )
     # A fresh registry, not the process-wide default: other tests register configured
     # *instances* (a "fake" endpoint derived from openai-compat) into the default one,
     # and those are an application's own naming rather than something to document.
@@ -577,8 +677,7 @@ def test_context_reduction_observer_shape() -> None:
                 seen.append(event)
 
     documents = [context.ContextDocument.of("a.py", "x = 1\n" * 500)]
-    context.select(documents, "x", max_tokens=50, strategy="ranked",
-                   observer=ContextWatcher())
+    context.select(documents, "x", max_tokens=50, strategy="ranked", observer=ContextWatcher())
 
     assert seen and isinstance(seen[0], ai.ContextReduced)
 
@@ -622,7 +721,10 @@ def test_module_digest_recipe_shape() -> None:
     assert set(surfaces) == {"src/auth"}
 
     reduction = context.select(
-        documents, "a", max_tokens=4000, strategy="tiered",
+        documents,
+        "a",
+        max_tokens=4000,
+        strategy="tiered",
         module_digests=dict.fromkeys(surfaces, "Auth helpers."),
     )
     assert "Auth helpers." in reduction.text
@@ -657,9 +759,7 @@ def test_local_models_remote_host_flow(tmp_path) -> None:
         blind = client.local_catalog("ollama")
         assert blind.hardware_source == "unavailable"
 
-        specs = local.HardwareProfile.from_user_input(
-            ram_gb=64, vram_gb=24, accelerator="cuda"
-        )
+        specs = local.HardwareProfile.from_user_input(ram_gb=64, vram_gb=24, accelerator="cuda")
         informed = client.local_catalog("ollama", hardware=specs)
         assert informed.hardware_source == "provided"
         assert any(entry.fit.level != "unknown" for entry in informed.entries)
@@ -670,8 +770,9 @@ def test_local_models_alias_bridge(tmp_path) -> None:
     catalog = ai.load_default_catalog().with_alias_target(
         "medium", "llama-cpp", "qwen2.5-coder-14b-instruct"
     )
-    with ai.Client([ai.ProviderSettings.of("llama-cpp")], catalog=catalog,
-                    model_dir=tmp_path) as client:
+    with ai.Client(
+        [ai.ProviderSettings.of("llama-cpp")], catalog=catalog, model_dir=tmp_path
+    ) as client:
         resolved = client.resolve("medium")
         assert resolved.provider_id == "llama-cpp"
         assert resolved.model in catalog.artifacts
@@ -779,9 +880,7 @@ def test_docs_testing_guide_scripted_provider() -> None:
     provider = ScriptedProvider("acme", [ScriptedModel("small", text="A one-sentence summary.")])
     provider.register(registry)
 
-    client = ai.Client(
-        [provider.settings()], registry=registry, use_default_catalog=False
-    )
+    client = ai.Client([provider.settings()], registry=registry, use_default_catalog=False)
     with client:
         result = client.generate("Summarize this", target=provider.target("small"))
     assert result.text == "A one-sentence summary."
@@ -875,9 +974,7 @@ def test_agents_md_row_there_is_no_openai_shaped_namespace() -> None:
 
 async def test_agents_md_row_the_router_owns_retry() -> None:
     """Row: `ai.Route` / `ai.Retry`, and every attempt lands on the trail."""
-    server = FakeOpenAIServer(
-        [FakeResponse(status=503), FakeResponse(text="recovered")]
-    )
+    server = FakeOpenAIServer([FakeResponse(status=503), FakeResponse(text="recovered")])
     async with make_client(server) as client:
         result = await client.generate(
             "hi",
@@ -902,9 +999,7 @@ def test_agents_md_row_cost_is_a_decimal_and_none_is_not_zero() -> None:
 async def test_agents_md_row_capabilities_carry_provenance() -> None:
     """Row: a capability is `Sourced[T]`, never a bare number."""
     overrides = {
-        "openai-compat:m": ai.ModelCapabilities(
-            context_window=ai.Sourced(8_192, "catalog")
-        )
+        "openai-compat:m": ai.ModelCapabilities(context_window=ai.Sourced(8_192, "catalog"))
     }
     server = FakeOpenAIServer()
     async with make_client(server, capability_overrides=overrides) as client:
@@ -938,11 +1033,10 @@ def test_every_trap_row_has_a_test() -> None:
 
     fragment = render_agents_md()
     table = fragment.split("### What not to guess", 1)[1].split("###", 1)[0]
-    rows = [line for line in table.splitlines() if line.startswith("| `") or
-            line.startswith("| a ")]
-    covered = [
-        name for name in globals() if name.startswith("test_agents_md_row_")
+    rows = [
+        line for line in table.splitlines() if line.startswith("| `") or line.startswith("| a ")
     ]
+    covered = [name for name in globals() if name.startswith("test_agents_md_row_")]
     assert len(rows) == len(covered), (
         f"{len(rows)} trap rows but {len(covered)} tests — add one beside the others"
     )

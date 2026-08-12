@@ -31,11 +31,34 @@ from .. import theme
 from ..assets import asset_path
 from .sdk_help import _monospace
 
-__all__ = ["AboutDialog", "LicensesDialog", "THIRD_PARTY_COMPONENTS"]
+__all__ = ["THIRD_PARTY_COMPONENTS", "AboutDialog", "LicensesDialog"]
 
 _MIT_TABLER = """MIT License
 
 Copyright (c) 2020-2024 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
+
+_MIT_ENGINE_ARTWORK = """MIT License
+
+Ollama logo artwork: Copyright (c) Ollama
+llama.cpp logo artwork: Copyright (c) 2023-2026 The ggml authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -105,6 +128,11 @@ THIRD_PARTY_COMPONENTS: tuple[_Component, ...] = (
         name="Tabler Icons",
         license_name="MIT",
         text=_MIT_TABLER,
+    ),
+    _Component(
+        name="Ollama and llama.cpp logo artwork",
+        license_name="MIT",
+        text=_MIT_ENGINE_ARTWORK,
     ),
     _Component(
         name="Python-Markdown",

@@ -12,7 +12,7 @@ import pytest
 
 import anyinfer as ai
 from anyinfer.errors import ConfigError
-from anyinfer.providers.base import AdapterFinal, ProviderConfig, WireRequest
+from anyinfer.providers.base import AdapterFinal, EmbeddingWireRequest, ProviderConfig, WireRequest
 from anyinfer.providers.bedrock import BedrockAdapter
 from anyinfer.providers.vertex import VertexAdapter
 from anyinfer.types.requests import Sampling, ToolSpec
@@ -165,7 +165,7 @@ async def test_aws_secret_access_key_is_resolved_and_redacted(
     """AWS credentials ride in options, and must still go through the resolver.
 
     Unresolved, ``env://VAR`` would be signed with as the literal string — every request
-    would 403 with nothing to explain it — and a literal key would never be registered
+    would 403 with nothing to explain it, and a literal key would never be registered
     for redaction, so it could surface in a log line.
     """
     from anyinfer._client.providers import AdapterPool
@@ -219,8 +219,7 @@ async def test_system_prompts_become_top_level_blocks() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -242,8 +241,7 @@ async def test_sampling_lives_under_inference_config() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -296,8 +294,7 @@ async def test_tool_results_ride_on_a_user_turn() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -328,8 +325,7 @@ async def test_a_schema_becomes_a_forced_tool() -> None:
             "message": {
                 "role": "assistant",
                 "content": [
-                    {"toolUse": {"toolUseId": "t1", "name": "response",
-                                 "input": {"answer": "ok"}}}
+                    {"toolUse": {"toolUseId": "t1", "name": "response", "input": {"answer": "ok"}}}
                 ],
             }
         },
@@ -361,8 +357,7 @@ async def test_reasoning_effort_becomes_an_additional_model_field() -> None:
         seen.append(json.loads(request.content))
         if request.url.path.endswith("converse-stream"):
             return _converse_stream(
-                _frame("contentBlockDelta",
-                       {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
+                _frame("contentBlockDelta", {"contentBlockIndex": 0, "delta": {"text": "Hello."}}),
                 _frame("messageStop", {"stopReason": "end_turn"}),
                 _frame("metadata", {"usage": {"inputTokens": 12, "outputTokens": 5}}),
             )
@@ -407,8 +402,7 @@ async def test_streaming_tool_calls_reassemble_by_block_index() -> None:
         _frame("messageStart", {"role": "assistant"}),
         _frame(
             "contentBlockStart",
-            {"contentBlockIndex": 0, "start": {"toolUse": {"toolUseId": "t1",
-                                                           "name": "lookup"}}},
+            {"contentBlockIndex": 0, "start": {"toolUse": {"toolUseId": "t1", "name": "lookup"}}},
         ),
         _frame(
             "contentBlockDelta",
@@ -439,8 +433,7 @@ async def test_reasoning_frames_are_a_separate_channel() -> None:
     frames = (
         _frame(
             "contentBlockDelta",
-            {"contentBlockIndex": 0,
-             "delta": {"reasoningContent": {"text": "Let me think."}}},
+            {"contentBlockIndex": 0, "delta": {"reasoningContent": {"text": "Let me think."}}},
         ),
         _frame("contentBlockDelta", {"contentBlockIndex": 1, "delta": {"text": "42"}}),
         _frame("messageStop", {"stopReason": "end_turn"}),
@@ -502,6 +495,103 @@ async def test_health_does_not_spend_a_generation() -> None:
     assert "us-east-1" in health.detail
 
 
+# ---- bedrock: embeddings ---------------------------------------------------------------
+
+_TITAN_RESPONSE = {
+    "embedding": [0.1, 0.2, 0.3],
+    "inputTextTokenCount": 5,
+}
+
+
+async def test_embeds_against_invoke_model_not_converse() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_TITAN_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(model="amazon.titan-embed-text-v2:0", inputs=("hi",))
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0].url.path == "/model/amazon.titan-embed-text-v2:0/invoke"
+    body = json.loads(seen[0].content)
+    assert body == {"inputText": "hi"}
+    assert result.vectors == ((0.1, 0.2, 0.3),)
+    assert result.usage is not None
+    assert result.usage.input_tokens == 5
+
+
+async def test_embed_forwards_dimensions() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_TITAN_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        await adapter.embed(
+            EmbeddingWireRequest(
+                model="amazon.titan-embed-text-v2:0", inputs=("hi",), dimensions=256
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    body = json.loads(seen[0].content)
+    assert body == {"inputText": "hi", "dimensions": 256}
+
+
+async def test_embed_issues_one_invoke_per_input_and_sums_tokens() -> None:
+    """Titan has no batch field — one inputText per call is the only shape it accepts."""
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_TITAN_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(
+                model="amazon.titan-embed-text-v2:0", inputs=("hi", "there")
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    assert len(seen) == 2
+    assert result.vectors == ((0.1, 0.2, 0.3), (0.1, 0.2, 0.3))
+    assert result.usage is not None
+    assert result.usage.input_tokens == 10
+
+
+async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _bedrock(
+        lambda request: httpx2.Response(
+            200, json={"embedding": [0.1], "padding": "x" * 200}
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(
+                    model="amazon.titan-embed-text-v2:0",
+                    inputs=("hi",),
+                    max_response_bytes=32,
+                )
+            )
+    finally:
+        await adapter.aclose()
+
+
 # ---- vertex --------------------------------------------------------------------------
 
 
@@ -518,8 +608,10 @@ def _vertex(handler: Any, **options: Any) -> VertexAdapter:
 
 _GEMINI_RESPONSE = {
     "candidates": [
-        {"content": {"role": "model", "parts": [{"text": "Hi from Vertex."}]},
-         "finishReason": "STOP"}
+        {
+            "content": {"role": "model", "parts": [{"text": "Hi from Vertex."}]},
+            "finishReason": "STOP",
+        }
     ],
     "usageMetadata": {"promptTokenCount": 8, "candidatesTokenCount": 4},
 }
@@ -630,3 +722,112 @@ async def test_health_reports_the_project_without_generating() -> None:
 
     assert health.ok is True
     assert "my-project/global" in health.detail
+
+
+_PREDICT_RESPONSE = {
+    "predictions": [
+        {
+            "embeddings": {
+                "values": [0.1, 0.2, 0.3],
+                "statistics": {"truncated": False, "token_count": 4},
+            }
+        }
+    ]
+}
+
+
+async def test_embeds_against_the_predict_endpoint_not_batch_embed_contents() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_PREDICT_RESPONSE)
+
+    adapter = _vertex(handler)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(model="gemini-embedding-001", inputs=("hi",))
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0].url.path.endswith("gemini-embedding-001:predict")
+    body = json.loads(seen[0].content)
+    assert body["instances"] == [{"content": "hi"}]
+    assert result.vectors == ((0.1, 0.2, 0.3),)
+    assert result.usage is not None
+    assert result.usage.input_tokens == 4
+
+
+async def test_embed_maps_input_type_to_task_type() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_PREDICT_RESPONSE)
+
+    adapter = _vertex(handler)
+    try:
+        await adapter.embed(
+            EmbeddingWireRequest(
+                model="gemini-embedding-001", inputs=("hi",), input_type="document"
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    body = json.loads(seen[0].content)
+    assert body["instances"][0]["task_type"] == "RETRIEVAL_DOCUMENT"
+
+
+_PREDICT_RESPONSE_TWO = {
+    "predictions": [
+        {"embeddings": {"values": [0.1, 0.2], "statistics": {"token_count": 1}}},
+        {"embeddings": {"values": [0.3, 0.4], "statistics": {"token_count": 1}}},
+    ]
+}
+
+
+async def test_embed_forwards_output_dimensionality() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_PREDICT_RESPONSE_TWO)
+
+    adapter = _vertex(handler)
+    try:
+        await adapter.embed(
+            EmbeddingWireRequest(
+                model="text-embedding-005", inputs=("hi", "there"), dimensions=256
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    body = json.loads(seen[0].content)
+    assert body["instances"] == [{"content": "hi"}, {"content": "there"}]
+    assert body["parameters"] == {"outputDimensionality": 256}
+
+
+async def test_vertex_embed_rejects_a_response_over_the_byte_cap() -> None:
+    from anyinfer.errors import StreamProtocolError
+
+    adapter = _vertex(
+        lambda request: httpx2.Response(
+            200,
+            json={
+                "predictions": [{"embeddings": {"values": [0.1]}}],
+                "padding": "x" * 200,
+            },
+        )
+    )
+    try:
+        with pytest.raises(StreamProtocolError, match="max_response_bytes"):
+            await adapter.embed(
+                EmbeddingWireRequest(
+                    model="gemini-embedding-001", inputs=("hi",), max_response_bytes=32
+                )
+            )
+    finally:
+        await adapter.aclose()

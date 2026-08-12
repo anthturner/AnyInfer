@@ -256,7 +256,7 @@ class CopilotAdapter:
 def _session_key(req: WireRequest) -> str | None:
     """The held-session key this request continues, if any.
 
-    ``None`` for a request with no session, and for a session's first turn — which has an
+    ``None`` for a request with no session, and for a session's first turn, which has an
     open handle but nothing stored in it yet.
     """
     state = req.session_state

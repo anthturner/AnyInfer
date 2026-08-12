@@ -1,7 +1,7 @@
 # Run a prompt from the shell
 
-`anyinfer run` sends one prompt through the same path the library uses — routing,
-fallback, structured output, telemetry — then exits. It is the shell-shaped way to reach
+`anyinfer run` sends one prompt through the same path the library uses; routing,
+fallback, structured output, telemetry; then exits. It is the shell-shaped way to reach
 everything AnyInfer abstracts, without writing a script or starting a server.
 
 ```bash
@@ -37,7 +37,7 @@ next       python starter.py
 It discovers rather than guesses: a provider reaches the file only when a loopback
 endpoint it declares answered a model listing, or a credential variable it names is set.
 Detected keys are written as `env://` references, never values, so the generated file is
-safe to commit — which `init` says once and then leaves your `.gitignore` alone.
+safe to commit, which `init` says once and then leaves your `.gitignore` alone.
 
 | Flag | What it does |
 |---|---|
@@ -54,8 +54,8 @@ when no configuration exists yet.
 ## Instructions for a coding agent
 
 `anyinfer agents-md` prints a short fragment describing how this library is actually
-called — the call shape, the traps worth pre-empting, and the list of things not to
-hand-roll — rendered from the installed version rather than from memory:
+called; the call shape, the traps worth pre-empting, and the list of things not to
+hand-roll; rendered from the installed version rather than from memory:
 
 ```bash
 anyinfer agents-md >> AGENTS.md
@@ -90,7 +90,7 @@ anyinfer run "Summarize the CAP theorem." --config anyinfer.json
 
 ## Where the prompt comes from
 
-The prompt can be an argument, piped on stdin, or both — stdin is appended, which makes
+The prompt can be an argument, piped on stdin, or both; stdin is appended, which makes
 the usual Unix shapes work:
 
 ```bash
@@ -197,8 +197,8 @@ anyinfer run "What is the weather in Boston?" \
   --config anyinfer.json --tool get_weather.json
 ```
 
-**`run` never executes tools.** It reports what the model asked for — on stderr, or in
-the `tool_calls` array under `--json` — and leaves the calling to you. Running a tool the
+**`run` never executes tools.** It reports what the model asked for; on stderr, or in
+the `tool_calls` array under `--json`, and leaves the calling to you. Running a tool the
 model chose is a decision a shell command should not make on your behalf; for an
 automated call-and-respond cycle, use the [tool loop](tool-loop.md) in a script.
 
@@ -226,13 +226,13 @@ anyinfer run "Write a haiku about latency." --config anyinfer.json \
 
 `--reasoning` (`minimal`, `low`, `medium`, `high`) sets reasoning effort on models that
 expose it. Parameters a provider does not support are dropped rather than rejected, and so
-are parameters a *model* is known not to have — sending one that does nothing is the
+are parameters a *model* is known not to have; sending one that does nothing is the
 failure mode that looks exactly like success. Every drop is reported as a warning.
 
 ## Costing a request before you send it
 
 `--dry-run` reports what a request would spend and whether it fits, using the same budget
-calculator the client holds the real request to — so this is not a second estimate of the
+calculator the client holds the real request to, so this is not a second estimate of the
 same thing:
 
 ```bash
@@ -253,19 +253,48 @@ fits              yes
 estimated cost    0.0138-0.0697 USD
 ```
 
-Nothing is sent. Where a figure is not known it says so rather than guessing — an unknown
+Nothing is sent. Where a figure is not known it says so rather than guessing; an unknown
 context window prints `unknown`, never a plausible default. `--json` emits the same
 information for scripts.
 
+## Embedding and reranking
+
+`anyinfer embed` and `anyinfer rerank` are the operation counterparts of `run`:
+
+```console
+$ anyinfer embed "how does retry backoff work" --target cohere:embed-v4.0 --json
+$ anyinfer embed --file corpus.txt --target ollama:nomic-embed-text --out vectors.json
+$ anyinfer rerank "which doc covers backoff" --file docs.txt --top-n 3 --target cohere:rerank-v3.5
+```
+
+Plain output prints a one-line summary to stderr — vector counts, never thousands of
+floats; the full vectors only appear with `--json` or `--out`. Inputs come from a
+positional argument, `--file` (newline-delimited), `--jsonl`, or stdin. Both commands
+accept `--trace` / `--trace-json` for the run manifest, exactly like `run`:
+
+```console
+$ anyinfer embed "hello" --target cohere:embed-v4.0 --trace-json | jq .operation
+"embedding"
+```
+
+Requests larger than the target's verified batch limit are split and re-assembled by the
+core — nothing to configure at the command line. A configured
+`operation_routes` block supplies the default target when `--target` is omitted (see the
+[configuration reference](../reference/configuration.md)).
+
 ## Checking a target actually works
 
-`anyinfer verify` sends one tiny request and reports what came back — the thing a health
+`anyinfer verify` sends one tiny request and reports what came back; the thing a health
 check cannot tell you, because a credential can be valid for a model listing and useless
 for inference:
 
 ```bash
 anyinfer verify ollama:qwen3:8b --config anyinfer.json
+anyinfer verify cohere:embed-v4.0 --operation embedding --config anyinfer.json
 ```
+
+`--operation embedding` (or `rerank`) proves the operation the same way — one tiny real
+call, judged on the vector or ranking that came back instead of a chat reply.
 
 ```text
 ok        ollama:qwen3:8b
@@ -273,7 +302,7 @@ ok        ollama:qwen3:8b
 ```
 
 With no target it checks every target in the configured route, and it exits non-zero if
-any of them failed — so it works as a setup gate in a script:
+any of them failed, so it works as a setup gate in a script:
 
 ```bash
 anyinfer verify --config anyinfer.json || { echo "fix your config first"; exit 1; }
@@ -294,13 +323,13 @@ about [its own runtime](../concepts/capabilities.md#runtime-diagnostics).
 
 A target known to reason gets a larger output budget for the probe than the ordinary
 64 tokens. A thinking model spends the small budget on reasoning before it says anything,
-and the truncated result reads as "the provider answered with empty text" — a connection
+and the truncated result reads as "the provider answered with empty text"; a connection
 failure you do not have.
 
 ## Fitting a directory into a prompt
 
 `anyinfer context` collects files, reduces them to a budget, and prints the envelope. The
-collection happens here, in the CLI — walking a filesystem and deciding what is safe to
+collection happens here, in the CLI; walking a filesystem and deciding what is safe to
 send is an application's job, and the library only reduces what it is handed.
 
 ```bash
@@ -348,7 +377,7 @@ distill           141 chunk(s), 142+ generation call(s); the only strategy that 
 ```
 
 `*` marks the recommendation. `whole>ranked` means the strategy could not do what was asked
-and reports what it did instead — the same way `auto` does.
+and reports what it did instead; the same way `auto` does.
 
 ### Tuning
 
@@ -373,14 +402,14 @@ turned on.
 |---|---|
 | `0` | The request succeeded. |
 | `1` | The request failed; the error and its hint are on stderr. For `verify`, at least one target did not pass. |
-| `2` | The command was used incorrectly — no prompt, no providers, bad flags. |
+| `2` | The command was used incorrectly; no prompt, no providers, bad flags. |
 | `130` | Interrupted with `Ctrl-C`. |
 
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
-- [The sidecar](../serve/README.md) — the long-running OpenAI-compatible service
+- [The sidecar](../serve/README.md): the long-running OpenAI-compatible service
 - [Shared configuration](../reference/configuration.md)
 - [Enforce a JSON schema](structured-output.md)
 - [Run the tool loop](tool-loop.md)

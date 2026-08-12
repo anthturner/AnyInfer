@@ -63,7 +63,7 @@ class Accelerator:
             which makes VRAM budgeting a different calculation entirely.
         compute_capability: NVIDIA compute capability as reported by the driver
             (``"8.9"``), or ``None``. Quantized kernels gate on this — FP8 needs 8.9, the
-            Marlin GPTQ kernel needs 8.0 — and an unknown capability must *exclude* a gated
+            Marlin GPTQ kernel needs 8.0, and an unknown capability must *exclude* a gated
             variant rather than optimistically permit it.
         driver_version: Vendor driver version string, when reported. Used to check that a
             downloadable CUDA runtime's toolkit version is supported before installing it.
@@ -371,7 +371,9 @@ def _detect_cpu() -> tuple[str | None, int | None, int | None, str | None]:
     if _IS_WINDOWS:
         output = _run(
             [
-                "powershell", "-NoProfile", "-Command",
+                "powershell",
+                "-NoProfile",
+                "-Command",
                 "Get-CimInstance Win32_Processor | "
                 "Select-Object -Property Name,NumberOfCores | ConvertTo-Json -Compress",
             ]

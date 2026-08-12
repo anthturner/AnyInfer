@@ -75,9 +75,7 @@ def normalize(manifest: RunManifest | Mapping[str, Any]) -> dict[str, Any]:
 
     timing = data.get("timing")
     if isinstance(timing, Mapping):
-        data["timing"] = {
-            k: v for k, v in timing.items() if k not in VOLATILE_FIELDS["timing"]
-        }
+        data["timing"] = {k: v for k, v in timing.items() if k not in VOLATILE_FIELDS["timing"]}
     return data
 
 

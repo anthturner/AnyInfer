@@ -198,9 +198,7 @@ def sigv4_headers(
     )
 
     signing_key = _signing_key(credentials.secret_access_key, date_stamp, region, service)
-    signature = hmac.new(
-        signing_key, string_to_sign.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
+    signature = hmac.new(signing_key, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
 
     result = {
         "authorization": (
@@ -236,8 +234,7 @@ def _canonical_query(query: str) -> str:
         return ""
     pairs = urllib.parse.parse_qsl(query, keep_blank_values=True)
     encoded = [
-        (urllib.parse.quote(k, safe="-._~"), urllib.parse.quote(v, safe="-._~"))
-        for k, v in pairs
+        (urllib.parse.quote(k, safe="-._~"), urllib.parse.quote(v, safe="-._~")) for k, v in pairs
     ]
     encoded.sort()
     return "&".join(f"{k}={v}" for k, v in encoded)
@@ -245,6 +242,7 @@ def _canonical_query(query: str) -> str:
 
 def _signing_key(secret: str, date_stamp: str, region: str, service: str) -> bytes:
     """Derive the date/region/service-scoped signing key."""
+
     def sign(key: bytes, message: str) -> bytes:
         return hmac.new(key, message.encode("utf-8"), hashlib.sha256).digest()
 
@@ -356,9 +354,7 @@ class GoogleTokenSource:
                 hint="check the path and its permissions",
             ) from exc
         except ValueError as exc:
-            raise CredentialError(
-                f"the Google credentials file is not valid JSON: {exc}"
-            ) from exc
+            raise CredentialError(f"the Google credentials file is not valid JSON: {exc}") from exc
 
         assertion = self._signed_assertion(info)
         return self._exchange(assertion)
@@ -425,7 +421,7 @@ def _rs256_sign(message: bytes, private_key_pem: str) -> bytes:
 
     Raises:
         CredentialError: When no RSA implementation is available. Signing needs real
-            asymmetric crypto, which the standard library does not provide — so this is
+            asymmetric crypto, which the standard library does not provide, so this is
             the one path where an optional dependency is genuinely required, and the
             error says exactly which and why.
     """
@@ -441,9 +437,7 @@ def _rs256_sign(message: bytes, private_key_pem: str) -> bytes:
             ),
         ) from exc
 
-    key = serialization.load_pem_private_key(
-        private_key_pem.encode("utf-8"), password=None
-    )
+    key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
     signer = getattr(key, "sign", None)
     if signer is None:
         raise CredentialError("the service-account key is not an RSA private key")

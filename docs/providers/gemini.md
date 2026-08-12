@@ -24,9 +24,11 @@ or better supported.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of("gemini", api_key="env://GEMINI_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("gemini", api_key="env://GEMINI_API_KEY"),
+    ]
+)
 
 result = client.generate(prompt, target="gemini:gemini-2.5-flash")
 ```
@@ -42,8 +44,8 @@ effort levels map straight across:
 ```python
 result = client.generate(prompt, target="gemini:gemini-2.5-pro", reasoning="high")
 
-print(result.usage.reasoning_tokens)   # thoughts, reported separately
-print(result.usage.output_tokens)      # answer + thoughts, because both bill as output
+print(result.usage.reasoning_tokens)  # thoughts, reported separately
+print(result.usage.output_tokens)  # answer + thoughts, because both bill as output
 ```
 
 Thinking text arrives as `ReasoningDelta` events and is excluded from `result.text`:
@@ -71,8 +73,10 @@ request upward server-side rather than failing.
 ```python
 SUMMARY = {
     "type": "object",
-    "properties": {"headline": {"type": "string"}, "points": {
-        "type": "array", "items": {"type": "string"}}},
+    "properties": {
+        "headline": {"type": "string"},
+        "points": {"type": "array", "items": {"type": "string"}},
+    },
     "required": ["headline", "points"],
 }
 
@@ -99,6 +103,26 @@ supports several calls in one turn. Tool results are sent back on a *user* turn 
 `functionResponse` parts — the adapter handles that translation, so
 [`run_tools()`](../guides/tool-loop.md) works the same as everywhere else.
 
+## Embeddings
+
+Gemini embeds through `batchEmbedContents`, so batches are native:
+
+```python
+result = client.embed(
+    ["What is deep learning?"],
+    target="gemini:gemini-embedding-2",
+    dimensions=768,  # 128-3072; both models default to 3072
+)
+```
+
+The legacy `gemini-embedding-001` accepts task types, mapped from `input_type`
+(`query` → `RETRIEVAL_QUERY` and so on). The current `gemini-embedding-2` documents no
+task types — prompt instructions replace them — so an `input_type` there is never sent
+and the result says so in a warning. No batch ceiling is documented, so requests above
+the library's sanity ceiling are refused rather than split at a guessed size; set
+`BatchPolicy.max_items_override` if you have verified a limit yourself. There is no
+reranking endpoint on this API.
+
 ## Discovery
 
 The model listing reports real limits, so context windows carry `discovered`
@@ -120,12 +144,14 @@ numeric thinking budgets — passes straight through:
 client.generate(
     prompt,
     target="gemini:gemini-2.5-flash",
-    provider_options={"gemini": {
-        "cachedContent": "cachedContents/abc123",
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
-        ],
-    }},
+    provider_options={
+        "gemini": {
+            "cachedContent": "cachedContents/abc123",
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+            ],
+        }
+    },
 )
 ```
 
@@ -133,7 +159,7 @@ client.generate(
 
 A prompt Gemini blocks returns **no candidates at all**, with the reason on
 `promptFeedback`. That surfaces as `finish_reason == "content_filter"` rather than an
-empty successful answer — and a [`Route`](../concepts/routing.md) with
+empty successful answer, and a [`Route`](../concepts/routing.md) with
 `content_policy_targets` can redirect it to a differently-governed provider.
 
 ## Multimodal inputs
@@ -147,8 +173,8 @@ remote references. Support and limits remain model-specific.
 
 - [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/gemini.md)
   — the exact wire details this adapter depends on.
-- [Capabilities and provenance](../concepts/capabilities.md) — how discovered limits are
+- [Capabilities and provenance](../concepts/capabilities.md): how discovered limits are
   ranked.
-- [Routing](../concepts/routing.md) — including the content-policy fallback chain.
+- [Routing](../concepts/routing.md): including the content-policy fallback chain.
 
 </div>

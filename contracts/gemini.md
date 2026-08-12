@@ -112,6 +112,27 @@ native protocol is used instead.
 - Official retry guidance: retry only 429/408/5xx with exponential backoff and jitter;
   never retry 400/403 — which is what the default retry predicate already does.
 
+### Embeddings (`POST /v1beta/models/{model}:batchEmbedContents`, verified 2026-08-12)
+- Verified against `ai.google.dev/gemini-api/docs/embeddings` and `ai.google.dev/api/embeddings`.
+- The adapter always uses the batch endpoint (single inputs included): `requests[]`
+  entries each carry `model: "models/{id}"`, `content: {parts: [{text}]}`, optional
+  `output_dimensionality` (top level, snake_case in the guide's own curl), and
+  `taskType` — **only for models that document task types**. `gemini-embedding-2`
+  explicitly does not ("use prompt instructions instead"), so the adapter never sends
+  it there; `gemini-embedding-001` (legacy) accepts
+  `RETRIEVAL_QUERY`/`RETRIEVAL_DOCUMENT`/`CLASSIFICATION`/`CLUSTERING`, mapped from the
+  normalized intent vocabulary.
+- Response: `embeddings[]` with `values[]` (floats, request order) and `usageMetadata`
+  with `promptTokenCount` → `input_tokens`.
+- Models and dimensions (verified 2026-08-12): both `gemini-embedding-2` (current,
+  multimodal-capable) and `gemini-embedding-001` (legacy, text-only) default to
+  **3,072** dimensions; 128-3,072 supported, 768/1536/3072 recommended — declared as
+  `dimension_choices`.
+- **Unverified:** any batch-size ceiling for `batchEmbedContents` (not stated —
+  `max_batch_inputs` stays `None`, so over-ceiling requests refuse locally rather than
+  split at a guessed size); whether returned vectors are unit-normalized at reduced
+  dimensionalities.
+
 ## Watchlist
 
 - **The new "Interactions" API.** Google's guides are migrating to

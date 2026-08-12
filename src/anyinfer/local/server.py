@@ -43,7 +43,7 @@ import httpx2
 
 from ..errors import LocalRuntimeError
 from ..events.telemetry import ServerLifecycle
-from .hardware import HardwareProfile
+from .hardware import AcceleratorKind, HardwareProfile
 from .tuning import ServerPlan
 
 __all__ = [
@@ -91,6 +91,7 @@ def is_loopback(base_url: str | None) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
 
 _IS_WINDOWS = sys.platform == "win32"
 
@@ -229,6 +230,8 @@ class ServerSupervisor:
     Args:
         binary: Path to the ``llama-server`` executable.
         hardware: Detected hardware, used for VRAM admission control.
+        runtime_backend: A required installed backend family, or ``None`` to select the
+            best runtime the detected hardware can drive.
         idle_ttl_s: Unload a server after this long with no active streams. ``None``
             keeps servers until the supervisor closes.
         max_resident: How many servers may run at once. Exceeding it evicts the
@@ -243,6 +246,7 @@ class ServerSupervisor:
         *,
         binary: Path | str = "llama-server",
         hardware: HardwareProfile | None = None,
+        runtime_backend: AcceleratorKind | None = None,
         idle_ttl_s: float | None = 900.0,
         max_resident: int = 1,
         allow_remote_exposure: bool = False,
@@ -260,6 +264,7 @@ class ServerSupervisor:
             )
         self._binary = Path(binary)
         self._hardware = hardware
+        self._runtime_backend = runtime_backend
         self._idle_ttl_s = idle_ttl_s
         self._max_resident = max(1, max_resident)
         self._host = host
@@ -338,9 +343,7 @@ class ServerSupervisor:
     async def _enforce_capacity(self, incoming: str) -> None:
         """Evict least-recently-used idle servers to make room."""
         while len(self._servers) >= self._max_resident:
-            evictable = [
-                h for h in self._servers.values() if h.is_idle and not h.persist
-            ]
+            evictable = [h for h in self._servers.values() if h.is_idle and not h.persist]
             if not evictable:
                 raise LocalRuntimeError(
                     f"cannot start a server for {incoming}: "
@@ -407,10 +410,18 @@ class ServerSupervisor:
         """Late-bind the detected hardware profile.
 
         Detection is deliberately lazy — probing at construction would tax clients that
-        never run a local model — so the adapter hands the profile over once it has one.
+        never run a local model, so the adapter hands the profile over once it has one.
         Admission control and backend fallback stay disabled until then.
         """
         self._hardware = hardware
+
+    def set_runtime_backend(self, backend: AcceleratorKind | None) -> None:
+        """Select a named installed backend, or return to automatic selection.
+
+        Existing child processes keep the executable they started with; this affects only
+        later server starts.
+        """
+        self._runtime_backend = backend
 
     def resolve_binary(self) -> Path:
         """Locate the llama-server executable without starting anything.
@@ -431,13 +442,21 @@ class ServerSupervisor:
                     hint="install a llama.cpp runtime, or set the binary path explicitly",
                 )
             return self._binary
+        if self._hardware is not None and (
+            self._runtime_backend is not None or self._binary == Path("llama-server")
+        ):
+            from .backends import select_backend
+
+            backend = select_backend(self._hardware, preferred=self._runtime_backend)
+            if backend is not None:
+                return backend.binary
         found = shutil.which(str(self._binary))
         if found is not None:
             return Path(found)
         if self._hardware is not None:
             from .backends import select_backend
 
-            backend = select_backend(self._hardware)
+            backend = select_backend(self._hardware, preferred=self._runtime_backend)
             if backend is not None:
                 return backend.binary
         raise LocalRuntimeError(
@@ -584,7 +603,7 @@ def _start_output_reader(handle: ServerHandle) -> None:
 
         Only this thread ever touches the stream. Closing a buffered pipe from another
         thread while this one is blocked in ``readline`` deadlocks, and on Windows a
-        grandchild process can keep the write end open after its parent exits — so the
+        grandchild process can keep the write end open after its parent exits, so the
         stream is closed here, on the way out, and nowhere else.
         """
         try:
@@ -599,9 +618,7 @@ def _start_output_reader(handle: ServerHandle) -> None:
             with contextlib.suppress(Exception):
                 stream.close()
 
-    thread = threading.Thread(
-        target=pump, name=f"anyinfer-log-{handle.model_key}", daemon=True
-    )
+    thread = threading.Thread(target=pump, name=f"anyinfer-log-{handle.model_key}", daemon=True)
     thread.start()
 
 

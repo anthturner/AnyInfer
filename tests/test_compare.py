@@ -32,6 +32,41 @@ def _registry() -> ProviderRegistry:
     return registry
 
 
+def _embedding_registry() -> ProviderRegistry:
+    registry = ProviderRegistry(load_builtins=False, load_entry_points=False)
+    registry.register(
+        ProviderDescriptor(
+            id="embed-only",
+            display_name="Embed only",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+            operations=frozenset({"generation", "embedding"}),
+            static_capabilities={
+                "e": ai.ModelCapabilities(
+                    pricing=ai.Sourced(ai.Pricing(Decimal("1"), Decimal("2")), "catalog"),
+                )
+            },
+            static_embedding_capabilities={
+                "e": ai.EmbeddingCapabilities(
+                    dimensions=768,
+                    max_batch_inputs=2,
+                    max_input_tokens=8_192,
+                    input_intents=("query", "document"),
+                )
+            },
+        )
+    )
+    registry.register(
+        ProviderDescriptor(
+            id="generation-only",
+            display_name="Generation only",
+            factory=OpenAICompatAdapter,
+            requires_base_url=True,
+        )
+    )
+    return registry
+
+
 @pytest.mark.asyncio
 async def test_compare_reports_ladder_fit_cost_and_does_not_dispatch() -> None:
     registry = _registry()
@@ -77,7 +112,10 @@ async def test_unresolvable_targets_are_data_and_order_is_preserved() -> None:
         )
 
     assert [item.requested for item in compared] == [
-        "missing:m", "json-only:m", "also-missing:m", "json-only:other"
+        "missing:m",
+        "json-only:m",
+        "also-missing:m",
+        "json-only:other",
     ]
     assert [item.resolvable for item in compared] == [False, True, False, True]
 
@@ -111,3 +149,103 @@ async def test_comparison_and_dispatch_gate_share_the_same_budget() -> None:
 
     assert item.fits is False
     assert "context" in str(excinfo.value).lower()
+
+
+# ---- embedding comparison --------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_compare_embedding_reports_capabilities_cost_and_does_not_dispatch() -> None:
+    registry = _embedding_registry()
+    provider = ScriptedProvider("scripted", [ScriptedModel("unused")])
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "embed-only", base_url="https://unused.invalid/v1", transport=provider.transport()
+            )
+        ],
+        registry=registry,
+        use_default_catalog=False,
+    ) as client:
+        compared = await client.compare_embedding(
+            "a short text", targets=["embed-only:e"], input_type="query"
+        )
+
+    item = compared[0]
+    assert item.resolvable is True
+    assert item.dimensions == 768
+    assert item.max_batch_inputs == 2
+    assert item.max_input_tokens == 8_192
+    assert item.input_intents == ("query", "document")
+    assert item.fits is True
+    assert item.cost is not None
+    assert item.notes == ()
+    assert provider.requests == []
+    assert ai.EmbeddingTargetComparison.from_dict(item.to_dict()) == item
+
+
+@pytest.mark.asyncio
+async def test_compare_embedding_flags_a_batch_over_the_declared_limit() -> None:
+    registry = _embedding_registry()
+    async with ai.AsyncClient(
+        [ai.ProviderSettings.of("embed-only", base_url="https://unused.invalid/v1")],
+        registry=registry,
+        use_default_catalog=False,
+    ) as client:
+        item = (
+            await client.compare_embedding(
+                ["one", "two", "three"], targets=["embed-only:e"]
+            )
+        )[0]
+
+    assert item.max_batch_inputs == 2
+    assert item.fits is False
+
+
+@pytest.mark.asyncio
+async def test_compare_embedding_notes_an_unsupported_intent() -> None:
+    registry = _embedding_registry()
+    async with ai.AsyncClient(
+        [ai.ProviderSettings.of("embed-only", base_url="https://unused.invalid/v1")],
+        registry=registry,
+        use_default_catalog=False,
+    ) as client:
+        item = (
+            await client.compare_embedding(
+                "hi", targets=["embed-only:e"], input_type="clustering"
+            )
+        )[0]
+
+    assert item.notes and "clustering" in item.notes[0]
+
+
+@pytest.mark.asyncio
+async def test_compare_embedding_rejects_a_generation_only_provider() -> None:
+    registry = _embedding_registry()
+    async with ai.AsyncClient(
+        [ai.ProviderSettings.of("generation-only", base_url="https://unused.invalid/v1")],
+        registry=registry,
+        use_default_catalog=False,
+    ) as client:
+        item = (
+            await client.compare_embedding("hi", targets=["generation-only:m"])
+        )[0]
+
+    assert item.resolvable is False
+    assert "embedding" in item.reason
+
+
+@pytest.mark.asyncio
+async def test_compare_embedding_unresolvable_targets_are_data_and_order_is_preserved() -> None:
+    registry = _embedding_registry()
+    async with ai.AsyncClient(
+        [ai.ProviderSettings.of("embed-only", base_url="https://unused.invalid/v1")],
+        registry=registry,
+        use_default_catalog=False,
+    ) as client:
+        compared = await client.compare_embedding(
+            "hi", targets=["missing:m", "embed-only:e"]
+        )
+
+    assert [item.requested for item in compared] == ["missing:m", "embed-only:e"]
+    assert [item.resolvable for item in compared] == [False, True]

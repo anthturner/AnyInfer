@@ -1,7 +1,7 @@
 """A pytest plugin for testing applications built on AnyInfer.
 
 Registered through the ``pytest11`` entry point, so installing ``anyinfer`` is enough to
-make the fixtures available. Nothing here runs — or imports anything expensive — unless a
+make the fixtures available. Nothing here runs, or imports anything expensive — unless a
 test asks for a fixture.
 
 The fixtures give each test its own provider registry. That is the load-bearing detail: a
@@ -270,7 +270,7 @@ def _run_sync(awaitable: Any) -> None:
     except RuntimeError:
         asyncio.run(awaitable)
         return
-    # Teardown inside a running loop cannot block, so the close is scheduled — and held,
+    # Teardown inside a running loop cannot block, so the close is scheduled, and held,
     # because a task with no live reference may be garbage-collected before it runs.
     task = loop.create_task(awaitable)
     _PENDING_TEARDOWNS.add(task)

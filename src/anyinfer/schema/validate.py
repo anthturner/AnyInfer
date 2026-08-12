@@ -2,7 +2,7 @@
 
 Validation is always against the *original* schema, whatever mechanism produced the text,
 even when a provider uses grammar-constrained decoding. Extraction is deliberately forgiving:
-models wrap JSON in code fences and prose even when told not to — but validation is not.
+models wrap JSON in code fences and prose even when told not to, but validation is not.
 """
 
 from __future__ import annotations
@@ -118,9 +118,7 @@ def validate(value: Any, schema: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _describe(error: jsonschema.ValidationError) -> str:
-    path = "".join(
-        f"[{p}]" if isinstance(p, int) else f".{p}" for p in error.absolute_path
-    )
+    path = "".join(f"[{p}]" if isinstance(p, int) else f".{p}" for p in error.absolute_path)
     location = path.lstrip(".") or "<root>"
     return f"{location}: {error.message}"
 

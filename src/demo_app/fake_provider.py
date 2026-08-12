@@ -12,13 +12,13 @@ something to show:
 ``demo-fake:reliable``
     Answers immediately, streams, reports usage.
 ``demo-fake:flaky``
-    Fails its first call with a retryable 503, then succeeds — which makes retry, fallback,
+    Fails its first call with a retryable 503, then succeeds, which makes retry, fallback,
     and the attempt trail visible without needing a real outage.
 ``demo-fake:slow``
     Streams the same answer in smaller chunks, so incremental rendering is easy to watch.
 ``demo-fake:tools``
     Answers a plain request with a tool call and a request carrying a tool result with
-    text — which is the whole shape of a tool loop: the model asks, the application runs
+    text, which is the whole shape of a tool loop: the model asks, the application runs
     the function, the result goes back, the model answers. Without it the loop could only
     be demonstrated against a real provider, and the demo would stop being offline-capable
     exactly where it got interesting.
@@ -32,12 +32,20 @@ from typing import Any
 import httpx2
 
 from anyinfer.registry import ProviderRegistry
-from anyinfer.testing import ScriptedFailure, ScriptedModel, ScriptedProvider
+from anyinfer.testing import (
+    FakeEmbeddingRerankProvider,
+    ScriptedFailure,
+    ScriptedModel,
+    ScriptedProvider,
+)
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
 
 __all__ = [
+    "DEMO_EMBEDDING_MODEL",
+    "DEMO_EMBEDDING_PROVIDER_ID",
     "DEMO_MODELS",
     "DEMO_PROVIDER_ID",
+    "DEMO_RERANK_MODEL",
     "DEMO_TOOL_CALL",
     "TOOL_MODEL",
     "DemoFakeBackend",
@@ -49,6 +57,20 @@ DEMO_PROVIDER_ID = "demo-fake"
 
 DEMO_MODELS: tuple[str, ...] = ("reliable", "flaky", "slow", "tools")
 """Model ids the offline provider serves, each with a different personality."""
+
+DEMO_EMBEDDING_PROVIDER_ID = "demo-fake-embed"
+"""Provider id the demo registers its offline embedding/rerank endpoint under.
+
+Kept separate from `DEMO_PROVIDER_ID` because the two operations need genuinely different
+in-process fakes (`FakeEmbeddingRerankProvider` implements `EmbedsText`/`ReranksText`
+directly rather than an HTTP dialect) — mirroring how a real deployment might point
+embeddings at a different service than chat."""
+
+DEMO_EMBEDDING_MODEL = "embed-small"
+"""Model id the offline embedding fake serves."""
+
+DEMO_RERANK_MODEL = "rerank-small"
+"""Model id the offline rerank fake serves."""
 
 TOOL_MODEL = "tools"
 """The model id whose scripted answer to a plain request is a tool call."""
@@ -85,7 +107,7 @@ class DemoFakeBackend:
     """The demo's offline provider.
 
     Two providers are kept — one answering prose, one answering the canned structured
-    object — and *each request* is routed to the right one by reading its own body. A
+    object, and *each request* is routed to the right one by reading its own body. A
     single mutable "json mode" flag would be a global for something that is per request,
     and with several conversations streaming at once the last caller to set it would
     decide what the others got back.
@@ -125,9 +147,7 @@ class DemoFakeBackend:
             body = _chat_body(request)
             if body is not None and body.get("model") == TOOL_MODEL:
                 messages = body.get("messages") or []
-                answered = any(
-                    isinstance(m, dict) and m.get("role") == "tool" for m in messages
-                )
+                answered = any(isinstance(m, dict) and m.get("role") == "tool" for m in messages)
                 response = (
                     FakeResponse(text=_TOOL_ANSWER)
                     if answered
@@ -137,11 +157,13 @@ class DemoFakeBackend:
                 # does internally, so the wire framing stays the library's own.
                 server = FakeOpenAIServer([response], models=list(DEMO_MODELS))
                 rendered = server.transport().handler(request)
-                assert isinstance(rendered, httpx2.Response)
+                if not isinstance(rendered, httpx2.Response):
+                    raise RuntimeError("the synchronous fake returned an awaitable response")
                 return rendered
             provider = self._structured if _wants_structured(body) else self._prose
             fallthrough = provider.transport().handler(request)
-            assert isinstance(fallthrough, httpx2.Response)
+            if not isinstance(fallthrough, httpx2.Response):
+                raise RuntimeError("the scripted fake returned an awaitable response")
             return fallthrough
 
         return httpx2.MockTransport(handle)
@@ -151,7 +173,7 @@ def _wants_structured(body: dict[str, Any] | None) -> bool:
     """Whether this request asked for a schema-shaped answer.
 
     ``response_format`` is how every structured-output mechanism the OpenAI dialect
-    carries announces itself — ``json_schema`` and plain ``json_object`` alike — so one
+    carries announces itself — ``json_schema`` and plain ``json_object`` alike, so one
     check covers both. A prompt-injected schema (the last-resort mechanism) sends no
     such field and legitimately gets prose, which is exactly the case the repair loop
     exists for.
@@ -205,7 +227,7 @@ def _build(*, json_mode: bool) -> ScriptedProvider:
 
 
 def register_demo_provider(registry: ProviderRegistry) -> None:
-    """Register the offline provider on ``registry``, replacing any prior registration.
+    """Register the offline providers on ``registry``, replacing any prior registration.
 
     Args:
         registry: The registry the demo's client will use. A demo-owned registry rather
@@ -213,3 +235,8 @@ def register_demo_provider(registry: ProviderRegistry) -> None:
             for an embedding application.
     """
     _build(json_mode=False).register(registry)
+    FakeEmbeddingRerankProvider(
+        DEMO_EMBEDDING_PROVIDER_ID,
+        embedding_dimensions={DEMO_EMBEDDING_MODEL: 32},
+        rerank_models=[DEMO_RERANK_MODEL],
+    ).register(registry)

@@ -59,9 +59,7 @@ def _serving(body: bytes = PAYLOAD):
 
 
 def test_downloads_and_verifies(tmp_path: Path) -> None:
-    report = download_artifact(
-        _artifact(), model_dir=tmp_path, client=_client(_serving())
-    )
+    report = download_artifact(_artifact(), model_dir=tmp_path, client=_client(_serving()))
 
     assert report.primary_path.read_bytes() == PAYLOAD
     assert report.reused is False
@@ -83,9 +81,7 @@ def test_existing_verified_file_is_reused(tmp_path: Path) -> None:
 def test_corrupt_existing_file_is_replaced(tmp_path: Path) -> None:
     (tmp_path / "model.gguf").write_bytes(b"corrupted")
 
-    report = download_artifact(
-        _artifact(), model_dir=tmp_path, client=_client(_serving())
-    )
+    report = download_artifact(_artifact(), model_dir=tmp_path, client=_client(_serving()))
 
     assert report.primary_path.read_bytes() == PAYLOAD
     assert any("failed verification" in w for w in report.warnings)

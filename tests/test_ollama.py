@@ -90,11 +90,17 @@ async def test_reasoning_is_a_separate_channel_from_the_answer() -> None:
                 200,
                 content=ndjson_lines(
                     [
-                        {"message": {"role": "assistant", "thinking": "Let me think..."},
-                         "done": False},
+                        {
+                            "message": {"role": "assistant", "thinking": "Let me think..."},
+                            "done": False,
+                        },
                         {"message": {"role": "assistant", "content": "42"}, "done": False},
-                        {"message": {"role": "assistant", "content": ""}, "done": True,
-                         "done_reason": "stop", "eval_count": 3},
+                        {
+                            "message": {"role": "assistant", "content": ""},
+                            "done": True,
+                            "done_reason": "stop",
+                            "eval_count": 3,
+                        },
                     ]
                 ),
                 headers={"content-type": "application/x-ndjson"},
@@ -177,9 +183,7 @@ async def test_sampling_maps_onto_the_options_block() -> None:
         await client.generate(
             "hi",
             target="ollama:qwen3:8b",
-            sampling=ai.Sampling(
-                temperature=0.4, top_p=0.8, max_output_tokens=256, stop=("END",)
-            ),
+            sampling=ai.Sampling(temperature=0.4, top_p=0.8, max_output_tokens=256, stop=("END",)),
         )
 
     options = server.requests[0]["options"]
@@ -294,8 +298,9 @@ async def test_loaded_models_reports_vram_residency() -> None:
     """``/api/ps`` drives GPU-spill detection: resident VRAM below artifact size."""
     server = FakeOllamaServer(loaded={"qwen3:8b": 2_000_000_000})
     adapter = OllamaAdapter(
-        ProviderConfig(provider_id="ollama", base_url="http://127.0.0.1:11434",
-                       transport=server.transport())
+        ProviderConfig(
+            provider_id="ollama", base_url="http://127.0.0.1:11434", transport=server.transport()
+        )
     )
     try:
         loaded = await adapter.loaded_models()
@@ -308,8 +313,9 @@ async def test_loaded_models_reports_vram_residency() -> None:
 async def _ollama_diagnostics(loaded: dict[str, int]) -> tuple[ai.Diagnostic, ...]:
     server = FakeOllamaServer(loaded=loaded)
     adapter = OllamaAdapter(
-        ProviderConfig(provider_id="ollama", base_url="http://127.0.0.1:11434",
-                       transport=server.transport())
+        ProviderConfig(
+            provider_id="ollama", base_url="http://127.0.0.1:11434", transport=server.transport()
+        )
     )
     try:
         return tuple(await adapter.diagnostics())
@@ -347,8 +353,11 @@ async def test_diagnostics_stay_quiet_when_the_server_is_unreachable() -> None:
         raise httpx2.ConnectError("connection refused", request=request)
 
     adapter = OllamaAdapter(
-        ProviderConfig(provider_id="ollama", base_url="http://127.0.0.1:11434",
-                       transport=httpx2.MockTransport(refuse))
+        ProviderConfig(
+            provider_id="ollama",
+            base_url="http://127.0.0.1:11434",
+            transport=httpx2.MockTransport(refuse),
+        )
     )
     try:
         assert tuple(await adapter.diagnostics()) == ()
@@ -393,10 +402,11 @@ def _server_for(scenario: str) -> FakeOllamaServer:
             [
                 FakeResponse(status=429, error_message="busy", headers={"retry-after": "0"}),
                 FakeResponse(text="recovered"),
-            ]
+            ],
+            embed_scenario=scenario,
         )
     if scenario == "oversized":
-        return FakeOllamaServer(FakeResponse(text="x" * 20_000))
+        return FakeOllamaServer(FakeResponse(text="x" * 20_000), embed_scenario=scenario)
     if scenario == "odd_finish":
         return FakeOllamaServer(FakeResponse(text="hello", finish_reason="unexpected"))
     return FakeOllamaServer(FakeResponse(text="Hello from Ollama."))
@@ -422,7 +432,9 @@ HARNESS = ConformanceHarness(
     provider_id="ollama",
     model="qwen3:8b",
     build_client=_build_client,
-    supports=Capabilities(),
+    # Rerank stays off: Ollama documents no rerank endpoint (contracts/ollama.md).
+    supports=Capabilities(embedding=True),
+    embedding_model="nomic-embed-text",
 )
 
 

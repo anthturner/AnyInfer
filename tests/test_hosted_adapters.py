@@ -24,11 +24,7 @@ from anyinfer.testing.fakes import sse_lines
 
 def _client(provider: str, handler: Any, **settings: Any) -> ai.AsyncClient:
     return ai.AsyncClient(
-        [
-            ai.ProviderSettings.of(
-                provider, transport=httpx2.MockTransport(handler), **settings
-            )
-        ]
+        [ai.ProviderSettings.of(provider, transport=httpx2.MockTransport(handler), **settings)]
     )
 
 
@@ -202,9 +198,7 @@ async def test_anthropic_oauth_token_wins_over_an_api_key() -> None:
 
 async def test_anthropic_blank_oauth_token_falls_back_to_the_api_key() -> None:
     """An emptied field must not shadow the key the user still has configured."""
-    headers = await _anthropic_headers(
-        api_key="sk-ant-api-key", options={"oauth_token": "   "}
-    )
+    headers = await _anthropic_headers(api_key="sk-ant-api-key", options={"oauth_token": "   "})
 
     assert headers["x-api-key"] == "sk-ant-api-key"
     assert "authorization" not in headers
@@ -219,9 +213,7 @@ async def test_anthropic_oauth_token_resolves_credential_references(
     a real one would never be registered for redaction.
     """
     monkeypatch.setenv("DEMO_ANTHROPIC_OAUTH", "sk-ant-oat01-from-env")
-    headers = await _anthropic_headers(
-        options={"oauth_token": "env://DEMO_ANTHROPIC_OAUTH"}
-    )
+    headers = await _anthropic_headers(options={"oauth_token": "env://DEMO_ANTHROPIC_OAUTH"})
 
     assert headers["authorization"] == "Bearer sk-ant-oat01-from-env"
 
@@ -245,14 +237,13 @@ async def test_anthropic_schema_becomes_a_forced_tool() -> None:
     ]
     seen, handler = _capture(
         lambda r: httpx2.Response(
-            200, content=sse_lines(events, done=False),
+            200,
+            content=sse_lines(events, done=False),
             headers={"content-type": "text/event-stream"},
         )
     )
     async with _client("anthropic", handler, api_key="sk-test-key-value") as client:
-        result = await client.generate(
-            "hi", target="anthropic:claude-sonnet-4-5", schema=schema
-        )
+        result = await client.generate("hi", target="anthropic:claude-sonnet-4-5", schema=schema)
 
     body = seen[0]
     assert body["tool_choice"]["type"] == "tool"
@@ -302,7 +293,8 @@ async def test_anthropic_tool_calls_use_dense_slots() -> None:
         {"type": "message_delta", "delta": {"stop_reason": "tool_use"}},
     ]
     handler = lambda r: httpx2.Response(  # noqa: E731
-        200, content=sse_lines(events, done=False),
+        200,
+        content=sse_lines(events, done=False),
         headers={"content-type": "text/event-stream"},
     )
     async with _client("anthropic", handler, api_key="sk-test-key-value") as client:
@@ -323,7 +315,8 @@ async def test_anthropic_mid_stream_error_event_is_a_provider_error() -> None:
         {"type": "error", "error": {"type": "overloaded_error", "message": "overloaded"}},
     ]
     handler = lambda r: httpx2.Response(  # noqa: E731
-        200, content=sse_lines(events, done=False),
+        200,
+        content=sse_lines(events, done=False),
         headers={"content-type": "text/event-stream"},
     )
     async with _client("anthropic", handler, api_key="sk-test-key-value") as client:
@@ -363,7 +356,8 @@ def _responses_stream(*, text: str = "Hi", reasoning: str = "") -> bytes:
 
 async def test_openai_responses_streaming_and_usage() -> None:
     handler = lambda r: httpx2.Response(  # noqa: E731
-        200, content=_responses_stream(text="Hi there"),
+        200,
+        content=_responses_stream(text="Hi there"),
         headers={"content-type": "text/event-stream"},
     )
     async with _client("openai", handler, api_key="sk-test-key-value") as client:
@@ -382,9 +376,7 @@ async def test_openai_uses_instructions_and_input_items() -> None:
         )
     )
     async with _client("openai", handler, api_key="sk-test-key-value") as client:
-        await client.generate(
-            [ai.system("Be brief."), ai.user("hi")], target="openai:gpt-5"
-        )
+        await client.generate([ai.system("Be brief."), ai.user("hi")], target="openai:gpt-5")
 
     body = seen[0]
     assert body["instructions"] == "Be brief."
@@ -431,7 +423,8 @@ async def test_openai_incomplete_response_maps_to_length() -> None:
         },
     ]
     handler = lambda r: httpx2.Response(  # noqa: E731
-        200, content=sse_lines(events, done=False),
+        200,
+        content=sse_lines(events, done=False),
         headers={"content-type": "text/event-stream"},
     )
     async with _client("openai", handler, api_key="sk-test-key-value") as client:
@@ -455,7 +448,8 @@ async def test_openai_tool_calls_stream_by_output_index() -> None:
         {"type": "response.completed", "response": {"status": "completed"}},
     ]
     handler = lambda r: httpx2.Response(  # noqa: E731
-        200, content=sse_lines(events, done=False),
+        200,
+        content=sse_lines(events, done=False),
         headers={"content-type": "text/event-stream"},
     )
     async with _client("openai", handler, api_key="sk-test-key-value") as client:
@@ -474,7 +468,8 @@ async def test_openai_schema_uses_text_format() -> None:
     ]
     seen, handler = _capture(
         lambda r: httpx2.Response(
-            200, content=sse_lines(events, done=False),
+            200,
+            content=sse_lines(events, done=False),
             headers={"content-type": "text/event-stream"},
         )
     )
@@ -499,7 +494,8 @@ async def test_openai_failed_response_event_is_a_provider_error() -> None:
         },
     ]
     handler = lambda r: httpx2.Response(  # noqa: E731
-        200, content=sse_lines(events, done=False),
+        200,
+        content=sse_lines(events, done=False),
         headers={"content-type": "text/event-stream"},
     )
     async with _client("openai", handler, api_key="sk-test-key-value") as client:
@@ -520,8 +516,11 @@ def _openai_compat_body(text: str = "azure answer") -> dict[str, Any]:
         "id": "c",
         "object": "chat.completion",
         "choices": [
-            {"index": 0, "message": {"role": "assistant", "content": text},
-             "finish_reason": "stop"}
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": "stop",
+            }
         ],
         "usage": {"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8},
     }
@@ -596,6 +595,56 @@ async def test_azure_api_version_is_appended_per_instance() -> None:
     try:
         assert "api-version=2024-10-21" in versioned.chat_path
         assert "api-version" not in plain.chat_path
+    finally:
+        await versioned.aclose()
+        await plain.aclose()
+
+
+def _azure_embedding_body() -> dict[str, Any]:
+    return {
+        "data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}],
+        "model": "text-embedding-3-small",
+        "usage": {"prompt_tokens": 4, "total_tokens": 4},
+    }
+
+
+async def test_azure_embeds_against_the_v1_embeddings_path() -> None:
+    seen, handler = _capture(lambda r: httpx2.Response(200, json=_azure_embedding_body()))
+    client = _client(
+        "azure-foundry",
+        handler,
+        base_url="https://res.services.ai.azure.com/openai/v1",
+        api_key="azure-key-value",
+    )
+    async with client:
+        result = await client.embed("hi", target="azure-foundry:text-embedding-3-small")
+
+    assert seen[0]["model"] == "text-embedding-3-small"
+    assert result.vectors[0].values == pytest.approx((0.1, 0.2, 0.3))
+
+
+async def test_azure_embeddings_path_carries_the_api_version() -> None:
+    handler = lambda r: httpx2.Response(200, json=_azure_embedding_body())  # noqa: E731
+    versioned = AzureFoundryAdapter(
+        ProviderConfig(
+            provider_id="azure-foundry",
+            base_url="https://res.services.ai.azure.com/openai/v1",
+            api_key="k",
+            api_version="2024-10-21",
+            transport=httpx2.MockTransport(handler),
+        )
+    )
+    plain = AzureFoundryAdapter(
+        ProviderConfig(
+            provider_id="azure-foundry",
+            base_url="https://res.services.ai.azure.com/openai/v1",
+            api_key="k",
+            transport=httpx2.MockTransport(handler),
+        )
+    )
+    try:
+        assert "api-version=2024-10-21" in versioned.embeddings_path
+        assert "api-version" not in plain.embeddings_path
     finally:
         await versioned.aclose()
         await plain.aclose()

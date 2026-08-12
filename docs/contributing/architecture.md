@@ -73,7 +73,7 @@ local subsystem is translation, not orchestration.
 
 ## Request lifecycle
 
-1. **Resolve** the target — alias or `provider:model` → `ResolvedTarget`.
+1. **Resolve** the target: alias or `provider:model` → `ResolvedTarget`.
 2. **Gate** on health, if the target recently failed.
 3. **Assemble** capabilities from the layered sources.
 4. **Build** the wire request: choose the mechanism, project the schema, translate reasoning

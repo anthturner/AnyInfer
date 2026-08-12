@@ -23,9 +23,10 @@ def test_demo_brand_assets_are_exact_canonical_mirrors() -> None:
     for name in RUNTIME_ASSETS:
         demo, docs = DEMO_ASSETS / name, DOC_ASSETS / name
         if demo.suffix == ".svg":
-            assert demo.read_text(encoding="utf-8").splitlines() == docs.read_text(
-                encoding="utf-8"
-            ).splitlines(), name
+            assert (
+                demo.read_text(encoding="utf-8").splitlines()
+                == docs.read_text(encoding="utf-8").splitlines()
+            ), name
         else:
             assert demo.read_bytes() == docs.read_bytes(), name
 

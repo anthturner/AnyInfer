@@ -23,12 +23,14 @@ signed, not what they look like.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "vertex",
-        options={"project": "my-gcp-project", "location": "global"},
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "vertex",
+            options={"project": "my-gcp-project", "location": "global"},
+        ),
+    ]
+)
 
 result = client.generate(prompt, target="vertex:gemini-2.5-flash")
 ```
@@ -67,10 +69,13 @@ refreshed rather than configured once. Three ways, in precedence order:
     ```
 
     ```python
-    ai.ProviderSettings.of("vertex", options={
-        "project": "my-project",
-        "credentials_file": "/secrets/sa.json",
-    })
+    ai.ProviderSettings.of(
+        "vertex",
+        options={
+            "project": "my-project",
+            "credentials_file": "/secrets/sa.json",
+        },
+    )
     ```
 
     Falls back to `GOOGLE_APPLICATION_CREDENTIALS`. The JWT is signed and exchanged
@@ -80,8 +85,9 @@ refreshed rather than configured once. Three ways, in precedence order:
 === "A pre-acquired token"
 
     ```python
-    ai.ProviderSettings.of("vertex", api_key="env://GCP_ACCESS_TOKEN",
-                            options={"project": "my-project"})
+    ai.ProviderSettings.of(
+        "vertex", api_key="env://GCP_ACCESS_TOKEN", options={"project": "my-project"}
+    )
     ```
 
     From `gcloud auth print-access-token`. Used verbatim and **never refreshed** — its
@@ -94,7 +100,7 @@ for one exchange per hour rather than one per request.
 ## Everything else is Gemini
 
 Thinking levels, response schemas, function calling, and usage accounting all behave
-exactly as on [the Gemini page](gemini.md) — including reporting `output_tokens` as
+exactly as on [the Gemini page](gemini.md), including reporting `output_tokens` as
 answer plus thinking, since both bill at the output rate:
 
 ```python
@@ -112,6 +118,27 @@ prevent. Name models explicitly in the target, and supply
 
 Health checks that a token can be acquired, without spending a generation.
 
+## Embeddings
+
+Unlike generation, embeddings are **not** the Gemini shape — Vertex's own text-embeddings
+API uses a `predict` verb with an `instances`/`parameters` body, so `VertexAdapter`
+overrides embedding translation rather than reusing Gemini's `batchEmbedContents`:
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="vertex:text-embedding-005",
+)
+```
+
+`gemini-embedding-001` accepts only **one input per request** — a documented Vertex
+limit, not an AnyInfer restriction — so the core's batching policy fans a multi-text
+call into one request per input. `text-embedding-005` and
+`text-multilingual-embedding-002` accept up to five. `dimensions=` requests native
+truncation via `outputDimensionality`; `input_type=` maps to Vertex's `task_type`
+(`query`→`RETRIEVAL_QUERY`, `document`→`RETRIEVAL_DOCUMENT`,
+`classification`→`CLASSIFICATION`, `clustering`→`CLUSTERING`).
+
 ## Claude on Vertex
 
 Vertex also serves Anthropic models, but through a different surface
@@ -123,6 +150,6 @@ point the [Anthropic adapter](anthropic.md) at that endpoint instead.
 <div class="anyinfer-see-also" markdown>
 
 - [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/vertex.md)
-- [Google Gemini](gemini.md) — the same models with API-key auth.
+- [Google Gemini](gemini.md): the same models with API-key auth.
 
 </div>

@@ -22,12 +22,14 @@ prices instead of shipping a catalog that will age.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of(
-        "nebius",
-        api_key="env://NEBIUS_API_KEY",
-    ),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of(
+            "nebius",
+            api_key="env://NEBIUS_API_KEY",
+        ),
+    ]
+)
 
 result = client.generate(
     "Explain why the sky appears blue.",

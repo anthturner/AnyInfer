@@ -55,7 +55,7 @@ class Session:
 
     Obtained from `session()`, passed to
     `generate()` or `stream()`, and threaded forward by the caller. Mutable by design —
-    it is a handle, like a stream, not a domain value — and updated in place after each
+    it is a handle, like a stream, not a domain value, and updated in place after each
     turn so a caller can keep passing the same object.
 
     ```python

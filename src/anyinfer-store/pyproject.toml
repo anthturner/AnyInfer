@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anyinfer-store"
+version = "0.1.0"
+description = "Small-scale, single-process, embedded vector store for AnyInfer's embed()/rerank() results. Never a clustered or production vector database."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Anthony Turner", email = "github@anthturner.com" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+# anyinfer for EmbeddingSpace/EmbeddingVector/rerank() types; no vector-search library —
+# brute-force cosine similarity in pure Python is the whole point at this package's
+# stated scale ceiling (see the README and module docstring for the exact numbers).
+dependencies = ["anyinfer>=0.1.0"]
+
+[project.urls]
+Homepage = "https://github.com/anthturner/AnyInfer"
+Documentation = "https://anyinfer.dev/guides/vector-store/"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anyinfer_store"]
+
+[tool.ruff]
+line-length = 99
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D", "S101"]
+ignore = ["D203", "D213", "D401", "D107", "RUF012", "RUF009"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "S101"]

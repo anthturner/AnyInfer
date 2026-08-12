@@ -26,7 +26,7 @@ __all__ = ["main"]
 
 # ASCII only: this prints on consoles whose code page cannot encode typographic dashes.
 _PYSIDE_HINT = (
-    'The AnyInfer demo needs PySide6, which the base install leaves out; '
+    "The AnyInfer demo needs PySide6, which the base install leaves out; "
     'run: pip install "anyinfer[demo]"'
 )
 

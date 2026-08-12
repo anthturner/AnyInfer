@@ -112,6 +112,10 @@ semantic retrieval ranks its own documents and passes the result through.
 
 ::: anyinfer.context.rank
 
+::: anyinfer.context.SemanticRanker
+
+::: anyinfer.semantic_ranker
+
 ::: anyinfer.context.build_rank_cache
 
 ::: anyinfer.context.tokenize

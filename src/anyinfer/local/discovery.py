@@ -3,7 +3,7 @@
 The question `anyinfer init` has to answer before it can write anything: which providers
 would work right now, without installing, downloading, or asking for a credential. Two
 sources answer it — an engine already listening on loopback, and an API key already in the
-environment — and a third, the OS credential vault, answers it only when asked, because
+environment, and a third, the OS credential vault, answers it only when asked, because
 reading a vault can prompt the user to unlock it.
 
 This lives in the local subsystem because "what is running on this machine" is its subject,
@@ -87,6 +87,12 @@ class DiscoveredProvider:
             ``"ANTHROPIC_API_KEY set"``. Never contains a credential value.
         models: Model ids the endpoint listed, when it listed any. Empty for credential
             evidence, which says nothing about what a provider serves.
+        embedding_models: The subset of `models` the endpoint stamped with the
+            ``embedding`` operation (LM Studio and Cohere discovery do this; most
+            providers report generation only, so this is empty far more often than
+            `models` is). A separate field rather than replacing `models` — the ids stay
+            the flat list every existing caller expects, and this is additive evidence
+            for a caller that specifically wants to route embedding traffic.
         credential_key: Setup-field key this credential satisfies (``"api_key"``), or
             empty for endpoint evidence.
         credential_ref: The reference a configuration file should carry for that field —
@@ -100,6 +106,7 @@ class DiscoveredProvider:
     evidence: DiscoveryEvidence
     detail: str
     models: tuple[str, ...] = ()
+    embedding_models: tuple[str, ...] = ()
     credential_key: str = ""
     credential_ref: str = ""
 
@@ -110,7 +117,7 @@ def endpoint_candidates(registry: ProviderRegistry) -> tuple[tuple[str, ...], ..
     Returns:
         One entry per distinct endpoint, as ``(base_url, provider_id, provider_id, …)``
         in registry order. Several engines share a port — ``llamafile``, ``localai``,
-        ``ramalama`` and ``llama-swap`` all default to 8080 — so an address that answers
+        ``ramalama`` and ``llama-swap`` all default to 8080, so an address that answers
         cannot be attributed to one of them by probing alone, and grouping is how that
         stays visible instead of becoming a coin flip.
 
@@ -226,10 +233,7 @@ async def _probe_endpoints(
     if not candidates:
         return []
     results = await asyncio.gather(
-        *(
-            _probe_one(registry, group[0], group[1:], timeout_s, transports)
-            for group in candidates
-        )
+        *(_probe_one(registry, group[0], group[1:], timeout_s, transports) for group in candidates)
     )
     return [entry for entry in results if entry is not None]
 
@@ -245,7 +249,7 @@ async def _probe_one(
 
     Every failure is swallowed: a refused connection, a timeout, a wrong protocol behind
     the port, and a provider whose optional extra is missing all mean the same thing to a
-    user — that engine is not available here — and distinguishing them would turn a
+    user — that engine is not available here, and distinguishing them would turn a
     discovery summary into a diagnostics report.
     """
     from ..providers.base import ProviderConfig
@@ -281,6 +285,11 @@ async def _probe_one(
         # same as a usable provider — writing it into a configuration would produce a
         # target with nothing behind it.
         return None
+    embedding_ids = tuple(
+        str(getattr(model, "id", model))
+        for model in models
+        if _stamps_embedding(getattr(model, "capabilities", None))
+    )
     detail = f"{len(ids)} model{'s' if len(ids) != 1 else ''}"
     if len(provider_ids) > 1:
         others = ", ".join(provider_ids[1:])
@@ -291,7 +300,22 @@ async def _probe_one(
         evidence="endpoint",
         detail=detail,
         models=ids,
+        embedding_models=embedding_ids,
     )
+
+
+def _stamps_embedding(capabilities: Any) -> bool:
+    """Whether a discovered model's own capabilities declare the embedding operation.
+
+    Most discovery listings carry no operations field at all — `ModelCapabilities`
+    stays silent on what it does not know, which here means "not observed," not "not
+    supported." Only a listing that positively stamps `embedding` counts.
+    """
+    operations = getattr(capabilities, "operations", None)
+    value = getattr(operations, "value", None)
+    if not value:
+        return False
+    return "embedding" in value
 
 
 # ---- credentials -------------------------------------------------------------------
@@ -316,9 +340,7 @@ def _environment_evidence(
     return None
 
 
-def _vault_evidence(
-    descriptor: ProviderDescriptor, read: Any
-) -> DiscoveredProvider | None:
+def _vault_evidence(descriptor: ProviderDescriptor, read: Any) -> DiscoveredProvider | None:
     """Whether the OS vault holds a secret under a conventional identifier."""
     secret_fields = [f for f in descriptor.setup.fields if f.kind == "secret"]
     if not secret_fields:

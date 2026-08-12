@@ -1,7 +1,7 @@
 """The embeddable OpenAI-compatible sidecar frontend.
 
 A wire codec plus an ASGI app around a normal
-`AsyncClient` — never a second core. Importing the
+`AsyncClient`; never a second core. Importing the
 codec is free; the ASGI app requires the ``[serve]`` extra.
 """
 

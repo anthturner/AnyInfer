@@ -68,7 +68,7 @@ from .history import (
     compact_history,
 )
 from .pack import DEFAULT_CHUNK_TOKENS, Chunk, split_document
-from .rank import build_rank_cache, expand_query, rank, salience, tokenize
+from .rank import SemanticRanker, build_rank_cache, expand_query, rank, salience, tokenize
 from .select import (
     DEFAULT_MAX_BYTES,
     DEFAULT_MAX_DOCUMENTS,
@@ -117,6 +117,7 @@ __all__ = [
     "ReductionState",
     "RenderOrder",
     "SelectionOrder",
+    "SemanticRanker",
     "Strategy",
     "StrategyOutlook",
     "SupportsGenerate",

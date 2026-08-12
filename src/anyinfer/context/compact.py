@@ -5,7 +5,7 @@ Verbatim rendering answers "what does this file say?" and drops nothing. The gap
 them is wide, and a document that just misses the budget falls all the way through it.
 
 Compaction fills the gap. It removes what a model reading code for an answer does not need
-— comments, docstrings, license headers, and runs of blank lines — and keeps every line
+— comments, docstrings, license headers, and runs of blank lines, and keeps every line
 that does something. On real source that is a 25-40% saving at very little semantic cost.
 
 Only lines that are *entirely* a comment are removed. Stripping a trailing ``#`` or ``//``
@@ -204,7 +204,7 @@ def _opens_block(stripped: str, syntax: _Syntax) -> tuple[str, str] | None:
 def _collapse_blank_runs(lines: Sequence[str]) -> list[str]:
     """Reduce every run of blank lines to one, and trim the ends.
 
-    Blank lines are kept — one of them — rather than removed outright: they are how a
+    Blank lines are kept — one of them, rather than removed outright: they are how a
     reader (and a model) sees where one declaration ends and the next begins, and that
     structure is worth a byte per gap.
     """

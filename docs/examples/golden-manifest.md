@@ -10,13 +10,15 @@ from anyinfer.testing import ScriptedFailure, ScriptedModel
 
 
 def test_fallback_contract(anyinfer_client, anyinfer_scripted, anyinfer_golden_manifest):
-    provider = anyinfer_scripted([
-        ScriptedModel(
-            "primary",
-            failures=(ScriptedFailure(status=503, retry_after_s=0.0),),
-        ),
-        ScriptedModel("fallback", structured={"answer": "stable"}),
-    ])
+    provider = anyinfer_scripted(
+        [
+            ScriptedModel(
+                "primary",
+                failures=(ScriptedFailure(status=503, retry_after_s=0.0),),
+            ),
+            ScriptedModel("fallback", structured={"answer": "stable"}),
+        ]
+    )
     client = anyinfer_client(provider)
     result = client.generate(
         "answer",

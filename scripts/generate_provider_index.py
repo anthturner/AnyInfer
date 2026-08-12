@@ -38,6 +38,9 @@ ADAPTER_PAGES = {
     "m365-copilot": "m365-copilot.md",
     "openrouter": "openrouter.md",
     "ollama": "ollama.md",
+    "tei": "tei.md",
+    "voyage": "voyage.md",
+    "jina": "jina.md",
     "llama-cpp": "llama-cpp.md",
     "openai-compat": "openai-compat.md",
     "nebius": "nebius.md",
@@ -157,11 +160,7 @@ def render() -> str:
         if not (REPO_ROOT / "docs" / "providers" / page).is_file():
             raise RuntimeError(f"provider guide does not exist: docs/providers/{page}")
 
-    out = [
-        HEADER.format(
-            total=len(descriptors), adapters=len(adapters), presets=len(presets)
-        )
-    ]
+    out = [HEADER.format(total=len(descriptors), adapters=len(adapters), presets=len(presets))]
 
     for descriptor in adapters:
         page = ADAPTER_PAGES[descriptor.id]
@@ -169,8 +168,7 @@ def render() -> str:
         kind = "Local" if descriptor.locality == "local" else "Hosted"
         summary = ADAPTER_SUMMARIES.get(descriptor.id, "")
         out.append(
-            f"| {name} | {_targets(descriptor.id, descriptor.aliases)} | {kind} "
-            f"| {summary} |\n"
+            f"| {name} | {_targets(descriptor.id, descriptor.aliases)} | {kind} | {summary} |\n"
         )
 
     out.append(PRESET_INTRO)
@@ -208,6 +206,9 @@ ADAPTER_SUMMARIES = {
     "m365-copilot": "Microsoft 365 Copilot Chat, Entra auth",
     "openrouter": "Router across upstreams, discovered per-model pricing",
     "ollama": "Native API, grammar schemas, phase timings",
+    "tei": "Local embeddings and reranking; retrieval-only, one model per server",
+    "voyage": "Specialist embeddings and reranking; query/document intents",
+    "jina": "Specialist embeddings and reranking; full task vocabulary",
     "llama-cpp": "Supervised `llama-server`, loopback only",
     "openai-compat": "Any `/chat/completions` endpoint by URL",
     "nebius": "Verbose listing: discovered pricing, context and quantization",

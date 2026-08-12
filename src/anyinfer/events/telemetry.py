@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, cast
 
+from ..types.operations import InferenceOperation
 from ..types.requests import ResolvedTarget, Target
 from ..types.results import Diagnostic, ErrorInfo, Mechanism, Timing, Usage
 
@@ -47,20 +48,25 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True)
 class RequestStarted:
-    """A generation request entered the router.
+    """An inference request entered the router.
 
     Attributes:
         request_id: Correlation id shared by every event this request emits.
         targets: The fallback chain as requested, in the order the router will try it.
         metadata: Caller-supplied labels from the request, passed through untouched.
         prompt_text: The prompt text; ``None`` unless the receiving observer registered
-            with ``payloads=True``.
+            with ``payloads=True``. Generation only — embedding inputs and rerank
+            documents are never carried on events.
+        operation: Which inference operation this request is. Defaults to
+            ``"generation"`` so pre-existing consumers observe no change; the embed and
+            rerank dispatchers stamp their own value.
     """
 
     request_id: str
     targets: tuple[Target, ...]
     metadata: Mapping[str, str] = field(default_factory=dict)
     prompt_text: str | None = None
+    operation: InferenceOperation = "generation"
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,7 +321,7 @@ class ContextReduced:
         strategy: The strategy requested (``auto`` stays ``auto``), or ``history`` for a
             compacted conversation.
         representation: The strategy actually applied.
-        candidate_count: Documents — or messages — offered to the reducer.
+        candidate_count: Documents, or messages — offered to the reducer.
         selected_count: Documents represented at detail fidelity, or messages kept.
         omitted_count: Documents not represented in detail, or messages dropped.
         estimated_tokens: Planning-side estimate of the rendered envelope, or of the
@@ -440,7 +446,7 @@ class DownloadProgress:
     Attributes:
         artifact_id: The artifact or catalog variant being acquired.
         downloaded_bytes: Bytes present across every file, including bytes that were
-            already on disk before this run — so resuming reports the resumed position.
+            already on disk before this run, so resuming reports the resumed position.
         total_bytes: Total expected bytes, or ``None`` when a size is genuinely unknown.
         done: Whether the acquisition finished.
         phase: Which stage emitted this, when the acquisition engine supplied one.

@@ -29,6 +29,7 @@ class Recorder:
             case ai.RequestFailed(error=error):
                 log.warning("request failed: %s", error.detail)
 
+
 client = ai.Client(providers, observers=[Recorder()])
 # or later:
 client.subscribe(Recorder())
@@ -68,8 +69,8 @@ VRAM since yesterday. See [runtime diagnostics](capabilities.md#runtime-diagnost
 Prompt and response text are `None` unless an observer explicitly opts in:
 
 ```python
-client.subscribe(audit_log, payloads=True)     # sees prompt and response text
-client.subscribe(metrics)                      # never does
+client.subscribe(audit_log, payloads=True)  # sees prompt and response text
+client.subscribe(metrics)  # never does
 ```
 
 Stripping happens **per observer**, so one payload-consuming sink does not leak text to the
@@ -86,7 +87,7 @@ as a single request rather than three disconnected ones.
 ```python
 from anyinfer import otel
 
-otel.install(client)                        # spans and metrics, payload-free
+otel.install(client)  # spans and metrics, payload-free
 ```
 
 Requires the `[otel]` extra; nothing OTel-related is imported otherwise. What the bridge
@@ -102,15 +103,15 @@ than round-tripping through spans.
       optional bridge, not the contract itself.
     - Prompt and response payloads are off by default, per observer, so one consumer's
       opt-in never leaks text to another.
-    - Degradation is observable by design — `ParameterDropped` and `UsageEstimated` exist
+    - Degradation is observable by design: `ParameterDropped` and `UsageEstimated` exist
       so silent failures in comparable gateways can't happen here.
 
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
-- [The event stream](events.md) — the *other* event channel, for response content.
-- [Capabilities](capabilities.md) — why `ParameterDropped` exists.
+- [The event stream](events.md): the *other* event channel, for response content.
+- [Capabilities](capabilities.md): why `ParameterDropped` exists.
 - [How-to: observability](../guides/observability.md)
 
 </div>

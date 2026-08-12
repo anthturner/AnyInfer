@@ -71,7 +71,17 @@ All of these arrive with `discovered` provenance.
 Probes the model listing, then reports **which models are resident** — the difference
 between a fast request and a cold load on a local engine.
 
+### Embeddings (`POST /v1/embeddings`, verified 2026-08-12)
+- Endpoint availability verified against `lmstudio.ai/docs/app/api/endpoints/openai`
+  (listed alongside chat/completions/models); the request/response shape is the shared
+  OpenAI-compatible dialect (`providers/openai_compat_embeddings.py`). LM Studio's docs
+  state no limits or field details for it — nothing beyond the shared dialect is
+  assumed, and no static embedding capabilities are declared (the loaded model decides).
+- Which models embed is discovery's job: the native listing's `type: "embedding"`
+  entries carry the operation at `discovered` provenance.
+
 ## Watchlist
+- Embeddings: watch for documented request limits on /v1/embeddings.
 - **The native chat API** (`POST /api/v1/chat`) offers stateful threads via
   `previous_response_id`, model-load progress events, per-request `context_length`, and
   ephemeral MCP integrations. Not used today; generation stays on the compatible endpoint.

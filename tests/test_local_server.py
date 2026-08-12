@@ -22,7 +22,7 @@ from anyinfer.local.tuning import ServerPlan
 
 GIB = 1024**3
 
-FAKE_SERVER = '''
+FAKE_SERVER = """
 import http.server, sys, threading, time
 
 mode = "ok"
@@ -55,7 +55,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 print("server listening", flush=True)
 http.server.HTTPServer(("127.0.0.1", port), Handler).serve_forever()
-'''
+"""
 
 
 @pytest.fixture
@@ -69,8 +69,7 @@ def fake_binary(tmp_path: Path) -> Path:
         shim.write_text(f'@echo off\r\n"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
     else:
         shim = tmp_path / "llama-server"
-        shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n',
-                        encoding="utf-8")
+        shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
         shim.chmod(0o755)
     return shim
 
@@ -233,9 +232,7 @@ async def test_a_model_that_cannot_fit_is_refused_before_spawning(
     assert excinfo.value.hint is not None
 
 
-async def test_unknown_memory_does_not_block_admission(
-    fake_binary: Path, tmp_path: Path
-) -> None:
+async def test_unknown_memory_does_not_block_admission(fake_binary: Path, tmp_path: Path) -> None:
     """An unknown budget must not refuse a model that would have worked."""
     hardware = HardwareProfile(os_name="linux", arch="x86_64", total_ram_bytes=None)
     supervisor = ServerSupervisor(binary=fake_binary, hardware=hardware)
@@ -261,9 +258,7 @@ async def test_idle_server_is_collected(fake_binary: Path, tmp_path: Path) -> No
         await supervisor.aclose()
 
 
-async def test_an_active_stream_is_never_collected(
-    fake_binary: Path, tmp_path: Path
-) -> None:
+async def test_an_active_stream_is_never_collected(fake_binary: Path, tmp_path: Path) -> None:
     """A long generation with no *new* requests is not idle — the classic false-idle kill."""
     supervisor = ServerSupervisor(binary=fake_binary, idle_ttl_s=0.0)
     try:
@@ -276,9 +271,7 @@ async def test_an_active_stream_is_never_collected(
         await supervisor.aclose()
 
 
-async def test_persisted_server_survives_collection(
-    fake_binary: Path, tmp_path: Path
-) -> None:
+async def test_persisted_server_survives_collection(fake_binary: Path, tmp_path: Path) -> None:
     supervisor = ServerSupervisor(binary=fake_binary, idle_ttl_s=0.0)
     try:
         await supervisor.acquire("m", _model(tmp_path), _plan(), persist=True)
@@ -322,9 +315,7 @@ async def test_busy_servers_are_not_evicted(fake_binary: Path, tmp_path: Path) -
         await supervisor.aclose()
 
 
-async def test_managed_server_tracks_active_streams(
-    fake_binary: Path, tmp_path: Path
-) -> None:
+async def test_managed_server_tracks_active_streams(fake_binary: Path, tmp_path: Path) -> None:
     supervisor = ServerSupervisor(binary=fake_binary)
     try:
         managed = await supervisor.acquire("m", _model(tmp_path), _plan())

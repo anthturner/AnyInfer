@@ -2,7 +2,7 @@
 
 Used to stack several panels (Telemetry, Structured output, Providers) in one
 `QSplitter` where minimizing one gives the others more room, without
-fully hiding it the way the View menu's show/hide checkboxes do — collapsing here always
+fully hiding it the way the Sidebar menu's show/hide checkboxes do — collapsing here always
 leaves the header visible so the section can be restored with one click.
 """
 
@@ -132,9 +132,7 @@ class CollapsibleSection(QFrame):
 
     def _render_icon(self) -> None:
         if self._icon_label is not None and self._icon_name is not None:
-            self._icon_label.setPixmap(
-                themed_icon(self, self._icon_name, size=16).pixmap(16, 16)
-            )
+            self._icon_label.setPixmap(themed_icon(self, self._icon_name, size=16).pixmap(16, 16))
 
     def _update_toggle(self) -> None:
         """Sync the toggle's icon, tooltip, and accessible name to the current state.

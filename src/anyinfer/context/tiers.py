@@ -231,9 +231,7 @@ def reduce_tiered(
     )
 
 
-def _overflowing(
-    used_tokens: int, max_tokens: int, used_bytes: int, max_bytes: int
-) -> str | None:
+def _overflowing(used_tokens: int, max_tokens: int, used_bytes: int, max_bytes: int) -> str | None:
     """Which ceiling a prospective admission would breach, if any.
 
     Tokens are checked first here, matching the order this strategy has always reported

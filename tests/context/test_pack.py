@@ -64,9 +64,7 @@ def test_a_runt_tail_chunk_merges_backward():
     body = "a" * (DEFAULT_CHUNK_TOKENS * 3) + "\n" + "b" * 10
     document = ContextDocument.of("blob.txt", body)
     chunks = split_document(document, chunk_tokens=DEFAULT_CHUNK_TOKENS)
-    assert all(
-        len(chunk.text) >= MIN_CHUNK_TOKENS or chunk is chunks[-1] for chunk in chunks
-    )
+    assert all(len(chunk.text) >= MIN_CHUNK_TOKENS or chunk is chunks[-1] for chunk in chunks)
     assert "".join(chunk.text for chunk in chunks) == body
 
 
@@ -77,8 +75,7 @@ CORPUS = [
     ContextDocument.of(
         "src/auth/credentials.py",
         "\n\n".join(
-            f"def credential_helper_{i}():\n    return resolve_credential({i})"
-            for i in range(60)
+            f"def credential_helper_{i}():\n    return resolve_credential({i})" for i in range(60)
         ),
     ),
     ContextDocument.of(
@@ -94,9 +91,7 @@ def test_packing_selects_chunks_not_whole_documents():
     assert "<file-chunk" in reduction.text
     assert reduction.tier_metadata is not None
     assert reduction.tier_metadata["chunks_selected"] >= 1
-    assert reduction.tier_metadata["chunks_available"] > reduction.tier_metadata[
-        "chunks_selected"
-    ]
+    assert reduction.tier_metadata["chunks_available"] > reduction.tier_metadata["chunks_selected"]
 
 
 def test_chunk_blocks_carry_line_spans():
@@ -136,15 +131,14 @@ def test_relevant_chunks_outrank_irrelevant_ones():
 
 def test_packed_output_is_deterministic_under_corpus_reversal():
     forward = select(CORPUS, "credential", max_tokens=500, strategy="packed").text
-    backward = select(
-        list(reversed(CORPUS)), "credential", max_tokens=500, strategy="packed"
-    ).text
+    backward = select(list(reversed(CORPUS)), "credential", max_tokens=500, strategy="packed").text
     assert forward == backward
 
 
 def test_the_document_ceiling_counts_documents_not_chunks():
-    reduction = select(CORPUS, "credential", max_tokens=100_000, strategy="packed",
-                       max_documents=1)
+    reduction = select(
+        CORPUS, "credential", max_tokens=100_000, strategy="packed", max_documents=1
+    )
     paths = set(re.findall(r'<file-chunk path="([^"]+)"', reduction.text))
     assert len(paths) == 1
     assert "document count" in reduction.binding_constraints

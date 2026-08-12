@@ -268,7 +268,7 @@ class ModelEntry:
         """The artifact id of this model's headline GGUF variant, when there is one.
 
         "Headline" means the quantization the entry's own memory estimates describe — the
-        rung a browsing user is being shown — not the highest rung in the repository.
+        rung a browsing user is being shown; not the highest rung in the repository.
         Picking the largest would quietly hand someone a Q8_0 download after they read a
         Q4_K_M size.
         """

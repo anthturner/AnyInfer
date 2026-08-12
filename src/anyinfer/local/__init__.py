@@ -3,7 +3,7 @@
 Nine cooperating pieces that turn "run this model locally" into something a novice can do:
 
 - `anyinfer.local.hardware` — what this machine has, advisory and cached.
-- `anyinfer.local.backends` — which llama.cpp runtime variants are installed.
+- `anyinfer.local.backends`, which llama.cpp runtime variants are installed.
 - `anyinfer.local.runtimes` — fetching and validating those runtime variants.
 - `anyinfer.local.tuning` — hardware + posture → concrete server flags.
 - `anyinfer.local.fit` — catalog entry + hardware → will it run, and why.
@@ -13,7 +13,7 @@ Nine cooperating pieces that turn "run this model locally" into something a novi
   finding them again.
 - `anyinfer.local.server` — supervised llama-server processes, loopback only.
 - `anyinfer.local.recommend` — hardware → catalog tier.
-- `anyinfer.local.discovery` — which providers this machine can already use.
+- `anyinfer.local.discovery`, which providers this machine can already use.
 
 Model acquisition lives here, never in a provider adapter: adapters translate protocol, and
 fetching forty gigabytes is not protocol translation.
@@ -30,6 +30,14 @@ from .acquire import (
     plan_acquisition,
 )
 from .artifacts import GgufArtifact, GgufFile
+from .attestation import (
+    ATTESTATION_CACHE_BYPASS_ENV,
+    ATTESTATION_CACHE_REFRESH_ENV,
+    ConfidentialExecutionStatus,
+    CpuTeeKind,
+    confidential_execution_status,
+)
+from .attestation import cache_path as attestation_cache_path
 from .backends import BACKEND_RANK, Backend, available_backends, select_backend
 from .discovery import (
     KEYRING_IDENTIFIER_SUFFIX,
@@ -60,6 +68,8 @@ from .hardware import (
     detect,
     probe_signature,
 )
+from .metrics import ResourceSample, StorageProfile, SystemSampler, storage_profile
+from .provenance import ModelManifest, hash_model_weights, verify_model_manifest
 from .recommend import Recommendation, Tier, TierSource, recommend_alias
 from .runtimes import (
     InstallReport,
@@ -98,6 +108,8 @@ from .variants import VariantChoice, VariantPrefs, evaluate_variants, select_var
 
 __all__ = [
     "ALLOWED_LICENSES",
+    "ATTESTATION_CACHE_BYPASS_ENV",
+    "ATTESTATION_CACHE_REFRESH_ENV",
     "BACKEND_RANK",
     "CACHE_BYPASS_ENV",
     "CACHE_REFRESH_ENV",
@@ -111,6 +123,8 @@ __all__ = [
     "AcquisitionProgress",
     "AcquisitionReport",
     "Backend",
+    "ConfidentialExecutionStatus",
+    "CpuTeeKind",
     "DiscoveredProvider",
     "DiscoveryEvidence",
     "DownloadReport",
@@ -122,6 +136,7 @@ __all__ = [
     "LifecycleCallback",
     "ManagedServer",
     "ModelFit",
+    "ModelManifest",
     "ModelStore",
     "Posture",
     "ProgressCallback",
@@ -131,6 +146,7 @@ __all__ = [
     "RemovalReport",
     "ResolvedArtifact",
     "ResolvedModel",
+    "ResourceSample",
     "RuntimeArtifact",
     "RuntimeManifest",
     "RuntimeTable",
@@ -140,7 +156,9 @@ __all__ = [
     "SizedEntry",
     "SourceRef",
     "SourceResolver",
+    "StorageProfile",
     "StoreEntry",
+    "SystemSampler",
     "Tier",
     "TierSource",
     "TuningInputs",
@@ -150,10 +168,12 @@ __all__ = [
     "acquire_sync",
     "allocate_port",
     "artifact_paths",
+    "attestation_cache_path",
     "available_backends",
     "cache_path",
     "check_cuda_preconditions",
     "classify_fit",
+    "confidential_execution_status",
     "default_model_dir",
     "default_runtime_kind",
     "detect",
@@ -161,6 +181,7 @@ __all__ = [
     "download_artifact",
     "endpoint_candidates",
     "evaluate_variants",
+    "hash_model_weights",
     "install_hint",
     "install_runtime",
     "installed_runtimes",
@@ -179,5 +200,7 @@ __all__ = [
     "select_backend",
     "select_variant",
     "sort_by_fit",
+    "storage_profile",
     "verify_file",
+    "verify_model_manifest",
 ]

@@ -1,7 +1,7 @@
 """Conversation persistence: one JSON file per conversation, no secrets or raw payloads.
 
 A `Conversation` stores the messages that make up the transcript plus a *summary* of
-each generation result — target, timing, usage, finish reason — never the provider's raw
+each generation result — target, timing, usage, finish reason; never the provider's raw
 response body. That keeps the on-disk format small, diffable, and safe to share.
 """
 
@@ -208,17 +208,21 @@ class Conversation:
         return "\n".join(lines)
 
 
-_FLUFF_WORDS = frozenset(
+def _word_set(words: str) -> frozenset[str]:
+    return frozenset(words.split())
+
+
+_FLUFF_WORDS = _word_set(
     "please can could would you kindly hey hi hello i we want need like to me my "
-    "help just maybe some".split()
+    "help just maybe some"
 )
 """Leading filler that carries no topic. 'Build' and 'Spec' survive; 'please can you'
 does not."""
 
-_STOP_WORDS = frozenset(
+_STOP_WORDS = _word_set(
     "a an the that this those these i we you it is are was be been being of in on at "
     "for with and or so then them they my your our me can could should would will "
-    "do does did have has had there here what which who how why when".split()
+    "do does did have has had there here what which who how why when"
 )
 """Grammar words dropped from the middle of a gist."""
 
@@ -287,21 +291,20 @@ def _part_to_json(part: ContentPart) -> dict[str, Any]:
         # picker can own a separate asset store; silently embedding binary request data in
         # conversation JSON would violate the existing persistence contract.
         return {"kind": "attachment_omitted", "media_type": part.media_type}
-    assert isinstance(part, ToolResult)
-    return {
-        "kind": "tool_result",
-        "call_id": part.call_id,
-        "content": part.content,
-        "is_error": part.is_error,
-    }
+    if isinstance(part, ToolResult):
+        return {
+            "kind": "tool_result",
+            "call_id": part.call_id,
+            "content": part.content,
+            "is_error": part.is_error,
+        }
+    raise TypeError(f"unsupported conversation content part: {type(part).__name__}")
 
 
 def _message_from_json(data: Mapping[str, Any]) -> Message:
     raw_role = data.get("role")
     role: Role = raw_role if raw_role in ("system", "user", "assistant", "tool") else "user"
-    parts = tuple(
-        _part_from_json(p) for p in data.get("content", []) if isinstance(p, Mapping)
-    )
+    parts = tuple(_part_from_json(p) for p in data.get("content", []) if isinstance(p, Mapping))
     return Message(role=role, content=parts)
 
 

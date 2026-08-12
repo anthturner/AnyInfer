@@ -97,8 +97,8 @@ The core depends on only `httpx2` and `jsonschema`; everything else is an extra.
   It includes the HTTP frontend and built-in dependency-free adapters. Integrations that
   require an optional provider SDK, such as GitHub Copilot or Entra authentication, should
   install the Python distribution with the corresponding extra.
-- On 32-bit Windows (x86) there is no standalone demo bundle — PySide6 publishes no
-  32-bit Qt builds — but the library wheel itself is pure Python and runs there fine.
+- On 32-bit Windows (x86) there is no standalone demo bundle: PySide6 publishes no
+  32-bit Qt builds, but the library wheel itself is pure Python and runs there fine.
 
 ## Previous releases and checksums
 

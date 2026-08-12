@@ -229,8 +229,7 @@ def _shingles(content: str, size: int) -> frozenset[int]:
     if len(tokens) <= size:
         return frozenset({_hash64(" ".join(tokens))})
     return frozenset(
-        _hash64(" ".join(tokens[index : index + size]))
-        for index in range(len(tokens) - size + 1)
+        _hash64(" ".join(tokens[index : index + size])) for index in range(len(tokens) - size + 1)
     )
 
 
@@ -254,9 +253,7 @@ signs the same way in every process and on every platform."""
 def _signature(prints: Iterable[int]) -> tuple[int, ...]:
     """Reduce a shingle set to its MinHash signature."""
     values = list(prints)
-    return tuple(
-        min((a * value + b) % _PRIME for value in values) for a, b in _PERMUTATIONS
-    )
+    return tuple(min((a * value + b) % _PRIME for value in values) for a, b in _PERMUTATIONS)
 
 
 def _candidate_pairs(signatures: Mapping[str, tuple[int, ...]]) -> list[tuple[str, str]]:

@@ -38,9 +38,7 @@ JSONRPC_VERSION = "2.0"
 PROTOCOL_VERSION = "2025-06-18"
 """MCP revision AnyInfer asks for. Recorded in ``contracts/mcp.md``."""
 
-ACCEPTED_PROTOCOL_VERSIONS: frozenset[str] = frozenset(
-    {"2025-06-18", "2025-03-26", "2024-11-05"}
-)
+ACCEPTED_PROTOCOL_VERSIONS: frozenset[str] = frozenset({"2025-06-18", "2025-03-26", "2024-11-05"})
 """Revisions AnyInfer will speak if a server answers with one of them.
 
 A server that answers with anything else fails loudly. Proceeding on an unrecognized
@@ -142,16 +140,17 @@ def read_result(message: Mapping[str, Any]) -> Mapping[str, Any]:
     if "error" in message:
         error = message["error"]
         if isinstance(error, Mapping):
-            code = int(error.get("code", 0))
+            code = error.get("code")
+            error_message = error.get("message")
+            if isinstance(code, bool) or not isinstance(code, int) or not isinstance(
+                error_message, str
+            ):
+                raise ToolLoopError("an MCP server sent a malformed JSON-RPC error object")
             raise JSONRPCError(
                 code,
-                str(error.get("message", "")),
+                error_message,
                 error.get("data"),
-                hint=(
-                    "the server does not expose a tool surface"
-                    if code == -32601
-                    else None
-                ),
+                hint=("the server does not expose a tool surface" if code == -32601 else None),
             )
         raise ToolLoopError("an MCP server sent a malformed JSON-RPC error object")
 
@@ -165,7 +164,7 @@ def initialize_params(client_version: str) -> dict[str, Any]:
     """Build the ``initialize`` params.
 
     Capabilities are deliberately empty. AnyInfer implements none of the client-side
-    features a capability would claim — sampling, roots, elicitation — and advertising one
+    features a capability would claim — sampling, roots, elicitation, and advertising one
     it does not honour is how a server ends up waiting on a request that never comes.
     """
     return {
@@ -181,7 +180,8 @@ def read_initialize(result: Mapping[str, Any]) -> ServerInfo:
     Raises:
         ToolLoopError: If the server answered with a revision this client does not speak.
     """
-    negotiated = str(result.get("protocolVersion", ""))
+    negotiated_raw = result.get("protocolVersion")
+    negotiated = negotiated_raw if isinstance(negotiated_raw, str) else ""
     if negotiated not in ACCEPTED_PROTOCOL_VERSIONS:
         accepted = ", ".join(sorted(ACCEPTED_PROTOCOL_VERSIONS))
         raise ToolLoopError(

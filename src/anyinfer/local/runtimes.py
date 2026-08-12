@@ -9,7 +9,7 @@ itself.
 An installed variant is a directory under the runtime root holding the build plus a
 ``runtime.json`` manifest. The manifest is what makes "are the CUDA extensions installed?"
 answerable without guessing from a directory name: it records the architecture, the backend,
-the pinned build id, and the executable — and a manifest that fails any of those checks means
+the pinned build id, and the executable, and a manifest that fails any of those checks means
 the variant simply does not exist. Advisory, never raising, exactly like hardware detection.
 """
 
@@ -486,7 +486,7 @@ def install_runtime(
                 "this machine does not meet the CUDA runtime's requirements: "
                 + "; ".join(blocking),
                 hint=(
-                    "install the Vulkan runtime instead — it drives NVIDIA GPUs too — or "
+                    "install the Vulkan runtime instead — it drives NVIDIA GPUs too, or "
                     "pass force=True if you are certain"
                 ),
             )
@@ -679,5 +679,3 @@ def install_hint(hardware: HardwareProfile | None, table: RuntimeTable | None = 
             "CUDA runtime gives better throughput and can be installed explicitly"
         )
     return f"install the {kind} runtime{size}"
-
-

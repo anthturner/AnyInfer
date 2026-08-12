@@ -80,7 +80,9 @@ def test_project_without_the_table_declares_full_support(tmp_path: Path) -> None
 # ---- the command ---------------------------------------------------------------------
 
 
-def test_presets_are_refused_with_a_pointer_to_their_own_process(capsys: pytest.CaptureFixture[str]) -> None:
+def test_presets_are_refused_with_a_pointer_to_their_own_process(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     code = main(["conform", "groq", "--model", "whatever"])
 
     captured = capsys.readouterr()

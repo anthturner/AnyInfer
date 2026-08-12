@@ -132,13 +132,13 @@ def dropped_parameters(
     """Find requested parameters this target will not honor.
 
     Two sources, because a parameter can go unhonored for two different reasons. The
-    *provider* may accept and discard it — declared on the descriptor — or this particular
+    *provider* may accept and discard it — declared on the descriptor, or this particular
     *model* may not have the feature at all, which only the assembled capabilities know.
 
     Returns ``(parameter, reason)`` pairs so the caller can emit one
     `ParameterDropped` event per parameter. A parameter
     that is accepted and ignored is the worst failure mode available — it looks exactly
-    like success — so it is surfaced rather than tolerated.
+    like success, so it is surfaced rather than tolerated.
     """
     dropped: list[tuple[str, str]] = []
     if request.reasoning is not None and not _model_takes_reasoning(request, capabilities):

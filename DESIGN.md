@@ -51,13 +51,18 @@ requests in, typed event streams or validated results out, across cloud and loca
 10. **Context engineering tied to dispatch.** Token budgets, cost ranges, deterministic
     reduction, and bounded distillation use the same provenance-tagged target capabilities as
     pre-dispatch gating and context-overflow routing; omissions and uncertainty stay visible.
+11. **Stateless embedding and reranking as first-class operations.** `EmbeddingRequest →
+    EmbeddingResult` and `RerankRequest → RerankResult` receive the same batteries as
+    generation — typed async APIs and a sync facade, target resolution and routing,
+    retries and health gating, capability provenance, usage/pricing/telemetry, and fake/
+    cassette/live conformance — without becoming a vector database or a retrieval
+    framework (see §28).
 
 ### Non-goals (v1)
 - **No daemon in the core.** The core is a library; nothing listens on a socket by default.
-  However, an **OpenAI-compatible loopback serve frontend** (`anyinfer.serve`, `[serve]`
-  extra) is an explicitly *architecture-guaranteed* future module — see §22 and ADR-009.
-  v1 core ships without it; the invariants that make it a thin projection are enforced
-  from M0.
+  The implemented **OpenAI-compatible loopback serve frontend** (`anyinfer.serve`, `[serve]`
+  extra) is an optional frontend over that library — see §22 and ADR-009. Its wire-codec
+  boundary and the invariants that keep it a thin projection are enforced in tests.
 - **Not an agent framework.** A tool-execution loop is provided (late in v1), but no planning,
   memory, or multi-agent constructs. *Clarified:*
   `anyinfer.context.distill` is a bounded, deterministic map/reduce fan-out — fixed
@@ -90,10 +95,15 @@ requests in, typed event streams or validated results out, across cloud and loca
   boundary as pacing-informed routing and is a reversal to argue. Non-OpenAI operations
   exposed by the sidecar live under `/v1/anyinfer/*`; they remain projections over public
   client APIs, never a second policy layer.
-- **No embeddings, image generation, audio output, or fine-tuning APIs.** Generation still
-  produces text and tool calls only. Multimodal *inputs* — images, documents, and audio
-  content attached to a generation request — are implemented as typed message parts; they
-  do not introduce a second inference primitive or any multimodal output API.
+- **No image generation, audio output, or fine-tuning APIs.** Generation still produces text
+  and tool calls only. Multimodal *inputs* — images, documents, and audio content attached to
+  a generation request — are implemented as typed message parts; they do not introduce a
+  second inference primitive or any multimodal output API. *Amended (§28):* embeddings and
+  reranking are no longer excluded — they are stateless inference operations distinct from
+  generation, scoped narrowly to text in the first release. AnyInfer remains an inference
+  layer, never a vector database, corpus store, or retrieval framework: it produces vectors
+  and relevance rankings and does not decide what an application indexes, persists,
+  retrieves, or deletes.
 - **No cross-provider continuation of interrupted streams.** A continuation would need to
   replay a provider's partial assistant output into another target without duplicating or
   revising it. The feasibility gate was rechecked on **2026-08-10** and required verified
@@ -204,9 +214,11 @@ accepted via duck-typed `model_json_schema()`).
 
 Role = Literal["system", "user", "assistant", "tool"]
 
+
 @dataclass(frozen=True, slots=True)
 class Text:
     text: str
+
 
 @dataclass(frozen=True, slots=True)
 class ToolCall:
@@ -214,18 +226,22 @@ class ToolCall:
     name: str
     arguments: Mapping[str, Any]
 
+
 @dataclass(frozen=True, slots=True)
 class ToolResult:
     call_id: str
     content: str
     is_error: bool = False
 
+
 ContentPart = Text | ToolCall | ToolResult | ImagePart | DocumentPart | AudioPart
+
 
 @dataclass(frozen=True, slots=True)
 class Message:
     role: Role
     content: tuple[ContentPart, ...]
+
 
 @dataclass(frozen=True, slots=True)
 class Sampling:
@@ -234,17 +250,19 @@ class Sampling:
     max_output_tokens: int | None = None
     stop: tuple[str, ...] = ()
 
-ReasoningEffort = Literal["minimal", "low", "medium", "high"]   # normalized; adapters translate
+
+ReasoningEffort = Literal["minimal", "low", "medium", "high"]  # normalized; adapters translate
+
 
 @dataclass(frozen=True, slots=True)
 class GenerationRequest:
     messages: tuple[Message, ...]
-    schema: SchemaSpec | None = None          # structured-output contract
+    schema: SchemaSpec | None = None  # structured-output contract
     tools: tuple[ToolSpec, ...] = ()
     sampling: Sampling = Sampling()
     reasoning: ReasoningEffort | None = None
     timeout_s: float | None = None
-    max_response_bytes: int = 1 << 20         # hard cap on a single response body
+    max_response_bytes: int = 1 << 20  # hard cap on a single response body
     provider_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     # ^ escape hatch, namespaced by provider id: {"ollama": {"keep_alive": "10m"}}
     #   Never consulted by the core; passed verbatim to the matching adapter only.
@@ -253,14 +271,15 @@ class GenerationRequest:
 **Targets** name where a request goes. Three spellings, one resolution path:
 
 ```python
-Target = str            # "anthropic:claude-sonnet-5" | "ollama:qwen3:8b" | alias "medium"
-                        # engine aliases normalize: "claude:..." → "anthropic:..."
+Target = str  # "anthropic:claude-sonnet-5" | "ollama:qwen3:8b" | alias "medium"
+# engine aliases normalize: "claude:..." → "anthropic:..."
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedTarget:
     provider_id: str
-    model: str            # may be the sentinel "auto" (Copilot) — see §7
-    via_alias: str | None # "medium" if resolved through the catalog
+    model: str  # may be the sentinel "auto" (Copilot) — see §7
+    via_alias: str | None  # "medium" if resolved through the catalog
 ```
 
 **Results:**
@@ -274,15 +293,17 @@ class Usage:
     cache_read_tokens: int | None = None
     cache_write_tokens: int | None = None
     reasoning_tokens: int | None = None
-    cost_usd: Decimal | None = None          # computed from pricing metadata when known
+    cost_usd: Decimal | None = None  # computed from pricing metadata when known
+
 
 @dataclass(frozen=True, slots=True)
 class Timing:
     started_at: float
-    first_token_ms: float | None             # TTFT, measured centrally at first visible delta
+    first_token_ms: float | None  # TTFT, measured centrally at first visible delta
     total_ms: float
     output_tokens_per_s: float | None
     phases: Mapping[str, float] = field(default_factory=dict)  # e.g. ollama model_load_ms
+
 
 @dataclass(frozen=True, slots=True)
 class AttemptRecord:
@@ -291,20 +312,21 @@ class AttemptRecord:
     error: ErrorInfo | None
     timing: Timing | None
 
+
 @dataclass(frozen=True, slots=True)
 class Generation:
     text: str
-    structured: Any | None                   # present iff request.schema; already validated
+    structured: Any | None  # present iff request.schema; already validated
     tool_calls: tuple[ToolCall, ...]
-    target: ResolvedTarget                   # what actually served it (post-fallback)
+    target: ResolvedTarget  # what actually served it (post-fallback)
     finish_reason: Literal["stop", "length", "tool_calls", "content_filter", "other"]
     usage: Usage
     timing: Timing
     structured_mechanism: Literal["grammar", "json_schema", "json_mode", "prompt"] | None
     repair_attempts: int
-    attempts: tuple[AttemptRecord, ...]      # full routing trail
+    attempts: tuple[AttemptRecord, ...]  # full routing trail
     warnings: tuple[str, ...]
-    raw: Any | None                          # provider payload escape hatch (opt-in retention)
+    raw: Any | None  # provider payload escape hatch (opt-in retention)
 ```
 
 ## 6. Streaming event model
@@ -314,22 +336,52 @@ the final result" (ADR-001).
 
 ```python
 @dataclass(frozen=True, slots=True)
-class TextDelta:        text: str
-@dataclass(frozen=True, slots=True)
-class ReasoningDelta:   text: str
-@dataclass(frozen=True, slots=True)
-class ToolCallDelta:    call_id: str; name: str | None; arguments_fragment: str
-@dataclass(frozen=True, slots=True)
-class UsageUpdate:      usage: Usage
-@dataclass(frozen=True, slots=True)
-class TimingMark:       name: Literal["first_token", "attempt_start", ...]; at_ms: float
-@dataclass(frozen=True, slots=True)
-class AttemptFailed:    record: AttemptRecord      # emitted before a retry/fallback
-@dataclass(frozen=True, slots=True)
-class StreamEnded:      result: Generation
+class TextDelta:
+    text: str
 
-StreamEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate \
-            | TimingMark | AttemptFailed | StreamEnded
+
+@dataclass(frozen=True, slots=True)
+class ReasoningDelta:
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCallDelta:
+    call_id: str
+    name: str | None
+    arguments_fragment: str
+
+
+@dataclass(frozen=True, slots=True)
+class UsageUpdate:
+    usage: Usage
+
+
+@dataclass(frozen=True, slots=True)
+class TimingMark:
+    name: Literal["first_token", "attempt_start", ...]
+    at_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptFailed:
+    record: AttemptRecord  # emitted before a retry/fallback
+
+
+@dataclass(frozen=True, slots=True)
+class StreamEnded:
+    result: Generation
+
+
+StreamEvent = (
+    TextDelta
+    | ReasoningDelta
+    | ToolCallDelta
+    | UsageUpdate
+    | TimingMark
+    | AttemptFailed
+    | StreamEnded
+)
 ```
 
 Consumption patterns this must serve:
@@ -348,14 +400,23 @@ events. Providers without streaming (or when the transport refuses) degrade to a
 ```python
 Provenance = Literal["catalog", "discovered", "probed", "default"]
 
+
 @dataclass(frozen=True, slots=True)
 class Sourced(Generic[T]):
     value: T
     provenance: Provenance
 
+
 class Feature(Flag):
-    STREAMING = auto(); JSON_SCHEMA = auto(); GRAMMAR = auto(); JSON_MODE = auto()
-    TOOLS = auto(); REASONING = auto(); SYSTEM_PROMPT = auto(); CACHE_USAGE = auto()
+    STREAMING = auto()
+    JSON_SCHEMA = auto()
+    GRAMMAR = auto()
+    JSON_MODE = auto()
+    TOOLS = auto()
+    REASONING = auto()
+    SYSTEM_PROMPT = auto()
+    CACHE_USAGE = auto()
+
 
 @dataclass(frozen=True, slots=True)
 class ModelCapabilities:
@@ -363,8 +424,8 @@ class ModelCapabilities:
     max_output_tokens: Sourced[int] | None
     features: Sourced[Feature]
     pricing: Sourced[Pricing] | None
-    local: LocalModelInfo | None    # artifact size, quantization, est. RAM/VRAM,
-                                    # observed VRAM residency
+    local: LocalModelInfo | None  # artifact size, quantization, est. RAM/VRAM,
+    # observed VRAM residency
 ```
 
 Assembly is layered, later layers overriding earlier, every field provenance-tagged:
@@ -391,7 +452,7 @@ class ProviderAdapter(Protocol):
     descriptor: ClassVar[ProviderDescriptor]
 
     async def list_models(self) -> Sequence[DiscoveredModel]: ...
-    async def health(self) -> Health: ...          # cheap readiness probe; router consults
+    async def health(self) -> Health: ...  # cheap readiness probe; router consults
     def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]: ...
     async def aclose(self) -> None: ...
 ```
@@ -409,20 +470,20 @@ class ProviderAdapter(Protocol):
 ```python
 @dataclass(frozen=True, slots=True)
 class ProviderDescriptor:
-    id: str                             # "anthropic"
-    aliases: tuple[str, ...]            # ("claude",)
+    id: str  # "anthropic"
+    aliases: tuple[str, ...]  # ("claude",)
     display_name: str
     factory: AdapterFactory
     locality: Literal["hosted", "local"]
     default_base_url: str | None
     requires_base_url: bool
-    setup: ProviderSetupSpec            # declarative fields → app UIs need no engine branches
+    setup: ProviderSetupSpec  # declarative fields → app UIs need no engine branches
     reasoning_translator: ReasoningTranslator
-    static_capabilities: Mapping[str, ModelCapabilities]   # catalog layer seed
+    static_capabilities: Mapping[str, ModelCapabilities]  # catalog layer seed
     token_calibration: TokenCalibration = TokenCalibration()  # envelope this provider bills for
-    max_repair_attempts: int | None = None                    # ceiling on schema-repair round trips
+    max_repair_attempts: int | None = None  # ceiling on schema-repair round trips
     supports_sessions: bool = False
-    reports_diagnostics: bool = False                         # adapter implements diagnostics()
+    reports_diagnostics: bool = False  # adapter implements diagnostics()
 ```
 
 Registration: built-ins pre-registered; third parties via entry points
@@ -442,6 +503,14 @@ id/alias rejection at registration).
 | `copilot` | `github-copilot-sdk` (extra) | `auto` sentinel; session resume; usage from events |
 | `m365-copilot` | httpx2 + interactive Entra | interactive-auth-only — degraded headless story, documented |
 | `llama-cpp` | supervised `llama-server`, openai-compat dialect | see §12; loopback only |
+| `gemini` | httpx2, native `generateContent` | thinking levels, discovered windows |
+| `deepseek` | httpx2, chat completions | separate reasoning channel and cache accounting |
+| `xai` | httpx2, chat completions | provider-reported cost and discovered pricing |
+| `vertex` | httpx2, native `generateContent` | project-scoped GCP auth and addressing |
+| `bedrock` | httpx2, Converse + event stream | SigV4/API-key auth and binary stream framing |
+| `cohere` | httpx2, native v2 chat | grounded generation and thinking channel |
+| `lm-studio` | httpx2, native discovery + chat | quantization and residency discovery |
+| `nebius` | httpx2, chat completions | live pricing, context, and quantization discovery |
 
 ## 9. Structured output
 
@@ -488,14 +557,15 @@ All `detail` strings pass the redaction registry before construction.
 @dataclass(frozen=True, slots=True)
 class Retry:
     max_attempts: int = 2
-    backoff_base_s: float = 0.5          # exponential, honors retry_after when larger
-    retry_on: Callable[[ProviderError], bool] | None = None   # default: e.retryable
+    backoff_base_s: float = 0.5  # exponential, honors retry_after when larger
+    retry_on: Callable[[ProviderError], bool] | None = None  # default: e.retryable
+
 
 @dataclass(frozen=True, slots=True)
 class Route:
-    targets: tuple[Target, ...]          # ordered fallback chain
+    targets: tuple[Target, ...]  # ordered fallback chain
     retry: Retry = Retry()
-    health_gate: bool = True             # skip targets whose health() failed recently
+    health_gate: bool = True  # skip targets whose health() failed recently
     on_fallback: Literal["same_request", "revalidate_capabilities"] = "same_request"
 ```
 
@@ -666,7 +736,7 @@ through the existing overlay machinery, with no resolver changes.
 import anyinfer as ai
 
 # --- one-liner, alias target, sync ---
-client = ai.Client()                       # default registry, bundled catalog
+client = ai.Client()  # default registry, bundled catalog
 result = client.generate("Summarize:\n" + text, target="medium")
 print(result.text, result.usage.output_tokens, result.timing.first_token_ms)
 
@@ -674,15 +744,18 @@ print(result.text, result.usage.output_tokens, result.timing.first_token_ms)
 with client.stream(messages, target="ollama:qwen3:8b") as stream:
     for ev in stream:
         match ev:
-            case ai.TextDelta(text=t): print(t, end="", flush=True)
-    final = stream.result                    # Generation
+            case ai.TextDelta(text=t):
+                print(t, end="", flush=True)
+    final = stream.result  # Generation
 
 # --- structured contract with repair ---
 result = client.generate(
-    messages, target="copilot:auto",
-    schema=ANSWER_SCHEMA, repair=ai.Repair(max_attempts=1),
+    messages,
+    target="copilot:auto",
+    schema=ANSWER_SCHEMA,
+    repair=ai.Repair(max_attempts=1),
 )
-answer = result.structured                   # validated against ANSWER_SCHEMA
+answer = result.structured  # validated against ANSWER_SCHEMA
 
 # --- fallback chain + retries (router) ---
 route = ai.Route(
@@ -690,7 +763,8 @@ route = ai.Route(
     retry=ai.Retry(max_attempts=3),
 )
 result = client.generate(messages, route=route)
-for a in result.attempts: print(a.target, a.outcome)
+for a in result.attempts:
+    print(a.target, a.outcome)
 
 # --- instrumented benchmarking ---
 async with ai.AsyncClient(observers=[metrics_writer]) as ac:
@@ -705,21 +779,26 @@ for m in client.models("openrouter"):
     print(m.id, m.capabilities.context_window, m.capabilities.pricing)
 
 # --- local inference, hardware-aware ---
-hw = ai.local.detect()                      # cached HardwareProfile
-alias = ai.local.recommend_alias(hw)        # e.g. "large" on a 24 GB GPU
-result = client.generate(prompt, target=alias)   # llama-cpp: download → tune → serve → answer
+hw = ai.local.detect()  # cached HardwareProfile
+alias = ai.local.recommend_alias(hw)  # e.g. "large" on a 24 GB GPU
+result = client.generate(prompt, target=alias)  # llama-cpp: download → tune → serve → answer
 
-# --- tool loop (late v1) ---
+
+# --- bounded tool loop ---
 @ai.tool
 def read_file(path: str) -> str:
     """Read a project file."""
     ...
-result = client.run_tools(messages, tools=[read_file],
-                          target="anthropic:claude-sonnet-5", max_rounds=8)
+
+
+result = client.run_tools(
+    messages, tools=[read_file], target="anthropic:claude-sonnet-5", max_rounds=8
+)
 
 # --- provider escape hatch ---
-result = client.generate(messages, target="ollama:qwen3:8b",
-                         provider_options={"ollama": {"keep_alive": "10m"}})
+result = client.generate(
+    messages, target="ollama:qwen3:8b", provider_options={"ollama": {"keep_alive": "10m"}}
+)
 ```
 
 ## 18. Package layout
@@ -737,24 +816,25 @@ src/anyinfer/
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
   session.py             # the session handle
-  benchmark.py           # throughput measurement + caller-owned store
+  benchmark.py           # throughput measurement, live samples + caller-owned store
   verification.py        # the end-to-end target probe
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
-  local/                 # hardware.py backends.py runtimes.py runtimes.json tuning.py
-                         # services.py engine-managed model pulls
-                         # fit.py variants.py artifacts.py downloads.py
+  local/                 # hardware.py metrics.py backends.py runtimes.py runtimes.json tuning.py
+                         # services.py discovery.py fit.py variants.py artifacts.py downloads.py
                          # acquire.py store.py sources/ server.py recommend.py
   providers/             # base.py sse.py openai_compat.py openai.py anthropic.py
                          # ollama.py openrouter.py azure_foundry.py copilot.py
-                         # m365_copilot.py llama_cpp.py
+                         # m365_copilot.py llama_cpp.py gemini.py deepseek.py xai.py
+                         # vertex.py bedrock.py cohere.py lm_studio.py nebius.py presets.py
   context/               # corpus reduction: documents.py rank.py structure.py
                          # envelope.py select.py tiers.py pack.py distill.py
                          # settings.py dedup.py compact.py history.py
-  testing/               # conformance.py fakes.py cassettes.py
-  cli.py                 # run, verify, benchmark, doctor, providers, models, runtime,
-                         # context, sidecar
+  mcp/                   # protocol.py transport.py toolset.py
+  testing/               # conformance.py scripted.py fakes.py cassettes.py plugin.py
+  cli.py                 # init, agents-md, run, verify, benchmark, doctor, providers,
+                         # models, runtime, context, mcp, conform, serve
   serve/                 # openai_codec.py app.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
@@ -762,11 +842,12 @@ contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§2
 docs/                    # provider guides, published site sources (§25)
 ```
 
-**Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]` github-copilot-sdk ·
-`[azure]` azure-identity(+broker) · `[keyring]` keyring · `[otel]` opentelemetry-api ·
-`[local]` download/tuning helpers (llama-server binaries fetched at runtime, never pip deps) ·
-`[serve]` ASGI server deps for the OpenAI-compatible frontend (§22) ·
-`[all]`. Missing-extra errors raise `ConfigError` with an install hint.
+**Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]`
+github-copilot-sdk · `[azure]` azure-identity · `[vertex]` cryptography · `[keyring]`
+keyring · `[otel]` opentelemetry-api · `[serve]` ASGI server deps · `[demo]` PySide6 and
+Markdown · `[mcp]` an explicit dependency-free feature marker · `[all]`. The complete local
+subsystem is core; llama-server binaries and model weights are runtime-fetched, never pip
+dependencies. Missing-extra errors raise `ConfigError` with an install hint.
 
 ## 19. MVP scope and roadmap
 
@@ -809,12 +890,15 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    keep_alive).~~ *Resolved:* `client.session(target)` returns an opaque,
    target-bound handle threaded through `generate()`/`stream()`; it never changes an answer,
    and the three capable providers each exploit it differently behind one shape.
-3. **Cancellation semantics** across the sync facade (KeyboardInterrupt → loop-thread task
-   cancellation → httpx2 stream close → llama-server survival). Must be specified in M0.
+3. ~~**Cancellation semantics** across the sync facade.~~ *Resolved:* an interrupt cancels
+   the loop-thread future, early stream exit closes the async iterator, and facade shutdown
+   cancels outstanding tasks with bounded waits. Dedicated tests cover early exit and thread
+   stress; supervised local servers survive request cancellation.
 4. **Default catalog contents and update cadence** — which models, who bumps them, does a
    catalog update constitute a library release? (Risk R6.)
-5. **M365 Copilot headless story** — interactive-only auth may make it conformance-exempt for
-   CI; degraded-mode contract TBD in M3.
+5. ~~**M365 Copilot headless story.**~~ *Resolved as a documented degraded mode:* auth is
+   interactive-only, the adapter is exempt from credentialed headless live runs, and its
+   fixed capability surface is covered offline.
 6. ~~**Ollama GPU-spill warning + observed-VRAM checks** — capability layer or
    Ollama-adapter warnings?~~ *Resolved:* adapter-reported runtime
    diagnostics, declared on the descriptor and surfaced on `Generation.warnings` plus a
@@ -823,7 +907,8 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 ## 21. Risks and complexity traps
 
 - **R1 — sync facade correctness** (streaming iterators, cancellation, thread affinity).
-  Mitigate: specify in M0, test under KeyboardInterrupt and thread stress from day one.
+  Mitigated by the background-loop ownership rules, bounded cancellation, early-exit tests,
+  and thread-stress coverage; retain those as release gates.
 - **R2 — multi-provider conformance drift**, now across seventeen dedicated adapters plus a
   preset registry. Mitigate: cassette CI + nightly live runs; the matrix doc is the source
   of truth for "native vs emulated vs unsupported", and presets are covered by
@@ -861,6 +946,14 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 - **R7 — Copilot `auto` sentinel** breaking "model is a known string" assumptions —
   conjunction-of-capabilities rule (§7) must be enforced in the capability assembler, not
   ad hoc per caller.
+- **R10 — Embedding-space mismatch and retrieval-scope creep** (§28). A silently-wrong
+  fallback embedding target is a correctness failure disguised as a success, worse than an
+  ordinary provider error because nothing in the response signals it (ADR-018's whole
+  reason to exist). Mitigate: same-target-only retries by default, refuse-before-send on
+  unknown equivalence, conformance tests asserting the refusal. Separately, "batteries
+  included" pressure will keep inviting a built-in vector database; the boundary in §28 and
+  the scale ceiling in `plans/VECTOR_STORE_ADDON.md` §2 exist to keep that pressure from
+  quietly expanding the core's product definition.
 
 ## 22. Serve frontend: OpenAI-compatible loopback federation
 
@@ -894,8 +987,9 @@ frontend is a wire codec plus an ASGI app around an `AsyncClient`.
   `GenerationRequest` fields; `temperature`/`top_p`/`max_tokens`/`stop` → `Sampling`;
   unrecognized extra-body fields → `provider_options` passthrough (namespaced), so OpenAI
   clients keep the escape hatch. Usage blocks and `finish_reason` come from `Generation`.
-- Out of scope for the frontend: endpoints AnyInfer itself doesn't model (embeddings, images,
-  audio, files) return 404 with a clear error body.
+- Out of scope for the frontend: endpoints AnyInfer itself doesn't model (images, audio,
+  files) return 404 with a clear error body. `POST /v1/embeddings` and
+  `POST /v1/anyinfer/rerank` are modeled endpoints as of §28 — see that section.
 
 **Invariants enforced from M0 so this stays a thin projection (conformance-tested):**
 1. `GenerationRequest` remains a **superset** of the OpenAI chat-completions request surface
@@ -1188,6 +1282,51 @@ projector artifact. Image generation, speech output, transcription endpoints, em
 and fine-tuning remain non-goals.
 
 
+### ADR-017 — Embedding and reranking are operation-typed, not a `ProviderAdapter` superset
+
+**Decision.** Generation, embedding, and reranking are three separately typed operations. The
+provider contract splits into a lifecycle every adapter implements (`list_models`, `health`,
+`aclose`) plus operation protocols an adapter opts into individually: `GeneratesText.generate`,
+`EmbedsText.embed`, `ReranksText.rerank`. A descriptor declares which operations its adapter
+supports; the registry validates the built object actually satisfies each declared protocol.
+One adapter instance and one connection pool may serve several operations when a single
+provider offers more than one; a retrieval-only provider needs no dummy `generate()`.
+`GenerationRequest` never grows embedding or rerank fields — each operation keeps its own
+request/result types, sharing only genuinely operation-neutral shapes (`ResolvedTarget`, the
+shape of `Usage`, `AttemptRecord`). **Why.** `ProviderAdapter` as originally specified
+requires every provider to generate text, which cannot represent a retrieval-only runtime
+(a hosted reranker, a TEI deployment) without a dummy method that lies about what the
+provider does. Folding embedding/rerank fields into `GenerationRequest` would also make the
+core's most central type a union of unrelated inference shapes, which ADR-003's "adapters
+only translate" discipline exists specifically to prevent generation code from becoming.
+**Consequences.** Model discovery must stop filtering out embedding-only and rerank-only
+models as "not chat models." Capability assembly gains per-operation capability records
+(`EmbeddingCapabilities`, `RerankCapabilities`) beside `ModelCapabilities`, both provenance-
+tagged on the same terms as §7. Third-party entry-point discovery, scaffolding, and
+certification must validate declared-vs-implemented protocols per operation rather than
+assuming every registered provider can generate.
+
+### ADR-018 — Embedding-space identity gates cross-target fallback
+
+**Decision.** Every embedding result carries an `EmbeddingSpace` (provider, model, revision
+when pinned, dimensions, input-intent sensitivity, normalization, and an optional caller-
+asserted compatibility id). Embedding routes retry on the same resolved target only by
+default; cross-target fallback is refused unless both targets share a trusted compatibility
+id or the caller explicitly opts into an unsafe fallback, which is recorded on the result and
+in telemetry. When equivalence is unknown, the request fails before a fallback is sent, with
+an actionable hint — the core never guesses that two models are interchangeable. Reranking
+gets ordinary fallback (there is no persisted "index" to invalidate), but scores from
+separate attempts are never merged or compared. **Why.** A query embedded with a fallback
+model produces numbers that look exactly as plausible as the primary model's, and will
+silently fail to find anything in an index built against the primary model's space. That
+failure mode is worse than an ordinary provider error because nothing about the response
+signals it went wrong — routing safety here has to be a refusal, not a warning.
+**Consequences.** `capabilities/pricing.json`-style bundled data cannot assert cross-provider
+embedding equivalence; only an application-supplied `compatibility_id` can. Batching must
+preserve one embedding space per request (a split request's batches all target the same
+resolved target). The context-reduction ranker boundary (ADR-011) may accept an embedding-
+backed ranker built on this guarantee once §9's `ER.6.9` decision is exercised.
+
 ## 24. Provider conformance test matrix (draft)
 
 **Contract snapshots and drift checking.** Each provider's exact wire dependencies
@@ -1273,9 +1412,9 @@ versioned docs (mike) so published SDK versions keep matching docs; docs build i
 
 1. **Quickstart** — install to first `generate()` in under five minutes; the three-line
    sync example, then streaming, then an alias target.
-2. **Installation matrix** — extras (`[copilot]`, `[azure]`, `[keyring]`, `[otel]`,
-   `[local]`, `[serve]`, `[all]`), Python/OS support, and the serve-binary download table
-   for users who want no Python at all.
+2. **Installation matrix** — extras (`[copilot]`, `[azure]`, `[vertex]`, `[keyring]`,
+   `[otel]`, `[mcp]`, `[serve]`, `[demo]`, `[all]`), Python/OS support, the core local
+   subsystem, and the serve-binary download table for users who want no Python at all.
 3. **Choosing an integration path** — decision page: embed the SDK (sync or async) vs run
    the `anyinfer-serve` binary and point existing OpenAI clients at it; latency, deployment,
    and capability trade-offs of each.
@@ -1448,3 +1587,48 @@ an arena with any failed candidate reports its aggregate usage as unknown rather
 summing only successful candidates into a falsely authoritative total. Calls, successful
 candidate usage, and attempt trails remain visible; provider invoices remain authoritative
 for failed-attempt billing.
+
+## 28. Embedding and reranking operations (`EmbeddingRequest`/`RerankRequest`)
+
+*Amends §2 goal 11 and the multimodal non-goal.* Full implementation plan:
+[plans/EMBEDDING_RERANKING_CONTINUATION.md](plans/EMBEDDING_RERANKING_CONTINUATION.md).
+
+Embeddings and reranking are stateless inference operations, typed and routed on the same
+terms as generation (ADR-017) but never folded into `GenerationRequest`. `EmbeddingRequest`
+carries non-empty ordered text inputs, an optional input intent (`query`/`document`/
+`classification`/`clustering`), optional requested dimensionality, and an optional
+`expected_space` contract; `EmbeddingResult` returns vectors in input order alongside the
+concrete `EmbeddingSpace` that produced them. `RerankRequest` carries a query and a
+caller-owned ordered document collection (opaque ids, unique per request); `RerankResult`
+preserves original index and document id on every ranked item so a malformed provider
+response can never be silently attributed to the wrong document.
+
+**Batching is core policy, never adapter behavior** (extending ADR-003): a `BatchPolicy`
+bounds concurrency and whether splitting is allowed at all; splitting only occurs from a
+discovered, cataloged, probed, or override limit — an unknown limit means one bounded
+request, never a guessed provider maximum. Embedding batch failure is all-or-error: a
+partial internal-batch failure never becomes an `EmbeddingResult` missing vectors. Reranking
+is not naively batched and concatenated, because scores from separate document batches are
+not assumed globally comparable (ADR-018) unless a provider documents otherwise.
+
+**Retrieval-infrastructure boundary.** AnyInfer produces vectors and rankings; it does not
+persist them, build an index, crawl a corpus, or decide what an application sends to a model.
+A small, separately-packaged, single-process vector store may exist as an optional add-on
+built entirely on these public types (tracked in
+[plans/VECTOR_STORE_ADDON.md](plans/VECTOR_STORE_ADDON.md)), explicitly scoped to
+personal/prototype-sized corpora and never marketed as a scalable or clustered vector
+database — that remains a deployment the application brings, fed by this operation layer the
+same way any other consumer is.
+
+**Sidecar.** `POST /v1/embeddings` is a shared OpenAI-compatible codec, implemented
+alongside (not inside) the chat-completions codec, over `AsyncClient.embed`. Reranking has no
+established OpenAI-shaped wire dialect, so the sidecar exposes an AnyInfer-native
+`POST /v1/anyinfer/rerank` route rather than emulating a specific vendor's rerank endpoint.
+Both inherit the existing loopback-only, redaction, and payload-privacy rules (§12, §14) and
+add request-size limits suited to large document/vector payloads. Both remain thin wire
+codecs over public client APIs, never a second policy layer, on the same terms ADR-009
+establishes for chat completions.
+
+**Context reduction boundary unchanged.** `anyinfer.context.select()` may accept a caller-
+supplied semantic ranker built on `embed()`, but its default stays lexical and offline
+(ADR-011); nothing here makes an embedding provider a hidden dependency of context reduction.

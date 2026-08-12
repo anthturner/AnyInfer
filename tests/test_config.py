@@ -81,6 +81,7 @@ def test_demo_owned_fields_and_disabled_providers_are_compatible() -> None:
                 "system_prompt": "demo only",
                 "theme": "dark",
                 "context_window_tokens": 8192,
+                "ignore_runtime_hardware_constraints": True,
             }
         )
     )
@@ -288,6 +289,29 @@ def test_the_limits_block_must_be_an_object() -> None:
         ai.loads_config(json.dumps({"providers": [{"id": "openai", "limits": [4]}]}))
 
 
+@pytest.mark.parametrize(
+    "server",
+    [
+        {"name": 7, "command": ["tool-server"]},
+        {"name": "tools", "command": ["tool-server"], "env": {"TOKEN": 7}},
+        {
+            "name": "tools",
+            "url": "https://tools.invalid/mcp",
+            "headers": {"authorization": ["token"]},
+        },
+        {"name": "tools", "command": ["tool-server"], "timeout_s": 0},
+    ],
+)
+def test_mcp_config_rejects_values_it_cannot_preserve(server: dict[str, object]) -> None:
+    with pytest.raises(ai.ConfigError):
+        ai.loads_config(json.dumps({"mcp": [server]}))
+
+
+def test_a_named_arena_cannot_be_null() -> None:
+    with pytest.raises(ai.ConfigError, match=r"arenas\.review must be an object"):
+        ai.loads_config(json.dumps({"arenas": {"review": None}}))
+
+
 # ---- writing the format ----------------------------------------------------------------
 
 
@@ -308,6 +332,14 @@ ROUND_TRIP_DOCUMENTS: list[dict[str, object]] = [
             },
         ],
         "default_route": ["openai:gpt-5", "work-azure:gpt-4o"],
+    },
+    {
+        "providers": [{"id": "cohere", "api_key": "env://CO_API_KEY"}],
+        "default_route": ["cohere:command-a-03-2025"],
+        "operation_routes": {
+            "embedding": ["cohere:embed-v4.0"],
+            "rerank": ["cohere:rerank-v3.5"],
+        },
     },
     {"providers": [{"id": "ollama", "base_url": "http://127.0.0.1:11434", "limits": {}}]},
     {"history": {}},
@@ -356,7 +388,9 @@ def test_a_comment_is_written_as_json_the_loader_accepts() -> None:
     from anyinfer.config import COMMENT_KEY
 
     text = ai.dumps_config(ai.AnyInferConfig(), comments=True)
-    assert "safe to commit" in json.loads(text)[COMMENT_KEY]
+    comment = json.loads(text)[COMMENT_KEY]
+    assert "review literal credentials" in comment
+    assert "safe to commit" not in comment
     assert ai.loads_config(text) == ai.AnyInferConfig()
 
 
@@ -385,3 +419,26 @@ def test_a_value_json_cannot_hold_is_refused_rather_than_mangled() -> None:
     settings = ai.ProviderSettings.of("openai", options={"callback": object()})
     with pytest.raises(ai.ConfigError, match="cannot be written as JSON"):
         ai.dumps_config(ai.AnyInferConfig(providers=(settings,)))
+
+
+def test_operation_routes_parse_into_routes() -> None:
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "providers": [{"id": "cohere", "api_key": "env://CO_API_KEY"}],
+                "operation_routes": {"embedding": ["cohere:embed-v4.0"]},
+            }
+        )
+    )
+    assert config.operation_routes["embedding"].targets == ("cohere:embed-v4.0",)
+    assert "rerank" not in config.operation_routes
+
+
+def test_operation_routes_reject_generation_key() -> None:
+    with pytest.raises(ai.ConfigError, match="unknown operation 'generation'"):
+        ai.loads_config(json.dumps({"operation_routes": {"generation": ["openai:gpt-5"]}}))
+
+
+def test_operation_routes_reject_empty_target_list() -> None:
+    with pytest.raises(ai.ConfigError, match="non-empty list"):
+        ai.loads_config(json.dumps({"operation_routes": {"embedding": []}}))

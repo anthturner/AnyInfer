@@ -22,8 +22,8 @@ flowchart LR
 Three forms ship in v1:
 
 ```python
-ai.ProviderSettings.of("openai", api_key="sk-literal-value")            # literal
-ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY")        # environment
+ai.ProviderSettings.of("openai", api_key="sk-literal-value")  # literal
+ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY")  # environment
 ai.ProviderSettings.of("openai", api_key="credential://system/openai")  # OS keyring
 ```
 
@@ -81,15 +81,16 @@ class VaultResolver:
         return reference.startswith("vault://")
 
     def resolve(self, reference: str) -> str:
-        return my_vault.read(reference[len("vault://"):])
+        return my_vault.read(reference[len("vault://") :])
+
 
 chain = ai.default_resolver()
-chain.add(VaultResolver())          # takes precedence over the built-ins
+chain.add(VaultResolver())  # takes precedence over the built-ins
 
 client = ai.Client(providers, resolver=chain)
 ```
 
-The *chain* registers resolved secrets for redaction, not the individual resolvers — so a
+The *chain* registers resolved secrets for redaction, not the individual resolvers, so a
 third-party resolver cannot forget to.
 
 ## Backend credentials never transit the sidecar
@@ -111,6 +112,6 @@ pointed at the frontend never sees, sends, or needs them.
 <div class="anyinfer-see-also" markdown>
 
 - [How-to: store credentials in the OS keyring](../guides/credentials.md)
-- [Telemetry](telemetry.md) — payload privacy, the other half of the security posture.
+- [Telemetry](telemetry.md): payload privacy, the other half of the security posture.
 
 </div>

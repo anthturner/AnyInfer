@@ -5,7 +5,7 @@ icon: material/format-list-bulleted
 # Every provider
 
 This is AnyInfer's compatibility inventory, not its primary value proposition:
-**103 providers** comprising 17 dedicated adapters with provider-specific
+**106 providers** comprising 20 dedicated adapters with provider-specific
 behavior and 86 presets over the shared OpenAI-compatible adapter. Each is a
 first-class target prefix: `groq:`, `vllm:`, `bedrock:`.
 
@@ -41,6 +41,7 @@ own adapter and guide.
 | [GitHub Copilot](copilot.md) | `copilot:` / `github-copilot:` | Hosted | GitHub Copilot subscription; auth delegated to the Copilot CLI |
 | [DeepSeek](deepseek.md) | `deepseek:` | Hosted | Separate reasoning channel, split cache accounting |
 | [Google Gemini](gemini.md) | `gemini:` / `google:` / `google-gemini:` / `ai-studio:` | Hosted | Native `generateContent`, thinking levels, discovered windows |
+| [Jina AI](jina.md) | `jina:` / `jinaai:` | Hosted | Specialist embeddings and reranking; full task vocabulary |
 | [llama.cpp (supervised llama-server)](llama-cpp.md) | `llama-cpp:` / `llamacpp:` / `llama:` | Local | Supervised `llama-server`, loopback only |
 | [LM Studio](lm-studio.md) | `lm-studio:` / `lmstudio:` | Local | Native discovery: context, quantization, residency |
 | [Microsoft 365 Copilot](m365-copilot.md) | `m365-copilot:` / `m365:` | Hosted | Microsoft 365 Copilot Chat, Entra auth |
@@ -49,7 +50,9 @@ own adapter and guide.
 | [OpenAI](openai.md) | `openai:` | Hosted | Responses API, reasoning-token accounting |
 | [OpenAI-compatible endpoint](openai-compat.md) | `openai-compat:` / `openai-compatible:` / `oai-compat:` | Hosted | Any `/chat/completions` endpoint by URL |
 | [OpenRouter](openrouter.md) | `openrouter:` | Hosted | Router across upstreams, discovered per-model pricing |
+| [Text Embeddings Inference](tei.md) | `tei:` / `text-embeddings-inference:` | Local | Local embeddings and reranking; retrieval-only, one model per server |
 | [Google Vertex AI](vertex.md) | `vertex:` / `vertex-ai:` / `google-vertex:` | Hosted | Gemini with GCP auth; project-scoped addressing |
+| [Voyage AI](voyage.md) | `voyage:` / `voyageai:` | Hosted | Specialist embeddings and reranking; query/document intents |
 | [xAI (Grok)](xai.md) | `xai:` / `grok:` | Hosted | Provider-reported cost, discovered pricing |
 
 ## Presets

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anyinfer-shared"
+version = "0.1.0"
+description = "Types shared across AnyInfer's optional add-on packages that do not belong in core."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Anthony Turner", email = "github@anthturner.com" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+# Deliberately dependency-free: this package holds plain frozen dataclasses composed by
+# other packages, never orchestration or I/O. It does not depend on `anyinfer` core either
+# — callers that need core types import them from `anyinfer` directly and compose.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/anthturner/AnyInfer"
+Documentation = "https://anyinfer.dev/"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anyinfer_shared"]
+
+[tool.ruff]
+line-length = 99
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D", "S101"]
+ignore = ["D203", "D213", "D401", "D107", "RUF012", "RUF009"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "S101"]

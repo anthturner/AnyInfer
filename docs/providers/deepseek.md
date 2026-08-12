@@ -22,9 +22,11 @@ automatic and split.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of("deepseek", api_key="env://DEEPSEEK_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("deepseek", api_key="env://DEEPSEEK_API_KEY"),
+    ]
+)
 
 result = client.generate(prompt, target="deepseek:deepseek-v4-pro")
 ```
@@ -66,7 +68,7 @@ client.generate(
 
 !!! warning "Sampling is ignored while thinking"
 
-    DeepSeek silently discards `temperature` and `top_p` in thinking mode — which is the
+    DeepSeek silently discards `temperature` and `top_p` in thinking mode, which is the
     default. AnyInfer declares both as ignored, so setting one raises a
     `ParameterDropped` telemetry event instead of quietly doing nothing.
 
@@ -77,8 +79,8 @@ the split, and cache hits bill at a much lower rate:
 
 ```python
 result = client.generate(long_prompt, target="deepseek:deepseek-v4-flash")
-print(result.usage.input_tokens)        # hits + misses
-print(result.usage.cache_read_tokens)   # the part that was cheap
+print(result.usage.input_tokens)  # hits + misses
+print(result.usage.cache_read_tokens)  # the part that was cheap
 ```
 
 !!! note "Cost is a ceiling here"
@@ -108,6 +110,6 @@ behavior — the reasoning channel and cache accounting above are only wired the
 <div class="anyinfer-see-also" markdown>
 
 - [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/deepseek.md)
-- [Presets](presets.md) — other OpenAI-compatible providers serving DeepSeek models.
+- [Presets](presets.md): other OpenAI-compatible providers serving DeepSeek models.
 
 </div>

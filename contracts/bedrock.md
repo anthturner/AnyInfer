@@ -1,7 +1,10 @@
 # bedrock — Protocol Contract
 
-Status: **implemented** — `providers/bedrock.py`, the Converse API.
-Last verified: 2026-08-07 — against live AWS documentation (sources below).
+Status: **implemented** — `providers/bedrock.py`, the Converse API for generation;
+Titan Text Embeddings V2 via `InvokeModel` for embeddings (implemented 2026-08-12 —
+Converse has no embeddings surface at all).
+Last verified: 2026-08-12 — generation section against 2026-08-07 live documentation;
+embeddings section fetched live 2026-08-12.
 
 ## Upstream sources
 - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html
@@ -18,6 +21,12 @@ Last verified: 2026-08-07 — against live AWS documentation (sources below).
 - https://docs.aws.amazon.com/bedrock/latest/userguide/inference-reasoning.html
 - https://aws.amazon.com/bedrock/pricing/
 - https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json
+- https://docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html
+  (embeddings, fetched live 2026-08-12)
+- https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-titan-embed-text.html
+  (embeddings request/response shape, fetched live 2026-08-12)
+- https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html
+  (InvokeModel URI/headers, fetched live 2026-08-12)
 
 ## Why Converse, not InvokeModel
 
@@ -115,6 +124,50 @@ reports no tokens at all.
 Deliberately not a network call: every runtime endpoint costs a generation, and the
 control plane may be denied by policy even when inference works. Health reports whether
 credentials are present.
+
+## Embeddings (verified live 2026-08-12)
+
+Bedrock has **no embeddings surface on Converse at all** — every embedding model goes
+through the older, per-model `InvokeModel` action, so `BedrockAdapter.embed()` is
+entirely separate machinery, reusing only the SigV4/bearer-key auth headers and the
+`_quote_model` path helper.
+
+### Endpoint
+`POST {base}/model/{modelId}/invoke`, `content-type: application/json`,
+`accept: application/json` — same base host and auth as generation, just a different
+action name and no `/converse` suffix.
+
+### Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`) — scoped and implemented
+Request:
+```json
+{"inputText": "string", "dimensions": 1024, "normalize": true, "embeddingTypes": ["float"]}
+```
+`inputText` required; `dimensions` accepts `1024` (default), `512`, or `256`; `normalize`
+defaults `true`; `embeddingTypes` defaults `["float"]`. **Exactly one `inputText` per
+call — there is no batch field**, confirmed by the request schema having no array
+variant. The adapter declares `max_batch_inputs=1` and issues one `InvokeModel` call per
+input, summing `inputTextTokenCount` across calls into `Usage.input_tokens`.
+
+Response:
+```json
+{"embedding": [0.1, ...], "inputTextTokenCount": 12, "embeddingsByType": {"float": [...]}}
+```
+`embedding` is read directly; `embeddingsByType` is not consumed (the adapter never sets
+`embeddingTypes`, so the response always carries `float` in both fields identically).
+
+Limits: 8,192 max input tokens, 50,000 max input characters (whichever binds first — only
+the token ceiling is representable in `EmbeddingCapabilities`). No `task_type`/intent
+concept in the request schema — `input_intents=()`.
+
+### Scoped out, recorded rather than guessed
+- **Cohere Embed on Bedrock** (`cohere.embed-english-v3`, `cohere.embed-multilingual-v3`):
+  the plan's own note records the expected shape (`{"texts": [...], "input_type": ...}`,
+  batch-capable) but this session could not fetch
+  docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-cohere-embed.html — the
+  fetch tool returned no content. **Not implemented**; do not assume the recorded shape
+  is current without a fresh live fetch.
+- **Bedrock's separate Rerank action** (agent-runtime, not runtime) — different host and
+  action entirely; unresearched.
 
 ## Watchlist
 - **The OpenAI-compat endpoints.** `bedrock-mantle.{region}.api.aws/v1` (recommended,

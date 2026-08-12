@@ -39,9 +39,7 @@ def _in_a_temporary_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.chdir(tmp_path)
 
 
-def _fake_discovery(
-    monkeypatch: pytest.MonkeyPatch, found: Sequence[DiscoveredProvider]
-) -> None:
+def _fake_discovery(monkeypatch: pytest.MonkeyPatch, found: Sequence[DiscoveredProvider]) -> None:
     """Pin what discovery reports, and prove nothing is contacted."""
 
     async def discover(*_args: object, **_kwargs: object) -> tuple[DiscoveredProvider, ...]:
@@ -104,6 +102,45 @@ def test_a_running_engine_becomes_a_configured_provider(
 
     out = capsys.readouterr().out
     assert "found      ollama at http://127.0.0.1:11434 (2 models)" in out
+    assert config.operation_routes == {}
+
+
+def _running_engine_with_embeddings() -> DiscoveredProvider:
+    return DiscoveredProvider(
+        provider_id="lm-studio",
+        base_url="http://127.0.0.1:1234/v1",
+        evidence="endpoint",
+        detail="2 models",
+        models=("qwen3-8b", "nomic-embed"),
+        embedding_models=("nomic-embed",),
+    )
+
+
+def test_a_stamped_embedding_model_writes_an_operation_route(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Discovery that positively tagged an embedding model earns its own default route."""
+    _fake_discovery(monkeypatch, [_running_engine_with_embeddings()])
+
+    assert main(["init", "--yes"]) == 0
+
+    config = load_config("anyinfer.json")
+    assert config.operation_routes["embedding"].targets == ("lm-studio:nomic-embed",)
+
+    out = capsys.readouterr().out
+    assert "embedding  lm-studio:nomic-embed (from what was discovered)" in out
+
+
+def test_no_stamped_embedding_model_writes_no_operation_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No provider stamped operations — writing a route nobody verified would be a guess."""
+    _fake_discovery(monkeypatch, [_running_engine()])
+
+    assert main(["init", "--yes"]) == 0
+
+    config = load_config("anyinfer.json")
+    assert config.operation_routes == {}
 
 
 def test_a_route_never_names_a_model_the_engine_does_not_serve(
@@ -277,8 +314,9 @@ def test_the_summary_names_every_endpoint_it_contacted(
 # ---- machine-readable output -------------------------------------------------------
 
 
-def test_json_output_reports_the_same_decisions(monkeypatch: pytest.MonkeyPatch,
-                                                capsys: pytest.CaptureFixture[str]) -> None:
+def test_json_output_reports_the_same_decisions(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     _fake_discovery(monkeypatch, [_running_engine(), _environment_key()])
 
     assert main(["init", "--yes", "--json"]) == 0
@@ -347,9 +385,7 @@ def test_the_generated_starter_runs_against_a_scripted_provider(
     registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
     provider = ScriptedProvider("acme", [ScriptedModel("m", text="Hello there.")])
     provider.register(registry)
-    with ai.Client(
-        [provider.settings()], registry=registry, use_default_catalog=False
-    ) as client:
+    with ai.Client([provider.settings()], registry=registry, use_default_catalog=False) as client:
         assert module.run(client, provider.target("m")) == "Hello there."
 
 

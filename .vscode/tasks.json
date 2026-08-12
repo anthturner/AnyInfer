@@ -3,21 +3,24 @@
   "tasks": [
     {
       // Creates .venv and installs the dev environment on folder open, and is a no-op
-      // once .venv exists. VSCode asks once to allow automatic tasks ("Manage Automatic
-      // Tasks" to change). Also runnable by hand: Terminal > Run Task > Bootstrap venv.
+      // once the venv and its dev tools exist. VS Code asks once to allow automatic tasks
+      // ("Manage Automatic Tasks" to change). Also runnable by hand: Terminal > Run Task
+      // > Bootstrap venv.
       "label": "Bootstrap venv",
       "type": "shell",
       "windows": {
-        "command": "if (-not (Test-Path .venv)) { py -3.11 -m venv .venv; .venv\\Scripts\\python.exe workspace.py setup }",
+        "command": "if (-not (Test-Path -LiteralPath '.venv\\Scripts\\python.exe' -PathType Leaf)) { if (Get-Command py -ErrorAction SilentlyContinue) { py -3 -m venv .venv } else { python -m venv .venv }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }; if ((-not (Test-Path -LiteralPath '.venv\\Scripts\\ruff.exe' -PathType Leaf)) -or (-not (Test-Path -LiteralPath '.venv\\Scripts\\anyinfer.exe' -PathType Leaf))) { & .\\.venv\\Scripts\\python.exe workspace.py setup; exit $LASTEXITCODE }",
         "options": {
           "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] }
         }
       },
       "linux": {
-        "command": "test -d .venv || (python3.11 -m venv .venv && .venv/bin/python workspace.py setup)"
+        "command": "if [ ! -x .venv/bin/python ]; then python3 -m venv .venv || exit; fi; if [ ! -x .venv/bin/ruff ] || [ ! -x .venv/bin/anyinfer ]; then .venv/bin/python workspace.py setup; fi",
+        "options": { "shell": { "executable": "/bin/sh", "args": ["-c"] } }
       },
       "osx": {
-        "command": "test -d .venv || (python3.11 -m venv .venv && .venv/bin/python workspace.py setup)"
+        "command": "if [ ! -x .venv/bin/python ]; then python3 -m venv .venv || exit; fi; if [ ! -x .venv/bin/ruff ] || [ ! -x .venv/bin/anyinfer ]; then .venv/bin/python workspace.py setup; fi",
+        "options": { "shell": { "executable": "/bin/sh", "args": ["-c"] } }
       },
       "runOptions": { "runOn": "folderOpen" },
       "presentation": {
@@ -31,13 +34,15 @@
       "label": "workspace check",
       "type": "shell",
       "windows": {
-        "command": ".venv\\Scripts\\python.exe workspace.py check",
+        "command": "& .\\.venv\\Scripts\\python.exe workspace.py check",
         "options": {
           "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] }
         }
       },
       "linux": { "command": ".venv/bin/python workspace.py check" },
       "osx": { "command": ".venv/bin/python workspace.py check" },
+      "dependsOn": "Bootstrap venv",
+      "dependsOrder": "sequence",
       "group": { "kind": "test", "isDefault": true },
       "problemMatcher": []
     }

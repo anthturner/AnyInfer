@@ -25,7 +25,7 @@ def test_every_api_entry_resolves_against_the_real_package():
         for entry in topic.api:
             try:
                 resolve_api(entry)
-            except Exception:  # noqa: BLE001 — collected for one readable failure
+            except Exception:
                 stale.append(f"{topic.key}: anyinfer.{entry}")
     assert stale == []
 
@@ -45,9 +45,7 @@ def test_every_topic_is_fully_written():
         assert topic.title, topic.key
         assert len(topic.summary) > 80, topic.key
         assert topic.api, topic.key
-        assert any(marker in topic.snippet for marker in ("client", "anyinfer", "ai.")), (
-            topic.key
-        )
+        assert any(marker in topic.snippet for marker in ("client", "anyinfer", "ai.")), topic.key
 
 
 def test_library_map_lists_uncovered():
@@ -84,6 +82,7 @@ class TestHelpWidgets:
         for topic in TOPICS.values():
             dialog = SdkHelpDialog(topic)
             assert topic.title in dialog.windowTitle()
+            assert dialog.minimumWidth() == 756
             assert dialog._snippet.toPlainText() == topic.snippet
             dialog.close()
 

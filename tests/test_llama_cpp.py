@@ -20,6 +20,7 @@ from anyinfer.catalog.model import Catalog
 from anyinfer.errors import ConfigError, LocalRuntimeError
 from anyinfer.local.hardware import Accelerator, HardwareProfile
 from anyinfer.local.server import ManagedServer, ServerHandle
+from anyinfer.local.store import ModelStore, StoreEntry
 from anyinfer.local.tuning import ServerPlan
 from anyinfer.providers.llama_cpp import LlamaCppAdapter, LlamaCppOptions
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
@@ -171,8 +172,15 @@ def test_options_ignore_unknown_keys() -> None:
 def test_default_options() -> None:
     options = LlamaCppOptions.from_mapping({})
     assert options.binary == "llama-server"
+    assert options.runtime == "auto"
     assert options.auto_download is True
     assert options.allow_remote_exposure is False
+
+
+def test_runtime_option_is_validated() -> None:
+    assert LlamaCppOptions.from_mapping({"runtime": "CUDA"}).runtime == "cuda"
+    with pytest.raises(ConfigError, match="runtime"):
+        LlamaCppOptions.from_mapping({"runtime": "quantum"})
 
 
 # ---- resolution ----------------------------------------------------------------------
@@ -347,11 +355,20 @@ async def test_closing_the_adapter_stops_the_supervisor(tmp_path: Path) -> None:
 # ---- discovery -----------------------------------------------------------------------
 
 
-async def test_list_models_reports_catalog_artifacts(tmp_path: Path) -> None:
-    """Local discovery means "what could run", not "what is loaded"."""
+async def test_list_models_reports_only_downloaded_catalog_artifacts(tmp_path: Path) -> None:
+    """The catalog is a download surface; discovery is the installed inventory."""
     fake = FakeOpenAIServer()
     adapter, _ = _adapter(tmp_path, fake)
     try:
+        assert await adapter.list_models() == []
+        ModelStore(tmp_path).register(
+            StoreEntry(
+                id="installed-test-model",
+                model_id="test-model-family",
+                variant_id="test-model",
+                engine="llama.cpp",
+            )
+        )
         models = await adapter.list_models()
     finally:
         await adapter.aclose()
@@ -424,9 +441,7 @@ async def test_diagnostics_never_trigger_hardware_detection(
         raise AssertionError("diagnostics must not detect hardware")
 
     monkeypatch.setattr(module, "detect", explode)
-    adapter, supervisor = _adapter(
-        tmp_path, FakeOpenAIServer(), options={"hardware": None}
-    )
+    adapter, supervisor = _adapter(tmp_path, FakeOpenAIServer(), options={"hardware": None})
     supervisor.resident_plans = {"test-model": ServerPlan(context_size=4096, gpu_layers=0)}
     try:
         assert tuple(await adapter.diagnostics()) == ()
@@ -476,8 +491,9 @@ async def test_structured_output_end_to_end(tmp_path: Path) -> None:
                 options={
                     "catalog": _catalog(tmp_path),
                     "model_dir": tmp_path,
-                    "hardware": HardwareProfile(os_name="linux", arch="x86_64",
-                                                total_ram_bytes=32 * GIB),
+                    "hardware": HardwareProfile(
+                        os_name="linux", arch="x86_64", total_ram_bytes=32 * GIB
+                    ),
                 },
                 transport=fake.transport(),
             )
@@ -518,9 +534,9 @@ async def test_missing_artifact_is_downloaded(tmp_path: Path) -> None:
 
     def recording(artifact, **kwargs):  # type: ignore[no-untyped-def]
         calls.append(artifact.id)
-        return original(artifact, **kwargs, client=httpx2.Client(
-            transport=httpx2.MockTransport(serve)
-        ))
+        return original(
+            artifact, **kwargs, client=httpx2.Client(transport=httpx2.MockTransport(serve))
+        )
 
     module.download_artifact = recording  # type: ignore[assignment]
     try:
@@ -617,7 +633,7 @@ async def test_a_corrupted_stored_model_is_re_acquired_not_handed_to_the_server(
 ) -> None:
     """The regression this replaced: the fast path used to check existence, not bytes.
 
-    A truncated GGUF that an older build — or a user — left in place would otherwise be
+    A truncated GGUF that an older build, or a user — left in place would otherwise be
     passed straight to llama-server, which fails at load with an error that says nothing
     about the file.
     """
@@ -647,9 +663,9 @@ async def test_a_corrupted_stored_model_is_re_acquired_not_handed_to_the_server(
 
     def recording(artifact, **kwargs):  # type: ignore[no-untyped-def]
         calls.append(artifact.id)
-        return original(artifact, **kwargs, client=httpx2.Client(
-            transport=httpx2.MockTransport(serve)
-        ))
+        return original(
+            artifact, **kwargs, client=httpx2.Client(transport=httpx2.MockTransport(serve))
+        )
 
     module.download_artifact = recording  # type: ignore[assignment]
     try:

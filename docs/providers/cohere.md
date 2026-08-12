@@ -23,9 +23,11 @@ was processed from what was billed.
 ```python
 import anyinfer as ai
 
-client = ai.Client([
-    ai.ProviderSettings.of("cohere", api_key="env://CO_API_KEY"),
-])
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("cohere", api_key="env://CO_API_KEY"),
+    ]
+)
 
 result = client.generate(prompt, target="cohere:command-a-03-2025")
 ```
@@ -63,7 +65,7 @@ what the model actually processed, which is what a context window measures:
 
 ```python
 result = client.generate(prompt, target="cohere:command-a-03-2025")
-print(result.usage.input_tokens)   # processed
+print(result.usage.input_tokens)  # processed
 ```
 
 If you need billed units for cost reconciliation, build the client with `retain_raw=True`
@@ -78,14 +80,49 @@ citations are not yet surfaced as typed results:
 client.generate(
     question,
     target="cohere:command-a-03-2025",
-    provider_options={"cohere": {
-        "documents": [{"id": "doc1", "data": {"text": "..."}}],
-        "citation_options": {"mode": "ACCURATE"},
-    }},
+    provider_options={
+        "cohere": {
+            "documents": [{"id": "doc1", "data": {"text": "..."}}],
+            "citation_options": {"mode": "ACCURATE"},
+        }
+    },
 )
 ```
 
 Read the citations from `result.raw` (with `retain_raw=True`) until they are modelled.
+
+## Embeddings and reranking
+
+Cohere serves both operations natively (`POST /v2/embed`, `POST /v2/rerank`), and is the
+first provider here with native input intents and native rerank scores:
+
+```python
+docs = client.embed(
+    ["the cat sat on the mat", "stock markets rallied"],
+    target="cohere:embed-v4.0",
+    input_type="document",
+)
+ranked = client.rerank(
+    "where did the cat sit",
+    ["stock markets rallied", "the cat sat on the mat"],
+    target="cohere:rerank-v3.5",
+    top_n=1,
+)
+```
+
+Three things worth knowing:
+
+- **`input_type` is required.** Cohere's embed API demands an intent and documents no
+  default, so an intent-less `embed()` is refused with a hint rather than guessed —
+  query and document embeddings are not comparable unless produced with matching
+  intents.
+- **Batching engages at 96 inputs.** The endpoint accepts at most 96 texts per call;
+  larger requests are split by the core and re-assembled in input order, invisibly.
+  Requested `dimensions` are forwarded as `output_dimension` (embed-v4 models only).
+- **Rerank usage is search units, not tokens.** Live rerank responses report only
+  `billed_units.search_units`, which AnyInfer never encodes as fake token counts — so
+  `result.usage` is typically empty for rerank. Use `retain_raw=True` and read
+  `result.raw["meta"]["billed_units"]` for cost reconciliation.
 
 ## Discovery
 
@@ -98,13 +135,15 @@ for model in client.models("cohere"):
         print(model.id, caps.context_window.value, caps.context_window.provenance)
 ```
 
-Only chat-capable models are listed.
+Every model is listed — embedding and rerank models included — with its operations
+derived from the listing's `endpoints` field, so `client.models("cohere",
+operation="embedding")` answers from discovery rather than a guess.
 
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
 - [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/cohere.md)
-- [Structured output](../concepts/structured-output.md) — how the schema mechanism is chosen.
+- [Structured output](../concepts/structured-output.md): how the schema mechanism is chosen.
 
 </div>

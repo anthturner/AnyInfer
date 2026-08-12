@@ -11,6 +11,13 @@ it, an application's ``override`` beats everything, and a model with no entry ke
 Freshness is opt-in and explicit. The library never fetches anything implicitly; a repo
 workflow keeps the upstream file current, and `fetch_pricing()` lets an application
 pull that file on its own schedule and hand it to a client.
+
+An entry may optionally carry ``per_search_unit`` (a decimal string, same rule as the
+token rates) for rerank providers billed per search rather than per token; embedding
+and rerank cost computation is `anyinfer.capabilities.pricing.compute_operation_cost`,
+which reads only the field relevant to its operation (input-token rate for embeddings,
+``per_search_unit`` for rerank) — an entry missing the field it needs simply prices
+that operation as unknown rather than guessing.
 """
 
 from __future__ import annotations
@@ -85,7 +92,7 @@ class PricingTable:
 
         Returns:
             The pricing tagged ``catalog`` provenance, or ``None`` when the model has no
-            entry — never a fallback price.
+            entry; never a fallback price.
         """
         entries = self._entries.get(provider_id)
         if not entries:
@@ -148,12 +155,17 @@ def _parse_entry(provider_id: str, raw: Any) -> PricingEntry:
         raise ConfigError(
             f"pricing entry for {provider_id!r} is missing field {missing.args[0]!r}"
         ) from None
+    per_search_unit_raw = raw.get("per_search_unit")
+    per_search_unit = (
+        _parse_rate(per_search_unit_raw) if per_search_unit_raw is not None else None
+    )
     return PricingEntry(
         model=model,
         pricing=Pricing(
             input_per_1m=input_rate,
             output_per_1m=output_rate,
             currency=str(raw.get("currency", "USD")),
+            per_search_unit=per_search_unit,
         ),
         last_verified=last_verified,
         source=source,
@@ -166,7 +178,7 @@ def _parse_rate(value: Any) -> Decimal:
     if not isinstance(value, str):
         raise ConfigError(
             f"price {value!r} must be a JSON string, not a number",
-            hint="floats lose precision; write prices as strings like \"1.25\"",
+            hint='floats lose precision; write prices as strings like "1.25"',
         )
     try:
         rate = Decimal(value)

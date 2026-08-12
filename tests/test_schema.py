@@ -289,9 +289,7 @@ def _capped_registry(ceiling: int | None) -> ai.ProviderRegistry:
 
 async def test_provider_repair_ceiling_clamps_the_caller_budget() -> None:
     server = FakeOpenAIServer(FakeResponse(text=json.dumps({"name": "Ada"})))
-    async with make_multi_client(
-        [("capped", server)], registry=_capped_registry(1)
-    ) as client:
+    async with make_multi_client([("capped", server)], registry=_capped_registry(1)) as client:
         with pytest.raises(ai.SchemaViolationError):
             await client.generate(
                 "who?",
@@ -352,9 +350,7 @@ async def test_repair_budget_under_the_ceiling_is_left_alone() -> None:
 
 async def test_no_ceiling_means_the_caller_decides() -> None:
     server = FakeOpenAIServer(FakeResponse(text=json.dumps({"name": "Ada"})))
-    async with make_multi_client(
-        [("capped", server)], registry=_capped_registry(None)
-    ) as client:
+    async with make_multi_client([("capped", server)], registry=_capped_registry(None)) as client:
         with pytest.raises(ai.SchemaViolationError):
             await client.generate(
                 "who?",
@@ -442,7 +438,7 @@ async def test_a_schema_answered_as_a_forced_tool_call_is_recovered() -> None:
 
 
 async def test_a_callers_own_tool_call_is_not_mistaken_for_the_answer() -> None:
-    """With caller tools present, a tool call is a tool call — not schema output."""
+    """With caller tools present, a tool call is a tool call; not schema output."""
     import httpx2
 
     from anyinfer.types.requests import ToolSpec

@@ -14,8 +14,8 @@ the caller silently:
   rate; ignoring them overstates cost on every repeated prefix.
 
 Sampling controls are declared as ignored because DeepSeek silently discards
-``temperature``, ``top_p``, and the penalties while thinking is enabled — which is the
-default — so a caller setting them deserves a `ParameterDropped` event rather than the
+``temperature``, ``top_p``, and the penalties while thinking is enabled, which is the
+default, so a caller setting them deserves a `ParameterDropped` event rather than the
 illusion that they took effect.
 """
 
@@ -49,17 +49,13 @@ _DEEPSEEK_EFFORTS: Mapping[ReasoningEffort, str] = {
 class DeepSeekAdapter(OpenAICompatAdapter):
     """Adapter for DeepSeek's OpenAI-compatible chat API."""
 
-    def _events_from_chunk(
-        self, chunk: Any, state: _StreamState
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
         """Surface ``reasoning_content`` as reasoning before delegating the rest."""
         if isinstance(chunk, Mapping):
             yield from _reasoning_events(chunk)
         yield from super()._events_from_chunk(chunk, state)
 
-    def _events_from_completion(
-        self, payload: Any, req: WireRequest
-    ) -> Iterable[AdapterEvent]:
+    def _events_from_completion(self, payload: Any, req: WireRequest) -> Iterable[AdapterEvent]:
         """Surface a buffered response's ``reasoning_content`` the same way."""
         if isinstance(payload, Mapping):
             choices = payload.get("choices")
@@ -75,7 +71,7 @@ class DeepSeekAdapter(OpenAICompatAdapter):
         """Read DeepSeek's split cache accounting on top of the standard block.
 
         ``prompt_tokens`` already equals hits plus misses, so only the hit count is
-        additional information — and it is the one that changes the bill.
+        additional information, and it is the one that changes the bill.
         """
         parsed = super()._parse_usage(usage)
         hits = usage.get("prompt_cache_hit_tokens")
@@ -150,8 +146,7 @@ descriptor = ProviderDescriptor(
                 kind="secret",
                 required=True,
                 help_text=(
-                    "Conventionally env://DEEPSEEK_API_KEY. Accepts env:// and "
-                    "credential://."
+                    "Conventionally env://DEEPSEEK_API_KEY. Accepts env:// and credential://."
                 ),
                 placeholder="env://DEEPSEEK_API_KEY or a literal key",
                 env_var="DEEPSEEK_API_KEY",

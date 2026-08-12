@@ -258,9 +258,7 @@ def test_split_prompt_folds_history_and_lifts_system_messages() -> None:
     system_prompt, user_prompt = _split_prompt(request)
 
     assert system_prompt == "Be terse."
-    assert user_prompt == (
-        "What is 2+2?\n\n[assistant] Let me check.\n\n[tool result] 4\n\nSo?"
-    )
+    assert user_prompt == ("What is 2+2?\n\n[assistant] Let me check.\n\n[tool result] 4\n\nSo?")
 
 
 # ---- discovery -----------------------------------------------------------------------

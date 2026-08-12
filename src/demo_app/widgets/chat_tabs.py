@@ -8,18 +8,17 @@ lands in the transcript it belongs to.
 
 The tab bar adds the affordances a chat app is expected to have: elided titles, a close
 button that appears on the hovered or active tab (and turns red under the pointer), and
-a context menu mirroring the conversation sidebar's actions.
+a context menu for opening, saving, renaming, deleting, and closing tabs.
 """
 
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QIcon, QResizeEvent
+from PySide6.QtGui import QAction, QIcon, QResizeEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QMenu,
     QTabBar,
-    QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -31,6 +30,7 @@ from .. import theme
 from ..conversation import Conversation
 from .chat_view import MessageList
 from .icons import themed_icon
+from .tab_widget import BorderedTabWidget
 
 __all__ = ["ChatPage", "ConversationTabs"]
 
@@ -111,10 +111,11 @@ class _CornerBox(QWidget):
         return self._size
 
 
-class ConversationTabs(QTabWidget):
+class ConversationTabs(BorderedTabWidget):
     """The tabbed chat area. Emits intents; the window owns what they mean."""
 
     new_requested = Signal()
+    open_saved_requested = Signal()
     rename_requested = Signal(int)
     save_requested = Signal(int, str)  # (index, "markdown" | "json")
     delete_requested = Signal(int)
@@ -126,7 +127,6 @@ class ConversationTabs(QTabWidget):
         self.setObjectName("ConversationTabs")
         self._bar = _TabBar()
         self.setTabBar(self._bar)
-        self.setDocumentMode(True)
         self.setMovable(True)
         self.setElideMode(Qt.TextElideMode.ElideRight)
         # Qt's own scroll buttons still do the scrolling (there is no public API for tab
@@ -183,6 +183,7 @@ class ConversationTabs(QTabWidget):
         self._scroll_refresh_timer.setSingleShot(True)
         self._scroll_refresh_timer.setInterval(0)
         self._scroll_refresh_timer.timeout.connect(self._refresh_scroll_buttons)
+        self._bar.tabMoved.connect(lambda *_: self.update_tab_outline())
         self._schedule_scroll_refresh()
         self.reapply_theme()
 
@@ -198,6 +199,8 @@ class ConversationTabs(QTabWidget):
         button.setToolTip("Close tab")
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.setAutoRaise(True)
+        button.setFixedSize(20, 20)
+        button.setIconSize(QSize(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE))
         button.setIcon(self._close_icon())
         button.clicked.connect(lambda _checked=False, b=button: self._on_close_clicked(b))
         self._bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, button)
@@ -241,18 +244,22 @@ class ConversationTabs(QTabWidget):
         self._new_tab_button.setIcon(themed_icon(self, "plus", size=_CLOSE_ICON_SIZE))
         self._scroll_left.setIcon(themed_icon(self, "chevron-left", size=_CLOSE_ICON_SIZE))
         self._scroll_right.setIcon(themed_icon(self, "chevron-right", size=_CLOSE_ICON_SIZE))
+        self.update_tab_outline()
 
     # ---- tab strip scrolling ------------------------------------------------------
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 — Qt's spelling
+        """Refresh tab scrolling after the widget is resized."""
         super().resizeEvent(event)
         self._schedule_scroll_refresh()
 
     def tabInserted(self, index: int) -> None:  # noqa: N802 — Qt's spelling
+        """Refresh tab scrolling after a tab is inserted."""
         super().tabInserted(index)
         self._schedule_scroll_refresh()
 
     def tabRemoved(self, index: int) -> None:  # noqa: N802 — Qt's spelling
+        """Refresh tab scrolling after a tab is removed."""
         super().tabRemoved(index)
         self._schedule_scroll_refresh()
 
@@ -273,6 +280,7 @@ class ConversationTabs(QTabWidget):
         button = left if direction < 0 else right
         if button is not None and button.isEnabled():
             button.click()
+        self.update_tab_outline()
         self._schedule_scroll_refresh()
 
     def _schedule_scroll_refresh(self) -> None:
@@ -300,12 +308,8 @@ class ConversationTabs(QTabWidget):
         normal = themed_icon(self, "x", size=_CLOSE_ICON_SIZE)
         active = themed_icon(self, "x", size=_CLOSE_ICON_SIZE, color=theme.color("danger"))
         icon = QIcon()
-        icon.addPixmap(
-            normal.pixmap(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE), QIcon.Mode.Normal
-        )
-        icon.addPixmap(
-            active.pixmap(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE), QIcon.Mode.Active
-        )
+        icon.addPixmap(normal.pixmap(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE), QIcon.Mode.Normal)
+        icon.addPixmap(active.pixmap(_CLOSE_ICON_SIZE, _CLOSE_ICON_SIZE), QIcon.Mode.Active)
         return icon
 
     def _refresh_close_buttons(self) -> None:
@@ -323,8 +327,30 @@ class ConversationTabs(QTabWidget):
 
     def _on_context_menu(self, pos: QPoint) -> None:
         index = self._bar.tabAt(pos)
+        menu, actions = self._make_context_menu(index)
+        chosen = menu.exec(self._bar.mapToGlobal(pos))
+        if chosen is actions["new"]:
+            self.new_requested.emit()
+        elif chosen is actions["open"]:
+            self.open_saved_requested.emit()
+        elif chosen is actions["rename"]:
+            self.rename_requested.emit(index)
+        elif chosen is actions["save_md"]:
+            self.save_requested.emit(index, "markdown")
+        elif chosen is actions["save_json"]:
+            self.save_requested.emit(index, "json")
+        elif chosen is actions["delete"]:
+            self.delete_requested.emit(index)
+        elif chosen is actions["close"]:
+            self.close_requested.emit(index)
+        elif chosen is actions["close_all"]:
+            self.close_all_requested.emit()
+
+    def _make_context_menu(self, index: int) -> tuple[QMenu, dict[str, QAction]]:
+        """Build the tab menu for ``index``; split out so its availability is testable."""
         menu = QMenu(self)
         new_action = menu.addAction("New")
+        open_saved_action = menu.addAction("Open Saved…")
         menu.addSeparator()
         rename_action = menu.addAction("Rename")
         save_menu = menu.addMenu("Save As")
@@ -338,19 +364,13 @@ class ConversationTabs(QTabWidget):
         for action in (rename_action, delete_action, close_action):
             action.setEnabled(index >= 0)
         save_menu.setEnabled(index >= 0)
-
-        chosen = menu.exec(self._bar.mapToGlobal(pos))
-        if chosen is new_action:
-            self.new_requested.emit()
-        elif chosen is rename_action:
-            self.rename_requested.emit(index)
-        elif chosen is save_md:
-            self.save_requested.emit(index, "markdown")
-        elif chosen is save_json:
-            self.save_requested.emit(index, "json")
-        elif chosen is delete_action:
-            self.delete_requested.emit(index)
-        elif chosen is close_action:
-            self.close_requested.emit(index)
-        elif chosen is close_all_action:
-            self.close_all_requested.emit()
+        return menu, {
+            "new": new_action,
+            "open": open_saved_action,
+            "rename": rename_action,
+            "save_md": save_md,
+            "save_json": save_json,
+            "delete": delete_action,
+            "close": close_action,
+            "close_all": close_all_action,
+        }

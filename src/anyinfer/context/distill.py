@@ -353,7 +353,7 @@ async def _reduce(
             summaries.append(result.text)
 
         # No progress means the notes are individually too large for this target, and
-        # batching further would loop — so take the first summary and stop.
+        # batching further would loop, so take the first summary and stop.
         current = summaries[:1] if len(summaries) >= len(current) else summaries
         depth += 1
 

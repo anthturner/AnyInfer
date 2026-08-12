@@ -185,9 +185,7 @@ async def test_request_failed_event_on_exhaustion() -> None:
 async def test_repair_events_are_emitted() -> None:
     recorder = Recorder()
     schema = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
-    server = FakeOpenAIServer(
-        [FakeResponse(text="{}"), FakeResponse(text=json.dumps({"n": 1}))]
-    )
+    server = FakeOpenAIServer([FakeResponse(text="{}"), FakeResponse(text=json.dumps({"n": 1}))])
     async with make_client(server, observers=[recorder]) as client:
         await client.generate(
             "hi", target="openai-compat:m", schema=schema, repair=ai.Repair(max_attempts=1)
@@ -261,7 +259,9 @@ async def test_adapter_lifecycle_events_share_the_client_dispatcher() -> None:
 
     registry = ProviderRegistry(load_builtins=False, load_entry_points=False)
     registry.register(
-        ProviderDescriptor(id="probe", display_name="Probe", factory=_Probe)
+        ProviderDescriptor(
+            id="probe", display_name="Probe", factory=_Probe, operations=frozenset()
+        )
     )
     pool = AdapterPool(
         [ai.ProviderSettings.of("probe")], registry=registry, events=captured.append
@@ -308,9 +308,7 @@ async def test_fallback_triggered_names_the_abandoned_and_next_targets() -> None
     async with client:
         result = await client.generate(
             "hi",
-            route=ai.Route(
-                targets=("primary:m", "secondary:m"), retry=ai.Retry(max_attempts=1)
-            ),
+            route=ai.Route(targets=("primary:m", "secondary:m"), retry=ai.Retry(max_attempts=1)),
         )
 
     assert result.text == "from the backup"

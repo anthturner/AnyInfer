@@ -97,9 +97,7 @@ def _hf_transport(
                     content=body[start:],
                     headers={"content-length": str(len(body) - start)},
                 )
-            return httpx2.Response(
-                200, content=body, headers={"content-length": str(len(body))}
-            )
+            return httpx2.Response(200, content=body, headers={"content-length": str(len(body))})
         raise AssertionError(f"unexpected request: {request.url}")
 
     return httpx2.MockTransport(handler)
@@ -137,7 +135,10 @@ async def _acquire(
     client = _client(transport)
     try:
         return await acquire(
-            _request(token=token), store=store, client=client, **kwargs  # type: ignore[arg-type]
+            _request(token=token),
+            store=store,
+            client=client,
+            **kwargs,  # type: ignore[arg-type]
         )
     finally:
         await client.aclose()
@@ -338,9 +339,7 @@ def test_a_hostile_tree_entry_is_refused_before_anything_is_written(
         }
     ]
     store = ModelStore(tmp_path)
-    request = _request(
-        ref=SourceRef(resolver="huggingface", repo="acme/model", revision="main")
-    )
+    request = _request(ref=SourceRef(resolver="huggingface", repo="acme/model", revision="main"))
 
     async def run() -> None:
         client = _client(_hf_transport(tree=hostile))
@@ -382,9 +381,7 @@ def test_a_branch_is_resolved_to_an_immutable_commit_before_anything_is_fetched(
 
 def test_the_token_is_sent_to_the_api_and_dropped_on_the_cdn_hop(tmp_path: Path) -> None:
     seen: list[httpx2.Request] = []
-    asyncio.run(
-        _acquire(ModelStore(tmp_path), _hf_transport(seen=seen), token="secret-token")
-    )
+    asyncio.run(_acquire(ModelStore(tmp_path), _hf_transport(seen=seen), token="secret-token"))
 
     api = [r for r in seen if r.url.host == "huggingface.co"]
     cdn = [r for r in seen if r.url.host == "cdn.invalid"]
@@ -459,9 +456,7 @@ def test_a_four_shard_acquisition_reports_the_full_total_from_the_first_callback
     tmp_path: Path,
 ) -> None:
     events = []
-    report = asyncio.run(
-        _acquire(ModelStore(tmp_path), _hf_transport(), progress=events.append)
-    )
+    report = asyncio.run(_acquire(ModelStore(tmp_path), _hf_transport(), progress=events.append))
 
     assert report.entry is not None
     assert events
@@ -487,9 +482,7 @@ def test_a_corrupted_shard_registers_nothing_and_locate_stays_empty(tmp_path: Pa
 def test_resuming_reports_the_position_it_resumed_from(tmp_path: Path) -> None:
     store = ModelStore(tmp_path)
     request = _request()
-    plan = asyncio.run(
-        _plan(request, store, _hf_transport())
-    )
+    plan = asyncio.run(_plan(request, store, _hf_transport()))
 
     # Pre-seed one shard's .part file at 60%, as an interrupted run would leave it.
     staging = store.staging_dir(plan.entry_id)
@@ -499,9 +492,7 @@ def test_resuming_reports_the_position_it_resumed_from(tmp_path: Path) -> None:
     partial.write_bytes(_shard(1)[:prefix])
 
     events = []
-    report = asyncio.run(
-        _acquire(store, _hf_transport(), progress=events.append)
-    )
+    report = asyncio.run(_acquire(store, _hf_transport(), progress=events.append))
     assert report.entry is not None
     assert events[0].total_downloaded_bytes == prefix
     assert events[0].session_bytes == 0

@@ -24,16 +24,39 @@ from typing import Any
 
 import httpx2
 
-from ..errors import ProviderError, StreamProtocolError
+from ..errors import ConfigError, ProviderError, StreamProtocolError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities, Sourced
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
 from ..types.messages import Message, Text, ToolCall, ToolResult
+from ..types.operations import (
+    EmbeddingCapabilities,
+    EmbeddingInputIntent,
+    InferenceOperation,
+    RerankCapabilities,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import has_multimodal, unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    EmbeddingWireRequest,
+    EmbeddingWireResult,
+    ProviderConfig,
+    RerankWireRequest,
+    RerankWireResult,
+    WireRankedItem,
+    WireRequest,
+    _encode_function_tool,
+)
+from .http import (
+    build_client,
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+)
 from .sse import iter_sse
 
 __all__ = ["CohereAdapter", "descriptor"]
@@ -56,6 +79,19 @@ _THINKING_BUDGETS: Mapping[ReasoningEffort, int] = {
     "high": 16384,
 }
 
+_INPUT_TYPES: Mapping[EmbeddingInputIntent, str] = {
+    "query": "search_query",
+    "document": "search_document",
+    "classification": "classification",
+    "clustering": "clustering",
+}
+"""AnyInfer input intents mapped onto Cohere's ``input_type`` spellings.
+
+Cohere requires ``input_type`` on every embed call and documents no default, so a request
+with no intent is refused before the wire call rather than silently embedded as one intent
+or another (see `contracts/cohere.md`, verified 2026-08-12).
+"""
+
 
 class CohereAdapter:
     """Adapter for Cohere's v2 Chat API."""
@@ -77,13 +113,15 @@ class CohereAdapter:
     # ---- discovery -------------------------------------------------------------------
 
     async def list_models(self) -> Sequence[DiscoveredModel]:
-        """List chat-capable models, following the listing's page tokens.
+        """List every model, following the listing's page tokens.
 
-        The listing reports real context lengths, so windows arrive with ``discovered``
-        provenance.
+        The listing reports real context lengths and each entry's compatible
+        ``endpoints`` (verified 2026-08-12), so windows *and* operations arrive with
+        ``discovered`` provenance — embedding-only and rerank-only models are listed,
+        never filtered out as non-chat.
         """
         models: list[DiscoveredModel] = []
-        params: dict[str, Any] = {"page_size": 1000, "endpoint": "chat"}
+        params: dict[str, Any] = {"page_size": 1000}
 
         while True:
             try:
@@ -213,14 +251,7 @@ class CohereAdapter:
         return {"role": message.role, "content": text}
 
     def _encode_tool(self, tool: ToolSpec) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": dict(tool.parameters),
-            },
-        }
+        return _encode_function_tool(tool)
 
     # ---- buffered path ---------------------------------------------------------------
 
@@ -395,6 +426,157 @@ class CohereAdapter:
                 state.usage = state.usage.merge(usage)
                 yield UsageUpdate(usage)
 
+    # ---- embedding ---------------------------------------------------------------------
+
+    async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Run one embedding call against ``POST /v2/embed``.
+
+        See ``contracts/cohere.md`` for the verified request/response fields. Cohere's
+        embed endpoint accepts at most 96 texts per call — the core's batching splits
+        larger requests before this adapter ever sees them.
+        """
+        payload = self._build_embed_payload(req)
+        try:
+            response = await self._client.post("/v2/embed", json=payload, timeout=req.timeout_s)
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                headers=response.headers,
+                phase="generate",
+            )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
+        return self._parse_embed_response(req, response.json())
+
+    def _build_embed_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]:
+        if req.input_type is None:
+            raise ConfigError(
+                "Cohere's embed API requires an input type and documents no default",
+                provider=self.provider_id,
+                hint=(
+                    "pass input_type='document' for corpus text, 'query' for search "
+                    "queries, or 'classification'/'clustering' — AnyInfer never guesses "
+                    "an intent, because query and document embeddings are not comparable "
+                    "unless produced with matching intents"
+                ),
+            )
+        payload: dict[str, Any] = {
+            "model": req.model,
+            "texts": list(req.inputs),
+            "input_type": _INPUT_TYPES[req.input_type],
+            "embedding_types": ["float"],
+        }
+        if req.dimensions is not None:
+            payload["output_dimension"] = req.dimensions
+        payload.update(req.extra_options)
+        return payload
+
+    def _parse_embed_response(
+        self, req: EmbeddingWireRequest, payload: Any
+    ) -> EmbeddingWireResult:
+        if not isinstance(payload, Mapping):
+            raise ProviderError("embed response is not a JSON object", phase="validate")
+        embeddings = payload.get("embeddings")
+        floats = embeddings.get("float") if isinstance(embeddings, Mapping) else None
+        if not isinstance(floats, list):
+            raise ProviderError(
+                "embed response is missing an 'embeddings.float' array", phase="validate"
+            )
+        if len(floats) != len(req.inputs):
+            raise ProviderError(
+                f"embed response returned {len(floats)} vectors for {len(req.inputs)} inputs",
+                phase="validate",
+            )
+        vectors: list[tuple[float, ...]] = []
+        for entry in floats:
+            if not isinstance(entry, list):
+                raise ProviderError(
+                    "embed response contains a non-array vector", phase="validate"
+                )
+            vectors.append(tuple(float(v) for v in entry))
+        meta = payload.get("meta")
+        return EmbeddingWireResult(
+            vectors=tuple(vectors),
+            dimensions=len(vectors[0]) if vectors else None,
+            usage=_parse_usage(meta) if isinstance(meta, Mapping) else None,
+            raw=payload,
+        )
+
+    # ---- reranking ---------------------------------------------------------------------
+
+    async def rerank(self, req: RerankWireRequest) -> RerankWireResult:
+        """Run one rerank call against ``POST /v2/rerank``.
+
+        Cohere's ``results[].index`` is positional within the ``documents`` array this
+        call sent; the adapter maps it back onto the caller-supplied
+        `RerankWireDocument.index`, which is what the core's index validation (and batch
+        chunking) is keyed on.
+        """
+        payload: dict[str, Any] = {
+            "model": req.model,
+            "query": req.query,
+            "documents": [doc.text for doc in req.documents],
+        }
+        if req.top_n is not None:
+            payload["top_n"] = req.top_n
+        payload.update(req.extra_options)
+        try:
+            response = await self._client.post("/v2/rerank", json=payload, timeout=req.timeout_s)
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                headers=response.headers,
+                phase="generate",
+            )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
+        return self._parse_rerank_response(req, response.json())
+
+    def _parse_rerank_response(self, req: RerankWireRequest, payload: Any) -> RerankWireResult:
+        if not isinstance(payload, Mapping):
+            raise ProviderError("rerank response is not a JSON object", phase="validate")
+        results = payload.get("results")
+        if not isinstance(results, list):
+            raise ProviderError(
+                "rerank response is missing a 'results' array", phase="validate"
+            )
+        items: list[WireRankedItem] = []
+        for entry in results:
+            if not isinstance(entry, Mapping):
+                raise ProviderError(
+                    "rerank response contains a non-object result", phase="validate"
+                )
+            position = entry.get("index")
+            score = entry.get("relevance_score")
+            if not isinstance(position, int) or isinstance(position, bool):
+                raise ProviderError(
+                    "rerank result is missing an integer 'index'", phase="validate"
+                )
+            if not isinstance(score, int | float) or isinstance(score, bool):
+                raise ProviderError(
+                    "rerank result is missing a numeric 'relevance_score'", phase="validate"
+                )
+            # Positional → caller-supplied index; an out-of-range positional passes
+            # through untranslated so the core rejects it as the contract violation it is.
+            index = (
+                req.documents[position].index
+                if 0 <= position < len(req.documents)
+                else position
+            )
+            items.append(WireRankedItem(index=index, score=float(score)))
+        meta = payload.get("meta")
+        return RerankWireResult(
+            items=tuple(items),
+            usage=_parse_usage(meta) if isinstance(meta, Mapping) else None,
+            raw=payload,
+        )
+
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
         await self._client.aclose()
@@ -472,27 +654,62 @@ def _parse_usage(payload: Any) -> Usage | None:
         return int(value) if isinstance(value, float) and value.is_integer() else None
 
     cached = payload.get("cached_tokens")
+    billed = payload.get("billed_units")
     usage = Usage(
         input_tokens=field(source, "input_tokens"),
         output_tokens=field(source, "output_tokens"),
         cache_read_tokens=cached
         if isinstance(cached, int) and not isinstance(cached, bool)
         else None,
+        # Search units live only under billed_units and are their own billing
+        # dimension — carried on their own field, never mapped into token counts.
+        search_units=field(billed, "search_units") if isinstance(billed, Mapping) else None,
     )
     return usage if usage != Usage() else None
 
 
+_ENDPOINT_OPERATIONS: Mapping[str, InferenceOperation] = {
+    "chat": "generation",
+    "generate": "generation",
+    "embed": "embedding",
+    "rerank": "rerank",
+}
+"""Cohere listing ``endpoints`` values mapped to operations (verified 2026-08-12).
+
+``classify``, ``summarize``, and ``rate`` have no normalized operation and are ignored.
+"""
+
+
 def _parse_model(entry: Mapping[str, Any]) -> DiscoveredModel:
-    """Read one model-listing entry."""
-    features = Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.JSON_SCHEMA | Feature.JSON_MODE
-    capabilities = entry.get("features")
-    if isinstance(capabilities, list):
-        if "tools" in capabilities:
+    """Read one model-listing entry.
+
+    Generation feature flags are stamped only on models whose ``endpoints`` include a
+    generation surface — an embedding model does not stream chat, whatever the default
+    flag set says.
+    """
+    endpoints = entry.get("endpoints")
+    operations: Sourced[frozenset[InferenceOperation]] | None = None
+    is_generation = True
+    if isinstance(endpoints, list):
+        ops = frozenset(
+            _ENDPOINT_OPERATIONS[e] for e in endpoints if e in _ENDPOINT_OPERATIONS
+        )
+        operations = Sourced(ops, "discovered")
+        is_generation = "generation" in ops
+
+    features = Feature(0)
+    if is_generation:
+        features = (
+            Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.JSON_SCHEMA | Feature.JSON_MODE
+        )
+        capabilities = entry.get("features")
+        if isinstance(capabilities, list):
+            if "tools" in capabilities:
+                features |= Feature.TOOLS
+            if "thinking" in capabilities or "reasoning" in capabilities:
+                features |= Feature.REASONING
+        else:
             features |= Feature.TOOLS
-        if "thinking" in capabilities or "reasoning" in capabilities:
-            features |= Feature.REASONING
-    else:
-        features |= Feature.TOOLS
 
     window = entry.get("context_length")
     context = (
@@ -503,7 +720,9 @@ def _parse_model(entry: Mapping[str, Any]) -> DiscoveredModel:
     return DiscoveredModel(
         id=str(entry.get("name", "")),
         capabilities=ModelCapabilities(
-            context_window=context, features=Sourced(features, "discovered")
+            context_window=context,
+            features=Sourced(features, "discovered"),
+            operations=operations,
         ),
     )
 
@@ -531,6 +750,55 @@ _COHERE_FEATURES = (
 )
 
 
+_EMBED_INTENTS: tuple[EmbeddingInputIntent, ...] = (
+    "query",
+    "document",
+    "classification",
+    "clustering",
+)
+
+_STATIC_EMBEDDING_CAPABILITIES: Mapping[str, EmbeddingCapabilities] = {
+    # Verified against docs.cohere.com/reference/embed and docs.cohere.com/docs/models
+    # on 2026-08-12: 96 texts per call is the endpoint-wide ceiling; dimensions and
+    # context lengths are per docs/models. Whether vectors are unit-normalized is not
+    # stated there, so `normalized` stays None.
+    "embed-v4.0": EmbeddingCapabilities(
+        dimensions=1536,
+        dimension_choices=(256, 512, 1024, 1536),
+        max_batch_inputs=96,
+        max_input_tokens=128_000,
+        input_intents=_EMBED_INTENTS,
+    ),
+    "embed-english-v3.0": EmbeddingCapabilities(
+        dimensions=1024, max_batch_inputs=96, max_input_tokens=512, input_intents=_EMBED_INTENTS
+    ),
+    "embed-english-light-v3.0": EmbeddingCapabilities(
+        dimensions=384, max_batch_inputs=96, max_input_tokens=512, input_intents=_EMBED_INTENTS
+    ),
+    "embed-multilingual-v3.0": EmbeddingCapabilities(
+        dimensions=1024, max_batch_inputs=96, max_input_tokens=512, input_intents=_EMBED_INTENTS
+    ),
+    "embed-multilingual-light-v3.0": EmbeddingCapabilities(
+        dimensions=384, max_batch_inputs=96, max_input_tokens=512, input_intents=_EMBED_INTENTS
+    ),
+}
+
+_STATIC_RERANK_CAPABILITIES: Mapping[str, RerankCapabilities] = {
+    # docs.cohere.com/reference/rerank (verified 2026-08-12) recommends against more
+    # than 1,000 documents per request; that documented recommendation is the split
+    # threshold. Documents beyond `max_tokens_per_doc` are truncated server-side, not
+    # rejected, so no per-document byte/token cap is declared here.
+    model: RerankCapabilities(max_documents=1_000, native_top_n=True)
+    for model in (
+        "rerank-v4.0-pro",
+        "rerank-v4.0-fast",
+        "rerank-v3.5",
+        "rerank-english-v3.0",
+        "rerank-multilingual-v3.0",
+    )
+}
+
+
 descriptor = ProviderDescriptor(
     id="cohere",
     display_name="Cohere",
@@ -538,6 +806,9 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=_DEFAULT_BASE_URL,
     requires_base_url=False,
+    operations=frozenset({"generation", "embedding", "rerank"}),
+    static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
+    static_rerank_capabilities=_STATIC_RERANK_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

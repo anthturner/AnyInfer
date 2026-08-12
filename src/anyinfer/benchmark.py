@@ -30,14 +30,16 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
+from .local.metrics import ResourceSample
 from .types.requests import ResolvedTarget
 
 __all__ = [
     "BENCHMARK_OUTPUT_TOKENS",
     "BENCHMARK_PROMPT_TOKENS",
+    "BenchmarkSample",
     "Measurement",
     "MeasurementIdentity",
     "MeasurementStore",
@@ -69,6 +71,22 @@ _MAX_STORE_ENTRIES = 64
 _STORE_FORMAT_VERSION = 1
 
 
+@dataclass(frozen=True, slots=True)
+class BenchmarkSample:
+    """One point in a live benchmark time series.
+
+    The token count and instantaneous rate are estimates while streaming because provider
+    usage is authoritative only at the terminal event. Resource fields are best-effort host
+    readings and remain ``None`` when the platform cannot report them.
+    """
+
+    elapsed_ms: float
+    phase: Literal["warmup", "decode", "complete"]
+    estimated_output_tokens: int = 0
+    output_tokens_per_s: float | None = None
+    resources: ResourceSample = ResourceSample()
+
+
 def benchmark_prompt(target_tokens: int = BENCHMARK_PROMPT_TOKENS) -> str:
     """Build a deterministic prompt of roughly ``target_tokens`` tokens.
 
@@ -82,9 +100,7 @@ def benchmark_prompt(target_tokens: int = BENCHMARK_PROMPT_TOKENS) -> str:
     Returns:
         The prompt, ending with an instruction that forces a bounded, prose-shaped answer.
     """
-    instruction = (
-        "\n\nSummarize the report above in exactly one paragraph of plain prose."
-    )
+    instruction = "\n\nSummarize the report above in exactly one paragraph of plain prose."
     repeats = max(1, (target_tokens * 3) // len(_FILLER.encode("utf-8")))
     return (_FILLER * repeats) + instruction
 
@@ -115,7 +131,7 @@ class MeasurementIdentity:
 
     Throughput is not a property of a model; it is a property of a model on an endpoint on
     a machine with a runtime. Change any of those and the old number is not stale, it is
-    about something else — which is what `fingerprint` is for.
+    about something else, which is what `fingerprint` is for.
 
     Attributes:
         provider_id: The configured provider instance.

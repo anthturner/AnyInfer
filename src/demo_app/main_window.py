@@ -20,22 +20,22 @@ from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QTextOption
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
-    QFrame,
-    QGroupBox,
+    QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
     QMainWindow,
-    QMenu,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QStatusBar,
@@ -54,14 +54,15 @@ from anyinfer.types.results import AttemptRecord, Generation
 
 from . import config as config_module
 from . import strings, theme
-from .config import DemoConfig
+from .config import DemoConfig, ProviderConfig
 from .conversation import Conversation, conversations_dir, gist_title
 from .engine import Engine, GenerationSpec
 from .widgets import (
     AboutDialog,
+    AppSettingsDialog,
     CollapsibleSection,
     Composer,
-    ConversationSidebar,
+    EmbeddingsPanel,
     EngineBar,
     LibraryMapDialog,
     LicensesDialog,
@@ -77,17 +78,15 @@ from .widgets import (
 )
 from .widgets.chat_tabs import ChatPage, ConversationTabs
 from .widgets.chat_view import MessageList
+from .widgets.collapsible_section import HEADER_HEIGHT
 from .widgets.icons import themed_icon
 from .widgets.sdk_help import DOCS_URL
 
 __all__ = ["MainWindow"]
 
-#: Below these drag widths a sidebar snaps shut — a 60-px conversation list is noise.
-_LEFT_SNAP_WIDTH = 140
 _RIGHT_SNAP_WIDTH = 220
 
-#: The width a sidebar reopens to when dragged out of its snapped-shut state.
-_LEFT_OPEN_WIDTH = 220
+#: The width the inspector sidebar reopens to after it is hidden or snapped shut.
 _RIGHT_OPEN_WIDTH = 380
 
 _SECTION_ICONS: dict[str, str] = {
@@ -96,8 +95,9 @@ _SECTION_ICONS: dict[str, str] = {
     "providers": "server",
     "target": "target",
     "tools": "tool",
+    "embeddings": "book",
 }
-"""Inspector section key → Tabler icon, shared by the headers and the View menu."""
+"""Inspector section key → Tabler icon used by its header."""
 
 _UNREPORTED_DEFAULT_NOTE = (
     " (Provider default: decided by the provider itself — the value is not reported "
@@ -120,6 +120,27 @@ def _cost_hint(cost: CostEstimate | None) -> str:
     return f"~{cost.low:.4f}-{cost.high:.4f} {cost.currency}"
 
 
+def _make_system_prompt_dialog(parent: QWidget, current: str) -> QInputDialog:
+    """Build the wider, edge-wrapping editor used for the configured system prompt."""
+    dialog = QInputDialog(parent)
+    dialog.setWindowTitle("System prompt")
+    dialog.setLabelText("Sent as the first system message in new chats:")
+    dialog.setInputMode(QInputDialog.InputMode.TextInput)
+    dialog.setOption(QInputDialog.InputDialogOption.UsePlainTextEditForTextInput)
+    dialog.setTextValue(current)
+
+    editor = dialog.findChild(QPlainTextEdit)
+    if editor is not None:
+        editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        editor.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        editor.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    dialog.ensurePolished()
+    natural = dialog.sizeHint()
+    dialog.resize(round(natural.width() * 1.5), natural.height())
+    return dialog
+
+
 class MainWindow(QMainWindow):
     """The demo window."""
 
@@ -127,6 +148,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("AnyInfer Demo")
         self.resize(1280, 860)
+        self.setMinimumSize(960, 640)
 
         self._engine = Engine(config)
         self._models_dialog: ModelsDialog | None = None
@@ -151,7 +173,6 @@ class MainWindow(QMainWindow):
         self._follow_system_scheme()
         self._discover_enabled_providers()
         self._open_page(Conversation.new())
-        self._reload_sidebar()
 
     # ---- compatibility views over the active tab ---------------------------------------
 
@@ -171,25 +192,13 @@ class MainWindow(QMainWindow):
     def _chat(self) -> MessageList:
         """The active tab's transcript view."""
         page = self._tabs.current_page()
-        assert page is not None, "the window always keeps at least one tab"
+        if page is None:
+            raise RuntimeError("the window must keep at least one conversation tab")
         return page.view
 
     # ---- construction ----------------------------------------------------------------
 
     def _build_ui(self, config: DemoConfig) -> None:
-        outer = QSplitter(Qt.Orientation.Horizontal)
-        outer.setHandleWidth(4)
-
-        self._sidebar = ConversationSidebar()
-        self._sidebar.new_chat_requested.connect(self._on_new_chat)
-        self._sidebar.conversation_selected.connect(self._on_conversation_selected)
-        self._sidebar.rename_requested.connect(self._on_rename_conversation)
-        self._sidebar.delete_requested.connect(self._on_delete_conversation)
-        self._sidebar.export_requested.connect(self._on_export_conversation)
-        self._sidebar.export_all_requested.connect(self._on_export_all)
-        self._sidebar.import_requested.connect(self._on_import_conversation)
-        outer.addWidget(self._sidebar)
-
         self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
         self._main_splitter.setHandleWidth(4)
         self._main_splitter.addWidget(self._build_center_pane(config))
@@ -197,26 +206,17 @@ class MainWindow(QMainWindow):
         self._main_splitter.setStretchFactor(0, 3)
         self._main_splitter.setStretchFactor(1, 2)
         self._main_splitter.setCollapsible(0, False)
-        outer.addWidget(self._main_splitter)
 
-        outer.setStretchFactor(0, 0)
-        outer.setStretchFactor(1, 1)
-        outer.setSizes([_LEFT_OPEN_WIDTH, 1000])
-
-        # Dragging a sidebar below a usable width snaps it shut; dragging it back out
-        # of the snap reopens it at a sane size. `splitterMoved` fires on user drags
-        # only, so programmatic setSizes cannot recurse through here.
-        outer.splitterMoved.connect(self._on_outer_splitter_moved)
+        # Dragging the inspector below a usable width snaps it shut. `splitterMoved`
+        # fires on user drags only, so programmatic setSizes cannot recurse through here.
         self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)
 
-        self.setCentralWidget(outer)
+        self.setCentralWidget(self._main_splitter)
         self.setStatusBar(QStatusBar())
         self._status_metrics = StatusMetrics()
         self.statusBar().addPermanentWidget(self._status_metrics)
         self.statusBar().showMessage("Ready — offline fake provider, no credentials needed.")
 
-        self._outer_splitter = outer
-        self._sidebar_width_before_hide = _LEFT_OPEN_WIDTH
         self._right_sidebar_width_before_hide = _RIGHT_OPEN_WIDTH
 
     def _build_center_pane(self, config: DemoConfig) -> QWidget:
@@ -231,6 +231,7 @@ class MainWindow(QMainWindow):
 
         self._tabs = ConversationTabs()
         self._tabs.new_requested.connect(self._on_new_chat)
+        self._tabs.open_saved_requested.connect(self._on_open_saved)
         self._tabs.rename_requested.connect(self._on_tab_rename)
         self._tabs.save_requested.connect(self._on_tab_save)
         self._tabs.delete_requested.connect(self._on_tab_delete)
@@ -238,16 +239,7 @@ class MainWindow(QMainWindow):
         self._tabs.close_all_requested.connect(self._on_tab_close_all)
         self._tabs.currentChanged.connect(self._on_tab_changed)
 
-        # A plain frame carries the box border: QTabWidget's own frame only ever
-        # outlines the pane below the tab bar, not the tab bar itself, so a border set
-        # on the tab widget can't start level with the leftmost tab's top edge.
-        tabs_frame = QFrame()
-        tabs_frame.setObjectName("ConversationTabsFrame")
-        tabs_frame_layout = QVBoxLayout(tabs_frame)
-        tabs_frame_layout.setContentsMargins(0, 0, 0, 0)
-        tabs_frame_layout.setSpacing(0)
-        tabs_frame_layout.addWidget(self._tabs)
-        layout.addWidget(tabs_frame, 1)
+        layout.addWidget(self._tabs, 1)
 
         self._composer = Composer()
         self._composer.send_requested.connect(self._on_send)
@@ -267,58 +259,74 @@ class MainWindow(QMainWindow):
         welcome.tool_loop_requested.connect(self._on_welcome_tools)
         return welcome
 
-    def _build_controls(self) -> QGroupBox:
-        # "&&": QGroupBox treats a lone ampersand as a mnemonic marker and eats it.
-        group = QGroupBox("Request options — sampling && routing")
-        # Two rows: sampling knobs above, routing/state below. One row held them all
-        # until reasoning, history, and caching arrived; ten controls in a line is a
-        # ribbon, not a form.
-        outer = QVBoxLayout(group)
-        outer.setSpacing(6)
-        controls = QHBoxLayout()
-        controls.setSpacing(12)
-        routing = QHBoxLayout()
-        routing.setSpacing(12)
-        outer.addLayout(controls)
-        outer.addLayout(routing)
+    def _build_controls(self) -> CollapsibleSection:
+        content = QWidget()
+        grid = QGridLayout(content)
+        self._request_options_grid = grid
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(8)
+        for column in range(3):
+            grid.setColumnStretch(column, 1)
 
-        controls.addWidget(QLabel("Temperature:"))
+        def add_cell(
+            row: int,
+            column: int,
+            label: str,
+            control: QWidget,
+            *,
+            help_topic: str | None = None,
+        ) -> None:
+            """Add one consistently aligned label/control cell to the three-column grid."""
+            cell = QWidget()
+            cell_layout = QVBoxLayout(cell)
+            cell_layout.setContentsMargins(0, 0, 0, 0)
+            cell_layout.setSpacing(3)
+
+            header = QWidget()
+            # Help chips are taller than labels. Giving every header the same height keeps
+            # the controls below them on one baseline, including the Session checkbox.
+            header.setFixedHeight(22)
+            header_layout = QHBoxLayout(header)
+            header_layout.setContentsMargins(0, 0, 0, 0)
+            header_layout.setSpacing(4)
+            header_layout.addWidget(QLabel(label))
+            if help_topic is not None:
+                header_layout.addWidget(SdkHelpButton(help_topic))
+            header_layout.addStretch(1)
+            cell_layout.addWidget(header)
+            cell_layout.addWidget(control)
+            grid.addWidget(cell, row, column)
+
         self._temperature = QDoubleSpinBox()
         self._temperature.setRange(0.0, 2.0)
         self._temperature.setSingleStep(0.1)
         self._temperature.setSpecialValueText("provider default")
         self._temperature.setValue(0.0)
+        self._temperature.setMinimumWidth(132)
         self._temperature.setAccessibleName("Temperature")
         self._temperature.setToolTip(
             "Sampling temperature. At the minimum the field reads 'provider default' and "
             "is omitted from the wire request entirely — AnyInfer never invents a "
             "temperature." + _UNREPORTED_DEFAULT_NOTE
         )
-        controls.addWidget(self._temperature)
-
-        controls.addWidget(QLabel("Top-p:"))
         self._top_p = QDoubleSpinBox()
         self._top_p.setRange(0.0, 1.0)
         self._top_p.setSingleStep(0.05)
         self._top_p.setSpecialValueText("provider default")
         self._top_p.setValue(0.0)
+        self._top_p.setMinimumWidth(132)
         self._top_p.setAccessibleName("Top-p")
         self._top_p.setToolTip(
             "Nucleus-sampling cutoff. At the minimum the value is omitted from the wire "
             "request, so the provider's default is used." + _UNREPORTED_DEFAULT_NOTE
         )
-        controls.addWidget(self._top_p)
-
-        controls.addWidget(QLabel("Max tokens:"))
         self._max_output_tokens = QSpinBox()
         self._max_output_tokens.setRange(0, 65_536)
         self._max_output_tokens.setSingleStep(1)
         self._max_output_tokens.setSpecialValueText("provider default")
         self._max_output_tokens.setValue(0)
+        self._max_output_tokens.setMinimumWidth(132)
         self._max_output_tokens.setAccessibleName("Max output tokens")
-        controls.addWidget(self._max_output_tokens)
-
-        controls.addWidget(QLabel("Reasoning:"))
         self._reasoning = QComboBox()
         # The blank entry is "say nothing", not "minimal": a request that omits the field
         # lets each provider apply its own default, and the normalized levels below are
@@ -332,17 +340,12 @@ class MainWindow(QMainWindow):
             "that provider's own spelling; a provider without the control drops it and "
             "reports the drop as telemetry rather than failing." + _UNREPORTED_DEFAULT_NOTE
         )
-        controls.addWidget(self._reasoning)
-
-        routing.addWidget(QLabel("Attempts:"))
         self._max_attempts = QSpinBox()
         self._max_attempts.setRange(1, 5)
         self._max_attempts.setValue(2)
+        self._max_attempts.setMinimumWidth(96)
         self._max_attempts.setAccessibleName("Max attempts per target")
         self._max_attempts.setToolTip("Retry budget per target, before falling back.")
-        routing.addWidget(self._max_attempts)
-
-        routing.addWidget(QLabel("Fallback:"))
         self._fallback = QComboBox()
         self._fallback.addItem("Nothing (no fallback)", "")
         self._fallback.setAccessibleName("Fallback target")
@@ -350,9 +353,6 @@ class MainWindow(QMainWindow):
             "Optional fallback target the router moves to once the retry budget is spent. "
             "Pick the flaky demo model above with 1 attempt to watch it happen."
         )
-        routing.addWidget(self._fallback)
-
-        routing.addWidget(QLabel("History:"))
         self._history = QComboBox()
         self._history.addItem("Send everything (default)", "")
         self._history.addItem("Trim only when it will not fit", "last_resort")
@@ -363,10 +363,6 @@ class MainWindow(QMainWindow):
             "Off by default — with no policy the full transcript is sent untouched. "
             "Trimming is never silent: it emits a ContextReduced telemetry event."
         )
-        routing.addWidget(self._history)
-        routing.addWidget(SdkHelpButton("history"))
-
-        routing.addWidget(QLabel("Prompt cache:"))
         self._cache = QComboBox()
         self._cache.addItem("Off (default)", "")
         self._cache.addItem("Auto placement", "auto")
@@ -377,9 +373,6 @@ class MainWindow(QMainWindow):
             "long it retains the prompt, so no policy means cached exactly as before: not "
             "at all. The plan — mechanism and marks — arrives as a CachePlanned event."
         )
-        routing.addWidget(self._cache)
-        routing.addWidget(SdkHelpButton("prompt-cache"))
-
         self._reuse_session = QCheckBox("Reuse session")
         self._reuse_session.setAccessibleName("Reuse provider session")
         self._reuse_session.setToolTip(
@@ -388,9 +381,16 @@ class MainWindow(QMainWindow):
             "status line reports what actually happened: resumed, fresh, or unsupported "
             "— the provider decides, never the client."
         )
-        routing.addWidget(self._reuse_session)
-
-        self._controls_help = SdkHelpButton("routing")
+        self._sync_request_control_heights()
+        add_cell(0, 0, "Temperature", self._temperature)
+        add_cell(0, 1, "Top-p", self._top_p)
+        add_cell(0, 2, "Max tokens", self._max_output_tokens)
+        add_cell(1, 0, "Reasoning", self._reasoning)
+        add_cell(1, 1, "Attempts", self._max_attempts)
+        add_cell(1, 2, "Fallback", self._fallback, help_topic="routing")
+        add_cell(2, 0, "History", self._history, help_topic="history")
+        add_cell(2, 1, "Prompt cache", self._cache, help_topic="prompt-cache")
+        add_cell(2, 2, "Session", self._reuse_session)
 
         saved = self._engine.config.targets
         if len(saved) > 1:
@@ -399,15 +399,28 @@ class MainWindow(QMainWindow):
         self._engine_bar.changed.connect(self._update_fallback_choices)
         self._engine_bar.changed.connect(self._refresh_token_hint)
         self._engine_bar.changed.connect(self._refresh_default_hints)
+        self._engine_bar.changed.connect(self._update_send_availability)
         self._refresh_default_hints()
+        self._update_send_availability()
 
-        controls.addStretch(1)
-        routing.addStretch(1)
-        routing.addWidget(self._controls_help)
-        return group
+        section = CollapsibleSection(
+            "Request options — sampling & routing",
+            content,
+        )
+        section.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        section.set_minimized(True)
+        self._request_options_section = section
+        return section
+
+    def _sync_request_control_heights(self) -> None:
+        """Keep the checkbox cell level with adjacent controls after style changes."""
+        self._reuse_session.setMinimumHeight(
+            max(self._history.sizeHint().height(), self._cache.sizeHint().height())
+        )
 
     def _build_inspector(self) -> QWidget:
         pane = QWidget()
+        pane.setObjectName("InspectorPane")
         layout = QVBoxLayout(pane)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
@@ -461,8 +474,15 @@ class MainWindow(QMainWindow):
         self._tools_section.set_minimized(True)
         self._inspector_splitter.addWidget(self._tools_section)
 
-        self._inspector_splitter.setSizes([280, 280, 220, 40, 40])
-        layout.addWidget(self._inspector_splitter, 1)
+        self._embeddings = EmbeddingsPanel(self._engine)
+        self._embeddings_section = CollapsibleSection(
+            strings.EMBEDDINGS_TITLE,
+            self._embeddings,
+            help_topic="embeddings",
+            icon=_SECTION_ICONS["embeddings"],
+        )
+        self._embeddings_section.set_minimized(True)
+        self._inspector_splitter.addWidget(self._embeddings_section)
 
         self._inspector_sections: dict[str, CollapsibleSection] = {
             "telemetry": self._telemetry_section,
@@ -470,17 +490,64 @@ class MainWindow(QMainWindow):
             "providers": self._providers_section,
             "target": self._target_section,
             "tools": self._tools_section,
+            "embeddings": self._embeddings_section,
         }
-        # Both panels act on whatever engine/model the bar currently points at.
+        # A splitter distributes surplus height between its handles when every visible
+        # child is fixed at its collapsed height. This invisible final child absorbs that
+        # surplus instead, keeping a stack of collapsed headers anchored to the top.
+        self._inspector_bottom_spacer = QWidget()
+        self._inspector_bottom_spacer.setObjectName("InspectorBottomSpacer")
+        self._inspector_bottom_spacer.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        self._inspector_splitter.addWidget(self._inspector_bottom_spacer)
+        self._inspector_splitter.setStretchFactor(len(self._inspector_sections), 1)
+        self._inspector_bottom_spacer.hide()
+        for section in self._inspector_sections.values():
+            section.minimized_changed.connect(self._sync_inspector_bottom_spacer)
+
+        self._inspector_splitter.setSizes(
+            [280, 280, 220, HEADER_HEIGHT, HEADER_HEIGHT, HEADER_HEIGHT, 0]
+        )
+        layout.addWidget(self._inspector_splitter, 1)
+
+        # All three panels act on whatever engine/model the bar currently points at.
         self._engine_bar.changed.connect(self._sync_inspector_targets)
         self._sync_inspector_targets()
         return pane
 
     def _sync_inspector_targets(self) -> None:
-        """Point the target inspector and tools panel at the bar's current selection."""
+        """Point the target inspector, tools panel, and embeddings panel at the bar's target."""
         target = self._engine_bar.target()
         self._target_inspector.set_target(target)
         self._tools.set_target(target)
+        self._embeddings.set_target(target)
+
+    def _sync_inspector_bottom_spacer(self, *_args: object) -> None:
+        """Put surplus splitter height below an entirely collapsed visible stack."""
+        visible_sections = [
+            section for section in self._inspector_sections.values() if not section.isHidden()
+        ]
+        anchor_to_top = bool(visible_sections) and all(
+            section.minimized for section in visible_sections
+        )
+        self._inspector_bottom_spacer.setVisible(anchor_to_top)
+        if not anchor_to_top:
+            return
+
+        handle_count = len(visible_sections)
+        used_height = len(visible_sections) * HEADER_HEIGHT
+        remaining = max(
+            0,
+            self._inspector_splitter.height()
+            - used_height
+            - handle_count * self._inspector_splitter.handleWidth(),
+        )
+        sizes = [
+            HEADER_HEIGHT if section in visible_sections else 0
+            for section in self._inspector_sections.values()
+        ]
+        self._inspector_splitter.setSizes([*sizes, remaining])
 
     def _build_providers_tab(self) -> QWidget:
         pane = QWidget()
@@ -519,9 +586,7 @@ class MainWindow(QMainWindow):
         self._provider_table = QTableWidget(0, 4)
         # Rows are keyed by instance, so the engine is named alongside it: two instances
         # of one engine are two rows that would otherwise be indistinguishable.
-        self._provider_table.setHorizontalHeaderLabels(
-            ["Alias", "Engine", "Health", "Models"]
-        )
+        self._provider_table.setHorizontalHeaderLabels(["Alias", "Engine", "Health", "Models"])
         self._provider_table.setAccessibleName("Provider report")
         self._provider_table.horizontalHeader().setStretchLastSection(True)
         self._provider_table.verticalHeader().setVisible(False)
@@ -533,6 +598,11 @@ class MainWindow(QMainWindow):
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
 
+        app_settings_action = QAction("App &settings…", self)
+        app_settings_action.setShortcut(QKeySequence("Ctrl+,"))
+        app_settings_action.triggered.connect(self._on_app_settings)
+        file_menu.addAction(app_settings_action)
+
         settings_action = QAction("Provider &settings…", self)
         settings_action.triggered.connect(self._on_configure)
         file_menu.addAction(settings_action)
@@ -541,6 +611,11 @@ class MainWindow(QMainWindow):
         new_chat_action.setShortcut(QKeySequence("Ctrl+Shift+N"))
         new_chat_action.triggered.connect(self._on_new_chat)
         file_menu.addAction(new_chat_action)
+
+        open_saved_action = QAction(strings.OPEN_SAVED, self)
+        open_saved_action.setShortcut(QKeySequence.StandardKey.Open)
+        open_saved_action.triggered.connect(self._on_open_saved)
+        file_menu.addAction(open_saved_action)
 
         system_prompt_action = QAction("System &prompt…", self)
         system_prompt_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
@@ -554,15 +629,12 @@ class MainWindow(QMainWindow):
         file_menu.addAction(quit_action)
 
         tools_menu = self.menuBar().addMenu("&Tools")
-        models_action = QAction(strings.LOCAL_MODELS, self)
+        models_action = QAction(strings.LOCAL_INFERENCE, self)
         models_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
         models_action.triggered.connect(self._on_local_models)
         tools_menu.addAction(models_action)
 
-        view_menu = self.menuBar().addMenu("&View")
-        self._build_sidebar_menu(view_menu)
-        view_menu.addSeparator()
-        self._build_theme_menu(view_menu)
+        self._build_sidebar_menu()
 
         self._build_help_menu()
 
@@ -613,34 +685,15 @@ class MainWindow(QMainWindow):
             "info": about_action,
         }
 
-    def _build_sidebar_menu(self, view_menu: QMenu) -> None:
-        """Whole-sidebar and per-section visibility entries.
+    def _build_sidebar_menu(self) -> None:
+        """Build the top-level Sidebar menu and its visibility checkboxes."""
+        self._sidebar_menu = self.menuBar().addMenu(f"&{strings.SIDEBAR}")
 
-        A visible section shows the ordinary checkmark; a hidden one shows the section's
-        own icon instead — the menu doubles as a legend for the header icons on the
-        right-hand dock.
-        """
-        self._left_sidebar_action = QAction(strings.SHOW_LEFT_SIDEBAR, self, checkable=True)
-        self._left_sidebar_action.setChecked(True)
-        self._left_sidebar_action.triggered.connect(self._set_left_sidebar_visible)
-        view_menu.addAction(self._left_sidebar_action)
-
-        self._right_sidebar_action = QAction(strings.SHOW_RIGHT_SIDEBAR, self, checkable=True)
+        self._right_sidebar_action = QAction(strings.SHOW_SIDEBAR, self, checkable=True)
         self._right_sidebar_action.setChecked(True)
         self._right_sidebar_action.triggered.connect(self._set_right_sidebar_visible)
-        view_menu.addAction(self._right_sidebar_action)
-
-        view_menu.addSeparator()
-
-        conversations_action = QAction(strings.SHOW_CONVERSATIONS, self, checkable=True)
-        conversations_action.setChecked(True)
-        conversations_action.triggered.connect(self._set_left_sidebar_visible)
-        view_menu.addAction(conversations_action)
-        # The sidebar has one panel, so its own checkbox and the left-sidebar checkbox are
-        # the same switch — keep both in sync rather than modeling a second state.
-        self._left_sidebar_action.triggered.connect(conversations_action.setChecked)
-        conversations_action.triggered.connect(self._left_sidebar_action.setChecked)
-        self._conversations_action = conversations_action
+        self._sidebar_menu.addAction(self._right_sidebar_action)
+        self._sidebar_menu.addSeparator()
 
         self._section_actions: dict[str, QAction] = {}
         section_labels = (
@@ -656,50 +709,8 @@ class MainWindow(QMainWindow):
             action.triggered.connect(
                 lambda checked, k=key: self._set_inspector_section_visible(k, checked)
             )
-            action.toggled.connect(lambda _checked, k=key: self._sync_section_action_icon(k))
-            view_menu.addAction(action)
+            self._sidebar_menu.addAction(action)
             self._section_actions[key] = action
-            self._sync_section_action_icon(key)
-
-    def _sync_section_action_icon(self, key: str) -> None:
-        """Hidden sections wear their icon in the menu; visible ones wear the checkmark."""
-        action = self._section_actions[key]
-        if action.isChecked():
-            action.setIcon(QIcon())
-        else:
-            action.setIcon(themed_icon(self, _SECTION_ICONS[key], size=16))
-
-    def _build_theme_menu(self, view_menu: QMenu) -> None:
-        """Build the Theme submenu.
-
-        Custom palettes first, then a separator, then the OS-following defaults — custom
-        themes are the more deliberate, less "default" choice, so they lead.
-
-        The menu, action group, and per-theme actions are kept as instance attributes
-        rather than locals: PySide6 does not keep a Python wrapper alive just because its
-        underlying Qt object is still parented, so an unreferenced local here can be
-        garbage-collected out from under the menu it was wired into.
-        """
-        self._theme_menu = view_menu.addMenu("&Theme")
-        self._theme_action_group = QActionGroup(self)
-        self._theme_action_group.setExclusive(True)
-        self._theme_actions: dict[str, QAction] = {}
-
-        for key, label in theme.CUSTOM_THEMES_MENU:
-            self._add_theme_action(key, label)
-
-        self._theme_menu.addSeparator()
-
-        for key, label in theme.DEFAULT_THEME_CHOICES:
-            self._add_theme_action(key, label)
-
-    def _add_theme_action(self, key: str, label: str) -> None:
-        action = QAction(label, self, checkable=True)
-        action.setChecked(key == self._theme)
-        action.triggered.connect(lambda _checked=False, p=key: self._set_theme(p))
-        self._theme_action_group.addAction(action)
-        self._theme_menu.addAction(action)
-        self._theme_actions[key] = action
 
     def _build_shortcuts(self) -> None:
         cancel_action = QAction("Cancel generation", self)
@@ -712,7 +723,7 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(self._on_configure)
         self.addAction(settings_action)
 
-        toggle_action = QAction("Toggle right sidebar", self)
+        toggle_action = QAction("Toggle sidebar", self)
         toggle_action.setShortcut(QKeySequence("Ctrl+Shift+T"))
         toggle_action.triggered.connect(self._toggle_right_sidebar)
         self.addAction(toggle_action)
@@ -790,22 +801,28 @@ class MainWindow(QMainWindow):
         if index >= 0:
             self._tabs.set_title(index, title)
         self._save_page(page)
-        self._reload_sidebar()
 
     def _on_tab_save(self, index: int, fmt: str) -> None:
         page = self._tabs.page_at(index)
         if page is None:
             return
         self._save_page(page)
-        self._on_export_conversation(page.conversation.id, fmt)
+        self._save_page_as(page, fmt)
 
     def _on_tab_delete(self, index: int) -> None:
         page = self._tabs.page_at(index)
-        if page is not None:
-            self._on_delete_conversation(page.conversation.id)
+        if page is None:
+            return
+        self._engine.cancel(page.key)
+        page.messages.clear()  # closing this page must not recreate the deleted save
+        self._tabs.removeTab(index)
+        page.deleteLater()
+        (self._conversations_dir / f"{page.conversation.id}.json").unlink(missing_ok=True)
+        if self._tabs.count() == 0:
+            self._open_page(Conversation.new())
 
     def _on_tab_close(self, index: int) -> None:
-        """Close one tab, keeping its conversation on disk and in the sidebar."""
+        """Close one tab, keeping its conversation on disk for Open Saved."""
         page = self._tabs.page_at(index)
         if page is None:
             return
@@ -815,7 +832,6 @@ class MainWindow(QMainWindow):
         page.deleteLater()
         if self._tabs.count() == 0:
             self._open_page(Conversation.new())
-        self._reload_sidebar()
 
     def _on_tab_close_all(self) -> None:
         """Close every tab (conversations stay saved) and start one fresh."""
@@ -828,7 +844,6 @@ class MainWindow(QMainWindow):
             if widget is not None:
                 widget.deleteLater()
         self._open_page(Conversation.new())
-        self._reload_sidebar()
 
     # ---- actions ---------------------------------------------------------------------
 
@@ -858,8 +873,7 @@ class MainWindow(QMainWindow):
         first_user_turn = not any(m.role == "user" for m in page.messages)
         page.messages.append(user(prompt))
         if first_user_turn and page.conversation.title == "New chat":
-            # Titled at send time, so the tab and sidebar read as the topic rather than
-            # as "New chat" for the length of the first answer.
+            # Title at send time so the tab immediately reads as the topic.
             title = gist_title(prompt)
             page.conversation = page.conversation.renamed(title)
             index = self._tabs.indexOf(page)
@@ -927,6 +941,10 @@ class MainWindow(QMainWindow):
             return (primary, fallback)
         return (primary,)
 
+    def _update_send_availability(self) -> None:
+        """Keep Send unavailable until both an engine and a model are selected."""
+        self._composer.set_send_enabled(bool(self._engine_bar.target()))
+
     def _update_fallback_choices(self) -> None:
         """Refresh the fallback dropdown from everything discovery has reported."""
         selected = self._fallback.currentData()
@@ -950,7 +968,7 @@ class MainWindow(QMainWindow):
         Three fields, one rule: show the number when the library has one on file, and say
         plainly that it does not when it does not. Sampling defaults are known only for a
         provider whose own documentation states them, so most selections still land on the
-        unreported note — which is the point, not a shortfall.
+        unreported note, which is the point, not a shortfall.
         """
         detected = self._engine_bar.max_output_tokens_detected()
         base = (
@@ -961,12 +979,9 @@ class MainWindow(QMainWindow):
             self._max_output_tokens.setSpecialValueText("provider default")
             self._max_output_tokens.setToolTip(base + _UNREPORTED_DEFAULT_NOTE)
         else:
-            self._max_output_tokens.setSpecialValueText(
-                f"provider default ({detected.value:,})"
-            )
+            self._max_output_tokens.setSpecialValueText(f"provider default ({detected.value:,})")
             self._max_output_tokens.setToolTip(
-                f"{base} (Provider default: {detected.value:,} tokens — "
-                f"{detected.provenance}.)"
+                f"{base} (Provider default: {detected.value:,} tokens — {detected.provenance}.)"
             )
 
         self._apply_sampling_hint(
@@ -993,9 +1008,7 @@ class MainWindow(QMainWindow):
             spin.setToolTip(base + _UNREPORTED_DEFAULT_NOTE)
             return
         spin.setSpecialValueText(f"provider default ({detected.value:g})")
-        spin.setToolTip(
-            f"{base} (Provider default: {detected.value:g} — {detected.provenance}.)"
-        )
+        spin.setToolTip(f"{base} (Provider default: {detected.value:g} — {detected.provenance}.)")
 
     def _on_configure(self) -> None:
         if self._engine.busy:
@@ -1006,30 +1019,73 @@ class MainWindow(QMainWindow):
         dialog = ProviderSettingsDialog(self._engine.registry, self._engine.config, self)
         if dialog.exec() != ProviderSettingsDialog.DialogCode.Accepted:
             return
-        config = self._with_ui_state(dialog.result_config())
+        self._apply_provider_config(
+            dialog.result_config(),
+            "Settings saved; the client will rebuild on next use.",
+        )
+
+    def _on_app_settings(self) -> None:
+        """Edit and persist preferences that apply beyond one provider instance."""
+        dialog = AppSettingsDialog(self._engine.config, self)
+        if dialog.exec() != AppSettingsDialog.DialogCode.Accepted:
+            return
+        self._apply_app_settings(dialog.result_config())
+
+    def _apply_app_settings(self, edited: DemoConfig) -> None:
+        """Apply and persist the result of the application-settings dialog."""
+        self._apply_theme(edited.theme)
+        config = self._with_ui_state(edited)
+        self._engine.update_preferences(config)
+        if self._models_dialog is not None:
+            self._models_dialog.set_providers(config)
+        try:
+            config.save(self._config_path)
+        except OSError as error:
+            self.statusBar().showMessage(f"App settings applied but not saved: {error}")
+            return
+        self.statusBar().showMessage("App settings saved.")
+
+    def _apply_provider_config(self, config: DemoConfig, success_message: str) -> None:
+        """Apply and persist provider settings from either configuration surface."""
+        config = self._with_ui_state(config)
         self._engine.apply_config(config)
         self._engine_bar.set_providers(config)
         if self._models_dialog is not None:
-            # The pull panel offers configured engines; a settings change can add or
-            # remove one while the dialog is open.
+            # Catalog acquisition and engine pull both depend on the configured engines;
+            # a settings change can add or remove one while the dialog is open.
             self._models_dialog.set_providers(config)
         self._discover_enabled_providers()
         try:
             config.save(self._config_path)
         except OSError as error:
-            self.statusBar().showMessage(f"Settings applied but not saved: {error}")
+            message = f"Settings applied but not saved: {error}"
+            self.statusBar().showMessage(message)
+            if self._models_dialog is not None:
+                self._models_dialog.show_status(message)
             return
-        self.statusBar().showMessage("Settings saved; the client will rebuild on next use.")
+        self.statusBar().showMessage(success_message)
+        if self._models_dialog is not None:
+            self._models_dialog.show_status(success_message)
+
+    def _on_quick_add_llama_cpp(self) -> None:
+        """Enable a default llama.cpp instance from the Local Inference catalog."""
+        if self._engine.busy:
+            message = "Finish or cancel the running generations before adding llama.cpp."
+            self.statusBar().showMessage(message)
+            if self._models_dialog is not None:
+                self._models_dialog.show_status(message)
+            return
+        config = self._engine.config.with_provider(
+            ProviderConfig(provider_id="llama-cpp", enabled=True)
+        )
+        self._apply_provider_config(config, "llama.cpp added with default settings.")
 
     def _on_system_prompt(self) -> None:
         """Edit the system prompt stored in the demo config."""
-        current = self._engine.config.system_prompt
-        text, ok = QInputDialog.getMultiLineText(
-            self, "System prompt", "Sent as the first system message in new chats:", current
-        )
-        if not ok:
+        dialog = _make_system_prompt_dialog(self, self._engine.config.system_prompt)
+        if dialog.exec() != QInputDialog.DialogCode.Accepted:
             return
-        config = replace(self._engine.config, system_prompt=text)
+        config = replace(self._engine.config, system_prompt=dialog.textValue())
         self._engine.update_preferences(config)
         with contextlib.suppress(OSError):
             config.save(self._config_path)
@@ -1050,13 +1106,39 @@ class MainWindow(QMainWindow):
         AboutDialog(self).exec()
 
     def _on_local_models(self) -> None:
-        """Open (or focus) the local-model manager."""
+        """Open (or focus) the local-inference manager."""
         if self._models_dialog is not None and self._models_dialog.isVisible():
             self._models_dialog.raise_()
             self._models_dialog.activateWindow()
             return
-        self._models_dialog = ModelsDialog(self._engine, self._engine.config, self)
+        self._models_dialog = ModelsDialog(
+            self._engine,
+            self._engine.config,
+            self,
+            initial_target=self._engine_bar.target(),
+        )
+        self._models_dialog.quick_llama_setup_requested.connect(self._on_quick_add_llama_cpp)
+        self._models_dialog.runtime_selection_requested.connect(self._on_runtime_selected)
         self._models_dialog.show()
+
+    def _on_runtime_selected(self, runtime: str) -> None:
+        """Persist one default runtime across the demo's llama.cpp instances."""
+        providers = []
+        changed = False
+        for provider in self._engine.config.providers:
+            if provider.provider_id != "llama-cpp":
+                providers.append(provider)
+                continue
+            options = dict(provider.options)
+            options["runtime"] = runtime
+            providers.append(replace(provider, options=options))
+            changed = True
+        if not changed:
+            return
+        self._apply_provider_config(
+            self._engine.config.with_providers(providers),
+            f"llama.cpp will use {runtime} for future server starts.",
+        )
 
     def _on_refresh_providers(self) -> None:
         self._provider_table.setRowCount(0)
@@ -1073,21 +1155,7 @@ class MainWindow(QMainWindow):
             self._engine.check_health(provider.instance_id)
             self._engine.list_models(provider.instance_id)
 
-    # ---- sidebars: visibility and snapping ---------------------------------------------
-
-    def _on_outer_splitter_moved(self, _pos: int, _index: int) -> None:
-        """Snap the conversation list shut below a usable width."""
-        sizes = self._outer_splitter.sizes()
-        if len(sizes) < 2:
-            return
-        width = sizes[0]
-        if 0 < width < _LEFT_SNAP_WIDTH:
-            total = sum(sizes)
-            self._outer_splitter.setSizes([0, total])
-            self._sync_left_actions(False)
-        elif width >= _LEFT_SNAP_WIDTH:
-            self._sidebar_width_before_hide = width
-            self._sync_left_actions(True)
+    # ---- sidebar: visibility and snapping ----------------------------------------------
 
     def _on_main_splitter_moved(self, _pos: int, _index: int) -> None:
         """Snap the inspector shut below a usable width."""
@@ -1102,10 +1170,6 @@ class MainWindow(QMainWindow):
         elif width >= _RIGHT_SNAP_WIDTH:
             self._right_sidebar_width_before_hide = width
             self._right_sidebar_action.setChecked(True)
-
-    def _sync_left_actions(self, visible: bool) -> None:
-        self._left_sidebar_action.setChecked(visible)
-        self._conversations_action.setChecked(visible)
 
     def _set_right_sidebar_visible(self, visible: bool) -> None:
         """Collapse or restore the inspector pane while keeping it resizable."""
@@ -1128,26 +1192,10 @@ class MainWindow(QMainWindow):
         collapsed = len(sizes) < 2 or sizes[1] == 0
         self._set_right_sidebar_visible(collapsed)
 
-    def _set_left_sidebar_visible(self, visible: bool) -> None:
-        """Collapse or restore the conversation history sidebar while keeping it resizable."""
-        splitter = self._outer_splitter
-        sizes = splitter.sizes()
-        if visible:
-            total = sum(sizes) if sizes else 1
-            restored = max(self._sidebar_width_before_hide, _LEFT_SNAP_WIDTH)
-            right = max(total - restored, int(total * 0.6))
-            splitter.setSizes([total - right, right])
-        else:
-            if len(sizes) >= 2 and sizes[0] > 0:
-                self._sidebar_width_before_hide = max(sizes[0], _LEFT_SNAP_WIDTH)
-            total = sum(sizes) if sizes else 1
-            splitter.setSizes([0, total])
-        self._sync_left_actions(visible)
-        self._sidebar.setVisible(visible)
-
     def _set_inspector_section_visible(self, key: str, visible: bool) -> None:
         """Show or fully hide one inspector section (distinct from minimize)."""
         self._inspector_sections[key].setVisible(visible)
+        self._sync_inspector_bottom_spacer()
 
     # ---- welcome / quick actions -------------------------------------------------------
 
@@ -1173,7 +1221,7 @@ class MainWindow(QMainWindow):
         self._engine_bar.set_target("demo-fake:tools")
         self._sync_inspector_targets()
         self._set_right_sidebar_visible(True)
-        self._tools_section.setVisible(True)
+        self._set_inspector_section_visible("tools", True)
         self._tools_section.set_minimized(False)
         self.statusBar().showMessage(
             "Tool loop ready — press 'Run tool loop' in the right sidebar."
@@ -1186,90 +1234,45 @@ class MainWindow(QMainWindow):
         self._open_page(Conversation.new())
         self.statusBar().showMessage("New chat.")
 
-    def _on_conversation_selected(self, conversation_id: str) -> None:
-        existing = self._tabs.index_of_key(conversation_id)
+    def _on_open_saved(self) -> None:
+        """Choose a saved conversation JSON file and open it as a tab."""
+        path_str, _ = QFileDialog.getOpenFileName(
+            self,
+            strings.OPEN_SAVED,
+            str(self._conversations_dir),
+            "AnyInfer conversations (*.json)",
+        )
+        if not path_str:
+            return
+        loaded = Conversation.load(Path(path_str))
+        if loaded is None:
+            self._warn("Open failed", "That file is not a valid saved conversation.")
+            return
+        existing = self._tabs.index_of_key(loaded.id)
         if existing >= 0:
             self._tabs.setCurrentIndex(existing)
-            return
-        path = self._conversations_dir / f"{conversation_id}.json"
-        loaded = Conversation.load(path)
-        if loaded is None:
-            return
-        self._open_page(loaded)
-        self.statusBar().showMessage(f"Loaded '{loaded.title}'.")
-
-    def _on_rename_conversation(self, conversation_id: str, title: str) -> None:
-        page = self._page_for(conversation_id)
-        if page is not None:
-            self._rename_page(page, title)
-            return
-        path = self._conversations_dir / f"{conversation_id}.json"
-        loaded = Conversation.load(path)
-        if loaded is not None:
-            loaded.renamed(title).save(self._conversations_dir)
-        self._reload_sidebar()
-
-    def _on_delete_conversation(self, conversation_id: str) -> None:
-        """Delete a conversation's file, closing its tab if it has one."""
-        index = self._tabs.index_of_key(conversation_id)
-        if index >= 0:
-            page = self._tabs.page_at(index)
-            if page is not None:
-                self._engine.cancel(page.key)
-                page.messages.clear()  # a close must not re-save what delete removes
-            self._tabs.removeTab(index)
-            if page is not None:
-                page.deleteLater()
-        (self._conversations_dir / f"{conversation_id}.json").unlink(missing_ok=True)
-        if self._tabs.count() == 0:
-            self._open_page(Conversation.new())
-        self._reload_sidebar()
-
-    def _on_export_conversation(self, conversation_id: str, fmt: str) -> None:
-        page = self._page_for(conversation_id)
-        if page is not None:
-            conversation = page.conversation.with_messages(page.messages)
         else:
-            loaded = Conversation.load(self._conversations_dir / f"{conversation_id}.json")
-            if loaded is None:
-                return
-            conversation = loaded
+            self._open_page(loaded)
+        self.statusBar().showMessage(f"Opened '{loaded.title}'.")
+
+    def _save_page_as(self, page: ChatPage, fmt: str) -> None:
+        """Save one tab as a portable Markdown or JSON file chosen by the user."""
+        conversation = page.conversation.with_messages(page.messages)
 
         if fmt == "markdown":
             destination, _ = QFileDialog.getSaveFileName(
-                self, "Export as Markdown", f"{conversation.title}.md", "Markdown (*.md)"
+                self, "Save as Markdown", f"{conversation.title}.md", "Markdown (*.md)"
             )
             if destination:
                 Path(destination).write_text(conversation.to_markdown(), encoding="utf-8")
         else:
             destination, _ = QFileDialog.getSaveFileName(
-                self, "Export as JSON", f"{conversation.title}.json", "JSON (*.json)"
+                self, "Save as JSON", f"{conversation.title}.json", "JSON (*.json)"
             )
             if destination:
                 Path(destination).write_text(
                     json.dumps(conversation.to_json(), indent=2), encoding="utf-8"
                 )
-
-    def _on_export_all(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, strings.EXPORT_ALL)
-        if not directory:
-            return
-        self._save_all_pages()
-        for conversation in Conversation.load_all(self._conversations_dir):
-            destination = Path(directory) / f"{conversation.id}.json"
-            destination.write_text(json.dumps(conversation.to_json(), indent=2), encoding="utf-8")
-        self.statusBar().showMessage(f"Exported conversations to {directory}.")
-
-    def _on_import_conversation(self) -> None:
-        path_str, _ = QFileDialog.getOpenFileName(self, strings.IMPORT, "", "JSON (*.json)")
-        if not path_str:
-            return
-        loaded = Conversation.load(Path(path_str))
-        if loaded is None:
-            self._warn("Import failed", "That file is not a valid conversation export.")
-            return
-        loaded.save(self._conversations_dir)
-        self._reload_sidebar()
 
     def _save_page(self, page: ChatPage) -> None:
         if not page.messages:
@@ -1278,20 +1281,9 @@ class MainWindow(QMainWindow):
         with contextlib.suppress(OSError):
             page.conversation.save(self._conversations_dir)
 
-    def _save_current_conversation(self) -> None:
-        page = self._tabs.current_page()
-        if page is not None:
-            self._save_page(page)
-
     def _save_all_pages(self) -> None:
         for page in self._tabs.pages():
             self._save_page(page)
-
-    def _reload_sidebar(self) -> None:
-        conversations = Conversation.load_all(self._conversations_dir)
-        page = self._tabs.current_page()
-        active_id = page.conversation.id if page is not None else ""
-        self._sidebar.set_conversations(conversations, active_id=active_id)
 
     # ---- theme and persistence -------------------------------------------------------
 
@@ -1299,6 +1291,7 @@ class MainWindow(QMainWindow):
         """Restyle the whole application and re-render the themed icons."""
         self._theme = preference
         theme.apply_theme(QApplication.instance(), preference)
+        self._sync_request_control_heights()
         self._engine_bar.reapply_theme()
         self._tabs.reapply_theme()
         for page in self._tabs.pages():
@@ -1307,30 +1300,21 @@ class MainWindow(QMainWindow):
             if isinstance(empty, WelcomeView):
                 empty.reapply_theme()
         self._composer.reapply_theme()
-        self._sidebar.reapply_theme()
         self._telemetry.reapply_theme()
         self._provider_refresh_button.setIcon(
             themed_icon(self._provider_refresh_button, "refresh")
         )
         for section in self._inspector_sections.values():
             section.reapply_theme()
-        for key in self._section_actions:
-            self._sync_section_action_icon(key)
         for name, action in self._help_menu_actions.items():
-            icon_name = {"map": "map", "book": "book", "book2": "book",
-                         "license": "license", "info": "info"}[name]
+            icon_name = {
+                "map": "map",
+                "book": "book",
+                "book2": "book",
+                "license": "license",
+                "info": "info",
+            }[name]
             action.setIcon(themed_icon(self, icon_name, size=16))
-
-    def _set_theme(self, preference: str) -> None:
-        """Adopt a theme chosen from the menu (or set programmatically), and remember it."""
-        self._apply_theme(preference)
-        action = self._theme_actions.get(preference)
-        if action is not None:
-            action.setChecked(True)
-        config = self._with_ui_state(self._engine.config)
-        self._engine.update_preferences(config)
-        with contextlib.suppress(OSError):
-            config.save(self._config_path)
 
     def _follow_system_scheme(self) -> None:
         """Track the OS appearance live while the preference is 'system'."""
@@ -1445,7 +1429,6 @@ class MainWindow(QMainWindow):
         page.messages.append(Message(role="assistant", content=(Text(result.text),)))
         page.conversation = page.conversation.with_result(result)
         self._save_page(page)
-        self._reload_sidebar()
         # What the provider actually did with the session — resumed, fresh, or
         # unsupported — is the library's answer, and the honest thing is to show it.
         reuse = self._engine.session_reuse if self._reuse_session.isChecked() else ""
