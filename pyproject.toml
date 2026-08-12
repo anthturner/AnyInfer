@@ -108,6 +108,7 @@ include = [
   "overrides",
   "scripts",
   "contracts",
+  "fixtures",
   "mkdocs.yml",
   "workspace.py",
   "README.md",

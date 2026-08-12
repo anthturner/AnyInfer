@@ -534,6 +534,7 @@ _DOCSTRING_INHERITED_EXEMPT = frozenset(
 
 _PUBLIC_SURFACES = (
     "anyinfer",
+    "anyinfer.compare_diff",
     "anyinfer.context",
     "anyinfer.local",
     "anyinfer.serve",

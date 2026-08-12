@@ -548,9 +548,9 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument(
         "--target",
         action="append",
-        required=True,
         metavar="TARGET",
-        help="target to compare, repeatable; results preserve this order",
+        help="target to compare, repeatable; results preserve this order — required unless "
+        "--snapshot, --diff, or --diff-request selects one of the fixture-driven modes",
     )
     compare.add_argument("--json", action="store_true", help="emit JSON records")
     compare.add_argument(
@@ -558,6 +558,37 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="refresh provider model listings before comparing (may contact providers)",
     )
+    compare.add_argument(
+        "--fixtures",
+        type=Path,
+        metavar="PATH",
+        help="a compare_diff fixture file — for --snapshot, or the ad hoc --diff-request mode",
+    )
+    compare.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="write a compare_diff snapshot of --fixtures to --out, instead of comparing live",
+    )
+    compare.add_argument(
+        "--out",
+        type=Path,
+        metavar="PATH",
+        help="where --snapshot writes its output",
+    )
+    compare.add_argument(
+        "--diff",
+        nargs=2,
+        metavar=("BASELINE", "CURRENT"),
+        help="diff two snapshot files written by --snapshot; exit 1 if they differ (CI-friendly)",
+    )
+    compare.add_argument(
+        "--diff-request",
+        metavar="ID",
+        help="ad hoc portability report: a fixture id from --fixtures, compared live between "
+        "--diff-target-a and --diff-target-b, no snapshot file needed",
+    )
+    compare.add_argument("--diff-target-a", metavar="TARGET")
+    compare.add_argument("--diff-target-b", metavar="TARGET")
 
     init = subcommands.add_parser(
         "init",
@@ -1184,7 +1215,25 @@ def _confirm(question: str, args: argparse.Namespace) -> bool:
 
 
 def _compare(args: argparse.Namespace) -> int:
-    """Compare a request across targets without dispatching it."""
+    """Compare a request across targets without dispatching it.
+
+    Dispatches to the portability diff tool (`anyinfer.compare_diff`) first when
+    ``--snapshot``, ``--diff``, or ``--diff-request`` was given; otherwise runs the
+    original single ad hoc comparison.
+    """
+    if args.diff is not None:
+        return _compare_diff_files(args)
+    if args.snapshot:
+        return _compare_snapshot(args)
+    if args.diff_request is not None:
+        return _compare_diff_request(args)
+    if not args.target:
+        print(
+            "--target is required (or use --snapshot, --diff, or --diff-request)",
+            file=sys.stderr,
+        )
+        return 2
+
     from . import Client, Repair, Sampling, SchemaSpec
     from .types.requests import CachePolicy
 
@@ -1278,6 +1327,111 @@ def _compare(args: argparse.Namespace) -> int:
     print("  ".join(name.ljust(widths[index]) for index, name in enumerate(headings)))
     for row in rows:
         print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
+    return 0
+
+
+def _compare_snapshot(args: argparse.Namespace) -> int:
+    """`anyinfer compare --snapshot`: write a compare_diff snapshot to --out."""
+    from . import Client
+    from . import compare_diff as cd
+
+    if args.fixtures is None or args.out is None:
+        print("--snapshot needs --fixtures and --out", file=sys.stderr)
+        return 2
+
+    fixtures = cd.load_fixtures(args.fixtures)
+    config = _config(args.config)
+    if not config.providers:
+        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+        return 2
+    client = Client(
+        list(config.providers), route=config.route, operation_routes=config.operation_routes
+    )
+    try:
+        snapshot = cd.snapshot(fixtures, client=client)
+    finally:
+        client.close()
+
+    args.out.write_text(json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8")
+    print(f"wrote {len(fixtures)} fixture(s) to {args.out}")
+    return 0
+
+
+def _compare_diff_files(args: argparse.Namespace) -> int:
+    """`anyinfer compare --diff BASELINE CURRENT`: structural diff, no client needed."""
+    from . import compare_diff as cd
+
+    baseline_path, current_path = args.diff
+    try:
+        baseline = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+        current = json.loads(Path(current_path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        print(f"could not read snapshot file: {exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(f"snapshot file is not valid JSON: {exc}", file=sys.stderr)
+        return 2
+
+    report = cd.diff(baseline, current)
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "fixture_id": e.fixture_id,
+                        "target": e.target,
+                        "kind": e.kind,
+                        "field": e.field,
+                        "before": e.before,
+                        "after": e.after,
+                        "summary": e.summary,
+                    }
+                    for e in report.entries
+                ],
+                indent=2,
+            )
+        )
+    else:
+        print(cd.render_text(report))
+    return 1 if not report.is_empty else 0
+
+
+def _compare_diff_request(args: argparse.Namespace) -> int:
+    """`anyinfer compare --diff-request ID --diff-target-a A --diff-target-b B`.
+
+    The ad hoc, no-baseline-file "should I move from A to B" report for one fixture.
+    """
+    from . import Client
+    from . import compare_diff as cd
+
+    if args.fixtures is None or args.diff_target_a is None or args.diff_target_b is None:
+        print(
+            "--diff-request needs --fixtures, --diff-target-a, and --diff-target-b",
+            file=sys.stderr,
+        )
+        return 2
+
+    fixtures = cd.load_fixtures(args.fixtures)
+    matches = [f for f in fixtures if f.id == args.diff_request]
+    if not matches:
+        print(f"no fixture with id {args.diff_request!r} in {args.fixtures}", file=sys.stderr)
+        return 2
+
+    config = _config(args.config)
+    if not config.providers:
+        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+        return 2
+    client = Client(
+        list(config.providers), route=config.route, operation_routes=config.operation_routes
+    )
+    try:
+        report = cd.diff_targets(
+            matches[0], args.diff_target_a, args.diff_target_b, client=client
+        )
+    finally:
+        client.close()
+
+    print(cd.render_text(report))
     return 0
 
 

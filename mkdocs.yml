@@ -209,6 +209,7 @@ nav:
           - Requests and messages: reference/api/requests.md
           - Results and stream events: reference/api/results.md
           - Embeddings and reranking: reference/api/embeddings.md
+          - Portability diff tool: reference/api/compare-diff.md
           - Routing: reference/api/routing.md
           - Capabilities: reference/api/capabilities.md
           - Context reduction: reference/api/context.md
