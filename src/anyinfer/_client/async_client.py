@@ -40,7 +40,12 @@ from ..capabilities.cache import CachePlan, plan_cache
 from ..capabilities.estimate import HeuristicTokenEstimator, TokenEstimator
 from ..capabilities.gating import check_context_fit
 from ..capabilities.ledger import SpendLedger, SpendTotals
-from ..capabilities.pricing import TRUSTED_PROVENANCE, compute_operation_cost, with_cost
+from ..capabilities.pricing import (
+    TRUSTED_PROVENANCE,
+    CostEstimate,
+    compute_operation_cost,
+    with_cost,
+)
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import (
     DEFAULT_PROBE_FEATURES,
@@ -58,7 +63,7 @@ from ..capabilities.probes import (
 )
 from ..catalog.model import Catalog, TargetEntry
 from ..catalog.resolve import load_default_catalog, resolve_target
-from ..compare import TargetComparison
+from ..compare import EmbeddingTargetComparison, TargetComparison
 from ..context.select import select as select_context
 from ..context_request import ContextRequest, ContextSummary
 from ..credentials import ResolverChain
@@ -147,6 +152,7 @@ from ..types.operations import (
     DEFAULT_MAX_RERANK_RESPONSE_BYTES,
     BatchPolicy,
     EmbeddingCapabilities,
+    EmbeddingInputIntent,
     EmbeddingRequest,
     EmbeddingResult,
     EmbeddingSpace,
@@ -2535,6 +2541,150 @@ class AsyncClient:
                     cache=cache_plan,
                     cost=budget.estimated_cost,
                     capability_provenance=provenance,
+                )
+            )
+        return tuple(results)
+
+    async def compare_embedding(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        targets: Sequence[Target],
+        input_type: EmbeddingInputIntent | None = None,
+        refresh: bool = False,
+    ) -> tuple[EmbeddingTargetComparison, ...]:
+        """Compare how one embedding request would behave across targets, without dispatching.
+
+        Results preserve caller order and are never ranked. With ``refresh=False`` (the
+        default), no adapter is constructed and no network is touched; ``refresh=True``
+        may list models to refresh discovered capabilities, exactly as `compare()`.
+        """
+        texts = (inputs,) if isinstance(inputs, str) else tuple(inputs)
+
+        resolved_items: list[tuple[str, ResolvedTarget | None, str]] = []
+        refresh_ids: list[str] = []
+        for requested in targets:
+            spelling = str(requested)
+            try:
+                resolved = self.resolve(requested)
+                reason = self._pool.configuration_reason(resolved.provider_id) or ""
+            except (ConfigError, ValueError) as exc:
+                resolved_items.append((spelling, None, str(exc)))
+                continue
+            resolved_items.append((spelling, resolved, reason))
+            if refresh and not reason and resolved.provider_id not in refresh_ids:
+                refresh_ids.append(resolved.provider_id)
+
+        refresh_errors: dict[str, str] = {}
+        for provider_id in refresh_ids:
+            try:
+                await self.models(provider_id)
+            except Exception as exc:  # noqa: BLE001 — failure is comparison data
+                refresh_errors[provider_id] = str(exc)
+
+        results: list[EmbeddingTargetComparison] = []
+        for requested, item_resolved, reason in resolved_items:
+            if item_resolved is None or reason:
+                results.append(
+                    EmbeddingTargetComparison(
+                        requested=requested,
+                        resolved=item_resolved,
+                        resolvable=False,
+                        reason=reason or "target could not be resolved",
+                    )
+                )
+                continue
+            resolved = item_resolved
+            if resolved.provider_id in refresh_errors:
+                results.append(
+                    EmbeddingTargetComparison(
+                        requested=requested,
+                        resolved=resolved,
+                        resolvable=False,
+                        reason=(
+                            "capability refresh failed: " + refresh_errors[resolved.provider_id]
+                        ),
+                    )
+                )
+                continue
+
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+            if "embedding" not in descriptor.operations:
+                results.append(
+                    EmbeddingTargetComparison(
+                        requested=requested,
+                        resolved=resolved,
+                        resolvable=False,
+                        reason=(
+                            f"{resolved.provider_id!r} does not declare the embedding operation"
+                        ),
+                    )
+                )
+                continue
+
+            model_capabilities = self._capabilities_for(descriptor, resolved)
+            embedding_capabilities = (
+                self._embedding_capabilities_of(resolved) or EmbeddingCapabilities()
+            )
+
+            fits: bool | None = None
+            if embedding_capabilities.max_batch_inputs is not None:
+                fits = len(texts) <= embedding_capabilities.max_batch_inputs
+            if embedding_capabilities.max_input_tokens is not None:
+                token_fits = all(
+                    self._estimator.estimate(t).tokens <= embedding_capabilities.max_input_tokens
+                    for t in texts
+                )
+                fits = token_fits if fits is None else (fits and token_fits)
+
+            cost: CostEstimate | None = None
+            floor_tokens = sum(self._estimator.estimate(t).floor for t in texts)
+            planning_tokens = sum(self._estimator.estimate(t).tokens for t in texts)
+            low_cost = compute_operation_cost(
+                Usage(input_tokens=floor_tokens), model_capabilities, "embedding"
+            )
+            high_cost = compute_operation_cost(
+                Usage(input_tokens=planning_tokens), model_capabilities, "embedding"
+            )
+            if low_cost is not None and high_cost is not None:
+                currency = (
+                    model_capabilities.pricing.value.currency
+                    if model_capabilities.pricing is not None
+                    else "USD"
+                )
+                cost = CostEstimate(low=low_cost, high=high_cost, currency=currency)
+
+            notes: list[str] = []
+            if (
+                input_type is not None
+                and embedding_capabilities.input_intents
+                and input_type not in embedding_capabilities.input_intents
+            ):
+                notes.append(
+                    f"{input_type!r} is not among the intents this model documents: "
+                    f"{embedding_capabilities.input_intents}"
+                )
+
+            provenance = {
+                name: sourced.provenance
+                for name, sourced in (("pricing", model_capabilities.pricing),)
+                if sourced is not None
+            }
+
+            results.append(
+                EmbeddingTargetComparison(
+                    requested=requested,
+                    resolved=resolved,
+                    fits=fits,
+                    dimensions=embedding_capabilities.dimensions,
+                    dimension_choices=embedding_capabilities.dimension_choices,
+                    max_batch_inputs=embedding_capabilities.max_batch_inputs,
+                    max_input_tokens=embedding_capabilities.max_input_tokens,
+                    input_intents=embedding_capabilities.input_intents,
+                    normalized=embedding_capabilities.normalized,
+                    cost=cost,
+                    capability_provenance=provenance,
+                    notes=tuple(notes),
                 )
             )
         return tuple(results)

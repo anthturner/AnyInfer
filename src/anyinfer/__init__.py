@@ -70,7 +70,7 @@ from .catalog import (
     OllamaChannel,
     load_default_catalog,
 )
-from .compare import TargetComparison
+from .compare import EmbeddingTargetComparison, TargetComparison
 from .config import (
     CONFIG_FORMAT_VERSION,
     MAX_CONFIG_BYTES,
@@ -295,6 +295,7 @@ __all__ = [
     "EmbeddingRequest",
     "EmbeddingResult",
     "EmbeddingSpace",
+    "EmbeddingTargetComparison",
     "EmbeddingVector",
     "ErrorInfo",
     "FallbackTriggered",

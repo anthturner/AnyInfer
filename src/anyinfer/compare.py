@@ -18,10 +18,11 @@ from .capabilities.pricing import CostEstimate
 from .manifest import DroppedParameter
 from .schema.mechanism import MechanismRung
 from .types.capabilities import Pricing, Provenance, Sourced
+from .types.operations import EmbeddingInputIntent
 from .types.requests import ResolvedTarget
 from .types.results import Mechanism
 
-__all__ = ["TargetComparison"]
+__all__ = ["EmbeddingTargetComparison", "TargetComparison"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +131,116 @@ class TargetComparison:
                 if isinstance(item, Mapping)
             ),
             cache=_cache_from_dict(data.get("cache")),
+            cost=cost,
+            capability_provenance={
+                str(key): cast("Provenance", str(value))
+                for key, value in (
+                    data.get("capability_provenance", {}).items()
+                    if isinstance(data.get("capability_provenance"), Mapping)
+                    else ()
+                )
+            },
+            notes=tuple(str(note) for note in data.get("notes", ())),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingTargetComparison:
+    """What one embedding request would become on one target, without dispatching.
+
+    A separate type from `TargetComparison` rather than an optional section grafted onto
+    it: generation's dimensions — mechanism rungs, cache planning, structured-output
+    fallback — have no embedding counterpart at all, so folding both into one type would
+    mean every embedding comparison carries a dozen fields that are always ``None``. The
+    dimensions here (space capacity, batch limit, intents, pricing) are what an embedding
+    call actually varies by.
+
+    Unresolvable targets are records rather than exceptions, exactly as
+    `TargetComparison` treats them: target-dependent fields are ``None``/empty and
+    `reason` says what was missing.
+    """
+
+    requested: str
+    resolved: ResolvedTarget | None = None
+    resolvable: bool = True
+    reason: str = ""
+    fits: bool | None = None
+    dimensions: int | None = None
+    dimension_choices: tuple[int, ...] = ()
+    max_batch_inputs: int | None = None
+    max_input_tokens: int | None = None
+    input_intents: tuple[EmbeddingInputIntent, ...] = ()
+    normalized: bool | None = None
+    cost: CostEstimate | None = None
+    capability_provenance: Mapping[str, Provenance] = field(default_factory=dict)
+    notes: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a stable JSON-safe representation."""
+        return {
+            "requested": self.requested,
+            "resolved": str(self.resolved) if self.resolved is not None else None,
+            "resolvable": self.resolvable,
+            "reason": self.reason,
+            "fits": self.fits,
+            "dimensions": self.dimensions,
+            "dimension_choices": list(self.dimension_choices),
+            "max_batch_inputs": self.max_batch_inputs,
+            "max_input_tokens": self.max_input_tokens,
+            "input_intents": list(self.input_intents),
+            "normalized": self.normalized,
+            "cost": (
+                None
+                if self.cost is None
+                else {
+                    "low": str(self.cost.low),
+                    "high": str(self.cost.high),
+                    "currency": self.cost.currency,
+                }
+            ),
+            "capability_provenance": dict(sorted(self.capability_provenance.items())),
+            "notes": list(self.notes),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> EmbeddingTargetComparison:
+        """Rebuild a comparison produced by `to_dict`, ignoring unknown keys."""
+        resolved_raw = data.get("resolved")
+        resolved = _resolved_from_string(str(resolved_raw)) if resolved_raw else None
+        cost_raw = data.get("cost")
+        cost = None
+        if isinstance(cost_raw, Mapping):
+            cost = CostEstimate(
+                Decimal(str(cost_raw.get("low", "0"))),
+                Decimal(str(cost_raw.get("high", "0"))),
+                str(cost_raw.get("currency", "USD")),
+            )
+        return cls(
+            requested=str(data.get("requested", "")),
+            resolved=resolved,
+            resolvable=bool(data.get("resolvable", False)),
+            reason=str(data.get("reason", "")),
+            fits=data.get("fits") if isinstance(data.get("fits"), bool) else None,
+            dimensions=(
+                int(data["dimensions"]) if data.get("dimensions") is not None else None
+            ),
+            dimension_choices=tuple(int(v) for v in data.get("dimension_choices", ())),
+            max_batch_inputs=(
+                int(data["max_batch_inputs"])
+                if data.get("max_batch_inputs") is not None
+                else None
+            ),
+            max_input_tokens=(
+                int(data["max_input_tokens"])
+                if data.get("max_input_tokens") is not None
+                else None
+            ),
+            input_intents=tuple(
+                cast("EmbeddingInputIntent", str(v)) for v in data.get("input_intents", ())
+            ),
+            normalized=(
+                data.get("normalized") if isinstance(data.get("normalized"), bool) else None
+            ),
             cost=cost,
             capability_provenance={
                 str(key): cast("Provenance", str(value))

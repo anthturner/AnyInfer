@@ -36,7 +36,7 @@ from ..capabilities.ledger import SpendLedger, SpendTotals
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import EmbeddingProbeReport, ProbeReport
 from ..catalog.model import Catalog
-from ..compare import TargetComparison
+from ..compare import EmbeddingTargetComparison, TargetComparison
 from ..context_request import ContextRequest
 from ..credentials import ResolverChain
 from ..errors import ConfigError
@@ -55,6 +55,7 @@ from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabili
 from ..types.events import StreamEnded, StreamEvent
 from ..types.operations import (
     BatchPolicy,
+    EmbeddingInputIntent,
     EmbeddingResult,
     EmbeddingSpace,
     InferenceOperation,
@@ -668,6 +669,28 @@ class Client:
                 provider_options=provider_options,
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
+                refresh=refresh,
+            )
+        )
+
+    def compare_embedding(
+        self,
+        inputs: str | Sequence[str],
+        *,
+        targets: Sequence[Target],
+        input_type: EmbeddingInputIntent | None = None,
+        refresh: bool = False,
+    ) -> tuple[EmbeddingTargetComparison, ...]:
+        """Compare embedding request portability without dispatching.
+
+        See `AsyncClient.compare_embedding`.
+        """
+        self._ensure_open()
+        return self._loop.run(
+            self._async.compare_embedding(
+                inputs,
+                targets=targets,
+                input_type=input_type,
                 refresh=refresh,
             )
         )

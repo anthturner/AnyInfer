@@ -32,6 +32,8 @@ stream yields on the way there. Ordering guarantees are documented in
 
 ::: anyinfer.TargetComparison
 
+::: anyinfer.EmbeddingTargetComparison
+
 ::: anyinfer.RunManifest
 
 ::: anyinfer.ContextSummary
