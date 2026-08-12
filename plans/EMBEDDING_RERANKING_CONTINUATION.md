@@ -229,7 +229,7 @@ result type). Cohere discovery now lists embedding models, so the
 - Repr/serialization audit for the new frozen types (ER.11.6's tail — check what
   GenerationRequest's repr does with payloads first; mirror its policy).
 
-### T10 — Docs remainder (Track K, BH.K.1/K.2/K.5)
+### T10 — Docs remainder (Track K, BH.K.1/K.2/K.5) — partially DONE 2026-08-12
 
 - Task guides under `docs/guides/`: semantic-search building blocks, batch embedding,
   intents, index/query compatibility, reranking, local embeddings (TEI + Ollama + LM
@@ -503,3 +503,19 @@ feature-complete bar:
   `GenerationRequest`'s policy first as instructed — no repr override, redaction happens
   only at output boundaries — and confirmed the new embedding/rerank frozen types already
   follow it with no special-casing needed. All gates green.
+- **2026-08-12:** T10 partially delivered and tested (`2919c05`). Discovery first, as
+  the plan's own discipline requires: `docs/concepts/embeddings.md` already existed and
+  thoroughly covered intents, the embedding-space safety rule, batching, and reranking —
+  most of the "separate guides" T10 asked for turned out to already be written from
+  prior work, not missing. What was actually missing and got done: the one runnable
+  example (`docs/examples/semantic-search.md`, shape-tested offline, honest about its
+  fake's hash-based vectors being mechanically-correct but not semantically meaningful —
+  the reranker's genuine lexical-overlap fake carries the "does this work" proof
+  instead); the embedding/rerank message contracts in the error catalog (D-15), quoted
+  verbatim from `operations.py`; and one real stray-claim fix in
+  `context-reduction.md`, which read as if semantic retrieval had no first-party path
+  when `anyinfer.semantic_ranker()` (D-11) already provides one. **Not done:** a
+  systematic stray-claims sweep beyond the one instance found, the non-embedding
+  sections of the error catalog, and local-embeddings/fallback-configuration content
+  beyond what the new example's prose already covers — left for a future pass rather
+  than padded out to claim the checklist item complete. All gates green.
