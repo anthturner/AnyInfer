@@ -118,6 +118,8 @@ nav:
   - Integrate:
       - guides/README.md
       - Why AnyInfer: why-anyinfer.md
+      - Confidentiality tiers: guides/confidentiality-tiers.md
+      - SOC 2 control mapping: guides/soc2-mapping.md
       - When to use AnyInfer: guides/when-to-use.md
       - Quickstart: guides/quickstart.md
       - Choosing an integration path: guides/integration-paths.md

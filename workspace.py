@@ -544,7 +544,10 @@ _PUBLIC_SURFACES = (
 )
 """Namespaces that integrator or contributor documentation teaches directly."""
 
-_PUBLIC_EXTRA_SYMBOLS = ("anyinfer.providers.llama_cpp.LlamaCppOptions",)
+_PUBLIC_EXTRA_SYMBOLS = (
+    "anyinfer.providers.llama_cpp.LlamaCppOptions",
+    "anyinfer.providers.confidential_execution.ConfidentialExecutionAdapter",
+)
 """Documented public one-offs outside the surface modules."""
 
 

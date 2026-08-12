@@ -22,6 +22,7 @@ __all__ = [
     "AllTargetsFailedError",
     "AnyInferError",
     "AuthError",
+    "ConfidentialExecutionError",
     "ConfigError",
     "ContextLengthError",
     "CredentialError",
@@ -325,3 +326,14 @@ class AllTargetsFailedError(AnyInferError):
 
 class LocalRuntimeError(AnyInferError):
     """llama-server lifecycle failure, or runtime/model integrity problem."""
+
+
+class ConfidentialExecutionError(LocalRuntimeError):
+    """`ConfidentialExecutionAdapter` refused to execute: the attestable guarantee a
+    caller requested is not available on this host right now.
+
+    Fails closed by design — this is never raised as a courtesy warning alongside a
+    completed generation; the generation never happened. See
+    `anyinfer.local.attestation.confidential_execution_status` for the detection this
+    check is built on.
+    """  # noqa: D205

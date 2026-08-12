@@ -201,38 +201,32 @@ in CI against those same fakes, so none of it can quietly rot.
 
 ---
 
-## On the horizon: confidential execution
-
-Everything above this line ships today and is checkable with the commands in the previous
-section. This one is different — it's in active design, not yet implemented, and this
-section will be corrected or removed the moment that stops being true. It's included because
-the gap it targets is real and worth naming honestly rather than saving for a launch post.
+## Confidential execution: an honestly-tiered check nobody else ships
 
 BYOK inference has an asymmetry nobody selling a client-side SDK talks about: your
 application's prompts, prompt templates, and orchestration logic run entirely on
 infrastructure your customer controls. You can protect their data from you — that part is
 solved, and it's most of what "BYOK" already means. Protecting *your own* prompt engineering
 and orchestration IP from a customer who owns the machine it runs on is a fundamentally
-harder problem, and today the honest answer for most vendors is "you can't, so nobody
-architects for it."
+harder problem, and for most of the industry the honest answer is still "you can't, so
+nobody architects for it."
 
-The underlying hardware capability to do better than that already exists: AMD SEV-SNP and
-Intel TDX confidential VMs, and NVIDIA's confidential-computing mode on H100 GPUs, can
-attest that a workload is running unmodified and isolated even from an operator with root on
-the box. Cloud vendors ship this (Azure and Google Cloud both have GA confidential-GPU
-offerings), and researchers are actively experimenting with wrapping local models in it. What
-doesn't exist yet, anywhere we've found, is that capability exposed as a **portable,
-honestly-tiered check inside a multi-provider BYOK library** — one function an application
-can call to learn, on whatever hardware a customer actually has, whether it can get a real
-attested-execution guarantee for local inference, with no silent downgrade when it can't.
-That integration — not the cryptography underneath it — is the part nobody else is building,
-and it's a natural extension of AnyInfer already treating a local model as a first-class,
-supervised target rather than a separate product (§4 above).
-
-This is being scoped, not shipped: what it can honestly claim depends on deployment specifics
-(which cloud, which CPU/GPU pairing, CPU-only versus GPU-offloaded inference) that this page
-will not gloss over once it lands, the same discipline applied to provenance and conformance
-elsewhere on this page.
+AnyInfer now ships four tiers that raise the cost of extraction up to the one point where a
+real cryptographic guarantee is possible: encrypted-at-rest prompt templates (Tier 1), a
+zero-retention remote assembly service so orchestration logic never ships to the client at
+all (Tier 2), and — the interesting one — a **portable capability check** that tells your
+application, on whatever hardware a customer actually has, whether local inference can run
+inside an attested trusted execution environment right now, with no silent downgrade when it
+can't (Tier 3), plus a verification layer proving the model weights that ran are the exact
+ones you signed (Tier 4). The underlying hardware capability isn't novel — AMD SEV-SNP, Intel
+TDX, and NVIDIA's confidential-computing GPUs already exist, and cloud vendors already sell
+attested inference as a service. What we could not find anywhere else is that capability
+exposed as one function inside a multi-provider BYOK library, honest about exactly what it
+can and cannot promise on the hardware in front of it. See the full
+[Confidentiality tiers](guides/confidentiality-tiers.md) guide for what each tier actually
+guarantees, what it costs, and — just as important — what it deliberately does not claim
+yet (GPU-offload attestation and cryptographic quote verification are both real gaps, named
+on that page rather than glossed over).
 
 ## Who this is for
 

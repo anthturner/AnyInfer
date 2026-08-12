@@ -30,6 +30,14 @@ from .acquire import (
     plan_acquisition,
 )
 from .artifacts import GgufArtifact, GgufFile
+from .attestation import (
+    ATTESTATION_CACHE_BYPASS_ENV,
+    ATTESTATION_CACHE_REFRESH_ENV,
+    ConfidentialExecutionStatus,
+    CpuTeeKind,
+    confidential_execution_status,
+)
+from .attestation import cache_path as attestation_cache_path
 from .backends import BACKEND_RANK, Backend, available_backends, select_backend
 from .discovery import (
     KEYRING_IDENTIFIER_SUFFIX,
@@ -61,6 +69,7 @@ from .hardware import (
     probe_signature,
 )
 from .metrics import ResourceSample, StorageProfile, SystemSampler, storage_profile
+from .provenance import ModelManifest, hash_model_weights, verify_model_manifest
 from .recommend import Recommendation, Tier, TierSource, recommend_alias
 from .runtimes import (
     InstallReport,
@@ -99,6 +108,8 @@ from .variants import VariantChoice, VariantPrefs, evaluate_variants, select_var
 
 __all__ = [
     "ALLOWED_LICENSES",
+    "ATTESTATION_CACHE_BYPASS_ENV",
+    "ATTESTATION_CACHE_REFRESH_ENV",
     "BACKEND_RANK",
     "CACHE_BYPASS_ENV",
     "CACHE_REFRESH_ENV",
@@ -112,6 +123,8 @@ __all__ = [
     "AcquisitionProgress",
     "AcquisitionReport",
     "Backend",
+    "ConfidentialExecutionStatus",
+    "CpuTeeKind",
     "DiscoveredProvider",
     "DiscoveryEvidence",
     "DownloadReport",
@@ -123,6 +136,7 @@ __all__ = [
     "LifecycleCallback",
     "ManagedServer",
     "ModelFit",
+    "ModelManifest",
     "ModelStore",
     "Posture",
     "ProgressCallback",
@@ -154,10 +168,12 @@ __all__ = [
     "acquire_sync",
     "allocate_port",
     "artifact_paths",
+    "attestation_cache_path",
     "available_backends",
     "cache_path",
     "check_cuda_preconditions",
     "classify_fit",
+    "confidential_execution_status",
     "default_model_dir",
     "default_runtime_kind",
     "detect",
@@ -165,6 +181,7 @@ __all__ = [
     "download_artifact",
     "endpoint_candidates",
     "evaluate_variants",
+    "hash_model_weights",
     "install_hint",
     "install_runtime",
     "installed_runtimes",
@@ -185,4 +202,5 @@ __all__ = [
     "sort_by_fit",
     "storage_profile",
     "verify_file",
+    "verify_model_manifest",
 ]

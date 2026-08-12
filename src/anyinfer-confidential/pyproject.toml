@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anyinfer-confidential"
+version = "0.1.0"
+description = "Tiered confidential-execution add-on for AnyInfer: SealedTemplate encrypted prompt assets (Tier 1) and the AnyInfer Relay zero-retention prompt-assembly service (Tier 2)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Anthony Turner", email = "github@anthturner.com" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+# anyinfer for the public request/result surfaces and client; cryptography for envelope
+# encryption and license-blob signature verification (same dependency `anyinfer[vertex]`
+# already takes for JWT signing — not a new supply-chain surface for this project).
+dependencies = ["anyinfer>=0.1.0", "cryptography>=42"]
+
+[project.optional-dependencies]
+# The AnyInfer Relay (Tier 2) is an optional ASGI service; most installs only need Tier 1's
+# SealedTemplate, which has no network-service dependency at all.
+relay = ["starlette>=0.37", "uvicorn>=0.30"]
+
+[project.scripts]
+anyinfer-confidential = "anyinfer_confidential.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/anthturner/AnyInfer"
+Documentation = "https://anyinfer.dev/confidentiality/"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anyinfer_confidential"]
+
+[tool.ruff]
+line-length = 99
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "PTH", "BLE", "D", "S101"]
+ignore = ["D203", "D213", "D401", "D107", "RUF012", "RUF009"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "S101"]

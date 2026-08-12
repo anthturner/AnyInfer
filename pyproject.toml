@@ -35,6 +35,11 @@ otel = ["opentelemetry-api>=1.25"]
 # Installing boto3 or google-auth alongside is optional and, when present, preferred for
 # credential resolution. Signing a Vertex service-account JWT needs an RSA implementation.
 vertex = ["cryptography>=42"]
+# Tier 4 model-weight provenance verification (anyinfer.local.provenance) — signature
+# checking only, never signing; see the module docstring for why that boundary is
+# absolute. Same dependency `vertex` already takes; a separate extra so importing
+# anyinfer.local never pulls in crypto for callers who use neither.
+attest = ["cryptography>=42"]
 # Model Context Protocol tool sources. No dependencies: the protocol is spoken directly
 # against httpx2 and the standard library, the same call ADR-007 makes for provider
 # SDKs. The extra exists so importing anyinfer never pulls in subprocess-spawning code.

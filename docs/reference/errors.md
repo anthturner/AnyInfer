@@ -310,6 +310,29 @@ nothing about *why* it failed.
 
 ---
 
+## `ConfidentialExecutionError` :material-alert-circle:{ title="Not retryable; the attested guarantee is unavailable" }
+
+<div class="anyinfer-error" markdown>
+
+**When:** `ConfidentialExecutionAdapter.generate()` was called and
+`anyinfer.local.confidential_execution_status()` reported `end_to_end=False` for this
+host. The inner local adapter is never called — this fails closed, not degraded.
+
+```
+ConfidentialExecutionError: confidential execution was requested but is not available:
+no attestable CPU TEE detected (SEV-SNP/TDX guest device not present)
+```
+
+!!! tip "How to fix"
+    Call `confidential_execution_status()` yourself before committing to a request, so
+    your application can degrade with a message the caller sees instead of hitting this
+    error mid-call. See the
+    [Confidentiality Tiers guide](../guides/confidentiality-tiers.md#tier-3-attested-local-execution).
+
+</div>
+
+---
+
 ## Handling patterns
 
 **Just show the user something useful:**

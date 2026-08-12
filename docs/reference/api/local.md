@@ -285,3 +285,52 @@ configuration file.
 ::: anyinfer.PullReport
 
 </div>
+
+## Confidential execution attestation
+
+Tier 3 of the [Confidentiality Tiers](../../guides/confidentiality-tiers.md): whether this
+host can back an attested-local-execution guarantee, and does it, right now. Advisory
+detection only — enforcement is
+[`anyinfer.providers.confidential_execution.ConfidentialExecutionAdapter`](#confidentialexecutionadapter),
+which calls the same function this section documents.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.local.confidential_execution_status
+
+::: anyinfer.local.ConfidentialExecutionStatus
+
+::: anyinfer.local.CpuTeeKind
+
+::: anyinfer.local.attestation_cache_path
+
+::: anyinfer.local.ATTESTATION_CACHE_BYPASS_ENV
+
+::: anyinfer.local.ATTESTATION_CACHE_REFRESH_ENV
+
+</div>
+
+### ConfidentialExecutionAdapter
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.providers.confidential_execution.ConfidentialExecutionAdapter
+
+</div>
+
+## Model provenance verification (Tier 4)
+
+Whether the model weights actually on disk are the exact artifact a vendor signed —
+verification only, never signing; see the module docstring for why that boundary is
+absolute. Only a Tier 4 claim in combination with `ConfidentialExecutionStatus.end_to_end`
+— see the [Confidentiality Tiers guide](../../guides/confidentiality-tiers.md).
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.local.ModelManifest
+
+::: anyinfer.local.hash_model_weights
+
+::: anyinfer.local.verify_model_manifest
+
+</div>

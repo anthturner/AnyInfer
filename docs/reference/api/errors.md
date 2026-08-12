@@ -43,4 +43,6 @@ actionable next step. The prose catalog with examples lives in
 
 ::: anyinfer.LocalRuntimeError
 
+::: anyinfer.ConfidentialExecutionError
+
 </div>
