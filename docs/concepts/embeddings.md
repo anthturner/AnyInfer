@@ -53,10 +53,12 @@ print(result.space.provider_id, result.space.model, result.space.dimensions)
 ```
 
 By default, embedding routes retry on the **same resolved target only** — no cross-provider
-or cross-model fallback. If you configure a fallback chain anyway, and the two spaces prove
-compatible via a compatibility id you have deliberately asserted, the fallback proceeds. If
-you have not asserted an equivalence, AnyInfer never guesses one; the request fails with an
-actionable error instead of returning a wrong-but-plausible vector.
+or cross-model fallback. A fallback chain that reaches a different `provider:model` is
+refused *before* any request is sent: AnyInfer never guesses that two spaces are
+equivalent, so the request fails with an actionable error instead of returning a
+wrong-but-plausible vector. If you genuinely want vectors that may not be comparable —
+an expert recovery workflow, for example — pass `allow_incompatible_fallback=True`; the
+result then always carries a warning naming both targets.
 
 You may also assert the space you expect up front:
 

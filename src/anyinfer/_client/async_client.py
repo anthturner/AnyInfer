@@ -1220,6 +1220,7 @@ class AsyncClient:
         input_type: Literal["query", "document", "classification", "clustering"] | None = None,
         dimensions: int | None = None,
         expected_space: EmbeddingSpace | None = None,
+        allow_incompatible_fallback: bool = False,
         timeout_s: float | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
@@ -1233,14 +1234,20 @@ class AsyncClient:
                 are preserved exactly.
             target: A single target, as for `generate()`.
             route: A fallback chain, as for `generate()`. Embedding fallback is
-                same-target-only by default: cross-target retries are attempted only when
-                every target shares a caller-asserted embedding-space compatibility id.
+                safe-by-default: a fallback target is dispatched only when it is the
+                identical ``provider:model`` as the route's primary target; anything else
+                is refused before any request is sent, unless
+                ``allow_incompatible_fallback`` is set.
             input_type: What the embedded text will be used for, when the target model
                 distinguishes it.
             dimensions: Requested output dimensionality, for models supporting native
                 dimensionality reduction.
             expected_space: An `anyinfer.EmbeddingSpace` the result must match; a
                 successful-but-incompatible response is rejected rather than returned.
+            allow_incompatible_fallback: Explicit opt-in permitting fallback to a target
+                that cannot be proven to share the primary target's embedding space. Off
+                by default because wrong-space vectors fail silently when compared; a
+                result served this way always carries a warning naming both targets.
             timeout_s: Per-attempt wall-clock budget.
             provider_options: Escape hatch, namespaced by provider id.
             metadata: Caller-supplied labels carried through telemetry.
@@ -1254,7 +1261,8 @@ class AsyncClient:
         Raises:
             anyinfer.errors.AllTargetsFailedError: Every target failed.
             anyinfer.errors.ConfigError: The resolved target does not support embedding,
-                or its response fails the embedding-space safety check.
+                its response fails the embedding-space safety check, or an incompatible
+                fallback was refused before dispatch.
         """
         texts = (inputs,) if isinstance(inputs, str) else tuple(inputs)
         request = EmbeddingRequest(
@@ -1262,6 +1270,7 @@ class AsyncClient:
             input_type=input_type,
             dimensions=dimensions,
             expected_space=expected_space,
+            allow_incompatible_fallback=allow_incompatible_fallback,
             timeout_s=timeout_s,
             max_response_bytes=max_response_bytes
             if max_response_bytes is not None

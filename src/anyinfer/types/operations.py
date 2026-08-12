@@ -268,6 +268,10 @@ class EmbeddingRequest:
             to the matching adapter and consulted by no core logic.
         batch: Core-owned batching policy for this request.
         retain_raw: Whether to keep the provider's raw response payload on the result.
+        allow_incompatible_fallback: Explicit opt-in permitting fallback to a route target
+            that cannot be proven to share the primary target's embedding space. Off by
+            default because wrong-space vectors fail silently when compared; a result
+            served through this opt-in always carries a warning naming both targets.
     """
 
     inputs: tuple[str, ...]
@@ -280,6 +284,7 @@ class EmbeddingRequest:
     provider_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     batch: BatchPolicy = BatchPolicy()
     retain_raw: bool = False
+    allow_incompatible_fallback: bool = False
 
     def __post_init__(self) -> None:
         """Reject a request with no inputs.

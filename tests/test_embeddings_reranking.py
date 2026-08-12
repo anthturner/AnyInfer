@@ -248,6 +248,71 @@ async def test_embed_exhausted_retries_raises_all_targets_failed() -> None:
         await client.aclose()
 
 
+async def test_embed_cross_space_fallback_is_refused_before_dispatch() -> None:
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4, "other": 4},
+        embedding_failures={
+            "small": [ScriptedEmbeddingFailure(kind="rate-limit", retry_after_s=0.0)]
+        },
+    )
+    client = _client_with_fake(fake)
+    try:
+        route = Route(
+            targets=("fake-embed:small", "fake-embed:other"),
+            retry=Retry(max_attempts=1, backoff_base_s=0.0),
+        )
+        with pytest.raises(ai.ConfigError, match="fallback to fake-embed:other refused"):
+            await client.embed(["hi"], route=route)
+        assert [req.model for req in fake.embed_requests] == ["small"]
+    finally:
+        await client.aclose()
+
+
+async def test_embed_incompatible_fallback_opt_in_serves_with_warning() -> None:
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4, "other": 4},
+        embedding_failures={
+            "small": [ScriptedEmbeddingFailure(kind="rate-limit", retry_after_s=0.0)]
+        },
+    )
+    client = _client_with_fake(fake)
+    try:
+        route = Route(
+            targets=("fake-embed:small", "fake-embed:other"),
+            retry=Retry(max_attempts=1, backoff_base_s=0.0),
+        )
+        result = await client.embed(["hi"], route=route, allow_incompatible_fallback=True)
+        assert result.target.model == "other"
+        assert any("not safely comparable" in w for w in result.warnings)
+        assert any("fake-embed:small" in w for w in result.warnings)
+    finally:
+        await client.aclose()
+
+
+async def test_embed_same_target_fallback_needs_no_opt_in() -> None:
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        embedding_failures={
+            "small": [ScriptedEmbeddingFailure(kind="rate-limit", retry_after_s=0.0)]
+        },
+    )
+    client = _client_with_fake(fake)
+    try:
+        route = Route(
+            targets=("fake-embed:small", "fake-embed:small"),
+            retry=Retry(max_attempts=1, backoff_base_s=0.0),
+            health_gate=False,
+        )
+        result = await client.embed(["hi"], route=route)
+        assert result.target.model == "small"
+        assert result.warnings == ()
+    finally:
+        await client.aclose()
+
+
 async def test_embed_rejects_target_without_embedding_support() -> None:
     from anyinfer.providers.openai_compat import OpenAICompatAdapter
 

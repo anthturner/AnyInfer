@@ -139,6 +139,18 @@ async def _attempt_with_retry(
     )
 
 
+def _same_space_target(candidate: ResolvedTarget, primary: ResolvedTarget) -> bool:
+    """Whether two resolved targets are provably the same embedding space before dispatch.
+
+    Before a response exists, the only equivalence AnyInfer can prove is the identical
+    provider and model — a caller-asserted compatibility id lives on `EmbeddingSpace`,
+    which is built from the response. Trusted per-target compatibility ids from
+    config/catalog are future work; until then anything else is a guess, and a guessed
+    equivalence is exactly what the embedding-space safety rule exists to refuse.
+    """
+    return candidate.provider_id == primary.provider_id and candidate.model == primary.model
+
+
 async def dispatch_embed(
     request: EmbeddingRequest,
     route: Route,
@@ -156,14 +168,15 @@ async def dispatch_embed(
     Raises:
         anyinfer.errors.AllTargetsFailedError: Every target in the route failed.
         anyinfer.errors.ConfigError: The expected embedding space was declared and the
-            resolved target's space does not match it, or a target cannot be proven
-            compatible with an already-failed target and unsafe fallback was not requested.
+            resolved target's space does not match it, or a fallback target cannot be
+            proven to share the route's primary target's embedding space and
+            ``allow_incompatible_fallback`` was not set.
     """
     request_id = uuid.uuid4().hex
     emit(RequestStarted(request_id=request_id, targets=route.targets))
     all_attempts: list[AttemptRecord] = []
     warnings: list[str] = []
-    first_space: EmbeddingSpace | None = None
+    primary: ResolvedTarget | None = None
     last_error: ProviderError | None = None
 
     for position, target in enumerate(route.targets):
@@ -171,10 +184,24 @@ async def dispatch_embed(
             target, registry=registry, catalog=catalog, configured_providers=configured_providers
         )
         emit(TargetResolved(request_id=request_id, target=resolved))
+        if primary is None:
+            primary = resolved
 
         if route.health_gate and health.recently_failed(resolved, route.health_ttl_s):
             all_attempts.append(AttemptRecord(target=resolved, outcome="skipped_unhealthy"))
             continue
+
+        if not _same_space_target(resolved, primary) and not request.allow_incompatible_fallback:
+            raise ConfigError(
+                f"embedding fallback to {resolved} refused: it cannot be proven to share "
+                f"an embedding space with the route's primary target {primary}",
+                provider=resolved.provider_id,
+                hint=(
+                    "vectors from a different embedding space fail silently when compared; "
+                    "keep embedding routes on one provider:model, or set "
+                    "allow_incompatible_fallback=True to accept incomparable vectors"
+                ),
+            )
 
         adapter = await pool.get(resolved.provider_id)
         if not isinstance(adapter, EmbedsText):
@@ -224,16 +251,11 @@ async def dispatch_embed(
                     "expected_space asserted; verify the target or drop expected_space"
                 ),
             )
-        if first_space is None:
-            first_space = space
-        elif not space.compatible_with(first_space):
-            # Only reachable via an explicit unsafe-fallback caller path; ordinary routing
-            # never reaches a second target for embeddings once the first attempt raised
-            # a provider error and this target is a plain retry, since same-space is
-            # guaranteed for a single resolved target. Recorded as a warning, not silently.
+        if primary is not None and not _same_space_target(resolved, primary):
             warnings.append(
-                f"embedding fallback served by {resolved} is a different embedding space "
-                "than the first attempted target; results are not comparable"
+                f"embedding fallback served by {resolved} could not be proven compatible "
+                f"with the route's primary target {primary}; these vectors are not safely "
+                "comparable with vectors from that target"
             )
 
         vectors = tuple(EmbeddingVector(values=v) for v in wire_result.vectors)
