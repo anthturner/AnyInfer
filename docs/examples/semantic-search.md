@@ -1,10 +1,13 @@
 # Semantic search over a small corpus
 
-AnyInfer embeds and reranks; it deliberately owns no vector store, no ANN index, and no
-persistence — see [the scope boundary](../concepts/embeddings.md#what-anyinfer-will-not-do-for-you).
+AnyInfer core embeds and reranks; it deliberately owns no vector store, no ANN index, and
+no persistence — see [the scope boundary](../concepts/embeddings.md#what-anyinfer-will-not-do-for-you).
 For a corpus small enough to hold in memory, that boundary costs nothing: this example
 embeds a handful of documents, embeds a query with the matching intent, and ranks by
 cosine similarity itself, in about a dozen lines that have no dependency beyond AnyInfer.
+When you want persistence without hand-rolling this loop yourself, the optional
+[`anyinfer-store`](../guides/vector-store.md) add-on does exactly this against a single
+SQLite file — still deliberately small-scale, never a production vector database.
 
 This shape runs offline against `anyinfer.testing.FakeEmbeddingRerankProvider` — a
 deterministic *pseudo*-embedding (a hash of the text, not a trained model), so it proves

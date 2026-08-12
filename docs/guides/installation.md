@@ -39,10 +39,12 @@ Some features ship as separate, independently-versioned distributions rather tha
 |---|---|---|
 | `anyinfer-confidential` | `SealedTemplate`, `TemplateVault`, the `AnyInfer Relay` | [Confidentiality tiers](confidentiality-tiers.md) 1-2 |
 | `anyinfer-shared` | `ConfidentialityReport` | Composing confidentiality facts from both `anyinfer-confidential` and `anyinfer` core in one type |
+| `anyinfer-store` | `VectorStore`, `query_and_rerank` | Small-scale [embedded vector storage](vector-store.md) over `embed()`/`rerank()` results |
 
 ```bash
 pip install -e src/anyinfer-confidential   # from a repository checkout, until a first
 pip install -e src/anyinfer-shared         # PyPI release ships
+pip install -e src/anyinfer-store
 ```
 
 ## Which providers need nothing extra

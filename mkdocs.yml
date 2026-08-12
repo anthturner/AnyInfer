@@ -139,6 +139,7 @@ nav:
           - Test your application offline: guides/testing-your-app.md
           - Compare targets without spending: guides/comparing-targets.md
           - Add your own provider: guides/custom-providers.md
+          - Embed, store, and query a small corpus: guides/vector-store.md
       - Operations:
           - Run a model locally: guides/local-inference.md
           - Choose and download a local model: guides/local-models.md
@@ -210,6 +211,7 @@ nav:
           - Results and stream events: reference/api/results.md
           - Embeddings and reranking: reference/api/embeddings.md
           - Portability diff tool: reference/api/compare-diff.md
+          - Vector store add-on: reference/api/vector-store.md
           - Routing: reference/api/routing.md
           - Capabilities: reference/api/capabilities.md
           - Context reduction: reference/api/context.md

@@ -1,15 +1,48 @@
 # Vector store add-on (follow-on plan)
 
-> **Status:** proposed; not started. The `embed()`/`rerank()` public surfaces this package
-> is built entirely on landed 2026-08-11; the remaining embedding/reranking work is
-> consolidated in [EMBEDDING_RERANKING_CONTINUATION.md](EMBEDDING_RERANKING_CONTINUATION.md) and
-> none of it blocks this package's core design, though batching (its Track A) will matter
-> for bulk indexing performance.
+> **Status:** v1 implemented and tested 2026-08-12 — brute-force only, per the "add an
+> approximate index only if benchmark evidence shows it's needed" framing in §7. The
+> `embed()`/`rerank()` public surfaces this package is built entirely on landed 2026-08-11;
+> the remaining embedding/reranking work is consolidated in
+> [EMBEDDING_RERANKING_CONTINUATION.md](EMBEDDING_RERANKING_CONTINUATION.md) and none of it
+> blocked this package's core design.
 > **Plan date:** 2026-08-11.
 > **Authority:** living implementation plan, not an architecture decision. It proposes a new
 > *package*, not a change to `anyinfer` core, so it does not amend `DESIGN.md` — it only cites
 > the core boundary that DESIGN.md already draws (inference engine, not a database) and
 > commits to staying on the inference side of it.
+
+## Implementation status (2026-08-12)
+
+Delivered as `src/anyinfer-store/` (`anyinfer_store`), own `pyproject.toml`, depending on
+`anyinfer` and never the reverse — the exact packaging shape
+`TIERED_ENCRYPTED_PLANS.md` §1 established as the template for AnyInfer's optional pieces.
+
+- **§7 open questions resolved by this implementation**: on-disk format is SQLite (one
+  table for the bound `EmbeddingSpace`, one for entries — vectors packed as
+  `array.array('d')` BLOBs, metadata as JSON text); an approximate index was not built,
+  per the plan's own "only if benchmark evidence shows it's needed" framing — brute-force
+  cosine similarity in pure Python is the whole v1 backend.
+- **§3 Included, delivered**: insert/update/delete/query (`VectorStore.add`/`add_many`/
+  `remove`/`get`/`query`), caller-supplied ids/vectors/metadata/text, `EmbeddingSpace`
+  identity persisted and enforced via `EmbeddingSpace.compatible_with` (refusing both a
+  mismatched `add` and a mismatched `query` — the persistence-side version of the same
+  rule the core plan requires for fallback routing), optional metadata exact-match filter,
+  optional second-stage `anyinfer.rerank()` pass (`query_and_rerank`, refusing when a
+  candidate has no stored text rather than inventing one), add/remove/`compact` (VACUUM)/
+  `export_jsonl`/`import_jsonl`, and `SIZE_WARNING_THRESHOLD` (200,000 entries) as the
+  documented, warned-at runtime ceiling.
+- **§3 Explicitly excluded, still excluded**: no clustering/replication/sharding, no
+  network service of its own (a plain library, matching core's "no daemon" posture), no
+  multi-writer guarantees beyond SQLite's own file locking, no automatic corpus collection.
+- **Not delivered**: a CLI and a standalone example app (§6 implementation order item 6) —
+  the guide (`docs/guides/vector-store.md`) covers the same embed→store→query→rerank flow
+  in prose and runnable snippets instead; left for a follow-up session rather than padded
+  out to claim the checklist item complete. 19 tests (`test_store.py`, `test_rerank.py`)
+  cover ordering, persistence across process restarts, embedding-space rejection
+  (both `add` and `query`), and the export/import round trip from §6 item 7's conformance
+  list; corpus-size-ceiling *behavior* (vs. the warning itself) was not separately
+  benchmarked.
 
 ## 1. Why this is a separate package, not a client of the core roadmap
 
