@@ -34,7 +34,7 @@ from ..capabilities.budget import ContextBudget
 from ..capabilities.estimate import TokenEstimator
 from ..capabilities.ledger import SpendLedger, SpendTotals
 from ..capabilities.pricing_table import PricingTable
-from ..capabilities.probes import ProbeReport
+from ..capabilities.probes import EmbeddingProbeReport, ProbeReport
 from ..catalog.model import Catalog
 from ..compare import TargetComparison
 from ..context_request import ContextRequest
@@ -57,6 +57,7 @@ from ..types.operations import (
     BatchPolicy,
     EmbeddingResult,
     EmbeddingSpace,
+    InferenceOperation,
     RerankDocument,
     RerankResult,
 )
@@ -391,10 +392,12 @@ class Client:
 
     # ---- discovery -------------------------------------------------------------------
 
-    def models(self, provider_id: str) -> Sequence[DiscoveredModel]:
-        """List a provider's models."""
+    def models(
+        self, provider_id: str, *, operation: InferenceOperation | None = None
+    ) -> Sequence[DiscoveredModel]:
+        """List a provider's models. See `AsyncClient.models`."""
         self._ensure_open()
-        return self._loop.run(self._async.models(provider_id))
+        return self._loop.run(self._async.models(provider_id, operation=operation))
 
     def health(self, provider_id: str) -> Health:
         """Probe a provider's readiness."""
@@ -482,13 +485,34 @@ class Client:
             self._async.probe(target, features=features, timeout_s=timeout_s, record=record)
         )
 
-    def verify(self, target: Target, *, timeout_s: float = 60.0) -> Verification:
+    def verify(
+        self,
+        target: Target,
+        *,
+        timeout_s: float = 60.0,
+        operation: InferenceOperation = "generation",
+    ) -> Verification:
         """Prove a target works by asking it something, end to end.
 
         See `AsyncClient.verify`.
         """
         self._ensure_open()
-        return self._loop.run(self._async.verify(target, timeout_s=timeout_s))
+        return self._loop.run(
+            self._async.verify(target, timeout_s=timeout_s, operation=operation)
+        )
+
+    def probe_embedding(
+        self,
+        target: Target,
+        *,
+        timeout_s: float = 30.0,
+        record: bool = True,
+    ) -> EmbeddingProbeReport:
+        """Measure an embedding target with one real call. See `AsyncClient.probe_embedding`."""
+        self._ensure_open()
+        return self._loop.run(
+            self._async.probe_embedding(target, timeout_s=timeout_s, record=record)
+        )
 
     # ---- local models ----------------------------------------------------------------
 

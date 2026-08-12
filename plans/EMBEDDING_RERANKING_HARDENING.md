@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D, A, B, C, and E landed 2026-08-12 (see §19); F is next.
+> **Status:** in progress — Tracks D, A, B, C, E, and F landed 2026-08-12 (see §19); G is next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -502,31 +502,31 @@ Blocked on Track B for real billing facts (Cohere search units are the forcing c
 
 ## 10. Track F — operation-aware capability and discovery surfaces (absorbs ER.1.3, ER.1.6-ER.1.8, ER.3.10, ER.6.6, ER.9.4, ER.9.9)
 
-- [ ] **BH.F.1** Add operation support to `ModelCapabilities` with provenance (ER.1.3) —
+- [x] **BH.F.1** Add operation support to `ModelCapabilities` with provenance (ER.1.3) —
   today only the coarse `ProviderDescriptor.operations` set exists; model-level operation
   facts have no home, which is why discovery can't filter honestly.
-- [ ] **BH.F.2** Extend `conjunction()`/overlay in `types/capabilities.py` to
+- [x] **BH.F.2** Extend `conjunction()`/overlay in `types/capabilities.py` to
   `EmbeddingCapabilities`/`RerankCapabilities` (ER.1.6), including delegating/`auto`
   targets — Track A reads these records, so overlay semantics must be defined, not
   accidental.
-- [ ] **BH.F.3** Audit `list_models()` paths so embedding-only and rerank-only models are
+- [x] **BH.F.3** Audit `list_models()` paths so embedding-only and rerank-only models are
   preserved rather than filtered as non-chat (ER.1.7) — includes LM Studio's current
   filtering (ER.5.10's discovery half).
-- [ ] **BH.F.4** Operation-aware `models()`, `capabilities()`, `compare()`, `verify()`,
+- [~] **BH.F.4** Operation-aware `models()`, `capabilities()`, `compare()`, `verify()`,
   and benchmark surfaces (ER.1.8/ER.6.6) so callers can inspect fit/degradation/pricing
   without dispatching.
-- [ ] **BH.F.5** CLI: extend `providers`, `models`, `verify`, `benchmark`, `doctor` output
+- [~] **BH.F.5** CLI: extend `providers`, `models`, `verify`, `benchmark`, `doctor` output
   with operation support and embedding-space diagnostics (ER.9.4).
-- [ ] **BH.F.6** Sidecar: distinguish generation/embedding/rerank models in `/v1/models`
+- [x] **BH.F.6** Sidecar: distinguish generation/embedding/rerank models in `/v1/models`
   or an AnyInfer-native listing (ER.9.9), then cover it in the sidecar tests (the
   model-listing half of ER.11.13).
-- [ ] **BH.F.7** Build minimal embed/rerank capability probes (ER.3.10; decided by owner
+- [x] **BH.F.7** Build minimal embed/rerank capability probes (ER.3.10; decided by owner
   2026-08-12 — build, not defer): a tiny real request per target, results
   provenance-tagged `probed` on the same terms as generation's probing, feeding the
   capability assembly so batch limits and intent support can resolve at runtime where
   static/catalog facts are absent. Probes cost real spend — they run only where probing
   is already invoked deliberately, never implicitly on ordinary dispatch.
-- [ ] **BH.F.8** Context semantic-ranker helper (D-11): define/confirm the ranker
+- [x] **BH.F.8** Context semantic-ranker helper (D-11): define/confirm the ranker
   protocol `context.select()` accepts inside `anyinfer.context` (leaf module), and ship
   the convenience constructor client-side (a rerank-backed ranker built from a client +
   target string). `anyinfer.context` must not import `_client` — verify with
@@ -916,3 +916,38 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   stays `[~]`: spend tests are in; mixed-operation rate-pacing tests (ER.11.12's other
   half) remain with Track J; the demo's cost display lights up automatically once real
   pricing entries exist.
+- **2026-08-12 (Track F — delivered and tested):** Operation-aware surfaces.
+  `ModelCapabilities.operations` (provenance-tagged frozenset, overlay + conjunction
+  with unknown-poisons-the-claim semantics) and overlay/conjunction for
+  `EmbeddingCapabilities`/`RerankCapabilities` (`embedding_conjunction` refuses to
+  minimize disagreeing dimensions — they are incompatible spaces, not a bound).
+  Discovery (ER.1.7): Cohere now lists *every* model, deriving operations from each
+  entry's `endpoints` (enum live-verified 2026-08-12: chat/generate/embed/rerank/
+  classify/summarize/rate) and stamping chat feature flags only on generation models;
+  LM Studio's native listing includes `type: "embedding"` models with typed operations
+  instead of dropping them; Ollama is deliberately unchanged — `/api/tags` carries
+  nothing that distinguishes embedding models, and a name heuristic would be a guess.
+  Surfaces: `models(operation=...)` filter (known-servers only, unknown never guessed
+  in), `verify(operation="embedding"|"rerank")` spending one tiny real call each,
+  `operations_for(target)`, sidecar `/v1/models` entries carry an additive
+  `anyinfer.operations` tag, CLI `providers` prints a `serves:` line + JSON
+  `operations`, CLI `verify --operation`. Probes (BH.F.7, owner: build):
+  `probe_embedding()` measures dimensions and unit-norm from one real vector, records
+  `EmbeddingCapabilities` at a new probed layer on `CapabilityStore`, and dispatch
+  reads static-overlaid-with-probed through a new hook; a rerank probe is deliberately
+  omitted — a tiny rerank call measures nothing recordable (`max_documents` is not
+  probeable), noted here rather than built as theater. Context ranker (BH.F.8, D-11):
+  `SemanticRanker` protocol in `anyinfer.context.rank`, `select(ranker=...)` threading
+  one scoring call through both ordering and admission, and the client-side
+  `anyinfer.semantic_ranker(client, target)` builder following the `build_catalog_view`
+  composition precedent — `lint-imports` confirms context stays a leaf. Bonus
+  strengthening surfaced by a test: dispatch now gates on *declared* descriptor
+  operations, not just structural protocol presence (completes ER.3.9 — a
+  structurally-present method on an adapter that never declared the operation is not an
+  offer to serve it). Cohere contract + provider docs updated for unfiltered discovery.
+  ~14 new tests. Gates: full pytest (only the documented pre-existing demo failure),
+  mypy, ruff, `lint-imports` 4/4, `mkdocs --strict` clean. BH.F.4 stays `[~]`:
+  `compare()` remains generation-only — an embedding comparison needs its own dimension
+  set (space, batch limits, intents) and is deferred with that design note; BH.F.5
+  stays `[~]`: CLI `models` (local catalog — blocked on Track G's catalog schema) and
+  `doctor` untouched.

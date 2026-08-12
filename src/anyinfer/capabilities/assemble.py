@@ -22,6 +22,7 @@ from ..types.capabilities import (
     Sourced,
     conjunction,
 )
+from ..types.operations import EmbeddingCapabilities
 from .pricing_table import PricingTable, load_default_pricing
 
 __all__ = ["AUTO_SENTINELS", "CapabilityStore", "capabilities_for"]
@@ -157,6 +158,7 @@ class CapabilityStore:
     ) -> None:
         self._discovered: dict[str, dict[str, ModelCapabilities]] = {}
         self._probed: dict[str, dict[str, ModelCapabilities]] = {}
+        self._embedding_probed: dict[str, dict[str, EmbeddingCapabilities]] = {}
         self._pricing = pricing if pricing is not None else load_default_pricing()
         self._overrides = {k: dict(v) for k, v in (overrides or {}).items()}
 
@@ -170,6 +172,16 @@ class CapabilityStore:
     def record_probe(self, provider_id: str, model: str, caps: ModelCapabilities) -> None:
         """Store measured capabilities for one model."""
         self._probed.setdefault(provider_id, {})[model] = caps
+
+    def record_embedding_probe(
+        self, provider_id: str, model: str, caps: EmbeddingCapabilities
+    ) -> None:
+        """Store measured embedding capabilities for one model."""
+        self._embedding_probed.setdefault(provider_id, {})[model] = caps
+
+    def embedding_probed_for(self, provider_id: str, model: str) -> EmbeddingCapabilities | None:
+        """Measured embedding capabilities for one model, when a probe recorded any."""
+        return self._embedding_probed.get(provider_id, {}).get(model)
 
     def has_discovery(self, provider_id: str) -> bool:
         """Whether a discovery layer has been recorded for this provider."""

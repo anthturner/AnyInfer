@@ -14,7 +14,10 @@ import math
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Flag, auto
-from typing import Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
+
+if TYPE_CHECKING:
+    from .operations import InferenceOperation
 
 __all__ = [
     "DiscoveredModel",
@@ -245,6 +248,11 @@ class ModelCapabilities:
         default_top_p: The nucleus-sampling cutoff this provider applies when a request
             sends none, with provenance; ``None`` when undocumented.
         local: Facts about the local artifact, for locally-run models only.
+        operations: Which inference operations this model serves, with provenance;
+            ``None`` when unknown. Deliberately not a generation `Feature` flag — "can
+            embed" is a different operation, not a feature of chat — and deliberately
+            not invented from the provider-level operations set, which says what the
+            *adapter* speaks, not what one model does.
 
     The two sampling defaults exist so an application can say *what* "provider default"
     means instead of only that it is one. They are populated from a provider's own
@@ -262,6 +270,7 @@ class ModelCapabilities:
     default_temperature: Sourced[float] | None = None
     default_top_p: Sourced[float] | None = None
     local: LocalModelInfo | None = None
+    operations: Sourced[frozenset[InferenceOperation]] | None = None
 
     def overlay(self, other: ModelCapabilities) -> ModelCapabilities:
         """Layer ``other`` on top of this, field by field, stronger provenance winning.
@@ -277,6 +286,7 @@ class ModelCapabilities:
             default_temperature=_stronger(self.default_temperature, other.default_temperature),
             default_top_p=_stronger(self.default_top_p, other.default_top_p),
             local=other.local if other.local is not None else self.local,
+            operations=_stronger(self.operations, other.operations),
         )
 
 
@@ -319,6 +329,17 @@ def conjunction(candidates: list[ModelCapabilities]) -> ModelCapabilities:
         features &= cap.features.value
         provenance = _weaker(provenance, cap.features.provenance)
 
+    operations: Sourced[frozenset[InferenceOperation]] | None = None
+    known_operations = [c.operations for c in candidates if c.operations is not None]
+    if len(known_operations) == len(candidates):
+        # Intersection is the only safe claim; one unknown candidate makes it unknown.
+        op_values = known_operations[0].value
+        op_provenance = known_operations[0].provenance
+        for entry in known_operations[1:]:
+            op_values = op_values & entry.value
+            op_provenance = _weaker(op_provenance, entry.provenance)
+        operations = Sourced(frozenset(op_values), op_provenance)
+
     return ModelCapabilities(
         context_window=context,
         max_output_tokens=max_out,
@@ -327,6 +348,7 @@ def conjunction(candidates: list[ModelCapabilities]) -> ModelCapabilities:
         default_temperature=None,
         default_top_p=None,
         local=None,
+        operations=operations,
     )
 
 

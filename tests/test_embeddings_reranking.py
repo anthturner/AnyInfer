@@ -940,3 +940,187 @@ async def test_embed_spend_reservation_is_released_on_failure() -> None:
         assert result.usage.cost_usd == Decimal("0.0005")
     finally:
         await client.aclose()
+
+
+# ---- capability overlay and conjunction -------------------------------------------------
+
+
+def test_embedding_capabilities_overlay_known_beats_unknown() -> None:
+    from anyinfer.types.operations import EmbeddingCapabilities
+
+    base = EmbeddingCapabilities(dimensions=1024, max_batch_inputs=96)
+    layered = base.overlay(EmbeddingCapabilities(max_batch_inputs=32, normalized=True))
+    assert layered.dimensions == 1024  # unknown in the layer never displaces known
+    assert layered.max_batch_inputs == 32  # the later layer wins where it speaks
+    assert layered.normalized is True
+
+
+def test_embedding_conjunction_refuses_to_guess() -> None:
+    from anyinfer.types.operations import EmbeddingCapabilities, embedding_conjunction
+
+    a = EmbeddingCapabilities(
+        dimensions=1024, max_batch_inputs=96, input_intents=("query", "document")
+    )
+    b = EmbeddingCapabilities(dimensions=384, max_batch_inputs=32, input_intents=("query",))
+    joined = embedding_conjunction([a, b])
+    assert joined.dimensions is None  # disagreement is incompatibility, not a bound
+    assert joined.max_batch_inputs == 32
+    assert joined.input_intents == ("query",)
+    # One unknown bound makes the conjunction unknown.
+    c = EmbeddingCapabilities(dimensions=384)
+    assert embedding_conjunction([a, c]).max_batch_inputs is None
+
+
+def test_rerank_conjunction_takes_minimum_known_bounds() -> None:
+    from anyinfer.types.operations import RerankCapabilities, rerank_conjunction
+
+    a = RerankCapabilities(max_documents=1000, native_top_n=True)
+    b = RerankCapabilities(max_documents=100, native_top_n=True)
+    joined = rerank_conjunction([a, b])
+    assert joined.max_documents == 100
+    assert joined.native_top_n is True
+    assert rerank_conjunction([a, RerankCapabilities()]).max_documents is None
+
+
+def test_model_capabilities_operations_field_with_provenance() -> None:
+    from anyinfer.types.capabilities import ModelCapabilities, Sourced, conjunction
+
+    embed_only = ModelCapabilities(operations=Sourced(frozenset({"embedding"}), "catalog"))
+    both = ModelCapabilities(
+        operations=Sourced(frozenset({"generation", "embedding"}), "discovered")
+    )
+    assert conjunction([embed_only, both]).operations == Sourced(
+        frozenset({"embedding"}), "catalog"
+    )
+    assert conjunction([embed_only, ModelCapabilities()]).operations is None
+    layered = ModelCapabilities().overlay(embed_only)
+    assert layered.operations is not None
+    assert layered.operations.value == frozenset({"embedding"})
+
+
+# ---- operation-aware surfaces (models, verify, probes, semantic ranker) -----------------
+
+
+async def test_models_operation_filter_lists_only_known_servers() -> None:
+    fake = _capable_fake(limit=2)  # declares static caps for "small" only
+    client = _client_with_fake(fake)
+    try:
+        embedders = await client.models("fake-embed", operation="embedding")
+        assert [m.id for m in embedders] == ["small"]
+        # An embed-only provider serves no generation models, and unknown support is
+        # never guessed into the listing.
+        assert await client.models("fake-embed", operation="generation") == ()
+        assert await client.models("fake-embed", operation="rerank") == ()
+    finally:
+        await client.aclose()
+
+
+async def test_operations_for_reads_model_level_facts() -> None:
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        rerank_models=["rr"],
+        embedding_capabilities={"small": ai.EmbeddingCapabilities(max_batch_inputs=2)},
+        rerank_capabilities={"rr": ai.RerankCapabilities(max_documents=10)},
+    )
+    client = _client_with_fake(fake)
+    try:
+        assert client.operations_for("fake-embed:small") == frozenset({"embedding"})
+        assert client.operations_for("fake-embed:rr") == frozenset({"rerank"})
+        # Unknown model on a provider that does not generate: nothing is known.
+        assert client.operations_for("fake-embed:mystery") == frozenset()
+    finally:
+        await client.aclose()
+
+
+async def test_verify_embedding_spends_one_probe_and_reports_dimensions() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    client = _client_with_fake(fake)
+    try:
+        verification = await client.verify("fake-embed:small", operation="embedding")
+        assert verification.ok is True
+        assert verification.reached is True
+        assert "4 dimensions" in verification.detail
+        assert len(fake.embed_requests) == 1
+    finally:
+        await client.aclose()
+
+
+async def test_verify_rerank_reports_unsupported_operation_as_not_reached() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    client = _client_with_fake(fake)
+    try:
+        verification = await client.verify("fake-embed:small", operation="rerank")
+        assert verification.ok is False
+        assert verification.reached is False
+        assert "rerank" in verification.detail
+    finally:
+        await client.aclose()
+
+
+async def test_probe_embedding_measures_dimensions_and_normalization() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 6})
+    client = _client_with_fake(fake)
+    try:
+        report = await client.probe_embedding("fake-embed:small")
+        assert report.dimensions == 6
+        assert report.normalized is True  # the fake emits unit vectors
+        assert report.capabilities.dimensions == 6
+        assert report.capabilities.normalized is True
+    finally:
+        await client.aclose()
+
+
+def test_semantic_ranker_scores_documents_by_path() -> None:
+    from anyinfer.context import ContextDocument
+
+    fake = FakeEmbeddingRerankProvider("fake-embed", rerank_models=["rr"])
+    registry = _empty_registry()
+    fake.register(registry)
+    client = ai.Client(
+        providers=[ai.ProviderSettings.of("fake-embed")],
+        registry=registry,
+        use_default_catalog=False,
+    )
+    try:
+        ranker = ai.semantic_ranker(client, "fake-embed:rr")
+        documents = [
+            ContextDocument.of("match.txt", "alpha beta gamma"),
+            ContextDocument.of("miss.txt", "nothing relevant here"),
+        ]
+        scores = ranker.scores(documents, "alpha beta")
+        assert scores["match.txt"] > scores["miss.txt"]
+    finally:
+        client.close()
+
+
+def test_select_uses_the_semantic_ranker_for_ordering() -> None:
+    from anyinfer.context import ContextDocument, select
+
+    fake = FakeEmbeddingRerankProvider("fake-embed", rerank_models=["rr"])
+    registry = _empty_registry()
+    fake.register(registry)
+    client = ai.Client(
+        providers=[ai.ProviderSettings.of("fake-embed")],
+        registry=registry,
+        use_default_catalog=False,
+    )
+    try:
+        ranker = ai.semantic_ranker(client, "fake-embed:rr")
+        documents = [
+            # Lexical ranking would favor the path match on query.txt; the semantic
+            # ranker (lexical-overlap fake) favors the body match instead.
+            ContextDocument.of("zzz.txt", "alpha beta gamma the answer"),
+            ContextDocument.of("query.txt", "unrelated body"),
+        ]
+        reduction = select(
+            documents,
+            "alpha beta",
+            max_tokens=10_000,
+            max_documents=1,
+            ranker=ranker,
+        )
+        assert [d.path for d in reduction.documents] == ["zzz.txt"]
+        assert len(fake.rerank_requests) == 1
+    finally:
+        client.close()

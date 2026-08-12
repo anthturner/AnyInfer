@@ -646,6 +646,12 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument(
         "--timeout", type=float, default=60.0, help="seconds to wait for each answer"
     )
+    verify.add_argument(
+        "--operation",
+        choices=("generation", "embedding", "rerank"),
+        default="generation",
+        help="which operation to prove; embedding and rerank send one tiny real request too",
+    )
     verify.add_argument("--json", action="store_true", help="emit machine-readable output")
 
     bench = subcommands.add_parser(
@@ -2533,7 +2539,10 @@ def _verify(args: argparse.Namespace) -> int:
 
     client = Client(settings)
     try:
-        results = [client.verify(target, timeout_s=args.timeout) for target in targets]
+        results = [
+            client.verify(target, timeout_s=args.timeout, operation=args.operation)
+            for target in targets
+        ]
     finally:
         client.close()
 
@@ -2878,6 +2887,7 @@ def _providers(args: argparse.Namespace) -> int:
                         "display_name": d.display_name,
                         "aliases": list(d.aliases),
                         "locality": d.locality,
+                        "operations": sorted(d.operations),
                         "requires_base_url": d.requires_base_url,
                         "fields": [
                             {
@@ -2906,6 +2916,8 @@ def _providers(args: argparse.Namespace) -> int:
     for descriptor in descriptors:
         aliases = f" (aliases: {', '.join(descriptor.aliases)})" if descriptor.aliases else ""
         print(f"{descriptor.id:<16} {descriptor.display_name}{aliases}")
+        if descriptor.operations != frozenset({"generation"}):
+            print(f"{'':<16} serves:   {', '.join(sorted(descriptor.operations))}")
         setup = descriptor.setup
         required = [f.key for f in setup.fields if f.required]
         if required:

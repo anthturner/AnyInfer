@@ -284,3 +284,18 @@ def test_unmodeled_v1_endpoint_still_404s() -> None:
     response = http.post("/v1/images/generations", json={})
 
     assert response.status_code == 404
+
+
+def test_models_listing_tags_operations() -> None:
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"small": 4},
+        embedding_capabilities={"small": ai.EmbeddingCapabilities(max_batch_inputs=96)},
+    )
+    http = _client(fake, expose_targets=["fake-embed:small"])
+
+    response = http.get("/v1/models")
+
+    assert response.status_code == 200
+    entries = {e["id"]: e for e in response.json()["data"]}
+    assert entries["fake-embed:small"]["anyinfer"]["operations"] == ["embedding"]

@@ -135,8 +135,9 @@ for model in client.models("cohere"):
         print(model.id, caps.context_window.value, caps.context_window.provenance)
 ```
 
-Only chat-capable models are listed — embedding and rerank models are not discovered
-yet; their verified capabilities ship statically with the provider descriptor.
+Every model is listed — embedding and rerank models included — with its operations
+derived from the listing's `endpoints` field, so `client.models("cohere",
+operation="embedding")` answers from discovery rather than a guess.
 
 ## See also
 

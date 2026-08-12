@@ -146,14 +146,22 @@ def create_app(
             """Advertise one id once, keeping catalog aliases ahead of concrete targets."""
             if model_id and model_id not in seen:
                 seen.add(model_id)
-                entries.append(
-                    {
-                        "id": model_id,
-                        "object": "model",
-                        "created": created,
-                        "owned_by": "anyinfer",
-                    }
-                )
+                entry: dict[str, Any] = {
+                    "id": model_id,
+                    "object": "model",
+                    "created": created,
+                    "owned_by": "anyinfer",
+                }
+                # Additive extension: which operations the target is known to serve,
+                # so a client can tell an embedding model from a chat model. OpenAI
+                # clients ignore unknown keys; an unresolvable id is simply untagged.
+                try:
+                    operations = client.operations_for(model_id)
+                except Exception:  # noqa: BLE001 — advisory metadata, never a 500
+                    operations = frozenset()
+                if operations:
+                    entry["anyinfer"] = {"operations": sorted(operations)}
+                entries.append(entry)
 
         catalog = getattr(client, "catalog", None)
         if catalog is not None:

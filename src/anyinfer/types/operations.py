@@ -14,7 +14,7 @@ type feeds.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -40,6 +40,8 @@ __all__ = [
     "RerankDocument",
     "RerankRequest",
     "RerankResult",
+    "embedding_conjunction",
+    "rerank_conjunction",
 ]
 
 InferenceOperation = Literal["generation", "embedding", "rerank"]
@@ -168,6 +170,37 @@ class EmbeddingCapabilities:
     normalized: bool | None = None
 
 
+
+    def overlay(self, other: EmbeddingCapabilities) -> EmbeddingCapabilities:
+        """Layer ``other``'s known fields over this one; unknown never displaces known.
+
+        The assembly rule for these records mirrors `ModelCapabilities.overlay` without
+        per-field provenance: they carry only provider-stated facts, so the later layer
+        (config or catalog over static) wins wherever it actually says something.
+        """
+        return EmbeddingCapabilities(
+            dimensions=other.dimensions if other.dimensions is not None else self.dimensions,
+            dimension_choices=other.dimension_choices or self.dimension_choices,
+            max_batch_inputs=(
+                other.max_batch_inputs
+                if other.max_batch_inputs is not None
+                else self.max_batch_inputs
+            ),
+            max_input_tokens=(
+                other.max_input_tokens
+                if other.max_input_tokens is not None
+                else self.max_input_tokens
+            ),
+            max_input_bytes=(
+                other.max_input_bytes
+                if other.max_input_bytes is not None
+                else self.max_input_bytes
+            ),
+            input_intents=other.input_intents or self.input_intents,
+            normalized=other.normalized if other.normalized is not None else self.normalized,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class RerankCapabilities:
     """What a reranking-capable model can do, sourced only from facts a provider states.
@@ -185,6 +218,25 @@ class RerankCapabilities:
     max_tokens_per_document: int | None = None
     max_bytes_per_document: int | None = None
     native_top_n: bool = False
+
+    def overlay(self, other: RerankCapabilities) -> RerankCapabilities:
+        """Layer ``other``'s known fields over this one; unknown never displaces known."""
+        return RerankCapabilities(
+            max_documents=(
+                other.max_documents if other.max_documents is not None else self.max_documents
+            ),
+            max_tokens_per_document=(
+                other.max_tokens_per_document
+                if other.max_tokens_per_document is not None
+                else self.max_tokens_per_document
+            ),
+            max_bytes_per_document=(
+                other.max_bytes_per_document
+                if other.max_bytes_per_document is not None
+                else self.max_bytes_per_document
+            ),
+            native_top_n=other.native_top_n or self.native_top_n,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,6 +272,57 @@ class EmbeddingVector:
     def __len__(self) -> int:
         """Number of dimensions."""
         return len(self.values)
+
+
+def embedding_conjunction(
+    candidates: Sequence[EmbeddingCapabilities],
+) -> EmbeddingCapabilities:
+    """Tightest safe embedding claim across delegated candidates — the ``auto`` rule.
+
+    Numeric limits take the minimum only when every candidate states one; a single
+    unknown bound makes the conjunction unknown, exactly as `conjunction` treats context
+    windows. ``dimensions`` is stricter still: candidates that disagree produce ``None``,
+    because differing dimensions are not a bound to minimize but incompatible vector
+    spaces. Input intents intersect; ``normalized`` survives only when unanimous.
+    """
+    if not candidates:
+        return EmbeddingCapabilities()
+    dimensions_seen = {c.dimensions for c in candidates}
+    intents: frozenset[str] = frozenset(candidates[0].input_intents)
+    for candidate in candidates[1:]:
+        intents = intents & frozenset(candidate.input_intents)
+    choices: frozenset[int] = frozenset(candidates[0].dimension_choices)
+    for candidate in candidates[1:]:
+        choices = choices & frozenset(candidate.dimension_choices)
+    normalized_seen = {c.normalized for c in candidates}
+    return EmbeddingCapabilities(
+        dimensions=dimensions_seen.pop() if len(dimensions_seen) == 1 else None,
+        dimension_choices=tuple(sorted(choices)),
+        max_batch_inputs=_min_known([c.max_batch_inputs for c in candidates]),
+        max_input_tokens=_min_known([c.max_input_tokens for c in candidates]),
+        max_input_bytes=_min_known([c.max_input_bytes for c in candidates]),
+        input_intents=tuple(i for i in candidates[0].input_intents if i in intents),
+        normalized=normalized_seen.pop() if len(normalized_seen) == 1 else None,
+    )
+
+
+def rerank_conjunction(candidates: Sequence[RerankCapabilities]) -> RerankCapabilities:
+    """Tightest safe rerank claim across delegated candidates — the ``auto`` rule."""
+    if not candidates:
+        return RerankCapabilities()
+    return RerankCapabilities(
+        max_documents=_min_known([c.max_documents for c in candidates]),
+        max_tokens_per_document=_min_known([c.max_tokens_per_document for c in candidates]),
+        max_bytes_per_document=_min_known([c.max_bytes_per_document for c in candidates]),
+        native_top_n=all(c.native_top_n for c in candidates),
+    )
+
+
+def _min_known(values: Sequence[int | None]) -> int | None:
+    """The minimum bound, only when every candidate states one — never a guessed limit."""
+    if not values or any(v is None for v in values):
+        return None
+    return min(v for v in values if v is not None)
 
 
 @dataclass(frozen=True, slots=True)

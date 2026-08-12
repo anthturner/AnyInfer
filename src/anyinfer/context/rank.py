@@ -30,6 +30,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import PurePosixPath
+from typing import Protocol
 
 from .documents import ContextDocument, RankCache
 from .settings import DEFAULT_TUNING, ContextTuning
@@ -41,6 +42,7 @@ __all__ = [
     "PATH_MATCH_WEIGHT",
     "STOP_WORDS",
     "TERM_SATURATION",
+    "SemanticRanker",
     "build_rank_cache",
     "expand_query",
     "query_terms",
@@ -448,6 +450,24 @@ def _stem(path: str) -> str:
         parents = pure.parent.name
         return parents or pure.stem
     return pure.stem
+
+
+class SemanticRanker(Protocol):
+    """Caller-supplied relevance scoring for context reduction.
+
+    The default ranking is lexical and offline on purpose; this protocol is the opt-in
+    seam for a semantic ranker backed by a rerank model. Scores are keyed by
+    `ContextDocument.path` — a document absent from the mapping scores 0.0. Scores are
+    only compared against each other within one call, never persisted.
+
+    Implementations live *outside* this package (context reduction is a leaf consumer
+    and never imports the client); `anyinfer.semantic_ranker` builds one from a client
+    and a rerank target.
+    """
+
+    def scores(self, documents: Sequence[ContextDocument], query: str) -> Mapping[str, float]:
+        """Score every document's relevance to ``query``, keyed by document path."""
+        ...
 
 
 def rank(

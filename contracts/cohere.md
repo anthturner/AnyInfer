@@ -29,8 +29,10 @@ own thinking channel, and usage that separates billed units from processed token
 
 ### Endpoints
 - `POST https://api.cohere.com/v2/chat` — generation, streaming and unary
-- `GET https://api.cohere.com/v1/models?endpoint=chat` — discovery, cursor-paginated via
-  `page_token`; reports `context_length` and `features`
+- `GET https://api.cohere.com/v1/models` — discovery, cursor-paginated via `page_token`;
+  reports `context_length`, `features`, and each model's compatible `endpoints`
+  (verified 2026-08-12: `chat`/`generate`/`embed`/`rerank`/`classify`/`summarize`/`rate`),
+  which the adapter maps onto operations with `discovered` provenance
 
 ### Auth
 - `Authorization: Bearer <api_key>`. Conventionally `env://CO_API_KEY`.
@@ -153,6 +155,6 @@ Embeddings and rerank responses are not streamed.
   the `input_type` enum for drift.
 - **Rerank:** watch the 1,000-document recommendation and `max_tokens_per_doc` default;
   structured/YAML document reranking guidance unmodelled.
-- **Discovery** (`GET /v1/models?endpoint=chat`) deliberately filters to chat models, so
-  embed/rerank models are not discovered — static capabilities carry them until
-  operation-aware discovery lands.
+- **Discovery** lists every model and derives operations from each entry's `endpoints`
+  (2026-08-12); watch that enum for new values — `classify`/`summarize`/`rate` are
+  deliberately unmapped.

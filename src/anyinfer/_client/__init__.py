@@ -3,6 +3,7 @@
 from .async_client import AsyncClient, AsyncStream, MessagesInput
 from .models import CatalogEntryFit, CatalogView
 from .providers import ProviderSettings
+from .rankers import semantic_ranker
 from .sync_client import Client, SyncStream
 from .tools import Tool, tool
 
@@ -16,5 +17,6 @@ __all__ = [
     "ProviderSettings",
     "SyncStream",
     "Tool",
+    "semantic_ranker",
     "tool",
 ]

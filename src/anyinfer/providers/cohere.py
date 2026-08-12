@@ -29,7 +29,12 @@ from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities, Sourced
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
 from ..types.messages import Message, Text, ToolCall, ToolResult
-from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent, RerankCapabilities
+from ..types.operations import (
+    EmbeddingCapabilities,
+    EmbeddingInputIntent,
+    InferenceOperation,
+    RerankCapabilities,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import has_multimodal, unsupported
@@ -102,13 +107,15 @@ class CohereAdapter:
     # ---- discovery -------------------------------------------------------------------
 
     async def list_models(self) -> Sequence[DiscoveredModel]:
-        """List chat-capable models, following the listing's page tokens.
+        """List every model, following the listing's page tokens.
 
-        The listing reports real context lengths, so windows arrive with ``discovered``
-        provenance.
+        The listing reports real context lengths and each entry's compatible
+        ``endpoints`` (verified 2026-08-12), so windows *and* operations arrive with
+        ``discovered`` provenance — embedding-only and rerank-only models are listed,
+        never filtered out as non-chat.
         """
         models: list[DiscoveredModel] = []
-        params: dict[str, Any] = {"page_size": 1000, "endpoint": "chat"}
+        params: dict[str, Any] = {"page_size": 1000}
 
         while True:
             try:
@@ -653,17 +660,48 @@ def _parse_usage(payload: Any) -> Usage | None:
     return usage if usage != Usage() else None
 
 
+_ENDPOINT_OPERATIONS: Mapping[str, InferenceOperation] = {
+    "chat": "generation",
+    "generate": "generation",
+    "embed": "embedding",
+    "rerank": "rerank",
+}
+"""Cohere listing ``endpoints`` values mapped to operations (verified 2026-08-12).
+
+``classify``, ``summarize``, and ``rate`` have no normalized operation and are ignored.
+"""
+
+
 def _parse_model(entry: Mapping[str, Any]) -> DiscoveredModel:
-    """Read one model-listing entry."""
-    features = Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.JSON_SCHEMA | Feature.JSON_MODE
-    capabilities = entry.get("features")
-    if isinstance(capabilities, list):
-        if "tools" in capabilities:
+    """Read one model-listing entry.
+
+    Generation feature flags are stamped only on models whose ``endpoints`` include a
+    generation surface — an embedding model does not stream chat, whatever the default
+    flag set says.
+    """
+    endpoints = entry.get("endpoints")
+    operations: Sourced[frozenset[InferenceOperation]] | None = None
+    is_generation = True
+    if isinstance(endpoints, list):
+        ops = frozenset(
+            _ENDPOINT_OPERATIONS[e] for e in endpoints if e in _ENDPOINT_OPERATIONS
+        )
+        operations = Sourced(ops, "discovered")
+        is_generation = "generation" in ops
+
+    features = Feature(0)
+    if is_generation:
+        features = (
+            Feature.STREAMING | Feature.SYSTEM_PROMPT | Feature.JSON_SCHEMA | Feature.JSON_MODE
+        )
+        capabilities = entry.get("features")
+        if isinstance(capabilities, list):
+            if "tools" in capabilities:
+                features |= Feature.TOOLS
+            if "thinking" in capabilities or "reasoning" in capabilities:
+                features |= Feature.REASONING
+        else:
             features |= Feature.TOOLS
-        if "thinking" in capabilities or "reasoning" in capabilities:
-            features |= Feature.REASONING
-    else:
-        features |= Feature.TOOLS
 
     window = entry.get("context_length")
     context = (
@@ -674,7 +712,9 @@ def _parse_model(entry: Mapping[str, Any]) -> DiscoveredModel:
     return DiscoveredModel(
         id=str(entry.get("name", "")),
         capabilities=ModelCapabilities(
-            context_window=context, features=Sourced(features, "discovered")
+            context_window=context,
+            features=Sourced(features, "discovered"),
+            operations=operations,
         ),
     )
 

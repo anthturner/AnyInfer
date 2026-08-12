@@ -36,7 +36,7 @@ from .envelope import (
     wrapper_bytes,
     wrapper_text,
 )
-from .rank import build_rank_cache, rank, scores_for
+from .rank import SemanticRanker, build_rank_cache, rank, scores_for
 from .settings import DEFAULT_TUNING, ContextTuning
 
 __all__ = [
@@ -459,6 +459,7 @@ def select(
     tuning: ContextTuning | None = None,
     previous: ReductionState | None = None,
     observer: Observer | None = None,
+    ranker: SemanticRanker | None = None,
 ) -> Reduction:
     """Reduce a corpus to fit a token budget.
 
@@ -487,6 +488,10 @@ def select(
             get ``tuning.carry_over_bonus`` so the selected set, and the rendered prefix
             — stays stable across turns.
         observer: Receives a `ContextReduced` event describing the outcome.
+        ranker: Caller-supplied semantic scoring (`SemanticRanker`). When set, its
+            scores replace the lexical ranking for both ordering and admission — one
+            scoring call per reduction. The default stays lexical and offline; build a
+            rerank-backed implementation with `anyinfer.semantic_ranker`.
 
     Returns:
         The `Reduction`, whose ``text`` is the envelope to place in your own message.
@@ -509,13 +514,24 @@ def select(
         cache = build_rank_cache(unique, split_identifiers=settings.split_identifiers)
 
     carry_over = previous.unchanged(unique) if previous is not None else frozenset()
-    ordered = rank(unique, query, rank_cache=cache, tuning=settings, carry_over=carry_over)
+    semantic_scores: dict[str, float] | None = None
+    if ranker is not None:
+        # One scoring call for the whole corpus; ordering and admission both read it, so
+        # the two can never disagree about relevance the way two scorers could.
+        semantic_scores = dict(ranker.scores(unique, query))
+        ordered = sorted(
+            unique,
+            key=lambda d: (not d.pinned, -semantic_scores.get(d.path, 0.0), d.sha256),
+        )
+    else:
+        ordered = rank(unique, query, rank_cache=cache, tuning=settings, carry_over=carry_over)
 
     reduction = _dispatch(
         name,
         candidates=candidates,
         ordered=ordered,
         query=query,
+        semantic_scores=semantic_scores,
         max_tokens=max_tokens,
         max_bytes=max_bytes,
         max_documents=max_documents,
@@ -615,6 +631,7 @@ def _dispatch(
     candidates: list[ContextDocument],
     ordered: list[ContextDocument],
     query: str,
+    semantic_scores: Mapping[str, float] | None = None,
     max_tokens: int,
     max_bytes: int,
     max_documents: int,
@@ -647,12 +664,22 @@ def _dispatch(
 
             return reduce_tiered(strategy=name, module_digests=module_digests, **common)
         return _greedy(
-            strategy=name, representation="ranked", query=query, rank_cache=rank_cache, **common
+            strategy=name,
+            representation="ranked",
+            query=query,
+            rank_cache=rank_cache,
+            semantic_scores=semantic_scores,
+            **common,
         )
 
     if name == "ranked":
         return _greedy(
-            strategy=name, representation="ranked", query=query, rank_cache=rank_cache, **common
+            strategy=name,
+            representation="ranked",
+            query=query,
+            rank_cache=rank_cache,
+            semantic_scores=semantic_scores,
+            **common,
         )
 
     if name == "tiered":
@@ -723,6 +750,7 @@ def _greedy(
     tuning: ContextTuning,
     duplicates: DuplicateMap,
     rank_cache: RankCache,
+    semantic_scores: Mapping[str, float] | None = None,
 ) -> Reduction:
     """Admit documents while they fit, in the configured order.
 
@@ -740,6 +768,7 @@ def _greedy(
 
     for document in _admission_order(
         ordered,
+        semantic_scores=semantic_scores,
         query=query,
         estimator=estimator,
         tuning=tuning,
@@ -806,6 +835,7 @@ def _admission_order(
     tuning: ContextTuning,
     duplicates: DuplicateMap,
     rank_cache: RankCache,
+    semantic_scores: Mapping[str, float] | None = None,
 ) -> list[ContextDocument]:
     """Decide the order candidates are offered to the budget.
 
@@ -828,7 +858,11 @@ def _admission_order(
     if not rest:
         return list(ordered)
 
-    scores = scores_for(rest, query, cache=rank_cache, tuning=tuning)
+    scores = (
+        semantic_scores
+        if semantic_scores is not None
+        else scores_for(rest, query, cache=rank_cache, tuning=tuning)
+    )
     values: dict[str, float] = {}
     for document in rest:
         score = scores.get(document.path, 0.0)

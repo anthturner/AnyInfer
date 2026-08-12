@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import contextvars
+import math
 import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
@@ -47,6 +48,7 @@ from ..capabilities.probes import (
     PROBE_SCHEMA,
     PROBE_TOOL,
     PROBEABLE_FEATURES,
+    EmbeddingProbeReport,
     FeatureProbe,
     ProbeOutcome,
     ProbeReport,
@@ -144,6 +146,7 @@ from ..types.operations import (
     DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES,
     DEFAULT_MAX_RERANK_RESPONSE_BYTES,
     BatchPolicy,
+    EmbeddingCapabilities,
     EmbeddingRequest,
     EmbeddingResult,
     EmbeddingSpace,
@@ -418,13 +421,71 @@ class AsyncClient:
 
     # ---- discovery -------------------------------------------------------------------
 
-    async def models(self, provider_id: str) -> Sequence[DiscoveredModel]:
-        """List a provider's models, recording what they report about capabilities."""
+    async def models(
+        self, provider_id: str, *, operation: InferenceOperation | None = None
+    ) -> Sequence[DiscoveredModel]:
+        """List a provider's models, recording what they report about capabilities.
+
+        Args:
+            provider_id: The configured provider to list.
+            operation: Keep only models *known* to serve this operation — via a
+                discovered operation tag, or the descriptor's static embedding/rerank
+                capability tables. A model whose operations are unknown is included only
+                for ``"generation"`` on a generation-capable provider (the pre-filter
+                behaviour); for embedding and rerank, unknown support is never guessed
+                into the listing. ``None`` lists everything.
+        """
         adapter = await self._pool.get(provider_id)
         models = await adapter.list_models()
         canonical = self._registry.resolve_alias(provider_id)
         self._capabilities.record_discovery(canonical, models)
-        return models
+        if operation is None:
+            return models
+        descriptor = self._pool.descriptor_for(provider_id)
+        static_ids: frozenset[str] = frozenset()
+        if operation == "embedding":
+            static_ids = frozenset(descriptor.static_embedding_capabilities)
+        elif operation == "rerank":
+            static_ids = frozenset(descriptor.static_rerank_capabilities)
+
+        def _serves(model: DiscoveredModel) -> bool:
+            tagged = model.capabilities.operations if model.capabilities is not None else None
+            if tagged is not None:
+                return operation in tagged.value
+            if model.id in static_ids:
+                return True
+            return operation == "generation" and "generation" in descriptor.operations
+
+        return tuple(m for m in models if _serves(m))
+
+    def operations_for(self, target: Target) -> frozenset[InferenceOperation]:
+        """Which inference operations the resolved target is *known* to serve.
+
+        Model-level facts win: a discovered operation tag, else membership in the
+        descriptor's static embedding/rerank capability tables. A model with no
+        model-level facts on a generation-capable provider reports ``{"generation"}`` —
+        the assumption every listing made before operations existed — and never has
+        embedding or rerank support guessed in.
+
+        Args:
+            target: A target string or catalog alias; resolved without dispatching.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved at all.
+        """
+        resolved = self.resolve(target)
+        capabilities = self._operation_capabilities(resolved)
+        if capabilities is not None and capabilities.operations is not None:
+            return capabilities.operations.value
+        descriptor = self._pool.descriptor_for(resolved.provider_id)
+        known: set[InferenceOperation] = set()
+        if resolved.model in descriptor.static_embedding_capabilities:
+            known.add("embedding")
+        if resolved.model in descriptor.static_rerank_capabilities:
+            known.add("rerank")
+        if not known and "generation" in descriptor.operations:
+            known.add("generation")
+        return frozenset(known)
 
     async def health(self, provider_id: str) -> Health:
         """Probe a provider's readiness."""
@@ -505,6 +566,7 @@ class AsyncClient:
         target: Target,
         *,
         timeout_s: float = 60.0,
+        operation: InferenceOperation = "generation",
     ) -> Verification:
         """Prove a target works by asking it something, end to end.
 
@@ -526,6 +588,10 @@ class AsyncClient:
         Args:
             target: The target to verify. A catalog alias resolves as usual.
             timeout_s: Wall clock for the probe.
+            operation: Which operation to prove. ``"embedding"`` embeds one tiny probe
+                text and judges the vector; ``"rerank"`` ranks two probe documents.
+                Both spend one deliberately small real request, exactly like the
+                generation probe.
 
         Returns:
             The `Verification`, whose ``reached``
@@ -537,6 +603,8 @@ class AsyncClient:
         """
         resolved = self.resolve(target)
         started = time.monotonic()
+        if operation != "generation":
+            return await self._verify_operation(target, resolved, operation, timeout_s, started)
         try:
             # No retries and no fallback: a probe reports what this target did, and a
             # chain that quietly answered from somewhere else would report a working
@@ -585,6 +653,136 @@ class AsyncClient:
             mechanism=result.structured_mechanism,
             usage=result.usage,
             diagnostics=await self._safe_diagnostics(result.target.provider_id),
+        )
+
+    async def _verify_operation(
+        self,
+        target: Target,
+        resolved: ResolvedTarget,
+        operation: InferenceOperation,
+        timeout_s: float,
+        started: float,
+    ) -> Verification:
+        """Verify an embedding or rerank target with one deliberately tiny real call.
+
+        Same contract as the generation probe: no retries, no fallback, and a provider
+        problem is the answer rather than an exception. A target whose provider does not
+        declare the operation reports not-reached with the refusal's own hint.
+        """
+        try:
+            if operation == "embedding":
+                embedded = await self.embed(
+                    ["anyinfer verification probe"],
+                    route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+                    input_type="document",
+                    timeout_s=timeout_s,
+                    manifest=False,
+                )
+                dimensions = len(embedded.vectors[0])
+                return Verification(
+                    target=embedded.target,
+                    ok=True,
+                    reached=True,
+                    latency_ms=(time.monotonic() - started) * 1000.0,
+                    detail=f"embedded one probe text into {dimensions} dimensions",
+                    usage=embedded.usage,
+                    diagnostics=await self._safe_diagnostics(embedded.target.provider_id),
+                )
+            ranked = await self.rerank(
+                "which document mentions verification",
+                ["this one mentions verification", "an unrelated sentence about weather"],
+                route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+                top_n=1,
+                timeout_s=timeout_s,
+                manifest=False,
+            )
+            ok = len(ranked.items) >= 1
+            return Verification(
+                target=ranked.target,
+                ok=ok,
+                reached=True,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=(
+                    "ranked two probe documents"
+                    if ok
+                    else "the provider returned no ranked items for two documents"
+                ),
+                usage=ranked.usage,
+                diagnostics=await self._safe_diagnostics(ranked.target.provider_id),
+            )
+        except ConfigError as error:
+            # A local refusal — the provider does not declare the operation, or the
+            # request could never be sent. Nothing was spent; nothing was reached.
+            return Verification(
+                target=resolved,
+                ok=False,
+                reached=False,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=error.detail,
+                diagnostics=await self._safe_diagnostics(resolved.provider_id),
+            )
+        except (AllTargetsFailedError, ProviderError) as error:
+            return Verification(
+                target=resolved,
+                ok=False,
+                latency_ms=(time.monotonic() - started) * 1000.0,
+                detail=_verification_detail(error),
+                diagnostics=await self._safe_diagnostics(resolved.provider_id),
+            )
+
+    async def probe_embedding(
+        self,
+        target: Target,
+        *,
+        timeout_s: float = 30.0,
+        record: bool = True,
+    ) -> EmbeddingProbeReport:
+        """Measure an embedding target with one tiny real call.
+
+        Embedding capability tables only carry what a provider documents; a self-hosted
+        or preset endpoint often documents nothing. This spends one deliberately small
+        request and measures what came back — the vector length, and whether it was
+        unit-normalized — recording both at ``probed`` provenance so later calls (and
+        `capabilities_for` consumers) see measured facts instead of blanks.
+
+        **This costs money and time**, exactly like `probe()`: opt-in, one round trip.
+
+        Args:
+            target: The embedding target to measure.
+            timeout_s: Wall clock for the probe call.
+            record: Store the findings at ``probed`` provenance.
+
+        Returns:
+            The `EmbeddingProbeReport` with the measured facts.
+
+        Raises:
+            anyinfer.errors.ConfigError: If the target cannot be resolved, or its
+                provider does not declare the embedding operation.
+            anyinfer.errors.AllTargetsFailedError: If the probe call itself failed.
+        """
+        result = await self.embed(
+            ["anyinfer embedding probe"],
+            route=Route(targets=(target,), retry=Retry(max_attempts=1)),
+            input_type="document",
+            timeout_s=timeout_s,
+            manifest=False,
+        )
+        vector = result.vectors[0]
+        norm = math.sqrt(sum(v * v for v in vector.values))
+        normalized = abs(norm - 1.0) <= 1e-3
+        capabilities = EmbeddingCapabilities(
+            dimensions=len(vector), normalized=normalized
+        )
+        if record:
+            self._capabilities.record_embedding_probe(
+                result.target.provider_id, result.target.model, capabilities
+            )
+        return EmbeddingProbeReport(
+            target=result.target,
+            dimensions=len(vector),
+            normalized=normalized,
+            capabilities=capabilities,
+            usage=result.usage,
         )
 
     async def probe(
@@ -1308,6 +1506,7 @@ class AsyncClient:
                 manifest=self._manifests if manifest is None else manifest,
                 anyinfer_version=_version(),
                 capabilities_for=self._operation_capabilities,
+                embedding_capabilities_for=self._embedding_capabilities_of,
                 request_id=request_id,
             )
         except BaseException:
@@ -3194,6 +3393,20 @@ class AsyncClient:
             return self._capabilities_for(descriptor, resolved)
         except (AnyInferError, ValueError):
             return None
+
+    def _embedding_capabilities_of(self, resolved: ResolvedTarget) -> Any:
+        """Static embedding capabilities layered under anything a probe measured."""
+        try:
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+        except (AnyInferError, ValueError):
+            return None
+        static = descriptor.static_embedding_capabilities.get(resolved.model)
+        probed = self._capabilities.embedding_probed_for(
+            resolved.provider_id, resolved.model
+        )
+        if static is not None and probed is not None:
+            return static.overlay(probed)
+        return probed if probed is not None else static
 
     def _check_operation_spend(
         self,

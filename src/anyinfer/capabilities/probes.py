@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from ..types.capabilities import Feature, ModelCapabilities, Sourced
+from ..types.operations import EmbeddingCapabilities
 from ..types.requests import ResolvedTarget, ToolSpec
 from ..types.results import Mechanism, Usage
 
@@ -38,6 +39,7 @@ __all__ = [
     "PROBE_MAX_OUTPUT_TOKENS",
     "PROBE_SCHEMA",
     "PROBE_TOOL",
+    "EmbeddingProbeReport",
     "FeatureProbe",
     "ProbeOutcome",
     "ProbeReport",
@@ -158,6 +160,32 @@ class ProbeReport:
         if unsupported:
             parts.append(f"does not support {', '.join(n for n in unsupported if n)}")
         return f"{self.target}: {'; '.join(parts) or 'nothing conclusive'}"
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingProbeReport:
+    """What one tiny real embedding call measured about a target.
+
+    A measurement, not a claim: the dimensions are the length of a vector the provider
+    actually returned, and ``normalized`` is whether that vector's L2 norm measured 1.0
+    within tolerance. One sample cannot prove normalization *policy*, but a norm far
+    from 1.0 disproves it, and a norm of exactly 1.0 on real output is how every
+    normalized model presents — both directions earn ``probed`` provenance.
+
+    Attributes:
+        target: The resolved target the probe embedded against.
+        dimensions: Vector length the call returned.
+        normalized: Whether the sampled vector was unit-norm within 1e-3.
+        capabilities: The measured facts as an `EmbeddingCapabilities`, ready for the
+            probed layer.
+        usage: What the probe cost, as reported.
+    """
+
+    target: ResolvedTarget
+    dimensions: int
+    normalized: bool
+    capabilities: EmbeddingCapabilities
+    usage: Usage
 
 
 def mechanism_for(feature: Feature) -> Mechanism | None:

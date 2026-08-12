@@ -297,7 +297,9 @@ async def test_native_discovery_reports_real_capabilities() -> None:
     finally:
         await adapter.aclose()
 
-    assert [m.id for m in models] == ["qwen3-8b"], "embeddings are not chat models"
+    # Embedding models are listed alongside chat models, each tagged with its
+    # discovered operation — never filtered out as non-chat.
+    assert [m.id for m in models] == ["qwen3-8b", "nomic-embed"]
     caps = models[0].capabilities
     assert caps is not None
     assert caps.context_window is not None and caps.context_window.value == 32768
@@ -306,6 +308,15 @@ async def test_native_discovery_reports_real_capabilities() -> None:
     assert caps.local is not None
     assert caps.local.quantization == "Q4_K_M"
     assert caps.local.parameter_size == "8B"
+    assert caps.operations is not None
+    assert caps.operations.value == frozenset({"generation"})
+
+    embed_caps = models[1].capabilities
+    assert embed_caps is not None
+    assert embed_caps.operations is not None
+    assert embed_caps.operations.value == frozenset({"embedding"})
+    assert embed_caps.operations.provenance == "discovered"
+    assert embed_caps.features.value == ai.Feature(0)  # no chat features invented
 
 
 async def test_discovery_falls_back_to_the_openai_listing() -> None:

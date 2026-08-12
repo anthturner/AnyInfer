@@ -28,6 +28,7 @@ from ._client import (
     ProviderSettings,
     SyncStream,
     Tool,
+    semantic_ranker,
     tool,
 )
 from .arena import ArenaResult, Candidate
@@ -437,6 +438,7 @@ __all__ = [
     "manifest_json_schema",
     "redact",
     "register_secret",
+    "semantic_ranker",
     "system",
     "tool",
     "user",

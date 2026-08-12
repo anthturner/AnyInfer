@@ -49,6 +49,7 @@ from ..types.operations import (
     DEFAULT_MAX_EMBEDDING_INPUTS,
     BatchFailure,
     BatchPolicy,
+    EmbeddingCapabilities,
     EmbeddingRequest,
     EmbeddingResult,
     EmbeddingSpace,
@@ -308,6 +309,8 @@ async def dispatch_embed(
     manifest: bool = False,
     anyinfer_version: str = "",
     capabilities_for: Callable[[ResolvedTarget], Any] | None = None,
+    embedding_capabilities_for: Callable[[ResolvedTarget], EmbeddingCapabilities | None]
+    | None = None,
     request_id: str | None = None,
 ) -> EmbeddingResult:
     """Route and dispatch one embedding request, honoring the embedding-space safety rule.
@@ -351,7 +354,12 @@ async def dispatch_embed(
             )
 
         adapter = await pool.get(resolved.provider_id)
-        if not isinstance(adapter, EmbedsText):
+        # Declared operations are the authoritative gate: a structurally-present method
+        # on an adapter that never declared the operation is not an offer to serve it.
+        if (
+            "embedding" not in registry.get(resolved.provider_id).operations
+            or not isinstance(adapter, EmbedsText)
+        ):
             raise ConfigError(
                 f"provider {resolved.provider_id!r} does not support embedding",
                 provider=resolved.provider_id,
@@ -359,8 +367,11 @@ async def dispatch_embed(
             )
 
         declared = (
-            registry.get(resolved.provider_id)
-            .static_embedding_capabilities.get(resolved.model, None)
+            embedding_capabilities_for(resolved)
+            if embedding_capabilities_for is not None
+            else registry.get(resolved.provider_id).static_embedding_capabilities.get(
+                resolved.model, None
+            )
         )
         limit = _effective_batch_limit(
             request.batch, declared.max_batch_inputs if declared is not None else None
@@ -586,7 +597,10 @@ async def dispatch_rerank(
             continue
 
         adapter = await pool.get(resolved.provider_id)
-        if not isinstance(adapter, ReranksText):
+        if (
+            "rerank" not in registry.get(resolved.provider_id).operations
+            or not isinstance(adapter, ReranksText)
+        ):
             raise ConfigError(
                 f"provider {resolved.provider_id!r} does not support reranking",
                 provider=resolved.provider_id,
