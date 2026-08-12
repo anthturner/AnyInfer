@@ -179,7 +179,7 @@ upstream that `/v1/embeddings` exists (start with together/fireworks/mistral/dee
 `contracts/openai-compat-presets.md` with dates, and enable only the verified ones.
 Unverified presets stay generation-only (the correct default).
 
-### T6 — Pricing pipeline entries (Track E remainder, BH.E.2) — mechanism DONE 2026-08-12, data entries still open
+### T6 — Pricing pipeline entries (Track E remainder, BH.E.2) — DONE 2026-08-12 (OpenAI + Voyage embeddings; Cohere/Jina/Voyage-rerank remain publicly unpriced)
 
 Mechanism is DONE (`Pricing.per_search_unit`, `compute_operation_cost`); what's missing
 is data + parsing:
@@ -195,7 +195,7 @@ is data + parsing:
 3. The demo panel's cost display lights up automatically once entries exist (ER.9.13).
 4. ER.11.12: mixed generation/embed/rerank rate-pacing test.
 
-### T7 — Conformance/harness remainder (Track H, BH.H.1/H.2/H.3/H.5) — two cases DONE 2026-08-12, live lanes still open
+### T7 — Conformance/harness remainder (Track H, BH.H.1/H.2/H.3/H.5) — four cases DONE 2026-08-12, live lanes and cancellation still open
 
 - Port the never-harness-registered behaviors into `CONFORMANCE_CASES`: intent
   translation, normalization metadata, byte caps, retry-after, cancellation,
@@ -229,7 +229,7 @@ result type). Cohere discovery now lists embedding models, so the
 - Repr/serialization audit for the new frozen types (ER.11.6's tail — check what
   GenerationRequest's repr does with payloads first; mirror its policy).
 
-### T10 — Docs remainder (Track K, BH.K.1/K.2/K.5) — partially DONE 2026-08-12
+### T10 — Docs remainder (Track K, BH.K.1/K.2/K.5) — DONE 2026-08-12 (stray-claims sweep closed; no further gaps found)
 
 - Task guides under `docs/guides/`: semantic-search building blocks, batch embedding,
   intents, index/query compatibility, reranking, local embeddings (TEI + Ollama + LM
@@ -554,3 +554,58 @@ feature-complete bar:
   byte-cap and retry-after conformance cases (T7); T4 whenever a llama-server + GGUF
   becomes available; and the remaining docs guides beyond what `embeddings.md` and the
   new example already cover (T10).
+- **2026-08-12:** T6 data entries delivered and tested. A working browser-rendered fetch
+  was available this session (unlike before): `developers.openai.com/api/docs/pricing`
+  and `docs.voyageai.com/docs/pricing` both rendered live and independently re-confirmed
+  the exact OpenAI figures this file's fact cache already carried ($0.02 / $0.13 per 1M
+  for `text-embedding-3-small` / `-large`), plus real Voyage numbers not previously in the
+  cache (`voyage-3` $0.06/1M, `voyage-3-lite` $0.02/1M). Both landed in `pricing.json`
+  with a new `voyage` coverage policy entry. Cohere and Jina were fetched again from
+  multiple pages each and confirmed, not merely assumed, still undocumented: both publish
+  only enterprise/Model-Vault hourly rates or no rate at all, never a public per-token or
+  per-search-unit number — left undone rather than guessed. Found and fixed a real gap
+  while wiring this in: `compute_operation_cost`'s embedding branch required
+  `usage.input_tokens`, which Voyage and Jina never report (contract cache: "total_tokens
+  only") — their pricing could never have taken effect even once entered. Fixed narrowly:
+  an embedding call has no completion tokens by construction, so `total_tokens` **is**
+  `input_tokens` for that operation specifically; the fallback is scoped to the embedding
+  branch only and never touches rerank's search-unit-only rule (D-13 stays intact — no
+  token is ever treated as a search unit). Voyage's rerank pricing was deliberately left
+  out: Voyage bills rerank by token count, not by search unit, so neither
+  `per_search_unit` (Voyage never reports `search_units`) nor the token path (rerank cost
+  is search-unit-only by design) can consume that data today — entering it would ship a
+  price that can never compute. Real gap recorded for a future session: rerank cost
+  computation has no path for token-billed rerank providers at all. Golden counts in
+  `test_pricing_drift.py` updated (294→298 bundled entries).
+- **2026-08-12:** T7 byte-cap/retry-after for embed/rerank delivered and tested — the two
+  conformance cases the plan flagged as "real multi-file work rather than a quick add."
+  Added `embedding_byte_cap`, `rerank_byte_cap`, `embedding_retry_after`,
+  `rerank_retry_after` to `CONFORMANCE_CASES`, reusing the existing
+  `oversized`/`rate_limited` scenario names (each case gets its own freshly built client
+  per `run_conformance`'s existing per-case client construction). Wired all three
+  harnesses that declare `embedding`/`rerank` support — Cohere, TEI, Ollama: Cohere's
+  `/v2/embed` and `/v2/rerank` fakes gained oversized/rate-limited branches; TEI's fake
+  gained the same (its `rate_limited` branch previously 429'd unconditionally forever,
+  unexercised because TEI declares `retry_after=False` for generation — fixed to
+  429-once-then-succeed); Ollama's `FakeOllamaServer` had no scenario-awareness at all on
+  `/api/embed`, so it gained an `embed_scenario` parameter. All three adapters already
+  had T9's `check_response_size` wired into their embed/rerank paths, so no adapter code
+  changed — this was purely test-harness wiring to exercise a protection that already
+  existed. Matrix regenerated; the four new columns read ✅ for cohere and tei, ✅/➖
+  correctly split for ollama (embedding yes, rerank ➖, no rerank surface), ➖ everywhere
+  without a declared embedding/rerank harness. Cancellation-in-conformance and live
+  Ollama/Voyage/Jina/TEI lanes remain explicitly undone — the former needs its own
+  scenario-plumbing concept, the latter needs infrastructure this session doesn't have.
+- **2026-08-12:** T10 stray-claims sweep re-run and closed, no new instances found beyond
+  the one fix the prior session already made in `context-reduction.md`. Every remaining
+  hit is an accurate, deliberate statement — Bedrock's Converse API genuinely has no
+  embeddings surface, the lexical ranker's docstring correctly says it has no embeddings
+  by design, and the errors reference's `groq does not support embedding` line is a
+  literal example error message. `operation_routes`/fallback-configuration content was
+  checked and is already covered in `docs/reference/configuration.md`,
+  `docs/guides/cli.md`, and the `semantic-search.md` example. **T11 (catalog schema +
+  pinned embedding entries) is still explicitly not done**: pinning a catalog entry means
+  downloading and hashing a real GGUF artifact from its upstream repo — the same
+  live-artifact requirement that blocked T4 — and this sandbox has no path to fetch
+  multi-gigabyte model files. Left for a session with real artifact-fetch access, as T4
+  already is.

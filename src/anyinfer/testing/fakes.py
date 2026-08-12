@@ -432,6 +432,7 @@ class FakeOllamaServer:
         models: Sequence[str] = ("qwen3:8b", "qwen2.5:3b"),
         loaded: Mapping[str, int] | None = None,
         chunk_size: int = 4,
+        embed_scenario: str | None = None,
     ) -> None:
         if responses is None:
             responses = [FakeResponse()]
@@ -442,6 +443,8 @@ class FakeOllamaServer:
         self._loaded = dict(loaded or {})
         self._chunk_size = chunk_size
         self._call_index = 0
+        self._embed_scenario = embed_scenario
+        self._embed_calls = 0
         self.requests: list[dict[str, Any]] = []
         self.pulled: list[str] = []
         self.pull_lines: list[dict[str, Any]] | None = None
@@ -461,6 +464,23 @@ class FakeOllamaServer:
             body = json.loads(request.content or b"{}")
             raw_input = body.get("input", [])
             inputs = raw_input if isinstance(raw_input, list) else [raw_input]
+            if self._embed_scenario == "rate_limited" and self._embed_calls == 0:
+                self._embed_calls += 1
+                return httpx2.Response(
+                    429,
+                    json={"error": "busy"},
+                    headers={"retry-after": "0"},
+                )
+            self._embed_calls += 1
+            if self._embed_scenario == "oversized":
+                return httpx2.Response(
+                    200,
+                    json={
+                        "model": body.get("model", ""),
+                        "embeddings": [[0.1] * 20_000 for _ in inputs],
+                        "prompt_eval_count": len(inputs),
+                    },
+                )
             return httpx2.Response(
                 200,
                 json={

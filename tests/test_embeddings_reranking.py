@@ -836,6 +836,26 @@ def test_rerank_cost_computed_from_search_units() -> None:
     assert compute_operation_cost(Usage(input_tokens=50), caps, "rerank") is None
 
 
+def test_embed_cost_falls_back_to_total_tokens_when_input_tokens_unreported() -> None:
+    from decimal import Decimal
+
+    from anyinfer.capabilities.pricing import compute_operation_cost
+    from anyinfer.types.capabilities import ModelCapabilities, Pricing, Sourced
+    from anyinfer.types.results import Usage
+
+    caps = ModelCapabilities(
+        pricing=Sourced(Pricing(input_per_1m=Decimal("100"), output_per_1m=Decimal("0")), "catalog")
+    )
+    # Voyage/Jina report only total_tokens for embed calls; an embedding call has no
+    # completion tokens, so total_tokens is the input count for that operation.
+    assert compute_operation_cost(Usage(total_tokens=5), caps, "embedding") == Decimal("0.0005")
+    # input_tokens is preferred when both are present.
+    assert compute_operation_cost(
+        Usage(input_tokens=3, total_tokens=5), caps, "embedding"
+    ) == Decimal("0.0003")
+    assert compute_operation_cost(Usage(), caps, "embedding") is None
+
+
 async def test_embed_cost_computed_from_trusted_pricing() -> None:
     from decimal import Decimal
 

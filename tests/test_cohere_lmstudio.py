@@ -432,6 +432,20 @@ def _cohere_server(scenario: str) -> Any:
                 },
             )
         if request.url.path.endswith("/v2/embed"):
+            if scenario == "oversized":
+                texts = json.loads(request.content)["texts"]
+                return httpx2.Response(
+                    200,
+                    json={
+                        "embeddings": {"float": [[0.1] * 20_000 for _ in texts]},
+                        "meta": {"tokens": {"input_tokens": len(texts)}},
+                    },
+                )
+            if scenario == "rate_limited" and state["calls"] == 0:
+                state["calls"] += 1
+                return httpx2.Response(
+                    429, json={"message": "slow down"}, headers={"retry-after": "0"}
+                )
             texts = json.loads(request.content)["texts"]
             return httpx2.Response(
                 200,
@@ -441,6 +455,20 @@ def _cohere_server(scenario: str) -> Any:
                 },
             )
         if request.url.path.endswith("/v2/rerank"):
+            if scenario == "oversized":
+                return httpx2.Response(
+                    200,
+                    json={
+                        "results": [{"index": 0, "relevance_score": 0.9}],
+                        "meta": {"billed_units": {"search_units": 1}},
+                        "padding": "x" * 20_000,
+                    },
+                )
+            if scenario == "rate_limited" and state["calls"] == 0:
+                state["calls"] += 1
+                return httpx2.Response(
+                    429, json={"message": "slow down"}, headers={"retry-after": "0"}
+                )
             body = json.loads(request.content)
             ranked = [
                 {"index": i, "relevance_score": 1.0 - i * 0.4}

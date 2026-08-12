@@ -294,6 +294,9 @@ PROVIDER_POLICIES: dict[str, ProviderPricingPolicy] = {
         "unrepresentable",
         "published rates are CNY and currency conversion is not represented",
     ),
+    "voyage": _policy(
+        "voyage", "manual", "no machine-readable pricing feed; provider page is the authority"
+    ),
 }
 
 

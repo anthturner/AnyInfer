@@ -40,6 +40,8 @@ def _adapter(handler: Any) -> TEIAdapter:
 
 
 def _server(scenario: str = "default") -> Any:
+    state = {"calls": 0}
+
     def handler(request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
         if path.endswith("/info"):
@@ -48,18 +50,33 @@ def _server(scenario: str = "default") -> Any:
                 info["model_id"] = "BAAI/bge-reranker-large"
                 info["model_type"] = {"reranker": {}}
             return httpx2.Response(200, json=info)
-        if scenario == "rate_limited":
+        if scenario == "rate_limited" and state["calls"] == 0:
+            state["calls"] += 1
             return httpx2.Response(
                 429,
                 json={"error": "model is overloaded", "error_type": "overloaded"},
                 headers={"retry-after": "1"},
             )
         if path.endswith("/embed"):
+            if scenario == "oversized":
+                inputs = json.loads(request.content)["inputs"]
+                return httpx2.Response(
+                    200, json=[[0.1] * 20_000 for _ in inputs]
+                )
             inputs = json.loads(request.content)["inputs"]
             return httpx2.Response(
                 200, json=[[0.1 * (i + 1), 0.2] for i in range(len(inputs))]
             )
         if path.endswith("/rerank"):
+            if scenario == "oversized":
+                body = json.loads(request.content)
+                return httpx2.Response(
+                    200,
+                    json=[
+                        {"index": i, "score": 0.5, "padding": "x" * 20_000}
+                        for i in range(len(body["texts"]))
+                    ],
+                )
             body = json.loads(request.content)
             # Index order, deliberately not score order — the adapter must sort.
             return httpx2.Response(

@@ -205,7 +205,7 @@ def test_bounded_fetch_network_failures(error: Exception) -> None:
 def test_coverage_policy_is_exhaustive_and_meets_non_regression_gate() -> None:
     rates = load_bundled(_pricing())
     assert validate_policies(rates) == []
-    assert len(rates) == 294
+    assert len(rates) == 298
     assert len(selected_rates(rates, "openrouter-models")) == 10
     assert len(selected_rates(rates, "chutes-models")) == 13
     assert len(selected_rates(rates, "avian-models")) == 10
@@ -237,7 +237,7 @@ def test_full_fixture_run_matches_33_entries_and_is_stable() -> None:
     )
     assert status == 0
     assert report["summary"] == {
-        "bundled_entries": 294,
+        "bundled_entries": 298,
         "checked_entries": 33,
         "direct_entries": 23,
         "secondary_entries": 10,
@@ -245,7 +245,7 @@ def test_full_fixture_run_matches_33_entries_and_is_stable() -> None:
         "source_failures": 0,
     }
     assert render_json(report) == render_json(report)
-    assert "33/294" in render_text(report)
+    assert "33/298" in render_text(report)
     serialized = render_json(report)
     assert "cache_read" not in serialized
     assert "headers" not in serialized

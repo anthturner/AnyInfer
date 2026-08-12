@@ -402,10 +402,11 @@ def _server_for(scenario: str) -> FakeOllamaServer:
             [
                 FakeResponse(status=429, error_message="busy", headers={"retry-after": "0"}),
                 FakeResponse(text="recovered"),
-            ]
+            ],
+            embed_scenario=scenario,
         )
     if scenario == "oversized":
-        return FakeOllamaServer(FakeResponse(text="x" * 20_000))
+        return FakeOllamaServer(FakeResponse(text="x" * 20_000), embed_scenario=scenario)
     if scenario == "odd_finish":
         return FakeOllamaServer(FakeResponse(text="hello", finish_reason="unexpected"))
     return FakeOllamaServer(FakeResponse(text="Hello from Ollama."))

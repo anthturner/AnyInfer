@@ -180,6 +180,14 @@ def compute_operation_cost(
     recorded per-unit rate: a rerank provider that reports no tokens is never priced
     through an invented token equivalence.
 
+    Some embedding providers (Voyage, Jina) report only ``total_tokens``, never
+    ``input_tokens`` (see their contract snapshots). For the embedding operation
+    specifically this is not a gap to guess around: an embedding call has no completion
+    tokens by definition, so ``total_tokens`` and ``input_tokens`` are the same quantity
+    for that operation. ``input_tokens`` is preferred when a provider reports it, and
+    ``total_tokens`` is used only as the equivalent fallback — never as an invented
+    number for a different operation.
+
     Args:
         usage: Reported usage for the call.
         capabilities: Assembled capabilities, whose ``pricing`` field supplies the rates.
@@ -195,9 +203,10 @@ def compute_operation_cost(
         return None
     pricing: Pricing = capabilities.pricing.value
     if operation == "embedding":
-        if usage.input_tokens is None:
+        tokens = usage.input_tokens if usage.input_tokens is not None else usage.total_tokens
+        if tokens is None:
             return None
-        return Decimal(usage.input_tokens) / _PER_MILLION * pricing.input_per_1m
+        return Decimal(tokens) / _PER_MILLION * pricing.input_per_1m
     if operation == "rerank":
         if usage.search_units is None or pricing.per_search_unit is None:
             return None

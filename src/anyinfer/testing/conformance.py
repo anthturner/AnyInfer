@@ -485,6 +485,55 @@ async def _case_embedding_normalization_probe(client: AsyncClient, h: Conformanc
     assert isinstance(report.normalized, bool), "normalization must be a measured bool"
 
 
+async def _case_embedding_byte_cap(client: AsyncClient, h: ConformanceHarness) -> None:
+    from ..errors import AllTargetsFailedError, StreamProtocolError
+
+    try:
+        await client.embed(
+            ["alpha"], target=h.embedding_target, input_type="document", max_response_bytes=64
+        )
+    except (AllTargetsFailedError, StreamProtocolError):
+        return
+    raise AssertionError(
+        "an oversized embedding response must be rejected, not truncated silently"
+    )
+
+
+async def _case_rerank_byte_cap(client: AsyncClient, h: ConformanceHarness) -> None:
+    from ..errors import AllTargetsFailedError, StreamProtocolError
+
+    try:
+        await client.rerank(
+            "which text is about the moon landing",
+            ["a document"],
+            target=h.rerank_target,
+            max_response_bytes=64,
+        )
+    except (AllTargetsFailedError, StreamProtocolError):
+        return
+    raise AssertionError("an oversized rerank response must be rejected, not truncated silently")
+
+
+async def _case_embedding_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.embed(["alpha"], target=h.embedding_target, input_type="document")
+    assert result.attempts, "the attempt trail must be populated"
+    retried = [a for a in result.attempts if a.outcome == "retried"]
+    assert retried, "a rate-limited embed attempt must be recorded as retried"
+    assert retried[0].error is not None
+    assert retried[0].error.retryable is True
+
+
+async def _case_rerank_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
+    result = await client.rerank(
+        "which text is about the moon landing", ["doc a", "doc b"], target=h.rerank_target
+    )
+    assert result.attempts, "the attempt trail must be populated"
+    retried = [a for a in result.attempts if a.outcome == "retried"]
+    assert retried, "a rate-limited rerank attempt must be recorded as retried"
+    assert retried[0].error is not None
+    assert retried[0].error.retryable is True
+
+
 CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
     ConformanceCase("list_models", "default", "list_models", _case_list_models),
     ConformanceCase("health", "default", "health", _case_health),
@@ -524,6 +573,12 @@ CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
         "embedding",
         _case_embedding_normalization_probe,
     ),
+    ConformanceCase("embedding_byte_cap", "oversized", "embedding", _case_embedding_byte_cap),
+    ConformanceCase("rerank_byte_cap", "oversized", "rerank", _case_rerank_byte_cap),
+    ConformanceCase(
+        "embedding_retry_after", "rate_limited", "embedding", _case_embedding_retry_after
+    ),
+    ConformanceCase("rerank_retry_after", "rate_limited", "rerank", _case_rerank_retry_after),
 )
 """Every conformance case, in matrix order."""
 
