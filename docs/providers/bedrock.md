@@ -148,6 +148,28 @@ Converse image, document, and audio blocks are used directly. Inline inputs are 
 remote image/document references must be S3 URIs. The selected model still decides which
 block types it accepts.
 
+## Embeddings
+
+Converse has no embeddings surface at all, so this goes through the older `InvokeModel`
+action instead — a separate code path from generation, sharing only auth and addressing:
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="bedrock:amazon.titan-embed-text-v2:0",
+)
+```
+
+Titan Text Embeddings V2 accepts **one `inputText` per call**, a real limit of the model
+(there is no batch field in its request schema) — the adapter declares
+`max_batch_inputs=1` so the core's batching policy fans a multi-text call into one
+`InvokeModel` request per input automatically. `dimensions=` requests native truncation
+to `1024` (default), `512`, or `256`. There is no `input_type`/intent concept on this
+model.
+
+Cohere Embed on Bedrock and Bedrock's separate Rerank action are not yet implemented —
+see the contract snapshot's watchlist.
+
 ## See also
 
 <div class="anyinfer-see-also" markdown>

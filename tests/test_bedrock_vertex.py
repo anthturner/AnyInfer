@@ -495,6 +495,82 @@ async def test_health_does_not_spend_a_generation() -> None:
     assert "us-east-1" in health.detail
 
 
+# ---- bedrock: embeddings ---------------------------------------------------------------
+
+_TITAN_RESPONSE = {
+    "embedding": [0.1, 0.2, 0.3],
+    "inputTextTokenCount": 5,
+}
+
+
+async def test_embeds_against_invoke_model_not_converse() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_TITAN_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(model="amazon.titan-embed-text-v2:0", inputs=("hi",))
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0].url.path == "/model/amazon.titan-embed-text-v2:0/invoke"
+    body = json.loads(seen[0].content)
+    assert body == {"inputText": "hi"}
+    assert result.vectors == ((0.1, 0.2, 0.3),)
+    assert result.usage is not None
+    assert result.usage.input_tokens == 5
+
+
+async def test_embed_forwards_dimensions() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_TITAN_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        await adapter.embed(
+            EmbeddingWireRequest(
+                model="amazon.titan-embed-text-v2:0", inputs=("hi",), dimensions=256
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    body = json.loads(seen[0].content)
+    assert body == {"inputText": "hi", "dimensions": 256}
+
+
+async def test_embed_issues_one_invoke_per_input_and_sums_tokens() -> None:
+    """Titan has no batch field — one inputText per call is the only shape it accepts."""
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_TITAN_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(
+                model="amazon.titan-embed-text-v2:0", inputs=("hi", "there")
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    assert len(seen) == 2
+    assert result.vectors == ((0.1, 0.2, 0.3), (0.1, 0.2, 0.3))
+    assert result.usage is not None
+    assert result.usage.input_tokens == 10
+
+
 # ---- vertex --------------------------------------------------------------------------
 
 
