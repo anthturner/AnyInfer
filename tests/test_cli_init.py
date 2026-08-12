@@ -102,6 +102,45 @@ def test_a_running_engine_becomes_a_configured_provider(
 
     out = capsys.readouterr().out
     assert "found      ollama at http://127.0.0.1:11434 (2 models)" in out
+    assert config.operation_routes == {}
+
+
+def _running_engine_with_embeddings() -> DiscoveredProvider:
+    return DiscoveredProvider(
+        provider_id="lm-studio",
+        base_url="http://127.0.0.1:1234/v1",
+        evidence="endpoint",
+        detail="2 models",
+        models=("qwen3-8b", "nomic-embed"),
+        embedding_models=("nomic-embed",),
+    )
+
+
+def test_a_stamped_embedding_model_writes_an_operation_route(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Discovery that positively tagged an embedding model earns its own default route."""
+    _fake_discovery(monkeypatch, [_running_engine_with_embeddings()])
+
+    assert main(["init", "--yes"]) == 0
+
+    config = load_config("anyinfer.json")
+    assert config.operation_routes["embedding"].targets == ("lm-studio:nomic-embed",)
+
+    out = capsys.readouterr().out
+    assert "embedding  lm-studio:nomic-embed (from what was discovered)" in out
+
+
+def test_no_stamped_embedding_model_writes_no_operation_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No provider stamped operations — writing a route nobody verified would be a guess."""
+    _fake_discovery(monkeypatch, [_running_engine()])
+
+    assert main(["init", "--yes"]) == 0
+
+    config = load_config("anyinfer.json")
+    assert config.operation_routes == {}
 
 
 def test_a_route_never_names_a_model_the_engine_does_not_serve(

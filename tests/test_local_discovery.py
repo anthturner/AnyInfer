@@ -269,3 +269,42 @@ async def test_vault_evidence_records_a_reference_not_a_secret(
     found = await discover(registry, probe=False, keyring=True)
     assert [e.credential_ref for e in found] == ["credential://system/vaulted-api-key"]
     assert found[0].evidence == "credential-store"
+
+
+# ---- embedding-tagged discovery -------------------------------------------------------
+
+
+async def test_a_model_stamped_as_embedding_is_reported_separately() -> None:
+    """LM Studio's native listing tags per-model operations; discovery must not flatten it."""
+    from anyinfer.providers.lm_studio import descriptor as lm_studio_descriptor
+
+    listing = {
+        "models": [
+            {"key": "qwen3-8b", "type": "llm", "max_context_length": 32768},
+            {"key": "nomic-embed", "type": "embedding", "max_context_length": 2048},
+        ]
+    }
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/api/v1/models"
+        return httpx2.Response(200, json=listing)
+
+    registry = ProviderRegistry(load_builtins=False, load_entry_points=False)
+    registry.register(lm_studio_descriptor)
+
+    found = await discover(
+        registry, transports={"lm-studio": httpx2.MockTransport(handler)}
+    )
+
+    assert [e.provider_id for e in found] == ["lm-studio"]
+    assert found[0].models == ("qwen3-8b", "nomic-embed")
+    assert found[0].embedding_models == ("nomic-embed",)
+
+
+async def test_a_provider_with_no_stamped_operations_reports_no_embedding_models() -> None:
+    """Most listings say nothing about operations — that must stay empty, never assumed."""
+    provider = _local("acme", 9111, "fast", "slow")
+    found = await discover(_registry(provider), transports={"acme": provider.transport()})
+
+    assert found[0].models == ("fast", "slow")
+    assert found[0].embedding_models == ()

@@ -87,6 +87,12 @@ class DiscoveredProvider:
             ``"ANTHROPIC_API_KEY set"``. Never contains a credential value.
         models: Model ids the endpoint listed, when it listed any. Empty for credential
             evidence, which says nothing about what a provider serves.
+        embedding_models: The subset of `models` the endpoint stamped with the
+            ``embedding`` operation (LM Studio and Cohere discovery do this; most
+            providers report generation only, so this is empty far more often than
+            `models` is). A separate field rather than replacing `models` — the ids stay
+            the flat list every existing caller expects, and this is additive evidence
+            for a caller that specifically wants to route embedding traffic.
         credential_key: Setup-field key this credential satisfies (``"api_key"``), or
             empty for endpoint evidence.
         credential_ref: The reference a configuration file should carry for that field —
@@ -100,6 +106,7 @@ class DiscoveredProvider:
     evidence: DiscoveryEvidence
     detail: str
     models: tuple[str, ...] = ()
+    embedding_models: tuple[str, ...] = ()
     credential_key: str = ""
     credential_ref: str = ""
 
@@ -278,6 +285,11 @@ async def _probe_one(
         # same as a usable provider — writing it into a configuration would produce a
         # target with nothing behind it.
         return None
+    embedding_ids = tuple(
+        str(getattr(model, "id", model))
+        for model in models
+        if _stamps_embedding(getattr(model, "capabilities", None))
+    )
     detail = f"{len(ids)} model{'s' if len(ids) != 1 else ''}"
     if len(provider_ids) > 1:
         others = ", ".join(provider_ids[1:])
@@ -288,7 +300,22 @@ async def _probe_one(
         evidence="endpoint",
         detail=detail,
         models=ids,
+        embedding_models=embedding_ids,
     )
+
+
+def _stamps_embedding(capabilities: Any) -> bool:
+    """Whether a discovered model's own capabilities declare the embedding operation.
+
+    Most discovery listings carry no operations field at all — `ModelCapabilities`
+    stays silent on what it does not know, which here means "not observed," not "not
+    supported." Only a listing that positively stamps `embedding` counts.
+    """
+    operations = getattr(capabilities, "operations", None)
+    value = getattr(operations, "value", None)
+    if not value:
+        return False
+    return "embedding" in value
 
 
 # ---- credentials -------------------------------------------------------------------

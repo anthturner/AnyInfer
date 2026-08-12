@@ -2153,7 +2153,10 @@ def _init(args: argparse.Namespace) -> int:
     settings, notes = _init_settings(found)
     target, recommendation = _init_target(settings, found, profile)
     route = _init_route(target, found)
-    config = AnyInferConfig(providers=tuple(settings), route=route)
+    operation_routes = _init_operation_routes(found)
+    config = AnyInferConfig(
+        providers=tuple(settings), route=route, operation_routes=operation_routes
+    )
 
     if args.json:
         payload = {
@@ -2166,6 +2169,7 @@ def _init(args: argparse.Namespace) -> int:
                     "base_url": entry.base_url,
                     "detail": entry.detail,
                     "models": list(entry.models),
+                    "embedding_models": list(entry.embedding_models),
                     "credential_ref": entry.credential_ref,
                 }
                 for entry in found
@@ -2177,6 +2181,10 @@ def _init(args: argparse.Namespace) -> int:
             },
             "target": target,
             "route": list(route.targets) if route else [],
+            "operation_routes": {
+                operation: list(op_route.targets)
+                for operation, op_route in operation_routes.items()
+            },
             "notes": notes,
             "config_path": str(config_path),
             "starter_path": str(starter_path),
@@ -2186,6 +2194,9 @@ def _init(args: argparse.Namespace) -> int:
         return 0
 
     _print_init_findings(profile, probed, found, recommendation, target, notes, args)
+    if operation_routes:
+        embedding_route = operation_routes["embedding"]
+        print(f"embedding  {embedding_route.targets[0]} (from what was discovered)")
     if not _confirm_init(config_path, starter_path, args):
         print("nothing written")
         return 0
@@ -2286,6 +2297,24 @@ def _init_route(target: str, found: Any) -> Any:
     from .routing import Route
 
     return Route(targets=(target,)) if found else None
+
+
+def _init_operation_routes(found: Any) -> dict[str, Any]:
+    """Write an ``embedding`` route only for providers discovery actually stamped.
+
+    `DiscoveredProvider.embedding_models` is populated only when the listing itself
+    tagged a model's operations (LM Studio, Cohere) — most listings say nothing about
+    embedding support, and staying silent there is correct: a config claiming an
+    embedding route nobody verified would fail on first use exactly like an invented
+    generation target would.
+    """
+    from .routing import Route
+
+    for entry in found:
+        if entry.evidence == "endpoint" and entry.embedding_models:
+            target = f"{entry.provider_id}:{entry.embedding_models[0]}"
+            return {"embedding": Route(targets=(target,))}
+    return {}
 
 
 def _write_init_files(
