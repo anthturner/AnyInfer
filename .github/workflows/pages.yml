@@ -46,6 +46,10 @@ jobs:
       # build needs a real install, same as the docs CI job.
       - run: pip install -e ".[all,dev]"
 
+      # Sharded add-ons (src/anyinfer-*, own pyproject.toml) that ship a mkdocstrings
+      # reference page need their own editable install too — see the docs CI job.
+      - run: pip install -e src/anyinfer-store
+
       - name: build the site
         run: python workspace.py build docs
 

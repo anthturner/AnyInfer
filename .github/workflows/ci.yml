@@ -119,6 +119,11 @@ jobs:
           cache: pip
       - run: pip install -e ".[all,dev]"
 
+      # mkdocstrings imports every documented package to render its reference pages, so
+      # sharded add-ons (src/anyinfer-*, each its own pyproject.toml and never folded into
+      # the root package) need their own editable install here too, not just anyinfer core.
+      - run: pip install -e src/anyinfer-store
+
       # Docstring coverage, link check, and the executable doc examples. Examples run
       # against the fake providers, so an example that stops working is a build failure
       # rather than a surprise for the next reader.

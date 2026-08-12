@@ -450,6 +450,11 @@ def cmd_setup(args: argparse.Namespace) -> int:
     """Install the project in editable mode with its development extras."""
     python("-m", "pip", "install", "--upgrade", "pip")
     python("-m", "pip", "install", "-e", f".[{args.extras}]")
+    # Sharded add-ons (src/anyinfer-*, each its own pyproject.toml per the monorepo
+    # sharding convention) aren't in the root package's dependency graph, but their
+    # mkdocstrings reference pages need them importable for `workspace build docs` /
+    # `workspace check --only=docs-build` to succeed locally, same as in CI.
+    python("-m", "pip", "install", "-e", "src/anyinfer-store")
     print()
     print(green("Environment ready.") + " Try `workspace check` or `workspace demo`.")
     return 0
