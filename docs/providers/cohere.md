@@ -91,6 +91,39 @@ client.generate(
 
 Read the citations from `result.raw` (with `retain_raw=True`) until they are modelled.
 
+## Embeddings and reranking
+
+Cohere serves both operations natively (`POST /v2/embed`, `POST /v2/rerank`), and is the
+first provider here with native input intents and native rerank scores:
+
+```python
+docs = client.embed(
+    ["the cat sat on the mat", "stock markets rallied"],
+    target="cohere:embed-v4.0",
+    input_type="document",
+)
+ranked = client.rerank(
+    "where did the cat sit",
+    ["stock markets rallied", "the cat sat on the mat"],
+    target="cohere:rerank-v3.5",
+    top_n=1,
+)
+```
+
+Three things worth knowing:
+
+- **`input_type` is required.** Cohere's embed API demands an intent and documents no
+  default, so an intent-less `embed()` is refused with a hint rather than guessed —
+  query and document embeddings are not comparable unless produced with matching
+  intents.
+- **Batching engages at 96 inputs.** The endpoint accepts at most 96 texts per call;
+  larger requests are split by the core and re-assembled in input order, invisibly.
+  Requested `dimensions` are forwarded as `output_dimension` (embed-v4 models only).
+- **Rerank usage is search units, not tokens.** Live rerank responses report only
+  `billed_units.search_units`, which AnyInfer never encodes as fake token counts — so
+  `result.usage` is typically empty for rerank. Use `retain_raw=True` and read
+  `result.raw["meta"]["billed_units"]` for cost reconciliation.
+
 ## Discovery
 
 The model listing reports real context lengths, so windows carry `discovered` provenance:
@@ -102,7 +135,8 @@ for model in client.models("cohere"):
         print(model.id, caps.context_window.value, caps.context_window.provenance)
 ```
 
-Only chat-capable models are listed.
+Only chat-capable models are listed — embedding and rerank models are not discovered
+yet; their verified capabilities ship statically with the provider descriptor.
 
 ## See also
 

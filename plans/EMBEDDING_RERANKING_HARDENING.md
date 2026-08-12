@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D and A landed 2026-08-12 (see §19); B is next.
+> **Status:** in progress — Tracks D, A, and B landed 2026-08-12 (see §19); C is next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -327,7 +327,7 @@ reuse, and `_parse_usage` already reads `billed_units`.
 AGENTS.md's rule ("never fabricate a last-verified date without actually verifying")
 applies with full force. Before writing wire code:
 
-- [ ] **BH.B.1** Fetch and cite Cohere's current embed and rerank API documentation
+- [x] **BH.B.1** Fetch and cite Cohere's current embed and rerank API documentation
   (verify the live URLs — do not assume paths from training data). Record exact
   request/response field names, batch limits, `input_type` enum values, billing unit
   names, and error-body shape, each with the fetch date, following
@@ -335,53 +335,53 @@ applies with full force. Before writing wire code:
   format (endpoint, auth, version pins, request fields, response fields, streaming,
   errors, watchlist — with explicit "unverified" markers for anything the docs don't
   state).
-- [ ] **BH.B.2** Confirm embed batch support and its stated ceiling (feeds
+- [x] **BH.B.2** Confirm embed batch support and its stated ceiling (feeds
   `EmbeddingCapabilities.max_batch_inputs`; directly exercises Track A).
-- [ ] **BH.B.3** Confirm the rerank document ceiling per call and whether Cohere documents
+- [x] **BH.B.3** Confirm the rerank document ceiling per call and whether Cohere documents
   any cross-batch score comparability (almost certainly not — confirm rather than assume;
   a "yes" would change the `rerank_cross_batch` recommendation for this provider only).
-- [ ] **BH.B.4** Extend `contracts/cohere.md` (exists, chat-only today) with dated, cited
+- [x] **BH.B.4** Extend `contracts/cohere.md` (exists, chat-only today) with dated, cited
   embeddings and rerank sections.
 
 ### Implementation
 
-- [ ] **BH.B.5** Add `embed()` to `CohereAdapter` implementing `EmbedsText`
+- [x] **BH.B.5** Add `embed()` to `CohereAdapter` implementing `EmbedsText`
   (`providers/base.py:276`), translating `EmbeddingWireRequest` → Cohere's embed shape,
   with an explicit mapping function from `EmbeddingInputIntent` to Cohere's spelling
   (pattern: `ollama.py`'s `_translate_reasoning`). Do not assume Cohere's vocabulary
   matches AnyInfer's literals. An unsupported intent must degrade loudly (result warning),
   not silently — Ollama's current silent drop (fact 13) is the anti-pattern.
-- [ ] **BH.B.6** Add `rerank()` implementing `ReranksText` (`providers/base.py:359`),
+- [x] **BH.B.6** Add `rerank()` implementing `ReranksText` (`providers/base.py:359`),
   translating to/from `RerankWireRequest`/`RerankWireResult`/`WireRankedItem`. Translation
   only — malformed-index handling stays in the core's `_validate_ranked_items`
   (`_client/operations.py:411`).
-- [ ] **BH.B.7** Update the descriptor (`cohere.py:527-560`) with
+- [x] **BH.B.7** Update the descriptor (`cohere.py:527-560`) with
   `operations=frozenset({"generation", "embedding", "rerank"})` (build-time validation
   will hold the adapter to it) and populate
   `static_embedding_capabilities`/`static_rerank_capabilities` with only what BH.B.1-B.3
   verified — an unverifiable fact stays `None`, matching `contracts/ollama.md`'s explicit
   unverified markers. The only existing precedent is Ollama's descriptor
   (`ollama.py:656`).
-- [ ] **BH.B.8** Billed search units: `Usage` has no honest field for them (fact 14) —
+- [x] **BH.B.8** Billed search units: `Usage` has no honest field for them (fact 14) —
   leave them out of `Usage` rather than encode them as fake tokens (§16, D-13). They
   remain reachable via `retain_raw`. First-class billable-unit representation is Track E
   (BH.E.1); note the gap in the adapter docstring and do not block this track on it.
 
 ### Tests
 
-- [ ] **BH.B.9** Wire-mapping unit tests with `httpx2.MockTransport` (fact 11), following
+- [x] **BH.B.9** Wire-mapping unit tests with `httpx2.MockTransport` (fact 11), following
   `tests/test_ollama_embeddings.py` / `tests/test_openai_compat_embeddings.py`: scalar
   input, batch order preservation, dimensions, malformed response rejection, HTTP error
   mapping (auth, rate limit, model-not-found).
-- [ ] **BH.B.10** `input_type` translation: every `EmbeddingInputIntent` value maps to the
+- [x] **BH.B.10** `input_type` translation: every `EmbeddingInputIntent` value maps to the
   verified Cohere wire value; unsupported combinations degrade loudly per BH.B.5.
-- [ ] **BH.B.11** Rerank wire-mapping: score ordering, `top_n`, malformed-index rejection
+- [x] **BH.B.11** Rerank wire-mapping: score ordering, `top_n`, malformed-index rejection
   feeding the existing core validation with real wire shapes.
-- [ ] **BH.B.12** End-to-end through `AsyncClient.embed()`/`.rerank()` targeting
+- [x] **BH.B.12** End-to-end through `AsyncClient.embed()`/`.rerank()` targeting
   `cohere:<model>` against the mock transport (adapt
   `tests/test_embeddings_reranking.py`'s `_client_with_fake` pattern, line 154, for a real
   adapter + mock transport).
-- [ ] **BH.B.13** Live verification: there is **no** pytest live-marker convention in this
+- [~] **BH.B.13** Live verification: there is **no** pytest live-marker convention in this
   repo (fact 10) — do not invent one ad hoc. Live conformance for Cohere goes through the
   conformance kit's opt-in live mode (Track H registers the cases; `anyinfer conform`
   runs them with real credentials). A trial key is available at `COHERE.key` in the
@@ -831,3 +831,31 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   clean. Explicitly not done: token/byte-aware splitting (out of scope by design),
   spend reservation across chunks (Track E, BH.E.5), per-chunk `AttemptCompleted`
   (Track C, BH.C.1).
+- **2026-08-12 (Track B — delivered and tested):** Cohere embedding + reranking.
+  Research first: `docs.cohere.com/reference/embed` and `/reference/rerank` fetched live
+  (2026-08-12) — endpoints `POST /v2/embed` / `POST /v2/rerank`; `input_type` **required**
+  with enum `search_query`/`search_document`/`classification`/`clustering`/`image`; 96
+  texts per embed call (endpoint-wide); rerank documents are plain strings with a
+  documented 1,000-document recommendation; `results[].index` is positional within the
+  submitted array. `contracts/cohere.md` extended with dated embed/rerank sections,
+  explicit unverified markers (vector normalization, per-endpoint error shape,
+  search-unit definition), and a watchlist. Adapter: `embed()`/`rerank()` on
+  `CohereAdapter` — intent mapping (an intent-less embed is refused locally with a hint,
+  since Cohere documents no default), `embedding_types: ["float"]`, `output_dimension`
+  pass-through, positional→caller-index mapping for rerank, usage from `meta.tokens`
+  only (billed search units never encoded — D-13). Descriptor declares all three
+  operations plus static capabilities for 5 embed models (dimensions, 96-input ceiling,
+  intents, context) and 5 rerank models (1,000-doc limit, native top_n). **Live-verified
+  with the trial key (owner-approved):** embed returned declared 384 dims for
+  `embed-english-light-v3.0` with `meta.tokens` usage; rerank ranked correctly with
+  `top_n` honored — and live rerank responses carry *only* `billed_units.search_units`
+  (no `tokens` block), now recorded in the contract; normalized rerank `Usage` is
+  honestly empty. 24 new tests in `tests/test_cohere_embeddings.py` (wire mapping,
+  intent translation, malformed-response rejection, HTTP error mapping, out-of-range
+  positional pass-through, end-to-end through `AsyncClient` including a 100-input
+  request splitting into 96+4 against the declared limit — Track A exercised by a real
+  provider ceiling). `docs/providers/cohere.md` gained the embeddings/reranking section.
+  Gates: full pytest (only the documented pre-existing demo-app failure), mypy, ruff,
+  `lint-imports` 4/4, `mkdocs --strict` all clean. BH.B.13 stays `[~]`: live smoke and
+  contract citations exist; conformance-kit registration and cassettes land with
+  Track H.
