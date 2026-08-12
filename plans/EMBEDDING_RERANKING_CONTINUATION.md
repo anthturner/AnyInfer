@@ -218,7 +218,7 @@ optional operation section on `TargetComparison` (`compare.py:27-47` is just the
 result type). Cohere discovery now lists embedding models, so the
 `discovered_has_model` refresh check no longer falsely fails there.
 
-### T9 — Robustness remainder (Track J)
+### T9 — Robustness remainder (Track J) — DONE 2026-08-12
 
 - **Response bombs:** find where generation enforces `max_response_bytes` (the
   `byte_cap` conformance case and `GoverningTransport` in `_client/providers.py` are
@@ -482,3 +482,24 @@ feature-complete bar:
   `AsyncClient` and the sync `Client` expose it; `to_dict`/`from_dict` round-trip. Caught
   and fixed a docstring-gate failure along the way (every public symbol needs a `:::`
   directive somewhere in `docs/`) — a real gate doing its job, not a false positive.
+- **2026-08-12:** T9 delivered and tested (`802c1f9`, `f0e3543`). Item 1 (response bombs)
+  was not actually verified before this session — it was **broken**: every generation
+  adapter's buffered path checks `len(response.content) > req.max_response_bytes` before
+  parsing, but not one embed()/rerank() implementation did, anywhere — not the shared
+  `OpenAICompatEmbeddingsMixin` (openai, lm-studio, azure-foundry, and all four verified
+  presets), not Cohere, Gemini, Voyage, Jina, TEI, Ollama, or this session's own Vertex
+  and Bedrock additions. `EmbeddingWireRequest`/`RerankWireRequest.max_response_bytes`
+  existed and defaulted correctly but was silently never read. Added
+  `providers.http.check_response_size()` and wired it into every embed()/rerank() call
+  site, with a new adapter-level test per provider proving an oversized response is
+  refused rather than parsed. Item 2 (sidecar cancellation, ER.11.13's last gap): found
+  and fixed — `_stream_chunks` never called `AsyncStream.aclose()` on early exit, so a
+  mid-stream client disconnect only released the upstream provider connection via GC,
+  not deterministically; one `finally` block fixes it, verified by driving the generator
+  directly and closing it early. Item 3 (CLI redaction proof): confirmed
+  `AnyInferError.detail`'s existing redact+512-char-truncate discipline actually reaches
+  `_report_error`'s stderr output, with a test using a credential-shaped multi-KB
+  scripted failure message. Item 4 (repr/serialization audit): checked
+  `GenerationRequest`'s policy first as instructed — no repr override, redaction happens
+  only at output boundaries — and confirmed the new embedding/rerank frozen types already
+  follow it with no special-casing needed. All gates green.
