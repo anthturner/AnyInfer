@@ -127,7 +127,7 @@ dedicated `embed()` that reuses the adapter's own URL builder). Research target:
 api-version, the deployment-vs-model naming rule, and limits (Azure inherits OpenAI's
 2,048-input ceiling but VERIFY, do not assume). Extend `contracts/azure-foundry.md`.
 
-### T2 — Vertex AI embeddings (BH.I.3)
+### T2 — Vertex AI embeddings (BH.I.3) — DONE 2026-08-12
 
 `providers/vertex.py` exists (Gemini with GCP auth, project-scoped addressing — reuse
 its auth/path machinery). Vertex text embeddings use
@@ -398,3 +398,15 @@ feature-complete bar:
   since Azure model ids are tenant-chosen deployment names, not a fixed catalog —
   keying static limits by an unknowable id would be a silent wrong answer. All gates
   green. T2 (Vertex AI) is next.
+- **2026-08-12:** T2 delivered and tested (`fce9e9e`). Resolved the plan's flagged
+  wire-shape ambiguity by fetching Google's current text-embeddings-api reference live:
+  every documented embedding model (`gemini-embedding-001`, `text-embedding-005`,
+  `text-multilingual-embedding-002`, `textembedding-gecko@001`) uses the generic
+  `:predict` verb with an `instances`/`parameters` body — **not** Gemini's
+  `batchEmbedContents`. `VertexAdapter.embed()` overrides the inherited Gemini method
+  entirely. Confirmed and declared the documented one-input-per-request limit on
+  `gemini-embedding-001` (`max_batch_inputs=1`) so the core's batching policy fans
+  multi-text calls into individual requests rather than sending an invalid batch. Noted
+  in the contract watchlist, not assumed: the API reference nav also lists an
+  `embedContent` method that the how-to guide doesn't document or use. All gates green.
+  T3 (Bedrock) is next.
