@@ -600,6 +600,56 @@ async def test_azure_api_version_is_appended_per_instance() -> None:
         await plain.aclose()
 
 
+def _azure_embedding_body() -> dict[str, Any]:
+    return {
+        "data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}],
+        "model": "text-embedding-3-small",
+        "usage": {"prompt_tokens": 4, "total_tokens": 4},
+    }
+
+
+async def test_azure_embeds_against_the_v1_embeddings_path() -> None:
+    seen, handler = _capture(lambda r: httpx2.Response(200, json=_azure_embedding_body()))
+    client = _client(
+        "azure-foundry",
+        handler,
+        base_url="https://res.services.ai.azure.com/openai/v1",
+        api_key="azure-key-value",
+    )
+    async with client:
+        result = await client.embed("hi", target="azure-foundry:text-embedding-3-small")
+
+    assert seen[0]["model"] == "text-embedding-3-small"
+    assert result.vectors[0].values == pytest.approx((0.1, 0.2, 0.3))
+
+
+async def test_azure_embeddings_path_carries_the_api_version() -> None:
+    handler = lambda r: httpx2.Response(200, json=_azure_embedding_body())  # noqa: E731
+    versioned = AzureFoundryAdapter(
+        ProviderConfig(
+            provider_id="azure-foundry",
+            base_url="https://res.services.ai.azure.com/openai/v1",
+            api_key="k",
+            api_version="2024-10-21",
+            transport=httpx2.MockTransport(handler),
+        )
+    )
+    plain = AzureFoundryAdapter(
+        ProviderConfig(
+            provider_id="azure-foundry",
+            base_url="https://res.services.ai.azure.com/openai/v1",
+            api_key="k",
+            transport=httpx2.MockTransport(handler),
+        )
+    )
+    try:
+        assert "api-version=2024-10-21" in versioned.embeddings_path
+        assert "api-version" not in plain.embeddings_path
+    finally:
+        await versioned.aclose()
+        await plain.aclose()
+
+
 async def test_azure_reasoning_effort_is_a_flat_field() -> None:
     seen, handler = _capture(lambda r: httpx2.Response(200, json=_openai_compat_body()))
     client = _client(

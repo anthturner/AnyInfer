@@ -66,7 +66,27 @@ ai.ProviderSettings.of("azure-foundry", base_url=..., api_version="2024-10-21")
 ```
 
 Only needed for deployments that still require it; the newer `/openai/v1` surface does not.
-The parameter is applied per instance, so it cannot leak onto other adapters.
+The parameter is applied per instance, so it cannot leak onto other adapters — chat,
+embeddings, and model listing all carry it consistently.
+
+## Embeddings
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="azure-foundry:text-embedding-3-small",
+)
+```
+
+`target`'s model half is your deployment name, not necessarily the underlying model's
+catalog id. The same `POST {base_url}/embeddings` surface as chat (deployment-less on
+`/openai/v1`, or `api-version`-pinned on the older surface) speaks the identical
+OpenAI-compatible body. Azure documents a 2,048-input ceiling, an 8,192-token
+per-input ceiling, and a 300,000-token aggregate ceiling per request — the same numbers
+OpenAI itself documents — but because the deployment name is tenant-chosen, AnyInfer
+does not declare them as static per-model capabilities; a request larger than what your
+deployment actually accepts surfaces as a provider error rather than a pre-flight
+refusal.
 
 ## Troubleshooting
 

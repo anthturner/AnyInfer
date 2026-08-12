@@ -9,6 +9,13 @@ An ``openai-compat`` subclass with three Azure-specific differences:
 
 Everything else — request shaping, SSE parsing, error mapping — is inherited, which is the
 point of having a base dialect at all.
+
+Embeddings compose `OpenAICompatEmbeddingsMixin` unchanged: the v1 surface
+(``{base_url}/openai/v1/embeddings``, model-addressed by deployment name, same as chat)
+speaks the identical OpenAI-compatible body verified in ``openai_compat_embeddings.py``.
+Verified against learn.microsoft.com/azure/ai-foundry/openai/how-to/embeddings, 2026-08-12:
+max 2,048 inputs/request, 8,192 tokens/input, 300,000 tokens aggregate per request — the
+same ceilings OpenAI itself documents.
 """
 
 from __future__ import annotations
@@ -22,6 +29,7 @@ from ..types.capabilities import Feature, ModelCapabilities, Sourced
 from ..types.requests import ReasoningEffort
 from .base import ProviderConfig
 from .openai_compat import OpenAICompatAdapter
+from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 
 __all__ = ["FOUNDRY_SCOPE", "AzureFoundryAdapter", "descriptor"]
 
@@ -29,7 +37,7 @@ FOUNDRY_SCOPE = "https://ai.azure.com/.default"
 """Entra token scope for Foundry, as recorded in the contract snapshot."""
 
 
-class AzureFoundryAdapter(OpenAICompatAdapter):
+class AzureFoundryAdapter(OpenAICompatEmbeddingsMixin, OpenAICompatAdapter):
     """Adapter for Azure AI Foundry deployments."""
 
     output_tokens_field: ClassVar[str] = "max_completion_tokens"
@@ -49,6 +57,7 @@ class AzureFoundryAdapter(OpenAICompatAdapter):
             # endpoints ignore it.
             self.chat_path = f"{self.chat_path}?api-version={self._api_version}"
             self.models_path = f"{self.models_path}?api-version={self._api_version}"
+            self.embeddings_path = f"{self.embeddings_path}?api-version={self._api_version}"
 
     def _build_headers(self, config: ProviderConfig) -> dict[str, str]:
         """Use an ``api-key`` header, or acquire an Entra token when no key is set."""
@@ -120,6 +129,11 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=None,
     requires_base_url=True,
+    # No static per-model embedding capabilities: the deployment name in `model` is
+    # tenant-chosen, not a fixed catalog id, so limits can't be keyed reliably. The
+    # 2,048-input / 8,192-token / 300k-aggregate ceilings are documented in the module
+    # docstring for callers who need them.
+    operations=frozenset({"generation", "embedding"}),
     setup=ProviderSetupSpec(
         fields=(
             SetupField(
