@@ -221,6 +221,7 @@ def create_app(
 
         try:
             target, inputs, kwargs = embedding_request_from_openai(body)
+            include_manifest = wants_manifest(body)
         except ValueError as exc:
             return _error(starlette, 400, str(exc))
 
@@ -228,7 +229,9 @@ def create_app(
             result = await client.embed(inputs, target=target, **kwargs)
         except AnyInferError as exc:
             return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
-        return starlette.JSONResponse(embeddings_response(result, model=target))
+        return starlette.JSONResponse(
+            embeddings_response(result, model=target, include_manifest=include_manifest)
+        )
 
     async def rerank(request: Any) -> Any:
         """Serve ``POST /v1/anyinfer/rerank`` as a codec over `AsyncClient.rerank`."""
@@ -244,6 +247,7 @@ def create_app(
 
         try:
             target, query, documents, kwargs = rerank_request_from_body(body)
+            include_manifest = wants_manifest(body)
         except ValueError as exc:
             return _error(starlette, 400, str(exc))
 
@@ -252,7 +256,9 @@ def create_app(
             result = await client.rerank(query, rerank_documents, target=target, **kwargs)
         except AnyInferError as exc:
             return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
-        return starlette.JSONResponse(rerank_response(result, model=target))
+        return starlette.JSONResponse(
+            rerank_response(result, model=target, include_manifest=include_manifest)
+        )
 
     async def health(request: Any) -> Any:
         """Serve ``GET /health``: liveness only, requiring no authentication."""

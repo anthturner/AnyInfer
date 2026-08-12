@@ -317,3 +317,63 @@ def test_embeddings_concurrent_requests_all_complete() -> None:
         statuses = list(pool.map(post, range(16)))
     assert statuses == [200] * 16
     assert len(fake.embed_requests) == 16
+
+
+# ---- anyinfer_manifest extension ------------------------------------------------------
+
+
+def test_embeddings_manifest_is_opt_in_and_stock_body_is_unchanged() -> None:
+    """A stock OpenAI embeddings client must see nothing new unless it asked to."""
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    http = _client(fake)
+
+    stock = http.post("/v1/embeddings", json={"model": "fake-embed:small", "input": "hi"})
+    assert stock.status_code == 200
+    assert "anyinfer_manifest" not in stock.json()
+
+    with_manifest = http.post(
+        "/v1/embeddings",
+        json={"model": "fake-embed:small", "input": "hi", "anyinfer_manifest": True},
+    )
+    assert with_manifest.status_code == 200
+    manifest = with_manifest.json()["anyinfer_manifest"]
+    assert manifest["operation"] == "embedding"
+    assert manifest["complete"] is True
+
+
+def test_embeddings_malformed_manifest_flag_is_a_400() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    http = _client(fake)
+
+    response = http.post(
+        "/v1/embeddings",
+        json={"model": "fake-embed:small", "input": "hi", "anyinfer_manifest": "yes"},
+    )
+    assert response.status_code == 400
+    assert "anyinfer_manifest" in response.text
+
+
+def test_rerank_manifest_is_opt_in_and_stock_body_is_unchanged() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-rerank", rerank_models=["r"])
+    http = _client(fake)
+
+    stock = http.post(
+        "/v1/anyinfer/rerank",
+        json={"model": "fake-rerank:r", "query": "q", "documents": ["a", "b"]},
+    )
+    assert stock.status_code == 200
+    assert "anyinfer_manifest" not in stock.json()
+
+    with_manifest = http.post(
+        "/v1/anyinfer/rerank",
+        json={
+            "model": "fake-rerank:r",
+            "query": "q",
+            "documents": ["a", "b"],
+            "anyinfer_manifest": True,
+        },
+    )
+    assert with_manifest.status_code == 200
+    manifest = with_manifest.json()["anyinfer_manifest"]
+    assert manifest["operation"] == "rerank"
+    assert manifest["complete"] is True

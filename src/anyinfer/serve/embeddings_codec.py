@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ..types.operations import EmbeddingResult, RerankResult
+from .openai_codec import MANIFEST_FIELD
 
 __all__ = [
     "embedding_request_from_openai",
@@ -68,14 +69,18 @@ def embedding_request_from_openai(
     return target, inputs, kwargs
 
 
-def embeddings_response(result: EmbeddingResult, *, model: str) -> dict[str, Any]:
+def embeddings_response(
+    result: EmbeddingResult, *, model: str, include_manifest: bool = False
+) -> dict[str, Any]:
     """Render an `EmbeddingResult` as an OpenAI-compatible ``list`` object.
 
     Args:
         result: The embedding result to render.
         model: The ``model`` string to echo back.
+        include_manifest: Attach the run manifest under `MANIFEST_FIELD` — opt-in, so a
+            stock OpenAI client's response shape never changes (see `wants_manifest`).
     """
-    return {
+    body: dict[str, Any] = {
         "object": "list",
         "data": [
             {"object": "embedding", "index": i, "embedding": list(vector.values)}
@@ -87,6 +92,9 @@ def embeddings_response(result: EmbeddingResult, *, model: str) -> dict[str, Any
             "total_tokens": result.usage.total_tokens or result.usage.input_tokens or 0,
         },
     }
+    if include_manifest and result.manifest is not None:
+        body[MANIFEST_FIELD] = result.manifest.to_dict()
+    return body
 
 
 def rerank_request_from_body(
@@ -140,14 +148,18 @@ def rerank_request_from_body(
     return target, query, documents, kwargs
 
 
-def rerank_response(result: RerankResult, *, model: str) -> dict[str, Any]:
+def rerank_response(
+    result: RerankResult, *, model: str, include_manifest: bool = False
+) -> dict[str, Any]:
     """Render a `RerankResult` as the AnyInfer-native rerank response shape.
 
     Args:
         result: The rerank result to render.
         model: The ``model`` string to echo back.
+        include_manifest: Attach the run manifest under `MANIFEST_FIELD` — opt-in, same
+            discipline as `embeddings_response`.
     """
-    return {
+    body: dict[str, Any] = {
         "object": "anyinfer.rerank",
         "model": model,
         "results": [
@@ -165,3 +177,6 @@ def rerank_response(result: RerankResult, *, model: str) -> dict[str, Any]:
         },
         "created": int(time.time()),
     }
+    if include_manifest and result.manifest is not None:
+        body[MANIFEST_FIELD] = result.manifest.to_dict()
+    return body
