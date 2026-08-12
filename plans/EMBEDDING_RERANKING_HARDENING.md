@@ -612,21 +612,21 @@ specialists. The ordering below is sequencing, not optionality.
 Independent, individually landable test/robustness items. None block the tracks above;
 several verify them.
 
-- [ ] **BH.J.1** Cancellation of a single in-flight `embed()`/`rerank()` closes HTTP work
+- [x] **BH.J.1** Cancellation of a single in-flight `embed()`/`rerank()` closes HTTP work
   and never returns partial results (ER.3.12; the mid-batch case is BH.A.14).
-- [ ] **BH.J.2** Sync-facade thread-stress and cancellation coverage for
+- [x] **BH.J.2** Sync-facade thread-stress and cancellation coverage for
   `Client.embed`/`rerank` (ER.6.2/ER.6.4/ER.11.11) — generation's facade has this; the new
   methods got only basic coverage.
-- [ ] **BH.J.3** Frozen-type hygiene for the new types: equality, repr safety,
+- [~] **BH.J.3** Frozen-type hygiene for the new types: equality, repr safety,
   serialization round-trips (ER.11.6).
-- [ ] **BH.J.4** Vector-validation gaps (ER.11.7): huge dimensions, ragged arrays
+- [~] **BH.J.4** Vector-validation gaps (ER.11.7): huge dimensions, ragged arrays
   (inconsistent per-vector lengths from a provider), response bombs against
   `max_response_bytes` (pairs with BH.A.8), integer/float mixtures.
-- [ ] **BH.J.5** Payload-leak proofs: no raised error's text contains vector values or
+- [~] **BH.J.5** Payload-leak proofs: no raised error's text contains vector values or
   document text (ER.10.4); redaction never serializes vectors into ordinary diagnostics
   (ER.8.4); a credential-shaped string inside a document does not leak into CLI error
   output (ER.11.14's redaction half).
-- [ ] **BH.J.6** Sidecar concurrency and disconnect-mid-request cancellation tests
+- [~] **BH.J.6** Sidecar concurrency and disconnect-mid-request cancellation tests
   (ER.11.13's remainder).
 - [ ] **BH.J.7** Warn on silently dropped request fields: Ollama ignores `input_type`
   today with no signal (fact 13) — emit a result warning (or `ParameterDropped`-style
@@ -951,3 +951,15 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   set (space, batch limits, intents) and is deferred with that design note; BH.F.5
   stays `[~]`: CLI `models` (local catalog — blocked on Track G's catalog schema) and
   `doctor` untouched.
+- **2026-08-12 (Track J — first increment, delivered and tested):** A ragged embedding
+  response (inconsistent per-vector lengths in one reply) is now rejected as the
+  provider contract violation it is — previously it passed through undetected
+  (ER.11.7's gap, confirmed then closed). Tests added: frozen-type value equality
+  (BH.J.3, partial — repr-audit and serialization sweep remain), integer/float vector
+  mixtures, single-call cancellation with no partial result (BH.J.1), malformed-rerank
+  error text proven free of document content (BH.J.5, core half), 24-call
+  8-thread sync-facade stress (BH.J.2), and 16-way concurrent sidecar embeddings
+  (BH.J.6's concurrency half — disconnect-mid-request remains). Still open in this
+  track: response-bomb enforcement tests, mixed-operation rate pacing (ER.11.12), the
+  CLI redaction proof, `ParameterDropped`-style warnings for silently ignored
+  `input_type` (BH.J.7).

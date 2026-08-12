@@ -1124,3 +1124,104 @@ def test_select_uses_the_semantic_ranker_for_ordering() -> None:
         assert len(fake.rerank_requests) == 1
     finally:
         client.close()
+
+
+# ---- robustness: type hygiene, malformed responses, cancellation, payload leaks ---------
+
+
+def test_new_frozen_types_compare_by_value() -> None:
+    a = EmbeddingRequest(inputs=("x", "y"), input_type="query")
+    b = EmbeddingRequest(inputs=("x", "y"), input_type="query")
+    assert a == b
+    doc = RerankDocument(id="d", text="t")
+    assert RerankRequest(query="q", documents=(doc,)) == RerankRequest(
+        query="q", documents=(doc,)
+    )
+    assert ai.BatchPolicy() == ai.BatchPolicy()
+    assert EmbeddingSpace(provider_id="p", model="m") == EmbeddingSpace(
+        provider_id="p", model="m"
+    )
+
+
+def test_embedding_vector_accepts_integer_float_mixture() -> None:
+    vec = EmbeddingVector(values=(1, 0.5, -2))
+    assert len(vec) == 3
+
+
+async def test_embed_rejects_ragged_vector_response() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+
+    async def ragged(req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        return EmbeddingWireResult(
+            vectors=((0.1, 0.2, 0.3, 0.4), (0.1, 0.2)), model="small", dimensions=4
+        )
+
+    fake.embed = ragged  # type: ignore[method-assign]
+    client = _client_with_fake(fake)
+    try:
+        with pytest.raises(ai.ConfigError, match="inconsistent dimensions"):
+            await client.embed(["a", "b"], target="fake-embed:small")
+    finally:
+        await client.aclose()
+
+
+async def test_single_call_cancellation_returns_no_partial_result() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    inner = fake.embed
+
+    async def slow(req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        await asyncio.sleep(0.2)
+        return await inner(req)
+
+    fake.embed = slow  # type: ignore[method-assign]
+    client = _client_with_fake(fake)
+    try:
+        task = asyncio.create_task(client.embed(["a"], target="fake-embed:small"))
+        await asyncio.sleep(0.02)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    finally:
+        await client.aclose()
+
+
+async def test_malformed_rerank_error_text_excludes_document_content() -> None:
+    secret_text = "confidential-payroll-figures-Q3"
+    fake = FakeEmbeddingRerankProvider("fake-embed", rerank_models=["rr"])
+
+    async def bad_index(req: object) -> RerankWireResult:
+        return RerankWireResult(items=(WireRankedItem(index=99, score=0.5),))
+
+    fake.rerank = bad_index  # type: ignore[method-assign]
+    client = _client_with_fake(fake)
+    try:
+        with pytest.raises(ai.ConfigError) as excinfo:
+            await client.rerank("q", [secret_text], target="fake-embed:rr")
+        assert secret_text not in str(excinfo.value)
+        assert secret_text not in repr(excinfo.value)
+    finally:
+        await client.aclose()
+
+
+def test_sync_facade_embed_from_many_threads() -> None:
+    import concurrent.futures
+
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    registry = _empty_registry()
+    fake.register(registry)
+    client = ai.Client(
+        providers=[ai.ProviderSettings.of("fake-embed")],
+        registry=registry,
+        use_default_catalog=False,
+    )
+    try:
+        def call(i: int) -> int:
+            result = client.embed([f"text-{i}"], target="fake-embed:small")
+            return len(result.vectors)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            counts = list(pool.map(call, range(24)))
+        assert counts == [1] * 24
+        assert len(fake.embed_requests) == 24
+    finally:
+        client.close()

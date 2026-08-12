@@ -299,3 +299,21 @@ def test_models_listing_tags_operations() -> None:
     assert response.status_code == 200
     entries = {e["id"]: e for e in response.json()["data"]}
     assert entries["fake-embed:small"]["anyinfer"]["operations"] == ["embedding"]
+
+
+def test_embeddings_concurrent_requests_all_complete() -> None:
+    import concurrent.futures
+
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    http = _client(fake)
+
+    def post(i: int) -> int:
+        response = http.post(
+            "/v1/embeddings", json={"model": "fake-embed:small", "input": f"text-{i}"}
+        )
+        return response.status_code
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(post, range(16)))
+    assert statuses == [200] * 16
+    assert len(fake.embed_requests) == 16

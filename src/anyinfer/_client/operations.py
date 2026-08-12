@@ -512,6 +512,16 @@ async def dispatch_embed(
                 provider=resolved.provider_id,
                 hint="this is a provider-side contract violation; report it upstream",
             )
+        if vectors and any(len(v) != len(vectors[0]) for v in vectors):
+            # A ragged response is not "variable dimensions"; it is a malformed result —
+            # every vector in one space has one length, and guessing which length was
+            # meant would corrupt whatever index these vectors land in.
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} returned vectors of inconsistent "
+                "dimensions in one response",
+                provider=resolved.provider_id,
+                hint="this is a provider-side contract violation; report it upstream",
+            )
 
         usage = Usage.sum([wire.usage or Usage() for wire in wire_results])
         if capabilities_for is not None:
