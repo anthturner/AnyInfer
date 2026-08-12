@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, TypeVar, cast
 
 from ..errors import AllTargetsFailedError, ConfigError, ProviderError
 from ..events.telemetry import (
+    AttemptCompleted,
     AttemptStarted,
     FallbackTriggered,
     RequestCompleted,
@@ -30,6 +31,7 @@ from ..events.telemetry import (
     RetryScheduled,
     TargetResolved,
 )
+from ..manifest import build_operation_manifest
 from ..providers.base import (
     EmbeddingWireRequest,
     EmbeddingWireResult,
@@ -138,6 +140,19 @@ async def _attempt_with_retry(
             continue
         else:
             attempts.append(AttemptRecord(target=resolved, outcome="ok", timing=timing))
+            # Both wire-result types carry `usage`; the retry loop is generic over them,
+            # so the attribute is read dynamically. Embed/rerank attempts always finish
+            # with the normalized "stop" — there is no other way for one to end well.
+            usage = getattr(wire_result, "usage", None) or Usage()
+            emit(
+                AttemptCompleted(
+                    request_id=request_id,
+                    target=resolved,
+                    usage=usage,
+                    timing=timing,
+                    finish_reason="stop",
+                )
+            )
             return wire_result, timing, attempts
     raise ConfigError(
         "retry policy allows zero attempts",
@@ -289,6 +304,8 @@ async def dispatch_embed(
     health: HealthCache,
     emit: EmitFn,
     retain_raw: bool,
+    manifest: bool = False,
+    anyinfer_version: str = "",
 ) -> EmbeddingResult:
     """Route and dispatch one embedding request, honoring the embedding-space safety rule.
 
@@ -300,7 +317,7 @@ async def dispatch_embed(
             ``allow_incompatible_fallback`` was not set.
     """
     request_id = uuid.uuid4().hex
-    emit(RequestStarted(request_id=request_id, targets=route.targets))
+    emit(RequestStarted(request_id=request_id, targets=route.targets, operation="embedding"))
     all_attempts: list[AttemptRecord] = []
     warnings: list[str] = []
     primary: ResolvedTarget | None = None
@@ -502,6 +519,20 @@ async def dispatch_embed(
             attempts=tuple(all_attempts),
             warnings=tuple(warnings),
             raw=raw,
+            manifest=build_operation_manifest(
+                operation="embedding",
+                request_id=request_id,
+                requested_targets=route.targets,
+                resolved=resolved,
+                attempts=all_attempts,
+                usage=usage,
+                timing=total_timing,
+                warnings=warnings,
+                embedding_space=space,
+                anyinfer_version=anyinfer_version,
+            )
+            if manifest
+            else None,
         )
 
     error_info = last_error.snapshot() if last_error is not None else None
@@ -521,6 +552,8 @@ async def dispatch_rerank(
     health: HealthCache,
     emit: EmitFn,
     retain_raw: bool,
+    manifest: bool = False,
+    anyinfer_version: str = "",
 ) -> RerankResult:
     """Route and dispatch one rerank request.
 
@@ -530,7 +563,7 @@ async def dispatch_rerank(
             or duplicate document indexes).
     """
     request_id = uuid.uuid4().hex
-    emit(RequestStarted(request_id=request_id, targets=route.targets))
+    emit(RequestStarted(request_id=request_id, targets=route.targets, operation="rerank"))
     all_attempts: list[AttemptRecord] = []
     warnings: list[str] = []
     last_error: ProviderError | None = None
@@ -634,6 +667,19 @@ async def dispatch_rerank(
                 attempts=tuple(all_attempts),
                 warnings=tuple(warnings),
                 raw=wire_result.raw if retain_raw else None,
+                manifest=build_operation_manifest(
+                    operation="rerank",
+                    request_id=request_id,
+                    requested_targets=route.targets,
+                    resolved=resolved,
+                    attempts=all_attempts,
+                    usage=usage,
+                    timing=timing,
+                    warnings=warnings,
+                    anyinfer_version=anyinfer_version,
+                )
+                if manifest
+                else None,
             )
 
         chunk_pairs = [
@@ -717,6 +763,19 @@ async def dispatch_rerank(
             attempts=tuple(all_attempts),
             warnings=tuple(warnings),
             raw=tuple(raws) if retain_raw else None,
+            manifest=build_operation_manifest(
+                operation="rerank",
+                request_id=request_id,
+                requested_targets=route.targets,
+                resolved=resolved,
+                attempts=all_attempts,
+                usage=usage,
+                timing=total_timing,
+                warnings=warnings,
+                anyinfer_version=anyinfer_version,
+            )
+            if manifest
+            else None,
         )
 
     error_info = last_error.snapshot() if last_error is not None else None

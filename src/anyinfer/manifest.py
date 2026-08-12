@@ -62,8 +62,9 @@ from .events.telemetry import (
 from .redaction import redact
 from .schema.mechanism import MechanismRung, choose_mechanism
 from .types.capabilities import ModelCapabilities
-from .types.requests import GenerationRequest, ResolvedTarget
-from .types.results import ErrorInfo, Generation
+from .types.operations import EmbeddingSpace, InferenceOperation
+from .types.requests import GenerationRequest, ResolvedTarget, Target
+from .types.results import AttemptRecord, ErrorInfo, Generation, Timing, Usage
 
 __all__ = [
     "MANIFEST_FORMAT",
@@ -85,6 +86,7 @@ __all__ = [
     "SourcedFact",
     "TimingFacet",
     "UsageFacet",
+    "build_operation_manifest",
     "manifest_json_schema",
     "render",
     "schema_digest",
@@ -446,6 +448,13 @@ class RunManifest:
         timing: Latency of the winning attempt.
         notes: Warnings and provider diagnostics, in the order they arrived.
         payloads: Prompt and response text, present only when explicitly asked for.
+        operation: Which inference operation this record describes. ``"generation"``
+            manifests carry every facet; embedding and rerank manifests leave the
+            generation-only facets (``request``, ``structured``, ``cache``, ``context``,
+            ``payloads``) at their empty defaults.
+        embedding_space: The vector-space identity an embedding call produced, so an
+            index builder can persist exactly what a stored corpus was embedded with.
+            ``None`` for every other operation.
     """
 
     format: str = MANIFEST_FORMAT
@@ -464,6 +473,8 @@ class RunManifest:
     timing: TimingFacet = TimingFacet()
     notes: tuple[str, ...] = ()
     payloads: PayloadFacet | None = None
+    operation: InferenceOperation = "generation"
+    embedding_space: EmbeddingSpace | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Render the manifest as JSON-safe data.
@@ -504,6 +515,85 @@ class RunManifest:
 # ---- encoding ------------------------------------------------------------------------
 
 
+def build_operation_manifest(
+    *,
+    operation: InferenceOperation,
+    request_id: str,
+    requested_targets: Sequence[Target],
+    resolved: ResolvedTarget,
+    attempts: Sequence[AttemptRecord],
+    usage: Usage,
+    timing: Timing,
+    warnings: Sequence[str] = (),
+    embedding_space: EmbeddingSpace | None = None,
+    anyinfer_version: str = "",
+) -> RunManifest:
+    """Assemble the run manifest for one embedding or rerank call.
+
+    Generation's `ManifestBuilder` is event-fed because generation's dispatch is spread
+    across a streaming loop; the embed/rerank dispatchers hold every input in one place
+    when the call finishes, so a projection function is the whole mechanism. The
+    derivation rule is the same one the builder honors: every field below comes from
+    this call's request, its attempt trail, and its result — nothing measured
+    independently, nothing reported anywhere else.
+
+    Args:
+        operation: ``"embedding"`` or ``"rerank"``.
+        request_id: The correlation id the call's events carried.
+        requested_targets: The fallback chain as the caller wrote it.
+        resolved: The target that produced the result.
+        attempts: The routing trail, exactly as returned on the result.
+        usage: The result's aggregated usage.
+        timing: The result's timing (whole-call for a split request).
+        warnings: The result's warnings, recorded as manifest notes.
+        embedding_space: The space identity for an embedding call.
+        anyinfer_version: The library version stamped on the record.
+
+    Returns:
+        A `RunManifest` with the operation-neutral facets populated and every
+        generation-only facet left at its empty default.
+    """
+    return RunManifest(
+        anyinfer_version=anyinfer_version,
+        request_id=request_id,
+        complete=True,
+        route=RouteFacet(
+            requested=tuple(requested_targets),
+            resolved=str(resolved),
+            considered=tuple(
+                RouteStep(
+                    target=str(record.target),
+                    outcome=record.outcome,
+                    reason=record.error.detail if record.error is not None else "",
+                )
+                for record in attempts
+            ),
+        ),
+        attempts=tuple(
+            AttemptFacet(
+                target=str(record.target),
+                outcome=record.outcome,
+                error=record.error,
+                total_ms=record.timing.total_ms if record.timing is not None else None,
+            )
+            for record in attempts
+        ),
+        usage=UsageFacet(
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            total_tokens=usage.total_tokens,
+            cache_read_tokens=usage.cache_read_tokens,
+            cache_write_tokens=usage.cache_write_tokens,
+            reasoning_tokens=usage.reasoning_tokens,
+            cost_usd=str(usage.cost_usd) if usage.cost_usd is not None else None,
+        ),
+        timing=TimingFacet(total_ms=timing.total_ms, phases=dict(timing.phases)),
+        notes=tuple(warnings),
+        operation=operation,
+        embedding_space=embedding_space,
+    )
+
+
 def _encode(value: Any) -> Any:
     """Render a manifest tree as JSON-safe data."""
     if is_dataclass(value) and not isinstance(value, type):
@@ -529,6 +619,7 @@ _NESTED: Mapping[tuple[type, str], type] = {
     (RunManifest, "usage"): UsageFacet,
     (RunManifest, "timing"): TimingFacet,
     (RunManifest, "payloads"): PayloadFacet,
+    (RunManifest, "embedding_space"): EmbeddingSpace,
     (RouteFacet, "considered"): RouteStep,
     (CapabilityFacet, "facts"): SourcedFact,
     (AttemptFacet, "error"): ErrorInfo,
@@ -1314,5 +1405,18 @@ def manifest_json_schema() -> dict[str, Any]:
             },
             "notes": {"type": "array", "items": {"type": "string"}},
             "payloads": {"type": ["object", "null"]},
+            "operation": {"enum": ["generation", "embedding", "rerank"]},
+            "embedding_space": {
+                "type": ["object", "null"],
+                "properties": {
+                    "provider_id": {"type": "string"},
+                    "model": {"type": "string"},
+                    "model_revision": {"type": ["string", "null"]},
+                    "dimensions": {"type": ["integer", "null"]},
+                    "input_intent_aware": {"type": "boolean"},
+                    "normalized": {"type": ["boolean", "null"]},
+                    "compatibility_id": {"type": ["string", "null"]},
+                },
+            },
         },
     }

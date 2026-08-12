@@ -55,8 +55,10 @@
     "reductions": []
   },
   "dropped": [],
+  "embedding_space": null,
   "format": "1",
   "notes": [],
+  "operation": "generation",
   "payloads": null,
   "request": {
     "char_count": 6,

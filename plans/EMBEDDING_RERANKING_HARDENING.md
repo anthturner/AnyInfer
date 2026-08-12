@@ -1,6 +1,6 @@
 # Embedding and reranking: consolidated completion plan
 
-> **Status:** in progress — Tracks D, A, and B landed 2026-08-12 (see §19); C is next.
+> **Status:** in progress — Tracks D, A, B, and C landed 2026-08-12 (see §19); E is next.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. Amends nothing in
 > `DESIGN.md` beyond what ADR-017/ADR-018 and §28 already establish — everything here fills
@@ -407,11 +407,11 @@ attempt-level events, and produce no manifest.
 
 ### Event parity (prerequisite for both manifests and OTel)
 
-- [ ] **BH.C.1** Emit `AttemptCompleted` (with per-attempt usage/timing) from
+- [x] **BH.C.1** Emit `AttemptCompleted` (with per-attempt usage/timing) from
   `_attempt_with_retry`'s success path in `_client/operations.py` — generation emits it,
   embed/rerank do not (fact 4), and both the manifest attempt facet and the OTel bridge's
   per-attempt handling hang off it.
-- [ ] **BH.C.2** Add `operation: InferenceOperation = "generation"` as a defaulted field
+- [x] **BH.C.2** Add `operation: InferenceOperation = "generation"` as a defaulted field
   on `RequestStarted` (and any other event whose handler stamps operation-flavored
   attributes) — frozen/slotted with defaulted-field precedent, fact 6 — set by
   `dispatch_embed`/`dispatch_rerank` vs. generation's `_route_events`. Extending the
@@ -420,7 +420,7 @@ attempt-level events, and produce no manifest.
 
 ### Manifests
 
-- [ ] **BH.C.3** Build the manifest for embed/rerank from dispatch-local state. The
+- [x] **BH.C.3** Build the manifest for embed/rerank from dispatch-local state. The
   investigation (fact 7) points at a lean shape: neutral facets (`route`, `attempts`,
   `usage`, `timing`, `capability`, `notes`) assembled by a small free function or slim
   builder from the events plus the local result — `ManifestBuilder`'s constructor is
@@ -432,25 +432,25 @@ attempt-level events, and produce no manifest.
   way ADR-014's derivation rule holds: every field computed from this call's events,
   request, resolved capabilities, and result; the manifest must carry embedding-space
   identity (ER.8.5). No I/O anywhere in the subsystem.
-- [ ] **BH.C.4** Wire it behind the existing `self._manifests` client toggle and add the
+- [x] **BH.C.4** Wire it behind the existing `self._manifests` client toggle and add the
   per-call `manifest: bool | None = None` parameter to `embed()`/`rerank()` — they lack it
   today (fact 7) — matching `generate()`/`stream()`'s resolution in `_new_run`
   (`async_client.py:1747`).
-- [ ] **BH.C.5** CLI `--trace`/`--trace-json` for `anyinfer embed`/`rerank`, mirroring
+- [x] **BH.C.5** CLI `--trace`/`--trace-json` for `anyinfer embed`/`rerank`, mirroring
   `run`'s flags (`cli.py:352-370`, `_emit_trace` at `cli.py:1841`); parsers at
   `cli.py:371` and `cli.py:423`. Only after BH.C.3-C.4.
-- [ ] **BH.C.6** Stretch: sidecar `anyinfer_manifest` response extension for
+- [-] **BH.C.6** Stretch: sidecar `anyinfer_manifest` response extension for
   `/v1/embeddings`, reusing the chat mechanism (fact 16). Optional; note if skipped.
 
 ### OTel bridge
 
-- [ ] **BH.C.7** Read the operation tag in `otel.py`'s handlers: span name and
+- [x] **BH.C.7** Read the operation tag in `otel.py`'s handlers: span name and
   `gen_ai.operation.name` become operation-correct (the value for embeddings has an
   established GenAI semantic-convention spelling — verify against the current spec at
   opentelemetry.io before hardcoding; the repo pins no semconv constants, fact 5). Extend
   `tests/test_otel_bridge.py` (don't fork a parallel file) and keep its union drift guard
   failing loudly on unmapped events.
-- [ ] **BH.C.8** Payloads: embed/rerank events carry no payload fields today (fact 5). If
+- [x] **BH.C.8** Payloads: embed/rerank events carry no payload fields today (fact 5). If
   this track adds any (input texts, query/document text as gated span attributes), they
   must be registered in `PAYLOAD_FIELDS` and gated behind `payloads=True`/`record_payloads`
   exactly like `prompt_text` — and embedding *vectors* are never exported as span
@@ -459,7 +459,7 @@ attempt-level events, and produce no manifest.
 
 ### Benchmark metrics
 
-- [ ] **BH.C.9** Embedding metrics (inputs/s, vectors/s, tokens/s where reported,
+- [ ] **BH.C.9** *(deferred by its own design — see the Track C progress-log entry)* Embedding metrics (inputs/s, vectors/s, tokens/s where reported,
   cold/warm) and rerank metrics (documents/s, query latency) need new fields —
   `Measurement`'s rate fields are all token-denominated (`benchmark.py:190-198`), and
   `Measurement.from_json` already degrades to `None` on unknown keys (`benchmark.py:
@@ -468,12 +468,12 @@ attempt-level events, and produce no manifest.
 
 ### Tests
 
-- [ ] **BH.C.10** Manifest dual-path test mirroring
+- [x] **BH.C.10** Manifest dual-path test mirroring
   `tests/test_manifest.py::TestDerivation::test_matches_a_subscribed_observer` (line 327)
   adapted for `embed()`/`rerank()`: the manifest and the event stream may not disagree.
-- [ ] **BH.C.11** OTel: an `embed()`/`rerank()` call produces a span with the correct
+- [x] **BH.C.11** OTel: an `embed()`/`rerank()` call produces a span with the correct
   non-`"chat"` operation name and no vector/document content in attributes by default.
-- [ ] **BH.C.12** Regression: generation's existing span shape and manifest output are
+- [x] **BH.C.12** Regression: generation's existing span shape and manifest output are
   byte-identical to before this track — the entire point of a defaulted operation tag is
   that `_route_events` behavior does not change.
 
@@ -859,3 +859,33 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   `lint-imports` 4/4, `mkdocs --strict` all clean. BH.B.13 stays `[~]`: live smoke and
   contract citations exist; conformance-kit registration and cassettes land with
   Track H.
+- **2026-08-12 (Track C — delivered and tested):** Observability parity. Event parity
+  first: `RequestStarted` gained a defaulted `operation: InferenceOperation` field
+  (embed/rerank dispatchers stamp theirs; untagged events mean generation, so existing
+  consumers observe nothing), and `_attempt_with_retry` now emits `AttemptCompleted`
+  with per-attempt usage/timing and `finish_reason="stop"` — closing fact 4's gap, so
+  OTel token metrics and manifest attempt facets fire for the new operations. OTel:
+  span name + `gen_ai.operation.name` resolve per operation — `("generate", "chat")`
+  unchanged for generation, `("embeddings", "embeddings")` per the GenAI semconv
+  registry (re-verified live 2026-08-12 at its new home,
+  github.com/open-telemetry/semantic-conventions-genai), and `("rerank", "rerank")` as
+  a plain custom value since the registry defines none for reranking. Manifests:
+  `RunManifest` reused (BH.C.3 resolved as the plan preferred) with two additive fields
+  — `operation` and `embedding_space` (the actual `EmbeddingSpace` type, so an index
+  builder persists exactly what a corpus was embedded with) — plus a
+  `build_operation_manifest()` projection function; generation-only facets stay at
+  their empty defaults; the JSON schema and golden files were extended/regenerated.
+  `embed()`/`rerank()` gained `manifest: bool | None = None` on both clients,
+  inheriting the client-level toggle exactly like `generate()`. CLI: `--trace`/
+  `--trace-json` on `anyinfer embed`/`rerank`, requesting a manifest for that call and
+  emitting via the existing `_emit_trace`. Payloads (BH.C.8): embed/rerank events carry
+  no payload fields — recorded as the safe status quo; no gate built with nothing to
+  gate; vectors never appear in span attributes (asserted in tests). Tests: manifest
+  projection/dual-path (attempt facets vs. collected events, round-trip via
+  `from_dict`), per-call disable, rerank warnings-as-notes, OTel spans for both
+  operations, an explicit generation-span regression test, and a CLI `--trace-json`
+  smoke. Gates: full pytest (only the documented pre-existing demo-app failure), mypy,
+  ruff, `lint-imports` 4/4, `mkdocs --strict` all clean. Explicitly not done:
+  BH.C.6 sidecar `anyinfer_manifest` extension for `/v1/embeddings` (optional stretch,
+  skipped — noted per its own terms); BH.C.9 benchmark metrics (its own text says land
+  last and lowest priority — deferred to a later session, still open).

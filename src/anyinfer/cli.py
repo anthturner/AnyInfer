@@ -409,6 +409,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     embed.add_argument("--dimensions", type=int, default=None, help="requested vector length")
     embed.add_argument(
+        "--trace",
+        action="store_true",
+        help="print the run manifest to stderr: route, attempts, usage, and timing",
+    )
+    embed.add_argument(
+        "--trace-json",
+        nargs="?",
+        const="-",
+        default=None,
+        metavar="PATH",
+        help=(
+            "write the run manifest as JSON to PATH, or to stdout when given no value. "
+            "Content-free: never input text, document text, or vectors"
+        ),
+    )
+    embed.add_argument(
         "--timeout", type=float, default=None, metavar="SECONDS", help="per-request timeout"
     )
     embed.add_argument(
@@ -462,6 +478,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON Lines file, one {'id': ..., 'text': ...} object per line",
     )
     rerank.add_argument("--top-n", type=int, default=None, metavar="N", help="return only top N")
+    rerank.add_argument(
+        "--trace",
+        action="store_true",
+        help="print the run manifest to stderr: route, attempts, usage, and timing",
+    )
+    rerank.add_argument(
+        "--trace-json",
+        nargs="?",
+        const="-",
+        default=None,
+        metavar="PATH",
+        help=(
+            "write the run manifest as JSON to PATH, or to stdout when given no value. "
+            "Content-free: never input text, document text, or vectors"
+        ),
+    )
     rerank.add_argument(
         "--timeout", type=float, default=None, metavar="SECONDS", help="per-request timeout"
     )
@@ -1416,12 +1448,14 @@ def _embed(args: argparse.Namespace) -> int:
             input_type=args.input_type,
             dimensions=args.dimensions,
             timeout_s=args.timeout,
+            manifest=True if (args.trace or args.trace_json is not None) else None,
         )
     except AnyInferError as exc:
         return _report_error(exc)
     finally:
         client.close()
 
+    _emit_trace(result, args)
     return _emit_embed_result(result, args)
 
 
@@ -1557,12 +1591,14 @@ def _rerank(args: argparse.Namespace) -> int:
             route=route if args.route else None,
             top_n=args.top_n,
             timeout_s=args.timeout,
+            manifest=True if (args.trace or args.trace_json is not None) else None,
         )
     except AnyInferError as exc:
         return _report_error(exc)
     finally:
         client.close()
 
+    _emit_trace(result, args)
     return _emit_rerank_result(result, args)
 
 

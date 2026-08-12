@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, cast
 
+from ..types.operations import InferenceOperation
 from ..types.requests import ResolvedTarget, Target
 from ..types.results import Diagnostic, ErrorInfo, Mechanism, Timing, Usage
 
@@ -47,20 +48,25 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True)
 class RequestStarted:
-    """A generation request entered the router.
+    """An inference request entered the router.
 
     Attributes:
         request_id: Correlation id shared by every event this request emits.
         targets: The fallback chain as requested, in the order the router will try it.
         metadata: Caller-supplied labels from the request, passed through untouched.
         prompt_text: The prompt text; ``None`` unless the receiving observer registered
-            with ``payloads=True``.
+            with ``payloads=True``. Generation only — embedding inputs and rerank
+            documents are never carried on events.
+        operation: Which inference operation this request is. Defaults to
+            ``"generation"`` so pre-existing consumers observe no change; the embed and
+            rerank dispatchers stamp their own value.
     """
 
     request_id: str
     targets: tuple[Target, ...]
     metadata: Mapping[str, str] = field(default_factory=dict)
     prompt_text: str | None = None
+    operation: InferenceOperation = "generation"
 
 
 @dataclass(frozen=True, slots=True)

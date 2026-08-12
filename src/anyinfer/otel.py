@@ -45,6 +45,20 @@ __all__ = ["GEN_AI", "OTelObserver", "install"]
 GEN_AI = "gen_ai"
 """Prefix of the GenAI semantic-convention attribute namespace."""
 
+_OPERATION_NAMES: dict[str, tuple[str, str]] = {
+    "generation": ("generate", "chat"),
+    "embedding": ("embeddings", "embeddings"),
+    "rerank": ("rerank", "rerank"),
+}
+"""Span name and ``gen_ai.operation.name`` per inference operation.
+
+``"chat"`` and ``"embeddings"`` are well-known GenAI semantic-convention values (verified
+against the semconv registry 2026-08-12); reranking has no defined value there yet, so it
+carries the plain value ``"rerank"`` rather than mislabeling itself as chat or retrieval.
+The generation pair is exactly what this bridge emitted before operations were tagged —
+generation spans are byte-identical to the untagged era.
+"""
+
 _INSTRUMENTATION_NAME = "anyinfer"
 
 
@@ -108,10 +122,13 @@ class OTelObserver:
     # ---- request lifecycle -----------------------------------------------------------
 
     def _on_RequestStarted(self, event: RequestStarted) -> None:  # noqa: N802
+        span_name, operation_name = _OPERATION_NAMES.get(
+            event.operation, (event.operation, event.operation)
+        )
         span = self._tracer.start_span(
-            "generate",
+            span_name,
             attributes={
-                f"{GEN_AI}.operation.name": "chat",
+                f"{GEN_AI}.operation.name": operation_name,
                 f"{GEN_AI}.anyinfer.request_id": event.request_id,
                 f"{GEN_AI}.anyinfer.targets": ", ".join(event.targets),
             },

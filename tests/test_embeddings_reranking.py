@@ -728,3 +728,74 @@ async def test_rerank_cross_batch_top_n_is_chunk_local_and_warned() -> None:
         assert "applied within each batch" in result.warnings[0]
     finally:
         await client.aclose()
+
+
+# ---- run manifests for embed and rerank ---------------------------------------------
+
+
+async def test_embed_manifest_is_a_projection_of_the_call() -> None:
+    """RM.8, operation edition — the manifest and the event stream may not disagree."""
+
+    class _Collector:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        def on_event(self, event: object) -> None:
+            self.events.append(event)
+
+    fake = _capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    collector = _Collector()
+    client.subscribe(collector)
+    try:
+        result = await client.embed(["a", "b", "c"], target="fake-embed:small")
+        m = result.manifest
+        assert m is not None
+        assert m.operation == "embedding"
+        assert m.complete is True
+        assert m.embedding_space == result.space
+        assert m.route.resolved == str(result.target)
+        assert [a.outcome for a in m.attempts] == [a.outcome for a in result.attempts]
+        assert m.usage.input_tokens == result.usage.input_tokens == 3
+
+        names = [type(e).__name__ for e in collector.events]
+        assert names.count("AttemptStarted") == len(m.attempts) == 2
+        assert names.count("AttemptCompleted") == 2
+        started = next(e for e in collector.events if type(e).__name__ == "RequestStarted")
+        assert started.operation == "embedding"  # type: ignore[attr-defined]
+
+        from anyinfer.manifest import RunManifest
+
+        assert RunManifest.from_dict(m.to_dict()) == m
+    finally:
+        await client.aclose()
+
+
+async def test_embed_manifest_can_be_disabled_per_call() -> None:
+    fake = _capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        result = await client.embed(["a"], target="fake-embed:small", manifest=False)
+        assert result.manifest is None
+    finally:
+        await client.aclose()
+
+
+async def test_rerank_manifest_records_warnings_as_notes() -> None:
+    fake = _rerank_capable_fake(limit=2)
+    client = _client_with_fake(fake)
+    try:
+        result = await client.rerank(
+            "alpha beta",
+            ["gamma", "alpha gamma", "alpha beta"],
+            target="fake-embed:rr",
+            batch=ai.BatchPolicy(rerank_cross_batch=True),
+        )
+        m = result.manifest
+        assert m is not None
+        assert m.operation == "rerank"
+        assert m.embedding_space is None
+        assert m.notes == result.warnings
+        assert m.notes and "global ordering" in m.notes[0]
+    finally:
+        await client.aclose()

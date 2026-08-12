@@ -1229,6 +1229,7 @@ class AsyncClient:
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
         retain_raw: bool | None = None,
+        manifest: bool | None = None,
     ) -> EmbeddingResult:
         """Embed one or more texts into vectors.
 
@@ -1260,6 +1261,8 @@ class AsyncClient:
             max_response_bytes: Hard cap on one provider response body.
             retain_raw: Keep the provider's raw response payload on the result. Defaults
                 to the client's ``retain_raw`` setting.
+            manifest: Overrides the client's manifest setting for this one call;
+                ``None`` inherits it.
 
         Returns:
             The assembled `EmbeddingResult`.
@@ -1296,6 +1299,8 @@ class AsyncClient:
             health=self._health,
             emit=self._emit,
             retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
+            manifest=self._manifests if manifest is None else manifest,
+            anyinfer_version=_version(),
         )
 
     async def rerank(
@@ -1313,6 +1318,7 @@ class AsyncClient:
         max_response_bytes: int | None = None,
         return_documents: bool = False,
         retain_raw: bool | None = None,
+        manifest: bool | None = None,
     ) -> RerankResult:
         """Rank documents by relevance to a query.
 
@@ -1335,6 +1341,8 @@ class AsyncClient:
             return_documents: Echo document text back on each ranked item.
             retain_raw: Keep the provider's raw response payload on the result. Defaults
                 to the client's ``retain_raw`` setting.
+            manifest: Overrides the client's manifest setting for this one call;
+                ``None`` inherits it.
 
         Returns:
             The assembled `RerankResult`.
@@ -1372,6 +1380,8 @@ class AsyncClient:
             health=self._health,
             emit=self._emit,
             retain_raw=retain_raw if retain_raw is not None else self._retain_raw,
+            manifest=self._manifests if manifest is None else manifest,
+            anyinfer_version=_version(),
         )
 
     async def _generate_request(

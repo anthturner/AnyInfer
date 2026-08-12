@@ -717,6 +717,7 @@ class Client:
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
         retain_raw: bool | None = None,
+        manifest: bool | None = None,
     ) -> EmbeddingResult:
         """Embed one or more texts into vectors. See `AsyncClient.embed()`."""
         self._ensure_open()
@@ -735,6 +736,7 @@ class Client:
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
                 retain_raw=retain_raw,
+                manifest=manifest,
             )
         )
 
@@ -753,6 +755,7 @@ class Client:
         max_response_bytes: int | None = None,
         return_documents: bool = False,
         retain_raw: bool | None = None,
+        manifest: bool | None = None,
     ) -> RerankResult:
         """Rank documents by relevance to a query. See `AsyncClient.rerank()`."""
         self._ensure_open()
@@ -770,6 +773,7 @@ class Client:
                 max_response_bytes=max_response_bytes,
                 return_documents=return_documents,
                 retain_raw=retain_raw,
+                manifest=manifest,
             )
         )
 

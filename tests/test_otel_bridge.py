@@ -472,3 +472,40 @@ def test_a_failed_request_exports_an_error_status(
     span = exporter.get_finished_spans()[0]
     assert span.status.status_code is StatusCode.ERROR
     assert span.attributes["error.type"] == "ProviderUnavailableError"
+
+
+# ---- operation-tagged spans (embedding and rerank) ----------------------------------
+
+
+def test_embedding_request_produces_an_embeddings_span(
+    observer: OTelObserver, tracer: FakeTracer
+) -> None:
+    observer.on_event(
+        ai.RequestStarted("e1", ("cohere:embed-v4.0",), operation="embedding")
+    )
+
+    span = tracer.spans[-1]
+    assert span.name == "embeddings"
+    assert span.attributes["gen_ai.operation.name"] == "embeddings"
+    assert "gen_ai.prompt" not in span.attributes
+
+
+def test_rerank_request_produces_a_rerank_span(
+    observer: OTelObserver, tracer: FakeTracer
+) -> None:
+    observer.on_event(ai.RequestStarted("rr1", ("cohere:rerank-v3.5",), operation="rerank"))
+
+    span = tracer.spans[-1]
+    assert span.name == "rerank"
+    assert span.attributes["gen_ai.operation.name"] == "rerank"
+
+
+def test_generation_span_shape_is_unchanged_by_operation_tagging(
+    observer: OTelObserver, tracer: FakeTracer
+) -> None:
+    """An untagged RequestStarted must produce exactly the pre-tagging span."""
+    observer.on_event(ai.RequestStarted("g1", ("openai:gpt-5",)))
+
+    span = tracer.spans[-1]
+    assert span.name == "generate"
+    assert span.attributes["gen_ai.operation.name"] == "chat"

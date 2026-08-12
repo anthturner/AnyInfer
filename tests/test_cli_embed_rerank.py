@@ -373,3 +373,29 @@ def test_rerank_reads_jsonl_with_ids(
     payload = json.loads(capsys.readouterr().out)
     ids = {item["document_id"] for item in payload["items"]}
     assert ids == {"doc-a", "doc-b"}
+
+
+def test_embed_trace_json_emits_an_operation_manifest(
+    config: Path,
+    fake_provider: FakeEmbeddingRerankProvider,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _stdin(monkeypatch, None)
+    code = main(
+        [
+            "embed",
+            "hello world",
+            "--config",
+            str(config),
+            "--target",
+            "cli-fake:embed-model",
+            "--trace-json",
+        ]
+    )
+    assert code == 0
+    manifest = json.loads(capsys.readouterr().out)
+    assert manifest["operation"] == "embedding"
+    assert manifest["complete"] is True
+    assert manifest["embedding_space"]["provider_id"] == "cli-fake"
+    assert manifest["route"]["resolved"] == "cli-fake:embed-model"
