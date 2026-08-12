@@ -118,6 +118,27 @@ prevent. Name models explicitly in the target, and supply
 
 Health checks that a token can be acquired, without spending a generation.
 
+## Embeddings
+
+Unlike generation, embeddings are **not** the Gemini shape — Vertex's own text-embeddings
+API uses a `predict` verb with an `instances`/`parameters` body, so `VertexAdapter`
+overrides embedding translation rather than reusing Gemini's `batchEmbedContents`:
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="vertex:text-embedding-005",
+)
+```
+
+`gemini-embedding-001` accepts only **one input per request** — a documented Vertex
+limit, not an AnyInfer restriction — so the core's batching policy fans a multi-text
+call into one request per input. `text-embedding-005` and
+`text-multilingual-embedding-002` accept up to five. `dimensions=` requests native
+truncation via `outputDimensionality`; `input_type=` maps to Vertex's `task_type`
+(`query`→`RETRIEVAL_QUERY`, `document`→`RETRIEVAL_DOCUMENT`,
+`classification`→`CLASSIFICATION`, `clustering`→`CLUSTERING`).
+
 ## Claude on Vertex
 
 Vertex also serves Anthropic models, but through a different surface

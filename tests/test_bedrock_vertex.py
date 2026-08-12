@@ -12,7 +12,7 @@ import pytest
 
 import anyinfer as ai
 from anyinfer.errors import ConfigError
-from anyinfer.providers.base import AdapterFinal, ProviderConfig, WireRequest
+from anyinfer.providers.base import AdapterFinal, EmbeddingWireRequest, ProviderConfig, WireRequest
 from anyinfer.providers.bedrock import BedrockAdapter
 from anyinfer.providers.vertex import VertexAdapter
 from anyinfer.types.requests import Sampling, ToolSpec
@@ -625,3 +625,89 @@ async def test_health_reports_the_project_without_generating() -> None:
 
     assert health.ok is True
     assert "my-project/global" in health.detail
+
+
+_PREDICT_RESPONSE = {
+    "predictions": [
+        {
+            "embeddings": {
+                "values": [0.1, 0.2, 0.3],
+                "statistics": {"truncated": False, "token_count": 4},
+            }
+        }
+    ]
+}
+
+
+async def test_embeds_against_the_predict_endpoint_not_batch_embed_contents() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_PREDICT_RESPONSE)
+
+    adapter = _vertex(handler)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(model="gemini-embedding-001", inputs=("hi",))
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0].url.path.endswith("gemini-embedding-001:predict")
+    body = json.loads(seen[0].content)
+    assert body["instances"] == [{"content": "hi"}]
+    assert result.vectors == ((0.1, 0.2, 0.3),)
+    assert result.usage is not None
+    assert result.usage.input_tokens == 4
+
+
+async def test_embed_maps_input_type_to_task_type() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_PREDICT_RESPONSE)
+
+    adapter = _vertex(handler)
+    try:
+        await adapter.embed(
+            EmbeddingWireRequest(
+                model="gemini-embedding-001", inputs=("hi",), input_type="document"
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    body = json.loads(seen[0].content)
+    assert body["instances"][0]["task_type"] == "RETRIEVAL_DOCUMENT"
+
+
+_PREDICT_RESPONSE_TWO = {
+    "predictions": [
+        {"embeddings": {"values": [0.1, 0.2], "statistics": {"token_count": 1}}},
+        {"embeddings": {"values": [0.3, 0.4], "statistics": {"token_count": 1}}},
+    ]
+}
+
+
+async def test_embed_forwards_output_dimensionality() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_PREDICT_RESPONSE_TWO)
+
+    adapter = _vertex(handler)
+    try:
+        await adapter.embed(
+            EmbeddingWireRequest(
+                model="text-embedding-005", inputs=("hi", "there"), dimensions=256
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    body = json.loads(seen[0].content)
+    assert body["instances"] == [{"content": "hi"}, {"content": "there"}]
+    assert body["parameters"] == {"outputDimensionality": 256}
