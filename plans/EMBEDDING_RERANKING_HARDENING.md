@@ -1061,3 +1061,17 @@ changes wire behavior belongs in a dated contract snapshot and a conformance cas
   (placeholder/env-var pairing, advanced endpoint) satisfied. Gates all clean.
   BH.I.3 now `[~]`: TEI done; Azure/Gemini/Vertex/Bedrock/LM Studio/llama-server/
   Voyage/Jina remain.
+- **2026-08-12 (Track I — third increment, delivered and tested):** Gemini embeddings.
+  Verified live (ai.google.dev guide + reference, 2026-08-12): the adapter always uses
+  `batchEmbedContents` (single inputs included), `output_dimensionality` forwarded,
+  `usageMetadata.promptTokenCount` → `input_tokens`. The intent story is
+  model-conditional as a *wire fact*: legacy `gemini-embedding-001` receives mapped
+  `taskType` values; the current `gemini-embedding-2` documents no task-type support
+  ("use prompt instructions"), so the adapter never sends one and its declared-empty
+  intents make the core's ignored-intent warning fire — verified end to end in a test.
+  Static capabilities: both models 3,072 default dimensions with 768/1536/3072 choices;
+  no batch ceiling is documented, so none is invented (`max_batch_inputs=None`, local
+  refusal above the sanity ceiling). Descriptor declares `{generation, embedding}`.
+  Contract snapshot + watchlist + provider docs page updated; 7 wire/e2e tests. Gates
+  all clean. Remaining in BH.I.3: Azure, Vertex, Bedrock, LM Studio, llama-server,
+  Voyage, Jina.

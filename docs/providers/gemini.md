@@ -103,6 +103,26 @@ supports several calls in one turn. Tool results are sent back on a *user* turn 
 `functionResponse` parts — the adapter handles that translation, so
 [`run_tools()`](../guides/tool-loop.md) works the same as everywhere else.
 
+## Embeddings
+
+Gemini embeds through `batchEmbedContents`, so batches are native:
+
+```python
+result = client.embed(
+    ["What is deep learning?"],
+    target="gemini:gemini-embedding-2",
+    dimensions=768,  # 128-3072; both models default to 3072
+)
+```
+
+The legacy `gemini-embedding-001` accepts task types, mapped from `input_type`
+(`query` → `RETRIEVAL_QUERY` and so on). The current `gemini-embedding-2` documents no
+task types — prompt instructions replace them — so an `input_type` there is never sent
+and the result says so in a warning. No batch ceiling is documented, so requests above
+the library's sanity ceiling are refused rather than split at a guessed size; set
+`BatchPolicy.max_items_override` if you have verified a limit yourself. There is no
+reranking endpoint on this API.
+
 ## Discovery
 
 The model listing reports real limits, so context windows carry `discovered`

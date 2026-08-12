@@ -47,10 +47,18 @@ from ..types.messages import (
     ToolCall,
     ToolResult,
 )
+from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    EmbeddingWireRequest,
+    EmbeddingWireResult,
+    ProviderConfig,
+    WireRequest,
+)
 from .http import build_client, classify_status, map_transport_error, read_error_detail
 from .sse import iter_sse
 
@@ -98,6 +106,20 @@ _SCHEMA_KEYWORDS = frozenset(
     }
 )
 """Keywords Gemini's response-schema subset accepts; anything else is dropped."""
+
+
+_TASK_TYPES: Mapping[EmbeddingInputIntent, str] = {
+    "query": "RETRIEVAL_QUERY",
+    "document": "RETRIEVAL_DOCUMENT",
+    "classification": "CLASSIFICATION",
+    "clustering": "CLUSTERING",
+}
+"""Normalized intents mapped to Gemini ``taskType`` values (verified 2026-08-12).
+
+Only models that document task types receive one; the current ``gemini-embedding-2``
+does not (its guide says to use prompt instructions), so the adapter never sends it
+there.
+"""
 
 
 class GeminiAdapter:
@@ -216,6 +238,93 @@ class GeminiAdapter:
         return Health(ok=True)
 
     # ---- generation ------------------------------------------------------------------
+
+    # ---- embedding ---------------------------------------------------------------------
+
+    async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Run one embedding call against ``:batchEmbedContents``.
+
+        The batch endpoint serves single inputs too, so one code path covers both. Task
+        types map from the normalized intent vocabulary for models that accept them;
+        ``gemini-embedding-2`` documents no ``taskType`` support (verified 2026-08-12:
+        "use prompt instructions instead"), so the field is never sent to it.
+        """
+        model_ref = f"models/{req.model}"
+        send_task_type = req.input_type is not None and not req.model.startswith(
+            "gemini-embedding-2"
+        )
+        entry_extra: dict[str, Any] = {}
+        if req.dimensions is not None:
+            entry_extra["output_dimensionality"] = req.dimensions
+        requests = []
+        for text_input in req.inputs:
+            entry: dict[str, Any] = {
+                "model": model_ref,
+                "content": {"parts": [{"text": text_input}]},
+                **entry_extra,
+            }
+            if send_task_type and req.input_type is not None:
+                entry["taskType"] = _TASK_TYPES[req.input_type]
+            entry.update(req.extra_options)
+            requests.append(entry)
+
+        path = self._model_path(req.model, "batchEmbedContents")
+        try:
+            response = await self._client.post(
+                path,
+                json={"requests": requests},
+                timeout=req.timeout_s,
+                headers=self._request_headers(),
+            )
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id) from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                headers=response.headers,
+            )
+        return self._parse_embed_response(req, response.json())
+
+    def _parse_embed_response(
+        self, req: EmbeddingWireRequest, payload: Any
+    ) -> EmbeddingWireResult:
+        if not isinstance(payload, Mapping):
+            raise ProviderError("embeddings response is not a JSON object", phase="validate")
+        entries = payload.get("embeddings")
+        if not isinstance(entries, list):
+            raise ProviderError(
+                "embeddings response is missing an 'embeddings' array", phase="validate"
+            )
+        if len(entries) != len(req.inputs):
+            raise ProviderError(
+                f"embeddings response returned {len(entries)} vectors for "
+                f"{len(req.inputs)} inputs",
+                phase="validate",
+            )
+        vectors: list[tuple[float, ...]] = []
+        for entry in entries:
+            values = entry.get("values") if isinstance(entry, Mapping) else None
+            if not isinstance(values, list):
+                raise ProviderError(
+                    "embeddings response entry is missing a 'values' array", phase="validate"
+                )
+            vectors.append(tuple(float(v) for v in values))
+
+        usage = None
+        meta = payload.get("usageMetadata")
+        if isinstance(meta, Mapping):
+            count = meta.get("promptTokenCount")
+            if isinstance(count, int) and not isinstance(count, bool):
+                usage = Usage(input_tokens=count)
+
+        return EmbeddingWireResult(
+            vectors=tuple(vectors),
+            dimensions=len(vectors[0]) if vectors else None,
+            usage=usage,
+            raw=payload,
+        )
 
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
         """Run one generation against ``:streamGenerateContent`` or ``:generateContent``."""
@@ -634,6 +743,23 @@ _GEMINI_FEATURES = (
 )
 
 
+_STATIC_EMBEDDING_CAPABILITIES = {
+    # Verified against ai.google.dev (embeddings guide + API reference) on 2026-08-12:
+    # both current models output 3,072 dimensions by default with 128-3,072 supported
+    # (768/1536/3072 recommended). gemini-embedding-2 documents no taskType support;
+    # gemini-embedding-001 (legacy) accepts the four mapped task types. No batch-size
+    # ceiling is stated for batchEmbedContents, so max_batch_inputs stays None.
+    "gemini-embedding-2": EmbeddingCapabilities(
+        dimensions=3_072, dimension_choices=(768, 1_536, 3_072), input_intents=()
+    ),
+    "gemini-embedding-001": EmbeddingCapabilities(
+        dimensions=3_072,
+        dimension_choices=(768, 1_536, 3_072),
+        input_intents=("query", "document", "classification", "clustering"),
+    ),
+}
+
+
 descriptor = ProviderDescriptor(
     id="gemini",
     display_name="Google Gemini",
@@ -642,6 +768,8 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=_DEFAULT_BASE_URL,
     requires_base_url=False,
+    operations=frozenset({"generation", "embedding"}),
+    static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(
             SetupField(
