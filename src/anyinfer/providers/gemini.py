@@ -23,7 +23,8 @@ back verbatim in multi-turn conversations, so they are preserved rather than str
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
+from contextlib import aclosing
 from typing import Any
 
 import httpx2
@@ -333,12 +334,16 @@ class GeminiAdapter:
             raw=payload,
         )
 
-    async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
+    async def generate(self, req: WireRequest) -> AsyncGenerator[AdapterEvent, None]:
         """Run one generation against ``:streamGenerateContent`` or ``:generateContent``."""
         payload = self.build_payload(req)
         if req.stream:
-            async for event in self._generate_streaming(req, payload):
-                yield event
+            # `aclosing`: an early close of this generator must also close
+            # `_generate_streaming`'s, or its open connection is left to finalize during
+            # GC instead of closing deterministically.
+            async with aclosing(self._generate_streaming(req, payload)) as events:
+                async for event in events:
+                    yield event
         else:
             async for event in self._generate_buffered(req, payload):
                 yield event
@@ -447,7 +452,7 @@ class GeminiAdapter:
 
     async def _generate_streaming(
         self, req: WireRequest, payload: dict[str, Any]
-    ) -> AsyncIterator[AdapterEvent]:
+    ) -> AsyncGenerator[AdapterEvent, None]:
         """Stream ``:streamGenerateContent?alt=sse``, translating each chunk."""
         path = self._model_path(req.model, "streamGenerateContent")
         try:
@@ -469,13 +474,19 @@ class GeminiAdapter:
                     )
 
                 state = _StreamState()
-                async for chunk in iter_sse(
-                    response.aiter_bytes(),
-                    max_bytes=req.max_response_bytes,
-                    provider=self.provider_id,
-                ):
-                    for event in self._events_from_chunk(chunk, state):
-                        yield event
+                # `aclosing`: an early close of this generator must also close the SSE
+                # parser's, or it and the open connection are left to finalize during GC
+                # instead of closing deterministically.
+                async with aclosing(
+                    iter_sse(
+                        response.aiter_bytes(),
+                        max_bytes=req.max_response_bytes,
+                        provider=self.provider_id,
+                    )
+                ) as chunks:
+                    async for chunk in chunks:
+                        for event in self._events_from_chunk(chunk, state):
+                            yield event
                 yield state.finalize()
         except (ProviderError, StreamProtocolError):
             raise

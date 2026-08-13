@@ -109,7 +109,13 @@ from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
 from ..local.tuning import Posture
 from ..local.variants import VariantPrefs
 from ..manifest import DroppedParameter, ManifestBuilder, RunManifest
-from ..providers.base import AdapterFinal, GeneratesText, ProviderAdapter, ProviderLifecycle
+from ..providers.base import (
+    AdapterFinal,
+    GeneratesText,
+    ProviderAdapter,
+    ProviderLifecycle,
+    aclosing_if_supported,
+)
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.attempts import AttemptBuffer
 from ..routing.health import HealthCache
@@ -2754,15 +2760,23 @@ class AsyncClient:
         if request_id is None:
             request_id, builder = self._new_run(request, route, None)
         try:
-            async for event in self._route_events(
-                request,
-                route,
-                stream=stream,
-                session=session,
-                request_id=request_id,
-                builder=builder,
-            ):
-                yield event
+            # `aclosing` rather than a bare `async for`: closing *this* generator early
+            # (a consumer breaking out of a stream) throws GeneratorExit at the current
+            # `yield`, which does not itself close `_route_events`'s generator — leaving
+            # it, and everything it wraps down to the provider connection, to finalize
+            # during GC instead of closing deterministically.
+            async with contextlib.aclosing(
+                self._route_events(
+                    request,
+                    route,
+                    stream=stream,
+                    session=session,
+                    request_id=request_id,
+                    builder=builder,
+                )
+            ) as events:
+                async for event in events:
+                    yield event
         finally:
             # The builder outlives this generator only through the handle a streaming
             # caller already holds; the registry must not, or an abandoned stream would
@@ -2850,28 +2864,34 @@ class AsyncClient:
                 emitted_content = False
 
                 try:
-                    async for event in self._run_attempt(
-                        request=target_request,
-                        resolved=resolved,
-                        adapter=adapter,
-                        descriptor=descriptor,
-                        capabilities=capabilities,
-                        buffer=buffer,
-                        request_id=request_id,
-                        stream=stream,
-                        attempts=attempts,
-                        session=session,
-                        builder=builder,
-                        context_summary=context_summary,
-                        content_chain=(
-                            unvisited_content_chain
-                            if route.content_policy_targets and not content_redirected
-                            else None
-                        ),
-                    ):
-                        if is_content_event(event):
-                            emitted_content = True
-                        yield event
+                    # See the matching comment in `_routed_stream`: `aclosing` ensures an
+                    # early close of *this* generator also closes `_run_attempt`'s, rather
+                    # than orphaning it.
+                    async with contextlib.aclosing(
+                        self._run_attempt(
+                            request=target_request,
+                            resolved=resolved,
+                            adapter=adapter,
+                            descriptor=descriptor,
+                            capabilities=capabilities,
+                            buffer=buffer,
+                            request_id=request_id,
+                            stream=stream,
+                            attempts=attempts,
+                            session=session,
+                            builder=builder,
+                            context_summary=context_summary,
+                            content_chain=(
+                                unvisited_content_chain
+                                if route.content_policy_targets and not content_redirected
+                                else None
+                            ),
+                        )
+                    ) as attempt_events:
+                        async for event in attempt_events:
+                            if is_content_event(event):
+                                emitted_content = True
+                            yield event
                     self._health.mark_healthy(resolved)
                     return
                 except _ContentPolicyRedirect as redirect:
@@ -3140,7 +3160,7 @@ class AsyncClient:
         builder: ManifestBuilder | None = None,
         context_summary: ContextSummary | None = None,
         content_chain: Callable[[], list[Target]] | None = None,
-    ) -> AsyncIterator[StreamEvent]:
+    ) -> AsyncGenerator[StreamEvent, None]:
         """Run one attempt against one target, including the schema repair loop.
 
         Repair re-runs *this* target rather than the route: a schema violation says
@@ -3237,11 +3257,18 @@ class AsyncClient:
             saw_usage_event = False
             pacing = AttemptPacing(request_id, resolved)
             try:
+                # An early close here must also close the adapter's generator, or the
+                # provider connection it holds is left to finalize during GC instead of
+                # closing deterministically (see the matching comment in `_routed_stream`).
+                # `aclosing_if_supported` rather than `contextlib.aclosing`: `adapter` is
+                # `ProviderAdapter`-typed, and `GeneratesText.generate()` does not promise
+                # `.aclose()` (see that Protocol's docstring).
                 async with (
                     self._client_side_pacing(limiter, descriptor),
                     asyncio.timeout(current.effective_timeout_s),
+                    aclosing_if_supported(adapter.generate(wire)) as adapter_events,
                 ):
-                    async for event in adapter.generate(wire):
+                    async for event in adapter_events:
                         # Pacing is over once anything comes back, and the marker must not
                         # outlive it: this is an async generator, so a marker still set at a
                         # yield would follow the consumer into whatever it does next.

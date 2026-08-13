@@ -20,9 +20,10 @@ from __future__ import annotations
 import binascii
 import json
 import struct
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from contextlib import aclosing
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from ..errors import StreamProtocolError
 from .sse import _ByteBudget
@@ -99,7 +100,7 @@ async def iter_event_stream(
     *,
     max_bytes: int,
     provider: str | None = None,
-) -> AsyncIterator[EventStreamMessage]:
+) -> AsyncGenerator[EventStreamMessage, None]:
     """Decode a binary event stream into frames.
 
     Network chunk boundaries have nothing to do with frame boundaries, so a partial buffer
@@ -120,15 +121,19 @@ async def iter_event_stream(
     buffer = bytearray()
     budget = _ByteBudget(max_bytes, provider)
 
-    async for chunk in chunks:
-        budget.consume(chunk)
-        buffer.extend(chunk)
+    # `aclosing` rather than a bare `async for`: see the matching comment in
+    # `sse.iter_sse` for why an early exit here would otherwise orphan `chunks`, and why
+    # the cast below is safe.
+    async with aclosing(cast(AsyncGenerator[bytes, None], chunks)) as chunks:
+        async for chunk in chunks:
+            budget.consume(chunk)
+            buffer.extend(chunk)
 
-        while True:
-            frame = _take_frame(buffer, provider)
-            if frame is None:
-                break
-            yield frame
+            while True:
+                frame = _take_frame(buffer, provider)
+                if frame is None:
+                    break
+                yield frame
 
     if buffer:
         raise StreamProtocolError(

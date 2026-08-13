@@ -42,6 +42,9 @@ def _attested_backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Backen
     monkeypatch.setattr(attest, "_DEV_ROOT", dev)
     monkeypatch.setattr(attest, "_run", lambda command: None)
     monkeypatch.setattr(attest, "cache_path", lambda: tmp_path / "attestation.json")
+    # Detection is gated on _IS_LINUX; force it so this fixture is deterministic on every
+    # CI runner OS, not just Linux (see attestation.py's cpu-tee-detection guard).
+    monkeypatch.setattr(attest, "_IS_LINUX", True)
     return Backend(kind="cpu", binary=Path("/usr/bin/llama-server"))
 
 

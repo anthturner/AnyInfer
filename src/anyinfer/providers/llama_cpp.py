@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import aclosing
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar, Literal
@@ -517,19 +518,23 @@ class LlamaCppAdapter:
             delegate = await self._delegate_for(managed.base_url)
             # The supervised server is a plain OpenAI-compatible endpoint, so the whole
             # generation path is the base adapter's — no duplicated wire logic.
-            async for event in delegate.generate(req):
-                if isinstance(event, AdapterFinal):
-                    phases = dict(event.phases)
-                    if load_ms is not None:
-                        phases["model_load_ms"] = load_ms
-                    state = (
-                        {"model_key": req.model}
-                        if req.session_state is not None
-                        else event.session_state
-                    )
-                    yield replace(event, phases=phases, session_state=state)
-                    continue
-                yield event
+            # `aclosing`: an early close of this generator must also close the delegate
+            # adapter's, or its open connection is left to finalize during GC instead of
+            # closing deterministically.
+            async with aclosing(delegate.generate(req)) as events:
+                async for event in events:
+                    if isinstance(event, AdapterFinal):
+                        phases = dict(event.phases)
+                        if load_ms is not None:
+                            phases["model_load_ms"] = load_ms
+                        state = (
+                            {"model_key": req.model}
+                            if req.session_state is not None
+                            else event.session_state
+                        )
+                        yield replace(event, phases=phases, session_state=state)
+                        continue
+                    yield event
 
     async def aclose(self) -> None:
         """Close delegates and stop every supervised server."""

@@ -11,9 +11,10 @@ If you find yourself adding control flow to an adapter, stop and move it to the 
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from ..types.capabilities import DiscoveredModel, Health
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
@@ -42,7 +43,27 @@ __all__ = [
     "SupportsDiagnostics",
     "WireRankedItem",
     "WireRequest",
+    "aclosing_if_supported",
 ]
+
+_T = TypeVar("_T")
+
+
+@contextlib.asynccontextmanager
+async def aclosing_if_supported(stream: AsyncIterator[_T]) -> AsyncIterator[AsyncIterator[_T]]:
+    """Close ``stream`` on exit if it supports it, same as `contextlib.aclosing`.
+
+    `GeneratesText.generate()` promises only `AsyncIterator`, deliberately: an adapter may
+    implement it as a generator or as a plain iterator (see that Protocol's docstring), so
+    unlike the concrete framing helpers this module's own generators use, callers here
+    cannot assume `.aclose()` exists — it is checked instead of required.
+    """
+    try:
+        yield stream
+    finally:
+        aclose = getattr(stream, "aclose", None)
+        if aclose is not None:
+            await aclose()
 
 
 def _encode_function_tool(tool: ToolSpec) -> dict[str, Any]:

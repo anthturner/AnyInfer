@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from contextlib import aclosing
 from typing import Any, ClassVar
 
 import httpx2
@@ -284,13 +285,19 @@ class OllamaAdapter:
                     raise self._classify(response.status_code, body, response.headers, req)
 
                 state = _StreamState()
-                async for message in iter_ndjson(
-                    response.aiter_bytes(),
-                    max_bytes=req.max_response_bytes,
-                    provider=self.provider_id,
-                ):
-                    for event in self._events_from_message(message, state):
-                        yield event
+                # `aclosing`: an early close of this generator must also close the NDJSON
+                # parser's, or it and the open connection are left to finalize during GC
+                # instead of closing deterministically.
+                async with aclosing(
+                    iter_ndjson(
+                        response.aiter_bytes(),
+                        max_bytes=req.max_response_bytes,
+                        provider=self.provider_id,
+                    )
+                ) as messages:
+                    async for message in messages:
+                        for event in self._events_from_message(message, state):
+                            yield event
                 yield state.finalize(session_state=req.session_state)
         except (ProviderError, StreamProtocolError):
             raise

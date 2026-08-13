@@ -14,8 +14,16 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 def qapp():
     """One QApplication for the whole session; Qt forbids a second."""
     pytest.importorskip("PySide6", reason="the demo app requires the 'demo' extra")
+    from PySide6.QtCore import QLocale
     from PySide6.QtWidgets import QApplication
 
+    # QTableWidgetItem's default sort compares via QString::localeAwareCompare, which
+    # collates through the host's system locale — case-*insensitive* under a real locale
+    # (macOS/Windows runners, most developer machines) but plain byte order under the
+    # bare "C" locale a minimal Linux CI container defaults to. A test asserting a table
+    # ends up in a specific sorted order must not depend on which of those the runner
+    # happens to have; pin it so every environment collates the same way.
+    QLocale.setDefault(QLocale(QLocale.Language.C))
     app = QApplication.instance() or QApplication([])
     yield app
 

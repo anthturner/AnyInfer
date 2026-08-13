@@ -27,6 +27,9 @@ def _no_devices(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     dev.mkdir(exist_ok=True)
     monkeypatch.setattr(attest, "_DEV_ROOT", dev)
     monkeypatch.setattr(attest, "_run", lambda command: None)
+    # Detection is gated on _IS_LINUX (see test_cpu_tee_detection_is_linux_only); force it
+    # so these device-node fixtures behave the same on every CI runner OS, not just Linux.
+    monkeypatch.setattr(attest, "_IS_LINUX", True)
     return dev
 
 

@@ -31,7 +31,8 @@ scoped out for now — see `contracts/bedrock.md`'s watchlist.
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
+from contextlib import aclosing
 from typing import Any
 
 import httpx2
@@ -289,12 +290,16 @@ class BedrockAdapter:
 
     # ---- generation ------------------------------------------------------------------
 
-    async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
+    async def generate(self, req: WireRequest) -> AsyncGenerator[AdapterEvent, None]:
         """Run one generation through Converse or ConverseStream."""
         payload = self.build_payload(req)
         if req.stream:
-            async for event in self._generate_streaming(req, payload):
-                yield event
+            # `aclosing`: an early close of this generator must also close
+            # `_generate_streaming`'s, or its open connection is left to finalize during
+            # GC instead of closing deterministically.
+            async with aclosing(self._generate_streaming(req, payload)) as events:
+                async for event in events:
+                    yield event
         else:
             async for event in self._generate_buffered(req, payload):
                 yield event
@@ -509,7 +514,7 @@ class BedrockAdapter:
 
     async def _generate_streaming(
         self, req: WireRequest, payload: dict[str, Any]
-    ) -> AsyncIterator[AdapterEvent]:
+    ) -> AsyncGenerator[AdapterEvent, None]:
         """Stream ConverseStream, decoding AWS's binary event framing."""
         path = f"/model/{_quote_model(req.model)}/converse-stream"
         body = json.dumps(payload).encode("utf-8")
@@ -532,13 +537,19 @@ class BedrockAdapter:
                     )
 
                 state = _StreamState()
-                async for frame in iter_event_stream(
-                    response.aiter_bytes(),
-                    max_bytes=req.max_response_bytes,
-                    provider=self.provider_id,
-                ):
-                    for event in self._events_from_frame(frame, state):
-                        yield event
+                # `aclosing`: an early close of this generator must also close the frame
+                # decoder's, or it and the open connection are left to finalize during GC
+                # instead of closing deterministically.
+                async with aclosing(
+                    iter_event_stream(
+                        response.aiter_bytes(),
+                        max_bytes=req.max_response_bytes,
+                        provider=self.provider_id,
+                    )
+                ) as frames:
+                    async for frame in frames:
+                        for event in self._events_from_frame(frame, state):
+                            yield event
                 yield state.finalize()
         except (ProviderError, StreamProtocolError):
             raise

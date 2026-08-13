@@ -11,8 +11,9 @@ carry a partial buffer across chunks.
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
-from typing import Any
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import aclosing
+from typing import Any, cast
 
 from ..errors import StreamProtocolError
 
@@ -45,7 +46,7 @@ async def iter_sse(
     *,
     max_bytes: int,
     provider: str | None = None,
-) -> AsyncIterator[Any]:
+) -> AsyncGenerator[Any, None]:
     """Parse an SSE byte stream into decoded JSON data payloads.
 
     Handles the framing quirks that matter in practice: records separated by a blank line,
@@ -67,18 +68,27 @@ async def iter_sse(
     budget = _ByteBudget(max_bytes, provider)
     buffer = ""
 
-    async for chunk in chunks:
-        budget.consume(chunk)
-        buffer += chunk.decode("utf-8", errors="replace")
-        buffer = buffer.replace("\r\n", "\n")
+    # `aclosing` rather than a bare `async for`: an early exit here (the caller closes its
+    # own generator mid-stream, e.g. SyncStream.close()) throws GeneratorExit at this
+    # suspension point, which a plain `async for` does not translate into closing `chunks`
+    # — leaving the response body's async generator to finalize during GC instead, which
+    # Python 3.14 surfaces as a hard "was never awaited" failure rather than a silent leak.
+    # `chunks` is always a real async generator (httpx2's `Response.aiter_bytes()`, typed
+    # as the weaker `AsyncIterator` by httpx2 itself); the cast tells mypy what's already
+    # true rather than widening this function's own, honestly-typed parameter.
+    async with aclosing(cast(AsyncGenerator[bytes, None], chunks)) as chunks:
+        async for chunk in chunks:
+            budget.consume(chunk)
+            buffer += chunk.decode("utf-8", errors="replace")
+            buffer = buffer.replace("\r\n", "\n")
 
-        while "\n\n" in buffer:
-            record, buffer = buffer.split("\n\n", 1)
-            payload = _parse_record(record, provider)
-            if payload is _DONE:
-                return
-            if payload is not None:
-                yield payload
+            while "\n\n" in buffer:
+                record, buffer = buffer.split("\n\n", 1)
+                payload = _parse_record(record, provider)
+                if payload is _DONE:
+                    return
+                if payload is not None:
+                    yield payload
 
     # A stream that ends without a trailing blank line still has a final record.
     if buffer.strip():
@@ -124,7 +134,7 @@ async def iter_ndjson(
     *,
     max_bytes: int,
     provider: str | None = None,
-) -> AsyncIterator[Any]:
+) -> AsyncGenerator[Any, None]:
     """Parse a newline-delimited JSON byte stream (Ollama's framing).
 
     Args:
@@ -141,14 +151,17 @@ async def iter_ndjson(
     budget = _ByteBudget(max_bytes, provider)
     buffer = ""
 
-    async for chunk in chunks:
-        budget.consume(chunk)
-        buffer += chunk.decode("utf-8", errors="replace")
-        while "\n" in buffer:
-            line, buffer = buffer.split("\n", 1)
-            value = _parse_line(line, provider)
-            if value is not None:
-                yield value
+    # See the matching comment in `iter_sse` for why this needs `aclosing` rather than a
+    # bare `async for`, and why `chunks` needs the cast.
+    async with aclosing(cast(AsyncGenerator[bytes, None], chunks)) as chunks:
+        async for chunk in chunks:
+            budget.consume(chunk)
+            buffer += chunk.decode("utf-8", errors="replace")
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                value = _parse_line(line, provider)
+                if value is not None:
+                    yield value
 
     if buffer.strip():
         value = _parse_line(buffer, provider)
