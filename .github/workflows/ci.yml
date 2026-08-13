@@ -3,10 +3,11 @@ name: CI
 # Branch model: feature branches -> develop -> main.
 #
 # CI runs on every pull request into `develop` and `main`, and again on the merge commit
-# once it lands. Merges are *blocked* on failure via branch protection: both branches
-# require the aggregate `ci-ok` status check below (a single stable name, so the required
-# check does not have to enumerate every matrix job). See docs/contributing/releasing.md
-# for the one-time `gh` commands that configure the protection rules.
+# once it lands. Merges are *blocked* on failure via branch protection: `ci-ok` below is
+# required on both branches (a single stable name, so the required check does not have to
+# enumerate every matrix job); `main` additionally requires `test-macos`, which only runs
+# on the develop -> main step. See docs/contributing/releasing.md for the one-time `gh`
+# commands that configure the protection rules.
 on:
   push:
     branches: [develop, main]
@@ -65,10 +66,11 @@ jobs:
       matrix:
         # Windows is a first-class platform for all three consumer applications, and the
         # llama-server supervisor's process-tree handling differs there — so it is tested,
-        # not assumed. But OS quirks aren't Python-version-specific, and macOS/Windows
-        # runners cost 10x/2x Linux in billed Actions minutes, so the full interpreter
-        # matrix only runs on Linux; Windows and macOS each get a single (latest) version
-        # to confirm the platform still works.
+        # not assumed. But OS quirks aren't Python-version-specific, and Windows runners
+        # cost 2x Linux in billed Actions minutes, so the full interpreter matrix only
+        # runs on Linux; Windows gets a single (latest) version to confirm the platform
+        # still works. macOS is not here at all — see `test-macos` below: at 10x Linux
+        # billing, it only runs on the develop -> main step, not on every feature PR.
         include:
           - os: ubuntu-latest
             python-version: "3.11"
@@ -79,8 +81,6 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.14"
           - os: windows-latest
-            python-version: "3.14"
-          - os: macos-latest
             python-version: "3.14"
     steps:
       - uses: actions/checkout@v7
@@ -110,6 +110,30 @@ jobs:
 
       # The test phase sets QT_QPA_PLATFORM=offscreen, so the demo app's Qt tests run
       # on a runner with no display.
+      - name: pytest
+        run: python workspace.py check --only=test
+
+  # macOS runners bill at 10x Linux, so this does not run on every feature-branch PR —
+  # only on the develop -> main step, where the branch model (docs/contributing/
+  # releasing.md) says a merge should actually prove the release is buildable. It is
+  # NOT part of `ci-ok`: a job skipped by `if:` still reports a "skipped" check, and a
+  # required check that is merely skipped blocks a GitHub merge just like a failure
+  # would, which would wedge every `develop` PR. Instead this is a second, separate
+  # required status check that only `main`'s branch protection asks for — see the
+  # one-time setup in docs/contributing/releasing.md.
+  test-macos:
+    name: tests (macos-latest, py3.14)
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[all,dev]"
+      - run: pip install -e src/anyinfer-store
       - name: pytest
         run: python workspace.py check --only=test
 

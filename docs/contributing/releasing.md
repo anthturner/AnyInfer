@@ -20,10 +20,18 @@ flowchart LR
   gated on CI. Every merge to `main` rebuilds the release packages; a merge that bumps
   the version also publishes them.
 
-Both protected branches require the single aggregate **`ci-ok`** status check, which
-passes only when every lint, type, contract, test-matrix, conformance, and docs job
-passed. Requiring one stable check name means adding a CI job (or a matrix row) can
-never silently escape the protection rules.
+Both protected branches require the aggregate **`ci-ok`** status check, which passes only
+when every lint, type, contract, test-matrix, conformance, and docs job passed. Requiring
+one stable check name means adding a CI job (or a matrix row) can never silently escape
+the protection rules.
+
+`main` requires one additional check, **`test-macos`**: macOS runners bill at 10x Linux,
+so that suite does not run on every feature-branch PR into `develop` — only on the
+develop -> main step, right before a merge triggers a release build. It is deliberately
+kept out of `ci-ok` (a job skipped by `if:` still reports "skipped", and a required check
+that is merely skipped blocks a GitHub merge same as a failure would — folding it into
+`ci-ok` would wedge every `develop` PR), so it is listed as its own required context, and
+only on `main`'s protection rule.
 
 ### One-time repository setup
 
@@ -33,15 +41,22 @@ Branch protection lives in repository settings, not in files. After pushing the 
 # create develop from main
 git checkout main && git checkout -b develop && git push -u origin develop
 
-# protect both branches on the aggregate check
-for branch in main develop; do
-  gh api "repos/{owner}/{repo}/branches/$branch/protection" -X PUT \
-    -F 'required_status_checks[strict]=true' \
-    -F 'required_status_checks[contexts][]=ci-ok' \
-    -F 'required_pull_request_reviews[required_approving_review_count]=0' \
-    -F 'enforce_admins=false' \
-    -F 'restrictions=null'
-done
+# develop: gated on the aggregate check only
+gh api "repos/{owner}/{repo}/branches/develop/protection" -X PUT \
+  -F 'required_status_checks[strict]=true' \
+  -F 'required_status_checks[contexts][]=ci-ok' \
+  -F 'required_pull_request_reviews[required_approving_review_count]=0' \
+  -F 'enforce_admins=false' \
+  -F 'restrictions=null'
+
+# main: also gated on the release-only macOS suite
+gh api "repos/{owner}/{repo}/branches/main/protection" -X PUT \
+  -F 'required_status_checks[strict]=true' \
+  -F 'required_status_checks[contexts][]=ci-ok' \
+  -F 'required_status_checks[contexts][]=test-macos' \
+  -F 'required_pull_request_reviews[required_approving_review_count]=0' \
+  -F 'enforce_admins=false' \
+  -F 'restrictions=null'
 ```
 
 Also set **Settings → Pages → Source** to *GitHub Actions* so the
