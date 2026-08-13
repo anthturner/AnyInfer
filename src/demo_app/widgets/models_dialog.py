@@ -148,6 +148,21 @@ def _family_label(family_or_model_id: str) -> str:
     return "Other"
 
 
+class _PlainSortTableWidgetItem(QTableWidgetItem):
+    """A table item that sorts by plain code-point order, not the host's locale.
+
+    `QTableWidgetItem`'s default comparison collates through the OS's locale — on
+    Windows and macOS that is typically case-insensitive-ish, on a minimal Linux
+    container with no locale configured it is plain byte order — so a user's model list
+    would resort itself differently depending on what machine they run the app on.
+    """
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, QTableWidgetItem):
+            return self.text() < other.text()
+        return NotImplemented
+
+
 def _bytes(count: int | None) -> str:
     """Format a byte count for a table cell, or an em dash when it is unknown.
 
@@ -1065,7 +1080,9 @@ class _CatalogPanel(QWidget):
             )
             name.setToolTip(entry.model.description or entry.id)
             self._table.setItem(row, 0, name)
-            self._table.setItem(row, 1, QTableWidgetItem(_family_label(entry.model.family)))
+            self._table.setItem(
+                row, 1, _PlainSortTableWidgetItem(_family_label(entry.model.family))
+            )
             self._table.setItem(row, 2, QTableWidgetItem(_bytes(entry.model.est_file_bytes)))
             context = entry.model.context_window
             self._table.setItem(row, 3, QTableWidgetItem(f"{context:,}" if context else "—"))
@@ -1106,7 +1123,7 @@ class _CatalogPanel(QWidget):
             name.setData(Qt.ItemDataRole.UserRole + 1, store_ids)
             name.setToolTip("Installed model not present in AnyInfer's shipped catalog.")
             self._table.setItem(row, 0, name)
-            self._table.setItem(row, 1, QTableWidgetItem(_family_label(model_id)))
+            self._table.setItem(row, 1, _PlainSortTableWidgetItem(_family_label(model_id)))
             local = (
                 source.capabilities.local
                 if isinstance(source, DiscoveredModel) and source.capabilities is not None
