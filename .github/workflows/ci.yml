@@ -65,9 +65,23 @@ jobs:
       matrix:
         # Windows is a first-class platform for all three consumer applications, and the
         # llama-server supervisor's process-tree handling differs there — so it is tested,
-        # not assumed.
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        # not assumed. But OS quirks aren't Python-version-specific, and macOS/Windows
+        # runners cost 10x/2x Linux in billed Actions minutes, so the full interpreter
+        # matrix only runs on Linux; Windows and macOS each get a single (latest) version
+        # to confirm the platform still works.
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: ubuntu-latest
+            python-version: "3.14"
+          - os: windows-latest
+            python-version: "3.14"
+          - os: macos-latest
+            python-version: "3.14"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
