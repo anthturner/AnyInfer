@@ -171,14 +171,22 @@ class TestModelsDialog:
             dialog.close()
 
     def test_runtimes_share_the_llama_setup_gate_and_limit_backends(
-        self, engine: Engine, qapp: object
+        self, engine: Engine, qapp: object, monkeypatch: pytest.MonkeyPatch
     ):
+        import platform
         from dataclasses import replace
 
         from PySide6.QtCore import Qt
 
         from anyinfer.local.hardware import HardwareProfile
         from demo_app.widgets.models_dialog import _RuntimePanel, _RuntimeReport
+
+        # default_runtime_kind() deliberately asks the real host, not the HardwareProfile
+        # passed in below (it decides what to install on *this* machine) — pin the host so
+        # the "plain Linux, no accelerator" scenario this test builds is what it sees too,
+        # regardless of which OS actually runs the test.
+        monkeypatch.setattr(platform, "system", lambda: "Linux")
+        monkeypatch.setattr(platform, "machine", lambda: "x86_64")
 
         missing = _RuntimePanel(engine, default_config())
         requested: list[bool] = []

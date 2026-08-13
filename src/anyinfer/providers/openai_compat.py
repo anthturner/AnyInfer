@@ -11,7 +11,8 @@ This is one dialect among several, not the internal representation.
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
+from contextlib import aclosing
 from typing import Any, ClassVar
 
 import httpx2
@@ -129,12 +130,16 @@ class OpenAICompatAdapter:
 
     # ---- generation ------------------------------------------------------------------
 
-    async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
+    async def generate(self, req: WireRequest) -> AsyncGenerator[AdapterEvent, None]:
         """Run one generation, yielding normalized events."""
         payload = self.build_payload(req)
         if req.stream:
-            async for event in self._generate_streaming(req, payload):
-                yield event
+            # `aclosing`: an early close of this generator (a consumer breaking out of a
+            # stream) must also close `_generate_streaming`'s, or its open connection and
+            # SSE parser are left to finalize during GC instead of closing deterministically.
+            async with aclosing(self._generate_streaming(req, payload)) as events:
+                async for event in events:
+                    yield event
         else:
             async for event in self._generate_buffered(req, payload):
                 yield event
@@ -265,7 +270,7 @@ class OpenAICompatAdapter:
 
     async def _generate_streaming(
         self, req: WireRequest, payload: dict[str, Any]
-    ) -> AsyncIterator[AdapterEvent]:
+    ) -> AsyncGenerator[AdapterEvent, None]:
         """Stream via SSE, degrading to the buffered path if the server ignores ``stream``."""
         try:
             async with self._client.stream(
@@ -292,13 +297,16 @@ class OpenAICompatAdapter:
                     return
 
                 state = _StreamState()
-                async for chunk in iter_sse(
-                    response.aiter_bytes(),
-                    max_bytes=req.max_response_bytes,
-                    provider=self.provider_id,
-                ):
-                    for event in self._events_from_chunk(chunk, state):
-                        yield event
+                async with aclosing(
+                    iter_sse(
+                        response.aiter_bytes(),
+                        max_bytes=req.max_response_bytes,
+                        provider=self.provider_id,
+                    )
+                ) as chunks:
+                    async for chunk in chunks:
+                        for event in self._events_from_chunk(chunk, state):
+                            yield event
                 yield state.finalize()
         except (ProviderError, StreamProtocolError):
             raise

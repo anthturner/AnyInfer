@@ -190,7 +190,7 @@ ignore_missing_imports = true
 # Imported lazily by workspace.py: the conformance harness modules live in tests/
 # (outside mypy's `files`), and pillow is an optional build-time dependency of the
 # demo bundle.
-module = ["test_conformance", "test_ollama", "test_gemini", "test_presets", "test_cohere_lmstudio", "test_nebius", "PIL.*"]
+module = ["test_conformance", "test_ollama", "test_gemini", "test_presets", "test_cohere_lmstudio", "test_nebius", "test_tei", "PIL.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

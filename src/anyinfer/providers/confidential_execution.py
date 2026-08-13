@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 from ..errors import ConfidentialExecutionError
 from ..local.attestation import confidential_execution_status
 from ..types.capabilities import DiscoveredModel, Health
-from .base import AdapterEvent, ProviderAdapter, WireRequest
+from .base import AdapterEvent, ProviderAdapter, WireRequest, aclosing_if_supported
 
 if TYPE_CHECKING:
     from ..local.backends import Backend
@@ -84,5 +84,11 @@ class ConfidentialExecutionAdapter:
             raise ConfidentialExecutionError(
                 f"confidential execution was requested but is not available: {status.detail}"
             )
-        async for event in self._inner.generate(req):
-            yield event
+        # An early close of this generator must also close the inner adapter's, or its
+        # open connection is left to finalize during GC instead of closing
+        # deterministically — `aclosing_if_supported` rather than `contextlib.aclosing`
+        # because `self._inner` is `ProviderAdapter`-typed, and `GeneratesText.generate()`
+        # does not promise `.aclose()` (see that Protocol's docstring).
+        async with aclosing_if_supported(self._inner.generate(req)) as events:
+            async for event in events:
+                yield event

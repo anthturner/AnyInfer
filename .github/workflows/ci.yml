@@ -77,6 +77,11 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: pip install -e ".[all,dev]"
 
+      # `workspace build all` (exercised by test_workspace.py) builds the docs site as
+      # part of "all", and mkdocstrings imports every sharded add-on (src/anyinfer-*) to
+      # render its reference pages — same reason the docs job installs it below.
+      - run: pip install -e src/anyinfer-store
+
       # The PySide6 wheel ships Qt's own libraries but still links against the system's
       # EGL/GL/xkbcommon/D-Bus stack, which the Linux runner image does not carry. Missing
       # them is an *import*-time failure (`libEGL.so.1: cannot open shared object file`),

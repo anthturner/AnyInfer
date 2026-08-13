@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from contextlib import aclosing
 from typing import Any, ClassVar
 
 import httpx2
@@ -137,13 +138,19 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
                     )
 
                 state = _StreamState()
-                async for chunk in iter_sse(
-                    response.aiter_bytes(),
-                    max_bytes=req.max_response_bytes,
-                    provider=self.provider_id,
-                ):
-                    for event in self._events_from_chunk(chunk, state):
-                        yield event
+                # `aclosing`: an early close of this generator (a consumer breaking out of
+                # a stream) must also close the SSE parser's, or it and the open connection
+                # are left to finalize during GC instead of closing deterministically.
+                async with aclosing(
+                    iter_sse(
+                        response.aiter_bytes(),
+                        max_bytes=req.max_response_bytes,
+                        provider=self.provider_id,
+                    )
+                ) as chunks:
+                    async for chunk in chunks:
+                        for event in self._events_from_chunk(chunk, state):
+                            yield event
                 yield state.finalize()
         except (ProviderError, StreamProtocolError):
             raise
