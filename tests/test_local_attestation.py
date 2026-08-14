@@ -76,11 +76,28 @@ def test_cpu_tee_detection_is_linux_only(monkeypatch: pytest.MonkeyPatch, tmp_pa
 # ---- GPU CC detection -------------------------------------------------------------------
 
 
+_NON_CC_CAPABLE_OUTPUT = """\
+==============NVSMI CONF-COMPUTE LOG==============
+
+    CC State                   : OFF
+    Multi-GPU Mode             : None
+    CPU CC Capabilities        : None
+    GPU CC Capabilities        : None
+    CC GPUs Ready State        : Not Ready
+"""
+"""Verbatim ``nvidia-smi conf-compute -q`` output captured live on an RTX 4090 (driver
+595.84, 2026-08-14) — a real, non-CC-capable card. See `attestation._detect_gpu_cc`'s
+docstring for the pin and what remains unverified (the positive-capability case)."""
+
+
 def test_gpu_cc_capable_and_enabled_parses_nvidia_smi_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        attest, "_run", lambda command: "CC capable: TRUE\nCC status: ON\n"
+        attest,
+        "_run",
+        lambda command: "    CC State                   : ON\n"
+        "    GPU CC Capabilities        : HOPPER_CC\n",
     )
     capable, enabled = attest._detect_gpu_cc()
     assert capable is True
@@ -89,11 +106,19 @@ def test_gpu_cc_capable_and_enabled_parses_nvidia_smi_output(
 
 def test_gpu_cc_capable_but_not_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        attest, "_run", lambda command: "CC capable: TRUE\nCC status: OFF\n"
+        attest,
+        "_run",
+        lambda command: "    CC State                   : OFF\n"
+        "    GPU CC Capabilities        : HOPPER_CC\n",
     )
     capable, enabled = attest._detect_gpu_cc()
     assert capable is True
     assert enabled is False
+
+
+def test_gpu_cc_capabilities_none_means_not_capable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(attest, "_run", lambda command: _NON_CC_CAPABLE_OUTPUT)
+    assert attest._detect_gpu_cc() == (False, False)
 
 
 def test_no_nvidia_smi_means_not_capable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,9 +152,9 @@ def _status(
 
     def fake_run(command: list[str]) -> str | None:
         if gpu_cc_capable or gpu_cc_enabled:
-            cap = "TRUE" if gpu_cc_capable else "FALSE"
-            status = "ON" if gpu_cc_enabled else "OFF"
-            return f"CC capable: {cap}\nCC status: {status}\n"
+            cap = "HOPPER_CC" if gpu_cc_capable else "None"
+            state = "ON" if gpu_cc_enabled else "OFF"
+            return f"    CC State                   : {state}\n    GPU CC Capabilities        : {cap}\n"
         return None
 
     monkeypatch.setattr(attest, "_run", fake_run)

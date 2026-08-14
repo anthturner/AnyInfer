@@ -258,17 +258,56 @@ def _detect_cpu_tee() -> CpuTeeKind | None:
 def _detect_gpu_cc() -> tuple[bool, bool]:
     """Detect NVIDIA confidential-computing GPU capability and enablement.
 
+    **Live-verified pin (2026-08-14, RTX 4090, driver 595.84, non-CC-capable card) —**
+    the plan this module implements (`plans/TIERED_ENCRYPTED_PLANS.md` §4d) flagged this
+    CLI surface as newer/less stable than the flags `hardware.py` already depends on and
+    asked for the exact format to be pinned once a real session could check it. ``-f``
+    (``--get-cc-feature``), which the original design guessed carried both a capability and
+    a state field, verifiably carries **only** state:
+
+    .. code-block:: text
+
+        $ nvidia-smi conf-compute -f
+        CC status: OFF
+
+    There is no "CC capable" line anywhere in ``-f``'s output — that guessed field never
+    matched real output, so `gpu_cc_capable` was unconditionally `False` on every host
+    regardless of hardware. Capability lives in ``-q`` (``--query-conf-compute``), which
+    also verifiably repeats state under a different label:
+
+    .. code-block:: text
+
+        ==============NVSMI CONF-COMPUTE LOG==============
+
+            CC State                   : OFF
+            Multi-GPU Mode             : None
+            CPU CC Capabilities        : None
+            GPU CC Capabilities        : None
+            CC GPUs Ready State        : Not Ready
+
+    ``-q`` is used for both facts now, one shared parse. **Not independently verified in
+    this session** (no CC-capable GPU — Hopper H100/H200 or newer — was available to test
+    against): the exact positive value of "GPU CC Capabilities" when a card *is* capable.
+    Public secondary sources (NVIDIA's own ACM Queue writeup on confidential GPUs)
+    describe two capability tiers, Ampere's partial "APM" and Hopper's full CC support,
+    which is consistent with this field naming a capability rather than being a bare
+    boolean — so parsing treats any value other than ``None`` as capable rather than
+    requiring one exact string match, which would silently misparse an unanticipated
+    tier name. Re-verify directly against real H100/H200 output when that hardware is
+    reachable and tighten this parse if warranted.
+
     Returns:
         ``(capable, enabled)``. Both ``False`` when `nvidia-smi` is absent, the
         ``conf-compute`` subcommand is unsupported, or its output does not parse — this
         surface is newer and less stable than the flags `hardware.py` already depends on,
         so an unparseable result is treated as "not detected," never a guess.
     """
-    output = _run(["nvidia-smi", "conf-compute", "-f"])
+    output = _run(["nvidia-smi", "conf-compute", "-q"])
     if output is None:
         return False, False
-    capable = bool(re.search(r"CC\s+capable\s*:\s*TRUE", output, re.IGNORECASE))
-    enabled = bool(re.search(r"CC\s+status\s*:\s*ON", output, re.IGNORECASE))
+    capable_match = re.search(r"GPU\s+CC\s+Capabilities\s*:\s*(\S.*)", output, re.IGNORECASE)
+    capable = capable_match is not None and capable_match.group(1).strip().lower() != "none"
+    enabled = bool(re.search(r"CC\s+State\s*:\s*ON\b", output, re.IGNORECASE))
     return capable, enabled
 
 
