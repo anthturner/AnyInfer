@@ -845,10 +845,20 @@ three backends run unmodified in a CVM. Genuinely still open:
   is a live-market fact that will move — re-verify periodically, the same discipline
   `contracts/DRIFT-CHECK.md` applies to provider claims, even though this isn't a provider
   contract itself.
-- Whether Nitro Enclaves' storage/networking constraints (§4c) are worth the engineering lift
-  for the CPU-only case given SEV-SNP/TDX CVMs already cover it with near-zero lift — leaning
-  "skip Nitro Enclaves for v1," but worth the owner's explicit call before it's dropped from
-  scope entirely.
+- **Decided by the owner, 2026-08-14: invest in real Nitro Enclaves support**, against the
+  plan's own "skip for v1" lean. This is real new scope, not a documentation update — §4c's
+  findings stand (no GPU support at all, no persistent storage, vsock-only networking, so
+  serving a model inside one needs real integration work, unlike SEV-SNP/TDX's
+  lift-and-shift story) and none of it was implemented this session: this sandbox has no
+  Nitro Enclave environment to build or test against (it is not itself running inside one),
+  so attempting the integration blind would produce exactly the kind of unverified
+  security-relevant code this plan's own NVAT investigation (above) already declined to
+  ship. Concretely still needed before implementation can start: vsock-based
+  request/response framing in place of the loopback HTTP `ConfidentialExecutionAdapter`
+  already assumes, a model-loading story that works with no persistent local storage
+  (enclave images are read-only/ephemeral), and real access to an AWS account with Nitro
+  Enclaves enabled to build and test against. Treat this as a scoped-but-not-started
+  workstream, not a same-session addition.
 - Tier 3 GPU-offload sizing: even with H100 CC confirmed available on two clouds, how much of
   the real local-inference audience that actually covers (vs. the CPU-only case, or vs.
   non-H100 GPU hardware operators run locally) still isn't sized — worth doing before treating
@@ -858,12 +868,13 @@ three backends run unmodified in a CVM. Genuinely still open:
   posture, and pricing/business model for the hosted offering — none of that is designed yet,
   and it's real scope (operating infrastructure, not just shipping code) the owner should
   weigh in on before implementation order item 5 reaches the hosted half.
-- **New, from the hybrid entitlement decision:** whether fail-open-to-last-cached-answer is
-  actually the right default for revocation-check network failures (§2's flagged
-  recommendation), or whether some/all vendors will want hard fail-closed enforcement as a
-  configurable option — this is a real security-posture tradeoff (availability vs. guaranteed
-  revocation) worth the owner's explicit sign-off rather than resting on the recommended
-  default alone.
+- **Resolved by the owner, 2026-08-14: fail-open to the last cached good answer is confirmed
+  as the default** for revocation-check network failures — matches what was already shipped
+  (`SealedTemplate.__init__`'s `revocation_fail_closed: bool = False` in
+  `anyinfer_confidential/sealed_template.py`), so no code change was needed, only removing
+  the "pending sign-off" hedge from this plan and from any doc that still carries it. The
+  configurable `revocation_fail_closed=True` escape hatch stays available for vendors who
+  want hard fail-closed enforcement instead.
 - Whether `anyinfer-shared` ends up holding a real type (the composite confidentiality-result
   case sketched in §1) or stays empty — can't be resolved until Tier 1/2 and Tier 3/4 are far
   enough along to know if that composite reporting need is real.
