@@ -166,11 +166,11 @@ the other side.
 | Mandatory dependencies | 2 | Varies | N/A | N/A | Typically many |
 | Central keys, org quotas, admin plane | **No; use a gateway** | No | Yes | No | No |
 | Embeddings and reranking as typed, routed inference ops | Yes | Varies | Varies | Varies | Often via a plugin |
-| Retrieval / vector index / corpus persistence | **No** | No | No | No | Often yes |
+| Retrieval / vector index / corpus persistence | **Opt-in add-on only** ([`anyinfer-store`](guides/vector-store.md), small-scale) | No | No | No | Often yes |
 | Prompt templates, chains, agents | **No** | No | No | No | Yes; that is its job |
 | High-throughput GPU serving | **No** | No | No | Some | No |
 
-The last four rows are the important ones. AnyInfer is a runtime, not a platform, and the
+The last three rows are the important ones. AnyInfer is a runtime, not a platform, and the
 tools in those columns are not competitors. They are boundaries to compose with. A gateway
 in front of AnyInfer is a reasonable architecture. So is AnyInfer calling
 an Ollama you already operate.
