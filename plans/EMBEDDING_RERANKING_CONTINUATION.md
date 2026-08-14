@@ -609,3 +609,14 @@ feature-complete bar:
   live-artifact requirement that blocked T4 — and this sandbox has no path to fetch
   multi-gigabyte model files. Left for a session with real artifact-fetch access, as T4
   already is.
+- **2026-08-14:** Cohere and Jina rerank/embed pricing re-checked again (this session has a
+  working fetch tool and network access neither prior session had, so this is a genuine
+  re-check, not a repeat of a stale result). `cohere.com/pricing` still shows only
+  Model Vault dedicated-instance hourly/monthly rates ($4-5/hr, $2,500-3,250/mo) for
+  Embed/Rerank, plus legacy per-token generation prices — no per-search-unit Rerank figure
+  anywhere on the page. Jina's reranker page states pricing "is aligned with our Embedding
+  API pricing" and mentions a 10M-free-token tier but discloses no per-token number, and
+  links to no separate pricing page. Same conclusion as 2026-08-12: still genuinely
+  unpublished, not merely unfetched — `pricing.json` is untouched again rather than
+  guessed. This item is likely to stay open until Cohere/Jina publish a number or the owner
+  supplies one directly; not worth re-checking again without a signal something changed.
