@@ -24,15 +24,15 @@ so a caller can render *why*, not just whether.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from .hardware import _run as _hardware_run
+from .hardware import read_cached, write_cached
 
 if TYPE_CHECKING:
     from .backends import Backend
@@ -341,53 +341,35 @@ def _probe_signature() -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
 
 
+def _decode_status(payload: dict[str, Any]) -> ConfidentialExecutionStatus:
+    """Rebuild a status from its cached payload dict, raising on anything malformed."""
+    return ConfidentialExecutionStatus(
+        cpu_tee=payload.get("cpu_tee"),
+        gpu_cc_capable=bool(payload["gpu_cc_capable"]),
+        gpu_cc_enabled=bool(payload["gpu_cc_enabled"]),
+        gpu_offload_required=bool(payload["gpu_offload_required"]),
+        end_to_end=bool(payload["end_to_end"]),
+        detail=str(payload["detail"]),
+    )
+
+
+def _encode_status(status: ConfidentialExecutionStatus) -> dict[str, Any]:
+    """The payload dict `_decode_status` rebuilds a status from."""
+    return {
+        "cpu_tee": status.cpu_tee,
+        "gpu_cc_capable": status.gpu_cc_capable,
+        "gpu_cc_enabled": status.gpu_cc_enabled,
+        "gpu_offload_required": status.gpu_offload_required,
+        "end_to_end": status.end_to_end,
+        "detail": status.detail,
+    }
+
+
 def _read_cache(signature: str) -> ConfidentialExecutionStatus | None:
     """Read a cached status, ignoring it if the probe signature changed."""
-    try:
-        data = json.loads(cache_path().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict) or data.get("signature") != signature:
-        return None
-    payload = data.get("status")
-    if not isinstance(payload, dict):
-        return None
-    try:
-        return ConfidentialExecutionStatus(
-            cpu_tee=payload.get("cpu_tee"),
-            gpu_cc_capable=bool(payload["gpu_cc_capable"]),
-            gpu_cc_enabled=bool(payload["gpu_cc_enabled"]),
-            gpu_offload_required=bool(payload["gpu_offload_required"]),
-            end_to_end=bool(payload["end_to_end"]),
-            detail=str(payload["detail"]),
-        )
-    except (KeyError, TypeError, ValueError):
-        return None
+    return read_cached(cache_path(), signature, "status", _decode_status)
 
 
 def _write_cache(signature: str, status: ConfidentialExecutionStatus) -> None:
     """Write the cache atomically, ignoring any failure."""
-    path = cache_path()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".tmp")
-        temporary.write_text(
-            json.dumps(
-                {
-                    "signature": signature,
-                    "status": {
-                        "cpu_tee": status.cpu_tee,
-                        "gpu_cc_capable": status.gpu_cc_capable,
-                        "gpu_cc_enabled": status.gpu_cc_enabled,
-                        "gpu_offload_required": status.gpu_offload_required,
-                        "end_to_end": status.end_to_end,
-                        "detail": status.detail,
-                    },
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        temporary.replace(path)
-    except OSError:
-        return
+    write_cached(cache_path(), signature, "status", lambda: _encode_status(status))

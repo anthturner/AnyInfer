@@ -50,6 +50,7 @@ from .base import (
     WireRankedItem,
     WireRequest,
     _encode_function_tool,
+    resolve_rerank_index,
 )
 from .http import (
     build_client,
@@ -573,13 +574,7 @@ class CohereAdapter:
                 raise ProviderError(
                     "rerank result is missing a numeric 'relevance_score'", phase="validate"
                 )
-            # Positional → caller-supplied index; an out-of-range positional passes
-            # through untranslated so the core rejects it as the contract violation it is.
-            index = (
-                req.documents[position].index
-                if 0 <= position < len(req.documents)
-                else position
-            )
+            index = resolve_rerank_index(req, position)
             items.append(WireRankedItem(index=index, score=float(score)))
         meta = payload.get("meta")
         return RerankWireResult(

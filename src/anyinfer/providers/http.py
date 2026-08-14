@@ -32,6 +32,7 @@ __all__ = [
     "map_transport_error",
     "parse_retry_after",
     "read_error_detail",
+    "read_int",
 ]
 
 
@@ -81,6 +82,19 @@ def build_client(
         follow_redirects=True,
         transport=transport,
     )
+
+
+def read_int(payload: Mapping[str, Any], name: str) -> int | None:
+    """Read a field as a strict int, rejecting ``bool``.
+
+    Every usage-block dialect across the adapters reads token counts the same defensive
+    way: a present-but-wrong-typed field must not silently become a number. ``bool`` is a
+    subclass of ``int`` in Python, so a naive ``isinstance(value, int)`` check would let a
+    provider's stray ``true``/``false`` on a numeric-looking field pass through as ``1``/
+    ``0`` — this excludes that case explicitly rather than by accident.
+    """
+    value = payload.get(name)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def parse_retry_after(headers: Mapping[str, str]) -> float | None:

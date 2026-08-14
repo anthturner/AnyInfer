@@ -371,7 +371,7 @@ TOPICS: dict[str, HelpTopic] = {
                 'warm = client.benchmark("ollama:qwen3:8b")\n'
                 "print(first.ttft_ms, warm.ttft_ms, warm.decode_tokens_per_s)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog.py",
+            demo_source="src/demo_app/widgets/models_dialog/benchmark_panel.py",
         ),
         HelpTopic(
             key="catalog",
@@ -396,7 +396,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "for entry in view.runnable:\n"
                 "    print(entry.name, entry.fit.level, entry.fit.reasons)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog.py",
+            demo_source="src/demo_app/widgets/models_dialog/catalog_panel.py",
         ),
         HelpTopic(
             key="acquisition",
@@ -429,7 +429,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "for entry in client.installed_models():\n"
                 "    print(entry.model_id, entry.directory)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog.py",
+            demo_source="src/demo_app/widgets/models_dialog/catalog_panel.py",
         ),
         HelpTopic(
             key="runtimes",
@@ -456,7 +456,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "report = install_runtime(None)  # None -> best for this machine\n"
                 "print(report.backend, report.executable)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog.py",
+            demo_source="src/demo_app/widgets/models_dialog/runtime_panel.py",
         ),
         HelpTopic(
             key="target-inspection",

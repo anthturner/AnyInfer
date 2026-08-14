@@ -45,7 +45,7 @@ from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .sse import iter_sse
 
 __all__ = ["ANTHROPIC_VERSION", "AnthropicAdapter", "descriptor"]
@@ -62,6 +62,7 @@ OAuth path rather than left to the caller to remember.
 """
 
 _DEFAULT_MAX_TOKENS = 4096
+"""Used when the caller sets none, because the API rejects a request without it."""
 
 _EPHEMERAL = {"type": "ephemeral"}
 """The only ``cache_control`` type this API defines. Sent verbatim on a marked block."""
@@ -76,7 +77,6 @@ contract documented on ``WireRequest.cache_marks``.
 
 _TOOLS_SEGMENT = -2
 """Mirror of `anyinfer.capabilities.cache.TOOLS_SEGMENT`; see `_SYSTEM_SEGMENT`."""
-"""Used when the caller sets none, because the API rejects a request without it."""
 
 _STOP_REASONS: Mapping[str, FinishReason] = {
     "end_turn": "stop",
@@ -520,15 +520,11 @@ def _parse_usage(payload: Any) -> Usage | None:
     if not isinstance(payload, Mapping):
         return None
 
-    def field(name: str) -> int | None:
-        value = payload.get(name)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
-
     usage = Usage(
-        input_tokens=field("input_tokens"),
-        output_tokens=field("output_tokens"),
-        cache_read_tokens=field("cache_read_input_tokens"),
-        cache_write_tokens=field("cache_creation_input_tokens"),
+        input_tokens=read_int(payload, "input_tokens"),
+        output_tokens=read_int(payload, "output_tokens"),
+        cache_read_tokens=read_int(payload, "cache_read_input_tokens"),
+        cache_write_tokens=read_int(payload, "cache_creation_input_tokens"),
     )
     return usage if usage != Usage() else None
 

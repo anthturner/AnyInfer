@@ -32,6 +32,7 @@ from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
 
 __all__ = [
+    "DEFAULT_CHUNK_TOKENS",
     "DEFAULT_TUNING",
     "SELECTION_ORDERS",
     "ContextTuning",
@@ -43,6 +44,15 @@ SelectionOrder = Literal["rank", "density"]
 
 SELECTION_ORDERS = ("rank", "density")
 """Accepted `ContextTuning.selection_order` values."""
+
+DEFAULT_CHUNK_TOKENS = 512
+"""Target chunk size for sub-document splitting, shared by ``packed`` and ``distill``.
+
+Large enough for a whole function, small enough to pack several. The canonical home for
+this default; `anyinfer.context.pack` imports it rather than redefining it, since a chunk
+size chosen for ``packed``'s splitter is the same number `ContextTuning.chunk_tokens`
+means for ``distill``.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +128,7 @@ class ContextTuning:
 
     compact_fallback: bool = False
 
-    chunk_tokens: int = 512
+    chunk_tokens: int = DEFAULT_CHUNK_TOKENS
     rollup_share: float = 0.45
 
     carry_over_bonus: float = 0.0

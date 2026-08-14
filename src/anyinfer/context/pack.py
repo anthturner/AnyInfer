@@ -32,7 +32,7 @@ from .envelope import (
 )
 from .rank import build_rank_cache, expand_query, score_document, tokenize
 from .select import Reduction, _blocks_for, _collapse_counts, _order_constraints
-from .settings import DEFAULT_TUNING, ContextTuning
+from .settings import DEFAULT_CHUNK_TOKENS, DEFAULT_TUNING, ContextTuning
 
 __all__ = [
     "DEFAULT_CHUNK_TOKENS",
@@ -41,9 +41,6 @@ __all__ = [
     "reduce_packed",
     "split_document",
 ]
-
-DEFAULT_CHUNK_TOKENS = 512
-"""Target chunk size. Large enough for a whole function, small enough to pack several."""
 
 MIN_CHUNK_TOKENS = 64
 """Tail chunks below this merge backward rather than standing alone."""

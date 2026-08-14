@@ -325,7 +325,7 @@ class Client:
                 registry=registry,
                 catalog=catalog,
                 route=route,
-            operation_routes=operation_routes,
+                operation_routes=operation_routes,
                 observers=observers,
                 resolver=resolver,
                 retain_raw=retain_raw,
@@ -600,6 +600,7 @@ class Client:
 
     def spend(self) -> SpendTotals:
         """What this client has spent so far. See `AsyncClient.spend`."""
+        self._ensure_open()
         totals: SpendTotals = self._async.spend()
         return totals
 

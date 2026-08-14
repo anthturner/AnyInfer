@@ -21,9 +21,10 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 __all__ = [
     "CACHE_BYPASS_ENV",
@@ -34,6 +35,8 @@ __all__ = [
     "cache_path",
     "detect",
     "probe_signature",
+    "read_cached",
+    "write_cached",
 ]
 
 CACHE_BYPASS_ENV = "ANYINFER_HARDWARE_CACHE_BYPASS"
@@ -596,35 +599,59 @@ def detect(*, use_cache: bool = True) -> HardwareProfile:
 
 def _read_cache(signature: str) -> HardwareProfile | None:
     """Read a cached profile, ignoring it if the probe signature changed."""
-    path = cache_path()
+    return read_cached(cache_path(), signature, "profile", HardwareProfile.from_json)
+
+
+def _write_cache(signature: str, profile: HardwareProfile) -> None:
+    """Write the cache atomically, ignoring any failure."""
+    write_cached(cache_path(), signature, "profile", profile.to_json)
+
+
+_T = TypeVar("_T")
+
+
+def read_cached(
+    path: Path, signature: str, key: str, decode: Callable[[dict[str, Any]], _T]
+) -> _T | None:
+    """Read a probe-signature-gated JSON cache file shared by this module and `attestation`.
+
+    The file is shaped ``{"signature": ..., key: <payload>}``. `decode` turns the payload
+    dict back into a value. A missing file, a mismatched signature, a malformed payload, or
+    a `decode` failure are all a cache miss, never an exception — the caller re-probes.
+    """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if not isinstance(data, dict) or data.get("signature") != signature:
         return None
-    payload = data.get("profile")
+    payload = data.get(key)
     if not isinstance(payload, dict):
         return None
     try:
-        return HardwareProfile.from_json(payload)
-    except (TypeError, ValueError):
+        return decode(payload)
+    except (TypeError, ValueError, KeyError):
         return None
 
 
-def _write_cache(signature: str, profile: HardwareProfile) -> None:
-    """Write the cache atomically, ignoring any failure."""
-    path = cache_path()
+def write_cached(
+    path: Path, signature: str, key: str, encode: Callable[[], dict[str, Any]]
+) -> None:
+    """Write ``{"signature": ..., key: encode()}`` atomically, ignoring any failure.
+
+    Writes to a ``.tmp`` sibling and replaces, so a reader never observes a partial file.
+    A read-only or full cache directory must not break the probe that would otherwise
+    populate it.
+    """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".tmp")
         temporary.write_text(
-            json.dumps({"signature": signature, "profile": profile.to_json()}, indent=2),
+            json.dumps({"signature": signature, key: encode()}, indent=2),
             encoding="utf-8",
         )
         temporary.replace(path)
     except OSError:
-        # A read-only or full cache directory must not break detection.
         return
 
 

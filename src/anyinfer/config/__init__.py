@@ -533,6 +533,58 @@ def _parse_provider(
     )
 
 
+def _bool_field(source: str | Path, location: str, raw: Mapping[str, Any], key: str) -> bool:
+    """Validate ``raw[key]`` as a boolean, or raise a `ConfigError` naming the field.
+
+    Assumes ``key in raw``; callers guard the optional-field check themselves so a field
+    left out of the mapping is silently skipped rather than reported as invalid.
+    """
+    value = raw[key]
+    if not isinstance(value, bool):
+        raise _error(source, f"{location}.{key} must be true or false")
+    return value
+
+
+def _int_field(
+    source: str | Path,
+    location: str,
+    raw: Mapping[str, Any],
+    key: str,
+    *,
+    allow_float: bool = False,
+) -> int | float:
+    """Validate ``raw[key]`` as a number, or raise a `ConfigError` naming the field.
+
+    ``allow_float`` widens the check to accept a float too, returned coerced to ``float``
+    — for a field whose dataclass declares it ``float`` rather than ``int``. Booleans are
+    always rejected even though ``bool`` is an ``int`` subtype.
+    """
+    value = raw[key]
+    if allow_float:
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            raise _error(source, f"{location}.{key} must be a number")
+        return float(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise _error(source, f"{location}.{key} must be an integer")
+    return value
+
+
+def _enum_field(
+    source: str | Path,
+    location: str,
+    raw: Mapping[str, Any],
+    key: str,
+    choices: tuple[str, ...],
+    *,
+    hint: str | None = None,
+) -> str:
+    """Validate ``raw[key]`` as a member of ``choices``, or raise a `ConfigError`."""
+    value = raw[key]
+    if not isinstance(value, str) or value not in choices:
+        raise _error(source, f"{location}.{key} must be one of {', '.join(choices)}", hint=hint)
+    return value
+
+
 def _parse_limits(value: Any, source: str, location: str) -> RateLimits | None:
     """Validate a provider entry's optional ``limits`` block.
 
@@ -556,23 +608,15 @@ def _parse_limits(value: Any, source: str, location: str) -> RateLimits | None:
     if unknown:
         raise _unknown_keys(source, f"{location}.limits", unknown)
 
+    limits_location = f"{location}.limits"
     fields: dict[str, Any] = {}
     if "max_concurrent" in value:
-        raw_value = value["max_concurrent"]
-        if isinstance(raw_value, bool) or not isinstance(raw_value, int):
-            raise _error(source, f"{location}.limits.max_concurrent must be an integer")
-        fields["max_concurrent"] = raw_value
+        fields["max_concurrent"] = _int_field(source, limits_location, value, "max_concurrent")
     for key in ("requests_per_minute", "min_interval_s", "reserve_fraction"):
         if key in value:
-            raw_value = value[key]
-            if isinstance(raw_value, bool) or not isinstance(raw_value, int | float):
-                raise _error(source, f"{location}.limits.{key} must be a number")
-            fields[key] = float(raw_value)
+            fields[key] = _int_field(source, limits_location, value, key, allow_float=True)
     if "respect_headers" in value:
-        raw_value = value["respect_headers"]
-        if not isinstance(raw_value, bool):
-            raise _error(source, f"{location}.limits.respect_headers must be true or false")
-        fields["respect_headers"] = raw_value
+        fields["respect_headers"] = _bool_field(source, limits_location, value, "respect_headers")
 
     try:
         return RateLimits(**fields)
@@ -623,23 +667,18 @@ def _parse_history(value: Any, source: str) -> HistoryPolicy | None:
     fields: dict[str, Any] = {}
     for key in ("enabled", "keep_system"):
         if key in value:
-            if not isinstance(value[key], bool):
-                raise _error(source, f"history.{key} must be true or false")
-            fields[key] = value[key]
+            fields[key] = _bool_field(source, "history", value, key)
     if "keep_recent" in value:
-        raw = value["keep_recent"]
-        if isinstance(raw, bool) or not isinstance(raw, int):
-            raise _error(source, "history.keep_recent must be an integer")
-        fields["keep_recent"] = raw
+        fields["keep_recent"] = _int_field(source, "history", value, "keep_recent")
     if "mode" in value:
-        mode = value["mode"]
-        if not isinstance(mode, str) or mode not in HISTORY_MODES:
-            raise _error(
-                source,
-                f"history.mode must be one of {', '.join(HISTORY_MODES)}",
-                hint="'last_resort' prefers a larger-window target; 'proactive' shrinks first",
-            )
-        fields["mode"] = mode
+        fields["mode"] = _enum_field(
+            source,
+            "history",
+            value,
+            "mode",
+            HISTORY_MODES,
+            hint="'last_resort' prefers a larger-window target; 'proactive' shrinks first",
+        )
 
     try:
         return HistoryPolicy(**fields)
@@ -689,14 +728,9 @@ def _parse_arena(value: Any, source: str, location: str = "'arena'") -> ArenaPol
         )
     for key in ("concurrency", "min_candidates"):
         if key in value:
-            raw = value[key]
-            if isinstance(raw, bool) or not isinstance(raw, int):
-                raise _error(source, f"{location}.{key} must be an integer")
-            fields[key] = raw
+            fields[key] = _int_field(source, location, value, key)
     if "reveal_targets" in value:
-        if not isinstance(value["reveal_targets"], bool):
-            raise _error(source, f"{location}.reveal_targets must be true or false")
-        fields["reveal_targets"] = value["reveal_targets"]
+        fields["reveal_targets"] = _bool_field(source, location, value, "reveal_targets")
     try:
         return ArenaPolicy(**fields)
     except ValueError as exc:
@@ -754,24 +788,19 @@ def _parse_cache(value: Any, source: str) -> CachePolicy | None:
     fields: dict[str, Any] = {}
     for key in ("include_tools", "include_system"):
         if key in value:
-            if not isinstance(value[key], bool):
-                raise _error(source, f"cache.{key} must be true or false")
-            fields[key] = value[key]
+            fields[key] = _bool_field(source, "cache", value, key)
     for key in ("min_segment_tokens", "max_marks"):
         if key in value:
-            raw = value[key]
-            if isinstance(raw, bool) or not isinstance(raw, int):
-                raise _error(source, f"cache.{key} must be an integer")
-            fields[key] = raw
+            fields[key] = _int_field(source, "cache", value, key)
     if "mode" in value:
-        mode = value["mode"]
-        if not isinstance(mode, str) or mode not in CACHE_MODES:
-            raise _error(
-                source,
-                f"cache.mode must be one of {', '.join(CACHE_MODES)}",
-                hint="'auto' uses the strongest mechanism the target offers",
-            )
-        fields["mode"] = mode
+        fields["mode"] = _enum_field(
+            source,
+            "cache",
+            value,
+            "mode",
+            CACHE_MODES,
+            hint="'auto' uses the strongest mechanism the target offers",
+        )
 
     try:
         return CachePolicy(**fields)
@@ -835,10 +864,7 @@ def _parse_mcp(value: Any, source: str) -> tuple[MCPServer, ...]:
                     )
                 fields[key] = dict(mapping)
         if "timeout_s" in raw:
-            timeout = raw["timeout_s"]
-            if isinstance(timeout, bool) or not isinstance(timeout, int | float):
-                raise _error(source, f"{location}.timeout_s must be a number")
-            fields["timeout_s"] = float(timeout)
+            fields["timeout_s"] = _int_field(source, location, raw, "timeout_s", allow_float=True)
         for key in ("allow_tools", "deny_tools"):
             if key in raw:
                 names = raw[key]

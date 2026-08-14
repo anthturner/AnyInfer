@@ -44,6 +44,7 @@ __all__ = [
     "WireRankedItem",
     "WireRequest",
     "aclosing_if_supported",
+    "resolve_rerank_index",
 ]
 
 _T = TypeVar("_T")
@@ -377,6 +378,19 @@ class RerankWireResult:
     model: str | None = None
     usage: Usage | None = None
     raw: Any | None = None
+
+
+def resolve_rerank_index(req: RerankWireRequest, position: int) -> int:
+    """Map a provider's positional rerank result back onto the caller's document index.
+
+    Cohere, Bedrock, Jina, TEI, and Voyage all echo back a document's *position* within
+    the submitted ``documents`` array rather than the caller-supplied index carried on
+    `RerankWireDocument.index` — so every one of those adapters needs this same
+    translation. An out-of-range positional passes through untranslated so the core
+    rejects it as the contract violation it is, rather than the adapter silently
+    swallowing it.
+    """
+    return req.documents[position].index if 0 <= position < len(req.documents) else position
 
 
 @runtime_checkable

@@ -36,6 +36,7 @@ from ..types.requests import ReasoningEffort
 from ..types.results import Usage
 from ._multimodal import has_multimodal, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .http import read_int
 
 __all__ = ["AUTO_MODEL", "CopilotAdapter", "descriptor"]
 
@@ -372,7 +373,10 @@ def _event_usage(event: Any) -> Usage | None:
         value = getattr(event, name, None)
         if value is None and isinstance(event, Mapping):
             value = event.get(name)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
+        # Not a plain payload dict (this is an SDK event, read via getattr), so the
+        # strict-int/bool-exclusion check is shared by routing the resolved value
+        # through the same `read_int` every dict-shaped dialect uses.
+        return read_int({name: value}, name)
 
     return Usage(
         input_tokens=field("input_tokens"),

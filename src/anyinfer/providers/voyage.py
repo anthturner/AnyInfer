@@ -12,27 +12,25 @@ core's ignored-intent warning via the declared capability set.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Any
 
 import httpx2
 
 from ..errors import ProviderError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
-from ..types.capabilities import DiscoveredModel, Health
 from ..types.operations import (
     EmbeddingCapabilities,
     EmbeddingInputIntent,
     RerankCapabilities,
 )
-from ..types.results import Usage
 from .base import (
     EmbeddingWireRequest,
-    EmbeddingWireResult,
     ProviderConfig,
     RerankWireRequest,
     RerankWireResult,
     WireRankedItem,
+    resolve_rerank_index,
 )
 from .http import (
     build_client,
@@ -41,6 +39,7 @@ from .http import (
     map_transport_error,
     read_error_detail,
 )
+from .openai_shaped_retrieval import OpenAIShapedRetrievalMixin, parse_retrieval_usage
 
 __all__ = ["VoyageAdapter", "descriptor"]
 
@@ -50,8 +49,15 @@ _INPUT_TYPES: Mapping[str, str] = {"query": "query", "document": "document"}
 """The two intents Voyage documents (verified 2026-08-12); the rest are never sent."""
 
 
-class VoyageAdapter:
-    """Adapter for Voyage AI's embeddings and reranker APIs."""
+class VoyageAdapter(OpenAIShapedRetrievalMixin):
+    """Adapter for Voyage AI's embeddings and reranker APIs.
+
+    Discovery (``list_models``/``health``), lifecycle (``aclose``), and the OpenAI-shaped
+    embeddings response parsing all come from `OpenAIShapedRetrievalMixin` — Voyage's only
+    genuinely distinct piece on the embeddings side is its ``input_type``/``output_dimension``
+    request vocabulary, built by `_build_embedding_payload` below. Reranking spells its
+    truncation parameter ``top_k`` and stays here in full.
+    """
 
     def __init__(self, config: ProviderConfig) -> None:
         self._config = config
@@ -67,110 +73,17 @@ class VoyageAdapter:
             transport=config.transport,
         )
 
-    # ---- discovery -------------------------------------------------------------------
-
-    async def list_models(self) -> Sequence[DiscoveredModel]:
-        """Voyage documents no listing endpoint; the answer is honestly empty.
-
-        The models this adapter was verified against live in the descriptor's static
-        capability tables, which is catalog knowledge rather than discovery — reporting
-        them here would stamp ``discovered`` provenance on something the provider never
-        said.
-        """
-        return ()
-
-    async def health(self) -> Health:
-        """Reachability probe: any HTTP answer from the endpoint counts.
-
-        There is no documented health or listing route, so this asks for one and treats
-        *any* HTTP status — including the expected 404 — as proof the service answered.
-        Only a transport failure reports unhealthy.
-        """
-        try:
-            response = await self._client.get("/models")
-        except httpx2.HTTPError as exc:
-            return Health(ok=False, detail=str(exc)[:200])
-        return Health(
-            ok=True,
-            detail=f"endpoint reachable (HTTP {response.status_code}; no listing API)",
-        )
-
-    async def aclose(self) -> None:
-        """Close the underlying HTTP transport."""
-        await self._client.aclose()
-
     # ---- embedding ---------------------------------------------------------------------
 
-    async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
-        """Run one embedding call against ``POST /v1/embeddings`` (Voyage's own dialect)."""
+    def _build_embedding_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]:
+        """Build ``POST /v1/embeddings`` body in Voyage's own dialect."""
         payload: dict[str, Any] = {"model": req.model, "input": list(req.inputs)}
         if req.input_type is not None and req.input_type in _INPUT_TYPES:
             payload["input_type"] = _INPUT_TYPES[req.input_type]
         if req.dimensions is not None:
             payload["output_dimension"] = req.dimensions
         payload.update(req.extra_options)
-        try:
-            response = await self._client.post("/embeddings", json=payload, timeout=req.timeout_s)
-        except httpx2.HTTPError as exc:
-            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
-        if response.status_code >= 400:
-            raise classify_status(
-                response.status_code,
-                provider=self.provider_id,
-                detail=read_error_detail(response.content),
-                headers=response.headers,
-                phase="generate",
-            )
-        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
-        return self._parse_embed_response(req, response.json())
-
-    def _parse_embed_response(
-        self, req: EmbeddingWireRequest, payload: Any
-    ) -> EmbeddingWireResult:
-        if not isinstance(payload, Mapping):
-            raise ProviderError("embeddings response is not a JSON object", phase="validate")
-        data = payload.get("data")
-        if not isinstance(data, list):
-            raise ProviderError(
-                "embeddings response is missing a 'data' array", phase="validate"
-            )
-        if len(data) != len(req.inputs):
-            raise ProviderError(
-                f"embeddings response returned {len(data)} vectors for "
-                f"{len(req.inputs)} inputs",
-                phase="validate",
-            )
-        # Entries carry their input index; order by it rather than trusting arrival order.
-        vectors: list[tuple[float, ...] | None] = [None] * len(req.inputs)
-        for entry in data:
-            if not isinstance(entry, Mapping):
-                raise ProviderError(
-                    "embeddings response contains a non-object entry", phase="validate"
-                )
-            index = entry.get("index")
-            values = entry.get("embedding")
-            if not isinstance(index, int) or isinstance(index, bool):
-                raise ProviderError(
-                    "embeddings entry is missing an integer 'index'", phase="validate"
-                )
-            if not (0 <= index < len(req.inputs)) or vectors[index] is not None:
-                raise ProviderError(
-                    f"embeddings entry has an out-of-range or duplicate index {index}",
-                    phase="validate",
-                )
-            if not isinstance(values, list):
-                raise ProviderError(
-                    "embeddings entry is missing an 'embedding' array", phase="validate"
-                )
-            vectors[index] = tuple(float(v) for v in values)
-        model = payload.get("model")
-        return EmbeddingWireResult(
-            vectors=tuple(v for v in vectors if v is not None),
-            model=model if isinstance(model, str) else None,
-            dimensions=len(vectors[0]) if vectors and vectors[0] is not None else None,
-            usage=_parse_usage(payload.get("usage")),
-            raw=payload,
-        )
+        return payload
 
     # ---- reranking ---------------------------------------------------------------------
 
@@ -226,29 +139,15 @@ class VoyageAdapter:
                 raise ProviderError(
                     "rerank entry is missing a numeric 'relevance_score'", phase="validate"
                 )
-            index = (
-                req.documents[position].index
-                if 0 <= position < len(req.documents)
-                else position
-            )
+            index = resolve_rerank_index(req, position)
             items.append(WireRankedItem(index=index, score=float(score)))
         model = payload.get("model")
         return RerankWireResult(
             items=tuple(items),
             model=model if isinstance(model, str) else None,
-            usage=_parse_usage(payload.get("usage")),
+            usage=parse_retrieval_usage(payload.get("usage")),
             raw=payload,
         )
-
-
-def _parse_usage(payload: Any) -> Usage | None:
-    """Read Voyage's usage block: ``total_tokens`` is all it reports."""
-    if not isinstance(payload, Mapping):
-        return None
-    total = payload.get("total_tokens")
-    if isinstance(total, int) and not isinstance(total, bool):
-        return Usage(total_tokens=total)
-    return None
 
 
 _EMBED_INTENTS: tuple[EmbeddingInputIntent, ...] = ("query", "document")

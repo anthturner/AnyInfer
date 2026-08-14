@@ -36,7 +36,7 @@ from ..types.messages import Text
 from ..types.results import Usage
 from ._multimodal import has_multimodal, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 
 __all__ = ["M365_COPILOT_SCOPES", "M365CopilotAdapter", "descriptor"]
 
@@ -238,13 +238,9 @@ def _parse_usage(body: Any) -> Usage | None:
     if not isinstance(usage, Mapping):
         return None
 
-    def field(name: str) -> int | None:
-        value = usage.get(name)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
-
     parsed = Usage(
-        input_tokens=field("promptTokens") or field("prompt_tokens"),
-        output_tokens=field("completionTokens") or field("completion_tokens"),
+        input_tokens=read_int(usage, "promptTokens") or read_int(usage, "prompt_tokens"),
+        output_tokens=read_int(usage, "completionTokens") or read_int(usage, "completion_tokens"),
     ).normalized()
     return parsed if parsed != Usage() else None
 

@@ -84,7 +84,37 @@ class FakeResponse:
     omit_usage_chunk: bool = False
 
 
-class FakeOpenAIServer:
+class _FakeServerBase:
+    """Shared response-list bookkeeping and transport wiring for fake provider servers.
+
+    Each dialect-specific subclass normalizes its constructor's ``responses`` argument
+    through this base, then adds its own wire-shape-specific request handling in
+    ``_handle``.
+    """
+
+    def __init__(self, responses: Sequence[FakeResponse] | FakeResponse | None) -> None:
+        if responses is None:
+            responses = [FakeResponse()]
+        elif isinstance(responses, FakeResponse):
+            responses = [responses]
+        self._responses = list(responses)
+        self._call_index = 0
+        self.requests: list[dict[str, Any]] = []
+
+    @property
+    def call_count(self) -> int:
+        """How many generation requests have been served."""
+        return self._call_index
+
+    def transport(self) -> httpx2.MockTransport:
+        """Build an httpx2 transport that routes to this fake."""
+        return httpx2.MockTransport(self._handle)
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        raise NotImplementedError
+
+
+class FakeOpenAIServer(_FakeServerBase):
     """A configurable in-process OpenAI-compatible endpoint.
 
     Args:
@@ -104,24 +134,9 @@ class FakeOpenAIServer:
         models: Sequence[str] = ("fake-model-small", "fake-model-large"),
         chunk_size: int = 4,
     ) -> None:
-        if responses is None:
-            responses = [FakeResponse()]
-        elif isinstance(responses, FakeResponse):
-            responses = [responses]
-        self._responses = list(responses)
+        super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
-        self._call_index = 0
-        self.requests: list[dict[str, Any]] = []
-
-    @property
-    def call_count(self) -> int:
-        """How many generation requests have been served."""
-        return self._call_index
-
-    def transport(self) -> httpx2.MockTransport:
-        """Build an httpx2 transport that routes to this fake."""
-        return httpx2.MockTransport(self._handle)
 
     def next_response(self) -> FakeResponse:
         """The response for the next generation call."""
@@ -252,7 +267,7 @@ class FakeOpenAIServer:
         }
 
 
-class FakeGeminiServer:
+class FakeGeminiServer(_FakeServerBase):
     """A configurable in-process Gemini endpoint speaking the native protocol.
 
     Args:
@@ -272,24 +287,9 @@ class FakeGeminiServer:
         models: Sequence[str] = ("gemini-2.5-flash", "gemini-2.5-pro"),
         chunk_size: int = 4,
     ) -> None:
-        if responses is None:
-            responses = [FakeResponse()]
-        elif isinstance(responses, FakeResponse):
-            responses = [responses]
-        self._responses = list(responses)
+        super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
-        self._call_index = 0
-        self.requests: list[dict[str, Any]] = []
-
-    @property
-    def call_count(self) -> int:
-        """How many generation requests have been served."""
-        return self._call_index
-
-    def transport(self) -> httpx2.MockTransport:
-        """Build an httpx2 transport that routes to this fake."""
-        return httpx2.MockTransport(self._handle)
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
@@ -411,7 +411,7 @@ _GEMINI_FINISH: Mapping[str, str] = {
 """Normalized finish reasons spelled the way Gemini reports them."""
 
 
-class FakeOllamaServer:
+class FakeOllamaServer(_FakeServerBase):
     """A configurable in-process Ollama server speaking the native NDJSON dialect.
 
     Args:
@@ -434,29 +434,14 @@ class FakeOllamaServer:
         chunk_size: int = 4,
         embed_scenario: str | None = None,
     ) -> None:
-        if responses is None:
-            responses = [FakeResponse()]
-        elif isinstance(responses, FakeResponse):
-            responses = [responses]
-        self._responses = list(responses)
+        super().__init__(responses)
         self._models = list(models)
         self._loaded = dict(loaded or {})
         self._chunk_size = chunk_size
-        self._call_index = 0
         self._embed_scenario = embed_scenario
         self._embed_calls = 0
-        self.requests: list[dict[str, Any]] = []
         self.pulled: list[str] = []
         self.pull_lines: list[dict[str, Any]] | None = None
-
-    @property
-    def call_count(self) -> int:
-        """How many generation requests have been served."""
-        return self._call_index
-
-    def transport(self) -> httpx2.MockTransport:
-        """Build an httpx2 transport that routes to this fake."""
-        return httpx2.MockTransport(self._handle)
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path

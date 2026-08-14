@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import ConfigError
+from .downloads import _read_and_hash
 
 __all__ = ["ModelManifest", "hash_model_weights", "verify_model_manifest"]
 
@@ -122,11 +123,7 @@ def hash_model_weights(path: Path) -> str:
 
 
 def _hash_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return _read_and_hash(path, hashlib.sha256)
 
 
 def verify_model_manifest(

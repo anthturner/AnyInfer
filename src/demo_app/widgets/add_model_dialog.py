@@ -32,6 +32,7 @@ from anyinfer.local.server import is_loopback
 from anyinfer.registry import ProviderRegistry
 
 from ..config import DemoConfig, ProviderConfig
+from .formatting import _bytes
 
 __all__ = ["AddModelChoice", "AddModelDialog", "catalog_model_choice"]
 
@@ -264,7 +265,7 @@ class AddModelDialog(QDialog):
             name.setData(Qt.ItemDataRole.UserRole, entry)
             self._table.setItem(row, 0, name)
             self._table.setItem(row, 1, QTableWidgetItem(self._source(entry, provider)))
-            self._table.setItem(row, 2, QTableWidgetItem(self._bytes(entry.model.est_file_bytes)))
+            self._table.setItem(row, 2, QTableWidgetItem(_bytes(entry.model.est_file_bytes)))
             recommendation, _reasonable, why = self._recommendation(entry)
             if entry.id == best_id:
                 recommendation = f"★ Best match · {recommendation}"
@@ -345,8 +346,8 @@ class AddModelDialog(QDialog):
             return (
                 "Do not use — disk",
                 False,
-                f"Needs about {self._bytes(round(size * 1.1))}; only "
-                f"{self._bytes(self._free_disk_bytes)} is free.",
+                f"Needs about {_bytes(round(size * 1.1))}; only "
+                f"{_bytes(self._free_disk_bytes)} is free.",
             )
         labels = {
             "gpu": ("Recommended", True),
@@ -425,14 +426,3 @@ class AddModelDialog(QDialog):
                 return
         self._choice = choice
         self.accept()
-
-    @staticmethod
-    def _bytes(count: int | None) -> str:
-        if count is None:
-            return "—"
-        size = float(count)
-        for unit in ("B", "KiB", "MiB", "GiB"):
-            if size < 1024 or unit == "GiB":
-                return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
-            size /= 1024
-        return f"{size:.1f} GiB"

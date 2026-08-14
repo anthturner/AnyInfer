@@ -81,7 +81,15 @@ speculative-decoding draft heads that are a fraction of the size. Matching one o
 the kind of quietly-wrong number that pinning exists to prevent.
 """
 
-# ---- memory estimation (mirrors anyinfer.local.tuning's KV table) -----------------------
+# ---- memory estimation --------------------------------------------------------------
+#
+# A superset of anyinfer.local.tuning's _KV_BYTES_PER_TOKEN_F16, not an import of it: this
+# script deliberately carries no dependency on the anyinfer package (see the module
+# docstring), and the catalog needs finer parameter-size buckets than the runtime tuner's
+# intentionally coarse context-ladder table. Every key this table shares with tuning.py's
+# must carry the same bytes-per-token value — if you change one for a shared key, change
+# the other too, or a catalog fit verdict and the runtime planner's own estimate will
+# silently disagree for the same model.
 
 KV_BYTES_PER_TOKEN_F16: dict[str, int] = {
     "1B": 64 * 1024,
@@ -787,6 +795,7 @@ def pin_model(
             return None, [
                 f"{candidate['id']}: projector {projector_name!r} is absent or unverifiable"
             ]
+    projector_digest = digest_of(projector) if projector is not None else None
     artifact_ids = dict(candidate.get("artifact_ids") or {})
     variants: list[dict[str, Any]] = []
 
@@ -806,10 +815,8 @@ def pin_model(
             digests[path] = digest
             sizes[path] = int(entry.get("size", 0))
         roles: dict[str, str] = {}
-        if projector is not None:
+        if projector is not None and projector_digest is not None:
             path = str(projector["path"])
-            projector_digest = digest_of(projector)
-            assert projector_digest is not None
             digests[path] = projector_digest
             sizes[path] = int(projector.get("size", 0))
             roles[path] = "projector"

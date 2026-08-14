@@ -75,6 +75,7 @@ from .base import (
     RerankWireResult,
     WireRankedItem,
     WireRequest,
+    resolve_rerank_index,
 )
 from .cloud_auth import AwsCredentials, resolve_aws_credentials, sigv4_headers
 from .eventstream import EventStreamMessage, iter_event_stream
@@ -84,6 +85,7 @@ from .http import (
     classify_status,
     map_transport_error,
     read_error_detail,
+    read_int,
 )
 
 __all__ = ["BedrockAdapter", "descriptor"]
@@ -513,9 +515,7 @@ class BedrockAdapter:
                 raise ProviderError(
                     "rerank result is missing a numeric 'relevanceScore'", phase="validate"
                 )
-            index = (
-                req.documents[position].index if 0 <= position < len(req.documents) else position
-            )
+            index = resolve_rerank_index(req, position)
             items.append(WireRankedItem(index=index, score=float(score)))
 
         # No usage/search-unit field anywhere in this response — verified live 2026-08-14
@@ -969,16 +969,12 @@ def _parse_usage(payload: Any) -> Usage | None:
     if not isinstance(payload, Mapping):
         return None
 
-    def field(name: str) -> int | None:
-        value = payload.get(name)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
-
     usage = Usage(
-        input_tokens=field("inputTokens"),
-        output_tokens=field("outputTokens"),
-        total_tokens=field("totalTokens"),
-        cache_read_tokens=field("cacheReadInputTokens"),
-        cache_write_tokens=field("cacheWriteInputTokens"),
+        input_tokens=read_int(payload, "inputTokens"),
+        output_tokens=read_int(payload, "outputTokens"),
+        total_tokens=read_int(payload, "totalTokens"),
+        cache_read_tokens=read_int(payload, "cacheReadInputTokens"),
+        cache_write_tokens=read_int(payload, "cacheWriteInputTokens"),
     )
     return usage if usage != Usage() else None
 
