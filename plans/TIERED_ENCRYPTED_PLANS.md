@@ -3,6 +3,18 @@
 > **Status:** Tiers 1-4 implemented and tested 2026-08-12 (same day as the plan). Sketched
 > from a brainstorm about differentiation once provider/adapter breadth (>100 providers, >20
 > adapters) stops being a distinguishing feature on its own.
+> **2026-08-14 update:** GPU CC detection (`local/attestation.py`) had a real bug fixed —
+> live-tested against a real GPU for the first time, the original `-f`-only parse never
+> actually detected capability on any host; now uses `-q` and is pinned against real
+> captured output (§4d cross-reference, code fix in the same commit series). Two of Tier
+> 3's three open research questions resolved with live/primary-source research (OpenRM
+> support confirmed, Azure SKU name confirmed verbatim; AWS still absent, H200/Blackwell
+> still not independently confirmed) — see §7. NVAT SDK installability and API surface
+> investigated directly for the first time (previously simply unreachable); genuinely new,
+> concrete findings recorded, but verification was deliberately not implemented — this
+> environment still cannot exercise the positive (attested) case against real CC-capable
+> hardware, and shipping unverified security-critical code is worse than the honest gap.
+> See the dated 2026-08-14 notes inline in §4c and §7 for specifics.
 > **Plan date:** 2026-08-12.
 > **Authority:** living implementation plan, not an architecture decision. It proposes
 > confidentiality features layered around AnyInfer's existing surfaces; where it touches
