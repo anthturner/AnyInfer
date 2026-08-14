@@ -1,10 +1,12 @@
 # bedrock — Protocol Contract
 
-Status: **implemented** — `providers/bedrock.py`, the Converse API for generation;
-Titan Text Embeddings V2 via `InvokeModel` for embeddings (implemented 2026-08-12 —
-Converse has no embeddings surface at all).
-Last verified: 2026-08-12 — generation section against 2026-08-07 live documentation;
-embeddings section fetched live 2026-08-12.
+Status: **implemented** — `providers/bedrock.py`, the Converse API for generation; Titan
+Text Embeddings V2 and Cohere Embed v3 via `InvokeModel` for embeddings; `amazon.rerank-v1:0`
+and `cohere.rerank-v3-5:0` via the separate `bedrock-agent-runtime` Rerank action.
+Last verified: 2026-08-14 — generation section against 2026-08-07 live documentation;
+Titan embeddings section fetched live 2026-08-12; Cohere embeddings and Rerank sections
+fetched live 2026-08-14 and cross-checked against botocore's own installed
+`bedrock-agent-runtime` service model.
 
 ## Upstream sources
 - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html
@@ -27,6 +29,17 @@ embeddings section fetched live 2026-08-12.
   (embeddings request/response shape, fetched live 2026-08-12)
 - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html
   (InvokeModel URI/headers, fetched live 2026-08-12)
+- https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-embed-v3.html
+  (Cohere Embed v3 request/response shape and limits, fetched live 2026-08-14)
+- https://docs.aws.amazon.com/bedrock/latest/userguide/rerank-supported.html
+  (Rerank model IDs and Region support, fetched live 2026-08-14)
+- https://docs.aws.amazon.com/bedrock/latest/userguide/rerank-use.html
+  (Rerank request/response fields and a verbatim boto3 code example, fetched live 2026-08-14)
+- https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent-runtime_Rerank.html
+  (Rerank API reference, fetched live 2026-08-14)
+- botocore's installed `bedrock-agent-runtime` `2023-07-26` service model
+  (`service-2.json`, inspected locally 2026-08-14) — the authoritative source for exact
+  shapes, enum values, and the SigV4 `signingName`
 
 ## Why Converse, not InvokeModel
 
@@ -159,15 +172,88 @@ Limits: 8,192 max input tokens, 50,000 max input characters (whichever binds fir
 the token ceiling is representable in `EmbeddingCapabilities`). No `task_type`/intent
 concept in the request schema — `input_intents=()`.
 
-### Scoped out, recorded rather than guessed
-- **Cohere Embed on Bedrock** (`cohere.embed-english-v3`, `cohere.embed-multilingual-v3`):
-  the plan's own note records the expected shape (`{"texts": [...], "input_type": ...}`,
-  batch-capable) but this session could not fetch
-  docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-cohere-embed.html — the
-  fetch tool returned no content. **Not implemented**; do not assume the recorded shape
-  is current without a fresh live fetch.
-- **Bedrock's separate Rerank action** (agent-runtime, not runtime) — different host and
-  action entirely; unresearched.
+### Cohere Embed v3 (`cohere.embed-english-v3`, `cohere.embed-multilingual-v3`) — verified live 2026-08-14, implemented
+
+Same `POST {base}/model/{modelId}/invoke` action and host as Titan, a completely
+different body — verified live against
+docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-embed-v3.html (the
+`model-parameters-cohere-embed.html` URL the earlier session tried no longer resolves;
+AWS has since restructured this page under `model-parameters-embed-v3.html`).
+
+Request:
+```json
+{"texts": ["string"], "input_type": "search_document|search_query|classification|clustering|image", "truncate": "NONE|START|END", "embedding_types": ["float"]}
+```
+`texts` required (mutually exclusive with `images`, not sent by this adapter);
+`input_type` required, **no default** — Bedrock's Cohere v3 refuses a request without one,
+same as hosted Cohere, so `BedrockAdapter._embed_cohere` raises `ConfigError` before
+sending rather than guessing an intent. `embedding_types` is always sent explicitly as
+`["float"]` by this adapter so the response shape stays the deterministic dict-keyed form
+below, rather than the flat-array form the docs show for the (unused, by this adapter)
+no-`embedding_types` default. Batch limits: **96 texts per call, 2,048 characters per
+text** (stated in characters on this page, not tokens — converted to `max_input_tokens=512`
+using the same page's own "1 token is about 4 characters" rule, to stay consistent with
+every other provider's token-denominated `EmbeddingCapabilities` field here).
+
+Response:
+```json
+{"id": "string", "response_type": "embeddings_floats", "embeddings": {"float": [[0.1, ...]]}, "texts": ["string"]}
+```
+`embeddings` is a dict keyed by requested type (confirmed by the docs' own boto3 code
+sample, which indexes it as `embeddings[embedding_type]`) — the same shape and the same
+parse `providers/cohere.py` already uses for hosted Cohere, reused verbatim here.
+**No token-usage or search-unit field anywhere in this response** — `Usage` is always
+`None`, unlike Titan's `inputTextTokenCount`. No `dimensions` override field exists on
+this action; output is always 1,024 dimensions for both v3 models.
+
+### Rerank (`amazon.rerank-v1:0`, `cohere.rerank-v3-5:0`) — verified 2026-08-14, implemented
+
+A **third action, a different host and a different service surface** from both
+`InvokeModel` and `Converse`: `bedrock-agent-runtime.{region}.amazonaws.com`'s
+`POST /rerank`, confirmed against the live AWS docs page
+(`docs.aws.amazon.com/bedrock/latest/userguide/rerank-use.html`, including a verbatim
+boto3 code example) and cross-checked against botocore's own installed
+`bedrock-agent-runtime` `2023-07-26` service model (`service-2.json`) for the exact shape
+and SigV4 `signingName` — which is `"bedrock"`, the **same** signing service name
+`InvokeModel`/`Converse` use, despite the different host and endpoint prefix. This
+adapter reuses `_SIGNING_SERVICE` unchanged.
+
+Genuinely model-agnostic at the wire level — one request/response shape for both
+`amazon.rerank-v1:0` and `cohere.rerank-v3-5:0`, selected only by `modelArn`:
+
+Request:
+```json
+{
+  "queries": [{"type": "TEXT", "textQuery": {"text": "string"}}],
+  "sources": [{"type": "INLINE", "inlineDocumentSource": {"type": "TEXT", "textDocument": {"text": "string"}}}],
+  "rerankingConfiguration": {
+    "type": "BEDROCK_RERANKING_MODEL",
+    "bedrockRerankingConfiguration": {
+      "modelConfiguration": {"modelArn": "arn:aws:bedrock:{region}::foundation-model/{modelId}"},
+      "numberOfResults": 10
+    }
+  }
+}
+```
+`queries` is fixed at exactly 1 item (`RerankQueriesList` max is 1 in the service model —
+Bedrock's Rerank action takes one query per call, not a batch of queries). `sources`
+allows 1-1,000 documents (`RerankSourcesList`). `numberOfResults` (this adapter's
+`top_n`) allows 1-1,000 when set; omitted when the caller doesn't request truncation, so
+every document is ranked. The `modelArn` format
+(`arn:aws:bedrock:{region}::foundation-model/{modelId}`, no account id between the two
+colons) is the literal string from AWS's own boto3 example, not inferred.
+
+Response:
+```json
+{"results": [{"index": 0, "relevanceScore": 0.9, "document": {...}}], "nextToken": "string"}
+```
+`index` is positional within the `sources` array this call sent, mapped back onto the
+caller-supplied `RerankWireDocument.index` — same rule every other adapter's rerank
+parsing follows. `document` (an echo of the input) is never requested or read.
+**No usage or search-unit field anywhere in this response.** `nextToken`-based pagination
+exists in the shape but is not implemented — every call the core issues fits its full
+document set in one `Rerank` call today (bounded by `RerankCapabilities.max_documents`),
+so pagination has never been reachable; revisit if that assumption changes.
 
 ## Watchlist
 - **The OpenAI-compat endpoints.** `bedrock-mantle.{region}.api.aws/v1` (recommended,

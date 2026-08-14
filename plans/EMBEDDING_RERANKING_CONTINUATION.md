@@ -141,7 +141,7 @@ which surface applies per model). Research target:
 task_type values mirror Gemini's legacy list (RETRIEVAL_QUERY etc.) — map like
 `gemini.py`'s `_TASK_TYPES`.
 
-### T3 — Bedrock embeddings (BH.I.3) — Titan DONE 2026-08-12, Cohere-on-Bedrock and Rerank still open
+### T3 — Bedrock embeddings (BH.I.3) — DONE 2026-08-14 (Titan, Cohere embed, and Rerank all implemented)
 
 `providers/bedrock.py` exists (Converse API, SigV4 or API key, binary event framing).
 Embeddings go through `InvokeModel` (NOT Converse):
@@ -620,3 +620,24 @@ feature-complete bar:
   unpublished, not merely unfetched — `pricing.json` is untouched again rather than
   guessed. This item is likely to stay open until Cohere/Jina publish a number or the owner
   supplies one directly; not worth re-checking again without a signal something changed.
+- **2026-08-14:** T3 finished — Cohere Embed v3 and the separate agent-runtime Rerank
+  action, the two pieces the prior session left explicitly open. Neither was guessable
+  from documentation alone per this project's own discipline, so both were re-researched
+  live rather than copied from the plan's earlier (correctly hedged) sketch: the
+  `model-parameters-cohere-embed.html` URL the prior session tried has since 404'd — AWS
+  restructured it to `model-parameters-embed-v3.html`, found via search, fetched live, and
+  cross-checked against a raw `curl` of the same page (WebFetch's summarization dropped
+  the "96 texts / 2,048 characters" limits table on the first pass; the raw HTML had it).
+  Rerank needed a different host entirely (`bedrock-agent-runtime`, not `bedrock-runtime`)
+  and turned out to be model-agnostic at the wire level — one shape serves both
+  `amazon.rerank-v1:0` and `cohere.rerank-v3-5:0` via `modelArn`. Verified the exact
+  request/response shapes and the SigV4 `signingName` (confirmed as `"bedrock"`, same as
+  the runtime host, despite the different endpoint) directly against botocore's own
+  installed `bedrock-agent-runtime` service model rather than trusting AWS's HTML docs
+  alone — belt-and-suspenders verification for a session that had never done this before.
+  Both land in `providers/bedrock.py` with adapter-level tests
+  (`tests/test_bedrock_vertex.py`), contract-snapshot updates
+  (`contracts/bedrock.md`), and provider-doc updates (`docs/providers/bedrock.md`).
+  Bedrock's Cohere embed and Rerank responses both report **no usage/token/search-unit
+  field at all** (unlike Titan's `inputTextTokenCount`) — `usage=None` in both cases,
+  never guessed. All gates green. This closes T3 entirely.
