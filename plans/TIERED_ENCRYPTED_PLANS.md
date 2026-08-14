@@ -397,6 +397,11 @@ Recommendation: **lead Tier 3's CPU-only claim with SEV-SNP/TDX CVMs, not Nitro 
 only for NVIDIA H100 so far.** Confirmed GA:
 - **Azure**: NVIDIA H100 NVL confidential VMs, paired with **AMD SEV-SNP** for the CPU TEE.
   Single GPU per node GA in East US 2; `ND H100 v5` SKUs support multi-GPU (up to 8) nodes.
+  **Exact SKU name confirmed 2026-08-14** against Microsoft Learn's own confidential-VM
+  size-support table: `NCCadsH100v5-series` is the literal confidential-VM SKU (listed
+  alongside the non-GPU DC/EC confidential series) — cite this name, not a paraphrase, in
+  the Confidentiality Tiers doc. Source:
+  [Azure confidential VM overview](https://learn.microsoft.com/en-us/azure/confidential-computing/confidential-vm-overview).
 - **Google Cloud**: Confidential VM / Confidential Space on H100, `A3` machine series, paired
   with **Intel TDX** for the CPU TEE (A3 uses Intel Xeon hosts).
 - **AWS**: no evidence found of a confidential-GPU offering at all — flagged as an open item
@@ -745,20 +750,45 @@ see the "Decided" call-outs inline in §1–§5. Also resolved 2026-08-12 by res
 sources): Tier 3 feasibility is gated by deployment topology, not by backend choice — all
 three backends run unmodified in a CVM. Genuinely still open:
 
-- **AWS GPU-CC status.** No evidence of an AWS confidential-GPU offering was found in this
-  research pass; that's an absence-of-evidence finding, not a confirmed "AWS doesn't have
-  this" — needs a direct check against current AWS docs before the Confidentiality Tiers doc
-  asserts anything about AWS one way or the other.
-- **OpenRM vs. proprietary NVIDIA driver for CC mode.** Whether the open-source `OpenRM`
-  kernel module supports Hopper Confidential Computing mode, or whether CC mode requires
-  NVIDIA's closed-source driver, wasn't confirmed — matters for documenting deployment
-  prerequisites accurately.
-- **H200/Blackwell CC availability on a major cloud.** Only H100 CC was confirmed GA on
-  Azure/GCP in this pass; H200/Blackwell CC was only found via a third-party GPU-rental
-  provider. Tier 3's GPU marketing claim should scope to H100 until this is separately
-  checked, and should be revisited as the market moves (this is exactly the kind of claim
-  that needs periodic re-verification, similar in spirit to `contracts/DRIFT-CHECK.md`'s
-  discipline for provider claims, even though it's not a provider contract itself).
+- **AWS GPU-CC status — re-checked 2026-08-14, still absent, now with a direct-source
+  search rather than a general pass.** A targeted search against AWS's own blog/docs
+  (`aws.amazon.com/blogs/aws/...`, the P5/P5en announcement posts, the P5 instance-type
+  page) found real, specific confidential-computing claims for **neither** P5 (H100) nor
+  P5en (H200): both are marketed purely on compute/networking (EFAv3, Nitro v5 for
+  *networking* bandwidth, not TEE). This strengthens the negative finding — it is not
+  merely "no evidence found" from a broad pass anymore, it is "no evidence found in AWS's
+  own product announcements specifically for these instance families" — but it is still
+  not proof of absence (AWS could ship this without the two people-facing posts checked
+  here using the words "confidential computing"). Treat as: document AWS as unsupported
+  for Tier 3 GPU-offload today, revisit if a customer conversation or a dedicated AWS docs
+  crawl says otherwise.
+- **OpenRM vs. proprietary NVIDIA driver for CC mode — resolved 2026-08-14.** Confirmed:
+  the open-source kernel modules (`NVIDIA/open-gpu-kernel-modules`, the "OpenRM" driver)
+  do support Hopper Confidential Computing — they implement the SPDM protocol used for GPU
+  attestation in CC mode (RSA-2048/3072, ECDSA-P256/P384, AES-128-GCM, SHA-256/384/512).
+  More than merely supported: NVIDIA's own guidance is that Blackwell-generation platforms
+  **require** the open-source modules — the proprietary driver is unsupported there at
+  all. Net effect on the plan: no CC-mode driver-choice caveat is needed for the
+  Confidentiality Tiers doc's deployment prerequisites; if anything, OpenRM is the
+  forward-looking default, not a fallback. Sources:
+  [NVIDIA/open-gpu-kernel-modules discussion #718](https://github.com/NVIDIA/open-gpu-kernel-modules/discussions/718),
+  [NVIDIA: Transitioning fully towards open-source GPU kernel modules](https://developer.nvidia.com/blog/nvidia-transitions-fully-towards-open-source-gpu-kernel-modules.md/).
+- **H200/Blackwell CC availability — re-checked 2026-08-14, partially resolved.** H200 is
+  the same Hopper architecture family as H100 and reportedly supports the identical CC
+  stack; however, no Azure/GCP docs page independently names an H200-specific confidential
+  VM SKU the way `NCCadsH100v5-series` is named for H100 (§4c above) — treat "H200 CC" as
+  architecturally plausible, not independently SKU-confirmed, and say so precisely rather
+  than rounding up to "H200 is GA." Blackwell/B200 CC remains **not GA on any hyperscaler**
+  as of this check — still preview-or-absent on Azure/GCP/AWS, available only through
+  smaller third-party confidential-GPU providers (Phala, Spheron, VoltageGPU-style
+  resellers), consistent with the original 2026-08-12 finding. GCP does list an RTX PRO
+  6000 Blackwell (`G4` series) in preview, but nothing found ties it to CC mode
+  specifically rather than the Blackwell architecture generally — flagged as a fresh
+  open item rather than assumed either way. Recommendation unchanged from §4c: **lead
+  with H100, name it explicitly, do not round H200/Blackwell into the same claim.** This
+  is a live-market fact that will move — re-verify periodically, the same discipline
+  `contracts/DRIFT-CHECK.md` applies to provider claims, even though this isn't a provider
+  contract itself.
 - Whether Nitro Enclaves' storage/networking constraints (§4c) are worth the engineering lift
   for the CPU-only case given SEV-SNP/TDX CVMs already cover it with near-zero lift — leaning
   "skip Nitro Enclaves for v1," but worth the owner's explicit call before it's dropped from
