@@ -310,6 +310,21 @@ def test_server_arguments_always_enable_jinja() -> None:
     assert args[args.index("--host") + 1] == "127.0.0.1"
     assert args[args.index("--port") + 1] == "9999"
     assert args[args.index("--ctx-size") + 1] == str(plan.context_size)
+
+
+def test_server_arguments_omit_embeddings_flag_unless_requested() -> None:
+    plan = plan_server(_profile(accelerators=_cuda(24)), TuningInputs(parameter_size="7B"))
+    args = plan.server_arguments("/models/x.gguf", host="127.0.0.1", port=9999)
+    assert "--embeddings" not in args
+
+
+def test_server_arguments_include_embeddings_flag_when_requested() -> None:
+    from dataclasses import replace
+
+    plan = plan_server(_profile(accelerators=_cuda(24)), TuningInputs(parameter_size="7B"))
+    plan = replace(plan, embeddings=True)
+    args = plan.server_arguments("/models/x.gguf", host="127.0.0.1", port=9999)
+    assert "--embeddings" in args
     assert args[args.index("--flash-attn") + 1] == "on"
 
 

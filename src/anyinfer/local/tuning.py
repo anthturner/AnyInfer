@@ -107,6 +107,11 @@ class ServerPlan:
         estimated_total_bytes: Weights plus KV cache.
         posture: The posture this plan was derived under.
         rationale: Human-readable notes explaining the choices.
+        embeddings: ``--embeddings``. Live-verified 2026-08-14: llama-server refuses
+            every embedding request with a 501 ("This server does not support
+            embeddings. Start it with `--embeddings`") unless this was set at startup —
+            it cannot be toggled on an already-running server, so a plan's embedding
+            intent must be decided before the process is spawned, not after.
     """
 
     context_size: int
@@ -123,6 +128,7 @@ class ServerPlan:
     posture: Posture = "balanced"
     rationale: tuple[str, ...] = ()
     projector_path: str | None = None
+    embeddings: bool = False
 
     def server_arguments(self, model_path: str, *, host: str, port: int) -> list[str]:
         """Render the plan as llama-server CLI arguments.
@@ -159,6 +165,8 @@ class ServerPlan:
             args.extend(("--flash-attn", "on"))
         if self.projector_path is not None:
             args.extend(("--mmproj", self.projector_path))
+        if self.embeddings:
+            args.append("--embeddings")
         return args
 
     @property

@@ -156,7 +156,7 @@ Embeddings go through `InvokeModel` (NOT Converse):
 VERIFY all body shapes at `docs.aws.amazon.com/bedrock/latest/userguide/titan-embedding-models.html`
 and the Cohere-on-Bedrock page. Reuse the adapter's SigV4 signing for the new path.
 
-### T4 — llama-server embeddings (BH.I.3 / ER.5.11) — BLOCKED, no live llama-server in this environment
+### T4 — llama-server embeddings (BH.I.3 / ER.5.11) — DONE 2026-08-14
 
 **Gated on a live contract check by its own rule** — documentation is not sufficient.
 Recipe: acquire a small embedding GGUF through the existing `local/` machinery (e.g.
@@ -649,3 +649,36 @@ feature-complete bar:
   Bedrock's Cohere embed and Rerank responses both report **no usage/token/search-unit
   field at all** (unlike Titan's `inputTextTokenCount`) — `usage=None` in both cases,
   never guessed. All gates green. This closes T3 entirely.
+- **2026-08-14:** T4 done — this sandbox gained a real llama-server-capable environment
+  (a GPU, `anyinfer runtime install` already had cpu/vulkan runtimes present, and network
+  access to Hugging Face) where the prior session had none of that. Acquired
+  `nomic-ai/nomic-embed-text-v1.5-GGUF`'s Q4_K_M file (84MB) through
+  `local.acquire.acquire()` directly with a hand-built `SourceRef` — real, hash-verified,
+  the same `HuggingFaceResolver` `pin_catalog.py` itself uses, not a shortcut — then
+  started the real pinned llama-server (`b10327`) with `--embeddings` and probed both
+  candidate endpoints live. Findings, neither guessable from docs alone: **`/v1/embeddings`
+  is genuinely OpenAI-shaped** (so `OpenAICompatEmbeddingsMixin` needed zero changes to
+  work against it — real dims=768 confirmed against the real model); the native
+  `/embedding` endpoint has a different, more deeply-nested shape, deliberately not used;
+  and **`--embeddings` is a startup-only flag** — a running plain-generation server answers
+  every embedding request with a 501, confirmed live, meaning `embed()` cannot share a
+  resident server with `generate()` for the same model even when the GGUF is identical.
+  Implementation: `ServerPlan.embeddings: bool` (new field, appends `--embeddings` to the
+  launch args when set — `local/tuning.py`); `LlamaCppAdapter.embed()`
+  (`providers/llama_cpp.py`) resolves the catalog artifact exactly like `generate()` but
+  acquires its server under a distinct supervisor key (`f"{model}:embeddings"`) with
+  `plan.embeddings=True`; `_delegate_for`'s delegates now compose
+  `OpenAICompatEmbeddingsMixin` (a small `_Delegate` subclass) so any supervised server can
+  speak both dialects — inert until called, since only an `--embeddings`-started server
+  will ever actually receive an `embed()` call. Verified twice: adapter-level tests with a
+  stubbed supervisor and a mocked transport carrying the exact live-observed response
+  shape (`tests/test_llama_cpp.py`), *and* a direct, unmocked call through the real
+  `_Delegate` class against the still-running real llama-server, confirming the production
+  code path itself (not just the mock) works end to end. `contracts/llama-cpp.md` and
+  `docs/providers/llama-cpp.md` updated with everything above. **Also found and recorded,
+  not fixed:** `anyinfer runtime install cuda` refuses on this platform — no CUDA build is
+  pinned for `linux-amd64` yet, so this real RTX 4090 falls back to the Vulkan backend;
+  re-pinning CUDA is a `scripts/pin_runtimes.py` maintainer call, out of scope here.
+  `static_embedding_capabilities` stays empty for this provider (dimensions/limits vary
+  per GGUF and the catalog schema has no field for them yet — that gap is T11). All gates
+  green.
