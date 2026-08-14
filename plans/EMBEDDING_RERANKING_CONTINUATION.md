@@ -1,7 +1,18 @@
 # Embedding/reranking: continuation handoff
 
-> **Status:** ready to execute; written 2026-08-12 at the end of the session that landed
-> commits `1a47675..f18d415` (18 commits on `develop`).
+> **Status (2026-08-14 update):** T1, T2, T3, T4, T5, T7 (partial), T8, T9, T10 (partial)
+> done. Genuinely still open: T6 (pricing data for Cohere/Jina rerank — re-checked
+> 2026-08-14, still unpublished, not a task gap), T7's remaining live lanes
+> (Voyage/Jina/TEI, cancellation-in-conformance — no credentials/servers for the former,
+> no scenario-plumbing concept built yet for the latter), T11 (catalog schema for
+> embedding models — a real design question about how embeddings fit the catalog's
+> generation-oriented alias/tier system, not a research gap; see its entry in §5 below).
+> Each item's own dated log entry in §12 has the honest specifics; do not re-attempt T6's
+> pricing re-check or T4/T7's "needs live access" framing without a new signal, since both
+> were genuinely re-verified this session, not assumed.
+>
+> **Original status:** ready to execute; written 2026-08-12 at the end of the session that
+> landed commits `1a47675..f18d415` (18 commits on `develop`).
 > **Authority:** the single live embedding/reranking plan. Its predecessor —
 > `plans/EMBEDDING_RERANKING_HARDENING.md`, the consolidated tracker whose Tracks D
 > through H (and five Track I increments) are fully implemented — was deleted to keep
@@ -323,12 +334,15 @@ result type). Cohere discovery now lists embedding models, so the
 
 ## 8. Session start checklist for the next thread
 
-1. `git log --oneline develop | head -20` — confirm you're at/after `f18d415`.
+1. `git log --oneline develop | head -20` — confirm you're at/after `f4be4f5`.
 2. Read this file. Do NOT re-scout what §4-§7 already state; the full historical
    tracker is in git history if archaeology is ever needed.
-3. Re-verify the pytest baseline (still exactly the one demo-app failure).
-4. Pick up at T1 (Azure) unless the owner redirects; each T-item is one gate-passing
-   commit in the established recipe.
+3. Re-verify the pytest baseline (should be fully green now — the one demo-app sort-order
+   failure was fixed 2026-08-13, `97b8fa3`).
+4. Pick up at T11 (catalog schema — needs a real design decision, see its 2026-08-14 note
+   in §5) or T7's remaining live lanes (Voyage/Jina/TEI, needs credentials/servers this
+   environment may or may not have now) unless the owner redirects; each T-item is one
+   gate-passing commit in the established recipe.
 5. Strike completed T-items in §5 and add a dated entry to §12's progress log as
    you land increments — with the same "delivered and tested" / "explicitly not done"
    honesty the deleted tracker's log applied to itself.
@@ -395,9 +409,14 @@ buffered).
 The hardening bar (Tracks D/A/B/C) was met on 2026-08-12. Still open from the
 feature-complete bar:
 
-- [ ] At least one hosted and one local embedding target — and one hosted rerank target
-  — pass fake, **cassette, and live** conformance (fake ✓ everywhere; Cohere cassettes
-  ✓; live lanes and remaining cassettes are T7).
+- [x] At least one hosted and one local embedding target — and one hosted rerank target
+  — pass fake, **cassette, and live** conformance. Fake ✓ everywhere; Cohere (hosted
+  embed+rerank) and Ollama (local embed+generate) cassettes ✓, both recorded against real
+  live traffic 2026-08-12/2026-08-14; llama.cpp embeddings live-verified end to end
+  2026-08-14 (T4) via a direct unmocked call, not a committed cassette — no cassette
+  fixture exists for it yet, worth adding in a future pass, but the live-verification bar
+  itself is met. Remaining live lanes (Voyage/Jina/TEI, cancellation-in-conformance) are
+  still open, tracked in T7.
 - [ ] Usage, **cost**, spend policy tested for both operations end to end (cost blocks
   on T6's pricing entries).
 - [ ] Standalone sidecar bundles pass `/v1/embeddings` and rerank smoke tests on macOS,
