@@ -256,6 +256,23 @@ result type). Cohere discovery now lists embedding models, so the
   `CANDIDATES` tuple `scripts/pin_catalog.py:118`, `pin_model` :764-880, `_parse_model`
   `catalog/model.py:644-707`, `scripts/validate_catalog.py`. Candidate first entries:
   nomic-embed-text (Ollama+GGUF), bge-large (TEI).
+  **Re-examined 2026-08-14, deliberately still not attempted, blocker category changed:**
+  this session had — for the first time — everything T4 needed to actually *not* be
+  blocked on live artifact access (network, a GPU, a working HF resolver; see T4's log
+  entry, which used exactly this machinery for a one-off, out-of-catalog acquisition).
+  So the honest reason this stays open is no longer "can't reach the artifacts" — it's
+  that `pin_model`/`_parse_model` (checked this session, `catalog/model.py` only defines
+  two top-level keys today, `aliases` and `gguf_artifacts`) are built entirely around
+  *generation* models: `SHIPPED_QUANTS`'s quality ladder, `estimate_memory`'s per-token
+  KV-cost table keyed by parameter size, and the alias tier system (`"small"`/`"medium"`/
+  `"large"`) all assume a chat model being sized for context and throughput, none of which
+  means the same thing for an embedding model. Landing embedding entries well means first
+  deciding a real schema question — a parallel `embedding_artifacts` top-level section, or
+  a `kind`/`operation` field threaded through the existing one, and whether the alias tier
+  system applies to embeddings at all or gets its own concept — not mechanically pointing
+  the existing pinning machinery at a new candidate and hoping the ill-fitting fields
+  render harmlessly. That is real design work deserving a focused session, not a
+  same-session addition bolted onto everything else this pass touched.
 - `anyinfer init` auto-writes `operation_routes` from discovery evidence:
   `local/discovery.py` `_probe_one` (:275-291) currently flattens model ids and
   discards `DiscoveredModel.capabilities.operations` (LM Studio and Cohere stamp them);
