@@ -441,7 +441,51 @@ keeping visibly separate in `confidential_execution_status()` and in marketing:
 
 Sources: [AWS Nitro Enclaves GPU issue #543](https://github.com/aws/aws-nitro-enclaves-cli/issues/543), [AWS Nitro Enclaves docs](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html), [NVIDIA H100 Azure confidential VM GA](https://blogs.nvidia.com/blog/azure-confidential-vm-h100-general-availability), [Google Cloud confidential accelerators](https://cloud.google.com/blog/products/identity-security/how-confidential-accelerators-can-boost-ai-workload-security), [AMD SEV-SNP confidential computing](https://www.amd.com/en/products/processors/server/epyc/confidential-computing.html), [Azure confidential VMs (SEV-SNP) GA](https://techcommunity.microsoft.com/blog/azureconfidentialcomputingblog/azure-confidential-vms-dcasv5ecasv5-using-amd-sev-snp-processors-are-now-general/2993530), [LM Studio headless server docs](https://lmstudio.ai/docs/developer/core/headless), [LM Studio 0.4 headless deployment](https://www.sitepoint.com/lm-studio-04-headless-deployment-local-llm-apis-without-the-gui/), [Ollama Secure Minions blog post](https://ollama.com/blog/secureminions), [NVIDIA nvTrust repository](https://github.com/NVIDIA/nvtrust), [NVIDIA Confidential Computing deployment guide (TDX)](https://docs.nvidia.com/cc-deployment-guide-tdx.pdf).
 
-## 4d. Implementation-grade detail — the CPU-only path
+**NVAT installability and API surface checked directly, 2026-08-14 — genuinely new
+information, not previously knowable.** This sandbox now has network access `pip install
+nv-attestation-sdk` needs (a prior session recorded this as simply unreachable); installing
+it confirms real, concrete facts the plan could previously only guess at:
+
+- `nv-attestation-sdk` pip-installs cleanly and pulls in a **separate** package,
+  `nv-local-gpu-verifier` (import name `verifier`), as a dependency — this is the actual
+  local-evidence-collection code, not `nv_attestation_sdk` itself. Any integration needs
+  both, not one.
+- The SDK's own `Attestation` class models exactly the shape §4/§4d already designed for
+  independently: an `Environment` enum (`TEST`/`LOCAL`/`AZURE`/`GCP`/`REMOTE`) and a
+  `Devices` flag enum (`CPU`/`GPU`/`SWITCH`/`OS`/`DPU`) — encouraging confirmation that
+  AnyInfer's own typed-fact approach (`CpuTeeKind`, `gpu_cc_capable`/`gpu_cc_enabled`) is
+  the right shape to bridge onto, not a mismatch requiring redesign.
+- **Real, load-bearing finding**: `verifier.cc_admin.collect_gpu_evidence_local()` — the
+  actual evidence-collection entry point — does **not** degrade gracefully on non-CC
+  hardware. Run against this sandbox's real RTX 4090 (no CC support), it raises a hard
+  `Exception` from inside NVML initialization: *"System must be running in either
+  confidential compute mode or PPCIE mode to perform attestation."* There is no built-in
+  "detect and report absence" path the way `hardware.py`/`attestation.py`'s own probes
+  are designed — every call site in AnyInfer would need to wrap this in a `try/except`
+  translating the exception into `gpu_cc_capable=False`, matching this project's
+  never-raise advisory-probe discipline itself, not something the upstream SDK provides.
+  (The SDK also hit an unrelated internal logging bug — a `%`-style format call with
+  mismatched arguments — while raising that exception; not AnyInfer's problem to fix, but
+  a sign of how rough this SDK's edges are.)
+- **Verification (not just evidence collection) needs NVIDIA's RIM/OCSP certificate
+  services over the network** (`RIM_SERVICE_URL`/`OCSP_SERVICE_URL` constants are wired
+  through the SDK already) — real external dependencies beyond just the pip package.
+
+**Why this was investigated but deliberately not implemented this session.** Evidence
+collection is reachable and wrappable, matching the rest of `local/attestation.py`'s
+style. But the actual verification path — the part that turns "here is some evidence"
+into "this quote is cryptographically valid" — was not exercised at all: this sandbox's
+GPU cannot produce a genuine CC attestation quote (RTX 4090 predates Hopper CC), so the
+positive case is completely unverified, and CPU-side attestation (Azure Attestation / GCP
+equivalent) still has no identified library at all (unchanged from the original finding
+above). Shipping a `ConfidentialExecutionAdapter` verification path whose only tested
+behavior is "correctly reports absence" — never once exercised against a real attested
+quote — would hand callers a false sense of a cryptographic guarantee this session cannot
+actually back up. For security-critical code specifically, an honest "not implemented"
+gap is safer than an implementation whose one hard case was never run. This is exactly
+the class of task flagged as needing real per-cloud SDK integration and hardware this
+environment lacks; unlike T4/T7 (where full live verification became possible this
+session), that has not changed here. Revisit when H100/H200 access is available.
 
 Per §4c's findings and the recommended sequencing in implementation order item 1: spec the
 CPU-only path first, since it's buildable today with no open feasibility questions blocking
