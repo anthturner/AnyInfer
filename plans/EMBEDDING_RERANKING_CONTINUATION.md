@@ -195,14 +195,22 @@ is data + parsing:
 3. The demo panel's cost display lights up automatically once entries exist (ER.9.13).
 4. ER.11.12: mixed generation/embed/rerank rate-pacing test.
 
-### T7 — Conformance/harness remainder (Track H, BH.H.1/H.2/H.3/H.5) — four cases DONE 2026-08-12, live lanes and cancellation still open
+### T7 — Conformance/harness remainder (Track H, BH.H.1/H.2/H.3/H.5) — four cases + Ollama live lane DONE, cancellation and Voyage/Jina/TEI live lanes still open
 
 - Port the never-harness-registered behaviors into `CONFORMANCE_CASES`: intent
   translation, normalization metadata, byte caps, retry-after, cancellation,
   duplicate-text-distinct-ids. Each needs a `requires` flag — reuse
   `embedding`/`rerank` or add narrow flags (remember: **new flags default False**).
-- Ollama live lane (BH.H.5): needs a local Ollama or CI runner with one; its
-  2026-08-11 "verification" was documentation research only.
+- Ollama live lane (BH.H.5) — DONE 2026-08-14. This sandbox gained a real local Ollama
+  install and a GPU it didn't have before; `ollama pull qwen3:0.6b` and `nomic-embed-text`
+  plus `tests/test_ollama_cassettes.py` record real wire traffic (chat NDJSON with live
+  reasoning frames, `/api/ps` discovery, and `/api/embed`) into committed, redaction-swept
+  cassettes that replay offline in CI from now on — no live server required going forward.
+  Found and fixed a real bug while recording: `CassetteTransport` never closed its
+  recording-mode inner `httpx2.AsyncHTTPTransport`, leaking a socket every recording run
+  and tripping this project's `filterwarnings = ["error"]` gate; fixed with an `aclose()`
+  override in `testing/cassettes.py`. This was a latent bug in shared test infrastructure,
+  not Ollama-specific — it would have hit the next person recording *any* cassette.
 - Enable Voyage/Jina/TEI cassette or live lanes when keys/servers are available; their
   contracts carry explicit not-live-verified watchlists to burn down.
 - `testing/scaffold.py`/`certify.py` extension beyond the conformance-table comment
