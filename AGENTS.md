@@ -110,6 +110,18 @@ changes require the generated reference and runnable examples.
 - Doc examples must run against the fake providers in CI — do not write examples that can't
   execute.
 - Public symbols require docstrings; the docs build fails otherwise.
+- **Documentation must not contradict itself.** A page that states a count (of concept
+  pages, providers, error classes) or enumerates a set (an index table, a hierarchy
+  diagram) must match the actual file tree and source — verify it, don't estimate it, and
+  re-verify it whenever the thing it counts changes. When the same claim is deliberately
+  restated in more than one file (README.md mirroring `docs/index.md`, a hand-written
+  reference page next to its generated twin), treat every copy as one edit: grep for the
+  other instances before considering the change done, and use identical wording where the
+  claim is meant to be identical. Prefer a short curated list with a link to the canonical
+  full index over hand-duplicating that index's contents — a link cannot drift the way a
+  copied list can. A stale count or a self-contradictory claim is a documentation bug, not
+  a style nit; it is exactly the kind of thing this project's own docs promise readers they
+  can trust.
 - **No ADR mentions in user-facing text.** `ADR-NNN` numbers are internal shorthand: they
   must not appear anywhere under `docs/`, in the root `README.md`, or in any public
   docstring (mkdocstrings renders those onto the published site). State the rule in plain

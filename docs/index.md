@@ -50,7 +50,7 @@ demo app are optional extras. Local inference is part of the core. See
 
 Most libraries in this space solve *provider switching* — one function, many APIs, one
 response shape. AnyInfer solves the problem that starts right after: being correct about
-what you sent, what you got back, what it cost, and what quietly didn't happen. Four things
+what you sent, what you got back, what it cost, and what quietly didn't happen. Five things
 you won't find bundled together anywhere else:
 
 - **Your fallback chain has a real test, with no credentials and no network.** The test kit
@@ -64,6 +64,11 @@ you won't find bundled together anywhere else:
   request becomes on a different target — dropped parameters, weaker mechanisms, cost
   deltas — before you spend anything, and you can diff two snapshots of it in CI.
   [→ Comparing targets](guides/comparing-targets.md)
+- **A local model is a target, not a separate product.** Point the same call at
+  `llama-cpp:qwen3-8b-q4-k-m` and AnyInfer acquires, verifies, and supervises the weights
+  itself — the same fallback chain, event stream, and structured-output contract as a
+  hosted model, with no separate daemon to install or operate.
+  [→ Run a model locally, end to end](guides/local-inference.md)
 - **A confidentiality story nobody else in this market ships.** Encrypted-at-rest prompt
   templates, a zero-retention orchestration relay, and — the genuinely novel part — one
   function that tells your application whether a box can back local inference with a real
@@ -89,11 +94,13 @@ AnyInfer is that layer, extracted and made rigorous:
   (grammar → json_schema → json_mode → prompt), with an opt-in bounded repair loop.
 - **Embeddings and reranking are inference primitives, not provider options.**
   `client.embed()`/`client.rerank()` are typed, routed, batched, and cost-tracked exactly
-  like generation, with a fallback safety rule generation does not need: a target that
-  cannot be proven to share the primary target's vector space is refused before dispatch.
-- **Context engineering is connected to dispatch.** Preflight budgets, cost ranges,
-  deterministic reduction, and hierarchical distillation all use the target's actual
-  capability data and report uncertainty or omission instead of hiding it.
+  like generation — with a safety rule generation does not need: a fallback that cannot
+  be proven to share the primary target's vector space is refused before dispatch, not
+  silently served as a wrong-but-plausible vector.
+- **Context engineering is part of dispatch.** A provenance-aware budget estimates input,
+  output reserve, headroom, and cost before a call. Deterministic reducers fit approved
+  corpora to that budget and report exactly what they omitted; hierarchical distillation
+  handles material that cannot fit at any fidelity.
 - **Capabilities carry provenance.** Every context window, price, and feature flag records
   whether it was catalogued, discovered, probed, or defaulted. Nothing is guessed silently.
 - **Local inference is first-class.** Hardware detection, backend selection, llama-server

@@ -271,7 +271,7 @@ class GenerationRequest:
 **Targets** name where a request goes. Three spellings, one resolution path:
 
 ```python
-Target = str  # "anthropic:claude-sonnet-5" | "ollama:qwen3:8b" | alias "medium"
+Target = str  # "anthropic:claude-sonnet-4-5" | "ollama:qwen3:8b" | alias "medium"
 # engine aliases normalize: "claude:..." → "anthropic:..."
 
 
@@ -759,7 +759,7 @@ answer = result.structured  # validated against ANSWER_SCHEMA
 
 # --- fallback chain + retries (router) ---
 route = ai.Route(
-    targets=("anthropic:claude-sonnet-5", "azure-foundry:gpt-5-mini", "ollama:qwen3:8b"),
+    targets=("anthropic:claude-sonnet-4-5", "azure-foundry:gpt-5-mini", "ollama:qwen3:8b"),
     retry=ai.Retry(max_attempts=3),
 )
 result = client.generate(messages, route=route)
@@ -792,7 +792,7 @@ def read_file(path: str) -> str:
 
 
 result = client.run_tools(
-    messages, tools=[read_file], target="anthropic:claude-sonnet-5", max_rounds=8
+    messages, tools=[read_file], target="anthropic:claude-sonnet-4-5", max_rounds=8
 )
 
 # --- provider escape hatch ---
@@ -979,7 +979,7 @@ frontend is a wire codec plus an ASGI app around an `AsyncClient`.
 
 **Surface (initial):**
 - `POST /v1/chat/completions` — streaming and non-streaming. The request's `model` field is
-  parsed as a `Target`: `"medium"` (alias), `"anthropic:claude-sonnet-5"`,
+  parsed as a `Target`: `"medium"` (alias), `"anthropic:claude-sonnet-4-5"`,
   `"ollama:qwen3:8b"`, or a named route configured server-side. Federation is therefore free.
 - `GET /v1/models` — enumerates catalog aliases, named routes, and (optionally) concrete
   `provider:model` targets, with capability metadata in OpenAI's `model` object shape.

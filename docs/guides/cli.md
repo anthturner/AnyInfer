@@ -76,7 +76,7 @@ the Python SDK and sidecar use, so one file drives all three:
     { "id": "ollama" },
     { "id": "anthropic", "api_key": "env://ANTHROPIC_API_KEY" }
   ],
-  "default_route": ["ollama:qwen3:8b", "anthropic:claude-sonnet-5"]
+  "default_route": ["ollama:qwen3:8b", "anthropic:claude-sonnet-4-5"]
 }
 ```
 
@@ -211,7 +211,7 @@ succeeds wins, so a local-first setup with a hosted backstop is one line:
 
 ```bash
 anyinfer run "Draft a commit message." --config anyinfer.json \
-  --route ollama:qwen3:8b --route anthropic:claude-sonnet-5
+  --route ollama:qwen3:8b --route anthropic:claude-sonnet-4-5
 ```
 
 `--route` overrides `--target`, since naming an ordered list is the more specific

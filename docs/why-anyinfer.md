@@ -74,7 +74,7 @@ in this category, and it is unrepresentable here.
 
 ### 3. Portability is a test result, not a claim
 
-103 providers is inventory, not a feature. The useful part is knowing which of them does
+106 providers is inventory, not a feature. The useful part is knowing which of them does
 what you need. AnyInfer runs the same suite against each adapter and publishes the results,
 including the gaps.
 
