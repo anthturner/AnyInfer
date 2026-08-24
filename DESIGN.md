@@ -1593,7 +1593,7 @@ for failed-attempt billing.
 *Amends §2 goal 11 and the multimodal non-goal.* Implemented. The implementation plan this
 section grew from was retired once its work landed; its full text, per-item audit, and
 progress log are in git history (`plans/EMBEDDING_RERANKING_CONTINUATION.md`, last version
-at commit `f57d8cc`). Everything below is the durable record.
+at commit `b36bb4e`). Everything below is the durable record.
 
 Embeddings and reranking are stateless inference operations, typed and routed on the same
 terms as generation (ADR-017) but never folded into `GenerationRequest`. `EmbeddingRequest`
@@ -1687,7 +1687,7 @@ Resolved during implementation and binding on later work:
 
 *Implemented.* A separate package, not a core change; its plan retired once the work landed
 and its full text is in git history (`plans/VECTOR_STORE_ADDON.md`, last version at commit
-`f57d8cc`).
+`b36bb4e`).
 
 ### 29.1 Why a separate package
 
@@ -1720,7 +1720,7 @@ implied-scalable database — a claim the implementation would not survive.
 
 *Tiers 1-4 implemented.* Its plan retired once the work landed; full text, research
 findings with sources, and the dated decision record are in git history
-(`plans/TIERED_ENCRYPTED_PLANS.md`, last version at commit `f57d8cc`).
+(`plans/TIERED_ENCRYPTED_PLANS.md`, last version at commit `b36bb4e`).
 
 ### 30.0 The problem this answers, and the one it does not
 
