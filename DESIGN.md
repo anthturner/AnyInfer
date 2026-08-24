@@ -1333,7 +1333,8 @@ backed ranker built on this guarantee once §9's `ER.6.9` decision is exercised.
 (endpoints, auth headers, version pins, fields sent/read, streaming framing, error shapes)
 are recorded in `contracts/<provider>.md` — updated in the same change as any adapter
 wire-behavior change. A semi-automated **drift check** (procedure:
-`contracts/DRIFT-CHECK.md`, with the tool-specific entry points listed in `AGENTS.md`)
+`contracts/DRIFT-CHECK.md`, with the tool-specific entry points listed in `AGENTS.md`,
+and the weekly `contract-drift` workflow as its scheduled track)
 audits these snapshots against live provider documentation and classifies
 findings as `OK / DRIFT / DEPRECATION / NEW-CAPABILITY / UNVERIFIABLE`, proposing contract,
 adapter, and matrix updates. Division of labor: the conformance suite proves *our code
@@ -1365,8 +1366,10 @@ and (nightly, where auth permits) live modes.
 > - **m365-copilot** — resolved as the documented degraded case: no streaming, no tools, no
 >   sampling controls (declared in `ignored_parameters`), interactive auth only.
 >
-> Snapshots in `contracts/` are still code-survey-derived; a drift-check run is
-> required before any of them can claim live verification.
+> Ten snapshots still say, in their own words, that they were never verified against
+> live provider documentation — most of them code-survey-derived. The weekly
+> `contract-drift` workflow ranks exactly that signal above age, so those are what its
+> first rotations audit; until a run clears one, it cannot claim live verification.
 
 | Behavior | openai-compat | openai | anthropic | ollama | openrouter | azure-foundry | copilot | m365-copilot | llama-cpp |
 |---|---|---|---|---|---|---|---|---|---|

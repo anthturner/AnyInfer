@@ -158,6 +158,10 @@ that compares each snapshot against the provider's *current* public documentatio
 changelogs:
 
 - Procedure (canonical, tool-agnostic): [contracts/DRIFT-CHECK.md](contracts/DRIFT-CHECK.md)
+- Scheduled: the weekly `contract-drift` workflow selects snapshots deterministically
+  (`scripts/check_contract_drift.py`, never-live-verified first, then oldest) and runs the
+  procedure against them. Needs no provider credentials — snapshots record what a provider
+  publishes, not what an authenticated call returns.
 - Codex: invoke the `check-provider-drift` skill (`$check-provider-drift`).
 - Claude Code: invoke the `check-provider-drift` skill (`/check-provider-drift`).
 - Copilot Chat: run the `check-provider-drift` prompt (`.github/prompts/`).

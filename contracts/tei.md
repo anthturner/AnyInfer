@@ -42,6 +42,13 @@ model; discovery reports the real id), and the descriptor declares
 - None by default (a loopback service). `Authorization: Bearer <key>` only when the
   server was started with `--api-key`; conventionally `env://TEI_API_KEY`.
 
+### Version pins
+- **No API version anywhere** — paths are unversioned and TEI sends no version header.
+  The server's build identity comes from `GET /info`'s `version` field, which is the only
+  thing a caller can pin against; the adapter reads it for diagnostics. A breaking change
+  to an unversioned local API is therefore invisible until a request fails, which is why
+  the watchlist below tracks build-specific behaviour explicitly.
+
 ### Embed request fields (spec 2026-08-12; live 2026-08-24)
 - `inputs` (string or array of strings, required), `normalize` (default **true**),
   `truncate` (default false — over-length input errors rather than silently truncating),

@@ -133,8 +133,23 @@ never changes `last_verified`.
 
 ## Cadence and hygiene
 
-- Intended cadence: before each milestone release, and ad hoc when a provider announces
-  changes. Scheduled CI automation remains an open question (DESIGN.md §20).
+- **Automated cadence: the weekly `contract-drift` workflow** (Mondays 07:00 UTC),
+  which is the scheduled track for this procedure and mirrors the shape the pricing and
+  catalog refreshes already use. Its deterministic stage
+  (`scripts/check_contract_drift.py`) reads no provider documentation at all: it ranks
+  snapshots by whether they have ever been verified against live upstream docs, then by
+  age, fetches each selected snapshot's own cited source URLs to catch pages that have
+  404'd, and hands a bounded selection to a Claude session that runs *this file* against
+  them. Selection is bounded per run so cost is predictable and every snapshot comes up
+  on a guaranteed rotation; the report names what it deferred, because a check that
+  silently audits four of twenty-two reads as "we checked" when it did not.
+- Run it manually against a specific snapshot at any time — before a milestone release,
+  or when a provider announces changes — via the entry points at the top of this file.
+  `workflow_dispatch` on the workflow also takes a larger `budget` to audit more per run.
+- **This lane needs no provider accounts.** A snapshot records what a provider
+  *publishes*, not what an authenticated call returns, so auditing one is a
+  documentation-reading task. That is why it is the verification track that scales to
+  every provider without buying anything.
 - Local engines (Ollama, llama.cpp) drift via GitHub releases rather than API docs; check
   their release notes since the pinned version recorded in the snapshot.
 - Findings that require code changes become tracked work items; this procedure never edits

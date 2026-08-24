@@ -835,8 +835,23 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
         Phase("types", "mypy --strict over src and the runner", (("mypy", lambda: tool("mypy")),)),
         Phase(
             "contracts",
-            "architecture contracts (import-linter, the ADRs)",
-            (("lint-imports", lambda: tool("lint-imports")),),
+            "architecture contracts (import-linter) and snapshot structure",
+            (
+                ("lint-imports", lambda: tool("lint-imports")),
+                # Two different things share the word "contract" here. The first is the
+                # ADRs' import boundaries; the second is whether each provider snapshot
+                # still carries the sections the drift check reads. A snapshot missing
+                # its Auth section is not a smaller snapshot -- it is one the drift
+                # procedure cannot audit, and the gap stays invisible until someone runs
+                # the check and finds nothing to compare.
+                (
+                    "validate contract snapshots",
+                    lambda: run(
+                        [sys.executable, str(ROOT / "scripts" / "validate_contracts.py")],
+                        check=False,
+                    ),
+                ),
+            ),
         ),
         Phase(
             "test",

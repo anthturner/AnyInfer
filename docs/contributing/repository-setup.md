@@ -69,9 +69,9 @@ for all outside collaborators*; the reasoning is in
 
 Two facts about scheduled workflows worth knowing up front:
 
-- The weekly crons in `pricing-refresh.yml` (Mondays 06:00 UTC) and `catalog-refresh.yml`
-  (06:30 UTC) only fire from the **default branch**; the workflow files must exist on
-  `main` before the schedules are live.
+- The weekly crons in `pricing-refresh.yml` (Mondays 06:00 UTC), `catalog-refresh.yml`
+  (06:30 UTC), and `contract-drift.yml` (07:00 UTC) only fire from the **default
+  branch**; the workflow files must exist on `main` before the schedules are live.
 - GitHub suspends cron schedules in repositories with no activity for ~60 days; the
   Actions tab shows a re-enable banner when that happens.
 
@@ -82,8 +82,8 @@ provided automatically and is not listed.
 
 | Secret | Used by | Required | What it is |
 |---|---|---|---|
-| `ANTHROPIC_API_KEY` | `pricing-refresh.yml`, `catalog-refresh.yml` (propose stages) | One of these two | An Anthropic **Console** API key ([platform.claude.com](https://platform.claude.com) → API keys). Billed per token against the Console account's credits. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | `pricing-refresh.yml`, `catalog-refresh.yml` (propose stages) | One of these two | A Claude Code OAuth token minted from a **Claude Pro/Max subscription** by running `claude setup-token` on your machine. Draws on the subscription's usage limits instead of per-token billing. |
+| `ANTHROPIC_API_KEY` | `pricing-refresh.yml`, `catalog-refresh.yml`, `contract-drift.yml` (propose stages) | One of these two | An Anthropic **Console** API key ([platform.claude.com](https://platform.claude.com) → API keys). Billed per token against the Console account's credits. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | `pricing-refresh.yml`, `catalog-refresh.yml`, `contract-drift.yml` (propose stages) | One of these two | A Claude Code OAuth token minted from a **Claude Pro/Max subscription** by running `claude setup-token` on your machine. Draws on the subscription's usage limits instead of per-token billing. |
 
 Set exactly one. Which one is right:
 

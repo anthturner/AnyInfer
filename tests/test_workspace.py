@@ -238,10 +238,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The seven default phases comprise ten steps — eight subprocesses plus the two
+        # The seven default phases comprise eleven steps — nine subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
-        # (conformance has two steps, docs-check three).
-        assert len(calls) == 10
+        # (contracts and conformance have two steps each, docs-check three).
+        assert len(calls) == 11
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0
