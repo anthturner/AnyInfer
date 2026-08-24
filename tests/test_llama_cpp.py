@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,11 @@ from anyinfer.local.server import ManagedServer, ServerHandle
 from anyinfer.local.store import ModelStore, StoreEntry
 from anyinfer.local.tuning import ServerPlan
 from anyinfer.providers.llama_cpp import LlamaCppAdapter, LlamaCppOptions
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
 from anyinfer.types.capabilities import Feature
 
@@ -849,3 +855,76 @@ async def test_a_corrupted_stored_model_is_re_acquired_not_handed_to_the_server(
 
     assert calls == ["test-model"], "a corrupted file must be re-acquired"
     assert target.read_bytes() == PAYLOAD
+
+
+# ---- conformance -----------------------------------------------------------------------
+#
+# The supervised local engine is a *target*, not a separate product, so it belongs in the
+# same matrix as the hosted providers. What makes it awkward is that the adapter owns a
+# process by design: there is no "point at a server someone else started" option, and
+# inventing one purely to make this row possible would put a test seam into the shipped
+# option surface. Swapping the supervisor on the built adapter keeps that seam inside the
+# harness, where `workspace matrix` gets exactly the behaviour the suite does.
+
+
+def _conformance_model_dir() -> Path:
+    """A directory holding the one GGUF the stub supervisor will be handed."""
+    directory = Path(tempfile.mkdtemp(prefix="anyinfer-llama-conformance-"))
+    (directory / "test-model.gguf").write_bytes(PAYLOAD)
+    return directory
+
+
+_CONFORMANCE_MODEL_DIR = _conformance_model_dir()
+
+
+async def _build_llama_cpp_client(scenario: str) -> ai.AsyncClient:
+    from anyinfer.testing.fakes import FakeOpenAIServer, scenario_responses
+
+    server = FakeOpenAIServer(scenario_responses(scenario), models=("test-model",))
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "llama-cpp",
+                options={
+                    "catalog": _catalog(_CONFORMANCE_MODEL_DIR),
+                    "model_dir": _CONFORMANCE_MODEL_DIR,
+                    "auto_download": False,
+                    "hardware": HardwareProfile(
+                        os_name="linux",
+                        arch="x86_64",
+                        total_ram_bytes=32 * GIB,
+                        physical_cores=8,
+                        accelerators=(Accelerator(kind="cuda", total_vram_bytes=24 * GIB),),
+                    ),
+                },
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("llama-cpp:test-model",), retry=ai.Retry(max_attempts=2, backoff_base_s=0.0)
+        ),
+        use_default_catalog=False,
+    )
+    # Build the adapter now so its supervisor can be replaced before any case runs. No
+    # llama-server process is started, no GGUF is downloaded, and no port is bound.
+    adapter = await client._pool.get("llama-cpp")
+    adapter._supervisor = _StubSupervisor()  # type: ignore[attr-defined]
+    return client
+
+
+HARNESS = ConformanceHarness(
+    provider_id="llama-cpp",
+    model="test-model",
+    build_client=_build_llama_cpp_client,
+    # The supervised server speaks the OpenAI-compatible dialect, which carries token
+    # counts for reasoning but no reasoning channel. Embeddings need a server started
+    # with --embeddings, which is a *different* resident server for the same model, so
+    # they are covered by the dedicated tests above rather than claimed here.
+    supports=Capabilities(reasoning=False, cancellation=True),
+)
+
+
+async def test_llama_cpp_conformance() -> None:
+    results = await run_conformance(HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

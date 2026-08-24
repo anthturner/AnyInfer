@@ -19,6 +19,11 @@ import anyinfer as ai
 from anyinfer.errors import AuthError, ConfigError, RateLimitError
 from anyinfer.providers.base import AdapterFinal, ProviderConfig, WireRequest
 from anyinfer.providers.copilot import AUTO_MODEL, CopilotAdapter, _split_prompt, descriptor
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
 from anyinfer.types.messages import Message, ToolResult
 
 
@@ -315,3 +320,112 @@ def test_descriptor_features_exclude_tools() -> None:
     assert ai.Feature.TOOLS not in features
     assert ai.Feature.STREAMING in features
     assert ai.Feature.SYSTEM_PROMPT in features
+
+
+# ---- conformance -----------------------------------------------------------------------
+#
+# The one row in the matrix whose evidence is a fake *SDK* rather than a fake server, and
+# that is the honest analogue rather than a shortcut: this adapter's boundary genuinely is
+# the SDK, not HTTP, so a transport-level fake would be testing a layer the adapter never
+# touches. The fake module is installed by the harness itself rather than by a pytest
+# fixture, because `workspace matrix` runs these harnesses outside pytest and a row that
+# only exists under the test runner is a row the published matrix cannot honestly claim.
+
+
+class _ConformanceSession:
+    """A session whose scripted events, and failures, follow the scenario."""
+
+    def __init__(self, events: Sequence[Any], error: Exception | None) -> None:
+        self._events = list(events)
+        self._error = error
+        self.closed = False
+
+    def send(self, prompt: str) -> list[Any]:
+        if self._error is not None:
+            raise self._error
+        return list(self._events)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def _conformance_sdk(scenario: str) -> types.ModuleType:
+    """A fake ``copilot`` module scripted for one conformance scenario.
+
+    Errors are raised as plain exceptions whose *message text* carries the signal, which
+    is exactly how the adapter classifies them: the SDK exposes no status codes, so
+    `_classify` matches on words like "unauthorized" and "rate limit". A fake that raised
+    typed errors would be testing a mapping the adapter does not have.
+    """
+    from anyinfer.testing.fakes import scenario_responses
+
+    responses = scenario_responses(scenario)
+    state = {"call": 0}
+
+    class _ConformanceClient:
+        def __init__(self, **options: Any) -> None:
+            self.options = options
+
+        def create_session(self, **_session_options: Any) -> _ConformanceSession:
+            index = min(state["call"], len(responses) - 1)
+            response = responses[index]
+            state["call"] += 1
+
+            error: Exception | None = None
+            if response.status == 401:
+                error = RuntimeError("unauthorized: please run copilot login")
+            elif response.status == 429:
+                error = RuntimeError("rate limit exceeded, too many requests")
+            events: list[Any] = [
+                {"text": response.text},
+                {"type": "assistant.usage", "input_tokens": 11, "output_tokens": 7},
+            ]
+            return _ConformanceSession(events, error)
+
+        def list_models(self) -> list[Any]:
+            return [{"id": "gpt-5"}]
+
+        def close(self) -> None:
+            return None
+
+    module = types.ModuleType("copilot")
+    module.CopilotClient = _ConformanceClient  # type: ignore[attr-defined]
+    return module
+
+
+async def _build_copilot_client(scenario: str) -> ai.AsyncClient:
+    # Installed directly rather than through monkeypatch: the harness must behave the
+    # same inside pytest and inside `workspace matrix`. Nothing else in this repository
+    # imports `copilot`, and the one test that needs the import to fail forces it to
+    # `None` explicitly, so it is unaffected by what is installed here.
+    sys.modules["copilot"] = _conformance_sdk(scenario)
+    return ai.AsyncClient(
+        [ai.ProviderSettings.of("copilot")],
+        route=ai.Route(
+            targets=("copilot:gpt-5",), retry=ai.Retry(max_attempts=2, backoff_base_s=0.0)
+        ),
+    )
+
+
+HARNESS = ConformanceHarness(
+    provider_id="copilot",
+    model="gpt-5",
+    build_client=_build_copilot_client,
+    # Every False is a documented property of the session API, not a gap in this fake.
+    # It takes a prompt and options only, so caller tool specs have no wire form at all
+    # (they are in `ignored_parameters`); there is no reasoning channel and no
+    # response-format field, so a schema is prompt-injected and validated client-side.
+    # Nothing counts response bytes, because the adapter is handed events, not a body.
+    supports=Capabilities(
+        tools=False,
+        reasoning=False,
+        byte_cap=False,
+        cancellation=False,
+    ),
+)
+
+
+async def test_copilot_conformance() -> None:
+    results = await run_conformance(HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

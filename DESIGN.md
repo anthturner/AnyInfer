@@ -1353,8 +1353,10 @@ and (nightly, where auth permits) live modes.
 > sharing the `openai_compat` adapter. The
 > *executed* matrix — generated from a real conformance run rather than hand-maintained —
 > lives at [docs/reference/conformance-matrix.md](docs/reference/conformance-matrix.md);
-> regenerate it with `workspace matrix`. The table below remains the
-> design-intent matrix. Cells marked `?` are design questions, several of which the
+> regenerate it with `workspace matrix`. **Every dedicated adapter now has a row there**,
+> at whatever boundary it actually has: an HTTP transport for the twenty that speak HTTP,
+> a fake SDK for `copilot`, and a stub supervisor for `llama-cpp`. The table below remains
+> the design-intent matrix. Cells marked `?` are design questions, several of which the
 > implementation has now answered:
 >
 > - **anthropic json_schema** — resolved as Ⓔ: emulated with a single forced tool call,

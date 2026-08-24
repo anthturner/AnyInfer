@@ -998,7 +998,12 @@ Regenerate with `python workspace.py matrix`.
 
 Legend: ✅ verified · ➖ declared unsupported · ❌ failing
 
-Each cell is one parametrized test case executed against that adapter in fake-server mode.
+Each cell is one parametrized test case executed against that adapter in fake-server mode,
+at whatever boundary that adapter actually has: an in-process HTTP transport for the
+twenty that speak HTTP, and a fake SDK module for `copilot`, whose boundary genuinely is
+the ``github-copilot-sdk`` session API rather than a wire protocol. `llama-cpp` speaks
+HTTP to a server it supervises, so its row substitutes a stub supervisor and starts no
+process, downloads nothing, and binds no port.
 A ➖ is an honest, declared limitation; it is not a pass.
 
 """
@@ -1065,10 +1070,12 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     import test_bedrock_vertex
     import test_cohere_lmstudio
     import test_conformance
+    import test_copilot
     import test_deepseek_xai
     import test_gemini
     import test_hosted_adapters
     import test_jina
+    import test_llama_cpp
     import test_nebius
     import test_ollama
     import test_presets
@@ -1094,6 +1101,8 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "m365-copilot": test_hosted_adapters.M365_HARNESS,
         "vertex": test_bedrock_vertex.VERTEX_HARNESS,
         "bedrock": test_bedrock_vertex.BEDROCK_HARNESS,
+        "llama-cpp": test_llama_cpp.HARNESS,
+        "copilot": test_copilot.HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed
