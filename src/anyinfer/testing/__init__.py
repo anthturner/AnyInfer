@@ -21,12 +21,14 @@ from .conformance import (
     run_conformance,
 )
 from .fakes import (
+    CONFORMANCE_SCENARIOS,
     FakeGeminiServer,
     FakeOllamaServer,
     FakeOpenAIServer,
     FakeResponse,
     chunk_text,
     ndjson_lines,
+    scenario_responses,
     sse_lines,
 )
 from .manifests import VOLATILE_FIELDS, assert_manifest_matches, normalize
@@ -42,6 +44,7 @@ from .scripted_operations import FakeEmbeddingRerankProvider, ScriptedEmbeddingF
 
 __all__ = [
     "CONFORMANCE_CASES",
+    "CONFORMANCE_SCENARIOS",
     "DEFAULT_SCRIPTED_CAPABILITIES",
     "VOLATILE_FIELDS",
     "Capabilities",
@@ -70,5 +73,6 @@ __all__ = [
     "normalize",
     "results_to_json",
     "run_conformance",
+    "scenario_responses",
     "sse_lines",
 ]

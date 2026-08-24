@@ -909,7 +909,7 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 - **R1 — sync facade correctness** (streaming iterators, cancellation, thread affinity).
   Mitigated by the background-loop ownership rules, bounded cancellation, early-exit tests,
   and thread-stress coverage; retain those as release gates.
-- **R2 — multi-provider conformance drift**, now across seventeen dedicated adapters plus a
+- **R2 — multi-provider conformance drift**, now across twenty dedicated adapters plus a
   preset registry. Mitigate: cassette CI + nightly live runs; the matrix doc is the source
   of truth for "native vs emulated vs unsupported", and presets are covered by
   representatives per quirk axis rather than one row each.
@@ -1345,9 +1345,10 @@ Legend: ✅ native · Ⓔ emulated by core/adapter · ➖ unsupported (documente
 milestone. Every cell backed by a parametrized conformance case run in cassette, fake-server,
 and (nightly, where auth permits) live modes.
 
-> **Implementation status.** Seventeen dedicated adapters are implemented
-> (the original nine plus Gemini, DeepSeek, xAI, Vertex AI, Bedrock, Cohere, and LM
-> Studio), alongside a preset registry of eighty-six OpenAI-compatible providers
+> **Implementation status.** Twenty dedicated adapters are implemented
+> (the original nine plus Gemini, DeepSeek, xAI, Vertex AI, Bedrock, Cohere, LM Studio,
+> Voyage AI, Jina AI, and Text Embeddings Inference), alongside a preset registry of
+> eighty-six OpenAI-compatible providers
 > sharing the `openai_compat` adapter. The
 > *executed* matrix — generated from a real conformance run rather than hand-maintained —
 > lives at [docs/reference/conformance-matrix.md](docs/reference/conformance-matrix.md);

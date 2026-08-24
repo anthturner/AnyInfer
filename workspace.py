@@ -1049,7 +1049,9 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     sys.path.insert(0, str(ROOT / "tests"))
     import test_cohere_lmstudio
     import test_conformance
+    import test_deepseek_xai
     import test_gemini
+    import test_hosted_adapters
     import test_nebius
     import test_ollama
     import test_presets
@@ -1063,6 +1065,10 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "lm-studio": test_cohere_lmstudio.LM_STUDIO_HARNESS,
         "nebius": test_nebius.HARNESS,
         "tei": test_tei.HARNESS,
+        "deepseek": test_deepseek_xai.DEEPSEEK_HARNESS,
+        "xai": test_deepseek_xai.XAI_HARNESS,
+        "azure-foundry": test_hosted_adapters.AZURE_HARNESS,
+        "openrouter": test_hosted_adapters.OPENROUTER_HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed
@@ -1072,6 +1078,23 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
             test_presets.PRESETS_BY_ID[preset_id], "fake-model-small"
         )
     return {name: await run_conformance(h) for name, h in harnesses.items()}
+
+
+def _uncovered_adapters(results: dict[str, list[CaseResult]]) -> list[str]:
+    """Dedicated adapters with no shared-harness row, derived from the registry.
+
+    Hand-maintaining this list is how a matrix ends up claiming coverage it lost, or
+    confessing a gap it already closed. Deriving it means adding a harness updates the
+    prose in the same run that adds the row.
+    """
+    from anyinfer.providers import _BUILTIN_MODULES
+
+    covered = set(results)
+    return [
+        name
+        for name in (module.replace("_", "-") for module in _BUILTIN_MODULES)
+        if name not in covered
+    ]
 
 
 def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
@@ -1093,12 +1116,20 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
         lines.append(f"| {provider} | " + " | ".join(cells) + " |")
 
     lines.append("")
+    uncovered = _uncovered_adapters(results)
+    covered_note = (
+        "Every dedicated adapter now has a shared-harness row."
+        if not uncovered
+        else (
+            "Adapters without a harness yet ("
+            + ", ".join(f"`{name}`" for name in uncovered)
+            + ") are covered by their own dialect tests; the public matrix reports only "
+            "shared-harness results."
+        )
+    )
     lines.append(
-        "Adapters without a harness yet (`openai`, `anthropic`, `azure-foundry`, "
-        "`openrouter`, `copilot`, `m365-copilot`, `llama-cpp`, `deepseek`, `xai`, "
-        "`bedrock`, `vertex`) are covered by their own dialect tests; "
-        "the public matrix reports only shared-harness results. Expanding cassette-backed "
-        "coverage is tracked as release follow-up work. "
+        covered_note + " Expanding cassette-backed coverage is tracked as release "
+        "follow-up work. "
         "The `groq`, `moonshot`, `reka` and `venice` rows exercise the shared adapter's "
         "quirk axes — bearer auth, the renamed output-token field, `x-api-key` auth, and "
         "the `max_completion_tokens` dialect. Every entry in the "

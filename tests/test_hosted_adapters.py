@@ -19,7 +19,12 @@ from anyinfer.providers.anthropic import ANTHROPIC_VERSION
 from anyinfer.providers.azure_foundry import AzureFoundryAdapter
 from anyinfer.providers.base import ProviderConfig
 from anyinfer.providers.openrouter import OpenRouterAdapter
-from anyinfer.testing.fakes import sse_lines
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
+from anyinfer.testing.fakes import FakeOpenAIServer, scenario_responses, sse_lines
 
 
 def _client(provider: str, handler: Any, **settings: Any) -> ai.AsyncClient:
@@ -811,3 +816,76 @@ async def test_m365_health_does_not_trigger_an_interactive_prompt() -> None:
 
     assert health.ok is False
     assert "interactive" in health.detail
+
+
+# ---- conformance ---------------------------------------------------------------------
+#
+# The dialect tests above prove each adapter's divergences. These harnesses prove the
+# shared contract on top of them, and are what the published conformance matrix reports.
+
+
+async def _build_azure_client(scenario: str) -> ai.AsyncClient:
+    server = FakeOpenAIServer(
+        scenario_responses(scenario), models=("gpt-5-deployment", "text-embedding-3-small")
+    )
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "azure-foundry",
+                api_key="azure-key",
+                base_url="https://fake.services.ai.azure.com/openai/v1",
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("azure-foundry:gpt-5-deployment",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+AZURE_HARNESS = ConformanceHarness(
+    provider_id="azure-foundry",
+    model="gpt-5-deployment",
+    build_client=_build_azure_client,
+    # Foundry deployments serve embeddings from the same resource, model-addressed by
+    # deployment name. No rerank endpoint exists, and the compat dialect carries token
+    # counts for reasoning but no reasoning channel.
+    supports=Capabilities(reasoning=False, cancellation=True, embedding=True),
+    embedding_model="text-embedding-3-small",
+)
+
+
+async def test_azure_foundry_conformance() -> None:
+    results = await run_conformance(AZURE_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+async def _build_openrouter_client(scenario: str) -> ai.AsyncClient:
+    server = FakeOpenAIServer(
+        scenario_responses(scenario), models=("anthropic/claude-sonnet-4-5",)
+    )
+    return ai.AsyncClient(
+        [ai.ProviderSettings.of("openrouter", api_key="or-key", transport=server.transport())],
+        route=ai.Route(
+            targets=("openrouter:anthropic/claude-sonnet-4-5",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+OPENROUTER_HARNESS = ConformanceHarness(
+    provider_id="openrouter",
+    model="anthropic/claude-sonnet-4-5",
+    build_client=_build_openrouter_client,
+    # Reasoning availability is per-upstream-model and discovered, never a property of
+    # the router itself; the dialect test above covers the translation.
+    supports=Capabilities(reasoning=False, cancellation=True),
+)
+
+
+async def test_openrouter_conformance() -> None:
+    results = await run_conformance(OPENROUTER_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

@@ -17,12 +17,14 @@ from typing import Any
 import httpx2
 
 __all__ = [
+    "CONFORMANCE_SCENARIOS",
     "FakeGeminiServer",
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",
     "chunk_text",
     "ndjson_lines",
+    "scenario_responses",
     "sse_lines",
 ]
 
@@ -84,6 +86,79 @@ class FakeResponse:
     omit_usage_chunk: bool = False
 
 
+CONFORMANCE_SCENARIOS: tuple[str, ...] = (
+    "default",
+    "tools",
+    "reasoning",
+    "structured",
+    "repair",
+    "auth_error",
+    "rate_limited",
+    "oversized",
+    "odd_finish",
+)
+"""Every scenario key `run_conformance` hands to a harness's client factory."""
+
+_PROBE_ANSWER = json.dumps({"answer": "ok"})
+
+
+def scenario_responses(
+    scenario: str,
+    *,
+    text: str = "Hello from the fake provider.",
+    reasoning: str = "Let me think.",
+    probe_answer: str = _PROBE_ANSWER,
+) -> list[FakeResponse]:
+    """The canonical response programme for one conformance scenario.
+
+    Every harness answers the same nine scenarios with the same *shapes*: a tool call for
+    ``tools``, an invalid-then-valid pair for ``repair``, a 401 for ``auth_error``, and so
+    on. Only the wire encoding differs per dialect, and the fake server classes already own
+    that. Programming the scenarios here means a new adapter's harness declares its dialect
+    and its capabilities — never a ninth copy of the same if/elif chain, which is exactly
+    where a subtly weaker probe slips into one provider's column unnoticed.
+
+    Args:
+        scenario: A key from `CONFORMANCE_SCENARIOS`. An unrecognized key is treated as
+            ``default``, so a harness never has to enumerate them.
+        text: Assistant text for the scenarios that just need a successful answer.
+        reasoning: Thinking text for the ``reasoning`` scenario. Dialects without a
+            reasoning channel ignore it and declare ``reasoning=False`` instead.
+        probe_answer: The JSON answer satisfying `PROBE_SCHEMA`.
+
+    Returns:
+        Responses to serve in order. The fake servers reuse the last one once exhausted,
+        so a single-element list answers every request in the scenario.
+    """
+    if scenario == "tools":
+        return [
+            FakeResponse(
+                text="",
+                tool_calls=(("call_0", "lookup", json.dumps({"key": "alpha"})),),
+                finish_reason="tool_calls",
+            )
+        ]
+    if scenario == "reasoning":
+        return [FakeResponse(text=text, reasoning=reasoning)]
+    if scenario == "structured":
+        return [FakeResponse(text=probe_answer)]
+    if scenario == "repair":
+        # The first answer validates against nothing; the repair loop must recover.
+        return [FakeResponse(text=json.dumps({"wrong": True})), FakeResponse(text=probe_answer)]
+    if scenario == "auth_error":
+        return [FakeResponse(status=401, error_message="invalid token")]
+    if scenario == "rate_limited":
+        return [
+            FakeResponse(status=429, error_message="busy", headers={"retry-after": "0"}),
+            FakeResponse(text="recovered"),
+        ]
+    if scenario == "oversized":
+        return [FakeResponse(text="x" * 20_000)]
+    if scenario == "odd_finish":
+        return [FakeResponse(text=text, finish_reason="model_decided")]
+    return [FakeResponse(text=text)]
+
+
 class _FakeServerBase:
     """Shared response-list bookkeeping and transport wiring for fake provider servers.
 
@@ -122,6 +197,11 @@ class FakeOpenAIServer(_FakeServerBase):
             exhausted, so a single-element list serves every request.
         models: Model ids reported by ``GET /models``.
         chunk_size: Characters per streamed text delta.
+        reasoning_field: Name of the dialect's reasoning key (DeepSeek and xAI both
+            send ``reasoning_content``). ``None`` — the plain OpenAI shape — omits
+            reasoning entirely, so an adapter with no reasoning channel cannot
+            accidentally pass the reasoning case.
+        dimensions: Width of the vectors ``POST /embeddings`` returns.
 
     Attributes:
         requests: Every request body received, for assertions.
@@ -133,10 +213,14 @@ class FakeOpenAIServer(_FakeServerBase):
         *,
         models: Sequence[str] = ("fake-model-small", "fake-model-large"),
         chunk_size: int = 4,
+        reasoning_field: str | None = None,
+        dimensions: int = 8,
     ) -> None:
         super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
+        self._reasoning_field = reasoning_field
+        self._dimensions = dimensions
 
     def next_response(self) -> FakeResponse:
         """The response for the next generation call."""
@@ -149,6 +233,8 @@ class FakeOpenAIServer(_FakeServerBase):
             return self._handle_models()
         if path.endswith("/chat/completions"):
             return self._handle_chat(request)
+        if path.endswith("/embeddings"):
+            return self._handle_embeddings(request)
         return httpx2.Response(404, json={"error": {"message": f"no such path: {path}"}})
 
     def _handle_models(self) -> httpx2.Response:
@@ -189,8 +275,60 @@ class FakeOpenAIServer(_FakeServerBase):
             headers=dict(response.headers),
         )
 
+    def _handle_embeddings(self, request: httpx2.Request) -> httpx2.Response:
+        """Serve ``POST /embeddings``, sharing the scenario script with generation.
+
+        Failure scenarios must reach embeddings the same way they reach chat, or a
+        provider's ``embedding_retry_after`` column would claim a retry path that was
+        never exercised. Vectors are derived from the input text so duplicate inputs
+        produce identical vectors and the positional-preservation case is meaningful.
+        """
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        response = self.next_response()
+        self._call_index += 1
+
+        if response.status >= 400:
+            return httpx2.Response(
+                response.status,
+                json={"error": {"message": response.error_message, "type": "fake_error"}},
+                headers=dict(response.headers),
+            )
+
+        raw = body.get("input", [])
+        inputs = [raw] if isinstance(raw, str) else list(raw)
+        return httpx2.Response(
+            200,
+            json={
+                "object": "list",
+                "model": body.get("model", "fake-embedding-model"),
+                "data": [
+                    {
+                        "object": "embedding",
+                        "index": index,
+                        "embedding": self._vector(str(text)),
+                    }
+                    for index, text in enumerate(inputs)
+                ],
+                "usage": {"prompt_tokens": len(inputs), "total_tokens": len(inputs)},
+            },
+            headers=dict(response.headers),
+        )
+
+    def _vector(self, text: str) -> list[float]:
+        """A deterministic, unnormalized vector for ``text``.
+
+        Deliberately not unit-length: the normalization probe must *measure* the answer,
+        so a fake that always returned normalized vectors would hide an adapter that
+        merely assumed it.
+        """
+        seed = sum(ord(c) for c in text) or 1
+        return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(self._dimensions)]
+
     def _completion_body(self, response: FakeResponse) -> dict[str, Any]:
         message: dict[str, Any] = {"role": "assistant", "content": response.text or None}
+        if response.reasoning and self._reasoning_field:
+            message[self._reasoning_field] = response.reasoning
         if response.tool_calls:
             message["tool_calls"] = [
                 {
@@ -215,6 +353,11 @@ class FakeOpenAIServer(_FakeServerBase):
             return b"data: {not json at all\n\n"
 
         chunks: list[dict[str, Any]] = []
+        if self._reasoning_field:
+            for fragment in chunk_text(response.reasoning, self._chunk_size):
+                if not fragment:
+                    continue
+                chunks.append(self._delta_chunk({self._reasoning_field: fragment}))
         for fragment in chunk_text(response.text, self._chunk_size):
             if not fragment:
                 continue

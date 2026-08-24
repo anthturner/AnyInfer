@@ -629,38 +629,9 @@ async def test_cohere_conformance() -> None:
 
 def _lm_studio_server(scenario: str) -> Any:
     """Program an LM Studio fake: native discovery plus the compatible chat endpoint."""
-    from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
+    from anyinfer.testing.fakes import FakeOpenAIServer, scenario_responses
 
-    if scenario == "tools":
-        inner = FakeOpenAIServer(
-            FakeResponse(
-                text="",
-                tool_calls=(("call_0", "lookup", '{"key": "alpha"}'),),
-                finish_reason="tool_calls",
-            )
-        )
-    elif scenario == "structured":
-        inner = FakeOpenAIServer(FakeResponse(text=PROBE_ANSWER))
-    elif scenario == "repair":
-        inner = FakeOpenAIServer(
-            [FakeResponse(text='{"wrong": true}'), FakeResponse(text=PROBE_ANSWER)]
-        )
-    elif scenario == "auth_error":
-        inner = FakeOpenAIServer(FakeResponse(status=401, error_message="invalid token"))
-    elif scenario == "rate_limited":
-        inner = FakeOpenAIServer(
-            [
-                FakeResponse(status=429, error_message="busy", headers={"retry-after": "0"}),
-                FakeResponse(text="recovered"),
-            ]
-        )
-    elif scenario == "oversized":
-        inner = FakeOpenAIServer(FakeResponse(text="x" * 20_000))
-    elif scenario == "odd_finish":
-        inner = FakeOpenAIServer(FakeResponse(text="hello", finish_reason="model_decided"))
-    else:
-        inner = FakeOpenAIServer(FakeResponse(text="Hello from LM Studio."))
-
+    inner = FakeOpenAIServer(scenario_responses(scenario, text="Hello from LM Studio."))
     compat = inner.transport()
 
     def handler(request: httpx2.Request) -> httpx2.Response:

@@ -82,6 +82,10 @@ without credentials or a network.
 
 ::: anyinfer.testing.FakeResponse
 
+::: anyinfer.testing.scenario_responses
+
+::: anyinfer.testing.CONFORMANCE_SCENARIOS
+
 ::: anyinfer.testing.chunk_text
 
 ::: anyinfer.testing.sse_lines
