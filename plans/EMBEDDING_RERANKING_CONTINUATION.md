@@ -1,15 +1,17 @@
 # Embedding/reranking: continuation handoff
 
-> **Status (2026-08-14 update):** T1, T2, T3, T4, T5, T7 (partial), T8, T9, T10 (partial)
-> done. Genuinely still open: T6 (pricing data for Cohere/Jina rerank — re-checked
-> 2026-08-14, still unpublished, not a task gap), T7's remaining live lanes
-> (Voyage/Jina/TEI, cancellation-in-conformance — no credentials/servers for the former,
-> no scenario-plumbing concept built yet for the latter), T11 (catalog schema for
-> embedding models — a real design question about how embeddings fit the catalog's
-> generation-oriented alias/tier system, not a research gap; see its entry in §5 below).
-> Each item's own dated log entry in §12 has the honest specifics; do not re-attempt T6's
-> pricing re-check or T4/T7's "needs live access" framing without a new signal, since both
-> were genuinely re-verified this session, not assumed.
+> **Status (2026-08-24): complete except for two items nobody here can unblock.**
+> T1-T5, T8-T11 are done. T7 is done except the Voyage and Jina live lanes, which need API
+> credentials this environment does not have. T6's mechanism is done and its obtainable
+> data landed; Cohere and Jina rerank prices remain genuinely unpublished — re-checked
+> 2026-08-24 for the third time, still only dedicated-instance hourly rates and no
+> per-search-unit figure anywhere. Neither remaining item is a task gap, and neither is
+> worth re-attempting without a new signal: credentials appearing, or those two vendors
+> publishing a rate.
+>
+> Closed this session: **T11** (the catalog's embedding schema, with the design question
+> resolved and two real pinned entries), **T7's cancellation case** and **TEI live lane**
+> (real servers, committed cassettes), and the last cost gap on the acceptance bar.
 >
 > **Original status:** ready to execute; written 2026-08-12 at the end of the session that
 > landed commits `1a47675..f18d415` (18 commits on `develop`).
@@ -176,7 +178,11 @@ upstream that `/v1/embeddings` exists (start with together/fireworks/mistral/dee
 `contracts/openai-compat-presets.md` with dates, and enable only the verified ones.
 Unverified presets stay generation-only (the correct default).
 
-### T6 — Pricing pipeline entries (Track E remainder, BH.E.2) — DONE 2026-08-12 (OpenAI + Voyage embeddings; Cohere/Jina/Voyage-rerank remain publicly unpriced)
+### T6 — Pricing pipeline entries (Track E remainder, BH.E.2) — DONE except two unpublished prices
+
+Mechanism, data, and an end-to-end proof that a bundled price reaches a real embedding
+result all landed. Cohere and Jina rerank prices re-checked a third time on 2026-08-24
+and still unpublished. Blocked on those vendors, not on work here.
 
 Mechanism is DONE (`Pricing.per_search_unit`, `compute_operation_cost`); what's missing
 is data + parsing:
@@ -192,7 +198,12 @@ is data + parsing:
 3. The demo panel's cost display lights up automatically once entries exist (ER.9.13).
 4. ER.11.12: mixed generation/embed/rerank rate-pacing test.
 
-### T7 — Conformance/harness remainder (Track H, BH.H.1/H.2/H.3/H.5) — four cases + Ollama live lane DONE, cancellation and Voyage/Jina/TEI live lanes still open
+### T7 — Conformance/harness remainder (Track H) — DONE except the Voyage and Jina live lanes
+
+Cancellation landed 2026-08-24 as a conformance case (the 'scenario-plumbing concept'
+turned out to be unnecessary — the consumer holds the stream open, not the fake), and the
+TEI live lane closed the same day against two real servers with committed cassettes.
+Voyage and Jina need API credentials no environment here has had.
 
 - Port the never-harness-registered behaviors into `CONFORMANCE_CASES`: intent
   translation, normalization metadata, byte caps, retry-after, cancellation,
@@ -246,7 +257,7 @@ result type). Cohere discovery now lists embedding models, so the
 - Error-catalog staleness check (D-15 chose ConfigError-with-documented-messages; the
   message contracts should be listed there).
 
-### T11 — Catalog + init (Track G deferred bits) — init/sidecar bits DONE 2026-08-12, catalog schema still open
+### T11 — Catalog + init (Track G deferred bits) — DONE 2026-08-24
 
 - Catalog schema lands **together with the first pinned embedding-model entries** (the
   deferral reason: schema with zero entries is dead surface). Touch points:
@@ -403,12 +414,18 @@ feature-complete bar:
   fixture exists for it yet, worth adding in a future pass, but the live-verification bar
   itself is met. Remaining live lanes (Voyage/Jina/TEI, cancellation-in-conformance) are
   still open, tracked in T7.
-- [ ] Usage, **cost**, spend policy tested for both operations end to end (cost blocks
-  on T6's pricing entries).
+- [x] Usage, **cost**, spend policy tested for both operations end to end. Closed
+  2026-08-24: the fake-priced tests already covered the arithmetic and the spend
+  ceilings; what was missing was proof that the *bundled* table's entries are keyed
+  the way the embedding path looks them up, since a price present but never found is
+  indistinguishable from an absent one. One end-to-end pass over the real table now
+  covers it. Rerank cost stays uncomputable for Cohere and Jina because neither
+  publishes a rate — a data gap, not a coverage gap.
 - [ ] Standalone sidecar bundles pass `/v1/embeddings` and rerank smoke tests on macOS,
   Linux, and Windows (D-16; release push).
-- [ ] Generated provider indexes and the conformance matrix make no unsupported claims
-  (holds today; re-check as T1-T5 land).
+- [x] Generated provider indexes and the conformance matrix make no unsupported claims.
+  Strengthened 2026-08-24: the matrix's own legend had drifted seven cases behind the
+  matrix, and a test now compares the two so it cannot again.
 - [ ] All public symbols documented; examples run offline; every gate passes (holds
   today; keep it true).
 
@@ -704,3 +721,65 @@ feature-complete bar:
   `static_embedding_capabilities` stays empty for this provider (dimensions/limits vary
   per GGUF and the catalog schema has no field for them yet — that gap is T11). All gates
   green.
+
+- **2026-08-24:** T11 done — the catalog's embedding schema, with the design question the
+  2026-08-14 note deferred actually decided rather than worked around. One table with a
+  `kind`, not a parallel `embedding_artifacts` section: acquisition is genuinely identical
+  (SourceRef, digests, revisions, resolver, allowlist), so a second section would have
+  duplicated all of it and then drifted. Only the interpreting code branches, and the
+  branch that mattered most was memory: an embedding model misses every rung of
+  `KV_BYTES_PER_TOKEN_F16` and takes its 256 KiB/token default, which over a chat-sized 8k
+  context budgets 2 GiB for weights of 84 MB — a 25x overestimate the fit engine would act
+  on by refusing the model on machines that run it comfortably.
+  `estimate_embedding_memory` computes the cost from layer count and hidden size read out
+  of the model's own `config.json` at pin time, over the model's real sequence length.
+  A row's facts are an `EmbeddingCapabilities` — the record the client already reads, so
+  there is no mapping step to drift — restricted to a closed key set of `dimensions` and
+  `max_input_tokens`, because the rest of that type is provider-specific or measurable and
+  a catalog row that could declare `normalized` would assert an unverifiable fact about
+  every deployment of the model at once. `probe_embedding()` measures that. Aliases:
+  small/medium/large answer "how big a chat model should I run", so the validator refuses
+  an alias pointing at an embedding model rather than leaving it to review.
+  **Found and fixed a real wrong answer:** every llama.cpp model discovered as
+  generation-only carrying the full chat feature set, embedding GGUFs included, so
+  `client.models(operation="embedding")` returned nothing on a machine with one installed.
+  Facts now reach the client through discovery, since a descriptor's static table is keyed
+  by ids known at authoring time and this provider's ids come from the machine.
+  First entries pinned live from the author's own GGUF repos: `nomic-embed-text-v1.5`
+  (768 dims, 8192 tokens, Ollama channel pinned by digest) and `nomic-embed-text-v2-moe`
+  (768 dims, 512 tokens). Sequence lengths come from the published model cards, not
+  `config.json` — nomic v1.5 trains to 8192 by rotary scaling while its config reads 2048.
+  Deliberately **not** done: automatic task-prefix application. Both models require
+  `search_query: `/`search_document: ` prefixes for good retrieval, and applying them would
+  be core-owned per-model input rewriting — a real design question, not a catalog field.
+- **2026-08-24:** T7's cancellation case delivered. The plan recorded it as needing "its
+  own scenario-plumbing concept"; it does not. The existing `streaming` scenario suffices
+  once the *consumer* holds the stream open rather than the fake. The case cancels a live
+  stream mid-flight and then asks the same client for a full generation — the second half
+  is what catches a generator that is collected rather than closed, which releases the
+  upstream connection whenever the GC gets there and, under a pool, leaves the next request
+  waiting on a slot nothing will free. Six harnesses plus all eighty-six presets declare and
+  pass it; TEI declares it False, the honest answer for a provider with no `generate()`.
+  Also closed a documentation bug: the matrix legend had drifted seven cases behind, so a
+  reader saw seven unexplained columns. A test now compares legend against
+  `CONFORMANCE_CASES`.
+- **2026-08-24:** T7's TEI live lane closed. Two real servers (official `cpu-1.8` image,
+  reporting 1.8.3; `BAAI/bge-small-en-v1.5` and `BAAI/bge-reranker-base`, because TEI serves
+  one model per process) back committed cassettes that replay offline. Every spec claim held.
+  Three things the spec does not say came out of the traffic: responses carry
+  `x-compute-tokens` and friends, entirely undocumented — deliberately **not** read, because
+  usage built on an undocumented header vanishes silently on any release and the drift check
+  compares against documentation that never mentioned it; rerank results arrive already
+  sorted descending, but the document still guarantees no order so the adapter keeps sorting;
+  and `/info.model_type` is a tagged object in both shapes, which the contract had listed as
+  needing live confirmation. The append trap this file documents caught me mid-record — a
+  fixed test re-recorded into an existing cassette and doubled its interactions.
+- **2026-08-24:** T6 re-checked a third time and still blocked on the vendors.
+  `cohere.com/pricing` serves dedicated-instance hourly rates and legacy generation
+  per-token prices, no per-search-unit Rerank figure; Jina's reranker and embeddings pages
+  serve no rate at all. `pricing.json` untouched again rather than guessed. The remaining
+  acceptance-bar cost item was closed a different way — see §11.
+- **2026-08-24:** The new-provider recipe that lived in §3 of this file moved to
+  `contracts/NEW-PROVIDER.md`, the canonical tool-agnostic procedure, with the three shims
+  every other procedure here has. A recipe that lives in one plan is a recipe the next
+  agent working on a different plan never sees.
