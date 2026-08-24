@@ -11,7 +11,7 @@ or reranking calls needs to change when you do.
 
 Similarity search is brute-force cosine similarity, in pure Python, on purpose: at this
 package's stated scale ceiling, an approximate index is complexity this package's own
-design record (`plans/VECTOR_STORE_ADDON.md` §7) does not commit to paying for without
+design record (DESIGN.md §29.3) does not commit to paying for without
 benchmark evidence it's needed. `SIZE_WARNING_THRESHOLD` is where this module starts
 telling you, not guessing silently, that you may be past the point brute force stays fast.
 """

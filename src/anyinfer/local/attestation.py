@@ -6,7 +6,7 @@ exactly: detection *proposes*, `ConfidentialExecutionAdapter` (in `providers` �
 thing that actually enforces anything) decides, and every probe here is best-effort. A
 missing device node or an
 unparseable `nvidia-smi` line produces "not detected," never a guess dressed up as a fact
-— see `plans/TIERED_ENCRYPTED_PLANS.md` §4d for the full design this module implements.
+— see DESIGN.md §30.4 for the full design this module implements.
 
 This is a hardware-capability question in the same category as `hardware.py`/`backends.py`
 already answer ("what does this box actually have"), so it stays in core, in `local/`, not
@@ -62,7 +62,7 @@ did you find" deserves the whole answer — but neither is part of the v1 `end_t
 claim: SGX's enclave-shaped programming model is not the lift-and-shift story SEV-SNP/TDX
 give, and Nitro Enclaves have no persistent storage or general networking, so serving a
 model inside one needs real integration work this module does not attempt to paper over
-(see the research findings in `plans/TIERED_ENCRYPTED_PLANS.md` §4c).
+(see the market findings in DESIGN.md §30.4).
 """
 
 _IS_LINUX = sys.platform.startswith("linux")
@@ -259,7 +259,7 @@ def _detect_gpu_cc() -> tuple[bool, bool]:
     """Detect NVIDIA confidential-computing GPU capability and enablement.
 
     **Live-verified pin (2026-08-14, RTX 4090, driver 595.84, non-CC-capable card) —**
-    the plan this module implements (`plans/TIERED_ENCRYPTED_PLANS.md` §4d) flagged this
+    the design this module implements (DESIGN.md §30.4) flagged this
     CLI surface as newer/less stable than the flags `hardware.py` already depends on and
     asked for the exact format to be pinned once a real session could check it. ``-f``
     (``--get-cc-feature``), which the original design guessed carried both a capability and

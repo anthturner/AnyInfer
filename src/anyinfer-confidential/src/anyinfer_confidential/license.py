@@ -1,6 +1,6 @@
 """Vendor-issued, signed, time-boxed entitlement blobs gating `TemplateVault` decryption.
 
-**Hybrid entitlement, decided 2026-08-12 (see `plans/TIERED_ENCRYPTED_PLANS.md` §2):**
+**Hybrid entitlement, decided 2026-08-12 (see DESIGN.md §30.2):**
 the default artifact is a signed, time-boxed license blob validated entirely offline — no
 network call is required to decrypt a template, so a deployment works air-gapped. Online
 revocation (`sealed_template.TemplateVault`'s `revocation_checker`) is a separate, opt-in

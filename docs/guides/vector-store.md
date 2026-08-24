@@ -95,4 +95,4 @@ hatch above, not as the only way to move a store.
   embedded and stored — the same discipline `anyinfer.context` already applies: nothing is
   collected or embedded on your behalf.
 
-See `plans/VECTOR_STORE_ADDON.md` in the repository for the full design record.
+See DESIGN.md §29 in the repository for the full design record.

@@ -5,7 +5,7 @@ add-on a vendor installs when they need to protect prompt *IP* (templates, orche
 from a customer running the vendor's client software on the customer's own
 bring-your-own-key infrastructure. It does not protect the customer's own prompt data
 from AnyInfer or the vendor; BYOK already provides that (see
-`plans/TIERED_ENCRYPTED_PLANS.md` §0).
+DESIGN.md §30.0).
 
 - **Tier 1** (`sealed_template`): `SealedTemplate`/`TemplateVault` — encrypted-at-rest
   prompt templates, decrypted only immediately before rendering.

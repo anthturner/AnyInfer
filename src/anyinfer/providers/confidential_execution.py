@@ -1,7 +1,7 @@
 """`ConfidentialExecutionAdapter` — fails closed unless Tier 3's attested guarantee holds.
 
 Composes over an already-configured local adapter (`llama_cpp`, `lm_studio`, `ollama`)
-rather than subclassing any of them, per `plans/TIERED_ENCRYPTED_PLANS.md` §4d. A caller
+rather than subclassing any of them, per DESIGN.md §30.4. A caller
 that requests confidential execution and does not get it must see a typed error, never a
 silent downgrade to unattested execution — that would make the guarantee a lie the same
 way a silently-logging Relay would (see `anyinfer_confidential.relay`'s own docstring for

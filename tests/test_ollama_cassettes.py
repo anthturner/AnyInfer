@@ -3,7 +3,7 @@
 Recorded against a real local Ollama server (2026-08-14, `qwen3:0.6b` for generation,
 `nomic-embed-text` for embedding) with ``ANYINFER_RECORD_CASSETTES=1``; replayed offline
 in CI. This is the wire-truth complement to `tests/test_ollama.py`'s mock-transport
-suite, and closes `plans/EMBEDDING_RERANKING_CONTINUATION.md` T7 — a real Ollama server
+suite, and closed the embedding/reranking plan's Ollama live lane — a real Ollama server
 was previously unavailable to verify against; its "verification" before this session was
 documentation research only.
 """

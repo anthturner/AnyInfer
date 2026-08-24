@@ -76,7 +76,7 @@ ConfigError: the copilot provider requires the github-copilot-sdk extra
 
 `embed()` and `rerank()` raise no new exception types — every operation-specific
 refusal is a `ConfigError` with a distinguishing message, per the decisions record in
-`plans/EMBEDDING_RERANKING_CONTINUATION.md` §10 (D-15). The four message shapes, verbatim
+DESIGN.md §28.2 decision 5. The four message shapes, verbatim
 from `_client/operations.py`:
 
 ```

@@ -25,7 +25,7 @@ language would be worse than no claim at all.
 | 4 — Model provenance | The model weights that ran are exactly what you signed, verified inside Tier 3's boundary | Only a Tier 4 claim when Tier 3 also holds | `anyinfer` core |
 
 The full design record — including the decisions behind each tier, what was explicitly
-excluded, and open questions — lives in `plans/TIERED_ENCRYPTED_PLANS.md` in the repository.
+excluded, and open questions — lives in DESIGN.md §30 in the repository.
 
 ## Tier 1 — `SealedTemplate`: encrypted-at-rest prompt assets
 
@@ -271,5 +271,5 @@ hardware everyone else already has access to.
 - [The local subsystem](../concepts/local.md) and its [API reference](../reference/api/local.md)
   for Tiers 3–4.
 - [Errors](../reference/errors.md#confidentialexecutionerror) for `ConfidentialExecutionError`.
-- `plans/TIERED_ENCRYPTED_PLANS.md` in the repository for the full design record, including
+- DESIGN.md §30 in the repository for the full design record, including
   every explicitly-excluded scope item and open question.
