@@ -1,7 +1,15 @@
 # Writing a provider adapter
 
 An adapter translates. That is the whole job, and keeping it that way is what lets one
-conformance suite cover every provider.
+conformance suite cover every provider. This page explains the shape and the reasoning
+behind it.
+
+For the step-by-step procedure — what to research before writing code, which registration
+gates a new provider trips, and what "done" means — follow
+[`contracts/NEW-PROVIDER.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/NEW-PROVIDER.md).
+It is the canonical checklist that this repository's coding-agent skills run, and it starts
+where every provider should: fetching the current API reference and recording what it says,
+before any code exists to be biased by.
 
 ## The contract
 
@@ -169,7 +177,11 @@ See [the conformance suite](conformance.md).
 ## Ship it with
 
 - the adapter;
-- a contract snapshot in `contracts/`;
+- a contract snapshot in `contracts/`, written before the adapter, not after;
 - a conformance harness;
 - a provider page in `docs/providers/`;
 - a row in the [matrix](../reference/conformance-matrix.md), regenerated, not hand-edited.
+
+[`contracts/NEW-PROVIDER.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/NEW-PROVIDER.md)
+carries the full list, including the generated-index and navigation entries a new built-in
+provider needs, and the gate commands to run before committing.

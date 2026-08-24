@@ -5,6 +5,6 @@ repository instruction set, including the core SDK, demo, CLI, sidecar, configur
 testing, and documentation boundaries. This file adds no Copilot-specific engineering
 policy.
 
-For provider protocol audits, run the `check-provider-drift` prompt in
-`.github/prompts/`. The prompt is only an entry point to the canonical procedure in
-`contracts/DRIFT-CHECK.md`.
+Two prompts in `.github/prompts/` are entry points only; each canonical procedure lives in
+one tool-neutral file: `add-provider` → `contracts/NEW-PROVIDER.md`, `check-provider-drift`
+→ `contracts/DRIFT-CHECK.md`.

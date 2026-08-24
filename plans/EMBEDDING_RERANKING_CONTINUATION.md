@@ -54,34 +54,20 @@ python workspace.py matrix                    # docs/reference/conformance-matri
 python scripts/generate_provider_index.py     # docs/providers/all.md (after adding a provider)
 ```
 
-## 3. The new-provider recipe (used 5× this session — follow it verbatim)
+## 3. The new-provider recipe — moved to a canonical procedure
 
-1. **Research first, live.** Fetch current docs; record request/response fields, limits,
-   auth, error shape, with the fetch date. If a page is bot-blocked or JS-only, say so
-   in the snapshot (`platform.openai.com` is blocked — `developers.openai.com` works;
-   TEI's canonical spec is
-   `raw.githubusercontent.com/huggingface/text-embeddings-inference/main/docs/openapi.json`).
-2. **Adapter** in `src/anyinfer/providers/<id>.py`. Copy patterns from:
-   `voyage.py` (hosted retrieval-only, no listing endpoint → honest empty
-   `list_models()` + labeled reachability `health()`), `tei.py` (local retrieval-only,
-   discovery-driven operations), `cohere.py` (embed+rerank on an existing generation
-   adapter), `openai.py`/`lm_studio.py` (compose `OpenAICompatEmbeddingsMixin`).
-   Rules encoded in all of them: rerank positional `index` → map to
-   `RerankWireDocument.index`; usage only from what the provider reports (Voyage/Jina
-   report `total_tokens` only — never copy into `input_tokens`); unsupported intents
-   never sent; unknown facts stay `None`.
-3. **Register:** `_BUILTIN_MODULES` in `src/anyinfer/providers/__init__.py:16`.
-4. **Descriptor invariants** (tests enforce): a secret `SetupField` needs `placeholder`
-   naming its `env_var` ("env://X_API_KEY or a literal key"); an endpoint field with a
-   `default_value` must be `advanced=True`; `model_selection` is
-   `"discover-or-manual"` or `"manual-only"`.
-5. **Docs/index:** `contracts/<id>.md` (structure: Upstream sources / Wire contract
-   with per-section "verified <date>" + explicit **Unverified:** markers / Watchlist);
-   `docs/providers/<id>.md` (frontmatter `provider:`/`icon:`); mkdocs.yml nav (~line
-   180); `ADAPTER_PAGES` **and** the blurb dict in
-   `scripts/generate_provider_index.py` (~lines 26/195) — then regenerate the index.
-6. **Tests** in `tests/test_<id>.py` — wire mapping via `httpx2.MockTransport`, one
-   client e2e. Optional conformance harness (see §5 of this file).
+This section used to carry the recipe inline. It now lives in
+[`contracts/NEW-PROVIDER.md`](../contracts/NEW-PROVIDER.md), the tool-agnostic procedure
+every agent entry point runs (`/add-provider` in Claude Code, `$add-provider` in Codex, the
+`add-provider` Copilot prompt, or the file read directly). It was extracted from here on
+2026-08-24 for the reason AGENTS.md gives for every other procedure: a recipe that lives in
+one plan is a recipe the next agent working on a different plan never sees.
+
+It generalizes what this plan's five provider additions established, and it covers the
+retrieval-only and new-operation cases this plan created — including the embedding/rerank
+rules that used to be listed here (rerank `index` is positional; usage only from what the
+provider reports; unsupported intents never sent; unknown facts stay `None`; every response
+body size-checked). Follow it, not this section.
 
 ## 4. Key file/line map (operation subsystem, as of `f18d415`)
 
@@ -313,10 +299,10 @@ result type). Cohere discovery now lists embedding models, so the
 - **Golden manifests**: any RunManifest/UsageFacet field addition needs
   `--update-manifests` AND a `manifest_json_schema()` property entry
   (`test_every_facet_field_is_described` enforces it).
-- **Adding a builtin provider** trips three enumeration gates: setup-spec invariants
-  (§3.4 above), the generated provider index + guide mapping
+- **Adding a builtin provider** trips three enumeration gates: setup-spec invariants,
+  the generated provider index + guide mapping
   (`scripts/generate_provider_index.py` raises "provider guide mapping mismatch"), and
-  the mkdocs nav.
+  the mkdocs nav — all three enumerated in `contracts/NEW-PROVIDER.md` Steps 3-4.
 - **`Route.health_gate` defaults True** with a 30s TTL — a test that fails a target and
   immediately retries the same target must pass `health_gate=False`.
 - **Conformance `Capabilities` flags default True** for generation — new operation

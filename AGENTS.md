@@ -16,7 +16,9 @@ bespoke provider layer an application would otherwise hand-roll.
 Adding a provider: if it needs real protocol translation, write a dedicated adapter with a
 `contracts/<id>.md` snapshot. If it only differs by endpoint, auth spelling, and quirks, add
 a `CompatPreset` entry instead — and record its verification in
-`contracts/openai-compat-presets.md`.
+`contracts/openai-compat-presets.md`. Either way the procedure is
+[contracts/NEW-PROVIDER.md](contracts/NEW-PROVIDER.md) — including when the addition is a
+new embedding or reranking binding on a provider that already exists.
 
 **Current status: implemented, pre-1.0.** [DESIGN.md](DESIGN.md) is the authoritative
 architecture document — it carries the goals and non-goals, the ADRs, the open questions,
@@ -33,9 +35,10 @@ This file is the single authoritative instruction set for Codex, Claude Code, Gi
 Copilot, and other coding agents. `CLAUDE.md` and `.github/copilot-instructions.md` are
 discovery shims only: they point here and contain no independent engineering policy. A
 tool-specific skill or prompt may adapt invocation syntax, but the procedure it runs must
-live in one tool-neutral canonical file. Today two procedures follow that model:
-`contracts/DRIFT-CHECK.md` and `docs/agents/INTEGRATION.md` are authoritative; the Codex
-and Claude skills and the Copilot prompts beside each are thin entry points.
+live in one tool-neutral canonical file. Today three procedures follow that model:
+`contracts/NEW-PROVIDER.md`, `contracts/DRIFT-CHECK.md`, and `docs/agents/INTEGRATION.md`
+are authoritative; the Codex and Claude skills and the Copilot prompts beside each are thin
+entry points.
 
 **The same rule governs instruction text that ships outward.** Agent instructions this
 project *emits* — `anyinfer agents-md`, the `llms.txt` pair built with the docs site, and
@@ -136,8 +139,16 @@ fields read, streaming framing, and error-mapping inputs — each with a last-ve
 One snapshot is not an inference provider: `contracts/huggingface.md` covers the weights
 source model acquisition depends on, and is audited by the same procedure.
 
-These snapshots are the input to the **provider drift check**, a semi-automated audit that
-compares each snapshot against the provider's *current* public documentation and changelogs:
+A snapshot is written **before** the adapter it specifies, as Step 1 of
+[contracts/NEW-PROVIDER.md](contracts/NEW-PROVIDER.md) — the canonical, tool-agnostic
+procedure for adding a provider, a preset, or a new embedding/rerank binding on an existing
+provider. Its entry points follow the same shape as the drift check's below: the
+`add-provider` skill (Codex `$add-provider`, Claude Code `/add-provider`), the
+`add-provider` Copilot prompt, or the file itself.
+
+These snapshots are then the input to the **provider drift check**, a semi-automated audit
+that compares each snapshot against the provider's *current* public documentation and
+changelogs:
 
 - Procedure (canonical, tool-agnostic): [contracts/DRIFT-CHECK.md](contracts/DRIFT-CHECK.md)
 - Codex: invoke the `check-provider-drift` skill (`$check-provider-drift`).
