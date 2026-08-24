@@ -784,6 +784,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="CASE",
         help="restrict the run to one case (repeatable)",
     )
+    conform.add_argument(
+        "--record",
+        type=Path,
+        metavar="DIR",
+        help=(
+            "record this run's real wire traffic into cassettes under DIR, one per "
+            "scenario, so the suite can replay it offline without your credentials"
+        ),
+    )
     conform.add_argument("--json", action="store_true", help="emit machine-readable results")
     conform.add_argument(
         "--markdown-row",
@@ -3202,11 +3211,15 @@ def _conform(args: argparse.Namespace) -> int:
 
     config = _config(args.config)
     supports = load_declared_capabilities(args.project)
+    recorder = _CassetteRecorder(args.record, provider_id) if args.record else None
 
-    async def build_client(_scenario: str) -> AsyncClient:
+    async def build_client(scenario: str) -> AsyncClient:
         # A fresh client per case: the runner closes what it is given.
+        providers = list(config.providers)
+        if recorder is not None:
+            providers = recorder.instrument(providers, scenario)
         return AsyncClient(
-            list(config.providers),
+            providers,
             route=config.route,
             operation_routes=config.operation_routes,
             history=config.history,
@@ -3231,7 +3244,104 @@ def _conform(args: argparse.Namespace) -> int:
         print(render_report(provider_id, results))
 
     failed = any(not r.passed and not r.skipped for r in results)
+    if recorder is not None and recorder.finish() != 0:
+        return 1
     return 1 if failed else 0
+
+
+class _CassetteRecorder:
+    """Wraps a run's provider transports so real traffic lands in committable cassettes.
+
+    One cassette per scenario rather than per case: cases sharing a scenario make
+    different requests against the same programmed state, and the replay transport
+    matches on method and path, so they coexist in one file the way they would in one
+    session.
+
+    Nothing is written until `finish` has audited every cassette. A cassette is recorded
+    from someone's real account, and the whole point of the contribution path is that a
+    maintainer who cannot know what was in that traffic still ends up with a file they
+    can safely commit.
+    """
+
+    def __init__(self, directory: Path, provider_id: str) -> None:
+        self._directory = directory
+        self._provider_id = provider_id
+        self._cassettes: dict[str, Any] = {}
+
+    def instrument(self, providers: list[Any], scenario: str) -> list[Any]:
+        """Return ``providers`` with each transport replaced by a recording one."""
+        import dataclasses
+
+        from .testing.cassettes import Cassette, CassetteTransport
+
+        cassette = self._cassettes.get(scenario)
+        if cassette is None:
+            path = self._directory / f"{self._provider_id}_{scenario}.json"
+            cassette = Cassette(path)
+            # A re-record replaces the file rather than appending a second copy of every
+            # exchange to whatever was there before.
+            cassette.interactions = []
+            self._cassettes[scenario] = cassette
+        # An already-configured transport becomes the recorder's inner transport rather
+        # than being discarded: a config that routes through a proxy or a test seam must
+        # still route through it while recording, or the cassette captures traffic that
+        # never resembled what this deployment actually sends.
+        return [
+            dataclasses.replace(
+                settings,
+                transport=CassetteTransport(
+                    cassette, record=True, inner=settings.transport
+                ),
+            )
+            for settings in providers
+        ]
+
+    def finish(self) -> int:
+        """Save every cassette, audit the saved bytes, and report.
+
+        Returns:
+            ``0`` when every cassette was written clean, ``1`` when the audit found
+            credential-shaped content and the cassettes were withheld.
+        """
+        from .testing.recording import audit_cassette
+
+        self._directory.mkdir(parents=True, exist_ok=True)
+        written = []
+        for scenario in sorted(self._cassettes):
+            cassette = self._cassettes[scenario]
+            if not cassette.interactions:
+                # A skipped case records nothing; an empty file would look like coverage.
+                continue
+            cassette.save()
+            written.append(cassette.path)
+
+        findings = [(path, audit_cassette(path)) for path in written]
+        leaky = [(path, f) for path, f in findings if f]
+        for path, path_findings in leaky:
+            # Delete first, report second: a failed audit must not leave the file behind
+            # for someone to commit after skimming past the warning.
+            path.unlink(missing_ok=True)
+            print(f"\nWITHHELD  {path.name} — credential-shaped content survived redaction")
+            for finding in path_findings:
+                print(f"          {finding}")
+
+        clean = [path for path, f in findings if not f]
+        for path in clean:
+            print(f"recorded  {path}")
+
+        if leaky:
+            print(
+                f"\n{len(leaky)} cassette(s) withheld. Register the credential through "
+                "anyinfer.credentials so redaction knows about it, then re-record. "
+                "The audit is heuristic: review what it did write before committing."
+            )
+            return 1
+        if clean:
+            print(
+                f"\n{len(clean)} cassette(s) recorded. The audit is heuristic, not a "
+                "proof of cleanliness — read them before committing."
+            )
+        return 0
 
 
 def _mcp(args: argparse.Namespace) -> int:

@@ -110,6 +110,24 @@ Record/replay of real provider exchanges.
 
 </div>
 
+## Recording
+
+Turning a live run against your own account into committable cassettes. The audit is a
+second, independent pass over the *saved* bytes: redaction removes secrets it was told
+about, and this looks for credential shapes it was not.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.testing.audit_cassette
+
+::: anyinfer.testing.audit_interaction
+
+::: anyinfer.testing.AuditFinding
+
+::: anyinfer.testing.SECRET_SHAPES
+
+</div>
+
 ## Conformance
 
 The parametrized suite behind the [conformance matrix](../conformance-matrix.md).

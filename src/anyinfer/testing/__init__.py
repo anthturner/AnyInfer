@@ -34,6 +34,7 @@ from .fakes import (
 )
 from .manifests import VOLATILE_FIELDS, assert_manifest_matches, normalize
 from .mcp_fake import FakeMCPServer, FakeMCPTool
+from .recording import SECRET_SHAPES, AuditFinding, audit_cassette, audit_interaction
 from .scripted import (
     DEFAULT_SCRIPTED_CAPABILITIES,
     FailureKind,
@@ -47,7 +48,9 @@ __all__ = [
     "CONFORMANCE_CASES",
     "CONFORMANCE_SCENARIOS",
     "DEFAULT_SCRIPTED_CAPABILITIES",
+    "SECRET_SHAPES",
     "VOLATILE_FIELDS",
+    "AuditFinding",
     "Capabilities",
     "CaseResult",
     "Cassette",
@@ -69,6 +72,8 @@ __all__ = [
     "ScriptedModel",
     "ScriptedProvider",
     "assert_manifest_matches",
+    "audit_cassette",
+    "audit_interaction",
     "chunk_text",
     "matrix_row",
     "ndjson_lines",
