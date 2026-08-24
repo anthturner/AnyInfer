@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "interactions": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:8081/rerank",
+      "request_body": "{\"query\":\"which text is about the moon landing\",\"texts\":[\"a recipe for sourdough bread\",\"apollo 11 landed on the moon in july 1969\",\"the rules of association football\"],\"return_text\":false}",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "x-compute-type": "gpu+optimized",
+        "x-compute-time": "64",
+        "x-compute-characters": "210",
+        "x-compute-tokens": "61",
+        "x-total-time": "64",
+        "x-tokenization-time": "0",
+        "x-queue-time": "4",
+        "x-inference-time": "58",
+        "vary": "origin, access-control-request-method, access-control-request-headers",
+        "access-control-allow-origin": "*",
+        "date": "Mon, 24 Aug 2026 20:58:32 GMT"
+      },
+      "body": "[{\"index\":1,\"score\":0.47565052},{\"index\":0,\"score\":0.000037436883},{\"index\":2,\"score\":0.000037418642}]"
+    }
+  ]
+}

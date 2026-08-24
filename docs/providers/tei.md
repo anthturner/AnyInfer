@@ -52,7 +52,11 @@ ranked = client.rerank("the query", docs, target="tei-rerank:bge-reranker")
 - **Vectors are unit-normalized by default** — the server's documented `normalize: true`
   default is left in force and reported on `result.space.normalized`; a
   `provider_options={"tei": {"normalize": False}}` override is reported as sent.
-- **No usage**: TEI reports no token counts, so `result.usage` stays honestly empty.
+- **No usage**: TEI's response body carries no token counts, so `result.usage` stays
+  honestly empty. Real servers do send an `x-compute-tokens` response header, but it is
+  absent from the project's published API document, and accounting built on an
+  undocumented header would disappear without anything noticing. It is recorded in the
+  contract's watchlist instead, to be adopted if upstream documents it.
 - **`top_n` is applied client-side** — the endpoint has no native parameter; the
   adapter sorts by score and truncates, and the contract snapshot records that.
 - **Batch ceiling is per-deployment**: `GET /info` reports `max_client_batch_size` for
@@ -64,3 +68,6 @@ ranked = client.rerank("the query", docs, target="tei-rerank:bge-reranker")
 
 For the exact request/response fields this adapter depends on, see
 [contracts/tei.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/tei.md).
+It was verified against real servers on 2026-08-24 — `text-embeddings-inference` 1.8.3
+serving `BAAI/bge-small-en-v1.5` and `BAAI/bge-reranker-base` — and that traffic is
+committed as cassettes, so the lane replays in CI without a server.
