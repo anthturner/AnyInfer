@@ -1062,6 +1062,7 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     # The harnesses are defined by the test modules, which is the point: the published
     # matrix and the suite cannot disagree, because they run the same objects.
     sys.path.insert(0, str(ROOT / "tests"))
+    import test_bedrock_vertex
     import test_cohere_lmstudio
     import test_conformance
     import test_deepseek_xai
@@ -1088,6 +1089,10 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "openrouter": test_hosted_adapters.OPENROUTER_HARNESS,
         "voyage": test_voyage.HARNESS,
         "jina": test_jina.HARNESS,
+        "anthropic": test_hosted_adapters.ANTHROPIC_HARNESS,
+        "openai": test_hosted_adapters.OPENAI_HARNESS,
+        "m365-copilot": test_hosted_adapters.M365_HARNESS,
+        "vertex": test_bedrock_vertex.VERTEX_HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed

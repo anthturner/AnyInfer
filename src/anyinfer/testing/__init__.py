@@ -22,10 +22,12 @@ from .conformance import (
 )
 from .fakes import (
     CONFORMANCE_SCENARIOS,
+    FakeAnthropicServer,
     FakeGeminiServer,
     FakeOllamaServer,
     FakeOpenAIServer,
     FakeResponse,
+    FakeResponsesServer,
     FakeRetrievalServer,
     chunk_text,
     ndjson_lines,
@@ -58,6 +60,7 @@ __all__ = [
     "ConformanceCase",
     "ConformanceHarness",
     "FailureKind",
+    "FakeAnthropicServer",
     "FakeEmbeddingRerankProvider",
     "FakeGeminiServer",
     "FakeMCPServer",
@@ -65,6 +68,7 @@ __all__ = [
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",
+    "FakeResponsesServer",
     "FakeRetrievalServer",
     "Interaction",
     "ScriptedEmbeddingFailure",

@@ -22,6 +22,12 @@ from anyinfer.providers.base import (
 )
 from anyinfer.providers.bedrock import BedrockAdapter
 from anyinfer.providers.vertex import VertexAdapter
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
+from anyinfer.testing.fakes import FakeGeminiServer, scenario_responses
 from anyinfer.types.requests import Sampling, ToolSpec
 
 AWS_OPTIONS = {
@@ -968,3 +974,43 @@ async def test_vertex_embed_rejects_a_response_over_the_byte_cap() -> None:
             )
     finally:
         await adapter.aclose()
+
+
+# ---- vertex conformance ----------------------------------------------------------------
+
+
+async def _build_vertex_client(scenario: str) -> ai.AsyncClient:
+    # Vertex is Gemini's protocol with different addressing and auth, so the Gemini fake
+    # serves it unchanged; `api_key` here is a pre-acquired OAuth access token.
+    server = FakeGeminiServer(scenario_responses(scenario), models=("gemini-2.5-flash",))
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "vertex",
+                api_key="ya29.test-token",
+                options={"project": "my-project", "location": "global"},
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("vertex:gemini-2.5-flash",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+VERTEX_HARNESS = ConformanceHarness(
+    provider_id="vertex",
+    model="gemini-2.5-flash",
+    build_client=_build_vertex_client,
+    # Embeddings go to `:predict`, which every Vertex embedding model documents. There is
+    # no rerank endpoint.
+    supports=Capabilities(cancellation=True, embedding=True),
+    embedding_model="text-embedding-005",
+)
+
+
+async def test_vertex_conformance() -> None:
+    results = await run_conformance(VERTEX_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

@@ -19,7 +19,7 @@ from typing import Any, ClassVar
 
 import httpx2
 
-from ..errors import ProviderError, StreamProtocolError
+from ..errors import Phase, ProviderError, StreamProtocolError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import (
     DiscoveredModel,
@@ -74,6 +74,30 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+        )
+
+    def _classify(
+        self,
+        status: int,
+        detail: str,
+        headers: Mapping[str, str],
+        phase: Phase = "generate",
+    ) -> ProviderError:
+        """Error-classification hook required by `OpenAICompatEmbeddingsMixin`.
+
+        Every other adapter composing that mixin also inherits `OpenAICompatAdapter`,
+        which supplies this. This one does not -- the Responses API is its own dialect --
+        so without this method the mixin's error path raised `AttributeError` instead of a
+        typed, retryable `ProviderError`, and the router could not retry a rate-limited
+        embeddings call because what it caught was not a provider error at all.
+
+        A default on the mixin would fix it in the wrong place: `openrouter` and `ollama`
+        override `_classify` for dialect-specific mapping, and the mixin sits *before*
+        the compat adapter in every other user's MRO, so a default there would shadow
+        those overrides.
+        """
+        return classify_status(
+            status, provider=self.provider_id, detail=detail, headers=headers, phase=phase
         )
 
     # ---- discovery -------------------------------------------------------------------

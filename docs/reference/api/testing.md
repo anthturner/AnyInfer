@@ -76,6 +76,10 @@ without credentials or a network.
 
 ::: anyinfer.testing.FakeOpenAIServer
 
+::: anyinfer.testing.FakeResponsesServer
+
+::: anyinfer.testing.FakeAnthropicServer
+
 ::: anyinfer.testing.FakeOllamaServer
 
 ::: anyinfer.testing.FakeGeminiServer

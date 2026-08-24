@@ -18,10 +18,12 @@ import httpx2
 
 __all__ = [
     "CONFORMANCE_SCENARIOS",
+    "FakeAnthropicServer",
     "FakeGeminiServer",
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",
+    "FakeResponsesServer",
     "FakeRetrievalServer",
     "chunk_text",
     "ndjson_lines",
@@ -516,6 +518,340 @@ class FakeRetrievalServer(_FakeServerBase):
         return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(self._dimensions)]
 
 
+class FakeResponsesServer(_FakeServerBase):
+    """A configurable in-process OpenAI **Responses API** endpoint.
+
+    Not the same dialect as `FakeOpenAIServer`, which speaks ``/chat/completions``. The
+    Responses protocol is *typed events* — ``response.output_text.delta``,
+    ``response.output_item.added``, ``response.completed`` — rather than choice deltas, and
+    a finish reason is derived from the terminal response object's ``status`` and
+    ``incomplete_details`` rather than sent as a field. Modelling that difference is the
+    point: an adapter that quietly treated one as the other would pass a chat-shaped fake.
+
+    Args:
+        responses: Responses to serve, one per request, in order. The last is reused once
+            exhausted, so a single-element list serves every request.
+        models: Model ids reported by ``GET /models``.
+        chunk_size: Characters per streamed text delta.
+        dimensions: Width of the vectors ``POST /embeddings`` returns.
+
+    Attributes:
+        requests: Every request body received, for assertions.
+    """
+
+    def __init__(
+        self,
+        responses: Sequence[FakeResponse] | FakeResponse | None = None,
+        *,
+        models: Sequence[str] = ("gpt-5", "gpt-5-mini"),
+        chunk_size: int = 4,
+        dimensions: int = 8,
+    ) -> None:
+        super().__init__(responses)
+        self._models = list(models)
+        self._chunk_size = chunk_size
+        self._dimensions = dimensions
+
+    def next_response(self) -> FakeResponse:
+        """The response for the next generation call."""
+        index = min(self._call_index, len(self._responses) - 1)
+        return self._responses[index]
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/models"):
+            return httpx2.Response(
+                200,
+                json={
+                    "object": "list",
+                    "data": [{"id": m, "object": "model"} for m in self._models],
+                },
+            )
+        if path.endswith("/responses"):
+            return self._handle_responses(request)
+        if path.endswith("/embeddings"):
+            return self._handle_embeddings(request)
+        return httpx2.Response(404, json={"error": {"message": f"no such path: {path}"}})
+
+    def _consume(self, request: httpx2.Request) -> tuple[dict[str, Any], FakeResponse]:
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        response = self.next_response()
+        self._call_index += 1
+        return body, response
+
+    def _handle_responses(self, request: httpx2.Request) -> httpx2.Response:
+        _body, response = self._consume(request)
+        if response.status >= 400:
+            return httpx2.Response(
+                response.status,
+                json={"error": {"message": response.error_message, "type": "fake_error"}},
+                headers=dict(response.headers),
+            )
+        return httpx2.Response(
+            200,
+            content=self._stream_body(response),
+            headers={"content-type": "text/event-stream", **dict(response.headers)},
+        )
+
+    def _handle_embeddings(self, request: httpx2.Request) -> httpx2.Response:
+        body, response = self._consume(request)
+        if response.status >= 400:
+            return httpx2.Response(
+                response.status,
+                json={"error": {"message": response.error_message, "type": "fake_error"}},
+                headers=dict(response.headers),
+            )
+        raw = body.get("input", [])
+        inputs = [raw] if isinstance(raw, str) else list(raw)
+        return httpx2.Response(
+            200,
+            json={
+                "object": "list",
+                "model": body.get("model", "text-embedding-3-small"),
+                "data": [
+                    {"object": "embedding", "index": i, "embedding": self._vector(str(text))}
+                    for i, text in enumerate(inputs)
+                ],
+                "usage": {"prompt_tokens": len(inputs), "total_tokens": len(inputs)},
+            },
+            headers=dict(response.headers),
+        )
+
+    def _vector(self, text: str) -> list[float]:
+        """A deterministic, unnormalized vector for ``text``."""
+        seed = sum(ord(c) for c in text) or 1
+        return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(self._dimensions)]
+
+    def _stream_body(self, response: FakeResponse) -> bytes:
+        if response.malformed_sse:
+            return b"data: {not json at all\n\n"
+
+        events: list[dict[str, Any]] = []
+        for fragment in chunk_text(response.reasoning, self._chunk_size):
+            if fragment:
+                events.append({"type": "response.reasoning_text.delta", "delta": fragment})
+        for fragment in chunk_text(response.text, self._chunk_size):
+            if fragment:
+                events.append({"type": "response.output_text.delta", "delta": fragment})
+
+        for index, (call_id, name, args) in enumerate(response.tool_calls):
+            events.append(
+                {
+                    "type": "response.output_item.added",
+                    "output_index": index,
+                    "item": {"type": "function_call", "call_id": call_id, "name": name},
+                }
+            )
+            events.extend(
+                {
+                    "type": "response.function_call_arguments.delta",
+                    "output_index": index,
+                    "delta": fragment,
+                }
+                for fragment in chunk_text(args, self._chunk_size)
+                if fragment
+            )
+
+        terminal: dict[str, Any] = {"status": "completed"}
+        if response.usage is not None:
+            terminal["usage"] = {
+                "input_tokens": response.usage.get("prompt_tokens", 11),
+                "output_tokens": response.usage.get("completion_tokens", 7),
+                "total_tokens": response.usage.get("total_tokens", 18),
+            }
+        kind = "response.completed"
+        if response.finish_reason not in ("stop", "tool_calls"):
+            # Responses reports an early stop as `incomplete` with a reason, not as a
+            # finish-reason string; an unrecognized reason must still normalize.
+            kind = "response.incomplete"
+            terminal["status"] = "incomplete"
+            terminal["incomplete_details"] = {"reason": response.finish_reason}
+        events.append({"type": kind, "response": terminal})
+        return sse_lines(events, done=False)
+
+
+class FakeAnthropicServer(_FakeServerBase):
+    """A configurable in-process Messages API endpoint.
+
+    Two properties of the real API shape this fake. It **always streams** — the adapter
+    sends ``stream: true`` unconditionally, so there is no buffered branch to model — and
+    it has **no response-format field**, so a schema is emulated as a single forced tool
+    call and the structured answer arrives as a ``tool_use`` block rather than as text.
+
+    That second point is why this fake reads the request before answering. A scenario says
+    "return this JSON"; whether that JSON belongs in a ``text_delta`` or in the ``input`` of
+    a ``tool_use`` block is a property of what was asked, not of the scenario. The tool name
+    is echoed from the request's own ``tool_choice`` rather than hardcoded, so the fake
+    cannot drift from whatever the core decides to call the schema.
+
+    Args:
+        responses: Responses to serve, one per request, in order. The last is reused once
+            exhausted, so a single-element list serves every request.
+        models: Model ids reported by ``GET /v1/models``.
+        chunk_size: Characters per streamed text delta.
+        page_size: Model ids per listing page. The listing is cursor-paginated, and an
+            adapter that ignores ``has_more`` silently reports only the first page --
+            which looks like a working discovery call.
+
+    Attributes:
+        requests: Every request body received, for assertions.
+    """
+
+    def __init__(
+        self,
+        responses: Sequence[FakeResponse] | FakeResponse | None = None,
+        *,
+        models: Sequence[str] = ("claude-sonnet-4-5", "claude-opus-4-1"),
+        chunk_size: int = 4,
+        page_size: int = 1,
+    ) -> None:
+        super().__init__(responses)
+        self._models = list(models)
+        self._chunk_size = chunk_size
+        self._page_size = max(1, page_size)
+
+    def next_response(self) -> FakeResponse:
+        """The response for the next generation call."""
+        index = min(self._call_index, len(self._responses) - 1)
+        return self._responses[index]
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/v1/models"):
+            return self._handle_models(request)
+        if path.endswith("/v1/messages"):
+            return self._handle_messages(request)
+        return httpx2.Response(
+            404, json={"type": "error", "error": {"type": "not_found", "message": path}}
+        )
+
+    def _handle_models(self, request: httpx2.Request) -> httpx2.Response:
+        after = request.url.params.get("after_id")
+        start = 0
+        if after is not None:
+            start = self._models.index(after) + 1 if after in self._models else len(self._models)
+        page = self._models[start : start + self._page_size]
+        has_more = start + self._page_size < len(self._models)
+        return httpx2.Response(
+            200,
+            json={
+                "data": [{"id": model, "type": "model"} for model in page],
+                "has_more": has_more,
+                "last_id": page[-1] if page else None,
+            },
+        )
+
+    def _handle_messages(self, request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        response = self.next_response()
+        self._call_index += 1
+
+        if response.status >= 400:
+            return httpx2.Response(
+                response.status,
+                json={
+                    "type": "error",
+                    "error": {"type": "fake_error", "message": response.error_message},
+                },
+                headers=dict(response.headers),
+            )
+        return httpx2.Response(
+            200,
+            content=self._stream_body(response, body),
+            headers={"content-type": "text/event-stream", **dict(response.headers)},
+        )
+
+    @staticmethod
+    def _forced_tool_name(body: Mapping[str, Any]) -> str | None:
+        """The schema's tool name, when this request emulates a schema."""
+        choice = body.get("tool_choice")
+        if isinstance(choice, Mapping) and choice.get("type") == "tool":
+            name = choice.get("name")
+            if isinstance(name, str):
+                return name
+        return None
+
+    def _stream_body(self, response: FakeResponse, body: Mapping[str, Any]) -> bytes:
+        if response.malformed_sse:
+            return b"data: {not json at all\n\n"
+
+        events: list[dict[str, Any]] = [
+            {"type": "message_start", "message": {"usage": {"input_tokens": 12}}}
+        ]
+        forced = self._forced_tool_name(body)
+        stop_reason = response.finish_reason
+
+        if forced is not None:
+            # A schema request: the answer is the tool call's input, not text.
+            events.extend(self._tool_use_events(0, "toolu_schema", forced, response.text))
+            stop_reason = "tool_use"
+        else:
+            events.append(
+                {"type": "content_block_start", "index": 0, "content_block": {"type": "text"}}
+            )
+            for fragment in chunk_text(response.reasoning, self._chunk_size):
+                if fragment:
+                    events.append(
+                        {
+                            "type": "content_block_delta",
+                            "index": 0,
+                            "delta": {"type": "thinking_delta", "thinking": fragment},
+                        }
+                    )
+            for fragment in chunk_text(response.text, self._chunk_size):
+                if fragment:
+                    events.append(
+                        {
+                            "type": "content_block_delta",
+                            "index": 0,
+                            "delta": {"type": "text_delta", "text": fragment},
+                        }
+                    )
+            events.append({"type": "content_block_stop", "index": 0})
+
+            for offset, (call_id, name, args) in enumerate(response.tool_calls):
+                events.extend(self._tool_use_events(offset + 1, call_id, name, args))
+                stop_reason = "tool_use"
+
+        if response.usage is not None:
+            events.append(
+                {
+                    "type": "message_delta",
+                    "delta": {"stop_reason": stop_reason},
+                    "usage": {"output_tokens": response.usage.get("completion_tokens", 7)},
+                }
+            )
+        else:
+            events.append({"type": "message_delta", "delta": {"stop_reason": stop_reason}})
+        events.append({"type": "message_stop"})
+        return sse_lines(events, done=False)
+
+    def _tool_use_events(
+        self, index: int, call_id: str, name: str, arguments: str
+    ) -> list[dict[str, Any]]:
+        """One tool call, opened then filled with ``input_json_delta`` fragments."""
+        events: list[dict[str, Any]] = [
+            {
+                "type": "content_block_start",
+                "index": index,
+                "content_block": {"type": "tool_use", "id": call_id, "name": name},
+            }
+        ]
+        events.extend(
+            {
+                "type": "content_block_delta",
+                "index": index,
+                "delta": {"type": "input_json_delta", "partial_json": fragment},
+            }
+            for fragment in chunk_text(arguments, self._chunk_size)
+            if fragment
+        )
+        events.append({"type": "content_block_stop", "index": index})
+        return events
+
+
 class FakeGeminiServer(_FakeServerBase):
     """A configurable in-process Gemini endpoint speaking the native protocol.
 
@@ -563,9 +899,56 @@ class FakeGeminiServer(_FakeServerBase):
             )
         if ":streamGenerateContent" in path or ":generateContent" in path:
             return self._handle_generate(request, streaming=":stream" in path)
+        if ":predict" in path:
+            # Vertex embedding models document `:predict`, not Gemini's
+            # `batchEmbedContents`, and the response nests under `embeddings.values`.
+            return self._handle_predict(request)
         return httpx2.Response(
             404, json={"error": {"code": 404, "message": f"no such path: {path}"}}
         )
+
+    def _handle_predict(self, request: httpx2.Request) -> httpx2.Response:
+        """Serve ``:predict``, sharing the scenario script with generation.
+
+        One prediction per instance, in the order they were sent: `:predict` carries no
+        index, so position *is* the identity and an adapter that reorders has no way to
+        recover. Vectors are derived from the input text, so duplicate inputs produce
+        identical vectors and the positional-preservation case stays meaningful.
+        """
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        index = min(self._call_index, len(self._responses) - 1)
+        response = self._responses[index]
+        self._call_index += 1
+
+        if response.status >= 400:
+            return httpx2.Response(
+                response.status,
+                json={"error": {"code": response.status, "message": response.error_message}},
+                headers=dict(response.headers),
+            )
+
+        instances = body.get("instances", [])
+        return httpx2.Response(
+            200,
+            json={
+                "predictions": [
+                    {
+                        "embeddings": {
+                            "values": self._vector(str(instance.get("content", ""))),
+                            "statistics": {"token_count": 3},
+                        }
+                    }
+                    for instance in instances
+                ]
+            },
+            headers=dict(response.headers),
+        )
+
+    def _vector(self, text: str) -> list[float]:
+        """A deterministic, unnormalized vector for ``text``."""
+        seed = sum(ord(c) for c in text) or 1
+        return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(8)]
 
     def _handle_generate(self, request: httpx2.Request, *, streaming: bool) -> httpx2.Response:
         body = json.loads(request.content or b"{}")
