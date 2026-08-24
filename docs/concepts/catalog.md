@@ -52,6 +52,38 @@ keeping two parallel lists:
   files for it; the tag is what gets recommended, and its manifest digest is recorded so a
   moved tag is detectable.
 
+### Chat models and embedding models
+
+Every row states its `kind`: `"generation"` (the default) or `"embedding"`. Both kinds are
+acquired identically — a GGUF is a GGUF, and the download, hashing, and verification
+machinery never cares what the weights compute — so they share one table rather than
+splitting into two that would drift.
+
+What differs is everything downstream of acquisition, and it differs enough that the
+distinction is worth stating:
+
+- An embedding row carries `dimensions` and `max_input_tokens`, the two facts a model card
+  actually publishes about its vectors. They reach `client.compare_embedding()` and the
+  capability system the same way a hosted provider's declared limits do.
+- Its memory estimate is computed from its own architecture and sequence length, not from
+  the chat-model KV table — that table's smallest rung is a thousand times larger than an
+  embedding model, and taking its default would budget gigabytes for something that needs
+  megabytes.
+- It reports no chat features and only the `embedding` operation, so
+  `client.models(operation="embedding")` finds it and a chat request never routes to it.
+- It is **not** part of the `small`/`medium`/`large` ladder. Those tiers answer "how big a
+  chat model should I run", a question an embedding model has no answer to, and the catalog
+  validator refuses an alias that points at one.
+
+```python
+for entry in catalog.models_for(kind="embedding"):
+    print(entry.id, entry.embedding.dimensions)
+```
+
+Passing no `kind` keeps every row: a caller browsing what a machine can run wants the
+embedding models too. A chat picker asks for `kind="generation"` explicitly rather than
+relying on a narrowing it never requested.
+
 ### Categories are a closed vocabulary
 
 `best_at` is drawn from a fixed set — `general-chat`, `coding`, `reasoning`, `vision`,

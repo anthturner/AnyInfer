@@ -23,7 +23,7 @@ RUNTIMES_PATH = REPO_ROOT / "src" / "anyinfer" / "local" / "runtimes.json"
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from anyinfer.catalog.model import BEST_AT, Catalog  # noqa: E402
+from anyinfer.catalog.model import BEST_AT, MODEL_KINDS, Catalog  # noqa: E402
 from anyinfer.local.downloads import license_allowed  # noqa: E402
 from anyinfer.local.runtimes import load_runtime_table  # noqa: E402
 
@@ -71,6 +71,10 @@ def validate_models(path: Path = MODELS_PATH) -> list[str]:
         else:
             problems.append(f"{model_id}: missing est_file_bytes or est_ram_bytes")
 
+        if entry.kind not in MODEL_KINDS:
+            problems.append(f"{model_id}: unknown kind {entry.kind!r}")
+        problems.extend(_validate_embedding(model_id, entry))
+
         problems.extend(_validate_variants(model_id, entry))
 
         if entry.ollama is not None and not entry.ollama.digest:
@@ -80,6 +84,35 @@ def validate_models(path: Path = MODELS_PATH) -> list[str]:
             )
 
     problems.extend(_validate_alias_targets(catalog))
+    return problems
+
+
+def _validate_embedding(model_id: str, entry: object) -> list[str]:
+    """Check that an embedding row says the things an embedding row must say.
+
+    Dimensions are the fact that makes a row useful: it is what the client reports when
+    asked what a target produces, and what a caller compares before assuming two indexes
+    live in the same space. A row without it is a download link wearing a schema.
+    """
+    problems: list[str] = []
+    embedding = getattr(entry, "embedding", None)
+    if getattr(entry, "kind", "generation") != "embedding":
+        if embedding is not None:
+            problems.append(f"{model_id}: carries embedding facts but is not kind 'embedding'")
+        return problems
+
+    if embedding is None:
+        problems.append(f"{model_id}: kind is 'embedding' but no embedding facts are recorded")
+        return problems
+    if not embedding.dimensions:
+        problems.append(f"{model_id}: embedding rows must record their vector dimensions")
+    if not embedding.max_input_tokens:
+        problems.append(f"{model_id}: embedding rows must record max_input_tokens")
+    if "embeddings" not in getattr(entry, "best_at", ()):
+        problems.append(
+            f"{model_id}: an embedding row must carry the 'embeddings' category, or it is "
+            "invisible to everyone browsing for one"
+        )
     return problems
 
 
@@ -146,11 +179,30 @@ def _validate_alias_targets(models: Catalog) -> list[str]:
     except Exception as error:  # noqa: BLE001
         return [f"the bundled catalog does not merge: {error}"]
 
+    embedding_artifacts = {
+        variant.artifact_id
+        for entry in merged.models.values()
+        if entry.is_embedding
+        for variant in entry.variants
+        if variant.artifact_id
+    }
+    embedding_tags = {
+        entry.ollama.tag for entry in merged.models.values() if entry.is_embedding and entry.ollama
+    }
+
     for alias in merged.alias_names():
         for provider_id, target in merged.targets_for_alias(alias).items():
             if target.gguf and target.gguf not in merged.artifacts:
                 problems.append(
                     f"alias {alias}/{provider_id} points at unknown artifact {target.gguf!r}"
+                )
+            # The tier ladder answers "how big a chat model should I run". An embedding
+            # model has no answer to that question, so resolving `small` to one would hand
+            # a caller who asked for a cheap chat model something that cannot chat at all.
+            if target.gguf in embedding_artifacts or target.model in embedding_tags:
+                problems.append(
+                    f"alias {alias}/{provider_id} points at an embedding model; the "
+                    "small/medium/large ladder is a generation-model ladder"
                 )
     del models
     return problems

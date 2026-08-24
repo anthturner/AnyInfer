@@ -29,16 +29,19 @@ from ..errors import ConfigError
 # source references are leaf data; nothing else in the local subsystem is needed here.
 from ..local.artifacts import GgufArtifact, GgufFile
 from ..local.sources import SourceRef
+from ..types.operations import EmbeddingCapabilities
 
 __all__ = [
     "BEST_AT",
     "FORMAT_VERSION",
+    "MODEL_KINDS",
     "AliasEntry",
     "ArtifactKind",
     "Catalog",
     "GgufArtifact",
     "GgufFile",
     "ModelEntry",
+    "ModelKind",
     "ModelVariant",
     "OllamaChannel",
     "TargetEntry",
@@ -73,6 +76,30 @@ category is a deliberate edit here, and the catalog validator enforces the set.
 
 ArtifactKind = str
 """``"gguf"`` (a file set for llama.cpp) or ``"hf_repo"`` (a directory snapshot for vLLM)."""
+
+ModelKind = str
+"""What a catalog row is *for*: ``"generation"`` or ``"embedding"``.
+
+The two share every acquisition mechanism — a GGUF is a GGUF, and the resolver, digests,
+and download machinery never care what the weights compute. What differs is
+interpretation, and it differs enough that guessing is wrong: an embedding model has no
+KV cache sized for a chat context, no quality ladder a user is trading off against
+throughput, and no place in the ``small``/``medium``/``large`` tier system, which answers
+"how big a chat model should I run". One field distinguishes them so the pieces that
+genuinely differ can ask, rather than a second table duplicating the pieces that do not.
+"""
+
+MODEL_KINDS: frozenset[str] = frozenset({"generation", "embedding"})
+"""The closed vocabulary of `ModelEntry.kind`, enforced by the parser and the validator."""
+
+_EMBEDDING_KEYS = frozenset({"dimensions", "max_input_tokens"})
+"""The only keys an ``embedding`` block may carry.
+
+`EmbeddingCapabilities` has more fields than these, and that is the point of the closed
+set: the rest are provider-specific limits or measured facts, and a catalog row that could
+declare them would be a catalog row that could assert an unverifiable number about every
+deployment of the model at once.
+"""
 
 _ARTIFACT_KINDS = frozenset({"gguf", "hf_repo"})
 _ENGINES = frozenset({"llama.cpp", "vllm"})
@@ -210,6 +237,8 @@ class ModelEntry:
 
     Attributes:
         id: Stable catalog id (``"qwen2.5-7b-instruct"``).
+        kind: ``"generation"`` (the default, and every entry written before embeddings
+            existed) or ``"embedding"``. See `ModelKind`.
         family: Model family, for grouping in a UI.
         display_name: Human-facing name.
         parameter_size: Parameter class (``"7B"``), keying the KV-cache cost table.
@@ -225,10 +254,17 @@ class ModelEntry:
         variants: The quantization ladder, best quality first is *not* assumed — sort by
             `ModelVariant.quality_rank`.
         ollama: The Ollama channel, when the model is published there.
+        embedding: Vector facts on ``kind="embedding"`` rows only, as the same record
+            the client reads — the catalog states only ``dimensions`` and
+            ``max_input_tokens``, the two an upstream model card actually publishes.
+            Everything else about an embedding model is either provider-specific
+            (batch ceilings) or measurable rather than declared (normalization, which
+            ``probe_embedding()`` observes), so the catalog does not guess at it.
         description: Free text for display.
     """
 
     id: str
+    kind: ModelKind = "generation"
     family: str = ""
     display_name: str = ""
     parameter_size: str | None = None
@@ -243,12 +279,18 @@ class ModelEntry:
     source: str = ""
     variants: tuple[ModelVariant, ...] = ()
     ollama: OllamaChannel | None = None
+    embedding: EmbeddingCapabilities | None = None
     description: str = ""
 
     @property
     def name(self) -> str:
         """Display name, falling back to the id."""
         return self.display_name or self.id
+
+    @property
+    def is_embedding(self) -> bool:
+        """Whether this row describes an embedding model rather than a chat model."""
+        return self.kind == "embedding"
 
     @property
     def channels(self) -> tuple[str, ...]:
@@ -385,14 +427,29 @@ class Catalog:
         return entry
 
     def models_for(
-        self, provider_id: str | None = None, *, best_at: str | None = None
+        self,
+        provider_id: str | None = None,
+        *,
+        best_at: str | None = None,
+        kind: ModelKind | None = None,
     ) -> tuple[ModelEntry, ...]:
-        """Logical models filtered by serving channel and category, id-ordered."""
+        """Logical models filtered by serving channel, category, and kind, id-ordered.
+
+        Args:
+            provider_id: Keep only models this channel can serve.
+            best_at: Keep only models carrying this category tag.
+            kind: Keep only rows of this kind. ``None`` — the default — keeps every kind,
+                because a caller browsing "what can this machine run" wants the embedding
+                models too; a caller filling a *chat* picker passes ``"generation"``
+                rather than relying on a narrowing it never asked for.
+        """
         channel = provider_id.strip().lower() if provider_id else None
         return tuple(
             entry
             for _, entry in sorted(self.models.items())
-            if (channel is None or channel in entry.channels) and entry.matches_best_at(best_at)
+            if (channel is None or channel in entry.channels)
+            and entry.matches_best_at(best_at)
+            and (kind is None or entry.kind == kind)
         )
 
     def with_alias_target(self, alias: str, provider_id: str, model_id: str) -> Catalog:
@@ -620,6 +677,28 @@ def _parse_artifact(artifact_id: str, entry: Mapping[str, Any]) -> GgufArtifact:
         quantization=_opt_str(entry.get("quantization")),
         est_ram_bytes=_opt_int(entry.get("est_ram_bytes")),
         est_vram_bytes=_opt_int(entry.get("est_vram_bytes")),
+        embedding=_parse_embedding_block(f"artifact {artifact_id!r}", entry.get("embedding")),
+    )
+
+
+def _parse_embedding_block(where: str, raw: Any) -> EmbeddingCapabilities | None:
+    """Parse the embedding facts an entry declares, or ``None`` when it declares none."""
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ConfigError(f"catalog {where} 'embedding' must be an object")
+    unknown = set(raw) - _EMBEDDING_KEYS
+    if unknown:
+        raise ConfigError(
+            f"catalog {where} 'embedding' has unknown keys: {', '.join(sorted(unknown))}",
+            hint=(
+                "the catalog states only what a model card publishes: "
+                f"{', '.join(sorted(_EMBEDDING_KEYS))}"
+            ),
+        )
+    return EmbeddingCapabilities(
+        dimensions=_opt_int(raw.get("dimensions")),
+        max_input_tokens=_opt_int(raw.get("max_input_tokens")),
     )
 
 
@@ -649,6 +728,20 @@ def _parse_model(entry: Mapping[str, Any]) -> ModelEntry:
             "every catalog model needs an 'id'",
             hint="model ids are stable, lowercase, and hyphenated",
         )
+
+    kind = str(entry.get("kind", "generation")).strip().lower() or "generation"
+    if kind not in MODEL_KINDS:
+        raise ConfigError(
+            f"catalog model {model_id!r} names unknown kind {kind!r}",
+            hint=f"known kinds: {', '.join(sorted(MODEL_KINDS))}",
+        )
+
+    if entry.get("embedding") is not None and kind != "embedding":
+        raise ConfigError(
+            f"catalog model {model_id!r} carries an 'embedding' block but is kind {kind!r}",
+            hint="set kind to 'embedding', or drop the block",
+        )
+    embedding = _parse_embedding_block(f"model {model_id!r}", entry.get("embedding"))
 
     raw_tags = entry.get("best_at", ())
     if isinstance(raw_tags, str) or not isinstance(raw_tags, Sequence):
@@ -689,6 +782,7 @@ def _parse_model(entry: Mapping[str, Any]) -> ModelEntry:
 
     return ModelEntry(
         id=model_id,
+        kind=kind,
         family=str(entry.get("family", "")),
         display_name=str(entry.get("display_name", "")),
         parameter_size=_opt_str(entry.get("parameter_size")),
@@ -703,6 +797,7 @@ def _parse_model(entry: Mapping[str, Any]) -> ModelEntry:
         source=str(entry.get("source", "")),
         variants=variants,
         ollama=ollama,
+        embedding=embedding,
         description=str(entry.get("description", "")),
     )
 
@@ -811,6 +906,7 @@ def _artifact_from_variant(model: ModelEntry, variant: ModelVariant) -> GgufArti
         quantization=variant.quantization or model.quantization,
         est_ram_bytes=variant.est_ram_bytes or model.est_ram_bytes,
         est_vram_bytes=variant.est_vram_bytes or model.est_vram_bytes,
+        embedding=model.embedding,
     )
 
 

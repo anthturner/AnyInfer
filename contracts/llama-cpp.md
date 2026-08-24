@@ -90,7 +90,11 @@ llama.cpp-specific parsing at all.
   exists for this platform") — only cpu/rocm/vulkan are pinned. A real NVIDIA GPU on this
   platform currently falls back to the Vulkan backend rather than CUDA; re-pinning a CUDA
   build is a `scripts/pin_runtimes.py` maintainer decision, not made here.
-- Embedding-capable catalog entries (dimensions, native context, pooling type) are not
-  yet representable in the catalog schema — `static_embedding_capabilities` is
-  deliberately empty for this provider; see `plans/EMBEDDING_RERANKING_CONTINUATION.md`
-  T11.
+- Embedding artifacts are described by the catalog as of 2026-08-24: a row states
+  `kind: "embedding"` with its `dimensions` and `max_input_tokens`, and the adapter
+  reports those through `list_models()` rather than through
+  `static_embedding_capabilities`, which stays empty because a descriptor table keyed by
+  model id cannot serve a provider whose ids are per-installation artifact ids. Pooling
+  type is still not recorded: llama-server takes it from GGUF metadata and no catalog
+  consumer would read it. Whether vectors come back normalized is measured by
+  `probe_embedding()`, not declared.

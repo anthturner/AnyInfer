@@ -13,7 +13,7 @@
     "A vision candidate must name one exact projector; the pinning pass verifies and records",
     "that companion beside every weight variant rather than matching an mmproj heuristically."
   ],
-  "generated": "2026-08-10",
+  "generated": "2026-08-24",
   "models": [
     {
       "id": "deepseek-r1-distill-llama-70b",
@@ -2641,6 +2641,264 @@
             },
             "size_bytes": {
               "mistralai_Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf": 14333915264
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "nomic-embed-text-v1.5",
+      "kind": "embedding",
+      "family": "nomic-embed",
+      "display_name": "Nomic Embed Text v1.5",
+      "parameter_size": "137M",
+      "quantization": "Q4_K_M",
+      "context_window": 8192,
+      "license": "apache-2.0",
+      "best_at": [
+        "embeddings",
+        "rag"
+      ],
+      "est_file_bytes": 84106624,
+      "est_ram_bytes": 922967424,
+      "est_vram_bytes": 788749696,
+      "last_verified": "2026-08-24",
+      "source": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5",
+      "sources": {
+        "ollama": {
+          "tag": "nomic-embed-text",
+          "digest": "sha256:31df23ea7daa448f9ccdbbcecce6c14689c8552222b80defd3830707c0139d4f"
+        }
+      },
+      "embedding": {
+        "dimensions": 768,
+        "max_input_tokens": 8192
+      },
+      "variants": [
+        {
+          "id": "nomic-embed-text-v1.5-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 146146432,
+          "est_ram_bytes": 985007232,
+          "est_vram_bytes": 850789504,
+          "artifact_id": "nomic-embed-text-v1.5-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+            "revision": "0188c9bf409793f810680a5a431e7b899c46104c",
+            "files": [
+              "nomic-embed-text-v1.5.Q8_0.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v1.5.Q8_0.gguf": "3e24342164b3d94991ba9692fdc0dd08e3fd7362e0aacc396a9a5c54a544c3b7"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v1.5.Q8_0.gguf": 146146432
+            }
+          }
+        },
+        {
+          "id": "nomic-embed-text-v1.5-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 113042528,
+          "est_ram_bytes": 951903328,
+          "est_vram_bytes": 817685600,
+          "artifact_id": "nomic-embed-text-v1.5-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+            "revision": "0188c9bf409793f810680a5a431e7b899c46104c",
+            "files": [
+              "nomic-embed-text-v1.5.Q6_K.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v1.5.Q6_K.gguf": "9b335d0801aded377a055257f7cf046daa48dd0bc2a7c2ea3300168c154b1fd9"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v1.5.Q6_K.gguf": 113042528
+            }
+          }
+        },
+        {
+          "id": "nomic-embed-text-v1.5-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 99588928,
+          "est_ram_bytes": 938449728,
+          "est_vram_bytes": 804232000,
+          "artifact_id": "nomic-embed-text-v1.5-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+            "revision": "0188c9bf409793f810680a5a431e7b899c46104c",
+            "files": [
+              "nomic-embed-text-v1.5.Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v1.5.Q5_K_M.gguf": "0c7930f6c4f6f29b7da5046e3a2c0832aa3f602db3de5760a95f0582dbd3d6e6"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v1.5.Q5_K_M.gguf": 99588928
+            }
+          }
+        },
+        {
+          "id": "nomic-embed-text-v1.5-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 84106624,
+          "est_ram_bytes": 922967424,
+          "est_vram_bytes": 788749696,
+          "artifact_id": "nomic-embed-text-v1.5-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+            "revision": "0188c9bf409793f810680a5a431e7b899c46104c",
+            "files": [
+              "nomic-embed-text-v1.5.Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v1.5.Q4_K_M.gguf": "d4e388894e09cf3816e8b0896d81d265b55e7a9fff9ab03fe8bf4ef5e11295ac"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v1.5.Q4_K_M.gguf": 84106624
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "nomic-embed-text-v2-moe",
+      "kind": "embedding",
+      "family": "nomic-embed",
+      "display_name": "Nomic Embed Text v2 MoE",
+      "parameter_size": "475M",
+      "quantization": "Q4_K_M",
+      "context_window": 512,
+      "license": "apache-2.0",
+      "best_at": [
+        "embeddings",
+        "multilingual",
+        "rag"
+      ],
+      "est_file_bytes": 344120288,
+      "est_ram_bytes": 899865568,
+      "est_vram_bytes": 765647840,
+      "last_verified": "2026-08-24",
+      "source": "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe",
+      "sources": {},
+      "embedding": {
+        "dimensions": 768,
+        "max_input_tokens": 512
+      },
+      "variants": [
+        {
+          "id": "nomic-embed-text-v2-moe-q8-0",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q8_0",
+          "quality_rank": 80,
+          "est_file_bytes": 512225120,
+          "est_ram_bytes": 1067970400,
+          "est_vram_bytes": 933752672,
+          "artifact_id": "nomic-embed-text-v2-moe-q8-0",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v2-moe-GGUF",
+            "revision": "ffbcf4c99e5d617dda10ec8c0e9f75754b0cbb80",
+            "files": [
+              "nomic-embed-text-v2-moe.Q8_0.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v2-moe.Q8_0.gguf": "06e7a7e594a26985523c18383aba4aad39fe6e14f08ffc6ab5b554e1ccdc3cff"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v2-moe.Q8_0.gguf": 512225120
+            }
+          }
+        },
+        {
+          "id": "nomic-embed-text-v2-moe-q6-k",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q6_K",
+          "quality_rank": 60,
+          "est_file_bytes": 397149152,
+          "est_ram_bytes": 952894432,
+          "est_vram_bytes": 818676704,
+          "artifact_id": "nomic-embed-text-v2-moe-q6-k",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v2-moe-GGUF",
+            "revision": "ffbcf4c99e5d617dda10ec8c0e9f75754b0cbb80",
+            "files": [
+              "nomic-embed-text-v2-moe.Q6_K.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v2-moe.Q6_K.gguf": "e74dafe6932fc7ae53f98061401f5cae136203a6b09fa940a2f1eb0ab5804ed8"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v2-moe.Q6_K.gguf": 397149152
+            }
+          }
+        },
+        {
+          "id": "nomic-embed-text-v2-moe-q5-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q5_K_M",
+          "quality_rank": 50,
+          "est_file_bytes": 370828256,
+          "est_ram_bytes": 926573536,
+          "est_vram_bytes": 792355808,
+          "artifact_id": "nomic-embed-text-v2-moe-q5-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v2-moe-GGUF",
+            "revision": "ffbcf4c99e5d617dda10ec8c0e9f75754b0cbb80",
+            "files": [
+              "nomic-embed-text-v2-moe.Q5_K_M.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v2-moe.Q5_K_M.gguf": "a6546bdf4e46288c93d79e6292bbdd8efa7ca87c242a8e60afa9cbacdc641471"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v2-moe.Q5_K_M.gguf": 370828256
+            }
+          }
+        },
+        {
+          "id": "nomic-embed-text-v2-moe-q4-k-m",
+          "engine": "llama.cpp",
+          "kind": "gguf",
+          "quantization": "Q4_K_M",
+          "quality_rank": 40,
+          "est_file_bytes": 344120288,
+          "est_ram_bytes": 899865568,
+          "est_vram_bytes": 765647840,
+          "artifact_id": "nomic-embed-text-v2-moe-q4-k-m",
+          "source": {
+            "resolver": "huggingface",
+            "repo": "nomic-ai/nomic-embed-text-v2-moe-GGUF",
+            "revision": "ffbcf4c99e5d617dda10ec8c0e9f75754b0cbb80",
+            "files": [
+              "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+            ],
+            "sha256": {
+              "nomic-embed-text-v2-moe.Q4_K_M.gguf": "b5fb2811647b8ef461519a68a3bf67014a84a66a130c8a2af9413ff9f06d3f22"
+            },
+            "size_bytes": {
+              "nomic-embed-text-v2-moe.Q4_K_M.gguf": 344120288
             }
           }
         }

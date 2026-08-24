@@ -3640,18 +3640,35 @@ class AsyncClient:
         return self._resolve_route(target, route, None)
 
     def _embedding_capabilities_of(self, resolved: ResolvedTarget) -> Any:
-        """Static embedding capabilities layered under anything a probe measured."""
+        """Embedding facts for one target, weakest evidence first.
+
+        Three layers, in the same order the rest of the capability system uses: what the
+        descriptor states about this model id, then what the model itself declared
+        through discovery (a listing that tags its own vectors, or a pinned catalog row
+        for a local artifact), then what a probe actually measured. Later layers only
+        fill or replace fields they genuinely know, so a probe never erases a declared
+        ceiling it did not test.
+        """
         try:
             descriptor = self._pool.descriptor_for(resolved.provider_id)
         except (AnyInferError, ValueError):
             return None
-        static = descriptor.static_embedding_capabilities.get(resolved.model)
-        probed = self._capabilities.embedding_probed_for(
-            resolved.provider_id, resolved.model
-        )
-        if static is not None and probed is not None:
-            return static.overlay(probed)
-        return probed if probed is not None else static
+        assembled = self._operation_capabilities(resolved)
+        layers = [
+            layer
+            for layer in (
+                descriptor.static_embedding_capabilities.get(resolved.model),
+                assembled.embedding if assembled is not None else None,
+                self._capabilities.embedding_probed_for(resolved.provider_id, resolved.model),
+            )
+            if layer is not None
+        ]
+        if not layers:
+            return None
+        merged = layers[0]
+        for layer in layers[1:]:
+            merged = merged.overlay(layer)
+        return merged
 
     def _check_operation_spend(
         self,

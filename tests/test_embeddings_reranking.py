@@ -1053,6 +1053,36 @@ async def test_operations_for_reads_model_level_facts() -> None:
         await client.aclose()
 
 
+async def test_a_model_declaring_its_own_vectors_is_believed() -> None:
+    """The second way a provider states embedding facts: through its listing.
+
+    A descriptor's static table is keyed by model ids known when the code was written,
+    which excludes every provider whose ids come from the machine it runs on -- a local
+    engine serving whatever GGUF is installed, most of all. Those providers state facts
+    the same way they state everything else, through `list_models()`, and the client has
+    to layer that under a probe the same way it layers a static table.
+    """
+    fake = FakeEmbeddingRerankProvider(
+        "fake-embed",
+        embedding_dimensions={"declared": 4},
+        declared_embedding={
+            "declared": ai.EmbeddingCapabilities(dimensions=4, max_input_tokens=512),
+        },
+    )
+    client = _client_with_fake(fake)
+    try:
+        # The listing has to be read before its facts are available, exactly as for any
+        # other discovered capability.
+        assert [m.id for m in await client.models("fake-embed", operation="embedding")] == [
+            "declared"
+        ]
+        comparison = await client.compare_embedding("hello", targets=["fake-embed:declared"])
+        assert comparison[0].dimensions == 4
+        assert comparison[0].max_input_tokens == 512
+    finally:
+        await client.aclose()
+
+
 async def test_verify_embedding_spends_one_probe_and_reports_dimensions() -> None:
     fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
     client = _client_with_fake(fake)

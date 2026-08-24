@@ -288,8 +288,21 @@ class LlamaCppAdapter:
             self._supervisor.set_hardware(self._hardware)
         return self._hardware
 
-    def _artifact_for(self, model: str) -> GgufArtifact:
-        """Resolve a model reference to a pinned catalog artifact."""
+    def _artifact_for(self, model: str, *, operation: str = "generation") -> GgufArtifact:
+        """Resolve a model reference to a pinned catalog artifact.
+
+        Args:
+            model: The artifact id, as an alias target or a direct reference.
+            operation: What the caller is about to ask the weights to do.
+
+        Exactly one combination is refused here, and only because it is *known* to be
+        impossible: a catalog row that declares itself an embedding model cannot serve a
+        chat request, so saying so beats downloading the weights, starting a server, and
+        relaying whatever llama-server reports. The reverse is not refused — llama.cpp
+        will produce vectors from a chat model, and an application overlay may pin an
+        embedding GGUF without classifying it — so an undeclared artifact keeps the
+        behaviour it had before the catalog could describe this at all.
+        """
         catalog = self._options.catalog
         if catalog is None:
             raise ConfigError(
@@ -300,7 +313,14 @@ class LlamaCppAdapter:
                     "bundled catalog"
                 ),
             )
-        return catalog.artifact(model)
+        artifact = catalog.artifact(model)
+        if operation == "generation" and artifact.embedding is not None:
+            raise ConfigError(
+                f"{model!r} is an embedding model and cannot serve a chat request",
+                provider=self.provider_id,
+                hint="embed with client.embed(...), or pick a generation model",
+            )
+        return artifact
 
     def _store(self) -> ModelStore:
         """The model store this adapter reads from and writes into."""
@@ -448,15 +468,28 @@ class LlamaCppAdapter:
         models: list[DiscoveredModel] = []
         for artifact_id in sorted(installed_ids & catalog.artifacts.keys()):
             artifact = catalog.artifacts[artifact_id]
+            embedding = artifact.embedding
+            # An embedding artifact serves exactly one operation and supports none of the
+            # chat features. Reporting the generation feature set for it would be a claim
+            # the weights cannot honour: llama-server started with --embeddings answers a
+            # chat completion with an error, so "streaming, tools, grammar" would describe
+            # a server that does not exist.
             models.append(
                 DiscoveredModel(
                     id=artifact_id,
                     capabilities=ModelCapabilities(
                         features=Sourced(
-                            _LLAMA_FEATURES
+                            Feature(0)
+                            if embedding is not None
+                            else _LLAMA_FEATURES
                             | (Feature.VISION if artifact.projector is not None else Feature(0)),
                             "catalog",
                         ),
+                        operations=Sourced(
+                            frozenset({"embedding" if embedding is not None else "generation"}),
+                            "catalog",
+                        ),
+                        embedding=embedding,
                         local=LocalModelInfo(
                             artifact_size_bytes=artifact.total_size_bytes,
                             parameter_size=artifact.parameter_size,
@@ -582,7 +615,7 @@ class LlamaCppAdapter:
         Paying for a second resident process per model is the honest cost of that
         constraint, not a bug to paper over.
         """
-        artifact = self._artifact_for(req.model)
+        artifact = self._artifact_for(req.model, operation="embedding")
         model_path = await self._ensure_downloaded(artifact)
         plan = self._plan_for_embed(artifact)
 
@@ -623,10 +656,11 @@ descriptor = ProviderDescriptor(
     locality="local",
     default_base_url=None,
     requires_base_url=False,
-    # No static_embedding_capabilities: dimensions/limits vary per GGUF artifact, and
-    # today's catalog schema carries no embedding-specific metadata to key them by
-    # (see plans/EMBEDDING_RERANKING_CONTINUATION.md T11) — probe_embedding() fills the
-    # gap the same way it already does for any provider without static declarations.
+    # No static_embedding_capabilities: a descriptor table is keyed by model id, and this
+    # provider's ids are catalog artifact ids that vary per installation. The facts live
+    # where the artifact does -- the catalog's embedding rows -- and reach the client
+    # through list_models(), which is how a provider states model-level facts. Anything
+    # the catalog does not declare, probe_embedding() measures.
     operations=frozenset({"generation", "embedding"}),
     setup=ProviderSetupSpec(
         fields=(

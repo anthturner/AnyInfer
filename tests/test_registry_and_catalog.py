@@ -10,6 +10,7 @@ import pytest
 import anyinfer as ai
 from anyinfer.catalog.model import Catalog
 from anyinfer.catalog.resolve import load_default_catalog, resolve_target
+from anyinfer.errors import ConfigError
 from anyinfer.registry import (
     ENTRY_POINT_GROUP,
     HostShorthand,
@@ -255,6 +256,92 @@ def test_alias_targets_resolve_to_bundled_artifacts() -> None:
         target = catalog.targets_for_alias(alias).get("llama-cpp")
         assert target is not None and target.gguf
         assert target.gguf in catalog.artifacts
+
+
+class TestEmbeddingRows:
+    """The catalog can describe an embedding model without pretending it is a chat model."""
+
+    def test_the_bundled_catalog_ships_embedding_rows(self) -> None:
+        catalog = load_default_catalog()
+        embedders = catalog.models_for(kind="embedding")
+        assert embedders, "the schema exists to carry these; a schema with no rows is dead"
+        for entry in embedders:
+            assert entry.is_embedding
+            assert entry.embedding is not None
+            assert entry.embedding.dimensions
+            assert "embeddings" in entry.best_at
+
+    def test_kind_filtering_never_narrows_silently(self) -> None:
+        """No argument means every kind — a caller opts into a narrower view."""
+        catalog = load_default_catalog()
+        everything = catalog.models_for()
+        generation = catalog.models_for(kind="generation")
+        embedding = catalog.models_for(kind="embedding")
+        assert len(everything) == len(generation) + len(embedding)
+        assert not {e.id for e in generation} & {e.id for e in embedding}
+
+    def test_embedding_facts_reach_the_derived_artifact(self) -> None:
+        """The artifact is what the llama.cpp adapter holds, so the facts must survive."""
+        catalog = load_default_catalog()
+        entry = catalog.models_for(kind="embedding")[0]
+        artifact_id = entry.gguf_artifact_id
+        assert artifact_id is not None
+        artifact = catalog.artifact(artifact_id)
+        assert artifact.embedding is not None
+        assert artifact.embedding.dimensions == entry.embedding.dimensions  # type: ignore[union-attr]
+
+    def test_an_embedding_model_is_sized_without_a_chat_context(self) -> None:
+        """The KV table is keyed by chat-model parameter classes and misses these entirely.
+
+        Taking its 256 KiB/token default over an 8k context would budget 2 GiB for a model
+        whose weights are 84 MB, and the fit engine would refuse it on machines that run it
+        without noticing.
+        """
+        catalog = load_default_catalog()
+        entry = catalog.model("nomic-embed-text-v1.5")
+        assert entry.est_file_bytes and entry.est_ram_bytes
+        assert entry.est_ram_bytes < 4 * entry.est_file_bytes + 1024**3
+
+    def test_a_generation_row_may_not_carry_embedding_facts(self) -> None:
+        with pytest.raises(ConfigError, match="kind"):
+            Catalog.from_mapping(
+                {
+                    "models": [
+                        {"id": "pretender", "embedding": {"dimensions": 768}},
+                    ]
+                }
+            )
+
+    def test_the_embedding_block_is_a_closed_set_of_keys(self) -> None:
+        """A key the catalog cannot verify per deployment must not be expressible here."""
+        with pytest.raises(ConfigError, match="unknown keys"):
+            Catalog.from_mapping(
+                {
+                    "models": [
+                        {
+                            "id": "overreach",
+                            "kind": "embedding",
+                            "embedding": {"dimensions": 768, "normalized": True},
+                        },
+                    ]
+                }
+            )
+
+    def test_an_unknown_kind_is_rejected(self) -> None:
+        with pytest.raises(ConfigError, match="unknown kind"):
+            Catalog.from_mapping({"models": [{"id": "x", "kind": "reranking"}]})
+
+    def test_no_tier_alias_resolves_to_an_embedding_model(self) -> None:
+        """small/medium/large answer "how big a chat model"; embeddings have no answer."""
+        catalog = load_default_catalog()
+        embedding_artifacts = {
+            variant.artifact_id
+            for entry in catalog.models_for(kind="embedding")
+            for variant in entry.variants
+        }
+        for alias in catalog.alias_names():
+            for target in catalog.targets_for_alias(alias).values():
+                assert target.gguf not in embedding_artifacts
 
 
 def test_sharded_artifacts_are_parsed() -> None:

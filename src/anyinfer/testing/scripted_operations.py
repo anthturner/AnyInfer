@@ -95,6 +95,12 @@ class FakeEmbeddingRerankProvider:
         embedding_capabilities: Static `EmbeddingCapabilities` recorded on the descriptor,
             keyed by model id — the way tests declare a verified batch limit
             (``max_batch_inputs``) for core-owned batching to resolve.
+        declared_embedding: `EmbeddingCapabilities` reported through ``list_models()``,
+            keyed by model id — the *other* way a provider states model-level facts, used
+            by listings that tag their own models and by local engines reading a pinned
+            catalog row. Distinct from ``embedding_capabilities`` on purpose: a descriptor
+            table is keyed by ids known when the code was written, and a provider whose
+            ids come from the machine it runs on cannot use one.
         rerank_capabilities: Static `RerankCapabilities` recorded on the descriptor,
             keyed by model id (``max_documents`` drives rerank batching).
         pricing: Trusted per-model pricing recorded on the descriptor (provenance
@@ -115,6 +121,7 @@ class FakeEmbeddingRerankProvider:
         normalized: bool = True,
         locality: Literal["hosted", "local", "remote"] = "local",
         embedding_capabilities: Mapping[str, EmbeddingCapabilities] | None = None,
+        declared_embedding: Mapping[str, EmbeddingCapabilities] | None = None,
         rerank_capabilities: Mapping[str, RerankCapabilities] | None = None,
         pricing: Mapping[str, Pricing] | None = None,
     ) -> None:
@@ -124,6 +131,7 @@ class FakeEmbeddingRerankProvider:
         self._normalized = normalized
         self._locality = locality
         self._embedding_capabilities = dict(embedding_capabilities or {})
+        self._declared_embedding = dict(declared_embedding or {})
         self._rerank_capabilities = dict(rerank_capabilities or {})
         self._pricing = dict(pricing or {})
         self._failures: dict[str, list[ScriptedEmbeddingFailure]] = {
@@ -178,9 +186,25 @@ class FakeEmbeddingRerankProvider:
     # ---- ProviderLifecycle ------------------------------------------------------------
 
     async def list_models(self) -> Sequence[DiscoveredModel]:
-        """Enumerate the models this fake serves."""
+        """Enumerate the models this fake serves, with any facts they declare."""
         ids = set(self._embedding_dimensions) | self._rerank_models
-        return tuple(DiscoveredModel(id=model_id) for model_id in sorted(ids))
+        models: list[DiscoveredModel] = []
+        for model_id in sorted(ids):
+            declared = self._declared_embedding.get(model_id)
+            models.append(
+                DiscoveredModel(
+                    id=model_id,
+                    capabilities=(
+                        ModelCapabilities(
+                            operations=Sourced(frozenset({"embedding"}), "discovered"),
+                            embedding=declared,
+                        )
+                        if declared is not None
+                        else None
+                    ),
+                )
+            )
+        return tuple(models)
 
     async def health(self) -> Health:
         """Always healthy — this fake never simulates transport-level outages at health time."""

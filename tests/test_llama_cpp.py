@@ -25,6 +25,7 @@ from anyinfer.local.store import ModelStore, StoreEntry
 from anyinfer.local.tuning import ServerPlan
 from anyinfer.providers.llama_cpp import LlamaCppAdapter, LlamaCppOptions
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
+from anyinfer.types.capabilities import Feature
 
 GIB = 1024**3
 PAYLOAD = b"gguf-bytes"
@@ -49,6 +50,31 @@ def _catalog(tmp_path: Path) -> Catalog:
                         {
                             "filename": "test-model.gguf",
                             "url": "https://host.invalid/test-model.gguf",
+                            "sha256": DIGEST,
+                            "size_bytes": len(PAYLOAD),
+                        }
+                    ],
+                }
+            },
+        }
+    )
+
+
+def _embedding_catalog(tmp_path: Path) -> Catalog:
+    """A catalog whose one artifact declares itself an embedding model."""
+    return Catalog.from_mapping(
+        {
+            "format_version": 1,
+            "gguf_artifacts": {
+                "embed-model": {
+                    "license": "Apache-2.0",
+                    "parameter_size": "137M",
+                    "quantization": "Q4_K_M",
+                    "embedding": {"dimensions": 768, "max_input_tokens": 8192},
+                    "files": [
+                        {
+                            "filename": "embed-model.gguf",
+                            "url": "https://host.invalid/embed-model.gguf",
                             "sha256": DIGEST,
                             "size_bytes": len(PAYLOAD),
                         }
@@ -473,6 +499,55 @@ async def test_list_models_reports_only_downloaded_catalog_artifacts(tmp_path: P
     assert caps is not None and caps.local is not None
     assert caps.local.parameter_size == "7B"
     assert caps.local.quantization == "Q4_K_M"
+
+
+async def test_discovery_reports_what_an_embedding_artifact_actually_serves(
+    tmp_path: Path,
+) -> None:
+    """A model id is not evidence of an operation; the pinned catalog row is.
+
+    Before the catalog could say which kind an artifact is, every llama.cpp model
+    discovered as generation-only with the full chat feature set -- including an embedding
+    GGUF, which serves none of it. `client.models(operation="embedding")` therefore
+    reported nothing for this provider, on a machine with an embedding model installed.
+    """
+    fake = FakeOpenAIServer()
+    adapter, _ = _adapter(tmp_path, fake, options={"catalog": _embedding_catalog(tmp_path)})
+    try:
+        ModelStore(tmp_path).register(
+            StoreEntry(
+                id="installed-embed-model",
+                model_id="embed-family",
+                variant_id="embed-model",
+                engine="llama.cpp",
+            )
+        )
+        models = await adapter.list_models()
+    finally:
+        await adapter.aclose()
+
+    assert [m.id for m in models] == ["embed-model"]
+    caps = models[0].capabilities
+    assert caps is not None
+    assert caps.operations is not None and caps.operations.value == frozenset({"embedding"})
+    assert caps.embedding is not None and caps.embedding.dimensions == 768
+    assert caps.embedding.max_input_tokens == 8192
+    # Not "streaming, tools, grammar": a server started with --embeddings serves none of it.
+    assert caps.features.value == Feature(0)
+
+
+async def test_generation_is_refused_on_a_declared_embedding_artifact(tmp_path: Path) -> None:
+    """The only mismatch the catalog *knows* is impossible, so the only one refused."""
+    fake = FakeOpenAIServer()
+    adapter, _ = _adapter(tmp_path, fake, options={"catalog": _embedding_catalog(tmp_path)})
+    try:
+        with pytest.raises(ConfigError, match="embedding model"):
+            adapter._artifact_for("embed-model", operation="generation")
+        # The reverse is not knowledge: llama.cpp will produce vectors from chat weights,
+        # and an overlay may pin an embedding GGUF without classifying it.
+        assert adapter._artifact_for("embed-model", operation="embedding") is not None
+    finally:
+        await adapter.aclose()
 
 
 async def test_health_reports_binary_availability(tmp_path: Path) -> None:

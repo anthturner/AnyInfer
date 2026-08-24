@@ -43,6 +43,10 @@ See [the model catalog](../../concepts/catalog.md).
 
 ::: anyinfer.BEST_AT
 
+::: anyinfer.ModelKind
+
+::: anyinfer.MODEL_KINDS
+
 ::: anyinfer.load_default_catalog
 
 </div>

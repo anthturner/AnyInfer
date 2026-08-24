@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from ..types.operations import EmbeddingCapabilities
+
 __all__ = ["GgufArtifact", "GgufFile"]
 
 
@@ -49,6 +51,9 @@ class GgufArtifact:
         quantization: Quantization of the shipped weights (``"Q4_K_M"``), when known.
         est_ram_bytes: Estimated memory needed on the CPU-only path.
         est_vram_bytes: Estimated memory needed when fully offloaded.
+        embedding: Vector facts, when the artifact's weights are an embedding model
+            rather than a chat model. Its presence is what marks the artifact as one
+            `llama-server` must be started with ``--embeddings`` to serve.
     """
 
     id: str
@@ -59,6 +64,7 @@ class GgufArtifact:
     quantization: str | None = None
     est_ram_bytes: int | None = None
     est_vram_bytes: int | None = None
+    embedding: EmbeddingCapabilities | None = None
 
     def __post_init__(self) -> None:
         """Require model weights first and at most one projector companion."""

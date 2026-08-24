@@ -17,7 +17,7 @@ from enum import Flag, auto
 from typing import TYPE_CHECKING, Generic, Literal, TypeVar
 
 if TYPE_CHECKING:
-    from .operations import InferenceOperation
+    from .operations import EmbeddingCapabilities, InferenceOperation
 
 __all__ = [
     "DiscoveredModel",
@@ -253,6 +253,11 @@ class ModelCapabilities:
             embed" is a different operation, not a feature of chat — and deliberately
             not invented from the provider-level operations set, which says what the
             *adapter* speaks, not what one model does.
+        embedding: Vector facts this model states about itself — the dimensions and input
+            ceiling a listing or a pinned catalog row declares. ``None`` when nothing
+            model-level is known, which is the honest state for most providers: it is
+            filled from what a model actually reports, never from the provider's
+            documentation about a different model.
 
     The two sampling defaults exist so an application can say *what* "provider default"
     means instead of only that it is one. They are populated from a provider's own
@@ -271,6 +276,7 @@ class ModelCapabilities:
     default_top_p: Sourced[float] | None = None
     local: LocalModelInfo | None = None
     operations: Sourced[frozenset[InferenceOperation]] | None = None
+    embedding: EmbeddingCapabilities | None = None
 
     def overlay(self, other: ModelCapabilities) -> ModelCapabilities:
         """Layer ``other`` on top of this, field by field, stronger provenance winning.
@@ -287,6 +293,11 @@ class ModelCapabilities:
             default_top_p=_stronger(self.default_top_p, other.default_top_p),
             local=other.local if other.local is not None else self.local,
             operations=_stronger(self.operations, other.operations),
+            embedding=(
+                self.embedding.overlay(other.embedding)
+                if self.embedding is not None and other.embedding is not None
+                else (other.embedding if other.embedding is not None else self.embedding)
+            ),
         )
 
 
