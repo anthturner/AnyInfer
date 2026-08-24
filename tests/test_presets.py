@@ -404,6 +404,7 @@ def _harness(preset: CompatPreset, model: str) -> ConformanceHarness:
             reasoning=False,  # the shared fake has no reasoning channel
             list_models=preset.models_listing,
             tools="tools" not in preset.ignored_parameters,
+            cancellation=True,
         ),
     )
 

@@ -615,7 +615,7 @@ HARNESS = ConformanceHarness(
     model="command-a",
     build_client=_build_cohere_client,
     # The fake has no thinking channel of its own; the dialect test above covers it.
-    supports=Capabilities(reasoning=False, embedding=True, rerank=True),
+    supports=Capabilities(reasoning=False, embedding=True, rerank=True, cancellation=True),
     embedding_model="embed-english-light-v3.0",
     rerank_model="rerank-v3.5",
 )
@@ -706,7 +706,7 @@ LM_STUDIO_HARNESS = ConformanceHarness(
     build_client=_build_lm_studio_client,
     # The shared fake has no reasoning channel; the dialect tests above cover the
     # native reasoning translation.
-    supports=Capabilities(reasoning=False),
+    supports=Capabilities(reasoning=False, cancellation=True),
 )
 
 

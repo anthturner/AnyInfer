@@ -7,6 +7,7 @@ per adapter, and cassette mode once real traffic has been recorded.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -81,8 +82,28 @@ HARNESS = ConformanceHarness(
         # The generic dialect has no reasoning channel of its own; providers that do
         # (openai, anthropic) enable this row in their own harness.
         reasoning=False,
+        cancellation=True,
     ),
 )
+
+
+def test_the_published_case_table_lists_every_case() -> None:
+    """The matrix's own legend must enumerate what the matrix actually ran.
+
+    The table is hand-written prose beside a generated table, which is exactly the shape
+    that drifts: seven cases had accumulated without an entry before this test existed,
+    so a reader of the published matrix saw seven unexplained columns.
+    """
+    import re
+
+    footer = (Path(__file__).resolve().parent.parent / "workspace.py").read_text(
+        encoding="utf-8"
+    )
+    documented = set(re.findall(r"^\| `([a-z_]+)` \|", footer, re.M))
+    undocumented = [c.name for c in CONFORMANCE_CASES if c.name not in documented]
+    assert undocumented == [], (
+        f"add these to the matrix legend in workspace.py: {', '.join(undocumented)}"
+    )
 
 
 @pytest.mark.parametrize("case", CONFORMANCE_CASES, ids=lambda c: c.name)

@@ -1009,11 +1009,18 @@ _MATRIX_FOOTER = f"""
 | `error_mapping` | Failures are typed, carry an attempt trail, and mark retryability. |
 | `retry_after` | A rate-limited attempt is retried and recorded. |
 | `byte_cap` | An oversized response is rejected rather than silently truncated. |
+| `cancellation` | Abandoning a stream releases its connection and leaves the client usable. |
 | `unknown_finish_reason` | An unrecognized finish reason normalizes instead of crashing. |
 | `embedding` | One vector per input, uniform non-zero dimensions, a space identity. |
 | `embedding_duplicates` | Duplicate inputs come back positionally, never deduplicated. |
 | `rerank` | Rankings descend, and caller document identity survives the round trip. |
 | `rerank_top_n` | `top_n` truncates the ranking to the requested size. |
+| `rerank_duplicate_text` | Identical document text keeps its distinct caller-owned ids. |
+| `embedding_normalization_probe` | A probe measures normalization instead of assuming it. |
+| `embedding_byte_cap` | An oversized embedding response is refused, not parsed. |
+| `rerank_byte_cap` | An oversized rerank response is refused, not parsed. |
+| `embedding_retry_after` | A rate-limited embedding call is retried and recorded. |
+| `rerank_retry_after` | A rate-limited rerank call is retried and recorded. |
 
 ## Modes
 

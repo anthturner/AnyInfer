@@ -348,7 +348,7 @@ HARNESS = ConformanceHarness(
     model="deepseek-ai/DeepSeek-V3",
     build_client=_build_nebius_client,
     # The shared fake has no reasoning channel; the translator test above covers it.
-    supports=Capabilities(reasoning=False),
+    supports=Capabilities(reasoning=False, cancellation=True),
 )
 
 
