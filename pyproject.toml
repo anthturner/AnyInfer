@@ -62,6 +62,10 @@ all = [
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
+  # Test-only: the suite is CPU-bound and embarrassingly parallel (every test builds its
+  # own in-process fakes), so `-n auto` turns a 96-second run into 13 on a 16-core
+  # machine. Nothing in the library knows it exists.
+  "pytest-xdist>=3.6",
   "ruff>=0.6",
   "mypy>=1.11",
   "import-linter>=2.0",
@@ -196,6 +200,12 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    # Two tracks, so the inner loop is seconds and the gate is still exhaustive.
+    # `workspace test` runs the fast track; `workspace test --all` and CI run everything.
+    "exhaustive: sweeps the entire preset or provider matrix. Needed when the shared OpenAI-compatible dialect, a descriptor invariant, or the conformance suite itself changes -- not when iterating on one adapter, which its own test module covers.",
+    "slow: takes seconds for reasons unrelated to the code under iteration (packaging, subprocess builds). Always run before a commit; skipped while iterating.",
+]
 filterwarnings = [
     "error",
     # Import-time warning from starlette's own test client about its httpx backend —

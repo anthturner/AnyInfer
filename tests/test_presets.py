@@ -409,9 +409,16 @@ def _harness(preset: CompatPreset, model: str) -> ConformanceHarness:
     )
 
 
+@pytest.mark.exhaustive
 @pytest.mark.parametrize("preset_id", sorted(PRESETS_BY_ID), ids=str)
 async def test_preset_conformance(preset_id: str) -> None:
     """Run the full conformance suite against every preset, not a sampled few.
+
+    Marked `exhaustive` and skipped by the fast track: eighty-six presets times the full
+    case list is half the suite's wall time, and it re-proves the *shared* dialect. Adding
+    a provider or editing one adapter cannot change what this covers -- editing
+    `openai_compat.py`, a preset entry, or the conformance suite can, and those are what
+    the marker asks you to run it for.
 
     Sampling by "quirk axis" was the old approach, and it assumed the axes were known
     and orthogonal. They are neither: a preset combines an auth spelling, a token-field

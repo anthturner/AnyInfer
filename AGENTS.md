@@ -106,6 +106,13 @@ changes require the generated reference and runnable examples.
 
 ## Testing and documentation obligations
 
+- **Two test tracks.** `workspace test` is the inner loop: the fast track, seconds, every
+  adapter's own module and the whole core, skipping the `exhaustive` preset matrix and
+  `slow` packaging builds. `workspace test --provider <id>` narrows to one provider's
+  modules plus the invariants a provider change trips — editing one adapter does not need
+  the other twenty exercised. `workspace check` is the gate and the only thing that says
+  the suite passes; run it before committing. `test` cannot be made to run everything, on
+  purpose.
 - Every provider adapter must pass the shared conformance suite (`anyinfer.testing`) in
   cassette and fake-server modes; live mode is opt-in via real credentials. A new adapter PR
   includes: adapter, conformance run, its column in the conformance matrix (DESIGN.md §24),

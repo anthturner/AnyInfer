@@ -179,8 +179,17 @@ Before claiming a provider works:
 
 ## Step 7 — gates
 
+While iterating, run the narrow track — adding a provider does not need the other twenty
+exercised, and this is how you say so:
+
 ```bash
-python -m pytest -q
+workspace test --provider <id>    # this provider's modules + the shared invariants
+```
+
+Before committing, run all of them:
+
+```bash
+python -m pytest -q               # or `workspace check`, which runs every gate below
 python -m mypy src/
 python -m ruff check src/ tests/
 lint-imports

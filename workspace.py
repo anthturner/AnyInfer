@@ -840,8 +840,8 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
         ),
         Phase(
             "test",
-            "the full pytest suite, headless",
-            (("pytest", lambda: tool("pytest", "-q", env=_headless_env())),),
+            "the full pytest suite, headless and parallel",
+            (("pytest", lambda: tool("pytest", "-q", "-n", "auto", env=_headless_env())),),
         ),
         Phase(
             "conformance",
@@ -1107,6 +1107,127 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
     )
     lines.append(_MATRIX_FOOTER)
     return "\n".join(lines)
+
+
+def _test_arguments(parser: argparse.ArgumentParser) -> None:
+    """Flags for the ``test`` verb."""
+    parser.add_argument(
+        "--provider",
+        metavar="ID",
+        help="run only the modules that mention this provider, plus the shared invariants",
+    )
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        default="auto",
+        help="worker processes (default: auto; pass 0 to run in one process)",
+    )
+
+
+CORE_INVARIANT_MODULES = (
+    "tests/test_registry_and_catalog.py",
+    "tests/test_docs_examples.py",
+    "tests/test_agent_instructions.py",
+)
+"""Modules a provider-scoped run always includes, whatever the provider.
+
+These are the enumeration gates a new or edited provider trips: the descriptor invariants,
+the generated documentation index, and the shims. They are cheap and they are exactly what
+someone changing one adapter forgets to run.
+"""
+
+
+def _known_provider_ids() -> set[str]:
+    """Every registered provider id and alias, read from the registry itself."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from anyinfer.registry import ProviderRegistry
+
+    known: set[str] = set()
+    for descriptor in ProviderRegistry(load_builtins=True, load_entry_points=False):
+        known.add(descriptor.id)
+        known.update(descriptor.aliases)
+    return known
+
+
+def _modules_mentioning(provider_id: str) -> list[str]:
+    """Test modules that name this provider, by reading them rather than by a lookup table.
+
+    A hard-coded provider-to-module map is a map that drifts the first time a test file is
+    split or renamed -- and the file names genuinely do not follow the ids: `cohere` lives
+    across three modules, `azure-foundry` lives in `test_hosted_adapters.py`. Grepping for
+    the id and its module spelling finds all of them and keeps finding them.
+    """
+    needles = {provider_id, provider_id.replace("-", "_")}
+    found: list[str] = []
+    for path in sorted((ROOT / "tests").rglob("test_*.py")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if any(needle in text for needle in needles):
+            found.append(str(path.relative_to(ROOT)))
+    return found
+
+
+@verb(
+    "test",
+    "The inner loop: the fast track, or one provider's modules.",
+    group="Quality",
+    arguments=_test_arguments,
+)
+def cmd_test(args: argparse.Namespace) -> int:
+    """Run a *subset* of the suite, for the edit-run-edit cycle.
+
+    This verb never runs the complete suite, which is what keeps it from being a second
+    way to do what `check` already does: the gate is `workspace check` (or
+    `workspace check --only=test`), and it stays the only thing that can tell you the
+    suite passes. This tells you the code you are touching still works, in seconds.
+
+    Default is the **fast track**: everything except the tests marked `exhaustive` (the
+    eighty-six-preset conformance sweep, which re-proves the shared OpenAI dialect) and
+    `slow` (packaging builds). That still covers every adapter's own module, the core,
+    the CLI, the sidecar, and the docs examples -- roughly a tenth of the wall time for
+    nearly all of the signal.
+
+    ``--provider <id>`` narrows further: the modules that mention that provider, plus the
+    shared invariants any provider change trips. Adding or editing one adapter does not
+    need the other twenty exercised, and this is how you say so.
+
+    Both tracks run in parallel by default (``-j0`` to disable); each test builds its own
+    in-process fakes, so there is nothing to share and nothing to serialize on.
+    """
+    command = ["-q"]
+    if args.jobs != "0":
+        command += ["-n", str(args.jobs)]
+
+    if args.provider:
+        # Validated against the registry, not against whether the grep found anything: an
+        # unknown id usually *does* match some module by accident (a fixture name, a
+        # docstring), and a typo that runs four unrelated modules and reports green is
+        # worse than no shortcut at all.
+        known = _known_provider_ids()
+        if args.provider not in known:
+            print(red(f"{args.provider!r} is not a registered provider"))
+            close = sorted(k for k in known if args.provider in k or k in args.provider)
+            if close:
+                print(dim(f"  did you mean: {', '.join(close[:6])}"))
+            print(dim("  `workspace run providers` lists every id."))
+            return 2
+        modules = _modules_mentioning(args.provider)
+        if not modules:
+            print(red(f"no test module mentions {args.provider!r} — nothing to narrow to"))
+            print(dim("  run the fast track instead: `workspace test`"))
+            return 2
+        extra = [m for m in CORE_INVARIANT_MODULES if m not in modules]
+        command += modules + extra
+        track = f"provider:{args.provider} ({len(modules) + len(extra)} modules)"
+    else:
+        command += ["-m", "not exhaustive and not slow"]
+        track = "fast"
+
+    print(f"{bold('track')} {cyan(track)}")
+    code = tool("pytest", *command, env=_headless_env())
+    if code == 0:
+        print()
+        print(dim("a subset passed — `workspace check` is the gate, and it is not this."))
+    return code
 
 
 @verb("matrix", "Regenerate the conformance matrix from an actual suite run.", group="Quality")

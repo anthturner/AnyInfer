@@ -2,8 +2,36 @@
 
 ## Running
 
+Two tracks, because the gate and the inner loop want different things.
+
 ```bash
-pytest -q                                  # everything
+workspace test                             # fast track — seconds
+workspace test --provider cohere           # one provider's modules + shared invariants
+workspace check                            # the gate: everything, plus lint/types/docs
+```
+
+`workspace test` deliberately cannot run the whole suite. `check` is the only thing that
+tells you the suite passes, so there is exactly one answer to "is it green" — `test` tells
+you the code you are editing still works, which is a different question.
+
+The fast track skips two markers:
+
+| Marker | What it covers | Run it when |
+|---|---|---|
+| `exhaustive` | The full preset matrix: eighty-six presets through every conformance case. Half the suite's wall time, and it re-proves the *shared* OpenAI dialect. | You changed `openai_compat.py`, a preset entry, or the conformance suite itself. |
+| `slow` | Packaging and subprocess builds. | Before committing — `check` runs it. |
+
+Adding or editing one adapter changes nothing either marker covers, which is the point:
+that work needs its own module and the shared invariants, not the other twenty adapters.
+
+Everything runs in parallel by default (`pytest-xdist`, `-n auto`), which is worth roughly
+a sevenfold speedup: every test builds its own in-process fakes, so there is nothing to
+share and nothing to serialize on. Pass `-j0` to debug in a single process.
+
+Raw pytest still works, and is what you want for a single test:
+
+```bash
+pytest -q -n auto                          # everything, parallel
 pytest tests/test_routing.py -q            # one module
 pytest -k "fallback" -q                    # by name
 pytest -q --durations=15                   # find slow tests

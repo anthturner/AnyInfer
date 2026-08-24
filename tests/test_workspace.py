@@ -61,12 +61,24 @@ class TestRegistry:
             "format",
             "types",
             "contracts",
-            "test",
             "conformance",
             "docs-check",
             "docs-build",
         ):
             assert name not in workspace.REGISTRY
+
+    def test_the_test_verb_cannot_run_the_whole_suite(self):
+        """`test` is the inner loop, `check` is the gate, and they must not overlap.
+
+        The gates were absorbed into `check` so there would be exactly one thing that can
+        say the suite passes. `test` exists for the edit-run-edit cycle and is therefore
+        allowed back only on the condition that it always runs a subset -- no `--all`, no
+        way to spell the complete run through it.
+        """
+        assert "test" in workspace.REGISTRY
+        parser = workspace.build_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["test", "--all"])
 
     def test_help_lists_every_registered_verb(self):
         epilog = workspace._epilog()
@@ -287,6 +299,7 @@ class TestBuild:
         assert workspace.main(["build", "serve"]) == 0
         assert built == ["serve"]
 
+    @pytest.mark.slow
     def test_all_builds_wheel_then_both_native_bundles(self, built):
         assert workspace.main(["build", "all"]) == 0
         assert built == ["wheel", "demo", "serve"]
