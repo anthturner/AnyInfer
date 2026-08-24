@@ -80,6 +80,8 @@ without credentials or a network.
 
 ::: anyinfer.testing.FakeGeminiServer
 
+::: anyinfer.testing.FakeRetrievalServer
+
 ::: anyinfer.testing.FakeResponse
 
 ::: anyinfer.testing.scenario_responses

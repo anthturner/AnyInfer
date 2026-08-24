@@ -1052,10 +1052,12 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     import test_deepseek_xai
     import test_gemini
     import test_hosted_adapters
+    import test_jina
     import test_nebius
     import test_ollama
     import test_presets
     import test_tei
+    import test_voyage
 
     harnesses = {
         "openai-compat": test_conformance.HARNESS,
@@ -1069,6 +1071,8 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "xai": test_deepseek_xai.XAI_HARNESS,
         "azure-foundry": test_hosted_adapters.AZURE_HARNESS,
         "openrouter": test_hosted_adapters.OPENROUTER_HARNESS,
+        "voyage": test_voyage.HARNESS,
+        "jina": test_jina.HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed

@@ -10,7 +10,7 @@ identically on every platform.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -22,6 +22,7 @@ __all__ = [
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",
+    "FakeRetrievalServer",
     "chunk_text",
     "ndjson_lines",
     "scenario_responses",
@@ -408,6 +409,111 @@ class FakeOpenAIServer(_FakeServerBase):
             "model": "fake-model-small",
             "choices": [{"index": 0, "delta": dict(delta), "finish_reason": None}],
         }
+
+
+class FakeRetrievalServer(_FakeServerBase):
+    """An in-process endpoint for retrieval-only providers (Voyage, Jina).
+
+    These providers speak a narrow dialect: ``POST /embeddings`` in the OpenAI shape, a
+    ``POST /rerank`` that differs only in which key holds the ranking, and no listing
+    route at all. Sharing one fake keeps their conformance rows honest about the same
+    scenarios every other adapter answers.
+
+    Args:
+        responses: Scenario script, as for the other fakes. Only ``status``, ``headers``,
+            and ``error_message`` apply — there is no text to generate.
+        dimensions: Width of the vectors ``POST /embeddings`` returns.
+        rerank_key: Key holding the ranking. Voyage uses ``data``; Jina uses ``results``.
+        top_n_key: Request key carrying the truncation count. Voyage spells it
+            ``top_k``; Jina sends a plain ``top_n``. A fake that accepted either
+            would let an adapter send the wrong one and still pass.
+        models_status: Status for ``GET /models``. These providers document no listing
+            route, so the honest default is a 404 that still proves reachability.
+
+    Attributes:
+        requests: Every request body received, for assertions.
+    """
+
+    def __init__(
+        self,
+        responses: Sequence[FakeResponse] | FakeResponse | None = None,
+        *,
+        dimensions: int = 8,
+        rerank_key: str = "data",
+        top_n_key: str = "top_n",
+        models_status: int = 404,
+    ) -> None:
+        super().__init__(responses)
+        self._dimensions = dimensions
+        self._rerank_key = rerank_key
+        self._top_n_key = top_n_key
+        self._models_status = models_status
+
+    def next_response(self) -> FakeResponse:
+        """The response for the next retrieval call."""
+        index = min(self._call_index, len(self._responses) - 1)
+        return self._responses[index]
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/models"):
+            return httpx2.Response(
+                self._models_status, json={"detail": "no listing API on this provider"}
+            )
+        if path.endswith("/embeddings"):
+            return self._retrieval(request, self._embedding_body)
+        if path.endswith("/rerank"):
+            return self._retrieval(request, self._rerank_body)
+        return httpx2.Response(404, json={"detail": f"no such path: {path}"})
+
+    def _retrieval(
+        self,
+        request: httpx2.Request,
+        build: Callable[[Mapping[str, Any]], dict[str, Any]],
+    ) -> httpx2.Response:
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        response = self.next_response()
+        self._call_index += 1
+        if response.status >= 400:
+            return httpx2.Response(
+                response.status,
+                json={"detail": response.error_message},
+                headers=dict(response.headers),
+            )
+        return httpx2.Response(200, json=build(body), headers=dict(response.headers))
+
+    def _embedding_body(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        raw = body.get("input", [])
+        inputs = [raw] if isinstance(raw, str) else list(raw)
+        return {
+            "object": "list",
+            "model": body.get("model", "fake-embedding-model"),
+            # Deliberately reversed: entries carry their index, and an adapter that
+            # trusts arrival order instead must fail this.
+            "data": [
+                {"object": "embedding", "index": index, "embedding": self._vector(str(text))}
+                for index, text in reversed(list(enumerate(inputs)))
+            ],
+            "usage": {"total_tokens": len(inputs)},
+        }
+
+    def _rerank_body(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        documents = list(body.get("documents", []))
+        top_n = body.get(self._top_n_key)
+        # Descending by construction; the caller's order is the tie-break.
+        ranked = [
+            {"index": index, "relevance_score": round(1.0 - index * 0.1, 4)}
+            for index in range(len(documents))
+        ]
+        if isinstance(top_n, int):
+            ranked = ranked[:top_n]
+        return {self._rerank_key: ranked, "model": body.get("model", "fake-rerank-model")}
+
+    def _vector(self, text: str) -> list[float]:
+        """A deterministic, unnormalized vector for ``text``."""
+        seed = sum(ord(c) for c in text) or 1
+        return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(self._dimensions)]
 
 
 class FakeGeminiServer(_FakeServerBase):

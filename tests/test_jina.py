@@ -17,6 +17,12 @@ from anyinfer.providers.base import (
     RerankWireRequest,
 )
 from anyinfer.providers.jina import JinaAdapter
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
+from anyinfer.testing.fakes import FakeRetrievalServer, scenario_responses
 
 
 def _adapter(handler: Any) -> JinaAdapter:
@@ -241,3 +247,51 @@ async def test_rerank_rejects_a_response_over_the_byte_cap() -> None:
             )
     finally:
         await adapter.aclose()
+
+
+# ---- conformance ---------------------------------------------------------------------
+
+
+async def _build_client(scenario: str) -> ai.AsyncClient:
+    # Jina's rerank answer lives under `results`, and it takes a plain `top_n`.
+    server = FakeRetrievalServer(
+        scenario_responses(scenario), rerank_key="results", top_n_key="top_n"
+    )
+    return ai.AsyncClient(
+        [ai.ProviderSettings.of("jina", api_key="jina-key", transport=server.transport())],
+        route=ai.Route(
+            targets=("jina:jina-embeddings-v3",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+HARNESS = ConformanceHarness(
+    provider_id="jina",
+    model="jina-embeddings-v3",
+    build_client=_build_client,
+    # Retrieval-only, like Voyage and TEI.
+    supports=Capabilities(
+        non_streaming=False,
+        streaming=False,
+        ttft=False,
+        usage=False,
+        tools=False,
+        reasoning=False,
+        structured_output=False,
+        repair=False,
+        retry_after=False,
+        error_mapping=False,
+        byte_cap=False,
+        embedding=True,
+        rerank=True,
+    ),
+    embedding_model="jina-embeddings-v3",
+    rerank_model="jina-reranker-v3",
+)
+
+
+async def test_jina_conformance() -> None:
+    results = await run_conformance(HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
