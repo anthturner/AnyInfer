@@ -80,6 +80,8 @@ without credentials or a network.
 
 ::: anyinfer.testing.FakeAnthropicServer
 
+::: anyinfer.testing.FakeBedrockServer
+
 ::: anyinfer.testing.FakeOllamaServer
 
 ::: anyinfer.testing.FakeGeminiServer
@@ -97,6 +99,8 @@ without credentials or a network.
 ::: anyinfer.testing.sse_lines
 
 ::: anyinfer.testing.ndjson_lines
+
+::: anyinfer.testing.eventstream_frame
 
 </div>
 

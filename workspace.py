@@ -1093,6 +1093,7 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "openai": test_hosted_adapters.OPENAI_HARNESS,
         "m365-copilot": test_hosted_adapters.M365_HARNESS,
         "vertex": test_bedrock_vertex.VERTEX_HARNESS,
+        "bedrock": test_bedrock_vertex.BEDROCK_HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed

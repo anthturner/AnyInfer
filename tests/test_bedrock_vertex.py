@@ -27,7 +27,11 @@ from anyinfer.testing.conformance import (
     ConformanceHarness,
     run_conformance,
 )
-from anyinfer.testing.fakes import FakeGeminiServer, scenario_responses
+from anyinfer.testing.fakes import (
+    FakeBedrockServer,
+    FakeGeminiServer,
+    scenario_responses,
+)
 from anyinfer.types.requests import Sampling, ToolSpec
 
 AWS_OPTIONS = {
@@ -1012,5 +1016,44 @@ VERTEX_HARNESS = ConformanceHarness(
 
 async def test_vertex_conformance() -> None:
     results = await run_conformance(VERTEX_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+# ---- bedrock conformance ---------------------------------------------------------------
+
+
+async def _build_bedrock_client(scenario: str) -> ai.AsyncClient:
+    server = FakeBedrockServer(scenario_responses(scenario))
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "bedrock",
+                options=dict(AWS_OPTIONS),
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("bedrock:anthropic.claude-sonnet-4-5-v1:0",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+BEDROCK_HARNESS = ConformanceHarness(
+    provider_id="bedrock",
+    model="anthropic.claude-sonnet-4-5-v1:0",
+    build_client=_build_bedrock_client,
+    # The only provider here whose embeddings, rerank, and generation are three
+    # different services; the fake routes all four actions so the suite sees one
+    # provider, the way a caller does.
+    supports=Capabilities(cancellation=True, embedding=True, rerank=True),
+    embedding_model="amazon.titan-embed-text-v2:0",
+    rerank_model="amazon.rerank-v1:0",
+)
+
+
+async def test_bedrock_conformance() -> None:
+    results = await run_conformance(BEDROCK_HARNESS)
     failures = [r for r in results if not r.passed and not r.skipped]
     assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

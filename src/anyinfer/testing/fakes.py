@@ -9,7 +9,9 @@ identically on every platform.
 
 from __future__ import annotations
 
+import binascii
 import json
+import struct
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -19,6 +21,7 @@ import httpx2
 __all__ = [
     "CONFORMANCE_SCENARIOS",
     "FakeAnthropicServer",
+    "FakeBedrockServer",
     "FakeGeminiServer",
     "FakeOllamaServer",
     "FakeOpenAIServer",
@@ -26,6 +29,7 @@ __all__ = [
     "FakeResponsesServer",
     "FakeRetrievalServer",
     "chunk_text",
+    "eventstream_frame",
     "ndjson_lines",
     "scenario_responses",
     "sse_lines",
@@ -669,6 +673,294 @@ class FakeResponsesServer(_FakeServerBase):
             terminal["incomplete_details"] = {"reason": response.finish_reason}
         events.append({"type": kind, "response": terminal})
         return sse_lines(events, done=False)
+
+
+def eventstream_frame(event_type: str, payload: Any) -> bytes:
+    """Encode one ``application/vnd.amazon.eventstream`` frame.
+
+    AWS frames its Converse stream in a binary envelope with two CRC32s rather than in
+    SSE, so a fake that returned JSON lines would exercise a decoder the adapter does not
+    have. The checksums are computed, not stubbed: an adapter that skips validating them
+    should not be able to pass by being handed frames that were never valid.
+    """
+    body = json.dumps(payload).encode("utf-8")
+    headers = b""
+    for name, value in ((":event-type", event_type), (":message-type", "event")):
+        encoded = value.encode("utf-8")
+        headers += bytes([len(name)]) + name.encode("ascii")
+        headers += bytes([7]) + struct.pack(">H", len(encoded)) + encoded
+    total = 12 + len(headers) + len(body) + 4
+    prelude = struct.pack(">II", total, len(headers))
+    prelude += struct.pack(">I", binascii.crc32(prelude) & 0xFFFFFFFF)
+    frame = prelude + headers + body
+    return frame + struct.pack(">I", binascii.crc32(frame) & 0xFFFFFFFF)
+
+
+class FakeBedrockServer(_FakeServerBase):
+    """A configurable in-process Bedrock endpoint spanning its four actions.
+
+    Bedrock is not one API. Generation is ``/model/{id}/converse`` buffered or
+    ``/model/{id}/converse-stream`` in AWS's binary event framing; Titan embeddings are
+    ``/model/{id}/invoke`` on the same runtime host; rerank is a *different service*
+    (``bedrock-agent-runtime``'s ``POST /rerank``); and discovery is a *different host*
+    again (the control plane's ``/foundation-models``). Routing all four through one fake
+    is what lets the shared suite treat Bedrock as one provider the way a caller does.
+
+    Two Converse details the fake models deliberately. Usage arrives **only** in the
+    terminal ``metadata`` event, so a stream that ends at ``messageStop`` reports no
+    tokens — an adapter reading usage from the wrong event silently loses it. And a
+    schema is emulated as a forced tool call, so the structured answer arrives as a
+    ``toolUse`` block rather than as text.
+
+    Args:
+        responses: Responses to serve, one per request, in order. The last is reused once
+            exhausted, so a single-element list serves every request.
+        models: Model ids reported by the control plane's ``/foundation-models``.
+        chunk_size: Characters per streamed text delta.
+        dimensions: Width of the vectors ``/invoke`` returns.
+
+    Attributes:
+        requests: Every request body received, for assertions.
+    """
+
+    def __init__(
+        self,
+        responses: Sequence[FakeResponse] | FakeResponse | None = None,
+        *,
+        models: Sequence[str] = (
+            "anthropic.claude-sonnet-4-5-v1:0",
+            "amazon.titan-embed-text-v2:0",
+        ),
+        chunk_size: int = 4,
+        dimensions: int = 8,
+    ) -> None:
+        super().__init__(responses)
+        self._models = list(models)
+        self._chunk_size = chunk_size
+        self._dimensions = dimensions
+
+    def next_response(self) -> FakeResponse:
+        """The response for the next call."""
+        index = min(self._call_index, len(self._responses) - 1)
+        return self._responses[index]
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/foundation-models"):
+            return httpx2.Response(
+                200,
+                json={
+                    "modelSummaries": [
+                        {"modelId": model, "providerName": "fake"} for model in self._models
+                    ]
+                },
+            )
+        if path.endswith("/converse-stream"):
+            return self._streaming(request)
+        if path.endswith("/converse"):
+            return self._buffered(request)
+        if path.endswith("/invoke"):
+            return self._embed(request)
+        if path.endswith("/rerank"):
+            return self._rerank(request)
+        return httpx2.Response(404, json={"message": f"no such path: {path}"})
+
+    def _consume(self, request: httpx2.Request) -> tuple[dict[str, Any], FakeResponse]:
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        response = self.next_response()
+        self._call_index += 1
+        return body, response
+
+    @staticmethod
+    def _error(response: FakeResponse) -> httpx2.Response:
+        return httpx2.Response(
+            response.status,
+            json={"message": response.error_message, "__type": "FakeException"},
+            headers=dict(response.headers),
+        )
+
+    @staticmethod
+    def _forced_tool_name(body: Mapping[str, Any]) -> str | None:
+        """The schema's tool name, when this request emulates a schema."""
+        config = body.get("toolConfig")
+        choice = config.get("toolChoice") if isinstance(config, Mapping) else None
+        tool = choice.get("tool") if isinstance(choice, Mapping) else None
+        if isinstance(tool, Mapping):
+            name = tool.get("name")
+            if isinstance(name, str):
+                return name
+        return None
+
+    def _content_blocks(
+        self, response: FakeResponse, body: Mapping[str, Any]
+    ) -> tuple[list[dict[str, Any]], str]:
+        """The Converse content blocks for one response, plus its stop reason."""
+        forced = self._forced_tool_name(body)
+        if forced is not None:
+            return (
+                [
+                    {
+                        "toolUse": {
+                            "toolUseId": "tooluse_schema",
+                            "name": forced,
+                            "input": json.loads(response.text or "{}"),
+                        }
+                    }
+                ],
+                "tool_use",
+            )
+
+        blocks: list[dict[str, Any]] = []
+        if response.reasoning:
+            blocks.append({"reasoningContent": {"reasoningText": {"text": response.reasoning}}})
+        if response.text:
+            blocks.append({"text": response.text})
+        stop = response.finish_reason
+        for call_id, name, args in response.tool_calls:
+            blocks.append(
+                {"toolUse": {"toolUseId": call_id, "name": name, "input": json.loads(args)}}
+            )
+            stop = "tool_use"
+        return blocks, stop
+
+    def _buffered(self, request: httpx2.Request) -> httpx2.Response:
+        body, response = self._consume(request)
+        if response.status >= 400:
+            return self._error(response)
+        blocks, stop = self._content_blocks(response, body)
+        payload: dict[str, Any] = {
+            "output": {"message": {"role": "assistant", "content": blocks}},
+            "stopReason": stop,
+        }
+        if response.usage is not None:
+            payload["usage"] = {
+                "inputTokens": response.usage.get("prompt_tokens", 11),
+                "outputTokens": response.usage.get("completion_tokens", 7),
+                "totalTokens": response.usage.get("total_tokens", 18),
+            }
+        return httpx2.Response(200, json=payload, headers=dict(response.headers))
+
+    def _streaming(self, request: httpx2.Request) -> httpx2.Response:
+        body, response = self._consume(request)
+        if response.status >= 400:
+            return self._error(response)
+
+        frames: list[bytes] = [eventstream_frame("messageStart", {"role": "assistant"})]
+        forced = self._forced_tool_name(body)
+        stop = response.finish_reason
+
+        if forced is not None:
+            frames.extend(self._tool_frames(0, "tooluse_schema", forced, response.text))
+            stop = "tool_use"
+        else:
+            for fragment in chunk_text(response.reasoning, self._chunk_size):
+                if fragment:
+                    frames.append(
+                        eventstream_frame(
+                            "contentBlockDelta",
+                            {
+                                "contentBlockIndex": 0,
+                                "delta": {"reasoningContent": {"text": fragment}},
+                            },
+                        )
+                    )
+            for fragment in chunk_text(response.text, self._chunk_size):
+                if fragment:
+                    frames.append(
+                        eventstream_frame(
+                            "contentBlockDelta",
+                            {"contentBlockIndex": 0, "delta": {"text": fragment}},
+                        )
+                    )
+            for offset, (call_id, name, args) in enumerate(response.tool_calls):
+                frames.extend(self._tool_frames(offset + 1, call_id, name, args))
+                stop = "tool_use"
+
+        frames.append(eventstream_frame("messageStop", {"stopReason": stop}))
+        if response.usage is not None:
+            # Usage lives here and nowhere else.
+            frames.append(
+                eventstream_frame(
+                    "metadata",
+                    {
+                        "usage": {
+                            "inputTokens": response.usage.get("prompt_tokens", 11),
+                            "outputTokens": response.usage.get("completion_tokens", 7),
+                            "totalTokens": response.usage.get("total_tokens", 18),
+                        }
+                    },
+                )
+            )
+        return httpx2.Response(
+            200,
+            content=b"".join(frames),
+            headers={
+                "content-type": "application/vnd.amazon.eventstream",
+                **dict(response.headers),
+            },
+        )
+
+    def _tool_frames(self, index: int, call_id: str, name: str, arguments: str) -> list[bytes]:
+        """One tool call, opened then filled with ``toolUse.input`` fragments."""
+        frames = [
+            eventstream_frame(
+                "contentBlockStart",
+                {
+                    "contentBlockIndex": index,
+                    "start": {"toolUse": {"toolUseId": call_id, "name": name}},
+                },
+            )
+        ]
+        frames.extend(
+            eventstream_frame(
+                "contentBlockDelta",
+                {"contentBlockIndex": index, "delta": {"toolUse": {"input": fragment}}},
+            )
+            for fragment in chunk_text(arguments, self._chunk_size)
+            if fragment
+        )
+        return frames
+
+    def _embed(self, request: httpx2.Request) -> httpx2.Response:
+        body, response = self._consume(request)
+        if response.status >= 400:
+            return self._error(response)
+        # Titan takes one input per call; the core's batching is what fans them out.
+        text = str(body.get("inputText", ""))
+        return httpx2.Response(
+            200,
+            json={"embedding": self._vector(text), "inputTextTokenCount": 3},
+            headers=dict(response.headers),
+        )
+
+    def _rerank(self, request: httpx2.Request) -> httpx2.Response:
+        body, response = self._consume(request)
+        if response.status >= 400:
+            return self._error(response)
+        sources = body.get("sources", [])
+        top_n = body.get("rerankingConfiguration", {}).get(
+            "bedrockRerankingConfiguration", {}
+        ).get("numberOfResults")
+        # `document` echoes the input. The adapter documents that it never reads the
+        # field, so including it proves exactly that: an adapter that started depending
+        # on it would be depending on something the contract says is optional.
+        ranked = [
+            {
+                "index": index,
+                "relevanceScore": round(1.0 - index * 0.1, 4),
+                "document": dict(source) if isinstance(source, Mapping) else {},
+            }
+            for index, source in enumerate(sources)
+        ]
+        if isinstance(top_n, int):
+            ranked = ranked[:top_n]
+        return httpx2.Response(200, json={"results": ranked}, headers=dict(response.headers))
+
+    def _vector(self, text: str) -> list[float]:
+        """A deterministic, unnormalized vector for ``text``."""
+        seed = sum(ord(c) for c in text) or 1
+        return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(self._dimensions)]
 
 
 class FakeAnthropicServer(_FakeServerBase):
