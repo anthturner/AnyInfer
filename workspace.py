@@ -451,9 +451,12 @@ def cmd_setup(args: argparse.Namespace) -> int:
     python("-m", "pip", "install", "--upgrade", "pip")
     python("-m", "pip", "install", "-e", f".[{args.extras}]")
     # Sharded add-ons (src/anyinfer-*, each its own pyproject.toml per the monorepo
-    # sharding convention) aren't in the root package's dependency graph, but their
-    # mkdocstrings reference pages need them importable for `workspace build docs` /
-    # `workspace check --only=docs-build` to succeed locally, same as in CI.
+    # sharding convention) aren't in the root package's dependency graph. They are
+    # installed editable for two reasons: their mkdocstrings reference pages need them
+    # importable for `workspace build docs` / `workspace check --only=docs-build`, and
+    # their own test suites must exercise the working tree. A non-editable install here
+    # means a shard's tests silently run against a stale copy in site-packages, which is
+    # exactly what hid two security fixes from their own tests once already.
     for shard in ("src/anyinfer-store", "src/anyinfer-shared", "src/anyinfer-confidential"):
         python("-m", "pip", "install", "-e", shard)
     print()
