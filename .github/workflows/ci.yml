@@ -120,7 +120,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # Full history, for the `changelog` gate alone: it proves that sections for
+      # already-released versions still match `main` byte for byte, which needs main's
+      # copy of the file. A shallow clone has no baseline to compare against, and the
+      # gate would pass by default -- the one way it must never fail.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
@@ -157,6 +163,13 @@ jobs:
         # Enforces the ADRs mechanically: adapters never orchestrate, serve stays a codec,
         # types stay leaf modules.
         run: python workspace.py check --only=contracts
+
+      # Shape, and that no released section has been rewritten. The second half is the
+      # one that matters: entries are drafted by a model on the branch that bumps the
+      # version, and history has to be structurally unwritable rather than merely asked
+      # to stay put. See docs/contributing/changelog.md.
+      - name: changelog
+        run: python workspace.py check --only=changelog
 
       - name: conformance and serve invariants (ADR-009)
         run: python workspace.py check --only=conformance

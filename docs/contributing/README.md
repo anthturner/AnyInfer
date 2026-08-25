@@ -53,6 +53,7 @@ tells you everything that is broken:
 | `lint` | `ruff check src tests workspace.py` (`--fix` applies fixes) |
 | `types` | `mypy` (strict) |
 | `contracts` | `lint-imports`: the architecture contracts |
+| `changelog` | `scripts/validate_changelog.py`: [changelog](changelog.md) shape, and that released sections have not been rewritten |
 | `test` | `pytest -q`, the full suite, headless |
 | `conformance` | The provider [conformance suite](conformance.md) and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
@@ -140,5 +141,7 @@ coding against what the provider does *now*.
 - [Testing guide](testing.md): the fast track, the gate, and where a test belongs.
 - [Branching and releases](releasing.md): the branch model and how a version bump reaches
   PyPI.
+- [The changelog](changelog.md): what earns an entry, and why released sections are
+  frozen.
 - [Branding and visual assets](branding.md): the canonical marks and the rules for using
   them.

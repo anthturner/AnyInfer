@@ -504,14 +504,16 @@ GATE_ORDER = (
     "format",
     "types",
     "contracts",
+    "changelog",
     "test",
     "conformance",
     "docs-check",
     "docs-build",
 )
 """Every phase ``check`` knows, in execution order: fastest feedback first (static
-analysis, then the type checker, then the architecture contracts), the suite after the
-cheap gates, and the documentation gates last because they partly re-run suite tests.
+analysis, then the type checker, then the architecture contracts, then the changelog),
+the suite after the cheap gates, and the documentation gates last because they partly
+re-run suite tests.
 
 The set is exhaustive by design: every gate CI enforces is one of these phases, so a green
 ``check`` and a green CI run mean the same thing. Adding a gate to the pipeline means
@@ -864,6 +866,24 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                     "validate contract snapshots",
                     lambda: run(
                         [sys.executable, str(ROOT / "scripts" / "validate_contracts.py")],
+                        check=False,
+                    ),
+                ),
+            ),
+        ),
+        Phase(
+            "changelog",
+            "changelog shape, and that released sections have not been rewritten",
+            (
+                # The shape rules are the cheap half. The half worth a gate is that
+                # sections for versions already released still match `main` byte for
+                # byte: the entries are drafted by a model, and a model asked to write a
+                # changelog will restate old entries in its own voice inside a diff
+                # nobody reads closely, because the change under review is a version bump.
+                (
+                    "validate changelog",
+                    lambda: run(
+                        [sys.executable, str(ROOT / "scripts" / "validate_changelog.py")],
                         check=False,
                     ),
                 ),

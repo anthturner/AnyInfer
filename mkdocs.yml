@@ -234,3 +234,4 @@ nav:
       - The Conformance Suite: contributing/conformance.md
       - Testing: contributing/testing.md
       - Branching and Releases: contributing/releasing.md
+      - The Changelog: contributing/changelog.md

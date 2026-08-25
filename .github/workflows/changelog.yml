@@ -1,0 +1,284 @@
+name: Changelog
+
+# Keeps CHANGELOG.md's `## Unreleased` section true, and pins it when a version is cut.
+#
+# Two modes, one file:
+#
+#   draft    — a pull request opens into `develop`. The branch's user-facing changes are
+#              written into `## Unreleased` and pushed onto the branch, so the entry is
+#              reviewed with the work it describes rather than reconstructed months later
+#              from commit subjects.
+#   promote  — a push to a feature branch declares a version with no tag and no section.
+#              The accrued `## Unreleased` entries are renamed to that version in place
+#              and a fresh empty `## Unreleased` opens above them.
+#
+# Promotion is deliberately mechanical (`validate_changelog.py --promote`): the entries
+# were agreed when the work merged, so cutting a release must not be an opportunity to
+# reword them. A model is invoked afterwards only if the promoted section fails its own
+# rules -- over the entry budget, most often -- and then only to curate what is there.
+#
+# Why the feature branch, and not the develop -> main promotion where the release is
+# actually cut. `develop` and `main` both require a pull request and neither carries a
+# push allowlist, so the workflow token cannot write to either; feature branches carry no
+# rules at all. Drafting here also puts the prose in front of the person already
+# reviewing the change, which is the review it needs and the only one it will get.
+#
+# Both modes push a commit with GITHUB_TOKEN, which deliberately does not start another
+# workflow run. That is what keeps this from looping on its own commit -- and it is also
+# why the last step exists: an already-open pull request would otherwise never get a
+# `ci-ok` check for the new head, and its merge button would stay stuck.
+
+on:
+  pull_request:
+    branches: [develop]
+    # Not `synchronize`: drafting once per pull request is the point. A branch that grows
+    # substantially after opening can be re-run by hand, and an entry edited in review
+    # must not be overwritten by the next push.
+    types: [opened, reopened, ready_for_review]
+  push:
+    branches: ["feature/**"]
+    # `project.version` is the only thing that can make a promotion due. Every other push
+    # skips this workflow rather than paying for a job that decides it has nothing to do.
+    paths: ["pyproject.toml"]
+  workflow_dispatch:
+
+# Keyed on the branch rather than the triggering ref, so a version bump that arrives on an
+# open pull request cannot run `draft` and `promote` against the same branch at once and
+# lose one of the two pushes. Never cancel in flight: a run cancelled between the edit and
+# the push loses the draft and leaves the branch looking untouched.
+concurrency:
+  group: changelog-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  mode:
+    name: decide what this run owes the changelog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # A fork's branch cannot be pushed to, and a fork's pull request should not be
+    # granting write scope to anything. Contributors from forks write their own entry;
+    # the gate tells them so.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      mode: ${{ steps.decide.outputs.mode }}
+      branch: ${{ steps.decide.outputs.branch }}
+      version: ${{ steps.decide.outputs.version }}
+      today: ${{ steps.decide.outputs.today }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0   # tags, and the base branch to diff against
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+
+      - name: decide
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          version="$(python -c 'import tomllib, pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "today=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+          # Promotion is stated as a property of the tree, not as a diff against the
+          # previous push: the declared version is unreleased and unpinned. That is
+          # idempotent, so a re-run after a failure does the right thing and a second
+          # push cannot pin the same version twice.
+          if [ "$EVENT" != "pull_request" ]; then
+            if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+              echo "v$version is already released; nothing to promote."
+              echo "mode=none" >> "$GITHUB_OUTPUT"
+            elif grep -q "^## $version — " CHANGELOG.md; then
+              echo "CHANGELOG.md already pins $version; leaving it alone."
+              echo "mode=none" >> "$GITHUB_OUTPUT"
+            else
+              echo "v$version is unreleased and unpinned; promoting Unreleased."
+              echo "mode=promote" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          # Drafting is skipped when CHANGELOG.md already differs from the base branch:
+          # either a previous run wrote the entry, or a contributor wrote their own. Both
+          # mean the branch has had its say, and neither should be overwritten.
+          # Against the merge base, not the base branch tip: entries that landed on
+          # `develop` after this branch forked are not this branch's doing, and comparing
+          # tips would read them as "already written" and skip the branch entirely.
+          base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          if ! git diff --quiet "$base" -- CHANGELOG.md; then
+            echo "this branch already changes CHANGELOG.md; leaving it alone."
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+          else
+            echo "drafting entries for origin/${{ github.base_ref }}..HEAD."
+            echo "mode=draft" >> "$GITHUB_OUTPUT"
+          fi
+
+  write:
+    name: write the entry and push it onto the branch
+    needs: mode
+    if: needs.mode.outputs.mode != 'none'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write        # push the entry onto the feature branch
+      actions: write         # re-dispatch CI if a pull request is already open
+      pull-requests: read    # ...and to find out whether one is
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.mode.outputs.branch }}
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+
+      # The model edits CHANGELOG.md and nothing else, in both modes. Committing and
+      # pushing are the steps below, so what reaches the branch is decided by this file
+      # rather than by the session -- and a session that goes wrong leaves an unpushed
+      # working tree.
+      - name: draft the entries for this branch
+        if: needs.mode.outputs.mode == 'draft'
+        uses: anthropics/claude-code-action@16b3b310c3d7b5279df73130324d5205aeea8eac # v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--allowedTools Bash,Read,Edit,Write"
+          prompt: |
+            Add this branch's changelog entries to the `## Unreleased` section of
+            CHANGELOG.md.
+
+            Read docs/contributing/changelog.md first and follow it exactly. It defines
+            what qualifies, what does not, the heading vocabulary, and the length caps. It
+            is the specification; this prompt is not.
+
+            The changes to describe are the commits in
+            origin/${{ github.base_ref }}..HEAD. Read them with
+            `git log origin/${{ github.base_ref }}..HEAD` for the subjects and bodies, and
+            `git diff --stat origin/${{ github.base_ref }}...HEAD` to see which surfaces
+            actually moved (three dots: compare against the merge base, so changes that
+            landed on the base branch after this one forked are not attributed here). Weight public API, configuration, provider and capability
+            bindings, the sidecar, and the demo app.
+
+            Most branches earn one entry or two. A branch confined to tests, CI, internal
+            refactoring, or documentation earns none — in that case change nothing at all
+            and say so. Writing an entry for a change a partner cannot observe is the
+            failure mode here, not missing one.
+
+            Verify every symbol you name. If you write that `Client.embed()` exists, grep
+            for it first — an entry naming an API that does not exist is worse than no
+            entry, because it ships verbatim in the release notes.
+
+            Add entries under the right `### Heading` inside `## Unreleased`, creating the
+            heading if it is absent. Change nothing below `## Unreleased`: those sections
+            are released and frozen, and scripts/validate_changelog.py fails the build if
+            any of them moves.
+
+            Then run `python scripts/validate_changelog.py` and fix what it reports until
+            it passes. Do not stage, commit, or push anything — the workflow does that.
+
+      # Mechanical by design: the entries were written and reviewed when each branch
+      # merged, so a release must not be a chance to reword them.
+      - name: promote the accrued entries
+        if: needs.mode.outputs.mode == 'promote'
+        run: |
+          python scripts/validate_changelog.py \
+            --promote "${{ needs.mode.outputs.version }}" \
+            --date "${{ needs.mode.outputs.today }}"
+
+      # Deterministic first, model only if the deterministic result does not hold up --
+      # the same shape as the pricing, catalog, and contract-drift workflows. A release
+      # that accrued more than the entry budget is the case that reaches the model.
+      - name: check the promoted section
+        if: needs.mode.outputs.mode == 'promote'
+        id: promoted
+        run: |
+          if ! python scripts/validate_changelog.py; then
+            echo "needs_curation=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: curate the promoted section
+        if: steps.promoted.outputs.needs_curation == 'true'
+        uses: anthropics/claude-code-action@16b3b310c3d7b5279df73130324d5205aeea8eac # v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--allowedTools Bash,Read,Edit,Write"
+          prompt: |
+            The `## ${{ needs.mode.outputs.version }}` section of CHANGELOG.md does not
+            pass `python scripts/validate_changelog.py`. Run it, read what it reports, and
+            fix only that section.
+
+            Read docs/contributing/changelog.md for the rules. Usually the release accrued
+            more entries than the budget allows. In that case merge entries that describe
+            one change, drop the ones a partner would not act on — following the priority
+            order on that page — and close the section with a line linking
+            https://github.com/${{ github.repository }}/compare/ for the release.
+
+            Keep the wording of the entries you keep. They were reviewed when the work
+            merged; you are curating a list, not rewriting it. Change nothing in any other
+            section, and change nothing below this one.
+
+            Stop when `python scripts/validate_changelog.py` passes. Do not stage, commit,
+            or push anything — the workflow does that.
+
+      - name: validate and commit
+        id: commit
+        env:
+          MODE: ${{ needs.mode.outputs.mode }}
+          VERSION: ${{ needs.mode.outputs.version }}
+        run: |
+          if git diff --quiet -- CHANGELOG.md; then
+            if [ "$MODE" = "draft" ]; then
+              echo "nothing user-facing on this branch; no entry written."
+              echo "pushed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "promotion produced no change to CHANGELOG.md"
+            exit 1
+          fi
+          git diff -- CHANGELOG.md
+          python scripts/validate_changelog.py
+
+          if [ "$MODE" = "draft" ]; then
+            message="docs(changelog): note this branch under Unreleased"
+          else
+            message="docs(changelog): pin the Unreleased entries to $VERSION"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "$message"
+          git push origin "HEAD:${{ needs.mode.outputs.branch }}"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      # A commit pushed with GITHUB_TOKEN does not raise the `synchronize` event, so an
+      # already-open pull request keeps the check it reported before this commit and never
+      # reports one for the new head. Dispatching CI against the branch produces the
+      # `ci-ok` check on the commit that is now the head, which is what the branch
+      # protection rule looks for. No open pull request means nothing to refresh: CI runs
+      # normally when one is opened.
+      - name: refresh CI on an already-open pull request
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.mode.outputs.branch }}
+        run: |
+          number="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            echo "no open pull request for $BRANCH; CI will run when one is opened."
+            exit 0
+          fi
+          echo "refreshing CI for pull request #$number"
+          gh workflow run ci.yml --ref "$BRANCH"

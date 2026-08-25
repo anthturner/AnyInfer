@@ -184,7 +184,7 @@ class TestVerbs:
         )
 
     def test_pages_deploy_isolated_from_reruns_and_upload_retries(self):
-        workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github" / "workflows" / "docs-site.yml").read_text(encoding="utf-8")
         artifact_name = "github-pages-${{ github.run_id }}-${{ github.run_attempt }}"
 
         assert f"PAGES_ARTIFACT_NAME: {artifact_name}" in workflow
@@ -239,10 +239,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The seven default phases comprise eleven steps — nine subprocesses plus the two
+        # The eight default phases comprise twelve steps — ten subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
         # (contracts and conformance have two steps each, docs-check three).
-        assert len(calls) == 11
+        assert len(calls) == 12
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0
