@@ -88,7 +88,11 @@ supported way to use the ambient chain.
   `bytes`; remote sources must be `s3://` and project to `s3Location`. **Tool results ride
   on a `user` turn**, as in the Anthropic dialect.
 - `system[]`: a top-level list of text blocks, not a message.
-- `inferenceConfig`: `maxTokens`, `temperature`, `topP`, `stopSequences`. Unset sampling
+- `inferenceConfig`: `maxTokens`, `temperature`, `topP`, `stopSequences` — and nothing
+  else. Converse defines no `seed`, penalty, or log-probability field (re-checked
+  2026-08-25); model-specific equivalents exist only under
+  `additionalModelRequestFields`, which is per-model rather than protocol-level, so the
+  descriptor declares all four in `ignored_parameters`. Unset sampling
   fields are omitted entirely.
 - `toolConfig`: `tools[].toolSpec` (`name`, `description`, `inputSchema.json`) plus
   `toolChoice`, which is `auto`, `any`, or a named `tool`.

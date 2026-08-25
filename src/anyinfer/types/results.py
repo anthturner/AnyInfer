@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
@@ -26,11 +27,48 @@ __all__ = [
     "Mechanism",
     "Outcome",
     "Timing",
+    "TokenLogprob",
     "Usage",
 ]
 
 DETAIL_MAX_CHARS = 512
 """Upper bound on `ErrorInfo.detail`, applied after redaction."""
+
+
+@dataclass(frozen=True, slots=True)
+class TokenLogprob:
+    """One generated token and how likely the model considered it.
+
+    Providers disagree about almost everything here except the two facts that matter — a
+    token and its log-probability — so those are the only required fields. ``top`` carries
+    the runners-up when the request asked for alternatives and the provider returned them;
+    an empty tuple means "not asked for, or not answered", which are indistinguishable on
+    the wire and equally uninformative to act on.
+
+    Log-probabilities are natural-log values in ``(-inf, 0]``, which is what every
+    provider reports and what a caller comparing two of them expects. AnyInfer does not
+    convert them to probabilities: the exponential is one line at the call site and a lossy
+    default here.
+
+    Attributes:
+        token: The generated token, as the provider spelled it.
+        logprob: Natural log of the token's probability.
+        top: Alternatives the model weighed at this position, most likely first. Empty
+            when none were requested or none were returned.
+        bytes: The token's raw UTF-8 bytes, when the provider reports them. Needed to
+            reassemble text through tokens that split a multi-byte character; ``None``
+            when the provider states only the string.
+    """
+
+    token: str
+    logprob: float
+    top: tuple[TokenLogprob, ...] = ()
+    bytes: tuple[int, ...] | None = None
+
+    @property
+    def probability(self) -> float:
+        """The token's probability in ``[0, 1]``, exponentiating `logprob`."""
+        return math.exp(self.logprob)
 
 DiagnosticSeverity = Literal["info", "warning"]
 """How much a runtime diagnostic should worry the caller. Never an error: a condition that
@@ -286,6 +324,10 @@ class Generation:
         arena: Every arena candidate and the terminal selection, or ``None`` for an
             ordinary generation.
         context_reduction: Content-free account of per-request corpus reduction.
+        logprobs: Per-token log-probabilities for the answer, in generation order, when
+            the request asked for them and the target returned them. Empty otherwise —
+            including for a target that accepted the request and answered without them,
+            which is reported as a dropped parameter rather than inferred from this field.
     """
 
     text: str
@@ -304,3 +346,4 @@ class Generation:
     manifest: RunManifest | None = None
     arena: ArenaResult | None = None
     context_reduction: ContextSummary | None = None
+    logprobs: tuple[TokenLogprob, ...] = ()

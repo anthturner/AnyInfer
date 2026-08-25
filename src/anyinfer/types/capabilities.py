@@ -160,6 +160,10 @@ class Feature(Flag):
     ``CACHE_USAGE`` and ``CACHE_PLACEMENT`` are deliberately separate facts: reporting what
     the prompt cache did is not the same as accepting instructions about where it should
     apply, and a provider may do either without the other.
+
+    ``LOGPROBS`` is a *model* fact rather than a provider one: several dialects accept the
+    field on their completion models and reject it on their reasoning models, so it is
+    carried here beside the input modalities instead of on the descriptor.
     """
 
     STREAMING = auto()
@@ -174,6 +178,8 @@ class Feature(Flag):
     VISION = auto()
     DOCUMENT = auto()
     AUDIO_IN = auto()
+    LOGPROBS = auto()
+    VIDEO_IN = auto()
 
 
 @dataclass(frozen=True, slots=True)

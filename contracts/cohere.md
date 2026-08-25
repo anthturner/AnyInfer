@@ -44,7 +44,12 @@ own thinking channel, and usage that separates billed units from processed token
 - `model`, `messages[]`, and **`stream` — which is required, not optional**, on every
   request.
 - Sampling under Cohere's own names: `temperature`, **`p`** (not `top_p`), `max_tokens`,
-  `stop_sequences`.
+  `stop_sequences`. `seed`, `presence_penalty`, and `frequency_penalty` keep the OpenAI
+  spelling (added 2026-08-25) — the renaming is confined to nucleus/top-k.
+- `logprobs` is **not sent**. v2 reports probabilities over text spans
+  (`{token_ids, text, logprobs}`) rather than per normalized token, which does not project
+  onto `TokenLogprob` without inventing a token boundary; the descriptor declares it in
+  `ignored_parameters` so a caller who asks is told rather than silently answered without.
 - `tools[]` in OpenAI function shape; `tool_choice` takes the **uppercase** enum
   `REQUIRED` or `NONE`. There is no way to name a specific tool, and no explicit `auto` —
   omitting the field *is* auto.

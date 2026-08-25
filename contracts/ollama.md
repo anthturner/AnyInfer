@@ -33,7 +33,10 @@ Embeddings section last verified: 2026-08-11 — fetched live against
 - `model`, `messages`, `stream`, `format` (JSON-schema object for grammar-enforced
   structured output, or `"json"`), `think` (bool or effort for reasoning models),
   `keep_alive` (session retention, e.g. `"10m"`), `options: {num_predict, temperature,
-  top_p, stop, num_ctx, num_gpu}`. Verified 2026-08-10: vision-capable models accept
+  top_p, stop, seed, presence_penalty, frequency_penalty, num_ctx, num_gpu}`
+  (the last three sampling keys added 2026-08-25). `/api/chat` defines no
+  log-probability field at all, so the descriptor declares `logprobs` in
+  `ignored_parameters` rather than the adapter dropping it silently. Verified 2026-08-10: vision-capable models accept
   base64 image strings in `messages[].images`. The native chat API does not define URL,
   document, or audio inputs, so those are refused before transport.
 ### Pull request/response fields

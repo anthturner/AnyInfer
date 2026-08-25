@@ -46,7 +46,7 @@ from ..types.requests import (
     SchemaSpec,
     ToolSpec,
 )
-from ..types.results import FinishReason, Generation, Usage
+from ..types.results import FinishReason, Generation, TokenLogprob, Usage
 
 __all__ = [
     "ARENA_FIELD",
@@ -58,6 +58,7 @@ __all__ = [
     "chunk_from_event",
     "completion_from_generation",
     "decode_messages",
+    "encode_logprobs",
     "encode_messages",
     "final_chunk",
     "manifest_chunk",
@@ -321,29 +322,24 @@ def request_from_openai(
     target = str(body.get("model", "")).strip()
 
     # Refused, not ignored. The codec's rule elsewhere is that telling the client beats
-    # silently applying the gateway's default; these were the two places it did not hold.
-    # `n` was reserved but never read, so n=3 returned one choice with no error, and
-    # logprobs forwarded upstream — possibly billed — with no response path to carry
-    # results back.
+    # silently applying the gateway's default, and `n` was reserved but never read — so
+    # n=3 returned one choice with no error. The companion `logprobs` refusal is gone:
+    # the normalized result now carries log-probabilities, so the field decodes instead.
     requested_choices = body.get("n")
     if requested_choices is not None and requested_choices != 1:
         raise ValueError(
             f"n={requested_choices!r} is not supported: AnyInfer returns one choice per "
             "request. Use the anyinfer_arena extension to fan out across targets."
         )
-    for field in ("logprobs", "top_logprobs"):
-        if body.get(field) not in (None, False):
-            raise ValueError(
-                f"{field!r} is not supported: AnyInfer's normalized result has no field "
-                "to carry log probabilities back, so the request would be billed for "
-                "data the response could not return."
-            )
 
     sampling = Sampling(
         temperature=_opt_float(body.get("temperature")),
         top_p=_opt_float(body.get("top_p")),
         max_output_tokens=_opt_int(body.get("max_completion_tokens", body.get("max_tokens"))),
         stop=_decode_stop(body.get("stop")),
+        seed=_opt_int(body.get("seed")),
+        presence_penalty=_opt_float(body.get("presence_penalty")),
+        frequency_penalty=_opt_float(body.get("frequency_penalty")),
     )
 
     tools = tuple(
@@ -371,8 +367,36 @@ def request_from_openai(
         context=_decode_context(body.get(CONTEXT_FIELD), context_tuning),
         provider_options=_decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
+        logprobs=_decode_logprobs(body),
     )
     return target, request, bool(body.get("stream"))
+
+
+def _decode_logprobs(body: Mapping[str, Any]) -> int | None:
+    """Collapse the dialect's two log-probability fields into one normalized count.
+
+    OpenAI splits the ask across a boolean and a count, and only the boolean turns the
+    feature on — ``top_logprobs`` without ``logprobs: true`` is an error upstream. The
+    normalized request has one field, so the pair collapses: absent or false means no ask,
+    true means the count (defaulting to zero, "the chosen token only").
+
+    Raises:
+        ValueError: If ``top_logprobs`` was sent without ``logprobs: true``, or the pair
+            is not the documented boolean-and-integer. Refused rather than reinterpreted,
+            because guessing which half the caller meant is how a request gets billed for
+            data nobody asked for.
+    """
+    enabled = body.get("logprobs")
+    count = body.get("top_logprobs")
+    if enabled is not None and not isinstance(enabled, bool):
+        raise ValueError("logprobs must be true or false")
+    if count is not None and (not isinstance(count, int) or isinstance(count, bool)):
+        raise ValueError("top_logprobs must be an integer")
+    if not enabled:
+        if count is not None:
+            raise ValueError("top_logprobs requires logprobs: true")
+        return None
+    return count or 0
 
 
 def _decode_reasoning_effort(raw: Any) -> ReasoningEffort | None:
@@ -578,6 +602,35 @@ def _opt_int(value: Any) -> int | None:
 # ---- request: AnyInfer -> OpenAI (round-trip verification) ---------------------------
 
 
+def encode_logprobs(logprobs: Sequence[TokenLogprob]) -> dict[str, Any]:
+    """Encode normalized log-probabilities into the dialect's ``logprobs`` object.
+
+    Args:
+        logprobs: The result's tokens, in generation order.
+
+    Returns:
+        The ``{"content": [...]}`` object a chat-completions choice carries. ``bytes`` is
+        emitted as ``null`` when the upstream provider did not report it, rather than
+        being reconstructed by encoding the token: a client comparing byte offsets would
+        then be trusting our guess about the provider's tokenizer.
+    """
+    return {"content": [_encode_logprob(token, with_top=True) for token in logprobs]}
+
+
+def _encode_logprob(token: TokenLogprob, *, with_top: bool) -> dict[str, Any]:
+    """Encode one token entry, with its alternatives when this is a top-level one."""
+    entry: dict[str, Any] = {
+        "token": token.token,
+        "logprob": token.logprob,
+        "bytes": list(token.bytes) if token.bytes is not None else None,
+    }
+    if with_top:
+        entry["top_logprobs"] = [
+            _encode_logprob(alternative, with_top=False) for alternative in token.top
+        ]
+    return entry
+
+
 def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
     """Encode typed messages back into an OpenAI ``messages`` array."""
     encoded: list[dict[str, Any]] = []
@@ -672,6 +725,19 @@ def request_to_openai(
         body["max_tokens"] = sampling.max_output_tokens
     if sampling.stop:
         body["stop"] = list(sampling.stop)
+    if sampling.seed is not None:
+        body["seed"] = sampling.seed
+    if sampling.presence_penalty is not None:
+        body["presence_penalty"] = sampling.presence_penalty
+    if sampling.frequency_penalty is not None:
+        body["frequency_penalty"] = sampling.frequency_penalty
+
+    if request.logprobs is not None:
+        # Back out to the dialect's two fields, mirroring `_decode_logprobs`. `0` means
+        # "chosen token only", which the dialect spells as the boolean with no count.
+        body["logprobs"] = True
+        if request.logprobs > 0:
+            body["top_logprobs"] = request.logprobs
 
     if request.reasoning is not None:
         body["reasoning_effort"] = request.reasoning
@@ -785,6 +851,8 @@ def completion_from_generation(
             }
         ],
     }
+    if result.logprobs:
+        body["choices"][0]["logprobs"] = encode_logprobs(result.logprobs)
     usage = _encode_usage(result.usage)
     if usage is not None:
         body["usage"] = usage

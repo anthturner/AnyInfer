@@ -20,8 +20,13 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ### Request fields
 - `model`, `messages[{role, content}]`, `stream`, `stream_options.include_usage: true`,
   `temperature`, `top_p`, `max_tokens` (subclasses may override the output-token
-  parameter name), `stop`, `tools`, `tool_choice`,
+  parameter name), `stop`, `seed`, `presence_penalty`, `frequency_penalty`,
+  `tools`, `tool_choice`,
   `response_format: {"type":"json_schema","json_schema":{...}}` or `{"type":"json_object"}`
+- `logprobs: true` plus optional `top_logprobs: <int>` (added 2026-08-25). The pair is
+  load-bearing: `top_logprobs` alone is rejected upstream, and `logprobs: true` alone
+  returns the chosen token's own probability with no alternatives — which is why the
+  normalized single count spells zero as the boolean with no companion.
 
 ### Multimodal inputs
 Verified 2026-08-10 for the OpenAI Chat Completions dialect. Message content arrays carry
@@ -33,15 +38,24 @@ or document support, and an upstream rejection remains explicit.
 - `choices[0].message.content`, `choices[0].message.tool_calls[]`,
   `choices[0].finish_reason` (`stop|length|tool_calls|content_filter`),
   `usage.prompt_tokens`, `usage.completion_tokens`, `usage.total_tokens`
+- `choices[0].logprobs.content[]` — entries of
+  `{token, logprob, bytes[], top_logprobs[{token, logprob, bytes[]}]}`. Read defensively:
+  a malformed entry is skipped rather than failing a generation that otherwise succeeded,
+  since log-probabilities are advisory output.
 ### Streaming
 - SSE; `data: {json}` chunks; `choices[0].delta.content` text deltas;
   `choices[0].delta.tool_calls[]` indexed argument fragments; terminator `data: [DONE]`;
   final usage chunk when `stream_options.include_usage` set
+- `choices[0].logprobs` appears **per chunk**, covering only that chunk's tokens, so the
+  adapter accumulates across chunks rather than replacing.
 ### Errors
 - Non-2xx with `{"error": {"message", "type", "code"}}`; retryable statuses
   {408, 409, 425, 429} ∪ ≥500; `Retry-After` header honored
 
 ## Watchlist
 - Servers vary on `response_format` json_schema support (capability probe territory)
+- Compatibility servers vary widely on `logprobs`, `seed`, and the two penalties: several
+  presets already declare them in `ignored_parameters`. As with `response_format`, this
+  snapshot records the *dialect*, not a capability claim for every implementer of it.
 - `max_tokens` vs `max_completion_tokens` divergence across implementations
 - `stream_options.include_usage` not universally implemented (fallback: usage absent)

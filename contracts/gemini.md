@@ -52,8 +52,12 @@ native protocol is used instead.
   `{"output": ...}`, or `{"error": ...}` when the result is error-flagged.
 - `systemInstruction: {parts: [{text}]}` — system messages are a top-level field.
 - `generationConfig`: `temperature`, `topP`, `maxOutputTokens`, `stopSequences`,
-  `responseMimeType`, `responseSchema`, `thinkingConfig`. Unset sampling fields are
-  omitted entirely.
+  `seed`, `presencePenalty`, `frequencyPenalty`, `responseMimeType`, `responseSchema`,
+  `thinkingConfig`. Unset sampling fields are omitted entirely.
+- `generationConfig.responseLogprobs: true` plus optional `generationConfig.logprobs:
+  <int>` (added 2026-08-25). The count is the number of *alternatives* per position;
+  Gemini rejects `logprobs: 0`, so a request for the chosen token alone sends the boolean
+  without the count.
 - `tools[0].functionDeclarations[]`: `{name, description, parameters}` with parameters
   projected to the accepted schema subset.
 - `toolConfig.functionCallingConfig`: `{mode: "NONE"|"ANY", allowedFunctionNames?}`.
@@ -85,6 +89,11 @@ native protocol is used instead.
 
 ### Response fields read
 - `candidates[0].content.parts[]` — `text` (with `thought` flag), `functionCall`.
+- `candidates[0].logprobsResult` — `chosenCandidates[{token, logProbability}]` and
+  `topCandidates[{candidates[{token, logProbability}]}]`. Google splits what other
+  dialects nest: the two arrays are **parallel by position**, so recovering one token with
+  its alternatives means zipping them. `topCandidates` is absent entirely unless the
+  request asked for a positive alternatives count.
 - `candidates[0].finishReason` — `STOP`→stop, `MAX_TOKENS`→length,
   `SAFETY`/`RECITATION`/`BLOCKLIST`/`PROHIBITED_CONTENT`/`SPII`/`IMAGE_SAFETY`/
   `BLOCKED_SAFETY`/`LANGUAGE`→content_filter, `MALFORMED_FUNCTION_CALL`/

@@ -633,6 +633,7 @@ descriptor = ProviderDescriptor(
         ),
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("seed", "presence_penalty", "frequency_penalty", "logprobs"),
     default_capabilities=ModelCapabilities(features=Sourced(_ANTHROPIC_FEATURES, "default")),
     # Per-segment `cache_control` marks, up to four breakpoints, with a documented
     # minimum cacheable prefix. Recorded in contracts/anthropic.md.

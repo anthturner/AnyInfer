@@ -67,6 +67,51 @@ one.
 `generate()` returns the finished result; to consume events as they arrive, see
 [streaming](streaming.md).
 
+## Shape the Sampling
+
+`Sampling` carries every knob that changes *how* the model chooses tokens. Every field
+defaults to unset, and unset means the provider's own default — AnyInfer never invents a
+temperature, and an unset field is omitted from the wire request entirely.
+
+```python
+result = client.generate(
+    "Summarize this changelog.",
+    sampling=ai.Sampling(
+        temperature=0.2,
+        max_output_tokens=400,
+        seed=1234,
+        frequency_penalty=0.3,
+    ),
+)
+```
+
+`seed` asks the provider to make a repeated identical request more likely to produce
+identical output. Treat it as best-effort: every provider that ships the field documents
+it that way, and none promise reproducibility across model revisions.
+
+Not every target has every knob. A provider that cannot honor one emits a
+[`ParameterDropped`](../concepts/telemetry.md) event naming the parameter and what the
+target did instead — the point being that a request accepted and quietly ignored looks
+exactly like one that worked.
+
+## Ask for Token Probabilities
+
+`logprobs` asks for the model's confidence in what it produced: `0` for each chosen
+token's own log-probability, a positive count for that many alternatives beside it.
+
+```python
+result = client.generate("Classify: positive or negative?", logprobs=3)
+
+for token in result.logprobs:
+    alternatives = ", ".join(f"{alt.token}={alt.probability:.2f}" for alt in token.top)
+    print(f"{token.token!r} p={token.probability:.2f}  ({alternatives})")
+```
+
+Each `TokenLogprob` carries the natural-log value the provider reported, with
+`probability` available when a linear scale reads better. Targets that do not report
+probabilities are not silently answered without them: the parameter is reported dropped,
+the same as any other unhonored request field.
+
 ## Handle Failures
 
 All public failures derive from `AnyInferError` and carry structured fields. Branch on

@@ -571,11 +571,14 @@ class ProviderDescriptor:
     """
 
     ignored_parameters: tuple[str, ...] = ()
-    """Request parameters this provider accepts and silently discards.
+    """Request parameters this target will not honor, whatever the caller sets.
 
-    Distinct from "rejects with an error" and from "supported": a silently-ignored
-    parameter looks like success while doing nothing, so the core reports it as a
-    `ParameterDropped` event instead of letting it pass
+    Two situations produce the same caller-visible outcome and so share one list: a
+    provider that *accepts* the parameter and silently discards it, and one whose protocol
+    has no field for it at all, so the adapter never sends it. Both are distinct from
+    "rejects with an error" and from "supported" — in either case the request succeeds, the
+    parameter does nothing, and nothing says so unless we say it. The core reports each as
+    a `ParameterDropped` event instead of letting it pass
     unnoticed.
     """
 

@@ -1197,6 +1197,7 @@ descriptor = ProviderDescriptor(
         ),
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("seed", "presence_penalty", "frequency_penalty", "logprobs"),
     default_capabilities=ModelCapabilities(features=Sourced(_BEDROCK_FEATURES, "default")),
 )
 """Descriptor for the AWS Bedrock provider."""

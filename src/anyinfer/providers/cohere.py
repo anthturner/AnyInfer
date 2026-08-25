@@ -222,6 +222,12 @@ class CohereAdapter:
             payload["max_tokens"] = sampling.max_output_tokens
         if sampling.stop:
             payload["stop_sequences"] = list(sampling.stop)
+        if sampling.seed is not None:
+            payload["seed"] = sampling.seed
+        if sampling.presence_penalty is not None:
+            payload["presence_penalty"] = sampling.presence_penalty
+        if sampling.frequency_penalty is not None:
+            payload["frequency_penalty"] = sampling.frequency_penalty
 
     def _encode_message(self, message: Message) -> dict[str, Any]:
         """Encode one message, splitting tool results into their own role."""
@@ -842,6 +848,7 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("logprobs",),
     default_capabilities=ModelCapabilities(features=Sourced(_COHERE_FEATURES, "default")),
 )
 """Descriptor for the Cohere provider."""

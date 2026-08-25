@@ -72,6 +72,12 @@ class FakeResponse:
         malformed_sse: Emit an unparseable SSE data field, to exercise error handling.
         ignore_stream: Answer a streaming request with a buffered JSON body.
         omit_usage_chunk: Stream without a terminal usage chunk.
+        logprobs: Report these per-token log-probabilities, as ``(token, logprob)``
+            pairs, but **only when the request asked for them**. A fake that answered
+            with log-probabilities nobody requested would let an adapter that never sends
+            the field pass a test for sending it.
+        top_logprobs: Alternatives to attach to each reported token, as ``(token,
+            logprob)`` pairs. Sent only when the request asked for a positive count.
     """
 
     text: str = "Hello from the fake provider."
@@ -91,6 +97,8 @@ class FakeResponse:
     malformed_sse: bool = False
     ignore_stream: bool = False
     omit_usage_chunk: bool = False
+    logprobs: tuple[tuple[str, float], ...] = ()
+    top_logprobs: tuple[tuple[str, float], ...] = ()
 
 
 CONFORMANCE_SCENARIOS: tuple[str, ...] = (
@@ -266,11 +274,15 @@ class FakeOpenAIServer(_FakeServerBase):
                 headers=dict(response.headers),
             )
 
+        asked_for_logprobs = bool(body.get("logprobs"))
+        wants_alternatives = asked_for_logprobs and bool(body.get("top_logprobs"))
         wants_stream = bool(body.get("stream")) and not response.ignore_stream
         if wants_stream:
             return httpx2.Response(
                 200,
-                content=self._stream_body(response),
+                content=self._stream_body(
+                    response, logprobs=asked_for_logprobs, alternatives=wants_alternatives
+                ),
                 headers={
                     "content-type": "text/event-stream",
                     **dict(response.headers),
@@ -278,7 +290,9 @@ class FakeOpenAIServer(_FakeServerBase):
             )
         return httpx2.Response(
             200,
-            json=self._completion_body(response),
+            json=self._completion_body(
+                response, logprobs=asked_for_logprobs, alternatives=wants_alternatives
+            ),
             headers=dict(response.headers),
         )
 
@@ -332,7 +346,35 @@ class FakeOpenAIServer(_FakeServerBase):
         seed = sum(ord(c) for c in text) or 1
         return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(self._dimensions)]
 
-    def _completion_body(self, response: FakeResponse) -> dict[str, Any]:
+    def _logprobs_block(
+        self, response: FakeResponse, *, alternatives: bool
+    ) -> dict[str, Any] | None:
+        """The dialect's ``logprobs`` object, or ``None`` when the script has none."""
+        if not response.logprobs:
+            return None
+        top = (
+            [
+                {"token": token, "logprob": logprob, "bytes": list(token.encode())}
+                for token, logprob in response.top_logprobs
+            ]
+            if alternatives
+            else []
+        )
+        return {
+            "content": [
+                {
+                    "token": token,
+                    "logprob": logprob,
+                    "bytes": list(token.encode()),
+                    "top_logprobs": top,
+                }
+                for token, logprob in response.logprobs
+            ]
+        }
+
+    def _completion_body(
+        self, response: FakeResponse, *, logprobs: bool = False, alternatives: bool = False
+    ) -> dict[str, Any]:
         message: dict[str, Any] = {"role": "assistant", "content": response.text or None}
         if response.reasoning and self._reasoning_field:
             message[self._reasoning_field] = response.reasoning
@@ -351,11 +393,17 @@ class FakeOpenAIServer(_FakeServerBase):
             "model": "fake-model-small",
             "choices": [{"index": 0, "message": message, "finish_reason": response.finish_reason}],
         }
+        if logprobs:
+            block = self._logprobs_block(response, alternatives=alternatives)
+            if block is not None:
+                body["choices"][0]["logprobs"] = block
         if response.usage is not None:
             body["usage"] = dict(response.usage)
         return body
 
-    def _stream_body(self, response: FakeResponse) -> bytes:
+    def _stream_body(
+        self, response: FakeResponse, *, logprobs: bool = False, alternatives: bool = False
+    ) -> bytes:
         if response.malformed_sse:
             return b"data: {not json at all\n\n"
 
@@ -394,6 +442,13 @@ class FakeOpenAIServer(_FakeServerBase):
 
         final = self._delta_chunk({})
         final["choices"][0]["finish_reason"] = response.finish_reason
+        if logprobs:
+            block = self._logprobs_block(response, alternatives=alternatives)
+            if block is not None:
+                # One chunk carrying every token, which is the shape a provider produces
+                # when its last delta closes the message. The adapter accumulates across
+                # chunks, so a single-chunk script still exercises the accumulation path.
+                final["choices"][0]["logprobs"] = block
         chunks.append(final)
 
         if response.usage is not None and not response.omit_usage_chunk:

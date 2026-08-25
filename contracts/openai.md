@@ -20,9 +20,14 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - None (Responses API is unversioned-by-header at snapshot time)
 ### Request fields
 - `model`, `input` (message list), `instructions` (system), `stream`,
-  `max_output_tokens`, `temperature`, `top_p`,
+  `max_output_tokens`, `temperature`, `top_p`, `top_logprobs`,
   `reasoning: {"effort": <none|minimal|low|medium|high>}` (normalized effort translated here),
   `text.format` for structured output (json_schema), `tools`
+- **Absent from this dialect** (verified 2026-08-25): `seed`, `presence_penalty`, and
+  `frequency_penalty` exist on chat-completions but not on Responses, so the adapter never
+  sends them and the descriptor declares all three in `ignored_parameters`.
+- `top_logprobs` is a bare count here — there is no companion boolean, and `0` is a valid
+  value meaning "the chosen token's own probability, no alternatives".
 
 ### Multimodal inputs
 Verified 2026-08-10 against the provider-owned image and file-input guides above.

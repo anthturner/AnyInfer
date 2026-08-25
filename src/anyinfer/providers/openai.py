@@ -41,7 +41,8 @@ from ..types.messages import (
 )
 from ..types.operations import EmbeddingCapabilities
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
+from ..types.results import FinishReason, TokenLogprob, Usage
+from ._logprobs import parse_logprob_entries
 from ._multimodal import base64_data, data_url, media_subtype
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
@@ -198,6 +199,11 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
 
         self._apply_sampling(payload, req.sampling)
 
+        if req.logprobs is not None:
+            # The Responses API takes only the count — there is no companion boolean, and
+            # zero means "the chosen token's own probability, no alternatives".
+            payload["top_logprobs"] = req.logprobs
+
         if req.mechanism == "json_schema" and req.wire_schema is not None:
             payload["text"] = {
                 "format": {
@@ -247,6 +253,9 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
         kind = str(chunk.get("type", ""))
 
         if kind == "response.output_text.delta":
+            # Log-probabilities ride on the text delta that produced them, covering only
+            # that delta's tokens, so they accumulate across the stream.
+            state.logprobs.extend(parse_logprob_entries(chunk.get("logprobs")))
             delta = chunk.get("delta")
             if isinstance(delta, str) and delta:
                 yield TextDelta(delta)
@@ -315,13 +324,14 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
 class _StreamState:
     """Tracks finish reason, usage, and output-index to tool-slot mapping."""
 
-    __slots__ = ("finish_reason", "saw_tool_call", "tool_slots", "usage")
+    __slots__ = ("finish_reason", "logprobs", "saw_tool_call", "tool_slots", "usage")
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots: dict[int, int] = {}
         self.saw_tool_call = False
+        self.logprobs: list[TokenLogprob] = []
 
     def tool_slot(self, output_index: int) -> int:
         """Map an output-item index onto a dense tool-call slot."""
@@ -338,6 +348,7 @@ class _StreamState:
         return AdapterFinal(
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
+            logprobs=tuple(self.logprobs),
         )
 
 
@@ -482,6 +493,7 @@ _OPENAI_FEATURES = (
     | Feature.REASONING
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
+    | Feature.LOGPROBS
 )
 
 
@@ -545,6 +557,7 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("seed", "presence_penalty", "frequency_penalty"),
     default_capabilities=ModelCapabilities(features=Sourced(_OPENAI_FEATURES, "default")),
     # Prompt caching is automatic on a stable prefix — there is nothing to mark, so the
     # core's only duty is to leave the prefix undisturbed. Recorded in contracts/openai.md.

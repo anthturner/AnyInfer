@@ -21,7 +21,7 @@ from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
 from ..types.messages import Message
 from ..types.operations import EmbeddingInputIntent
 from ..types.requests import Sampling, ToolSpec
-from ..types.results import Diagnostic, FinishReason, Mechanism, Usage
+from ..types.results import Diagnostic, FinishReason, Mechanism, TokenLogprob, Usage
 
 if TYPE_CHECKING:
     from ..events.telemetry import TelemetryEvent
@@ -161,6 +161,11 @@ class WireRequest:
             policy, and for every provider whose cache needs no marks. An adapter's whole
             duty here is to spell each mark in its own wire format; deciding *where* they
             go is the core's, and belongs to `anyinfer.capabilities.cache`.
+        logprobs: How many alternative tokens per position the caller asked for
+            log-probabilities on, or ``None`` for none. Already gated by capability — an
+            adapter that receives a value may send it. Each dialect spells the ask
+            differently (a flag plus a count, a single integer, a boolean); the count is
+            normalized here and the adapter projects it.
         extra_options: ``provider_options[this_provider]``, passed through verbatim.
         session_state: Opaque continuation data from an open
             `Session`, or ``None`` for an
@@ -184,6 +189,7 @@ class WireRequest:
     timeout_s: float = 120.0
     max_response_bytes: int = 1_048_576
     cache_marks: tuple[int, ...] = ()
+    logprobs: int | None = None
     extra_options: Mapping[str, Any] = field(default_factory=dict)
     session_state: Mapping[str, Any] | None = None
 
@@ -200,6 +206,10 @@ class AdapterFinal:
             on the result only when the client opted in via ``retain_raw``.
         session_state: Continuation data to remember for the next turn of an open
             session, or ``None`` when there is none. Opaque to the core.
+        logprobs: Per-token log-probabilities the provider returned, in generation order.
+            Empty when none were requested or the provider returned none. Carried on the
+            terminal event rather than streamed per token because no dialect emits them
+            in a form the core could reassemble incrementally without buffering anyway.
     """
 
     finish_reason: FinishReason
@@ -207,6 +217,7 @@ class AdapterFinal:
     phases: Mapping[str, float] = field(default_factory=dict)
     raw: Any | None = None
     session_state: Mapping[str, Any] | None = None
+    logprobs: tuple[TokenLogprob, ...] = ()
 
 
 AdapterEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate | AdapterFinal

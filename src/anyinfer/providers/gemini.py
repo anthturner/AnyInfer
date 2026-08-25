@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import aclosing
+from dataclasses import replace
 from typing import Any
 
 import httpx2
@@ -50,7 +51,7 @@ from ..types.messages import (
 )
 from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
+from ..types.results import FinishReason, TokenLogprob, Usage
 from ._multimodal import base64_data
 from .base import (
     AdapterEvent,
@@ -387,6 +388,20 @@ class GeminiAdapter:
             config["maxOutputTokens"] = sampling.max_output_tokens
         if sampling.stop:
             config["stopSequences"] = list(sampling.stop)
+        if sampling.seed is not None:
+            config["seed"] = sampling.seed
+        if sampling.presence_penalty is not None:
+            config["presencePenalty"] = sampling.presence_penalty
+        if sampling.frequency_penalty is not None:
+            config["frequencyPenalty"] = sampling.frequency_penalty
+
+        if req.logprobs is not None:
+            # Two fields again, spelled differently: `responseLogprobs` switches the
+            # feature on and `logprobs` is the alternatives count. Gemini rejects a
+            # `logprobs` of 0, so a bare "chosen token only" ask sends the switch alone.
+            config["responseLogprobs"] = True
+            if req.logprobs > 0:
+                config["logprobs"] = req.logprobs
 
         if req.mechanism in ("json_schema", "grammar") and req.wire_schema is not None:
             config["responseMimeType"] = "application/json"
@@ -541,6 +556,7 @@ class GeminiAdapter:
             usage=final.usage,
             phases=final.phases,
             raw=body,
+            logprobs=final.logprobs,
         )
 
     def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
@@ -576,6 +592,8 @@ class GeminiAdapter:
         reason = candidate.get("finishReason")
         if isinstance(reason, str):
             state.finish_reason = _FINISH_REASONS.get(reason, "other")
+
+        state.logprobs.extend(_parse_logprobs(candidate.get("logprobsResult")))
 
         content = candidate.get("content")
         if not isinstance(content, Mapping):
@@ -625,12 +643,13 @@ class GeminiAdapter:
 class _StreamState:
     """Accumulates cross-chunk streaming state so the final event is complete."""
 
-    __slots__ = ("finish_reason", "tool_slots", "usage")
+    __slots__ = ("finish_reason", "logprobs", "tool_slots", "usage")
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots = 0
+        self.logprobs: list[TokenLogprob] = []
 
     def next_tool_slot(self) -> int:
         """Allocate the next dense tool-call index.
@@ -648,7 +667,58 @@ class _StreamState:
         return AdapterFinal(
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
+            logprobs=tuple(self.logprobs),
         )
+
+
+def _parse_logprobs(result: Any) -> tuple[TokenLogprob, ...]:
+    """Read a candidate's ``logprobsResult`` into normalized tokens.
+
+    Gemini splits what other dialects nest: ``chosenCandidates`` lists the tokens that were
+    actually generated, and ``topCandidates`` lists the alternatives *per position* in a
+    parallel array. Zipping the two by position is what recovers one dialect-neutral token
+    with its runners-up attached. A missing or short ``topCandidates`` is normal — it is
+    absent entirely unless the request asked for alternatives — so the chosen list drives
+    the zip and alternatives are filled in where they exist.
+    """
+    if not isinstance(result, Mapping):
+        return ()
+    chosen = result.get("chosenCandidates")
+    if not isinstance(chosen, list):
+        return ()
+    tops = result.get("topCandidates")
+    top_groups: list[Any] = tops if isinstance(tops, list) else []
+    tokens: list[TokenLogprob] = []
+    for position, entry in enumerate(chosen):
+        parsed = _parse_logprob_candidate(entry)
+        if parsed is None:
+            continue
+        alternatives: tuple[TokenLogprob, ...] = ()
+        if position < len(top_groups):
+            group = top_groups[position]
+            if isinstance(group, Mapping):
+                raw = group.get("candidates")
+                if isinstance(raw, list):
+                    alternatives = tuple(
+                        candidate
+                        for candidate in (_parse_logprob_candidate(item) for item in raw)
+                        if candidate is not None
+                    )
+        tokens.append(replace(parsed, top=alternatives))
+    return tuple(tokens)
+
+
+def _parse_logprob_candidate(entry: Any) -> TokenLogprob | None:
+    """Parse one ``LogprobsResult.Candidate``, or ``None`` when it is unusable."""
+    if not isinstance(entry, Mapping):
+        return None
+    token = entry.get("token")
+    logprob = entry.get("logProbability")
+    if not isinstance(token, str) or not isinstance(logprob, int | float):
+        return None
+    if isinstance(logprob, bool):
+        return None
+    return TokenLogprob(token=token, logprob=float(logprob))
 
 
 def _split_system(messages: Sequence[Message]) -> tuple[str, list[Message]]:
@@ -763,6 +833,7 @@ _GEMINI_FEATURES = (
     | Feature.REASONING
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
+    | Feature.LOGPROBS
 )
 
 

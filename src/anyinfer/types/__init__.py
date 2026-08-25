@@ -62,6 +62,7 @@ from .requests import (
     ARENA_STRATEGIES,
     DEFAULT_MAX_RESPONSE_BYTES,
     DEFAULT_TIMEOUT_S,
+    MAX_TOP_LOGPROBS,
     ArenaPolicy,
     CacheMechanism,
     CacheMode,
@@ -91,6 +92,7 @@ from .results import (
     Mechanism,
     Outcome,
     Timing,
+    TokenLogprob,
     Usage,
 )
 
@@ -102,6 +104,7 @@ __all__ = [
     "DEFAULT_MAX_RESPONSE_BYTES",
     "DEFAULT_TIMEOUT_S",
     "DETAIL_MAX_CHARS",
+    "MAX_TOP_LOGPROBS",
     "ArenaPolicy",
     "AttemptFailed",
     "AttemptRecord",
@@ -164,6 +167,7 @@ __all__ = [
     "TimingMark",
     "TimingMarkName",
     "TokenCalibration",
+    "TokenLogprob",
     "ToolCall",
     "ToolCallDelta",
     "ToolChoice",

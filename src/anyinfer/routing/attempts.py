@@ -16,7 +16,7 @@ from typing import Any
 from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta
 from ..types.messages import ToolCall
 from ..types.requests import CacheMechanism, ResolvedTarget
-from ..types.results import FinishReason, Timing, Usage
+from ..types.results import FinishReason, Timing, TokenLogprob, Usage
 
 __all__ = ["AttemptBuffer", "ToolCallBuffer"]
 
@@ -88,6 +88,7 @@ class AttemptBuffer:
     warnings: list[str] = field(default_factory=list)
     first_token_ms: float | None = None
     raw: Any | None = None
+    logprobs: tuple[TokenLogprob, ...] = ()
     cache_mechanism: CacheMechanism | None = None
     """Which prompt-cache mechanism was engaged for this attempt, when any was.
 

@@ -14,6 +14,8 @@ stream yields on the way there. Ordering guarantees are documented in
 
 ::: anyinfer.Timing
 
+::: anyinfer.TokenLogprob
+
 ::: anyinfer.AttemptRecord
 
 ::: anyinfer.Outcome

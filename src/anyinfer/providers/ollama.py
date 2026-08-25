@@ -370,6 +370,12 @@ class OllamaAdapter:
             options["num_predict"] = sampling.max_output_tokens
         if sampling.stop:
             options["stop"] = list(sampling.stop)
+        if sampling.seed is not None:
+            options["seed"] = sampling.seed
+        if sampling.presence_penalty is not None:
+            options["presence_penalty"] = sampling.presence_penalty
+        if sampling.frequency_penalty is not None:
+            options["frequency_penalty"] = sampling.frequency_penalty
         return options
 
     def _encode_message(self, message: Message) -> dict[str, Any]:
@@ -674,6 +680,7 @@ descriptor = ProviderDescriptor(
         host_shorthand=HostShorthand(scheme="http", default_port=11434),
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("logprobs",),
     default_capabilities=ModelCapabilities(features=Sourced(_OLLAMA_FEATURES, "default")),
     supports_sessions=True,
     # Ollama keeps its own store and downloader, so acquisition here means asking it to

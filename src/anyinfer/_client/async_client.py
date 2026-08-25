@@ -1320,6 +1320,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         cache: CachePolicy | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1332,6 +1333,12 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
 
         ``manifest`` overrides the client's manifest setting for this one call; ``None``
         inherits it.
+
+        ``logprobs`` asks the target to report per-token log-probabilities: ``0`` for the
+        chosen token's own, a positive count for that many alternatives beside it, and
+        ``None`` — the default — for none at all. A target that cannot report them emits a
+        `ParameterDropped` event rather than answering with an empty
+        `Generation.logprobs`.
 
         Returns:
             The assembled `Generation`.
@@ -1353,6 +1360,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             cache=cache,
             arena=arena,
             context=context,
+            logprobs=logprobs,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1605,6 +1613,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         cache: CachePolicy | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1617,6 +1626,12 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
 
         ``manifest`` overrides the client's manifest setting for this one call; ``None``
         inherits it.
+
+        ``logprobs`` asks the target to report per-token log-probabilities: ``0`` for the
+        chosen token's own, a positive count for that many alternatives beside it, and
+        ``None`` — the default — for none at all. A target that cannot report them emits a
+        `ParameterDropped` event rather than answering with an empty
+        `Generation.logprobs`.
 
         Returns:
             An `AsyncStream`: an async iterator of
@@ -1636,6 +1651,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             cache=cache,
             arena=arena,
             context=context,
+            logprobs=logprobs,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1773,6 +1789,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         max_input_bytes: int | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
     ) -> GenerationRequest:
         spec = SchemaSpec.coerce(schema) if schema is not None else None
         request = GenerationRequest(
@@ -1788,6 +1805,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             cache=cache,
             arena=arena,
             context=context,
+            logprobs=logprobs,
             provider_options=dict(provider_options or {}),
             metadata=dict(metadata or {}),
             max_input_part_bytes=(

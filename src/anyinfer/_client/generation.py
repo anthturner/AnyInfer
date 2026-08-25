@@ -862,6 +862,7 @@ class GenerationExecutionMixin:
                         # still see it, so the core normalizes the difference away.
                         yield UsageUpdate(final.usage)
                 active_buffer.phases.update(final.phases)
+                active_buffer.logprobs = final.logprobs
                 if self._retain_raw:
                     active_buffer.raw = final.raw
 
@@ -1013,6 +1014,7 @@ class GenerationExecutionMixin:
             warnings=tuple(buffer.warnings),
             raw=buffer.raw,
             context_reduction=context_summary,
+            logprobs=buffer.logprobs,
         )
 
     def _plan_cache(

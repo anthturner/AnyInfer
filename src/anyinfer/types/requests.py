@@ -7,6 +7,7 @@ which are used throughout the client and provider boundary.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
@@ -26,6 +27,7 @@ __all__ = [
     "DEFAULT_MAX_RESPONSE_BYTES",
     "DEFAULT_TIMEOUT_S",
     "HISTORY_MODES",
+    "MAX_TOP_LOGPROBS",
     "ArenaPolicy",
     "CacheMechanism",
     "CacheMode",
@@ -97,12 +99,41 @@ class Sampling:
         top_p: Nucleus-sampling cutoff — the probability mass considered for each token.
         max_output_tokens: Upper bound on how many tokens the model may generate.
         stop: Sequences that end generation as soon as one is produced.
+        seed: Requested sampling seed. A provider that honors it makes repeated identical
+            requests more likely to produce identical output — *more likely*, never
+            guaranteed: every provider that ships this field documents it as best-effort,
+            and none of them promise reproducibility across model or backend revisions.
+            Each descriptor spells it in its own dialect (``seed``, ``random_seed``);
+            targets that have no such field report a dropped parameter rather than
+            silently sampling freely.
+        presence_penalty: Penalty applied to tokens that have already appeared at all,
+            discouraging repeated topics. Provider scales differ; the value is passed
+            through unchanged rather than rescaled, because a rescaled penalty is a
+            number the caller cannot reason about.
+        frequency_penalty: Penalty scaled by how often a token has already appeared,
+            discouraging verbatim repetition.
     """
 
     temperature: float | None = None
     top_p: float | None = None
     max_output_tokens: int | None = None
     stop: tuple[str, ...] = ()
+    seed: int | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+
+    def __post_init__(self) -> None:
+        """Reject sampling values no provider could act on.
+
+        Raises:
+            ValueError: If the seed is negative, or a penalty is not finite.
+        """
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("sampling seed must not be negative")
+        for name in ("presence_penalty", "frequency_penalty"):
+            value = getattr(self, name)
+            if value is not None and not math.isfinite(value):
+                raise ValueError(f"{name} must be a finite number")
 
 
 ReasoningEffort = Literal["none", "minimal", "low", "medium", "high"]
@@ -524,6 +555,15 @@ DEFAULT_MAX_INPUT_PART_BYTES = 20 * 1024 * 1024
 DEFAULT_MAX_INPUT_BYTES = 50 * 1024 * 1024
 """Maximum inline multimodal bytes across one generation request."""
 
+MAX_TOP_LOGPROBS = 20
+"""Most alternative tokens per position a request may ask for.
+
+The ceiling is the smallest one published by a provider that accepts the field at all
+(OpenAI's ``top_logprobs``), so a request valid here is valid everywhere the feature
+exists. Refusing at construction beats discovering the limit as a provider 400 after the
+prompt has already been assembled.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class GenerationRequest:
@@ -564,6 +604,14 @@ class GenerationRequest:
             never see it; the client runs and selects every candidate before projection.
         context: Explicit caller-approved documents to reduce for the resolved target.
             ``None`` preserves ordinary generation byte-for-byte.
+        logprobs: How many alternative tokens to report a log-probability for at each
+            generated position. ``None`` — the default — asks for none, and is the only
+            value that costs nothing: every provider that returns logprobs inflates the
+            response with them. ``0`` asks for the chosen token's own probability and no
+            alternatives, which is what a confidence-scoring caller needs; a positive value
+            additionally asks for that many runners-up. A target known not to report them
+            emits a dropped-parameter event rather than returning an empty ``logprobs``
+            a caller would have to notice for themselves.
     """
 
     messages: tuple[Message, ...]
@@ -583,11 +631,14 @@ class GenerationRequest:
     cache: CachePolicy | None = None
     arena: ArenaPolicy | None = None
     context: ContextRequest | None = None
+    logprobs: int | None = None
 
     def __post_init__(self) -> None:
         """Enforce multimodal request byte ceilings before any adapter can run."""
         if self.max_input_part_bytes < 1 or self.max_input_bytes < 1:
             raise ValueError("multimodal input byte ceilings must be positive")
+        if self.logprobs is not None and not 0 <= self.logprobs <= MAX_TOP_LOGPROBS:
+            raise ValueError(f"logprobs must be between 0 and {MAX_TOP_LOGPROBS}")
         total = 0
         for message in self.messages:
             for part in message.content:

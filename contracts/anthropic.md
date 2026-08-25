@@ -34,6 +34,10 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
   `stop_sequences`, `tools`, `tool_choice`; reasoning-effort wire form recorded in
   `output_config: {"effort": e}` — VERIFY on first drift run (extended
   thinking may instead use `thinking: {"type":"enabled","budget_tokens":N}`)
+- **Absent from this protocol** (re-checked 2026-08-25): `seed`, `presence_penalty`,
+  `frequency_penalty`, and any log-probability field. The Messages API publishes none of
+  them, so the descriptor declares all four in `ignored_parameters` — a caller who sets
+  one is told, rather than getting a successful answer that ignored it.
 
 ### Multimodal inputs
 Verified 2026-08-10 against the provider-owned vision and PDF guides. Images use `image`
