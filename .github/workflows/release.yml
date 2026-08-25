@@ -194,7 +194,7 @@ jobs:
   # secrets, and nothing to rotate. PyPI mints a short-lived credential for a run only
   # when the run's repository, workflow file, and environment match what the project's
   # publisher configuration names. The one-time setup (PyPI publisher + the `pypi`
-  # environment) is in docs/contributing/repository-setup.md.
+  # environment) is in docs/contributing/releasing.md.
   #
   # `needs: release` (not just `version`) is load-bearing in two ways: it gates upload on
   # the GitHub Release having been cut, and — because `release` itself only runs when the

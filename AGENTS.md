@@ -103,7 +103,7 @@ changes require the generated reference and runnable examples.
 - Secrets: anything credential-shaped goes through `anyinfer.credentials` and is registered
   for redaction. Never log, print, or embed secrets in errors, events, or fixtures.
 - Local servers bind `127.0.0.1` only unless `allow_remote_exposure=True`.
-- Layout: `src/anyinfer/` per DESIGN.md §18. Tests mirror the package under `tests/`.
+- Layout: `src/anyinfer/` per DESIGN.md §18. Tests are flat `tests/test_<area>.py` modules — an area is often a group of related adapters, so bedrock's tests live in `test_bedrock_vertex.py` — plus mirrored subpackages for `context/`, `demo_app/`, `mcp/`, and `testing/`. Grep for the symbol rather than guessing a path from the module name.
 
 ## Testing and documentation obligations
 
@@ -144,8 +144,9 @@ changes require the generated reference and runnable examples.
 `contracts/<provider>.md` records exactly what upstream protocol details AnyInfer
 depends on per provider: endpoints, auth headers, version pins, request fields sent, response
 fields read, streaming framing, and error-mapping inputs — each with a last-verified date.
-One snapshot is not an inference provider: `contracts/huggingface.md` covers the weights
-source model acquisition depends on, and is audited by the same procedure.
+Two snapshots are not inference providers: `contracts/huggingface.md` covers the weights
+source model acquisition depends on, and `contracts/mcp.md` covers the Model Context
+Protocol AnyInfer speaks to source tool definitions. Both are audited by the same procedure.
 
 A snapshot is written **before** the adapter it specifies, as Step 1 of
 [contracts/NEW-PROVIDER.md](contracts/NEW-PROVIDER.md) — the canonical, tool-agnostic

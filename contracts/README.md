@@ -32,6 +32,9 @@ Two procedures own this directory's lifecycle, and both are tool-agnostic:
 - **`huggingface.md` is not an inference provider.** It records the weights-source API model
   acquisition depends on. It follows the same schema and the same drift procedure, because a
   third-party protocol we depend on is a third-party protocol we depend on.
+- **`mcp.md` is not an inference provider either.** It records the Model Context Protocol
+  as a source of tool definitions and an execution transport, scoped to `tools/list` and
+  `tools/call`. Same schema, same drift procedure, same reason.
 - **`openai-compat-presets.md` covers many providers in one file** — the presets share one
   adapter, so they share one snapshot, with a section per provider. Treat each section as
   an independent unit when drift-checking.

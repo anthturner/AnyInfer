@@ -64,26 +64,26 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | E.3 | Provider-native server-side tools (web search, code execution) | 4 | 2 | 8 |
 | `[ ]` | E.4 | Typed citations / grounded-generation output | 3 | 2 | 6 |
 | `[ ]` | E.9 | Explicit proxy / custom CA / mTLS configuration | 2 | 3 | 6 |
-| `[ ]` | A.6 | Fix the "tests mirror the package" AGENTS.md claim | 1 | 5 | 5 |
+| `[x]` | A.6 | Fix the "tests mirror the package" AGENTS.md claim | 1 | 5 | 5 |
 | `[x]` | F.9 | `catalog-refresh` workflow write scope on its read-only job | 1 | 5 | 5 |
 | `[x]` | F.13 | Loose `COHERE.key` credential file in the working tree | 1 | 5 | 5 |
 | `[x]` | A.3 | `serve/service.py` workstream boundary + import-linter scope | 1 | 4 | 4 |
-| `[ ]` | B.7 | Extras/snapshot enumerations incomplete (`mcp` extra, `contracts/mcp.md`) | 1 | 4 | 4 |
-| `[ ]` | C.3 | Add-on install story contradicts itself (PyPI vs checkout) | 1 | 4 | 4 |
+| `[x]` | B.7 | Extras/snapshot enumerations incomplete (`mcp` extra, `contracts/mcp.md`) | 1 | 4 | 4 |
+| `[x]` | C.3 | Add-on install story contradicts itself (PyPI vs checkout) | 1 | 4 | 4 |
 | `[ ]` | E.7 | Video input parts | 2 | 2 | 4 |
 | `[ ]` | E.8 | Runtime credential rotation / hot reload | 2 | 2 | 4 |
 | `[x]` | F.8 | Third-party GitHub Actions pinned to mutable tags | 1 | 4 | 4 |
-| `[ ]` | G.7 | Nitro Enclaves decision (resolve or explicitly defer) | 2 | 2 | 4 |
+| `[x]` | G.7 | Nitro Enclaves decision (resolve or explicitly defer) | 2 | 2 | 4 |
 | `[ ]` | A.4 | Generic top-level `demo_app` package ships in the core wheel | 1 | 3 | 3 |
-| `[ ]` | C.5 | `installation.md` breaks the guide skeleton and dead-ends | 1 | 3 | 3 |
-| `[ ]` | C.7 | README routes readers through retired redirect URLs | 1 | 3 | 3 |
+| `[x]` | C.5 | `installation.md` breaks the guide skeleton and dead-ends | 1 | 3 | 3 |
+| `[x]` | C.7 | README routes readers through retired redirect URLs | 1 | 3 | 3 |
 | `[ ]` | D.4 | Sidecar silently swallows `n>1`, never projects logprobs back | 1 | 3 | 3 |
 | `[ ]` | D.5 | `ConfidentialityReport` has no producer anywhere | 1 | 3 | 3 |
-| `[ ]` | D.7 | DESIGN.md's open-decisions ledger drift (both directions) | 1 | 3 | 3 |
+| `[x]` | D.7 | DESIGN.md's open-decisions ledger drift (both directions) | 1 | 3 | 3 |
 | `[ ]` | E.12 | Shipped logging/JSONL sink for the telemetry stream | 1 | 3 | 3 |
 | `[x]` | F.6 | Sidecar has no request-body size limit | 1 | 3 | 3 |
 | `[x]` | F.7 | Config-controlled URLs (SSRF / `file://`) trust assumption undocumented | 1 | 3 | 3 |
-| `[ ]` | F.12 | SECURITY.md canonical org/domain diverges across the repo | 1 | 3 | 3 |
+| `[x]` | F.12 | SECURITY.md canonical org/domain diverges across the repo | 1 | 3 | 3 |
 | `[ ]` | G.6 | GPU SPDM attestation (explicitly deferred; state the ceiling) | 3 | 1 | 3 |
 | `[ ]` | A.2 | `cli.py` is a 3,776-line single module | 1 | 2 | 2 |
 | `[ ]` | A.5 | Root-of-package module sprawl in `anyinfer/` | 1 | 2 | 2 |
@@ -257,7 +257,7 @@ cannot tell curated-public from internal glue at the root except by the undersco
 distrust the instruction file.
 
 **Remediation:**
-- [ ] **A.6.1** Amend AGENTS.md:106 to describe the real convention ("flat `test_<area>.py`
+- [x] **A.6.1** Amend AGENTS.md:106 to describe the real convention ("flat `test_<area>.py`
   modules plus mirrored subpackages for context/demo_app/mcp/testing"). Physically re-nesting
   ~100 files buys little; do not do it just for the claim.
 
@@ -442,10 +442,10 @@ handling a failure.
 **Severity:** Low · **Confidence:** High
 
 **Brief / sub-items:**
-- [ ] **B.7.1** `docs/guides/installation.md:13-23`'s extras table omits the `mcp` extra, which
+- [x] **B.7.1** `docs/guides/installation.md:13-23`'s extras table omits the `mcp` extra, which
   `pyproject.toml` defines and `docs/guides/tool-loop.md:103` instructs users to install.
   Fix: add a `mcp` row ("nothing installed — feature marker; see the tool-loop guide").
-- [ ] **B.7.2** AGENTS.md:147 and `contracts/README.md:32-34` say "*One* snapshot is not an
+- [x] **B.7.2** AGENTS.md:147 and `contracts/README.md:32-34` say "*One* snapshot is not an
   inference provider" (huggingface.md); `contracts/mcp.md` exists and self-describes as the
   second. Fix: "Two snapshots…" in AGENTS.md; add an mcp.md bullet to contracts/README.md.
 
@@ -522,10 +522,13 @@ checkout "until a first PyPI release ships," but the confidentiality guide shows
 guide / semantic-search example teach `anyinfer_store` as if a pip install away.
 
 **Remediation:**
-- [ ] **C.3.1** Add a one-line "ships as a separate package; install from a checkout for now" note
+- [x] **C.3.1** Add a one-line "ships as a separate package; install from a checkout for now" note
   (linking installation.md's section) to confidentiality-tiers.md, vector-store.md, and
   semantic-search.md.
-- [ ] **C.3.2** When the packages hit PyPI, delete all four caveats in one commit.
+- [ ] **C.3.2** When the packages hit PyPI, delete the caveats in one commit. (Only two carry
+  one now: `installation.md` and `confidentiality-tiers.md`. `vector-store.md` already had
+  it; `semantic-search.md` links to the guide rather than teaching an install, so it needed
+  none. *Verified 2026-08-25.*)
 
 ## C.4 Provider pages drift from their own skeleton at the edges
 
@@ -551,7 +554,7 @@ Also` appears on 9 of 20 adapter pages and is absent from the 11 most-visited on
 Install" with no onward link — the one gap in the site's otherwise careful next-step trail.
 
 **Remediation:**
-- [ ] **C.5.1** Append a See Also (quickstart, configuration, providers) and a Key Takeaways tip,
+- [x] **C.5.1** Append a See Also (quickstart, configuration, providers) and a Key Takeaways tip,
   matching the other 17 guides.
 
 ## C.6 Nav labels and page H1s diverge on ~17 pages
@@ -579,9 +582,9 @@ redirect stubs for merged pages — and in one spot uses the retired and canonic
 same content three lines apart.
 
 **Remediation:**
-- [ ] **C.7.1** Replace with canonical URLs (`why-anyinfer/`, `guides/`), adjusting link text where
+- [x] **C.7.1** Replace with canonical URLs (`why-anyinfer/`, `guides/`), adjusting link text where
   the target is now a section rather than a page.
-- [ ] **C.7.2** Grep first-party files (README, `docs/agents/INTEGRATION.md`, skills, contracts)
+- [x] **C.7.2** Grep first-party files (README, `docs/agents/INTEGRATION.md`, skills, contracts)
   for the other REDIRECTS keys in the same pass.
 
 ## C.8 Glossary omits load-bearing terms
@@ -772,12 +775,12 @@ snapshots first) but until runs clear it, ten adapters' wire contracts rest on c
 alone.
 
 **Remediation:**
-- [ ] **D.7.1** Mark §20.4 *Resolved*, citing `catalog-refresh.yml` and `pricing-refresh.yml`.
-- [ ] **D.7.2** Either open a tracked design section/issue for Nitro Enclaves or downgrade the
+- [x] **D.7.1** Mark §20.4 *Resolved*, citing `catalog-refresh.yml` and `pricing-refresh.yml`.
+- [x] **D.7.2** Either open a tracked design section/issue for Nitro Enclaves or downgrade the
   §30.4 owner decision to "deferred" explicitly.
-- [ ] **D.7.3** Add a release-signing checklist item to `docs/contributing/releasing.md`.
-- [ ] **D.7.4** Let the drift rotation burn down the ten unverified snapshots; record clearance
-  dates in `contracts/*.md` as they clear.
+- [x] **D.7.3** Add a release-signing checklist item to `docs/contributing/releasing.md`.
+- [ ] **D.7.4** Not actionable here — needs live provider runs. Left for the drift rotation to
+  burn down; record clearance dates in `contracts/*.md` as they clear. *(2026-08-25)*
 
 ---
 
@@ -1307,8 +1310,12 @@ diverges (`anthturner` org vs `anyinfer.dev` docs domain in the systemd `Documen
 and site links).
 
 **Remediation:**
-- [ ] **F.12.1** Before 1.0, reconcile the canonical org/domain across SECURITY.md, the systemd
-  unit, and the docs site so a vulnerability reporter cannot be misdirected.
+- [x] **F.12.1** Partially closed *(2026-08-25)*: SECURITY.md now states plainly that
+  `anyinfer.dev` and `github.com/anthturner/AnyInfer` are the same project and that there is
+  no other reporting address, which removes the misdirection risk. The surfaces were already
+  internally consistent (docs domain for docs, repo for code and reporting).
+  **Still the owner's call:** whether the canonical identity before 1.0 is `anthturner/AnyInfer`
+  or a dedicated `anyinfer` org. Renaming is a decision, not a cleanup.
 
 ## F.13 Loose `COHERE.key` credential file in the working tree
 
@@ -1444,7 +1451,7 @@ substantially harder than the CPU path and needs sustained GPU-CC hardware acces
 
 **Sev 2 · Pri 2** — resolve the standing owner decision rather than leaving it silently open.
 
-- [ ] **G.7.1** Either open a tracked design section for real Nitro Enclaves support (scope:
+- [x] **G.7.1** Either open a tracked design section for real Nitro Enclaves support (scope:
   vsock-only networking, no GPU, no persistent storage; attestation via NSM documents would
   be a G.4-style follow-on) or downgrade the DESIGN §30.4 owner decision to "deferred"
   explicitly. Doing nothing is the only wrong outcome.

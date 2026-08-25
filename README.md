@@ -60,7 +60,7 @@ ranked = client.rerank("which passage answers the question", passages, target="c
 There are already good libraries for switching between cloud providers, good gateways for
 centralizing model traffic, and good local-model servers. If one of those is your whole
 problem, you may not need AnyInfer. See
-[when AnyInfer is the right layer](https://anyinfer.dev/guides/when-to-use/).
+[when a smaller tool is the better boundary](https://anyinfer.dev/why-anyinfer/#when-a-smaller-tool-is-the-better-boundary).
 
 AnyInfer is for applications that need those environments to behave as one runtime. It
 keeps provider translation, local process ownership, context preparation, routing, and
@@ -114,8 +114,8 @@ LM Studio, or LocalAI directly when a dedicated local-model service is the produ
 
 **[Why AnyInfer →](https://anyinfer.dev/why-anyinfer/)** goes through the five capabilities
 that are genuinely unusual here, with a dated comparison by category and the commands that
-check each claim. The [decision guide](https://anyinfer.dev/guides/when-to-use/) argues the
-other side and names the tools that are a better fit when they are.
+check each claim. The same page argues the other side, naming the tools that are a better
+fit when they are.
 
 ## Install
 
@@ -230,7 +230,7 @@ All three use the same engine and the same versioned JSON configuration format:
 ```
 
 Load it with `ai.load_config("anyinfer.json")`, pass it to `anyinfer run --config`, or use
-it unchanged with the sidecar. See [choosing an integration path](https://anyinfer.dev/guides/integration-paths/)
+it unchanged with the sidecar. See [choosing an integration path](https://anyinfer.dev/guides/#choose-a-path)
 and [shared configuration](https://anyinfer.dev/reference/configuration/).
 
 ## Documentation

@@ -34,7 +34,9 @@ gated on a signed, time-boxed license blob, so an install without a valid licens
 render a single prompt (which doubles as a licensing mechanism).
 
 ```bash
-pip install "anyinfer-confidential[relay]"   # relay is optional; Tier 1 alone needs no extra
+# Ships as a separate package. Until a first PyPI release, install from a repository
+# checkout — see [installation](installation.md#optional-add-on-packages).
+pip install -e "src/anyinfer-confidential[relay]"   # relay is optional; Tier 1 needs no extra
 ```
 
 ```python

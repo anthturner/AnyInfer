@@ -118,6 +118,12 @@ deliberate act; the environment just adds a pause before the copy leaves the bui
 3. PR into `develop`; merge when green. PR `develop` into `main`; merge when green.
 4. Watch the release workflow attach `v<version>` and publish the wheel to PyPI.
 5. Verify the [downloads page](../downloads.md), checksum file, and PyPI project page.
+6. Confirm the artifact-signing posture is what you intend to ship, and that it matches
+   what the downloads page tells users. Today that means: the wheel and sdist go to PyPI
+   through Trusted Publishing (OIDC, no long-lived token), `SHA256SUMS` is attached to the
+   Release, and native bundles are **not** code-signed. Signing and notarization are a
+   tracked release-infrastructure gap, not an oversight — if that changes, this step and
+   the note below change with it.
 
 If a step fails, [when a release goes wrong](#when-a-release-goes-wrong) lists the
 recovery for each failure mode.

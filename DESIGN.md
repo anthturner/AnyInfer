@@ -917,8 +917,13 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    the loop-thread future, early stream exit closes the async iterator, and facade shutdown
    cancels outstanding tasks with bounded waits. Dedicated tests cover early exit and thread
    stress; supervised local servers survive request cancellation.
-4. **Default catalog contents and update cadence** — which models, who bumps them, does a
-   catalog update constitute a library release? (Risk R6.)
+4. ~~**Default catalog contents and update cadence** — which models, who bumps them, does a
+   catalog update constitute a library release?~~ *Resolved as scheduled automation:*
+   `.github/workflows/catalog-refresh.yml` runs the deterministic drift check and opens a
+   re-pinning PR when upstream moves, and `pricing-refresh.yml` does the same for the
+   pricing table. Nobody bumps entries by hand, and a catalog change rides the next ordinary
+   release rather than forcing one. Risk R6 is the residual staleness *between* runs, not an
+   unanswered question.
 5. ~~**M365 Copilot headless story.**~~ *Resolved as a documented degraded mode:* auth is
    interactive-only, the adapter is exempt from credentialed headless live runs, and its
    fixed capability surface is covered offline.
@@ -1838,9 +1843,14 @@ Market facts that gate what may be *claimed*, and that will move — re-verify o
 - **The open-source NVIDIA kernel modules (OpenRM) do support Hopper CC**, implementing the
   SPDM attestation protocol; Blackwell platforms *require* them. No driver-choice caveat is
   needed, and OpenRM is the forward-looking default rather than a fallback.
-- **Owner decision: invest in real Nitro Enclaves support**, against the original plan's
-  "skip for v1" lean — real new scope, since enclaves have no GPU, no persistent storage,
-  and vsock-only networking.
+- **Nitro Enclaves support: deferred past 1.0** *(2026-08-25)*. An earlier owner decision
+  leaned toward investing in it against the original "skip for v1" plan; nothing was
+  started, and recording an unstarted commitment as a decision made the roadmap read as
+  more certain than it was. Deferred explicitly instead. The scope if it is ever taken up:
+  vsock-only networking, no GPU, no persistent storage, with attestation via NSM documents
+  as a follow-on to the CPU quote-verification work. **Re-evaluate when** a design partner
+  needs an enclave deployment, or when the CPU attestation path (which NSM would extend
+  rather than duplicate) has shipped.
 - Attestation-quote cryptographic verification is **deliberately not implemented**: this
   environment cannot exercise the positive case against real CC-capable hardware, and
   shipping unverified security-critical code is worse than an honest, documented gap.
