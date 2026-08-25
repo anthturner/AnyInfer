@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import re
 import tomllib
+from html import escape as html_escape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -181,26 +182,58 @@ def _doc_url(config: Any, doc_path: str) -> str:
 def _write_redirects(config: Any) -> None:
     """Write a static stub at every retired URL, pointing at the page that absorbed it.
 
+    Each stub carries the same link-preview head a real page gets (mirroring
+    overrides/main.html), because chat unfurlers read the stub's own tags and never
+    execute the meta refresh: without them, a retired URL pasted into Teams or Slack
+    renders a bare "Redirecting…" card.
+
     Raises:
         ValueError: If a mapping's source doc still exists (it should be a real page,
             not a redirect), or its target doc does not (the redirect would 404).
     """
     docs_dir = Path(config.docs_dir)
     site_dir = Path(config.site_dir)
+    titles = {
+        src: (page_title, summary)
+        for _section, pages in _sections(config)
+        for page_title, _url, summary, src in pages
+    }
+    card = _absolute(config, "assets/anyinfer-social-card.png")
+    card_alt = "The AnyInfer wordmark on a deep teal field"
     for old, new in REDIRECTS.items():
         if (docs_dir / old).exists():
             raise ValueError(f"redirect source {old!r} still exists; remove the mapping")
         if not (docs_dir / new.partition("#")[0]).exists():
             raise ValueError(f"redirect target {new!r} does not exist")
         target = _doc_url(config, new)
+        page_title, summary = titles.get(new.partition("#")[0], ("", ""))
+        title = f"{page_title} - {config.site_name}" if page_title else config.site_name
+        title = html_escape(title, quote=True)
+        description = html_escape(_collapse(summary or config.site_description), quote=True)
         stub_dir = site_dir / old[: -len(".md")]
         stub_dir.mkdir(parents=True, exist_ok=True)
         (stub_dir / "index.html").write_text(
             "<!doctype html>\n<html lang=\"en\">\n<head>\n"
             "<meta charset=\"utf-8\">\n"
-            f"<title>Redirecting…</title>\n"
+            f"<title>{title}</title>\n"
             f"<link rel=\"canonical\" href=\"{target}\">\n"
             f"<meta http-equiv=\"refresh\" content=\"0; url={target}\">\n"
+            '<meta property="og:type" content="article">\n'
+            f'<meta property="og:site_name" content="{config.site_name}">\n'
+            f'<meta property="og:title" content="{title}">\n'
+            f'<meta property="og:description" content="{description}">\n'
+            f'<meta property="og:url" content="{target}">\n'
+            f'<meta property="og:image" content="{card}">\n'
+            '<meta property="og:image:type" content="image/png">\n'
+            '<meta property="og:image:width" content="1200">\n'
+            '<meta property="og:image:height" content="630">\n'
+            f'<meta property="og:image:alt" content="{card_alt}">\n'
+            '<meta property="og:locale" content="en_US">\n'
+            '<meta name="twitter:card" content="summary_large_image">\n'
+            f'<meta name="twitter:title" content="{title}">\n'
+            f'<meta name="twitter:description" content="{description}">\n'
+            f'<meta name="twitter:image" content="{card}">\n'
+            f'<meta name="twitter:image:alt" content="{card_alt}">\n'
             "</head>\n<body>\n"
             f"<p>This page has moved to <a href=\"{target}\">{target}</a>.</p>\n"
             "</body>\n</html>\n",
