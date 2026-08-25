@@ -1,7 +1,7 @@
 # Errors
 
 A shallow hierarchy with structured fields (`provider`, `phase`, `retryable`,
-`http_status`, `detail`, `hint`) — `detail` is bounded and redacted, `hint` is the
+`http_status`, `detail`, `hint`); `detail` is bounded and redacted, `hint` is the
 actionable next step. The prose catalog with examples lives in
 [the error reference](../errors.md).
 

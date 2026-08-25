@@ -35,7 +35,7 @@ result = client.generate(prompt, target="m365-copilot:m365-copilot")
 
 Alias: `m365`.
 
-## Interactive authentication
+## Interactive Authentication
 
 There is no client-credential or daemon flow for this API. Sign-in opens a browser.
 Consequently:
@@ -45,7 +45,7 @@ Consequently:
 - `health()` does not trigger a sign-in: a health probe that opens a browser window would
   be a hostile surprise, and [the router](../concepts/routing.md) calls it speculatively.
 
-If you already hold a token, supply it and skip the interactive flow:
+If a token is already held, supply it and skip the interactive flow:
 
 ```python
 ai.ProviderSettings.of("m365-copilot", api_key="env://M365_TOKEN")
@@ -57,14 +57,14 @@ This is the only workable path for automated use.
 
 | Behavior | Support |
 |---|---|
-| Streaming | No — a whole response, emitted as one delta |
+| Streaming | No (a whole response, emitted as one delta) |
 | Structured output | Prompt-injected only |
 | Tools | No |
 | Sampling controls | **Ignored by the service** |
 | Usage | Generally absent |
 | Schema repair | Capped at **one** round trip |
 
-## Ignored parameters
+## Ignored Parameters
 
 Temperature, top-p, max tokens, stop sequences, tools, and reasoning effort are declared
 on the descriptor as ignored, so requesting them emits a `ParameterDropped`
@@ -80,11 +80,11 @@ class Watch:
 That event matters: a `temperature=0` that had no effect is otherwise
 indistinguishable from one that worked.
 
-## Schema repair
+## Schema Repair
 
 The descriptor caps [schema repair](../concepts/structured-output.md#repair) at a single
 round trip, since every request here is an interactively-authenticated Graph call against
-service-kept conversation state — the most expensive request shape in the registry.
+service-kept conversation state (the most expensive request shape in the registry).
 Asking for more is clamped rather than refused, and the clamp is reported the same way an
 ignored parameter is:
 
@@ -110,11 +110,11 @@ mode when the shape matters more than the M365 grounding does.
   it is understood.
 - A 401/403 hints at both re-authentication *and* the tenant licensing and admin-consent
   requirements, because those are the usual real causes.
-- If you need automation, streaming, tools, or sampling control, use another provider —
+- For automation, streaming, tools, or sampling control, use another provider;
   [GitHub Copilot](copilot.md) covers the subscription-billed case with fewer
   constraints. This adapter is for applications with a genuine M365 Copilot requirement.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/m365-copilot.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/m365-copilot.md).

@@ -1,4 +1,4 @@
-# Local inference
+# Local Inference
 
 The `anyinfer.local` subsystem: hardware detection, backend selection, runtime
 acquisition, tuning, fit classification, model acquisition and storage, server supervision,
@@ -35,7 +35,7 @@ from anyinfer import local
 
 </div>
 
-## Resource sampling and storage
+## Resource Sampling and Storage
 
 Lightweight host metrics used by benchmarks and local-capacity reporting.
 
@@ -65,7 +65,7 @@ Lightweight host metrics used by benchmarks and local-capacity reporting.
 
 </div>
 
-## Runtime variants
+## Runtime Variants
 
 AnyInfer ships no llama.cpp binaries. These fetch, validate, and select them; CUDA is an
 explicit opt-in, never installed on a user's behalf.
@@ -116,7 +116,7 @@ explicit opt-in, never installed on a user's behalf.
 
 </div>
 
-## Fit and variant selection
+## Fit and Variant Selection
 
 Whether a model will run on this machine, and which quantization to acquire for it. Both
 are advisory and both explain themselves.
@@ -145,7 +145,7 @@ are advisory and both explain themselves.
 
 </div>
 
-## Acquisition and the model store
+## Acquisition and the Model Store
 
 Getting weights onto this disk and finding them again. Model acquisition lives here, never
 in a provider adapter.
@@ -194,7 +194,7 @@ Where weights come from. Adding an internal mirror is a resolver, not a dependen
 
 </div>
 
-## Artifacts and downloads
+## Artifacts and Downloads
 
 <div class="anyinfer-api-block" markdown>
 
@@ -222,7 +222,7 @@ Where weights come from. Adding an internal mirror is a resolver, not a dependen
 
 </div>
 
-## Server supervision
+## Server Supervision
 
 <div class="anyinfer-api-block" markdown>
 
@@ -276,7 +276,7 @@ configuration file.
 
 </div>
 
-## Engine-managed models
+## Engine-Managed Models
 
 <div class="anyinfer-api-block" markdown>
 
@@ -286,11 +286,11 @@ configuration file.
 
 </div>
 
-## Confidential execution attestation
+## Confidential Execution Attestation
 
 Tier 3 of the [Confidentiality Tiers](../../guides/confidentiality-tiers.md): whether this
 host can back an attested-local-execution guarantee, and does it, right now. Advisory
-detection only — enforcement is
+detection only; enforcement is
 [`anyinfer.providers.confidential_execution.ConfidentialExecutionAdapter`](#confidentialexecutionadapter),
 which calls the same function this section documents.
 
@@ -318,12 +318,12 @@ which calls the same function this section documents.
 
 </div>
 
-## Model provenance verification (Tier 4)
+## Model Provenance Verification (Tier 4)
 
-Whether the model weights actually on disk are the exact artifact a vendor signed —
-verification only, never signing; see the module docstring for why that boundary is
-absolute. Only a Tier 4 claim in combination with `ConfidentialExecutionStatus.end_to_end`
-— see the [Confidentiality Tiers guide](../../guides/confidentiality-tiers.md).
+Whether the model weights actually on disk are the exact artifact a vendor signed
+(verification only, never signing); see the module docstring for why that boundary is
+absolute. Only a Tier 4 claim in combination with `ConfidentialExecutionStatus.end_to_end`;
+see the [Confidentiality Tiers guide](../../guides/confidentiality-tiers.md).
 
 <div class="anyinfer-api-block" markdown>
 

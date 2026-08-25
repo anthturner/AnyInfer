@@ -1,4 +1,4 @@
-# Why and when to use AnyInfer
+# Why and When to Use AnyInfer
 
 Most libraries in this space solve provider switching: one function, many APIs, one
 response shape. That is a real problem and several tools solve it well. AnyInfer is built
@@ -15,9 +15,9 @@ normalizes the behavior and reports every place it could not.
 This page argues both directions: what is genuinely unusual here, and when a smaller
 tool is the better boundary.
 
-## Five things that are unusual
+## Five Things That Are Unusual
 
-### 1. You can unit-test your integration's failure paths, offline
+### 1. You Can Unit-Test Your Integration's Failure Paths, Offline
 
 Inference code has behavior worth testing: it falls back when a provider is down, it
 repairs a malformed structured answer, it reduces a corpus to fit. Testing that normally
@@ -41,13 +41,13 @@ provider = ScriptedProvider(
 )
 ```
 
-Five failure kinds are declarable — an HTTP status with `Retry-After`, a stream cut
-mid-event, a body that will not validate, a read timeout, and a content-policy refusal —
+Five failure kinds are declarable (an HTTP status with `Retry-After`, a stream cut
+mid-event, a body that will not validate, a read timeout, and a content-policy refusal),
 and each reaches a different part of the core. These are the failures you cannot
 schedule against a real provider, and they are exactly the ones your error handling is
 written for. See [test your application offline](guides/testing-your-app.md).
 
-### 2. Every number says where it came from
+### 2. Every Number Says Where It Came From
 
 A context window you read from a table and a context window the provider just told you
 are not the same fact, and code that cannot tell them apart will eventually gate a
@@ -59,17 +59,17 @@ budget.context_window  # Sourced(8192, 'discovered')
 budget.context_window  # None, and it stays None
 ```
 
-Five provenances layer from weakest to strongest — `default`, `catalog`, `discovered`,
-`probed`, `override` — and a weaker source never displaces a stronger one. Only trusted
+Five provenances layer from weakest to strongest (`default`, `catalog`, `discovered`,
+`probed`, `override`), and a weaker source never displaces a stronger one. Only trusted
 provenance may refuse a request pre-dispatch. The same rule governs money:
 `usage.cost_usd` is a `Decimal` or `None`, and `None` means unknown, never zero. See
 [capabilities and provenance](concepts/capabilities.md).
 
-### 3. Portability is a test result, not a claim
+### 3. Portability Is a Test Result, Not a Claim
 
 106 providers is inventory, not a feature; the useful part is knowing which of them does
 what you need. The [conformance matrix](reference/conformance-matrix.md) is generated
-from real suite runs — every cell is one test case that executed against that adapter,
+from real suite runs: every cell is one test case that executed against that adapter,
 and a `➖` is a declared limitation, not a pass. Providers without rows stay empty
 rather than turning missing evidence into a claim.
 
@@ -82,7 +82,7 @@ that audits them against current provider documentation. Writing
 [your own adapter](guides/custom-providers.md) puts it on the same footing:
 `anyinfer conform` runs the suite and emits its matrix row.
 
-### 4. A local model is a target, not a separate product
+### 4. A Local Model Is a Target, Not a Separate Product
 
 ```python
 client.generate(prompt, target="anthropic:claude-sonnet-4-5")
@@ -93,11 +93,11 @@ If the weights are not there yet, the second call acquires a pinned, hash-verifi
 artifact, picks a runtime for the detected hardware, tunes the launch flags for the
 memory actually available, starts `llama-server` on loopback, waits for readiness,
 serves the request, and evicts the model when idle. No separate daemon to install or
-operate. An already-running Ollama, LM Studio, or vLLM is equally a target — and both
+operate. An already-running Ollama, LM Studio, or vLLM is equally a target, and both
 kinds sit in the same fallback chain with the same event stream, usage normalization,
 and structured-output contract. See [run a model locally](guides/local-inference.md).
 
-### 5. Context fit is decided before you pay for it
+### 5. Context Fit Is Decided Before You Pay for It
 
 ```python
 budget = client.budget(messages, target="anthropic:claude-sonnet-4-5")
@@ -114,7 +114,7 @@ reports its omissions rather than quietly truncating. See
 [context budgets](concepts/budgeting.md) and
 [context reduction](concepts/context-reduction.md).
 
-## When a smaller tool is the better boundary
+## When a Smaller Tool Is the Better Boundary
 
 Provider count is not a reason to add a dependency. Use AnyInfer when the application
 needs to own a hybrid inference runtime; use the smaller tool when it already solves
@@ -140,9 +140,9 @@ OpenAI-compatible sidecar, basic retry and fallback, or calling an already-runni
 endpoint. Integrators need all of those, and many tools have them. The reason to pick
 AnyInfer is the runtime and correctness contract around them.
 
-## Where it sits among the alternatives
+## Where It Sits Among the Alternatives
 
-The columns are categories of tool, not specific products — a category claim can be
+The columns are categories of tool, not specific products: a category claim can be
 checked against what the category is for, while a product claim goes stale the week it
 is written. Snapshot date: 2026-08-09. When choosing against a specific tool, verify
 that tool's current behavior rather than trusting a generalization here.
@@ -165,7 +165,7 @@ that tool's current behavior rather than trusting a generalization here.
 The last four rows matter most: AnyInfer is a runtime, not a platform, and the tools in
 those columns are boundaries to compose with, not competitors.
 
-## Check the claims yourself
+## Check the Claims Yourself
 
 Nothing on this page requires taking a documentation page's word for it:
 
@@ -179,30 +179,30 @@ anyinfer run "..." --dry-run --target ollama:qwen3:8b   # cost and fit, nothing 
 
 `anyinfer verify` sends a real, tiny request, because a credential can be valid for a
 model listing and useless for inference, and it distinguishes *unreachable* from
-*reachable but could not hold the requested shape* — which need different fixes. Nothing
+*reachable but could not hold the requested shape*, which need different fixes. Nothing
 requires an account: the [demo app](guides/demo-app.md) runs entirely offline against
 in-process fakes, and every code example in this documentation is executed in CI against
 those same fakes, so none of it can quietly rot.
 
-## Confidential execution
+## Confidential Execution
 
 BYOK inference protects your customer's data from you; it does nothing to protect your
 prompt templates and orchestration IP from a customer who owns the machine they run on.
 AnyInfer ships a four-tier ladder for that problem, from encrypted-at-rest templates up
-to attested execution in a trusted environment with signed-model verification — each
+to attested execution in a trusted environment with signed-model verification, each
 tier stating exactly what it does and does not guarantee. See
 [confidentiality tiers](guides/confidentiality-tiers.md).
 
-## Who this is for
+## Who This Is For
 
 It fits an application that ships: a desktop tool, a developer tool, an offline-capable
-service, a distributable Python product — something that needs a cloud route and a local
-route to behave the same way, that has to explain its costs, and whose inference code
-deserves tests. It does not fit a notebook experiment, a single-provider script, or an
+service, a distributable Python product. That is, something that needs a cloud route and
+a local route to behave the same way, that has to explain its costs, and whose inference
+code deserves tests. It does not fit a notebook experiment, a single-provider script, or an
 organization looking for a central control plane; the table above names better-shaped
 tools for those.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

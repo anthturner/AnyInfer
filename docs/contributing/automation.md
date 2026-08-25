@@ -1,4 +1,4 @@
-# Coding-agent instructions
+# Coding-Agent Instructions
 
 AnyInfer supports Codex, Claude Code, and GitHub Copilot with one authoritative instruction
 set. [`AGENTS.md`](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) is the source
@@ -15,8 +15,8 @@ The tool-specific files are discovery shims only:
 The shims point back to the canonical source and must not restate repository rules. This
 prevents one tool from operating under a stale or subtly different architecture.
 
-Each workflow follows the same shape — one tool-neutral procedure file, three thin entry
-points that only make it discoverable:
+Each workflow follows the same shape (one tool-neutral procedure file, three thin entry
+points that only make it discoverable):
 
 | Workflow | Canonical procedure | What it owns |
 |---|---|---|
@@ -27,7 +27,7 @@ points that only make it discoverable:
 The first two are two halves of one lifecycle: `NEW-PROVIDER.md` produces a contract
 snapshot, `DRIFT-CHECK.md` keeps it true afterwards.
 
-## Scheduled repository checks
+## Scheduled Repository Checks
 
 Three weekly workflows watch for the world changing underneath the repository.
 
@@ -49,7 +49,7 @@ upstream. The contract drift check audits provider contract snapshots against cu
 public API documentation, following
 [`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md).
 
-## Workstream boundaries
+## Workstream Boundaries
 
 Start in the narrowest workstream that owns the behavior:
 
@@ -65,7 +65,7 @@ Tests mirror those boundaries under `tests/`. Shared behavior belongs in the eng
 configuration package, not copied into the CLI, sidecar, or demo. A change that crosses a
 boundary should say why in its pull request and update every affected guide.
 
-## Keeping the shims in sync
+## Keeping the Shims in Sync
 
 The test suite checks that each tool-specific shim points to its canonical file and stays
 small. When a rule changes:

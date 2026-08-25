@@ -1,4 +1,4 @@
-# Run manifests
+# Run Manifests
 
 A run manifest is the portable explanation of one generation. It records the route that
 won, attempts and fallback, structured-output and cache mechanisms, context reductions,
@@ -19,10 +19,10 @@ print(result.manifest.to_json())
 The default record contains shapes and decisions, never prompts, completions, schemas,
 tool arguments, or document bodies. `manifest_payloads=True` is an explicit client-wide
 opt-in; captured strings still pass through
-[credential redaction](credentials.md). AnyInfer never writes manifests — callers decide
+[credential redaction](credentials.md). AnyInfer never writes manifests; callers decide
 whether and where to serialize them.
 
-## Why manifests make useful golden files
+## Why Manifests Make Useful Golden Files
 
 Model prose changes. Routing and policy decisions should not change accidentally. The
 testing helper removes request IDs and wall-clock fields, then compares the stable
@@ -32,7 +32,7 @@ and the [complete example](../examples/golden-manifest.md). For the related ques
 "did my request's *resolution* change across targets", see the
 [portability diff](../guides/comparing-targets.md).
 
-## The format
+## The Format
 
 The canonical, machine-readable JSON Schema ships in the package:
 
@@ -53,14 +53,14 @@ This is a pre-1.0 contract. The top-level `format` is currently `"1"`, and reade
 ignore unknown keys: adding a field does not change the format, while changing an
 existing field's meaning does.
 
-!!! tip "Key takeaways"
-    - A manifest explains one generation's decisions — route, mechanisms, reductions,
-      provenance — and is payload-free unless you opt in.
+!!! tip "Key Takeaways"
+    - A manifest explains one generation's decisions (route, mechanisms, reductions,
+      provenance) and is payload-free unless payloads are opted in.
     - The library never writes manifests to disk; serialization is the caller's call.
     - Manifests make good golden files because the testing helper strips the volatile
       fields, leaving only decisions that should not change accidentally.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

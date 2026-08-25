@@ -1,7 +1,7 @@
-# Multimodal inputs
+# Multimodal Inputs
 
 AnyInfer generation requests may contain images, documents, and audio alongside text.
-The output is still text and tool calls — this does not add image generation, speech
+The output is still text and tool calls; this does not add image generation, speech
 output, transcription, or another inference API.
 
 ```python
@@ -32,7 +32,7 @@ The default ceilings are 20 MiB for one inline part and 50 MiB for the whole req
 `generate()` and `stream()` accept `max_input_part_bytes` and `max_input_bytes` for a
 tighter bound. A violation is rejected before a provider call.
 
-## Capabilities and conservative budgets
+## Capabilities and Conservative Budgets
 
 The [capability flags](capabilities.md) are `VISION`, `DOCUMENT`, and `AUDIO_IN`. A
 trusted capability record that lacks a required flag refuses the request before
@@ -42,7 +42,7 @@ unsupported-input error.
 
 Image and document token costs depend on provider formulas, resolution, page count, and
 model. When no catalog formula is available, `budget.estimate.unpriced_parts` reports
-the gap and both `budget.fits` and `budget.estimated_cost` are `None` — the
+the gap and both `budget.fits` and `budget.estimated_cost` are `None`; the
 [context gate](budgeting.md#the-pre-dispatch-gate) lets the request through instead of
 inventing a token count.
 
@@ -59,27 +59,27 @@ The [sidecar](../serve/README.md) preserves OpenAI message content arrays contai
 `image_url`, `input_audio`, and `file` parts, subject to the same request caps. No
 attachment content appears in [telemetry](telemetry.md), manifests, or error messages.
 
-## Which providers accept what
+## Which Providers Accept What
 
 Support varies by part type, provider, and model. The
 [conformance matrix](../reference/conformance-matrix.md) records per-provider multimodal
-support from actual test runs, and each provider page states its own quirks — for
+support from actual test runs, and each provider page states its own quirks: for
 example, [Ollama](../providers/ollama.md) takes inline images only, and the supervised
 [llama.cpp](../providers/llama-cpp.md) path needs a catalog artifact with a pinned
 projector companion. Provider contract snapshots record the wire spellings and their
 verification sources.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Parts are typed (`ImagePart`, `DocumentPart`, `AudioPart`) and size-capped before
       any provider call; adapters handle wire encoding.
     - A trusted capability record gates multimodal requests before dispatch; an unknown
       one defers to the adapter's explicit accept-or-raise.
-    - Unpriceable parts make the budget honest — `fits` and `estimated_cost` go `None`
+    - Unpriceable parts make the budget honest: `fits` and `estimated_cost` go `None`
       instead of guessing.
     - Per-provider support lives in the conformance matrix, not in a hand-maintained
       list here.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

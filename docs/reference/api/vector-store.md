@@ -1,6 +1,6 @@
-# Vector store add-on
+# Vector Store Add-On
 
-`anyinfer_store`: a small-scale, single-process, embedded vector store — a separate
+`anyinfer_store`: a small-scale, single-process, embedded vector store; a separate
 installable distribution, never imported by `anyinfer` core and never a dependency of it.
 See the [vector store guide](../../guides/vector-store.md) for the full walkthrough and the
 explicit, permanent scale boundary this package commits to.

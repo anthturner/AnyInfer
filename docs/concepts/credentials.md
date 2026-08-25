@@ -1,4 +1,4 @@
-# Credentials and redaction
+# Credentials and Redaction
 
 Two guarantees:
 
@@ -42,14 +42,14 @@ CredentialError: environment variable OPENAI_API_KEY is not set
   (hint: export OPENAI_API_KEY=<your key> and retry)
 ```
 
-A typo'd scheme is not treated as a literal secret — `LiteralResolver` declines anything
+A typo'd scheme is not treated as a literal secret: `LiteralResolver` declines anything
 that looks like a known scheme, so `env:/OPENAI_KEY` fails loudly.
 
 As a rule of thumb: `env://` is the usual choice for containers and CI, and
 `credential://` for a workstation. A literal key is fine in test code and poor in
 config.
 
-## Using the OS keyring
+## Using the OS Keyring
 
 Install the extra, store the secret, and reference it:
 
@@ -66,8 +66,8 @@ client = ai.Client(
 )
 ```
 
-The service name is `AnyInfer`; the identifier is yours to choose, and the reference
-string is safe to commit — it names where the secret lives, not the secret. Keyring
+The service name is `AnyInfer`; the identifier is the developer's to choose, and the
+reference string is safe to commit: it names where the secret lives, not the secret. Keyring
 failures are actionable like the rest:
 
 ```
@@ -79,9 +79,9 @@ CredentialError: no usable OS credential store is available on this system
 ```
 
 Headless Linux often has no usable vault; `env://` is the right answer there, and the
-error says so rather than leaving you to guess.
+error says so rather than leaving the developer to guess.
 
-## Redaction is automatic and global
+## Redaction Is Automatic and Global
 
 Every secret resolved through the credential chain is registered for redaction the moment it
 is resolved. From then on, it is stripped from:
@@ -101,15 +101,15 @@ has to apply even to errors raised by code that never saw the client that resolv
 Values shorter than six characters are not registered: redacting them would corrupt
 unrelated text far more often than it would protect anything.
 
-You can register additional secrets an application resolves itself:
+An application can register additional secrets it resolves itself:
 
 ```python
 ai.register_secret(my_token)
 ```
 
-## Custom resolvers
+## Custom Resolvers
 
-For anything beyond the keyring — AWS Secrets Manager, HashiCorp Vault — applications
+For anything beyond the keyring (AWS Secrets Manager, HashiCorp Vault), applications
 plug in their own vault:
 
 ```python
@@ -130,21 +130,21 @@ client = ai.Client(providers, resolver=chain)
 The *chain* registers resolved secrets for redaction, not the individual resolvers, so a
 third-party resolver cannot forget to.
 
-## Backend credentials never transit the sidecar
+## Backend Credentials Never Transit the Sidecar
 
-When you run the [sidecar](../serve/README.md), it authenticates *clients to itself*
+When the [sidecar](../serve/README.md) is running, it authenticates *clients to itself*
 with its own bearer token. The provider credentials it uses stay on the server. A client
 pointed at the frontend never sees, sends, or needs them.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Credentials are referenced (`env://`, `credential://`), never embedded, so config
       stays safe to commit.
-    - Redaction is automatic, global, and applies from the moment a secret resolves —
+    - Redaction is automatic, global, and applies from the moment a secret resolves,
       including to code that never saw the client that resolved it.
     - Backend credentials never transit the sidecar; it authenticates clients to
       itself with its own bearer token.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

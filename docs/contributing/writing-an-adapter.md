@@ -1,17 +1,17 @@
-# Writing a provider adapter
+# Writing a Provider Adapter
 
 An [adapter](../reference/glossary.md#adapter) translates. That is the whole job, and
 keeping it that way is what lets one conformance suite cover every provider. This page
 explains the shape and the reasoning behind it.
 
-For the step-by-step procedure — what to research before writing code, which registration
-gates a new provider trips, and what "done" means — follow
+For the step-by-step procedure (what to research before writing code, which registration
+gates a new provider trips, and what "done" means), follow
 [`contracts/NEW-PROVIDER.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/NEW-PROVIDER.md).
 It is the canonical checklist that this repository's coding-agent skills run, and it starts
 where every provider should: fetching the current API reference and recording what it says,
 before any code exists to be biased by.
 
-## The contract
+## The Contract
 
 Four methods:
 
@@ -27,14 +27,14 @@ class MyAdapter:
     async def aclose(self) -> None: ...
 ```
 
-`WireRequest` arrives fully resolved — concrete model, chosen mechanism, projected
+`WireRequest` arrives fully resolved: concrete model, chosen mechanism, projected
 schema, translated reasoning effort, merged options. You never see aliases, routing policy,
 or repair state.
 
 You may emit only: `TextDelta`, `ReasoningDelta`, `ToolCallDelta`, `UsageUpdate`, and
 exactly one terminal `AdapterFinal`.
 
-## What you must not do
+## What You Must Not Do
 
 - Retry. The router does that, and doing both multiplies the attempts.
 - Validate schemas or repair responses. The core does.
@@ -43,7 +43,7 @@ exactly one terminal `AdapterFinal`.
 
 `lint-imports` enforces this. If it fails, move the code.
 
-## Start from a descriptor
+## Start from a Descriptor
 
 ```python
 descriptor = ProviderDescriptor(
@@ -95,7 +95,7 @@ Two fields worth understanding:
 - `ignored_parameters`: declare anything your provider accepts and silently discards.
   The core emits `ParameterDropped` so users find out.
 
-## If it speaks OpenAI
+## If It Speaks OpenAI
 
 Subclass [the OpenAI-compatible adapter](../providers/openai-compat.md) and override only
 what differs:
@@ -111,7 +111,7 @@ class MyAdapter(OpenAICompatAdapter):
         return headers
 ```
 
-`azure_foundry.py` and `openrouter.py` are both small for exactly this reason — read them
+`azure_foundry.py` and `openrouter.py` are both small for exactly this reason; read them
 before writing a new dialect from scratch.
 
 ## Errors
@@ -133,7 +133,7 @@ raise classify_status(
 Every error deserves an actionable `hint`. "Invalid request" is not a hint; "verify the
 model id, or list available models with client.models()" is.
 
-## Register it
+## Register It
 
 Built-ins go in `providers/__init__.py`. Third-party adapters advertise themselves:
 
@@ -145,7 +145,7 @@ my_provider = "my_package.adapter:descriptor"
 Discovery is lazy and collision-safe. A plugin that fails to import is skipped rather than
 breaking every other provider.
 
-## Certify it
+## Certify It
 
 Run [the conformance suite](conformance.md) against your adapter through a
 `ConformanceHarness`, declaring anything the provider cannot do in `Capabilities` so the

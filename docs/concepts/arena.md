@@ -1,11 +1,11 @@
-# Arena runs
+# Arena Runs
 
 An arena sends the same request to a fixed set of targets and selects one answer, keeping
 every candidate as evidence. A three-target arena costs up to three ordinary generations
 before selection, and the `judge` or `synthesize` strategies add one more. It is an
-on-demand comparison tool, not a router that learns from winners — results are not
-stored, ranked across runs, or fed back into future target selection. To compare targets
-*without* spending anything, use the
+on-demand comparison tool, not a router that learns from winners; results are not
+stored, ranked across runs, or fed back into future target selection. In order to
+compare targets *without* spending anything, use the
 [portability diff](../guides/comparing-targets.md) instead.
 
 The strongest mode is structured consensus: candidates must satisfy the same
@@ -45,10 +45,10 @@ an [unknown cost](cost.md) as zero, and `fastest` uses measured completion timin
 `synthesize` asks it to produce an additional answer while retaining all original
 candidates, marked separately.
 
-Candidate envelopes are anonymized by default — set `reveal_targets=True` only when the
+Candidate envelopes are anonymized by default; set `reveal_targets=True` only when the
 selector genuinely needs provider identity.
 
-## The same policy on every surface
+## The Same Policy on Every Surface
 
 The [CLI](../guides/cli.md) (`anyinfer run --arena ... --arena-strategy consensus`) and
 the [OpenAI-compatible sidecar](../serve/README.md) (an `anyinfer_arena` request
@@ -57,7 +57,7 @@ response remains a valid single-choice OpenAI completion, with content-free cand
 evidence added under `anyinfer_arena`; streaming buffers candidates and emits only the
 selected answer, so branches never interleave on the wire.
 
-## Tool loops and spend ceilings
+## Tool Loops and Spend Ceilings
 
 [`run_tools(..., arena=policy, max_rounds=R)`](../guides/tool-loop.md) runs one isolated
 conversation per candidate, with a provider-call ceiling of one round-trip per candidate
@@ -70,7 +70,7 @@ paid usage cannot be recovered faithfully, the aggregate is marked incomplete ra
 than presenting an understated total. Use `anyinfer run --dry-run --arena ...` to
 inspect the call ceiling and summed cost range without sending anything.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - An arena multiplies cost by its target count; use it to answer a question, not as
       standing routing. The free alternative for capability comparisons is
       `compare()`.
@@ -80,7 +80,7 @@ inspect the call ceiling and summed cost range without sending anything.
       behind it.
     - Spend is reserved up front: a ceiling refusal costs zero provider calls.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

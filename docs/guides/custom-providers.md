@@ -1,10 +1,10 @@
-# Add your own provider
+# Add Your Own Provider
 
 A provider AnyInfer does not ship is not a fork: a provider is a small installable
-package, and once it is installed, `yourprovider:model` targets resolve everywhere — the
+package, and once it is installed, `yourprovider:model` targets resolve everywhere: the
 Python API, the command line, the sidecar, and any config UI built on the setup spec.
 
-## Do you need an adapter at all?
+## Do You Need an Adapter at All?
 
 If your endpoint speaks `/chat/completions` and differs only by URL, authentication
 spelling, and a few quirks, you do not. Point the built-in
@@ -22,11 +22,11 @@ client = ai.Client(
 )
 ```
 
-Write an adapter when there is real protocol translation to do — a different request shape,
+Write an adapter when there is real protocol translation to do: a different request shape,
 a different streaming framing, or discovery that reports something the OpenAI listing
 cannot express.
 
-## Scaffold it
+## Scaffold It
 
 ```bash
 anyinfer conform acme --scaffold ./acme-anyinfer
@@ -44,7 +44,7 @@ acme-anyinfer/
   README.md
 ```
 
-## Write the four methods
+## Write the Four Methods
 
 An adapter exposes exactly `list_models`, `health`, `generate`, and `aclose`. `generate`
 yields normalized events; everything else is the core's job:
@@ -58,23 +58,23 @@ That constraint is what makes an adapter small. It is also what makes your provi
 identically to every built-in one without you implementing any of it. The
 [adapter walkthrough](../contributing/writing-an-adapter.md) covers each method's contract
 in detail, and what your models support flows through the same
-[capabilities](../concepts/capabilities.md) system the built-ins use — declare what you
+[capabilities](../concepts/capabilities.md) system the built-ins use; declare what you
 know and leave the rest unknown.
 
-## Declare what your provider needs
+## Declare What Your Provider Needs
 
-The descriptor's `ProviderSetupSpec` is how a configuration UI renders your provider
-without knowing which provider it is: which fields to prompt for, which have sensible
-defaults, which are credentials, and which environment variable each conventionally comes
-from. Fill it in and every AnyInfer-based application can configure your provider.
+The descriptor's `ProviderSetupSpec` is what allows a configuration UI to render your
+provider without knowing which provider it is: which fields to prompt for, which have
+sensible defaults, which are credentials, and which environment variable each
+conventionally comes from. Fill it in and every AnyInfer-based application can configure your provider.
 
-Declare `SetupField.env_var` on any field with a conventional variable — the bare name,
+Declare `SetupField.env_var` on any field with a conventional variable: the bare name,
 `"ACME_API_KEY"`, not the `env://` reference form. It is the machine-readable half of what
-`placeholder` says in prose, and it is what lets `anyinfer init` find your provider already
-usable on somebody's machine, and a config UI say "we found this in your environment",
-without either of them parsing an example sentence.
+`placeholder` says in prose, and it is what allows `anyinfer init` to find your provider
+already usable on somebody's machine, and a config UI to say "we found this in your
+environment", without either of them parsing an example sentence.
 
-## Certify it
+## Certify It
 
 ```bash
 anyinfer conform acme --model acme-large
@@ -104,13 +104,13 @@ retry_after = false   # rate limiting cannot be provoked on demand
 ```
 
 Declaring them in the project file rather than on the command line keeps the claim
-reviewable — "what we do not support" is checked in, not typed once on a bad day.
+reviewable: "what we do not support" is checked in, not typed once on a bad day.
 
 The command exits non-zero on any failure, so your own CI can gate on it. Add
 `--markdown-row` for a pasteable conformance-matrix row, or `--json` for a machine-readable
 report.
 
-## Record what you depend on
+## Record What You Depend On
 
 `contracts/acme.md` is the snapshot of exactly which upstream details your adapter relies
 on: endpoints, auth headers, version pins, fields sent and read, streaming framing, and
@@ -120,7 +120,7 @@ production failure. The in-tree adapters keep the same snapshots under `contract
 written by the procedure in
 [`contracts/NEW-PROVIDER.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/NEW-PROVIDER.md).
 
-## Install and use it
+## Install and Use It
 
 ```bash
 pip install -e ./acme-anyinfer
@@ -131,11 +131,11 @@ client = ai.Client([ai.ProviderSettings.of("acme", api_key="env://ACME_API_KEY")
 client.generate("hello", target="acme:acme-large")
 ```
 
-Nothing in the application changed. If your package fails to load — a bad import, an id
-that collides with a built-in — `anyinfer doctor` says so by name, rather than leaving your
+Nothing in the application changed. If your package fails to load (a bad import, an id
+that collides with a built-in), `anyinfer doctor` says so by name, rather than leaving your
 provider mysteriously absent.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - An endpoint that speaks `/chat/completions` needs no adapter; `openai-compat` with a
       `base_url` covers it.
     - An adapter is four methods that translate protocol. Retry, validation, timing,
@@ -146,7 +146,7 @@ provider mysteriously absent.
     - The contract snapshot records the upstream details you depend on, so provider drift
       is detectable by comparison instead of by production failure.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -1,7 +1,7 @@
-# OpenAI-compatible sidecar
+# OpenAI-Compatible Sidecar
 
 An OpenAI-compatible projection of the same configured hybrid runtime used by the Python
-SDK and command-line tool. It lets existing clients use your hosted, hub, and local routes
+SDK and command-line tool. It allows existing clients to use hosted, hub, and local routes
 without creating a second routing or configuration system.
 
 <div class="anyinfer-hero-diagram" markdown>
@@ -29,7 +29,7 @@ sequenceDiagram
 
 === "Standalone bundle"
 
-    Download the bundle for your platform from [Downloads](../downloads.md), unzip it,
+    Download the platform's bundle from [Downloads](../downloads.md), unzip it,
     then run:
 
     ```bash
@@ -57,7 +57,7 @@ codec plus an ASGI app around a normal `AsyncClient`. No routing, validation, te
 credential, or local-inference code is duplicated, and an architecture test enforces that
 the frontend stays a codec.
 
-## What it serves
+## What It Serves
 
 | Endpoint | Behavior |
 |---|---|
@@ -70,7 +70,7 @@ Embeddings and generated image/audio outputs are out of scope. Typed image, docu
 audio *inputs* are accepted in OpenAI content arrays and capability-gated before dispatch;
 see [multimodal inputs](../concepts/multimodal-inputs.md).
 
-## Model strings are targets
+## Model Strings Are Targets
 
 Every target spelling works in the `model` field, which is what makes federation free:
 
@@ -84,7 +84,7 @@ Every target spelling works in the `model` field, which is what makes federation
 A round-trip test enforces that no target spelling can carry structure an OpenAI `model`
 field cannot.
 
-## What survives the wire, and what does not
+## What Survives the Wire, and What Does Not
 
 **Survives:** text and multimodal message parts, tools, `tool_choice`,
 `response_format.json_schema`, temperature, top-p, max tokens, stop sequences, the stream
@@ -131,13 +131,13 @@ absence of both response forms. See [run manifests](../concepts/run-manifests.md
     anyinfer serve --host 0.0.0.0 --allow-remote-exposure
     ```
 
-## Keeping it running
+## Keeping It Running
 
 `anyinfer serve install` writes the systemd unit, launchd agent, or scheduled task
-that keeps the sidecar up across logins and reboots — after showing you the exact
+that keeps the sidecar up across logins and reboots, after first showing the exact
 file and commands. See [running as a service](running-as-a-service.md).
 
-## Embedding it
+## Embedding It
 
 `create_app` returns a plain ASGI app, mountable in an existing Starlette or FastAPI stack:
 
@@ -147,13 +147,13 @@ from anyinfer.serve import create_app
 app = create_app(async_client, auth_token=token, expose_targets=("anthropic:claude-sonnet-4-5",))
 ```
 
-## Behind a proxy
+## Behind a Proxy
 
 The app sets `X-Accel-Buffering: no` on streaming responses. Without it, reverse proxies
-buffer the whole response and streaming silently stops being streaming — a failure that only
-appears in deployment, never in local testing.
+buffer the whole response and streaming silently stops being streaming (a failure that only
+appears in deployment, never in local testing).
 
-## Oversized conversations
+## Oversized Conversations
 
 The sidecar applies whatever context policy its client was built with, since it is a codec
 over a normal client rather than a second core. Give the shared config a
@@ -177,7 +177,7 @@ superset of OpenAI chat completions, and this is what that superset is for:
 shortened conversation; `true` accepts the defaults. A malformed value is a `400` rather
 than a silent fallback to the gateway's setting.
 
-## Reducing an explicit corpus
+## Reducing an Explicit Corpus
 
 An application can also send an explicit, caller-approved corpus with a request:
 
@@ -211,7 +211,7 @@ running beside the files. [Context reduction](../concepts/context-reduction.md) 
 the strategies; [fit a corpus to a context budget](../guides/fitting-context.md) covers
 choosing one.
 
-## Fixed-target arena requests
+## Fixed-Target Arena Requests
 
 An AnyInfer-aware caller can add `anyinfer_arena` with the complete `ArenaPolicy` field set,
 or use a configured arena name as `model`. The response stays a valid single-choice OpenAI
@@ -224,7 +224,7 @@ reservation, and tool-loop behavior are covered in [arena runs](../concepts/aren
 The sidecar, CLI, and Python SDK use the same
 [shared configuration file](../reference/configuration.md).
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - The sidecar is a wire codec over the same client the SDK uses; routing, credentials,
       telemetry, and context policy come from the shared configuration, not a second
       system.
@@ -236,7 +236,7 @@ The sidecar, CLI, and Python SDK use the same
     - A non-loopback bind requires both `--allow-remote-exposure` and a bearer token, and
       backend credentials never transit the frontend.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

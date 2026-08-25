@@ -61,7 +61,7 @@ Aliases: `azure`, `foundry`.
 
 Sending `max_tokens` to Azure is rejected outright, which is why the subclass exists.
 
-## API versions
+## API Versions
 
 ```python
 ai.ProviderSettings.of("azure-foundry", base_url=..., api_version="2024-10-21")
@@ -79,7 +79,7 @@ result = client.embed(
 )
 ```
 
-`target`'s model half is your deployment name, not necessarily the underlying model's
+`target`'s model half is the deployment name, not necessarily the underlying model's
 catalog id. The same `POST {base_url}/embeddings` surface as chat (deployment-less on
 `/openai/v1`, or `api-version`-pinned on the older surface) speaks the identical
 OpenAI-compatible body.
@@ -87,18 +87,18 @@ OpenAI-compatible body.
 Azure documents the same request ceilings [OpenAI itself does](openai.md#embeddings):
 2,048 inputs per request, 8,192 tokens per input, and 300,000 tokens aggregate. Since the
 deployment name is tenant-chosen, AnyInfer does not declare these as static per-model
-[capabilities](../concepts/capabilities.md); a request larger than what your deployment
+[capabilities](../concepts/capabilities.md); a request larger than what the deployment
 accepts surfaces as a provider error rather than a pre-flight refusal.
 
 ## Troubleshooting
 
-**`could not acquire an Entra token`** — run `az login`, or configure a service principal in
+**`could not acquire an Entra token`**: run `az login`, or configure a service principal in
 the environment. The error names the scope it tried.
 
-**`azure-foundry requires the base URL of your Foundry resource`** — the resource endpoint
+**`azure-foundry requires the base URL of your Foundry resource`**: the resource endpoint
 is deployment-specific and cannot be defaulted.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/azure-foundry.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/azure-foundry.md).

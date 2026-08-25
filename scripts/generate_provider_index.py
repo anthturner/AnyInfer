@@ -54,7 +54,7 @@ HEADER = """---
 icon: material/format-list-bulleted
 ---
 
-# Every provider
+# Every Provider
 
 This is AnyInfer's compatibility inventory, not its primary value proposition:
 **{total} providers** comprising {adapters} dedicated adapters with provider-specific
@@ -78,7 +78,7 @@ result = client.generate(prompt, target="groq:llama-3.3-70b-versatile")
 New to these? Start with [choosing a provider](README.md); the per-provider quirks for
 the preset table are in [hosted & local presets](presets.md).
 
-## Dedicated adapters
+## Dedicated Adapters
 
 These need more than declarative endpoint and auth settings: a native request shape,
 special auth flow, richer discovery, or provider-specific stream handling. Each has its
@@ -95,14 +95,14 @@ These speak the OpenAI chat-completions dialect closely enough that one shared a
 covers them; what differs is declarative — endpoint, auth spelling, token-field name,
 model listing, reasoning translation. See [presets](presets.md) for the quirk notes.
 
-### Hosted services
+### Hosted Services
 
 | Provider | Target | Key (conventional env var) | Notes |
 |---|---|---|---|
 """
 
 LOCAL_INTRO = """
-### Local engines & self-hosted servers
+### Local Engines & Self-Hosted Servers
 
 Local engines need no API key and default to loopback. Where the address is yours — a
 cluster host, a dynamically assigned port — the preset requires a base URL instead.
@@ -112,7 +112,7 @@ cluster host, a dynamically assigned port — the preset requires a base URL ins
 """
 
 FOOTER = """
-## Not yet covered
+## Not Yet Covered
 
 - **Replicate** — its predictions API is asynchronous and per-model, with no
   chat-completions route to normalize; `api.replicate.com/openapi.json` declares 26

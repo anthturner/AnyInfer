@@ -1,10 +1,10 @@
-# Results and stream events
+# Results and Stream Events
 
 The output side: the final `Generation`, its usage and timing, and the typed events a
 stream yields on the way there. Ordering guarantees are documented in
 [the event stream](../../concepts/events.md).
 
-## The final result
+## The Final Result
 
 <div class="anyinfer-api-block" markdown>
 
@@ -40,7 +40,7 @@ stream yields on the way there. Ordering guarantees are documented in
 
 </div>
 
-## Run manifest facets
+## Run Manifest Facets
 
 <div class="anyinfer-api-block" markdown>
 
@@ -84,7 +84,7 @@ stream yields on the way there. Ordering guarantees are documented in
 
 </div>
 
-## Stream events
+## Stream Events
 
 <div class="anyinfer-api-block" markdown>
 

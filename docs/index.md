@@ -36,6 +36,10 @@ hide:
 
 </div>
 
+AnyInfer provides a provider-independent inference runtime for Python applications that
+span hosted providers and local models, as well as an OpenAI-compatible sidecar for
+everything that is not Python.
+
 ## Install
 
 ```bash
@@ -46,18 +50,18 @@ The core depends on only `httpx2` and `jsonschema`. Provider SDKs, the sidecar, 
 demo app are optional extras. Local inference is part of the core. See
 [installation and extras](guides/installation.md).
 
-## What makes this different
+## What Makes This Different
 
-Most libraries in this space solve *provider switching* — one function, many APIs, one
+Most libraries in this space solve *provider switching*: one function, many APIs, one
 response shape. AnyInfer solves the problem that starts right after: being correct about
 what you sent, what you got back, what it cost, and what quietly didn't happen.
 
 - **Your fallback chain has a real test, with no credentials and no network.** The test
-  kit ships with the library — script a 503, a malformed schema response, a rate limit —
-  and assert on the recovery, not on a mock of your own wrapper.
+  kit ships with the library (script a 503, a malformed schema response, a rate limit)
+  and allows you to assert on the recovery, not on a mock of your own wrapper.
   [→ Testing your app](guides/testing-your-app.md)
 - **Every number says where it came from.** A context window, a price, a feature flag is
-  tagged cataloged, discovered, probed, or defaulted — and an unknown cost is `None`,
+  tagged cataloged, discovered, probed, or defaulted, and an unknown cost is `None`,
   never `$0.00`. [→ Capabilities and provenance](concepts/capabilities.md)
 - **Structured output is a contract.** A request carrying a schema always returns a
   client-side-validated result, using the strongest mechanism the provider offers, with
@@ -69,7 +73,7 @@ what you sent, what you got back, what it cost, and what quietly didn't happen.
   tests. [→ Comparing targets](guides/comparing-targets.md)
 - **A local model is a target, not a separate product.** Point the same call at
   `llama-cpp:qwen3-8b-q4-k-m` and AnyInfer acquires, verifies, and supervises the
-  weights itself — same fallback chain, event stream, and structured-output contract,
+  weights itself: same fallback chain, event stream, and structured-output contract,
   no separate daemon. [→ Run a model locally](guides/local-inference.md)
 - **Context engineering is part of dispatch.** A provenance-aware budget estimates
   input, reserve, and cost before a call; deterministic reducers fit approved corpora
@@ -78,7 +82,7 @@ what you sent, what you got back, what it cost, and what quietly didn't happen.
 
 **→ [Read the full case, with runnable proof for every claim](why-anyinfer.md).**
 
-### One engine, four kinds of target
+### One Engine, Four Kinds of Target
 
 | Environment | Examples | What AnyInfer owns |
 |---|---|---|
@@ -87,13 +91,13 @@ what you sent, what you got back, what it cost, and what quietly didn't happen.
 | Existing local service | Ollama, LM Studio, vLLM | Native or compatible client behavior; the service keeps process ownership |
 | Managed local runtime | `llama.cpp` | Runtime and model acquisition, hardware fit, tuning, supervision, and loopback lifecycle |
 
-**→ [See the compatibility inventory](providers/all.md)** — dedicated protocol adapters
+**→ [See the compatibility inventory](providers/all.md)**: dedicated protocol adapters
 and declarative presets, from frontier APIs to local engines, with
 [per-provider guides](providers/README.md). Embeddings and reranking are typed, routed
-operations on the same client — see
+operations on the same client; see
 [embeddings and reranking](concepts/embeddings.md).
 
-## Next steps
+## Next Steps
 
 <div class="grid cards" markdown>
 
@@ -111,14 +115,14 @@ operations on the same client — see
 
 - **Want existing OpenAI clients to use the same route?**
 
-    Run the [sidecar](serve/README.md) — an OpenAI-compatible loopback service.
+    Run the [sidecar](serve/README.md), an OpenAI-compatible loopback service.
     Anything that can point at an OpenAI base URL can use the providers, routes, and
     local models you configured.
 
 - **Just want to see it?**
 
     The [pack-in demo app](guides/demo-app.md) runs fully offline against in-process
-    fakes — no credentials required. Grab a standalone build from
+    fakes (no credentials required). Grab a standalone build from
     [Downloads](downloads.md).
 
 </div>

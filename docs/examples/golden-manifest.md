@@ -1,7 +1,7 @@
-# Regression-test fallback and repair
+# Regression-Test Fallback and Repair
 
-This test asserts the part of inference that should be deterministic — which route ran and
-which mechanism enforced the schema — and it runs offline: a scripted provider and stored
+This test asserts the part of inference that should be deterministic (which route ran and
+which mechanism enforced the schema), and it runs offline: a scripted provider and stored
 fixtures, no network, no spend. The pytest plugin stores the normalized
 [run manifest](../concepts/run-manifests.md) in `manifests/fallback-and-repair.json`
 beside the test.
@@ -42,7 +42,7 @@ Create or refresh goldens with `pytest --update-manifests`, and review the JSON 
 a behavior change: a different target, extra attempt, weaker schema mechanism, or new
 reduction should be intentional.
 
-## What to notice
+## What to Notice
 
 - The golden file is a normalized run manifest, so the assertion covers route, attempts,
   and schema mechanism rather than model prose.
@@ -50,10 +50,10 @@ reduction should be intentional.
   `anyinfer_scripted` and `anyinfer_golden_manifest` fixtures come from the pytest plugin
   described in [testing your application offline](../guides/testing-your-app.md).
 - A golden manifest asserts "did this run's behavior change"; `compare_diff` asserts "did
-  this request's resolution change" — see
+  this request's resolution change"; see
   [the portability diff](../guides/comparing-targets.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

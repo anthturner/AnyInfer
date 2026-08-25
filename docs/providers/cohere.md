@@ -32,10 +32,10 @@ client = ai.Client(
 result = client.generate(prompt, target="cohere:command-a-03-2025")
 ```
 
-## Dialect differences
+## Dialect Differences
 
 Cohere's API diverges from the OpenAI shape in ways the adapter normalizes, but which
-show up if you reach past it with `provider_options`:
+show up when reaching past it with `provider_options`:
 
 | AnyInfer | Cohere |
 |---|---|
@@ -57,20 +57,20 @@ blocks arrive as `ReasoningDelta` events on the
 result = client.generate(prompt, target="cohere:command-a-03-2025", reasoning="high")
 ```
 
-## Usage accounting
+## Usage Accounting
 
-Cohere reports both `billed_units` and `tokens`. AnyInfer's counts follow `tokens` —
-what the model actually processed, which is what a context window measures:
+Cohere reports both `billed_units` and `tokens`. AnyInfer's counts follow `tokens`
+(what the model actually processed, which is what a context window measures):
 
 ```python
 result = client.generate(prompt, target="cohere:command-a-03-2025")
 print(result.usage.input_tokens)  # processed
 ```
 
-If you need billed units for cost reconciliation, build the client with `retain_raw=True`
+If billed units are needed for cost reconciliation, build the client with `retain_raw=True`
 and read them off `result.raw`.
 
-## Grounded generation
+## Grounded Generation
 
 ```python
 client.generate(
@@ -89,7 +89,7 @@ Document grounding and citations are reachable through the
 [escape hatch](README.md#reaching-provider-specific-parameters). Citations are not yet
 surfaced as typed results; read them from `result.raw` until they are modeled.
 
-## Embeddings and reranking
+## Embeddings and Reranking
 
 Cohere serves both operations natively (`POST /v2/embed`, `POST /v2/rerank`), and is the
 first provider here with native [input intents](../concepts/embeddings.md#input-intent)
@@ -112,7 +112,7 @@ ranked = client.rerank(
 Three things worth knowing:
 
 - **`input_type` is required.** Cohere's embed API demands an intent and documents no
-  default, so an intent-less `embed()` is refused with a hint rather than guessed —
+  default, so an intent-less `embed()` is refused with a hint rather than guessed;
   query and document embeddings are not comparable unless produced with matching
   intents.
 - **Batching engages at 96 inputs.** The endpoint accepts at most 96 texts per call;
@@ -120,7 +120,7 @@ Three things worth knowing:
   re-assembled in input order, invisibly. Requested `dimensions` are forwarded as
   `output_dimension` (embed-v4 models only).
 - **Rerank usage is search units, not tokens.** Live rerank responses report only
-  `billed_units.search_units`, which AnyInfer never encodes as fake token counts — so
+  `billed_units.search_units`, which AnyInfer never encodes as fake token counts, so
   `result.usage` is typically empty for rerank. The billed units are on
   `result.raw["meta"]["billed_units"]` for cost reconciliation.
 
@@ -136,16 +136,16 @@ for model in client.models("cohere"):
         print(model.id, caps.context_window.value, caps.context_window.provenance)
 ```
 
-Every model is listed — embedding and rerank models included — with its operations
+Every model is listed (embedding and rerank models included), with its operations
 derived from the listing's `endpoints` field, so `client.models("cohere",
 operation="embedding")` answers from discovery rather than a guess.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/cohere.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/cohere.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

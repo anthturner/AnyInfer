@@ -1,4 +1,4 @@
-# Telemetry and observers
+# Telemetry and Observers
 
 The telemetry contract is **typed in-process events delivered to registered observers**.
 OpenTelemetry is an optional bridge over that contract, not the contract itself.
@@ -35,17 +35,17 @@ client = ai.Client(providers, observers=[Recorder()])
 client.subscribe(Recorder())
 ```
 
-Observers are synchronous and dispatched inline, so keep `on_event` fast — queue anything
+Observers are synchronous and dispatched inline, so keep `on_event` fast; queue anything
 slow. An observer that raises is isolated: the exception is swallowed and warned about once,
 because a broken telemetry sink must never fail a generation.
 
-## The events
+## The Events
 
 **Request lifecycle:** `RequestStarted` · `TargetResolved` · `AttemptStarted` · `FirstToken`
 · `AttemptCompleted` · `RetryScheduled` · `FallbackTriggered` · `RepairAttempted` ·
 `RequestCompleted` · `RequestFailed`
 
-**Degradation** — the ones that make silent failures visible:
+**Degradation**: the ones that make silent failures visible:
 
 | Event | Emitted when |
 |---|---|
@@ -53,18 +53,18 @@ because a broken telemetry sink must never fail a generation.
 | `UsageEstimated` | A usage figure was derived rather than reported. |
 | `ProviderDiagnostic` | A provider reported something about its own runtime. |
 
-Anything AnyInfer drops or estimates is observable — a degraded request always leaves
+Anything AnyInfer drops or estimates is observable; a degraded request always leaves
 evidence.
 
 `ProviderDiagnostic` covers the case the other two cannot: the request worked, nothing was
 dropped or estimated, and it still took thirty seconds because the model had spilled out of
 VRAM since yesterday. See [runtime diagnostics](capabilities.md#runtime-diagnostics).
 
-**Context reduction:** `ContextReduced` — counts and ceilings only, never content.
+**Context reduction:** `ContextReduced` (counts and ceilings only, never content).
 
 **Local subsystem:** `ServerLifecycle` · `DownloadProgress`
 
-## Payloads are off by default
+## Payloads Are Off by Default
 
 Prompt and response text are `None` unless an observer explicitly opts in:
 
@@ -76,13 +76,13 @@ client.subscribe(metrics)  # never does
 Stripping happens **per observer**, so one payload-consuming sink does not leak text to the
 others. Everything still passes redaction first.
 
-## Correlating events
+## Correlating Events
 
 Every request-lifecycle event carries a `request_id`. A fallback chain that tried three
 targets emits one `RequestStarted` and one terminal event with the same id, so a trace reads
 as a single request rather than three disconnected ones.
 
-## The OpenTelemetry bridge
+## The OpenTelemetry Bridge
 
 ```python
 from anyinfer import otel
@@ -91,14 +91,14 @@ otel.install(client)  # spans and metrics, payload-free
 ```
 
 Requires the `[otel]` extra; nothing OTel-related is imported otherwise. What the bridge
-emits — one span per request, attempts as span events, GenAI semantic-convention metrics —
+emits (one span per request, attempts as span events, GenAI semantic-convention metrics)
 is covered in [the observability guide](../guides/observability.md#opentelemetry).
 
 The bridge is one consumer of the event contract. Applications that want structured data
-in-process — a JSONL trail, a SQLite evidence table — consume the events directly rather
+in-process (a JSONL trail, a SQLite evidence table) consume the events directly rather
 than round-tripping through spans.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Telemetry is typed in-process events to registered observers; OpenTelemetry is an
       optional bridge, not the contract itself.
     - Prompt and response payloads are off by default, per observer, so one consumer's
@@ -106,7 +106,7 @@ than round-tripping through spans.
     - Degradation is observable: `ParameterDropped` and `UsageEstimated` mean a dropped
       parameter or a derived usage figure always leaves evidence.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

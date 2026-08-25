@@ -2,13 +2,13 @@
 
 Three supported production paths share the same core behavior and
 [configuration file](../reference/configuration.md); only the process boundary changes.
-Not every application needs this layer at all — if a provider-switching client, an
+Not every application needs this layer at all; if a provider-switching client, an
 organization gateway, or a dedicated local server already solves your whole problem,
 [why and when to use AnyInfer](../why-anyinfer.md) names the better-shaped tool.
 
 The [quickstart](quickstart.md) is the shortest path from installation to a result.
 
-## Choose a path
+## Choose a Path
 
 **Embed the [Python SDK](python-sdk.md)** when you are writing Python and want typed
 results, the event stream, and in-process telemetry. The cost: AnyInfer is in your
@@ -24,8 +24,8 @@ anyinfer serve --config anyinfer.json
 ```
 
 The cost: an HTTP hop, and the OpenAI wire format cannot carry AnyInfer-native
-observability — timing marks and attempt records have no chunk representation, though
-usage and finish reasons survive.
+observability (timing marks and attempt records have no chunk representation, though
+usage and finish reasons survive).
 
 **Use [`anyinfer run`](cli.md)** when a person or a shell script needs one answer with
 no server left running. The cost: process startup per call and no state between calls;
@@ -45,10 +45,10 @@ The paths compose: `anyinfer.serve.create_app(async_client, auth_token=token)` r
 a plain ASGI app, mountable inside an existing Starlette or FastAPI application, so one
 process can embed the SDK and expose the frontend.
 
-To evaluate everything offline first, the [reference application](demo-app.md) runs
-against in-process fakes with no credentials.
+In order to evaluate everything offline first, the [reference application](demo-app.md)
+runs against in-process fakes with no credentials.
 
-## Python tasks
+## Python Tasks
 
 - [Stream typed events](streaming.md)
 - [Enforce a JSON schema](structured-output.md)
@@ -72,7 +72,7 @@ against in-process fakes with no credentials.
 - [Confidentiality tiers](confidentiality-tiers.md): protecting prompt IP shipped to
   customer machines, including the SOC 2 control mapping.
 
-## Coding agents
+## Coding Agents
 
 - [Coding agents](coding-agents.md): `anyinfer agents-md`, `llms.txt`, and the
   [integration procedure](../agents/INTEGRATION.md) a skill can execute.

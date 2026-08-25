@@ -1,15 +1,15 @@
-# Cost and spending
+# Cost and Spending
 
 AnyInfer computes what each call cost, keeps a per-client spend ledger, and can refuse a
 request before it crosses a ceiling. One rule underlies all three: an unknown cost is
 reported as unknown, never rendered as zero.
 
-## Cost is tri-state
+## Cost Is Tri-State
 
 | State | Meaning | How it renders |
 |---|---|---|
 | A number | Computed from trusted pricing and provider-reported usage | `0.004125` |
-| `None` | Unknown — no pricing, or pricing that is not trusted | `unknown`, never `$0.00` |
+| `None` | Unknown: no pricing, or pricing that is not trusted | `unknown`, never `$0.00` |
 | `Decimal(0)` | Genuinely free, as local inference is | `0.000000` |
 
 Rendering an unknown cost as `$0.00` turns a reporting gap into a silent accounting error.
@@ -21,11 +21,11 @@ Cost is computed centrally, from pricing whose
 `probed`, or `override`), so every provider reports it identically. A descriptor-level
 fallback price is a placeholder and never produces money.
 
-## Where prices come from
+## Where Prices Come From
 
 A bundled pricing table supplies the `catalog` layer for hosted models. Each entry records
 when it was last verified and against what source; a weekly repository check watches for
-drift, and `fetch_pricing()` pulls the maintained file for numbers newer than your
+drift, and `fetch_pricing()` pulls the maintained file for numbers newer than the
 installed release. Prices are keyed by provider *and* model, because the same model served
 by a different engine may cost differently. On top of the table:
 
@@ -36,13 +36,13 @@ by a different engine may cost differently. On top of the table:
   is a real zero, not an unknown.
 - [Azure AI Foundry](../providers/azure-foundry.md) and the Copilots ship no table
   entries: Foundry pricing is region- and deployment-specific, and Copilot bills by
-  subscription rather than per token. Their costs stay `None` unless you
-  [override](capabilities.md#overriding-capabilities).
+  subscription rather than per token. Their costs stay `None` unless
+  [overridden](capabilities.md#overriding-capabilities).
 
 How the bundled table is checked for drift is a contributor concern; see
 [the scheduled repository checks](../contributing/automation.md#scheduled-repository-checks).
 
-## What one call cost
+## What One Call Cost
 
 ```python
 result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")
@@ -55,7 +55,7 @@ result.usage.cache_read_tokens  # served from the provider's prompt cache
 Check `cost_usd` for `None` before formatting it. The `cache_read_tokens` field is how
 [prompt caching](caching.md) shows up in the bill.
 
-## What this client has spent
+## What This Client Has Spent
 
 ```python
 ledger = ai.SpendLedger()
@@ -75,7 +75,7 @@ if not totals.complete:
     print(f"{totals.unknown_requests} of {totals.requests} calls could not be priced")
 ```
 
-Break spending down by target, or by your own labels:
+Break spending down by target, or by the application's own labels:
 
 ```python
 client.generate(prompt, target=..., metadata={"tenant": "acme", "feature": "summarize"})
@@ -84,14 +84,14 @@ ledger.by_target()  # {"anthropic:claude-sonnet-4-5": SpendTotals(...)}
 ledger.by_label("tenant")  # {"acme": SpendTotals(...), "globex": SpendTotals(...)}
 ```
 
-The library never interprets the labels. Tenant, feature, job id — that vocabulary is
-yours, carried through untouched.
+The library never interprets the labels. Tenant, feature, job id: that vocabulary is
+the application's, carried through untouched.
 
 There is no process-wide ledger. Two clients that should share a total are given the same
 `SpendLedger` object; a global would make totals depend on import order and would merge
 the accounting of unrelated libraries sharing a process.
 
-## Stopping before you spend too much
+## Stopping Before You Spend Too Much
 
 ```python
 client = ai.Client(
@@ -102,15 +102,15 @@ client = ai.Client(
 
 A ceiling is checked before dispatch, beside the [context gate](budgeting.md), so a
 refusal costs nothing. Crossing it raises
-[`SpendLimitError`](../reference/errors.md), which carries the ceiling, what you had
-already spent, and the estimate that tripped it, so you can see the arithmetic and not
-just the verdict.
+[`SpendLimitError`](../reference/errors.md), which carries the ceiling, what had
+already been spent, and the estimate that tripped it, so the arithmetic is visible and
+not just the verdict.
 
 The estimate is the high end of the
-[preflight cost range](budgeting.md#estimated-cost) — the pessimistic number, since a
+[preflight cost range](budgeting.md#estimated-cost): the pessimistic number, since a
 guard built on the optimistic one would admit requests it was meant to stop.
 
-### When the cost cannot be known
+### When the Cost Cannot Be Known
 
 ```python
 ai.SpendPolicy(max_total_usd=Decimal("25"), on_unknown="refuse")
@@ -125,7 +125,7 @@ A refusal is not a [routing](routing.md) signal. It leaves the router entirely r
 than falling back to a cheaper target: a ceiling is client-wide, so a different target
 does not satisfy it.
 
-## Keeping a total across restarts
+## Keeping a Total Across Restarts
 
 The library writes nothing on its own. For durability, own the file:
 
@@ -144,7 +144,7 @@ This is accounting for one client in one process. It cannot see other processes 
 consumers of the same API key. Organization-wide quotas and fleet-level spend controls
 belong to a deployment around AnyInfer, not inside it.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Cost is tri-state: a number from trusted pricing, a genuine `Decimal(0)` for local
       inference, or `None` for unknown. `None` is never rendered as `$0.00`.
     - Read `SpendTotals.cost` together with `unknown_requests`; a total is only honest
@@ -154,7 +154,7 @@ belong to a deployment around AnyInfer, not inside it.
       `on_unknown="refuse"` to fail instead.
     - Durable totals are opt-in via `SpendStore`; the library writes nothing on its own.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -1,4 +1,4 @@
-# Run the tool loop
+# Run the Tool Loop
 
 `run_tools` runs the generate, call tools, feed results back loop for you, with bounded
 rounds and normalized errors:
@@ -32,7 +32,7 @@ print(result.text)
 The decorator derives the JSON schema from your signature and the description from your
 docstring, so a tool is declared once rather than kept in sync with a hand-written schema.
 
-## Supported parameter types
+## Supported Parameter Types
 
 `str`, `int`, `float`, `bool`, `list`, `dict`, their parameterized forms (`list[str]`), and
 `Optional[T]`. Anything else raises `ToolLoopError` when the tool is declared, before a
@@ -40,7 +40,7 @@ schema that misdescribes the tool ever reaches a model.
 
 Parameters with defaults are optional; the rest are required.
 
-## Errors reach the model, not you
+## Errors Reach the Model, Not You
 
 A tool that raises becomes an error-flagged result the model can react to:
 
@@ -55,7 +55,7 @@ The model sees `ConnectError: connection refused` as a tool result and can apolo
 different URL, or give up — all ordinary conversation. Only loop-level faults raise to you:
 an unknown tool, or an exhausted round budget.
 
-## The round bound
+## The Round Bound
 
 `max_rounds` (default 8) bounds the loop, because a model that keeps calling tools would
 otherwise never terminate:
@@ -67,20 +67,20 @@ except ai.ToolLoopError as error:
     log.warning("%s (%s)", error.detail, error.hint)
 ```
 
-## Execution is sequential
+## Execution Is Sequential
 
 v1 dispatches tool calls one at a time, in the order the model requested. Parallel
 execution is deferred: it raises cancellation and ordering questions that no current
 consumer needs answered.
 
-## Naming and overrides
+## Naming and Overrides
 
 ```python
 @ai.tool(name="search_docs", description="Search the documentation index.")
 def search(query: str, limit: int = 10) -> list: ...
 ```
 
-Plain functions work too — `run_tools(tools=[my_function])` wraps them automatically.
+Plain functions work too: `run_tools(tools=[my_function])` wraps them automatically.
 
 ## Async
 
@@ -94,9 +94,9 @@ The loop executes whatever the model asks for, within the tools you provide. Tre
 implementations as a security boundary: validate paths, bound sizes and durations, and do
 not expose a tool that runs arbitrary commands unless that is genuinely your intent.
 
-## Tools from an MCP server
+## Tools from an MCP Server
 
-Model Context Protocol servers distribute tools — filesystems, databases, internal APIs —
+Model Context Protocol servers distribute tools (filesystems, databases, internal APIs)
 behind one protocol, and AnyInfer can use one as a source of tools for the loop above:
 
 ```bash
@@ -120,7 +120,7 @@ async with await MCPToolset.connect(
 same rule that a failing tool becomes a result the model can recover from. Names are
 namespaced by server (`fs__read_file`), so two servers offering `search` do not collide.
 
-### Describing servers in configuration
+### Describing Servers in Configuration
 
 ```json
 {
@@ -150,12 +150,12 @@ fs__read_file    Read a file from the allowed directory  [read-only — server's
 fs__list_dir     List entries in a directory             [read-only — server's claim]
 ```
 
-### What is not supported
+### What Is Not Supported
 
-- **Sampling** — a server asking the client to run a generation. Honoring that would let a
+- **Sampling**: a server asking the client to run a generation. Honoring that would let a
   remote server drive inference through your credentials, so it is not implemented.
-- **Prompts, resources, and roots** — out of scope; this integration is a tool source.
-- **AnyInfer as an MCP server** — non-Python clients reach your models through the
+- **Prompts, resources, and roots**: out of scope; this integration is a tool source.
+- **AnyInfer as an MCP server**: non-Python clients reach your models through the
   [OpenAI-compatible sidecar](../serve/README.md) instead.
 
 ### Trust
@@ -167,7 +167,7 @@ and `allow_tools`/`deny_tools` narrow what a server may expose. Annotations such
 `ToolSpec.annotations` so your code can reason about them, and never grants access, skips a
 step, or auto-approves anything because a server said it was safe.
 
-### Testing it
+### Testing It
 
 The [test kit](testing-your-app.md)'s in-process fake MCP server makes an MCP-fed tool loop
 testable without a subprocess:
@@ -182,7 +182,7 @@ toolset = await MCPToolset.connect(
 )
 ```
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - A tool is declared once: the schema comes from the signature, the description from
       the docstring, and an unsupported parameter type fails at declaration rather than
       misdescribing the tool to a model.
@@ -194,7 +194,7 @@ toolset = await MCPToolset.connect(
       claims: narrow exposure with `allow_tools`/`deny_tools` and validate inside your
       tool implementations.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

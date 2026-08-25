@@ -10,18 +10,18 @@ pip install anyinfer
 ```
 
 The core depends on `httpx2` and `jsonschema` and nothing else. Providers that need more
-come as extras — see [installation](installation.md).
+come as extras; see [installation](installation.md).
 
 The fastest start is `anyinfer init`: it inspects the machine, reports which providers
 are already usable (a running Ollama, a set credential variable), and writes a valid
-`anyinfer.json` plus a runnable `starter.py` — without ever storing a secret or
+`anyinfer.json` plus a runnable `starter.py`, without ever storing a secret or
 installing anything. The
 [CLI guide](cli.md#getting-a-config-file-in-the-first-place) covers what it detects and
 its flags. The file it writes is the
 [shared configuration](../reference/configuration.md) the SDK, CLI, and sidecar all
 read.
 
-## Your first call
+## Your First Call
 
 === "Sync"
 
@@ -93,7 +93,7 @@ Using the stream as a context manager matters: leaving the block early cancels t
 in-flight request instead of letting it run on. See
 [stream typed events](streaming.md).
 
-## Aliases: don't hardcode model names
+## Aliases: Don't Hardcode Model Names
 
 `small`, `medium`, and `large` resolve to a concrete model for whichever provider you
 have configured:
@@ -112,7 +112,7 @@ result = client.generate(prompt, target="medium")  # -> ollama, since it is list
 The order you configure providers is the preference order. See
 [targets and aliases](../concepts/targets.md).
 
-## Structured output
+## Structured Output
 
 Pass a JSON schema and get back a validated Python value:
 
@@ -138,10 +138,10 @@ print(result.structured_mechanism)  # "json_schema", "grammar", "json_mode", or 
 ```
 
 AnyInfer uses the strongest mechanism the provider supports, then validates the result
-against *your* schema regardless. `repair` lets the model correct itself once if it
+against *your* schema regardless. `repair` allows the model to correct itself once if it
 gets the shape wrong. See [structured output](../concepts/structured-output.md).
 
-## Fallback chains
+## Fallback Chains
 
 ```python
 route = ai.Route(
@@ -159,24 +159,24 @@ for attempt in result.attempts:
 Every result carries its full routing trail, so "why was this slow?" is answerable
 after the fact. See [routing and rate limits](../concepts/routing.md).
 
-## Beyond generation
+## Beyond Generation
 
-The same client embeds and reranks (`client.embed()`, `client.rerank()`) — typed and
+The same client embeds and reranks (`client.embed()`, `client.rerank()`), typed and
 routed like generation, with a
 [safety rule](../concepts/embeddings.md#the-embedding-space-safety-rule) that keeps
 fallback from mixing incompatible vector spaces. And a local model is just another
 target: with `llama-cpp` configured, one `generate()` call downloads a pinned,
-hash-verified model, tunes a server for your hardware, and answers on loopback — see
+hash-verified model, tunes a server for your hardware, and answers on loopback; see
 [run a model locally](local-inference.md).
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - One call shape covers every provider; only the `target=` string changes.
     - Credentials are references (`env://…`), resolved once and redacted everywhere.
     - A schema is validated client-side no matter which mechanism the provider offers.
     - Every result carries its attempt trail, so routing decisions are inspectable
       after the fact.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

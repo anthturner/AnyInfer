@@ -1,4 +1,4 @@
-# Testing guide
+# Testing Guide
 
 How to run and write tests for AnyInfer itself. If you are testing an application that
 *uses* AnyInfer, the guide is
@@ -18,7 +18,7 @@ workspace check                            # the gate: everything, plus lint/typ
 
 `workspace test` cannot run the whole suite, by design. `check` runs
 [the quality gates](README.md#the-quality-gates) and is the only thing that tells you the
-suite passes, so there is exactly one answer to "is it green" — `test` tells you the code
+suite passes, so there is exactly one answer to "is it green"; `test` tells you the code
 you are editing still works, which is a different question.
 
 The fast track skips two markers:
@@ -26,13 +26,13 @@ The fast track skips two markers:
 | Marker | What it covers | Run it when |
 |---|---|---|
 | `exhaustive` | The full preset matrix: eighty-six presets through every conformance case. Half the suite's wall time, and it re-proves the *shared* OpenAI dialect. | You changed `openai_compat.py`, a preset entry, or the conformance suite itself. |
-| `slow` | Packaging and subprocess builds. | Before committing — `check` runs it. |
+| `slow` | Packaging and subprocess builds. | Before committing; `check` runs it. |
 
 Adding or editing one adapter changes nothing either marker covers, which is the point:
 that work needs its own module and the shared invariants, not the other twenty adapters.
 
-Everything runs in parallel by default (`pytest-xdist`, `-n auto`), which is worth roughly
-a sevenfold speedup: every test builds its own in-process fakes, so there is nothing to
+Everything runs in parallel by default (`pytest-xdist`, `-n auto`), which is worth a ~7x
+speedup: every test builds its own in-process fakes, so there is nothing to
 share and nothing to serialize on. Pass `-j0` to debug in a single process.
 
 Raw pytest still works, and is what you want for a single test:
@@ -48,11 +48,11 @@ pytest -q --durations=15                   # find slow tests
 unclosed event loop fails the suite. That strictness caught three real concurrency bugs
 in the llama-server supervisor.
 
-## Where a test belongs
+## Where a Test Belongs
 
 | Testing | Put it in |
 |---|---|
-| A behavior every provider must have | `testing/conformance.py` — [the conformance suite](conformance.md) |
+| A behavior every provider must have | `testing/conformance.py` ([the conformance suite](conformance.md)) |
 | One provider's dialect quirks | `tests/test_<provider>.py` |
 | Core logic (routing, schema, events) | The matching `tests/test_*.py` |
 | A serve-frontend invariant | `tests/test_openai_roundtrip.py` |
@@ -60,7 +60,7 @@ in the llama-server supervisor.
 If a behavior should hold for *all* providers, it belongs in the conformance suite so it is
 checked for all of them, not just the one you were looking at.
 
-## Fakes, not sockets
+## Fakes, Not Sockets
 
 ```python
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
@@ -103,7 +103,7 @@ touching disk, so a committed cassette cannot carry a key. The record, replay, a
 API is under [recording](../reference/api/testing.md#recording), and
 [contributing a cassette](conformance.md#contributing-a-cassette) covers the workflow.
 
-## Writing good tests here
+## Writing Good Tests Here
 
 **Name the behavior, not the function.**
 
@@ -132,9 +132,9 @@ suite exist because a comparable tool shipped that exact bug.
 
 ## Async
 
-`asyncio_mode = "auto"` is set — write `async def test_...` with no decorator.
+`asyncio_mode = "auto"` is set; write `async def test_...` with no decorator.
 
-## Subprocess tests
+## Subprocess Tests
 
 `tests/test_local_server.py` spawns a fake `llama-server` (a Python script behind a
 platform-appropriate shim) rather than requiring a real llama.cpp build. It exercises the

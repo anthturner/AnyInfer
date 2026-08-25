@@ -1,17 +1,17 @@
-# The model catalog
+# The Model Catalog
 
 The catalog answers three questions in sequence: what local models exist, whether this
 machine can run them, and how a pick becomes verified bytes an engine can load. It serves
 two shapes of caller over the same data:
 
-- *"Just give me a good default"* — the tier ladder: `small`, `medium`, `large`.
-- *"Let me see what I could run"* — the model catalog: forty-odd curated local models,
-  each annotated with whether your machine can run it.
+- *"Just give me a good default"*: the tier ladder (`small`, `medium`, `large`).
+- *"Let me see what I could run"*: the model catalog, forty-odd curated local models,
+  each annotated with whether this machine can run it.
 
 They are bridged, not merged: a user's pick from the catalog flows into the ladder, so an
 application can offer both without maintaining two code paths.
 
-## What is in it
+## What Is in It
 
 `models.json` ships with AnyInfer and holds one row per logical model:
 
@@ -29,9 +29,9 @@ entry.channels  # ('llama-cpp', 'ollama')
 entry.est_file_bytes  # 4683073632
 ```
 
-Each entry carries a quantization ladder — the same model at Q8_0, Q6_K, Q5_K_M, and
-Q4_K_M — because "which model" and "at what quality" are different questions, and the
-second depends on your hardware:
+Each entry carries a quantization ladder (the same model at Q8_0, Q6_K, Q5_K_M, and
+Q4_K_M), because "which model" and "at what quality" are different questions, and the
+second depends on the hardware:
 
 ```python
 for variant in entry.variants_for("llama.cpp"):
@@ -52,7 +52,7 @@ Every row also states its `kind`: `"generation"` (the default) or `"embedding"`.
 acquired identically, so they share one table. An embedding row carries `dimensions` and
 `max_input_tokens`, budgets memory from its own architecture rather than a chat model's,
 reports only the `embedding` operation so a chat request never routes to it, and is
-excluded from the `small`/`medium`/`large` ladder — those tiers answer "how big a chat
+excluded from the `small`/`medium`/`large` ladder; those tiers answer "how big a chat
 model should I run", which an embedding model has no answer to.
 
 ```python
@@ -64,9 +64,9 @@ for entry in catalog.models_for(kind="embedding"):
 `long-context`, and nine others); a free-text tag set would drift into synonyms nobody
 can filter on.
 
-## Will it run?
+## Will It Run?
 
-`local_catalog()` classifies every entry against your machine:
+`local_catalog()` classifies every entry against this machine:
 
 ```python
 view = client.local_catalog("llama-cpp", best_at="coding")
@@ -94,11 +94,11 @@ entry.fit.reasons
 #   throughput on this NVIDIA device')
 ```
 
-### When the model runs somewhere else
+### When the Model Runs Somewhere Else
 
 Ollama can point at another machine, and probing *this* machine would then describe the
 wrong computer. Since no Ollama API reports its host's specifications, the view says so
-instead of guessing, and you can supply the numbers:
+instead of guessing, and allows the caller to supply the numbers:
 
 ```python
 view = await client.local_catalog("ollama")
@@ -111,9 +111,9 @@ view.hardware_source  # 'provided'
 
 Anything omitted stays unknown rather than becoming zero. A remote engine may also sit
 behind a metered proxy, so its per-token cost reports as unknown rather than the genuine
-zero a loopback engine gets — see [cost](cost.md).
+zero a loopback engine gets; see [cost](cost.md).
 
-## Using a pick as your default tier
+## Using a Pick as Your Default Tier
 
 The bridge between the two shapes is one call:
 
@@ -125,10 +125,10 @@ client.generate(prompt, target="medium")  # now resolves to the user's pick
 ```
 
 Overlays produce new catalogs rather than mutating shared ones. Applications can overlay
-whole model entries the same way — the supported route for models the bundled catalog
+whole model entries the same way: the supported route for models the bundled catalog
 excludes, such as anything under non-commercial or research-only terms.
 
-## Acquiring a pick
+## Acquiring a Pick
 
 ```python
 report = client.acquire_model("qwen2.5-7b-instruct", progress=on_progress)
@@ -140,13 +140,13 @@ The quantization is chosen, not assumed: the highest-quality rung whose weights 
 cache* fit the memory budget, preferring a rung resident on the GPU over a better one
 that would page through the CPU. Below Q4, the policy prefers a smaller model at a good
 quantization over a bigger model at a bad one, so when nothing at Q4_K_M or better fits,
-acquisition refuses with the arithmetic rather than handing you a two-bit quantization.
+acquisition refuses with the arithmetic rather than handing back a two-bit quantization.
 Pass `local.VariantPrefs(allow_low_quality=True)` to override. For vLLM the ladder has
 hard hardware gates (FP8 needs NVIDIA compute capability 8.9, Marlin GPTQ 8.0, AWQ 7.5);
 an unreported capability excludes a gated variant, since guessing produces a download
 that fails at model load.
 
-### Know the cost before you pay it
+### Know the Cost Before You Pay It
 
 ```python
 report = await client.acquire_model("gpt-oss-120b", dry_run=True)
@@ -156,7 +156,7 @@ report.plan.already_have_bytes  # what a previous interrupted run already fetche
 report.plan.remaining_bytes  # what this run would actually transfer
 ```
 
-Nothing is written — this is what an application needs to put a real confirmation dialog
+Nothing is written; this is what an application needs to put a real confirmation dialog
 in front of a sixty-gigabyte download. Before any transfer starts, free disk space is
 checked against what remains plus ten percent.
 
@@ -170,19 +170,19 @@ Interrupting is not deleting: cancel and the partial transfers stay on disk, run
 and it resumes. Nothing is registered until every file verifies, so a half-complete
 model is invisible rather than half-usable.
 
-### What gets verified
+### What Gets Verified
 
 | Where the file came from | What is checked |
 |---|---|
 | A pinned catalog artifact | The SHA-256 in the catalog. A mismatch is a hard failure. |
 | A Hugging Face repository | The digest the API reports for that file, checked against the bytes. |
-| A URL you supplied with a digest | Your digest. A mismatch is a hard failure. |
-| A URL you supplied with no digest | Refused, unless you pass `allow_unverified=True`. |
+| A URL supplied with a digest | The supplied digest. A mismatch is a hard failure. |
+| A URL supplied with no digest | Refused, unless `allow_unverified=True` is passed. |
 
 API digests are trust-on-first-use: the API is trusted for what the bytes should be,
 then the bytes are verified against it, which turns a later upstream change into a
 detectable event. An unverified file is recorded as unverified all the way out to
-`locate_model()` — "AnyInfer checked these bytes" and "AnyInfer found these bytes" are
+`locate_model()`: "AnyInfer checked these bytes" and "AnyInfer found these bytes" are
 different claims.
 
 Two rules apply to every acquisition and are not optional. File names from a remote API
@@ -192,7 +192,7 @@ checked for containment after resolution so a symlink cannot escape. And pickle-
 weights (`*.bin`, `*.pt`, `*.pth`, `*.ckpt`) are never fetched by default, because they
 execute arbitrary code on load; acquisition fails with a hint naming the risk.
 
-### Finding it again
+### Finding It Again
 
 ```python
 located = client.locate_model("qwen2.5-7b-instruct")
@@ -205,17 +205,17 @@ located.launch_hints  # {'engine': 'llama.cpp', 'model': '…', 'ctx_size': 3276
 Lookups do no network I/O and no re-hashing (size and modification time are compared
 against the index; pass `verify=True` to force the full check). `launch_hints` is
 advisory data, not process control: the llama.cpp supervisor consumes the hints
-automatically, while for vLLM they are what you would paste into a command line —
+automatically, while for vLLM they are what a developer would paste into a command line;
 AnyInfer acquires and locates vLLM weights but does not start a vLLM process.
 
-Models live under revision-scoped directories in your platform's data directory
+Models live under revision-scoped directories in the platform's data directory
 (`ANYINFER_MODEL_DIR` or `Client(model_dir=...)` overrides it), indexed by a
-`store.json` that is a cache, not the truth — a missing or corrupt index is tolerated
+`store.json` that is a cache, not the truth: a missing or corrupt index is tolerated
 and `rebuild_index()` recovers by rescanning. Nothing is ever evicted automatically:
 `disk_usage()` and `remove_model()` give an application what it needs to build its own
 policy.
 
-### Engines that keep their own store
+### Engines That Keep Their Own Store
 
 Some engines already have a store, a registry, and a downloader. For those the useful
 operation is not "download these bytes" but "make yourself ready":
@@ -232,7 +232,7 @@ will not find them, because they are not AnyInfer's to find. Which providers wor
 way is declared on the descriptor. `anyinfer models pull ollama qwen3:8b` is the same
 call from a shell.
 
-## Where the numbers come from
+## Where the Numbers Come From
 
 Every hash, size, revision, and verification date in the catalog is read from the
 upstream API by a pin script and written verbatim; an entry that cannot be verified is
@@ -241,7 +241,7 @@ against upstream and opens a human-reviewed pull request when something moved. A
 entry therefore either points at bytes that hash to what was recorded, or it fails
 loudly.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - One catalog serves both "give me a default tier" and "show me what fits", and a
       user's pick bridges into the alias ladder with `with_alias_target()`.
     - Fit verdicts are five-state (`gpu`, `cpu`, `tight`, `no`, `unknown`) and always
@@ -251,7 +251,7 @@ loudly.
     - Verification is per-file against pinned or API-reported digests; unverified files
       are refused by default and marked unverified forever if allowed.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -6,7 +6,7 @@ icon: material/atom-variant
 # DeepSeek
 
 An [OpenAI-compatible](openai-compat.md) dialect with three deltas that would otherwise
-cost you silently: reasoning arrives on its own channel, thinking is on by default, and
+cost a developer silently: reasoning arrives on its own channel, thinking is on by default, and
 cache accounting is automatic and split.
 
 <div class="anyinfer-badge-row" markdown="span">
@@ -56,7 +56,7 @@ DeepSeek accepts `low`/`high`/`max`, AnyInfer maps `minimal` and `low` to `low`,
 result = client.generate(prompt, target="deepseek:deepseek-v4-pro", reasoning="low")
 ```
 
-To turn thinking off — a behavior change, not an effort setting:
+To turn thinking off (a behavior change, not an effort setting):
 
 ```python
 client.generate(
@@ -73,7 +73,7 @@ client.generate(
     `ParameterDropped` [telemetry event](../concepts/telemetry.md) instead of silently
     doing nothing.
 
-## Cache accounting
+## Cache Accounting
 
 Context caching is automatic: no opt-in, no cache-control parameters. DeepSeek reports
 the split, and cache hits bill at a much lower rate:
@@ -91,20 +91,20 @@ print(result.usage.cache_read_tokens)  # the part that was cheap
     [`capability_overrides`](../concepts/capabilities.md#overriding-capabilities) for the
     blended rate.
 
-## The Anthropic-compatible endpoint
+## The Anthropic-Compatible Endpoint
 
 DeepSeek also exposes a Messages endpoint at `https://api.deepseek.com/anthropic`, which
-the Anthropic adapter serves through a base-URL override — see
+the Anthropic adapter serves through a base-URL override; see
 [pointing that adapter elsewhere](anthropic.md#pointing-this-adapter-elsewhere). Use the
-native `deepseek:` provider unless you specifically need Messages-dialect behavior; the
+native `deepseek:` provider unless Messages-dialect behavior is specifically needed; the
 reasoning channel and cache accounting above are only wired there.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/deepseek.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/deepseek.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

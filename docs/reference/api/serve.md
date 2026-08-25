@@ -11,7 +11,7 @@ provider, embeddable as an ASGI app. Guide: [serve](../../serve/README.md).
 
 </div>
 
-## OpenAI codec
+## OpenAI Codec
 
 The translation layer between the OpenAI wire dialect and AnyInfer's native types
 (see the [architecture overview](../../contributing/architecture.md)). Useful directly

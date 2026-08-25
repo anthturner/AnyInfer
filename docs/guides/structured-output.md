@@ -1,4 +1,4 @@
-# Enforce a JSON schema
+# Enforce a JSON Schema
 
 Pass a schema and `result.structured` comes back already validated against it, whichever
 [mechanism](../concepts/structured-output.md) the target supports:
@@ -32,7 +32,7 @@ print(analysis["sentiment"], analysis["score"])
 model before the call fails; see [repair](../concepts/structured-output.md#repair) for
 what that costs and why it never falls back to another provider.
 
-## Handling failure
+## Handling Failure
 
 ```python
 try:
@@ -48,7 +48,7 @@ complete top-level members in `error.partial`, so your application can inspect t
 response or tighten the prompt. [Fallback](fallback.md) never fires here: the model
 answered, just in the wrong shape.
 
-## Pydantic models work
+## Pydantic Models Work
 
 No pydantic dependency is added; the model is duck-typed through `model_json_schema()`:
 
@@ -65,7 +65,7 @@ result = client.generate(prompt, target="medium", schema=Review)
 parsed = Review.model_validate(result.structured)
 ```
 
-## Knowing what happened
+## Knowing What Happened
 
 ```python
 result.structured_mechanism  # "grammar" | "json_schema" | "json_mode" | "prompt"
@@ -76,16 +76,16 @@ Both are worth logging in aggregate. A model that frequently needs repair is usu
 prompt problem; a target that unexpectedly reports `"prompt"` may not be the model you
 thought you configured.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - `result.structured` is validated client-side against your original schema, whatever
       mechanism the provider used to produce it.
     - A `SchemaViolationError` carries the raw text, the specific validation errors, and
-      any recoverable partial members — enough to debug the prompt, not just the failure.
+      any recoverable partial members (enough to debug the prompt, not just the failure).
     - Repair is opt-in and costs an extra request per attempt; budget for it on
       latency-sensitive paths.
     - Pydantic models are accepted directly, with no pydantic dependency in the library.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 
