@@ -43,8 +43,10 @@ if max_tokens is None:
     max_tokens = 8_000
 ```
 
-That `if` is deliberate. When a target's context window is unknown, `remaining_tokens` is
-`None` and the fallback is your explicit choice, made where you can see it.
+When a target's context window is unknown, `remaining_tokens` is `None`; the fallback is
+your explicit choice, made where you can see it. See
+[token estimation and context budgets](../concepts/budgeting.md) for where the number
+comes from.
 
 ## 3. Reduce
 
@@ -64,6 +66,9 @@ context.select(documents, query, max_tokens=max_tokens, strategy="ranked")  # wh
 context.select(documents, query, max_tokens=max_tokens, strategy="tiered")  # full coverage
 context.select(documents, query, max_tokens=max_tokens, strategy="packed")  # chunk-level
 ```
+
+The [five strategies](../concepts/context-reduction.md#the-five-strategies) and their
+tradeoffs are documented on the concept page.
 
 ## 4. Place the result and check what happened
 
@@ -96,112 +101,75 @@ class ContextWatcher:
 reduction = context.select(documents, query, max_tokens=max_tokens, observer=ContextWatcher())
 ```
 
-## Reuse the ranking cache across turns
+The `ContextReduced` event carries counts and ceilings only, like every
+[telemetry event](../concepts/telemetry.md).
 
-An interactive application ranks the same corpus on every turn. Build the statistics once:
+## Generating module digests
 
-```python
-cache = context.build_rank_cache(documents)
-
-for turn in conversation:
-    reduction = context.select(documents, turn.text, max_tokens=budget_for(turn), rank_cache=cache)
-```
-
-Invalidation is yours: key the cache on a corpus hash and rebuild when the corpus changes.
-A stale cache produces undefined ranking, not an error.
-
-## Keep the prompt prefix stable
-
-Documents render in path order by default, whatever their rank. Two turns that select the
-same documents produce byte-identical text, so provider prompt caches keep hitting. If you
-would rather have strongest-first ordering:
+The `tiered` strategy renders module digests you supply, but never generates them:
+summarizing spends inference, and that is your decision rather than a side effect of
+packing. Generate them once and cache them:
 
 ```python
-context.select(documents, query, max_tokens=max_tokens, render_order="rank")
-```
+surfaces = context.module_surfaces(documents, depth=2)
 
-That makes a *given* selection stable. To keep the selection itself stable across turns,
-hand back the previous reduction's state:
+digests = {}
+for module, surface in surfaces.items():
+    key = hashlib.sha256(surface.encode()).hexdigest()
+    if (cached := digest_cache.get(key)) is not None:
+        digests[module] = cached
+        continue
+    summary = await client.generate(
+        f"Describe what this module does in two sentences:\n\n{surface}",
+        target="anthropic:claude-haiku-4-5",
+    )
+    digests[module] = summary.text
+    digest_cache[key] = summary.text
 
-```python
-tuning = context.ContextTuning(carry_over_bonus=0.5)
-first = context.select(documents, query, max_tokens=max_tokens, tuning=tuning)
-...
-second = context.select(
-    documents, query, max_tokens=max_tokens, tuning=tuning, previous=first.state()
-)
-print(second.carried_over)
-```
-
-Unchanged documents get the bonus, so a corpus that barely moved produces the same
-selection, and therefore the same prefix, rather than swapping one equally ranked file
-for another.
-
-## Choose a strategy from measurements
-
-If you are unsure which strategy suits a corpus, cost all four. `plan()` runs each one,
-measures the envelope it would render, and discards the text. It spends no inference:
-
-```python
-outcome = context.plan(documents, query, max_tokens=max_tokens)
-for option in outcome.options:
-    print(option.strategy, option.selected_count, option.estimated_tokens, option.complete)
-
-best = outcome.best()
 reduction = context.select(
-    documents, query, max_tokens=max_tokens, strategy=best.strategy if best else "auto"
+    documents,
+    query,
+    max_tokens=max_tokens,
+    strategy="tiered",
+    module_digests=digests,
 )
 ```
 
-## Turn on the settings that suit your corpus
+`module_surfaces()` is deterministic, so the digest cache key is stable across runs. The
+cache itself stays app-side.
 
-Every algorithmic choice is a field on `ContextTuning`, and the defaults reproduce the
-plain behaviour exactly. For a source-code corpus, the shipped preset is a good starting
-point:
+## Going further
 
-```python
-reduction = context.select(
-    documents, query, max_tokens=max_tokens, tuning=context.ContextTuning.recommended()
-)
-```
+Each refinement is one section of the [concept page](../concepts/context-reduction.md):
 
-That collapses duplicates, orders by relevance per token, penalizes near-identical
-candidates, splits compound identifiers, expands the query, blends in import-graph
-centrality, and shortens a file rather than dropping it. Each is [explained
-here](../concepts/context-reduction.md#advanced-settings-in-one-place), and each can be set
-in your [config file](../reference/configuration.md) instead.
+- `plan()` prices every deterministic strategy for free before you commit —
+  [plan before you commit](../concepts/context-reduction.md#plan-before-you-commit).
+- Duplicates collapse losslessly, and a file that just misses the budget can be shortened
+  instead of dropped —
+  [losing less than you drop](../concepts/context-reduction.md#losing-less-than-you-drop).
+- Carrying over the previous turn's selection keeps the prompt prefix stable, so provider
+  caches keep hitting —
+  [turn two: send the same thing](../concepts/context-reduction.md#turn-two-send-the-same-thing).
+- Every algorithmic choice is a `ContextTuning` field, and `recommended()` is the set
+  worth having for source code —
+  [tuning](../concepts/context-reduction.md#tuning).
+- `compact_history()` and `HistoryPolicy` apply the same discipline to the conversation
+  itself —
+  [conversations are context too](../concepts/context-reduction.md#conversations-are-context-too).
+- When no fidelity reduction is enough, the answer is more requests rather than fewer
+  tokens — [distill a corpus](../examples/distill-a-corpus.md).
 
-## Compact the conversation, not just the corpus
-
-Reduction is not only about material you collected. In an agentic loop the window fills
-with tool results, and those compact well:
-
-```python
-compaction = context.compact_history(messages, max_tokens=max_tokens)
-if not compaction.fits:
-    ...  # the system prompt and recent turns alone exceed the budget; your call
-result = client.generate(list(compaction.messages), target=target)
-```
-
-Tool-call pairing survives, system messages survive, and the recent window survives — the
-three things naive truncation breaks.
-
-Or hand the policy to the client and stop thinking about it. Every frontend built on that
-client, including `anyinfer run` and the sidecar — then behaves the same way:
-
-```python
-client = ai.Client(providers, history=ai.HistoryPolicy())
-```
-
-By default that only acts once the route's larger-window targets are exhausted, so a bigger
-model is always preferred to losing history. See
-[the concept page](../concepts/context-reduction.md#or-let-the-client-do-it).
-
-## When it will never fit
-
-At some size no fidelity reduction is enough, and the answer is more requests rather than
-fewer tokens. That is [`distill`](../examples/distill-a-corpus.md) — it reads everything
-and writes something shorter, reporting exactly how many calls that took.
+!!! tip "Key takeaways"
+    - Ask `client.budget()` what is left over before reducing; an unknown window comes
+      back as `None`, and the fallback number is yours to choose in the open.
+    - The default `auto` strategy sends everything when it fits and degrades to `tiered`
+      only when it must, so small corpora pay nothing.
+    - The envelope lands in your own message; the library never edits
+      `GenerationRequest.messages`.
+    - `reduction.complete` and `summary()` report exactly what the budget cost, in
+      content-free form that is safe to log.
+    - Module digests for `tiered` are generated by your code, keyed on the deterministic
+      `module_surfaces()` output, so a cache survives across runs.
 
 ## See also
 

@@ -53,8 +53,8 @@ because a broken telemetry sink must never fail a generation.
 | `UsageEstimated` | A usage figure was derived rather than reported. |
 | `ProviderDiagnostic` | A provider reported something about its own runtime. |
 
-Anything AnyInfer drops or estimates is observable. That is a deliberate inversion of the
-common `drop_params=True`-style design, where the whole point is that you *do not* find out.
+Anything AnyInfer drops or estimates is observable — a degraded request always leaves
+evidence.
 
 `ProviderDiagnostic` covers the case the other two cannot: the request worked, nothing was
 dropped or estimated, and it still took thirty seconds because the model had spilled out of
@@ -103,8 +103,8 @@ than round-tripping through spans.
       optional bridge, not the contract itself.
     - Prompt and response payloads are off by default, per observer, so one consumer's
       opt-in never leaks text to another.
-    - Degradation is observable by design: `ParameterDropped` and `UsageEstimated` exist
-      so silent failures in comparable gateways can't happen here.
+    - Degradation is observable: `ParameterDropped` and `UsageEstimated` mean a dropped
+      parameter or a derived usage figure always leaves evidence.
 
 ## See also
 

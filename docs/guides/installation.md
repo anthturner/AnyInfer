@@ -4,9 +4,9 @@
 pip install anyinfer
 ```
 
-The core depends on **`httpx2` and `jsonschema`** and nothing else. That is a deliberate
-constraint, and it is a security argument as much as an aesthetic one: a small
-mandatory dependency surface is a small supply-chain attack surface.
+The core depends on `httpx2` and `jsonschema` and nothing else. That constraint is a
+security argument as much as an aesthetic one: a small mandatory dependency surface is a
+small supply-chain attack surface.
 
 ## Extras
 

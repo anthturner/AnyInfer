@@ -1,7 +1,7 @@
 # Quickstart
 
-From `pip install` to a working result. Every example on this page is executed in CI against
-the fake providers, so none of it can quietly rot.
+From `pip install` to a working result. Every example on this page is executed in CI
+against the fake providers, so none of it can quietly rot.
 
 ## Install
 
@@ -9,49 +9,17 @@ the fake providers, so none of it can quietly rot.
 pip install anyinfer
 ```
 
-The core depends on `httpx2` and `jsonschema` and nothing else. Providers that need more come
-as extras — see [installation](installation.md).
+The core depends on `httpx2` and `jsonschema` and nothing else. Providers that need more
+come as extras — see [installation](installation.md).
 
-## Zero to a working call
-
-`anyinfer init` inspects the machine, reports what is already usable, and writes a valid
-configuration plus a runnable starter program:
-
-```bash
-anyinfer init
-python starter.py
-```
-
-```text
-detected   Linux / x86_64, 32.0 GiB RAM, NVIDIA RTX 4070 (12.0 GiB)
-probed     17 loopback endpoint(s), every one a provider default:
-           http://127.0.0.1:11434, http://127.0.0.1:1234/v1, …
-found      ollama at http://127.0.0.1:11434 (4 models)
-found      anthropic, credential env://ANTHROPIC_API_KEY
-recommend  medium -> ollama:qwen3:8b
-
-wrote      anyinfer.json
-wrote      starter.py
-```
-
-What it will and will not do:
-
-- **It only reports what it observed.** A provider is written into the file because a
-  loopback endpoint it declares answered, or because a credential variable it names is set —
-  never because it might work.
-- **It never writes a credential value.** A detected key becomes `"api_key":
-  "env://ANTHROPIC_API_KEY"`, the reference and not the secret, so the generated file is safe
-  to commit.
-- **It never installs anything.** Use [`anyinfer models add`](../guides/local-models.md) to
-  download weights and `anyinfer runtime install` for a llama.cpp runtime.
-- **It never replaces a file you already have.** An existing `anyinfer.json` stops the
-  command; pass `--force` to replace it or `--output` to write elsewhere.
-
-Useful flags: `--no-probe` contacts nothing at all, `--keyring` also looks in the OS
-credential vault, and `--json` emits the same findings for a script.
-
-The file it writes is the [shared configuration](../reference/configuration.md) format —
-the same file the command-line runner, the sidecar, and the Python API all read.
+The fastest start is `anyinfer init`: it inspects the machine, reports which providers
+are already usable (a running Ollama, a set credential variable), and writes a valid
+`anyinfer.json` plus a runnable `starter.py` — without ever storing a secret or
+installing anything. The
+[CLI guide](cli.md#getting-a-config-file-in-the-first-place) covers what it detects and
+its flags. The file it writes is the
+[shared configuration](../reference/configuration.md) the SDK, CLI, and sidecar all
+read.
 
 ## Your first call
 
@@ -96,11 +64,13 @@ the same file the command-line runner, the sidecar, and the Python API all read.
 The highlighted line is the only one that changes when you point the same call at a
 different provider or a local model.
 
-Note the credential: `"env://ANTHROPIC_API_KEY"` is a *reference*, safe to keep in a config
-file. It is resolved once and registered for redaction, so the key can never appear in a log
-line or an error message. See [credentials](../concepts/credentials.md).
+Note the credential: `"env://ANTHROPIC_API_KEY"` is a *reference*, safe to keep in a
+config file. It is resolved once and registered for redaction, so the key can never
+appear in a log line or an error message. See
+[credentials](../concepts/credentials.md).
 
-`Client` owns a background event loop, so use it as a context manager or call `close()`:
+`Client` owns a background event loop, so use it as a context manager or call
+`close()`:
 
 ```python
 with ai.Client([ai.ProviderSettings.of("ollama")]) as client:
@@ -119,13 +89,14 @@ with client.stream(messages, target="ollama:qwen3:8b") as stream:
     print(f"\n\n{final.usage.output_tokens} tokens in {final.timing.total_ms:.0f} ms")
 ```
 
-Using the stream as a context manager matters: leaving the block early cancels the in-flight
-request instead of letting it run on.
+Using the stream as a context manager matters: leaving the block early cancels the
+in-flight request instead of letting it run on. See
+[stream typed events](streaming.md).
 
 ## Aliases: don't hardcode model names
 
-`small`, `medium`, and `large` resolve to a concrete model for whichever provider you have
-configured:
+`small`, `medium`, and `large` resolve to a concrete model for whichever provider you
+have configured:
 
 ```python
 client = ai.Client(
@@ -167,8 +138,8 @@ print(result.structured_mechanism)  # "json_schema", "grammar", "json_mode", or 
 ```
 
 AnyInfer uses the strongest mechanism the provider supports, then validates the result
-against *your* schema regardless. `repair` lets the model correct itself once if it gets the
-shape wrong. See [structured output](../concepts/structured-output.md).
+against *your* schema regardless. `repair` lets the model correct itself once if it
+gets the shape wrong. See [structured output](../concepts/structured-output.md).
 
 ## Fallback chains
 
@@ -185,63 +156,32 @@ for attempt in result.attempts:
     print(f"  {attempt.target} -> {attempt.outcome}")
 ```
 
-Every result carries its full routing trail, so "why was this slow?" is answerable after the
-fact. See [routing](../concepts/routing.md).
+Every result carries its full routing trail, so "why was this slow?" is answerable
+after the fact. See [routing and rate limits](../concepts/routing.md).
 
-## Async
+## Beyond generation
 
-`Client` is a facade; `AsyncClient` is the real implementation and has the same surface:
+The same client embeds and reranks (`client.embed()`, `client.rerank()`) — typed and
+routed like generation, with a
+[safety rule](../concepts/embeddings.md#the-embedding-space-safety-rule) that keeps
+fallback from mixing incompatible vector spaces. And a local model is just another
+target: with `llama-cpp` configured, one `generate()` call downloads a pinned,
+hash-verified model, tunes a server for your hardware, and answers on loopback — see
+[run a model locally](local-inference.md).
 
-```python
-async with ai.AsyncClient(
-    [ai.ProviderSettings.of("openai", api_key="env://OPENAI_API_KEY")]
-) as client:
-    result = await client.generate(prompt, target="openai:gpt-5")
+!!! tip "Key takeaways"
+    - One call shape covers every provider; only the `target=` string changes.
+    - Credentials are references (`env://…`), resolved once and redacted everywhere.
+    - A schema is validated client-side no matter which mechanism the provider offers.
+    - Every result carries its attempt trail, so routing decisions are inspectable
+      after the fact.
 
-    async with client.stream(prompt, target="openai:gpt-5") as stream:
-        async for event in stream:
-            ...
-```
+## See also
 
-## Embeddings and reranking
-
-Two operations alongside generation — typed and routed the same way, but never folded into
-`GenerationRequest`:
-
-```python
-result = client.embed(["Why is the sky blue?", "Why is the grass green?"], target="ollama:nomic-embed-text")
-print(result.space.dimensions, len(result.vectors))
-
-ranked = client.rerank(
-    "capital of France",
-    ["Paris is the capital of France.", "Berlin is the capital of Germany."],
-    target="cohere:rerank-v3.5",
-)
-for item in ranked.items:
-    print(item.document_id, item.score)
-```
-
-AnyInfer produces vectors and relevance rankings; it never persists them or builds an index.
-See [embeddings and reranking](../concepts/embeddings.md) for the embedding-space safety
-rule that governs fallback.
-
-## Running a local model
-
-```python
-from anyinfer import local
-
-profile = local.detect()  # cached hardware probe
-recommendation = local.recommend_alias(profile, ai.load_default_catalog())
-
-print(recommendation.alias, "-", recommendation.reason)
-```
-
-With `llama-cpp` configured, generating against that alias downloads the pinned GGUF,
-verifies its hash, tunes a server for your hardware, starts it on loopback, and answers —
-all from one `generate()` call. See [local inference](local-inference.md).
-
-## What next
+<div class="anyinfer-see-also" markdown>
 
 - [Concepts](../concepts/README.md): the model behind the API.
-- [Choosing an integration path](integration-paths.md): SDK or standalone service?
+- [Integrate AnyInfer](README.md): SDK, CLI, or sidecar.
 - [Providers](../providers/README.md): the quirks of each backend.
+
+</div>

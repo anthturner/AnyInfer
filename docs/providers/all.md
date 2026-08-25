@@ -41,7 +41,7 @@ own adapter and guide.
 | [GitHub Copilot](copilot.md) | `copilot:` / `github-copilot:` | Hosted | GitHub Copilot subscription; auth delegated to the Copilot CLI |
 | [DeepSeek](deepseek.md) | `deepseek:` | Hosted | Separate reasoning channel, split cache accounting |
 | [Google Gemini](gemini.md) | `gemini:` / `google:` / `google-gemini:` / `ai-studio:` | Hosted | Native `generateContent`, thinking levels, discovered windows |
-| [Jina AI](jina.md) | `jina:` / `jinaai:` | Hosted | Specialist embeddings and reranking; full task vocabulary |
+| [Jina AI](retrieval.md) | `jina:` / `jinaai:` | Hosted | Specialist embeddings and reranking; full task vocabulary |
 | [llama.cpp (supervised llama-server)](llama-cpp.md) | `llama-cpp:` / `llamacpp:` / `llama:` | Local | Supervised `llama-server`, loopback only |
 | [LM Studio](lm-studio.md) | `lm-studio:` / `lmstudio:` | Local | Native discovery: context, quantization, residency |
 | [Microsoft 365 Copilot](m365-copilot.md) | `m365-copilot:` / `m365:` | Hosted | Microsoft 365 Copilot Chat, Entra auth |
@@ -52,7 +52,7 @@ own adapter and guide.
 | [OpenRouter](openrouter.md) | `openrouter:` | Hosted | Router across upstreams, discovered per-model pricing |
 | [Text Embeddings Inference](tei.md) | `tei:` / `text-embeddings-inference:` | Local | Local embeddings and reranking; retrieval-only, one model per server |
 | [Google Vertex AI](vertex.md) | `vertex:` / `vertex-ai:` / `google-vertex:` | Hosted | Gemini with GCP auth; project-scoped addressing |
-| [Voyage AI](voyage.md) | `voyage:` / `voyageai:` | Hosted | Specialist embeddings and reranking; query/document intents |
+| [Voyage AI](retrieval.md) | `voyage:` / `voyageai:` | Hosted | Specialist embeddings and reranking; query/document intents |
 | [xAI (Grok)](xai.md) | `xai:` / `grok:` | Hosted | Provider-reported cost, discovered pricing |
 
 ## Presets
@@ -83,7 +83,7 @@ model listing, reasoning translation. See [presets](presets.md) for the quirk no
 | Fireworks AI | `fireworks:` / `fireworks-ai:` | `FIREWORKS_API_KEY` | Model ids look like accounts/fireworks/models/…; over-long max_tokens is silently truncated unless context_length_exceeded_behavior='error' |
 | Groq | `groq:` | `GROQ_API_KEY` | LPU-served open models; rejects logprobs/logit_bias-style parameters |
 | Helicone AI Gateway | `helicone:` / `helicone-gateway:` | `HELICONE_API_KEY` | Routing with observability |
-| Hugging Face Inference Providers | `huggingface:` / `hf:` / `huggingface-router:` | `HF_TOKEN` | Routes HF-hub model ids across serving partners; append :provider to pin one (e.g |
+| Hugging Face Inference Providers | `huggingface:` / `hf:` / `huggingface-router:` | `HF_TOKEN` | Routes HF-hub model ids across serving partners; append :provider to pin one (e.g. moonshotai/Kimi-K2-Instruct:groq) |
 | Tencent Hunyuan | `hunyuan:` / `tencent:` | `HUNYUAN_API_KEY` | Reasoning is mostly a model choice (the hunyuan-t1-* line), though hunyuan-a13b instead toggles it in-prompt with a /no_think prefix |
 | Hyperbolic | `hyperbolic:` | `HYPERBOLIC_API_KEY` | Open-model serving; reasoning models emit inline <think> content |
 | Hyperstack AI Studio | `hyperstack:` | `HYPERSTACK_API_KEY` | Base URL and model id are both read off the AI Studio playground's API panel, since they follow your deployment rather than a fixed catalog |
@@ -120,7 +120,7 @@ model listing, reasoning translation. See [presets](presets.md) for the quirk no
 | Snowflake Cortex | `snowflake-cortex:` / `cortex:` / `snowflake:` | `SNOWFLAKE_PAT` | Base URL embeds your account identifier; authenticate with a programmatic access token |
 | iFlytek Spark | `spark:` / `iflytek:` | `SPARK_API_PASSWORD` | The HTTP surface takes a single bearer APIPassword from the console — not the legacy AppID/APIKey/APISecret triple, which belongs to the WebSocket path and does not work here |
 | StepFun | `stepfun:` / `step:` | `STEP_API_KEY` | Step models |
-| Together AI | `together:` / `together-ai:` | `TOGETHER_API_KEY` | Large open-model catalog; org/model ids (e.g |
+| Together AI | `together:` / `together-ai:` | `TOGETHER_API_KEY` | Large open-model catalog; org/model ids (e.g. deepseek-ai/…) |
 | Upstage (Solar) | `upstage:` / `solar:` | `UPSTAGE_API_KEY` | Solar family; reasoning_effort semantics differ per model — solar-mini rejects the parameter entirely, solar-open2 reasons unless disabled |
 | Vast.ai Serverless | `vast-ai:` / `vast:` | `VAST_API_KEY` | The base URL ends in your endpoint name and carries no /v1 |
 | Venice AI | `venice:` | `VENICE_API_KEY` | Privacy-focused; max_tokens is deprecated in favour of max_completion_tokens |

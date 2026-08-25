@@ -5,13 +5,13 @@ icon: material/microsoft-office
 
 # Microsoft 365 Copilot
 
-The most constrained provider in the set, and documented as such rather than papered over.
+The most constrained provider in the set.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-no">:material-close: streaming</span>
 <span class="anyinfer-badge anyinfer-badge-partial">:material-minus: structured output (prompt-only)</span>
 <span class="anyinfer-badge anyinfer-badge-no">:material-close: tool calls</span>
-<span class="anyinfer-badge anyinfer-badge-no">:material-close: health (deliberately no-op)</span>
+<span class="anyinfer-badge anyinfer-badge-no">:material-close: health (no-op)</span>
 <span class="anyinfer-badge anyinfer-badge-no">:material-close: discovery</span>
 </div>
 
@@ -35,16 +35,15 @@ result = client.generate(prompt, target="m365-copilot:m365-copilot")
 
 Alias: `m365`.
 
-## Interactive authentication only
+## Interactive authentication
 
-There is **no client-credential or daemon flow** for this API. Sign-in opens a browser.
-
-Consequences, stated plainly:
+There is no client-credential or daemon flow for this API. Sign-in opens a browser.
+Consequently:
 
 - It cannot run headless, in CI, or in a container without a human present.
 - It is exempt from live conformance testing.
-- `health()` deliberately does *not* trigger a sign-in: a health probe that opens a browser
-  window would be a hostile surprise, and the router calls it speculatively.
+- `health()` does not trigger a sign-in: a health probe that opens a browser window would
+  be a hostile surprise, and [the router](../concepts/routing.md) calls it speculatively.
 
 If you already hold a token, supply it and skip the interactive flow:
 
@@ -54,7 +53,7 @@ ai.ProviderSettings.of("m365-copilot", api_key="env://M365_TOKEN")
 
 This is the only workable path for automated use.
 
-## What it supports
+## Supported
 
 | Behavior | Support |
 |---|---|
@@ -65,11 +64,11 @@ This is the only workable path for automated use.
 | Usage | Generally absent |
 | Schema repair | Capped at **one** round trip |
 
-## Ignored parameters are reported
+## Ignored parameters
 
-Temperature, top-p, max tokens, stop sequences, tools, and reasoning effort are declared on the descriptor as
-ignored, so requesting them emits a `ParameterDropped` telemetry event rather than silently
-doing nothing:
+Temperature, top-p, max tokens, stop sequences, tools, and reasoning effort are declared
+on the descriptor as ignored, so requesting them emits a `ParameterDropped`
+[telemetry event](../concepts/telemetry.md) rather than silently doing nothing:
 
 ```python
 class Watch:
@@ -81,13 +80,11 @@ class Watch:
 That event matters: a `temperature=0` that had no effect is otherwise
 indistinguishable from one that worked.
 
-## One repair attempt, never a loop
+## Schema repair
 
-The descriptor caps schema repair at a single round trip. Every request here is a Graph
-call against a conversation the service keeps state for, behind an interactively-acquired
-token — the most expensive request shape in the registry, and the least likely to answer a
-repeated question differently.
-
+The descriptor caps [schema repair](../concepts/structured-output.md#repair) at a single
+round trip, since every request here is an interactively-authenticated Graph call against
+service-kept conversation state — the most expensive request shape in the registry.
 Asking for more is clamped rather than refused, and the clamp is reported the same way an
 ignored parameter is:
 
@@ -102,8 +99,8 @@ result = client.generate(
 ```
 
 Prompt-only schema enforcement plus one repair is a real failure rate. Validate
-`result.structured` defensively, and prefer a provider with a native structured-output mode
-when the shape matters more than the M365 grounding does.
+`result.structured` defensively, and prefer a provider with a native structured-output
+mode when the shape matters more than the M365 grounding does.
 
 ## Notes
 
@@ -113,12 +110,9 @@ when the shape matters more than the M365 grounding does.
   it is understood.
 - A 401/403 hints at both re-authentication *and* the tenant licensing and admin-consent
   requirements, because those are the usual real causes.
-
-## When to use something else
-
-If you need automation, streaming, tools, or sampling control, use another provider. This
-adapter exists so that applications with a genuine M365 Copilot requirement can reach it
-through the same interface; not because it is a good default.
+- If you need automation, streaming, tools, or sampling control, use another provider —
+  [GitHub Copilot](copilot.md) covers the subscription-billed case with fewer
+  constraints. This adapter is for applications with a genuine M365 Copilot requirement.
 
 ## Wire contract
 

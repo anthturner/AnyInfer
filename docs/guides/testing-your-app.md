@@ -1,35 +1,18 @@
 # Test your application offline
 
-Your application's inference code has behaviour worth testing: it falls back when a
+Your application's inference code has behavior worth testing: it falls back when a
 provider is down, it repairs a malformed structured answer, it reduces a corpus to fit a
-budget. Testing that normally means either mocking the library, which tests your mocks —
-or calling a real provider from CI, which is slow, costs money, and fails for reasons that
+budget. Testing that normally means either mocking the library, which tests your mocks, or
+calling a real provider from CI, which is slow, costs money, and fails for reasons that
 have nothing to do with your change.
 
-AnyInfer ships the third option. `anyinfer.testing` gives you a provider whose behaviour
+AnyInfer ships the third option. `anyinfer.testing` gives you a provider whose behavior
 you declare, and pytest fixtures that wire it to a real client. Everything runs in-process:
 no sockets, no credentials, no network, and the same result on every machine.
 
 ```bash
 pip install anyinfer     # the fixtures come with it — no extra to install
 ```
-
-## Regression-test inference behaviour
-
-Lead with a golden run manifest when the route, repair budget, cache placement, or context
-policy is the contract you care about. It tests those decisions without asserting on model
-prose or unstable timing:
-
-```python
-def test_answer_path(anyinfer_golden_manifest):
-    result = application.answer("hi")
-    anyinfer_golden_manifest(result.manifest, "answer-path")
-```
-
-The fixture removes request IDs and timings before comparing `manifests/answer-path.json`
-beside your test. Run `pytest --update-manifests` only after an intentional behavior change,
-then review the JSON diff. The [complete fallback-and-repair example](../examples/golden-manifest.md)
-runs offline in AnyInfer's own suite.
 
 ## Declare a provider, get a real client
 
@@ -55,7 +38,8 @@ the target, the adapter spoke the wire dialect, the core measured the timings.
 ## Prove your fallback chain works
 
 A scripted model can be told to fail. Failures are consumed in order, then the model
-answers normally, so "fails once, then succeeds" is one line.
+answers normally, so "fails once, then succeeds" is one line — enough to exercise the
+[fallback chain](fallback.md) you configured.
 
 ```python
 from anyinfer.testing import ScriptedFailure, ScriptedModel
@@ -76,8 +60,8 @@ def test_retries_a_transient_failure(anyinfer_client, anyinfer_scripted):
 
 ## Prove your repair budget converges
 
-`malformed-json` answers with something that will not validate, so the repair loop runs for
-real:
+`malformed-json` answers with something that will not validate, so the
+[repair loop](structured-output.md) runs for real:
 
 ```python
 from anyinfer.testing import ScriptedFailure, ScriptedModel
@@ -121,7 +105,8 @@ def test_repairs_an_invalid_structured_answer(anyinfer_client, anyinfer_scripted
 
 ## Assert on telemetry
 
-`anyinfer_events` collects the typed event stream. It is payload-free: it never captures
+`anyinfer_events` collects the same typed event stream your
+[observers](observability.md) consume in production. It is payload-free: it never captures
 prompt or response text, so adding it to a suite cannot start logging user content.
 
 ```python
@@ -159,6 +144,23 @@ The result still validates — client-side validation is always authoritative �
 `result.structured_mechanism` reports `prompt` instead of `json_schema`, which is what your
 production code will see against a model that cannot do better.
 
+## Regression-test inference behavior
+
+When the route, repair budget, cache placement, or context policy is the contract you care
+about, compare a golden [run manifest](../concepts/run-manifests.md) instead of asserting
+on model prose or unstable timing:
+
+```python
+def test_answer_path(anyinfer_golden_manifest):
+    result = application.answer("hi")
+    anyinfer_golden_manifest(result.manifest, "answer-path")
+```
+
+The fixture removes request IDs and timings before comparing `manifests/answer-path.json`
+beside your test. Run `pytest --update-manifests` only after an intentional behavior change,
+then review the JSON diff. The [complete fallback-and-repair example](../examples/golden-manifest.md)
+runs offline in AnyInfer's own suite.
+
 ## The fixtures
 
 | Fixture | What it gives you |
@@ -173,7 +175,8 @@ production code will see against a model that cannot do better.
 | `anyinfer_golden_manifest` | Compare a normalized run manifest with a checked-in golden |
 
 Each test gets its own provider registry, so two tests may register the same provider id
-without depending on execution order.
+without depending on execution order. Every fixture and scripted type is specified in the
+[testing API reference](../reference/api/testing.md).
 
 ## Recording real traffic
 
@@ -189,3 +192,27 @@ def test_against_recorded_traffic(anyinfer_cassette, anyinfer_recording):
 Run your suite with `ANYINFER_RECORD_CASSETTES=1` to record; unset it to replay. Recorded
 bodies pass through the redaction registry before reaching disk, so a cassette you commit
 alongside a test cannot carry a registered credential.
+
+!!! tip "Key takeaways"
+    - A scripted provider exercises the real router, adapter layer, and core, so the suite
+      tests the library's behavior rather than your mocks.
+    - Failures are consumed in order before the model answers normally, which makes
+      "fails once, then succeeds" a one-line declaration.
+    - `anyinfer_events` is payload-free by construction; adding telemetry assertions
+      cannot start logging user content.
+    - Golden run manifests pin routing and policy decisions without asserting on prose;
+      refresh them with `pytest --update-manifests` only after an intentional change.
+    - Recorded cassettes pass through redaction before reaching disk, so committing one
+      cannot leak a registered credential.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Run manifests](../concepts/run-manifests.md): what a manifest records and why it makes
+  a stable golden file.
+- [Golden manifest example](../examples/golden-manifest.md): fallback and repair pinned
+  end to end.
+- [Testing API reference](../reference/api/testing.md): every fixture and scripted type.
+
+</div>

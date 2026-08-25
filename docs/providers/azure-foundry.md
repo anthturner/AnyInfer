@@ -5,8 +5,8 @@ icon: material/domain
 
 # Azure AI Foundry
 
-An `openai-compat` subclass carrying Azure's parameter renames and its two authentication
-modes.
+An [`openai-compat`](openai-compat.md) subclass carrying Azure's parameter renames and
+its two authentication modes.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
@@ -16,39 +16,41 @@ modes.
 <span class="anyinfer-badge anyinfer-badge-partial">:material-minus: discovery</span>
 </div>
 
-## Setup with an API key
+## Setup
 
-```python
-client = ai.Client(
-    [
-        ai.ProviderSettings.of(
-            "azure-foundry",
-            base_url="https://<resource>.services.ai.azure.com/openai/v1",
-            api_key="env://AZURE_AI_KEY",
-        ),
-    ]
-)
-result = client.generate(prompt, target="azure-foundry:gpt-5")
-```
+=== "API key"
 
-## Setup with Entra
+    ```python
+    client = ai.Client(
+        [
+            ai.ProviderSettings.of(
+                "azure-foundry",
+                base_url="https://<resource>.services.ai.azure.com/openai/v1",
+                api_key="env://AZURE_AI_KEY",
+            ),
+        ]
+    )
+    result = client.generate(prompt, target="azure-foundry:gpt-5")
+    ```
 
-```bash
-pip install "anyinfer[azure]"
-az login
-```
+=== "Entra"
 
-```python
-ai.ProviderSettings.of(
-    "azure-foundry",
-    base_url="https://<resource>.services.ai.azure.com/openai/v1",
-    # no api_key: DefaultAzureCredential is used
-)
-```
+    ```bash
+    pip install "anyinfer[azure]"
+    az login
+    ```
+
+    ```python
+    ai.ProviderSettings.of(
+        "azure-foundry",
+        base_url="https://<resource>.services.ai.azure.com/openai/v1",
+        # no api_key: DefaultAzureCredential is used
+    )
+    ```
 
 Aliases: `azure`, `foundry`.
 
-## Differences from vanilla openai-compat
+## Differences from openai-compat
 
 | | Azure |
 |---|---|
@@ -66,8 +68,7 @@ ai.ProviderSettings.of("azure-foundry", base_url=..., api_version="2024-10-21")
 ```
 
 Only needed for deployments that still require it; the newer `/openai/v1` surface does not.
-The parameter is applied per instance, so it cannot leak onto other adapters — chat,
-embeddings, and model listing all carry it consistently.
+Chat, embeddings, and model listing all carry it consistently.
 
 ## Embeddings
 
@@ -81,12 +82,13 @@ result = client.embed(
 `target`'s model half is your deployment name, not necessarily the underlying model's
 catalog id. The same `POST {base_url}/embeddings` surface as chat (deployment-less on
 `/openai/v1`, or `api-version`-pinned on the older surface) speaks the identical
-OpenAI-compatible body. Azure documents a 2,048-input ceiling, an 8,192-token
-per-input ceiling, and a 300,000-token aggregate ceiling per request — the same numbers
-OpenAI itself documents — but because the deployment name is tenant-chosen, AnyInfer
-does not declare them as static per-model capabilities; a request larger than what your
-deployment actually accepts surfaces as a provider error rather than a pre-flight
-refusal.
+OpenAI-compatible body.
+
+Azure documents the same request ceilings [OpenAI itself does](openai.md#embeddings):
+2,048 inputs per request, 8,192 tokens per input, and 300,000 tokens aggregate. Since the
+deployment name is tenant-chosen, AnyInfer does not declare these as static per-model
+[capabilities](../concepts/capabilities.md); a request larger than what your deployment
+accepts surfaces as a provider error rather than a pre-flight refusal.
 
 ## Troubleshooting
 

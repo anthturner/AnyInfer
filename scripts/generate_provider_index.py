@@ -13,6 +13,7 @@ GitHub Pages agree and a reader browsing the source sees the same list as the si
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -39,8 +40,9 @@ ADAPTER_PAGES = {
     "openrouter": "openrouter.md",
     "ollama": "ollama.md",
     "tei": "tei.md",
-    "voyage": "voyage.md",
-    "jina": "jina.md",
+    # The two specialist retrieval providers share one guide page.
+    "voyage": "retrieval.md",
+    "jina": "retrieval.md",
     "llama-cpp": "llama-cpp.md",
     "openai-compat": "openai-compat.md",
     "nebius": "nebius.md",
@@ -136,7 +138,9 @@ def _first_sentence(note: str) -> str:
     """Trim a preset note to its first sentence, for a table cell."""
     if not note:
         return ""
-    sentence = note.split(". ")[0].rstrip(".")
+    # A ". " inside "e.g." or "i.e." is not a sentence boundary; splitting there
+    # used to leave cells ending in a dangling "(e.g".
+    sentence = re.split(r"(?<!e\.g)(?<!i\.e)\.\s", note, maxsplit=1)[0].rstrip(".")
     # Table cells cannot contain a raw pipe, and long notes belong on presets.md.
     return sentence.replace("|", "\\|")
 
@@ -154,8 +158,8 @@ def render() -> str:
         missing = sorted(adapter_ids - page_ids)
         stale = sorted(page_ids - adapter_ids)
         raise RuntimeError(f"provider guide mapping mismatch: missing={missing}, stale={stale}")
-    if len(set(ADAPTER_PAGES.values())) != len(ADAPTER_PAGES):
-        raise RuntimeError("every dedicated adapter must have its own provider guide")
+    # Closely related adapters may share one guide (voyage and jina both live on
+    # retrieval.md), so pages are checked for existence, not uniqueness.
     for page in ADAPTER_PAGES.values():
         if not (REPO_ROOT / "docs" / "providers" / page).is_file():
             raise RuntimeError(f"provider guide does not exist: docs/providers/{page}")

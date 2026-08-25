@@ -5,9 +5,9 @@ icon: material/atom-variant
 
 # DeepSeek
 
-An OpenAI-compatible dialect with three deltas that would otherwise cost you silently:
-reasoning arrives on its own channel, thinking is on by default, and cache accounting is
-automatic and split.
+An [OpenAI-compatible](openai-compat.md) dialect with three deltas that would otherwise
+cost you silently: reasoning arrives on its own channel, thinking is on by default, and
+cache accounting is automatic and split.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
@@ -36,7 +36,7 @@ Two models are served: `deepseek-v4-flash` and `deepseek-v4-pro`. The old
 
 ## Reasoning
 
-Thinking is **on by default**. Chain-of-thought streams as `ReasoningDelta` events,
+Thinking is on by default. Chain-of-thought streams as `ReasoningDelta` events,
 separate from the answer:
 
 ```python
@@ -56,7 +56,7 @@ DeepSeek accepts `low`/`high`/`max`, AnyInfer maps `minimal` and `low` to `low`,
 result = client.generate(prompt, target="deepseek:deepseek-v4-pro", reasoning="low")
 ```
 
-To turn thinking **off** — a deliberate behavior change, not an effort setting:
+To turn thinking off — a behavior change, not an effort setting:
 
 ```python
 client.generate(
@@ -70,7 +70,8 @@ client.generate(
 
     DeepSeek silently discards `temperature` and `top_p` in thinking mode, which is the
     default. AnyInfer declares both as ignored, so setting one raises a
-    `ParameterDropped` telemetry event instead of quietly doing nothing.
+    `ParameterDropped` [telemetry event](../concepts/telemetry.md) instead of silently
+    doing nothing.
 
 ## Cache accounting
 
@@ -85,31 +86,29 @@ print(result.usage.cache_read_tokens)  # the part that was cheap
 
 !!! note "Cost is a ceiling here"
 
-    The bundled pricing table records the standard (cache-miss) rate, so
-    `usage.cost_usd` overstates spend on cache-heavy workloads. Supply
-    `capability_overrides` if you need the blended rate.
+    The bundled pricing table records the standard (cache-miss) rate, so `usage.cost_usd`
+    overstates spend on cache-heavy workloads; supply
+    [`capability_overrides`](../concepts/capabilities.md#overriding-capabilities) for the
+    blended rate.
 
 ## The Anthropic-compatible endpoint
 
-DeepSeek also exposes a Messages endpoint. Point the Anthropic adapter at it — the
-dialect is the same, so nothing else is needed:
+DeepSeek also exposes a Messages endpoint at `https://api.deepseek.com/anthropic`, which
+the Anthropic adapter serves through a base-URL override — see
+[pointing that adapter elsewhere](anthropic.md#pointing-this-adapter-elsewhere). Use the
+native `deepseek:` provider unless you specifically need Messages-dialect behavior; the
+reasoning channel and cache accounting above are only wired there.
 
-```python
-ai.ProviderSettings.of(
-    "anthropic",
-    base_url="https://api.deepseek.com/anthropic",
-    api_key="env://DEEPSEEK_API_KEY",
-)
-```
+## Wire contract
 
-Use the native `deepseek:` provider unless you specifically need Messages-dialect
-behavior — the reasoning channel and cache accounting above are only wired there.
+For the exact request/response fields this adapter depends on, see
+[contracts/deepseek.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/deepseek.md).
 
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/deepseek.md)
 - [Presets](presets.md): other OpenAI-compatible providers serving DeepSeek models.
+- [Prompt caching](../concepts/caching.md): how cache reads show up in usage and cost.
 
 </div>

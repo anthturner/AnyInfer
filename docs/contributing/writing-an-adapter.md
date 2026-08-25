@@ -1,8 +1,8 @@
 # Writing a provider adapter
 
-An adapter translates. That is the whole job, and keeping it that way is what lets one
-conformance suite cover every provider. This page explains the shape and the reasoning
-behind it.
+An [adapter](../reference/glossary.md#adapter) translates. That is the whole job, and
+keeping it that way is what lets one conformance suite cover every provider. This page
+explains the shape and the reasoning behind it.
 
 For the step-by-step procedure — what to research before writing code, which registration
 gates a new provider trips, and what "done" means — follow
@@ -27,7 +27,7 @@ class MyAdapter:
     async def aclose(self) -> None: ...
 ```
 
-`WireRequest` arrives **fully resolved** — concrete model, chosen mechanism, projected
+`WireRequest` arrives fully resolved — concrete model, chosen mechanism, projected
 schema, translated reasoning effort, merged options. You never see aliases, routing policy,
 or repair state.
 
@@ -81,25 +81,24 @@ descriptor = ProviderDescriptor(
 ```
 
 `setup` is what lets config UIs stay generic; never add a per-engine branch to UI code when
-you can add a declarative field here.
+you can add a declarative field here. Full signatures for `ProviderDescriptor`,
+`ProviderSetupSpec`, and `SetupField` are in
+[the registry API](../reference/api/registry.md), and how `advanced` and `default_value`
+drive a setup form is covered in
+[shared configuration](../reference/configuration.md#which-fields-to-actually-ask-for).
 
-Three fields worth understanding:
+Two fields worth understanding:
 
-- **`SetupField.advanced`**: set it on every field you already have a working value for,
-  and put that value in `default_value`. It is what keeps a config UI down to the
-  questions only the user can answer: mark the endpoint you default to, the version you
-  pin, and the credential path that only a non-standard deployment uses. A required field
-  may not be advanced — hiding something that blocks saving is the failure this prevents —
-  and `ProviderSetupSpec` rejects that combination at import time.
-- **`grammar_needs_prompt_injection`**: set it when your engine compiles a schema to a
+- `grammar_needs_prompt_injection`: set it when your engine compiles a schema to a
   decoding grammar *without* conditioning the model on it. A grammar guarantees well-formed
   JSON, not meaningful JSON.
-- **`ignored_parameters`**: declare anything your provider accepts and silently discards.
+- `ignored_parameters`: declare anything your provider accepts and silently discards.
   The core emits `ParameterDropped` so users find out.
 
 ## If it speaks OpenAI
 
-Subclass and override only what differs:
+Subclass [the OpenAI-compatible adapter](../providers/openai-compat.md) and override only
+what differs:
 
 ```python
 class MyAdapter(OpenAICompatAdapter):
@@ -148,40 +147,7 @@ breaking every other provider.
 
 ## Certify it
 
-```python
-from anyinfer.testing.conformance import Capabilities, ConformanceHarness, run_conformance
-
-
-async def build_client(scenario: str) -> AsyncClient:
-    return AsyncClient(
-        [ProviderSettings.of("my-provider", transport=fake_for(scenario).transport())]
-    )
-
-
-HARNESS = ConformanceHarness(
-    provider_id="my-provider",
-    model="my-model",
-    build_client=build_client,
-    supports=Capabilities(reasoning=False),  # declare what you genuinely cannot do
-)
-
-results = await run_conformance(HARNESS)
-assert all(r.passed or r.skipped for r in results)
-```
-
-Declare unsupported behaviors explicitly in `Capabilities`. A declared ➖ is a documented
-limitation; a silently passing test is a lie that will cost a user an afternoon.
-
-See [the conformance suite](conformance.md).
-
-## Ship it with
-
-- the adapter;
-- a contract snapshot in `contracts/`, written before the adapter, not after;
-- a conformance harness;
-- a provider page in `docs/providers/`;
-- a row in the [matrix](../reference/conformance-matrix.md), regenerated, not hand-edited.
-
-[`contracts/NEW-PROVIDER.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/NEW-PROVIDER.md)
-carries the full list, including the generated-index and navigation entries a new built-in
-provider needs, and the gate commands to run before committing.
+Run [the conformance suite](conformance.md) against your adapter through a
+`ConformanceHarness`, declaring anything the provider cannot do in `Capabilities` so the
+matrix records a ➖ instead of overstating support. The harness, the run modes, and
+cassette recording are all covered there.

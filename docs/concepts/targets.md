@@ -79,34 +79,11 @@ print(resolved.provider_id, resolved.model, resolved.via_alias)
 
 ## Proving a target actually works
 
-Resolving a target says it is *spelled* correctly. It says nothing about whether the
-credential behind it can generate, whether the model id exists at that endpoint, or whether
-the deployment has capacity, and a health probe does not either, because everything a
-health probe touches can be fine while inference still fails.
-
-`verify()` spends one deliberately tiny request to find out, and reports rather than raises:
-
-```python
-result = client.verify("openai:gpt-5")
-
-result.ok  # answered, in the shape asked for, with the expected content
-result.reached  # answered at all
-result.detail  # what went wrong, when something did
-result.target  # which model actually served it — meaningful for "auto"
-```
-
-The two booleans are separate on purpose, because the fixes are different:
-
-| `reached` | `ok` | What it means |
-|---|---|---|
-| `False` | `False` | Nothing answered. Wrong endpoint, bad credential, no capacity. |
-| `True` | `False` | The connection is fine; the model could not hold the requested shape. |
-| `True` | `True` | Good. |
-
-Verification also carries whatever the provider said about
-[its own runtime](capabilities.md#runtime-diagnostics), so a target that works *slowly*
-does not read as a target that simply works. The CLI wraps the same call as
-[`anyinfer verify`](../guides/cli.md#checking-a-target-actually-works).
+Resolving a target says it is spelled correctly, nothing more. `verify()` spends one
+tiny request to prove the credential, model, and deployment actually serve, and
+`probe()` measures features on compatibility endpoints — both are covered in
+[proving a target works](capabilities.md#proving-a-target-works). The CLI wraps the
+first as [`anyinfer verify`](../guides/cli.md#checking-a-target-actually-works).
 
 ## Overriding the catalog
 
@@ -150,8 +127,8 @@ This is enforced by a round-trip test, not just intended.
 !!! tip "Key takeaways"
     - A target is either `provider:model` or a catalog alias; both resolve through the
       same path, and resolution either succeeds concretely or raises `ConfigError`.
-    - Alias resolution order is boring on purpose: first configured provider that offers
-      the alias wins, every time.
+    - Aliases resolve to the first configured provider that offers them, every time;
+      nothing is scored or chosen for you.
     - Every target spelling is a valid OpenAI `model` string, which is what lets the serve
       frontend federate without inventing a routing syntax.
 
@@ -159,7 +136,10 @@ This is enforced by a round-trip test, not just intended.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Routing](routing.md): a `Route` is an ordered list of targets plus policy.
-- [Capabilities](capabilities.md): what is known about a resolved model.
+- [Routing and rate limits](routing.md): a `Route` is an ordered list of targets plus
+  policy.
+- [Capabilities](capabilities.md): what is known about a resolved model, and how to
+  verify or probe it.
+- [The model catalog](catalog.md): where aliases and their tier data live.
 
 </div>

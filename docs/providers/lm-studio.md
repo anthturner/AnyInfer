@@ -5,9 +5,9 @@ icon: material/laptop
 
 # LM Studio
 
-LM Studio's local server, with **native model discovery**. Generation uses its
-OpenAI-compatible endpoint — that dialect is shared and well understood, but discovery
-uses the native API, because a local engine's model list is inventory, not a catalog.
+LM Studio's local server. Generation uses its OpenAI-compatible endpoint, a shared and
+well-understood dialect; discovery uses the native API, which reports what a local
+engine's model list actually holds.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
@@ -37,10 +37,10 @@ ai.ProviderSettings.of("lm-studio", base_url="gpu-box")  # http://gpu-box:1234
 An API token is only needed when you have enabled LM Studio's authentication.
 `lmstudio:` is an accepted alias.
 
-## Why the native API for discovery
+## Discovery
 
-The compatibility endpoint lists model ids. The native one lists what actually matters for
-a local engine:
+The compatibility endpoint lists model ids. The native one lists what matters for a
+local engine:
 
 ```python
 for model in client.models("lm-studio"):
@@ -50,13 +50,14 @@ for model in client.models("lm-studio"):
 ```
 
 Context length, quantization, artifact size, tool-use and reasoning support — all with
-`discovered` provenance, because the server reported them rather than a table guessing.
-Embedding models are filtered out; they are not chat models.
+[`discovered` provenance](../concepts/capabilities.md#the-five-provenances), because the
+server reported them rather than a table guessing. Embedding models are filtered out;
+they are not chat models.
 
 Older LM Studio builds have no native API. A 404 there degrades to the OpenAI listing —
 ids alone, rather than failing.
 
-## Residency is visible
+## Residency
 
 On a local engine the difference between a fast request and a thirty-second wait is
 whether the model is already loaded. Health says so:
@@ -66,12 +67,8 @@ health = client.health("lm-studio")
 print(health.detail)  # "loaded: qwen3-8b"  or  "no model loaded; the first request will load one"
 ```
 
-And the adapter exposes residency directly, the same way the [Ollama](ollama.md) one does:
-
-```python
-adapter = await client._pool.get("lm-studio")  # or use health() above
-loaded = await adapter.loaded_models()  # {"qwen3-8b": 1}
-```
+The detail names every resident model, so an application that prefers an already-loaded
+model over one that would first be read from disk can route on it.
 
 ## Reasoning
 
@@ -85,31 +82,6 @@ result = client.generate(prompt, target="lm-studio:qwen3-8b", reasoning="medium"
 answer more than reducing it does. Pass `provider_options={"lm-studio": {"reasoning":
 "off"}}` to turn it off deliberately.
 
-## Model management
-
-This adapter *reads* inventory but does not manage it: loading, unloading, and downloading
-stay in LM Studio's own UI and CLI (`lms load`, `lms unload`). Requests load a model on
-demand as usual.
-
-For an engine AnyInfer supervises end to end — downloading artifacts, tuning for your
-hardware, and managing the server process — see [llama.cpp](llama-cpp.md).
-
-## Other local engines
-
-Running something else? [vLLM, SGLang, KoboldCpp, Jan, GPT4All, text-generation-webui, and
-TabbyAPI](presets.md#local-engines) are all preconfigured presets, and any
-OpenAI-compatible server works through [`openai-compat`](openai-compat.md).
-
-## See also
-
-<div class="anyinfer-see-also" markdown>
-
-- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/lm-studio.md)
-- [Ollama](ollama.md): the other local engine with native discovery.
-- [The local subsystem](../concepts/local.md): hardware detection and supervision.
-
-</div>
-
 ## Embeddings
 
 Embedding models loaded in LM Studio serve through the OpenAI-compatible dialect:
@@ -121,5 +93,31 @@ result = client.embed(["hello"], target="lm-studio:text-embedding-nomic-embed-te
 `client.models("lm-studio", operation="embedding")` lists which loaded models embed —
 the native listing's `type` field distinguishes them, so nothing is guessed. LM Studio
 documents no request limits for the endpoint; for large corpora set
-`BatchPolicy.max_items_override` to a size your machine handles.
+[`BatchPolicy.max_items_override`](../concepts/embeddings.md#batching) to a size your
+machine handles.
 
+## Model management
+
+This adapter *reads* inventory but does not manage it: loading, unloading, and downloading
+stay in LM Studio's own UI and CLI (`lms load`, `lms unload`). Requests load a model on
+demand as usual.
+
+For an engine AnyInfer supervises end to end — downloading artifacts, tuning for your
+hardware, and managing the server process — see [llama.cpp](llama-cpp.md). For other
+engines, [vLLM, SGLang, KoboldCpp, Jan, GPT4All, text-generation-webui, and
+TabbyAPI](presets.md#local-engines) are all preconfigured presets, and any
+OpenAI-compatible server works through [`openai-compat`](openai-compat.md).
+
+## Wire contract
+
+For the exact request/response fields this adapter depends on, see
+[contracts/lm-studio.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/lm-studio.md).
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Ollama](ollama.md): the other local engine with native discovery.
+- [The local subsystem](../concepts/local.md): hardware detection and supervision.
+
+</div>

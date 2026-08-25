@@ -10,40 +10,39 @@ Look things up.
   from test results rather than assertion.
 - **[Shared configuration](configuration.md)**: provider settings, environment variables,
   and the common JSON file.
-- **[Run manifest format](run-manifest.md)**: serialization, compatibility, and its
-  executable JSON Schema.
+- **[Run manifests](../concepts/run-manifests.md)**: the manifest format, serialization
+  compatibility, and its executable JSON Schema.
 - **[Glossary](glossary.md)**: the vocabulary this project uses precisely.
 
 ## API stability
 
 The public API is fully typed (the package ships a `py.typed` marker) and documented in
-its docstrings; CI fails if any exported symbol lacks a docstring or a reference page.
-The stability commitments cover the top-level `anyinfer` namespace plus the subpackage
-surfaces the guides teach: `anyinfer.config`, `anyinfer.local`, `anyinfer.serve`,
-`anyinfer.testing`, and `anyinfer.otel`. Anything under `anyinfer._client` is private, and within every module
-only the names in `__all__` are public — everything else is an implementation detail
-that may change without notice. `help(ai.AsyncClient.generate)` in a REPL always
-matches the published [SDK reference](api/README.md), because both come from the same
-docstrings.
+its docstrings. The stability commitments cover the top-level `anyinfer` namespace plus
+the subpackage surfaces the guides teach: `anyinfer.config`, `anyinfer.local`,
+`anyinfer.serve`, `anyinfer.testing`, and `anyinfer.otel`. Anything under
+`anyinfer._client` is private, and within every module only the names in `__all__` are
+public — everything else is an implementation detail that may change without notice.
+`help(ai.AsyncClient.generate)` in a REPL always matches the published
+[SDK reference](api/README.md), because both come from the same docstrings.
 
 ## Module map
 
 | Module | Responsibility |
 |---|---|
-| `anyinfer.types` | Frozen domain types. Zero I/O. |
-| `anyinfer.errors` | The exception hierarchy. |
-| `anyinfer._client` | `AsyncClient`, the sync `Client`, and the tool loop. |
-| `anyinfer.registry` | Provider descriptors and collision-safe registration. |
-| `anyinfer.config` | Shared, versioned JSON configuration. |
-| `anyinfer.routing` | Routes, retries, health gating, attempt accounting. |
-| `anyinfer.schema` | Mechanism selection, projection, validation, repair. |
-| `anyinfer.events` | Telemetry events and observer dispatch. |
-| `anyinfer.redaction` | The secret-redaction registry. |
-| `anyinfer.credentials` | Credential resolvers. |
-| `anyinfer.catalog` | Alias catalog and target resolution. |
-| `anyinfer.capabilities` | Capability assembly, cost computation, token estimation, context budgets, and the pre-dispatch gate. |
-| `anyinfer.local` | Hardware, backends, tuning, downloads, supervision. |
-| `anyinfer.providers` | One module per adapter. |
-| `anyinfer.testing` | Fakes, cassettes, and the conformance suite. |
-| `anyinfer.serve` | The OpenAI-compatible frontend. |
-| `anyinfer.otel` | The OpenTelemetry bridge. |
+| [`anyinfer.types`](api/requests.md) | Frozen domain types. Zero I/O. |
+| [`anyinfer.errors`](api/errors.md) | The exception hierarchy. |
+| [`anyinfer._client`](api/client.md) | `AsyncClient`, the sync `Client`, and the tool loop. |
+| [`anyinfer.registry`](api/registry.md) | Provider descriptors and collision-safe registration. |
+| [`anyinfer.config`](api/configuration.md) | Shared, versioned JSON configuration. |
+| [`anyinfer.routing`](api/routing.md) | Routes, retries, health gating, attempt accounting. |
+| [`anyinfer.schema`](api/requests.md) | Mechanism selection, projection, validation, repair. |
+| [`anyinfer.events`](api/telemetry.md) | Telemetry events and observer dispatch. |
+| [`anyinfer.redaction`](api/telemetry.md) | The secret-redaction registry. |
+| [`anyinfer.credentials`](api/registry.md) | Credential resolvers. |
+| [`anyinfer.catalog`](api/registry.md) | Alias catalog and target resolution. |
+| [`anyinfer.capabilities`](api/capabilities.md) | Capability assembly, cost computation, token estimation, context budgets, and the pre-dispatch gate. |
+| [`anyinfer.local`](api/local.md) | Hardware, backends, tuning, downloads, supervision. |
+| [`anyinfer.providers`](api/registry.md) | One module per adapter. |
+| [`anyinfer.testing`](api/testing.md) | Fakes, cassettes, and the conformance suite. |
+| [`anyinfer.serve`](api/serve.md) | The OpenAI-compatible frontend. |
+| [`anyinfer.otel`](api/telemetry.md) | The OpenTelemetry bridge. |

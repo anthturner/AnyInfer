@@ -6,10 +6,10 @@ integration. That path has a specific failure mode here, and this page is about 
 An agent working from pre-training and a web search will confidently produce an OpenAI
 clone — `client.chat.completions.create(...)`, a `model=` keyword,
 `response_format={"type": "json_object"}`, because that is what almost every other library
-in this space looks like. AnyInfer deliberately is not that, so the most predictable guess
-is also the most likely to be wrong. Worse, the wrong version usually *runs*: a hand-written
-retry loop around a call that already retries produces four attempts where you asked for two,
-and nothing fails loudly enough to notice.
+in this space looks like. AnyInfer is not that, so the most predictable guess is also the
+most likely to be wrong. Worse, the wrong version usually *runs*: a hand-written retry loop
+around a call that already retries produces four attempts where you asked for two, and
+nothing fails loudly enough to notice.
 
 Three artifacts exist to correct that, and every one of them is derived from something
 canonical rather than written twice.
@@ -44,20 +44,25 @@ yours to make, and it is also your review step.
 Built with the site and published at its root:
 
 - <https://anyinfer.dev/llms.txt>: the index: a one-line summary of every page, grouped
-  the way the navigation is.
-- <https://anyinfer.dev/llms-full.txt>: the full text of every page, navigation chrome
-  stripped, including the generated API reference.
+  the way the navigation is. Each section heading links a full-text bundle of just that
+  section (`llms/concepts.txt`, `llms/providers.txt`, …), each sized to fit one context
+  window.
+- <https://anyinfer.dev/llms-full.txt>: the full text of every page in one file,
+  navigation chrome stripped, including the generated API reference. It has outgrown a
+  single context window; fetch a section bundle unless you truly want the whole corpus.
 
-Both are generated from the navigation and the built pages, so a page added to the docs
-appears without a hand edit and a deleted one cannot linger.
+All of them are generated from the navigation and the built pages, so a page added to
+the docs appears without a hand edit and a deleted one cannot linger.
 
 ## The integration skill
 
-[`docs/agents/INTEGRATION.md`](https://github.com/anthturner/AnyInfer/blob/main/docs/agents/INTEGRATION.md)
+[`docs/agents/INTEGRATION.md`](../agents/INTEGRATION.md)
 is the canonical procedure: establish the version, read what the application already
-configured, write the call, do not re-implement the core, interpret results accurately, prove it
-offline, then check the work. Three thin entry points in the repository invoke it —
-`.claude/skills/anyinfer-integration/`, `.agents/skills/anyinfer-integration/`, and
+configured, write the call the way [the Python SDK guide](python-sdk.md) does, do not
+re-implement the core, interpret results accurately, prove it offline with
+[the test kit](testing-your-app.md), then check the work. Three thin entry points in the
+repository invoke it — `.claude/skills/anyinfer-integration/`,
+`.agents/skills/anyinfer-integration/`, and
 `.github/prompts/anyinfer-integration.prompt.md`.
 
 To use it in your own project, copy the canonical file and whichever shim your tool reads:
@@ -76,8 +81,8 @@ procedure.
 
 ## One caveat
 
-A generated fragment reflects the version that generated it, and a copied procedure
-reflects the day it was copied. Neither updates itself. Regenerate after upgrading:
+A generated fragment and a copied procedure describe the release they came from, so
+regenerate them when you upgrade:
 
 ```bash
 anyinfer agents-md > /tmp/anyinfer-agents.md && diff /tmp/anyinfer-agents.md AGENTS.md
@@ -86,3 +91,24 @@ anyinfer agents-md > /tmp/anyinfer-agents.md && diff /tmp/anyinfer-agents.md AGE
 What does not go stale is the library itself. `anyinfer providers`, `anyinfer verify`, and
 `anyinfer run --dry-run` answer from the installed code, which is why the procedure tells an
 agent to run them rather than to trust anything it remembers, including this page.
+
+!!! tip "Key takeaways"
+    - The predictable failure is an OpenAI clone that runs: hand-rolled retries around a
+      call that already retries, and no loud failure to flag it.
+    - `anyinfer agents-md` renders from live introspection and stamps its release; it
+      prints only, so installing the fragment stays your decision and your review step.
+    - `llms.txt` and `llms-full.txt` are generated from the built site, so they cannot
+      drift from the documentation.
+    - The canonical procedure lives in `docs/agents/INTEGRATION.md`; the `.claude/`,
+      `.agents/`, and `.github/` entries are thin shims that invoke it.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [The integration procedure](../agents/INTEGRATION.md): what an agent is told to do,
+  step by step.
+- [Integrate the Python SDK](python-sdk.md): the call shapes an agent should produce.
+- [Test your application offline](testing-your-app.md): how "prove it offline" works.
+
+</div>

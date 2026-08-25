@@ -29,12 +29,42 @@ LLMS_INDEX = "llms.txt"
 """Curated link index; the filename is the community convention, not ours to choose."""
 
 LLMS_FULL = "llms-full.txt"
-"""Concatenated page text, for an agent that wants the corpus rather than the map."""
+"""Concatenated page text, for an agent that wants the corpus rather than the map. Kept
+even though it outgrew one context window, because the filename is a community
+convention that tools fetch blindly; the per-section bundles below are the sized-to-fit
+alternative."""
 
-LLMS_FULL_SPLIT_BYTES = 800_000
-"""Roughly 200k tokens. Past this the bundle should become a per-section split with
-``llms.txt`` as the index; the build logs its size so the threshold is observed rather
-than guessed at."""
+LLMS_SECTION_DIR = "llms"
+"""Site subdirectory holding one full-text bundle per navigation section
+(``llms/concepts.txt``, ``llms/providers.txt``, …), each linked from its section
+heading in ``llms.txt``."""
+
+LLMS_SECTION_MAX_BYTES = 800_000
+"""Roughly 200k tokens — the point past which a bundle stops fitting an agent's context
+window. ``llms-full.txt`` crossed it in 2026-08, which is why the per-section split
+exists; the build fails if any *single section* crosses it, because that means the
+split itself needs to go a level deeper."""
+
+REDIRECTS: dict[str, str] = {
+    "guides/when-to-use.md": "why-anyinfer.md",
+    "guides/integration-paths.md": "guides/README.md",
+    "guides/local-models.md": "guides/local-inference.md",
+    "guides/credentials.md": "concepts/credentials.md",
+    "guides/soc2-mapping.md": "guides/confidentiality-tiers.md#appendix-soc-2-control-mapping",
+    "guides/sidecar-corpus-context.md": "serve/README.md#reducing-an-explicit-corpus",
+    "examples/compare-targets.md": "guides/comparing-targets.md",
+    "concepts/rate-limits.md": "concepts/routing.md#pacing-before-the-limit",
+    "concepts/models.md": "concepts/catalog.md#acquiring-a-pick",
+    "reference/run-manifest.md": "concepts/run-manifests.md",
+    "providers/jina.md": "providers/retrieval.md",
+    "providers/voyage.md": "providers/retrieval.md",
+    "contributing/repository-setup.md": "contributing/releasing.md",
+}
+"""Old doc path -> new doc path (with optional anchor) for pages merged away in the
+2026-08 documentation reorganization. Kept in the build hook rather than a redirects
+plugin so the docs build adds no dependency; each entry becomes a static stub page at
+the old URL. Entries are keyed by *former* doc paths, so nothing here may name a file
+that still exists — the build fails if one does."""
 
 _SUMMARIES: dict[str, str] = {}
 """One-line summary per page source path, harvested from its first prose paragraph."""
@@ -107,21 +137,76 @@ def on_post_build(*, config: Any, **kwargs: Any) -> None:
     index = _render_index(config)
     if "\n## " not in index:
         raise ValueError(f"{LLMS_INDEX} lists no pages; the navigation hook produced nothing")
-    (site_dir / LLMS_INDEX).write_text(index, encoding="utf-8")
 
     bundle = _render_full(config)
-    for name, text in ((LLMS_INDEX, index), (LLMS_FULL, bundle)):
+    outputs: list[tuple[str, str]] = [(LLMS_INDEX, index), (LLMS_FULL, bundle)]
+    for title, pages in _sections(config):
+        if not pages:
+            continue
+        name = f"{LLMS_SECTION_DIR}/{_section_slug(title)}.txt"
+        outputs.append((name, _render_section(config, title, pages)))
+
+    for name, text in outputs:
         leak = re.search(r"\bADR-\d", text)
         if leak is not None:
             raise ValueError(
                 f"{name} contains the internal identifier {leak.group(0)!r}; state the "
                 "rule in plain words in the source page instead"
             )
-    (site_dir / LLMS_FULL).write_text(bundle, encoding="utf-8")
+        size = len(text.encode("utf-8"))
+        if name.startswith(f"{LLMS_SECTION_DIR}/") and size > LLMS_SECTION_MAX_BYTES:
+            budget = LLMS_SECTION_MAX_BYTES / 1024
+            raise ValueError(
+                f"{name} is {size / 1024:.0f} KiB, past the {budget:.0f} KiB context-window "
+                "budget; split that section's bundle a level deeper"
+            )
+        destination = site_dir / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(text, encoding="utf-8")
+        print(f"INFO    -  {name} is {size / 1024:.0f} KiB")
 
-    size = len(bundle.encode("utf-8"))
-    note = " - past the split threshold" if size > LLMS_FULL_SPLIT_BYTES else ""
-    print(f"INFO    -  {LLMS_FULL} is {size / 1024:.0f} KiB{note}")
+    _write_redirects(config)
+
+
+def _doc_url(config: Any, doc_path: str) -> str:
+    """Map a doc path to its absolute site URL, honoring directory URLs."""
+    path, _, anchor = doc_path.partition("#")
+    if path.endswith(("README.md", "index.md")):
+        url = path.rsplit("/", 1)[0] + "/" if "/" in path else ""
+    else:
+        url = path[: -len(".md")] + "/"
+    return _absolute(config, url) + (f"#{anchor}" if anchor else "")
+
+
+def _write_redirects(config: Any) -> None:
+    """Write a static stub at every retired URL, pointing at the page that absorbed it.
+
+    Raises:
+        ValueError: If a mapping's source doc still exists (it should be a real page,
+            not a redirect), or its target doc does not (the redirect would 404).
+    """
+    docs_dir = Path(config.docs_dir)
+    site_dir = Path(config.site_dir)
+    for old, new in REDIRECTS.items():
+        if (docs_dir / old).exists():
+            raise ValueError(f"redirect source {old!r} still exists; remove the mapping")
+        if not (docs_dir / new.partition("#")[0]).exists():
+            raise ValueError(f"redirect target {new!r} does not exist")
+        target = _doc_url(config, new)
+        stub_dir = site_dir / old[: -len(".md")]
+        stub_dir.mkdir(parents=True, exist_ok=True)
+        (stub_dir / "index.html").write_text(
+            "<!doctype html>\n<html lang=\"en\">\n<head>\n"
+            "<meta charset=\"utf-8\">\n"
+            f"<title>Redirecting…</title>\n"
+            f"<link rel=\"canonical\" href=\"{target}\">\n"
+            f"<meta http-equiv=\"refresh\" content=\"0; url={target}\">\n"
+            "</head>\n<body>\n"
+            f"<p>This page has moved to <a href=\"{target}\">{target}</a>.</p>\n"
+            "</body>\n</html>\n",
+            encoding="utf-8",
+        )
+    print(f"INFO    -  wrote {len(REDIRECTS)} redirect stub(s) for retired URLs")
 
 
 # ---- rendering -----------------------------------------------------------------------
@@ -135,13 +220,19 @@ def _render_index(config: Any) -> str:
         f"> {_collapse(config.site_description)}",
         "",
         f"Version {config.extra['anyinfer_version']}. Full text of every page below: "
-        f"{_absolute(config, LLMS_FULL)}",
+        f"{_absolute(config, LLMS_FULL)} (all sections; larger than one context window). "
+        "Each section heading links its own full-text bundle, sized to fit one.",
         "",
     ]
     for title, pages in _sections(config):
         if not pages:
             continue
         lines.append(f"## {title}")
+        lines.append("")
+        lines.append(
+            f"Full text of this section: "
+            f"{_absolute(config, f'{LLMS_SECTION_DIR}/{_section_slug(title)}.txt')}"
+        )
         lines.append("")
         for page_title, url, summary, _src in pages:
             suffix = f": {summary}" if summary else ""
@@ -152,20 +243,42 @@ def _render_index(config: Any) -> str:
 
 def _render_full(config: Any) -> str:
     """Concatenate every navigated page's body text, in navigation order."""
-    parts = [
-        f"# {config.site_name} - full documentation",
-        "",
+    prelude = (
+        f"# {config.site_name} - full documentation\n\n"
         f"Version {config.extra['anyinfer_version']}. Generated from the built site; the "
-        f"link index is at {_absolute(config, LLMS_INDEX)}.",
-    ]
+        f"link index is at {_absolute(config, LLMS_INDEX)}."
+    )
+    parts = [prelude]
     for title, pages in _sections(config):
-        for page_title, url, _summary, src in pages:
-            body = _BODIES.get(src, "")
-            if not body:
-                continue
-            parts.append(f"\n\n---\n\n# {title} / {page_title}\n\nSource: {url}\n")
-            parts.append(body)
-    return "\n".join(parts).rstrip("\n") + "\n"
+        parts.append(_render_pages(title, pages))
+    return "".join(parts).rstrip("\n") + "\n"
+
+
+def _render_section(config: Any, title: str, pages: list[tuple[str, str, str, str]]) -> str:
+    """Render one navigation section's full text as a standalone bundle."""
+    header = (
+        f"# {config.site_name} - {title} (full text)\n\n"
+        f"Version {config.extra['anyinfer_version']}. One section of the documentation; "
+        f"the link index for everything is at {_absolute(config, LLMS_INDEX)}."
+    )
+    return (header + _render_pages(title, pages)).rstrip("\n") + "\n"
+
+
+def _render_pages(title: str, pages: list[tuple[str, str, str, str]]) -> str:
+    """Concatenate a section's page bodies, each under a source-attributed heading."""
+    parts = []
+    for page_title, url, _summary, src in pages:
+        body = _BODIES.get(src, "")
+        if not body:
+            continue
+        parts.append(f"\n\n---\n\n# {title} / {page_title}\n\nSource: {url}\n")
+        parts.append("\n" + body)
+    return "".join(parts)
+
+
+def _section_slug(title: str) -> str:
+    """Turn a navigation section title into a bundle filename stem."""
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
 
 
 def _sections(config: Any) -> list[tuple[str, list[tuple[str, str, str, str]]]]:

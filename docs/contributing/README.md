@@ -15,22 +15,13 @@ python workspace.py check                          # every gate CI runs
 
 Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI.
 
-When the repository root is opened in VS Code, accept the recommended Python, Python
-Environments, Ruff, and mypy extensions. The automatic `Bootstrap venv` task creates the
-same repo-local `.venv` with the host's `py -3`/`python` (Windows) or `python3`
-(macOS/Linux) interpreter and installs the dev environment; that interpreter must be Python
-3.11+. The checked-in editor settings refer to the venv directory rather than a
-platform-specific executable, so the same configuration resolves on Windows, macOS, and
-Linux.
-
 ## The task runner
 
-[`workspace.py`](https://github.com/anthturner/AnyInfer/blob/main/workspace.py) is the one entry point for routine commands. It works
-as `python workspace.py <verb>` in a fresh clone, and as `workspace <verb>` once installed.
-The repo also ships wrapper scripts — `./workspace` (sh) and `workspace.cmd` (Windows) —
-that run the checkout's `workspace.py` with a repo-local `.venv` when one exists, so
-`workspace <verb>` works from the repo root without an install and can never dispatch to a
-stale installed copy. Run it with no arguments to list every verb.
+[`workspace.py`](https://github.com/anthturner/AnyInfer/blob/main/workspace.py) is the one
+entry point for routine commands: `python workspace.py <verb>` in a fresh clone,
+`workspace <verb>` once installed, or the checked-in `./workspace` (sh) and
+`workspace.cmd` (Windows) wrappers from the repo root. Run it with no arguments to list
+every verb.
 
 | Verb | Does |
 |---|---|
@@ -63,34 +54,26 @@ tells you everything that is broken:
 | `types` | `mypy` (strict) |
 | `contracts` | `lint-imports` — the architecture contracts |
 | `test` | `pytest -q`, the full suite, headless |
-| `conformance` | The provider conformance suite and the serve invariants |
+| `conformance` | The provider [conformance suite](conformance.md) and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
 | `docs-build` | `mkdocs build --strict` — the exact artifact the Pages deploy publishes |
 
 That table is the whole pipeline: every step of every CI job is one of these phases,
 invoked as `python workspace.py check --only=<phase>`. A green `check` therefore means what
-a green CI run means, with one honest exception — CI also runs the `test` phase across
+a green CI run means, with one exception — CI also runs the `test` phase across
 Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners can cover.
 
 `--skip=a,b` leaves phases out; `--only=a,b` runs just those; the two are mutually
 exclusive. `python workspace.py build docs` runs the same strict site build as the
 `docs-build` phase, for when you want the artifact rather than the verdict.
 
-The formatter is deliberately **not** a default gate — it reflows argv-style flag/value
-pairs one per line, which makes the llama-server tuner and the provider payload builders
-materially harder to read. `python workspace.py check --only=format` exists if you want it anyway
-(with `--fix` to format in place).
+The formatter is not a default gate, since it reflows argv-style flag/value pairs into a
+less readable shape; `python workspace.py check --only=format --fix` formats anyway.
 
 `lint-imports` is the unusual one: it enforces the architecture boundaries mechanically
-rather than relying only on review.
-
-| Contract | Enforces |
-|---|---|
-| Adapters never orchestrate | No routing, validation, repair, or client logic in `providers/` |
-| Sidecar is a codec | The frontend cannot grow its own provider or routing logic |
-| Types are leaf modules | `types/` stays I/O-free and dependency-free |
-
-If one of these fails, the fix is almost always to move code, not to loosen the contract.
+rather than relying only on review. The contracts and what each one forbids are listed in
+[architecture](architecture.md#enforcement); when one fails, the fix is almost always to
+move code, not to loosen the contract.
 
 ## Where to read first
 
@@ -148,16 +131,14 @@ A change touching an adapter's wire behavior includes:
 Run the [drift check](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md) before starting adapter work, so you are
 coding against what the provider does *now*.
 
-## More
+## Where next
 
-- [Architecture](architecture.md)
-- [Writing a provider adapter](writing-an-adapter.md)
-- [The conformance suite](conformance.md)
-- [Testing guide](testing.md)
-- [Coding-agent instructions and workstreams](automation.md)
-- [Branding and visual assets](branding.md)
-- [Branching and releases](releasing.md): the branch model, what a release is, and how
-  a version bump reaches PyPI
-- [Repository setup](repository-setup.md): the one-time GitHub settings and secrets
-  (branch protection, Pages, Actions PR permission, PyPI trusted publishing,
-  `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` for the pricing refresh)
+- [Writing a provider adapter](writing-an-adapter.md): the adapter contract, the
+  descriptor, and the OpenAI-dialect shortcut.
+- [The conformance suite](conformance.md): certifying an adapter and contributing
+  cassettes.
+- [Testing guide](testing.md): the fast track, the gate, and where a test belongs.
+- [Branching and releases](releasing.md): the branch model and how a version bump reaches
+  PyPI.
+- [Branding and visual assets](branding.md): the canonical marks and the rules for using
+  them.

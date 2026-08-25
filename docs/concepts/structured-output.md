@@ -65,9 +65,12 @@ result.structured_mechanism  # "grammar"
 
 **2. Project the schema for that provider.**
 
-Grammar-based engines choke on constructs that are cheap for a validator but expensive for a
-grammar — string length bounds, very large array bounds, so those are stripped *for the
-wire only*.
+Grammar-based engines choke on constructs that are cheap for a validator but expensive for
+a grammar: `minLength`/`maxLength` on strings, and `minItems`/`maxItems` of 2000 or more,
+are stripped *for the wire only*. If a local model keeps failing a length constraint, that
+is why — the constraint never reached the engine, and clearer prompt wording will help
+more than a tighter bound. Two things improve results under every mechanism: prefer `enum`
+over free-form strings, and keep nesting shallow.
 
 **3. Validate the response against your original schema.**
 
@@ -112,6 +115,9 @@ It does not fall back to a different provider: a schema violation says something
 model's output, not the endpoint's health, and fallback would spend the routing budget on a
 problem fallback cannot fix.
 
+Each attempt is a full additional request. A repair budget is therefore also a latency
+budget, worth accounting for on latency-sensitive paths.
+
 The budget is bounded. When it is exhausted:
 
 ```python
@@ -128,24 +134,10 @@ object contains delimiter-confirmed complete members—`error.partial` plus
 guesses a cut-off scalar, asks another provider to continue it, or treats recovered fields
 as schema-validated.
 
-### Some providers cap the budget
-
-The budget is the caller's to set, and for almost every provider it stays that way. A few
-declare a ceiling, because a repair round trip costs them far more than a malformed answer
-is worth: Microsoft 365 Copilot allows one, since every request is a Graph call against a
-service-held conversation behind an interactively-acquired token.
-
-The clamp is never silent. Asking for three where the provider allows one emits a
-[`ParameterDropped`](telemetry.md) event naming `repair.max_attempts`, so a budget reduced
-behind your back is as discoverable as a parameter ignored outright:
-
-```python
-ai.ParameterDropped(
-    parameter="repair.max_attempts",
-    reason="m365-copilot allows at most 1 schema-repair round trip(s); 3 requested",
-    ...
-)
-```
+The budget is the caller's to set for almost every provider. A few declare a ceiling —
+[Microsoft 365 Copilot](../providers/m365-copilot.md) allows one repair attempt, because
+each is a full Graph round trip — and the clamp is never silent: asking for more emits a
+[`ParameterDropped`](telemetry.md) event naming `repair.max_attempts`.
 
 ## Extraction is forgiving; validation is not
 

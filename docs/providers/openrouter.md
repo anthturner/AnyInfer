@@ -5,9 +5,10 @@ icon: material/router-network
 
 # OpenRouter
 
-An `openai-compat` subclass. Its distinctive value is the model listing: OpenRouter reports
-per-model context length **and** per-token pricing, so its costs carry `discovered`
-provenance rather than catalogued estimates.
+An [`openai-compat`](openai-compat.md) subclass. Its distinctive value is the model
+listing: OpenRouter reports per-model context length and per-token pricing, so its
+[costs](../concepts/cost.md) carry `discovered` provenance rather than cataloged
+estimates.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
@@ -34,22 +35,13 @@ result = client.generate(prompt, target="openrouter:anthropic/claude-sonnet-4.5"
 
 Model ids are namespaced `vendor/model`. The attribution headers are optional.
 
-## Discovered capabilities
+## Discovery
 
-```python
-for model in client.models("openrouter"):
-    caps = model.capabilities
-    if caps and caps.pricing:
-        print(model.id, caps.pricing.value.input_per_1m, caps.pricing.provenance)
-```
-
-Prices are parsed with `Decimal`: per-token prices are fractions of a cent, and float error
-accumulates quickly across a long run.
-
-Feature flags come from each model's `supported_parameters`. Absence is treated as
-unsupported rather than unknown — OpenRouter enumerates what a model accepts, so a missing
-entry is meaningful, and claiming more would send requests the upstream provider silently
-drops.
+The listing's prices are parsed with `Decimal` and arrive with
+[`discovered` provenance](../concepts/capabilities.md#the-five-provenances), beating the
+bundled table. Feature flags come from each model's `supported_parameters`, where absence
+means unsupported: OpenRouter enumerates what a model accepts, so claiming more would
+send requests the upstream provider silently drops.
 
 ## Notes
 

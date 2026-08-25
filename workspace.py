@@ -999,12 +999,13 @@ Regenerate with `python workspace.py matrix`.
 Legend: ✅ verified · ➖ declared unsupported · ❌ failing
 
 Each cell is one parametrized test case executed against that adapter in fake-server mode,
-at whatever boundary that adapter actually has: an in-process HTTP transport for the
-twenty that speak HTTP, and a fake SDK module for `copilot`, whose boundary genuinely is
+at whatever boundary that adapter has: an in-process HTTP transport for the
+twenty that speak HTTP, and a fake SDK module for `copilot`, whose boundary is
 the ``github-copilot-sdk`` session API rather than a wire protocol. `llama-cpp` speaks
 HTTP to a server it supervises, so its row substitutes a stub supervisor and starts no
 process, downloads nothing, and binds no port.
-A ➖ is an honest, declared limitation; it is not a pass.
+A ➖ is a declared limitation, not a pass. How a case is defined and how to record a
+cassette are covered in [the conformance suite](../contributing/conformance.md).
 
 """
 
@@ -1162,8 +1163,7 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
         )
     )
     lines.append(
-        covered_note + " Expanding cassette-backed coverage is tracked as release "
-        "follow-up work. "
+        covered_note + " "
         "The `groq`, `moonshot`, `reka` and `venice` rows exercise the shared adapter's "
         "quirk axes — bearer auth, the renamed output-token field, `x-api-key` auth, and "
         "the `max_completion_tokens` dialect. Every entry in the "

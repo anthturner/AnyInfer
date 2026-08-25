@@ -1,12 +1,11 @@
 # Distill a corpus
 
-Some material will never fit at any fidelity. `distill` reads all of it and writes
-something shorter: each chunk is summarized against your question, then the notes are
-synthesized into one answer.
-
-It is the only reduction strategy that **spends inference**, so it is a separate function
-rather than a `select()` strategy, and it reports the call count and aggregate usage so
-the multiplier is never a surprise.
+`distill` reads material that will never fit at any fidelity and writes something
+shorter: each chunk is summarized against your question, then the notes are synthesized
+into one answer. Since that spends inference — a corpus of N chunks costs N+1 requests —
+it is a separate function rather than a `select()` strategy, and this example needs a
+live provider: as written, [Anthropic](../providers/anthropic.md) with
+`ANTHROPIC_API_KEY` set.
 
 ## The basic shape
 
@@ -31,8 +30,9 @@ print(result.text)
 print(f"{result.calls} calls, {result.usage.output_tokens} output tokens")
 ```
 
-`source` may be raw text or `ContextDocument` values. Documents split per document,
-because a document boundary is a natural chunk boundary.
+`result.calls` and `result.usage` report the fan-out and aggregate spend, so the
+multiplier is never a surprise. `source` may be raw text or `ContextDocument` values;
+documents split per document, because a document boundary is a natural chunk boundary.
 
 ## Know the cost before you commit
 
@@ -52,13 +52,26 @@ if estimate is not None:
     print(f"roughly ${estimate.low * chunks:.2f}–${estimate.high * chunks:.2f}")
 ```
 
-Afterwards, `result.usage.cost_usd` is what it actually cost, wherever the provider
-reports cost.
+Afterwards, `result.usage.cost_usd` is what it cost, wherever the provider reports cost.
 
-## Spend nothing on the reduce phase
+## Hierarchical reduce, when there are many notes
+
+With enough chunks, the notes themselves exceed the window. `distill` handles that by
+reducing in batches — sized by what fits, not by note count — and then reducing those
+summaries:
+
+```python
+result = await context.distill(huge_corpus, question, client=client, target=target)
+print(result.reduce_depth)  # 1 for a single pass, higher when it recursed
+```
+
+A single-pass merge would overflow here.
+
+## Variations
 
 If your notes merge structurally — a union of entries, a concatenation, a JSON merge —
-supply a `reducer` and the reduce call disappears entirely:
+supply a `reducer` and the reduce call disappears; the map phase is still N calls, the
+reduce is free and reproducible:
 
 ```python
 import json
@@ -89,11 +102,7 @@ result = await context.distill(
 assert result.calls == result.chunk_count  # map phase only
 ```
 
-The map phase is still N calls; the reduce is free and reproducible.
-
-## Own the framing
-
-The built-in prompts are mechanical scaffolding — "here is part 3 of 9, take notes" — not
+The built-in prompts are mechanical scaffolding ("here is part 3 of 9, take notes"), not
 application prose. Replace them when the framing matters:
 
 ```python
@@ -113,22 +122,9 @@ result = await context.distill(
 )
 ```
 
-## Hierarchical reduce, when there are many notes
-
-With enough chunks, the notes themselves exceed the window. `distill` handles that by
-reducing in batches — sized by what actually fits, not by note count, and then reducing
-those summaries:
-
-```python
-result = await context.distill(huge_corpus, question, client=client, target=target)
-print(result.reduce_depth)  # 1 for a single pass, higher when it recursed
-```
-
-A naive single-pass merge would simply overflow here.
-
-## Bound the fan-out
-
-Concurrency defaults to 4. A fan-out is somebody's rate limit:
+Concurrency defaults to 4, and a fan-out is somebody's rate limit. Failures propagate as
+normal provider errors, so retry and fallback stay on your
+[`Route`](../concepts/routing.md), not duplicated inside the reducer:
 
 ```python
 result = await context.distill(
@@ -140,10 +136,8 @@ result = await context.distill(
 )
 ```
 
-Failures propagate as normal provider errors, so retry and fallback stay where they
-belong — on your [`Route`](../concepts/routing.md), not duplicated inside the reducer.
-
-## From a synchronous application
+From a synchronous application, use `distill_sync`; chunks process one at a time, since
+concurrency is the async path's feature:
 
 ```python
 with ai.Client([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]) as client:
@@ -154,43 +148,6 @@ with ai.Client([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API
         target="anthropic:claude-sonnet-4-5",
     )
 ```
-
-Chunks process one at a time — concurrency is the async path's feature. Use
-`distill()` with an `AsyncClient` if you want the parallel map phase.
-
-## Generating module digests (the caching recipe)
-
-The `tiered` strategy renders app-supplied module digests but never generates them —
-spending inference to summarize is your decision, not a side effect of packing. Here is
-the pattern, with caching:
-
-```python
-surfaces = context.module_surfaces(documents, depth=2)
-
-digests = {}
-for module, surface in surfaces.items():
-    key = hashlib.sha256(surface.encode()).hexdigest()
-    if (cached := digest_cache.get(key)) is not None:
-        digests[module] = cached
-        continue
-    summary = await client.generate(
-        f"Describe what this module does in two sentences:\n\n{surface}",
-        target="anthropic:claude-haiku-4-5",
-    )
-    digests[module] = summary.text
-    digest_cache[key] = summary.text
-
-reduction = context.select(
-    documents,
-    query,
-    max_tokens=max_tokens,
-    strategy="tiered",
-    module_digests=digests,
-)
-```
-
-`module_surfaces()` is deterministic, so the digest cache key is stable across runs. The
-cache itself stays app-side.
 
 ## See also
 

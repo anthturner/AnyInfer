@@ -5,10 +5,10 @@ icon: material/hexagon-multiple
 
 # Cohere
 
-The native **v2 Chat API**, not the OpenAI compatibility endpoint. The compatibility layer
-would work, but v2 is where the things worth choosing Cohere for live: grounded generation
-with document citations, a separate thinking channel, and usage that distinguishes what
-was processed from what was billed.
+The native v2 Chat API, chosen over the OpenAI compatibility layer because v2 is where
+the things worth choosing Cohere for live: grounded generation with document citations, a
+separate thinking channel, and usage that distinguishes what was processed from what was
+billed.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
@@ -32,7 +32,7 @@ client = ai.Client(
 result = client.generate(prompt, target="cohere:command-a-03-2025")
 ```
 
-## Dialect differences you may notice
+## Dialect differences
 
 Cohere's API diverges from the OpenAI shape in ways the adapter normalizes, but which
 show up if you reach past it with `provider_options`:
@@ -48,19 +48,18 @@ Unknown finish reasons normalize to `"other"` rather than propagating.
 
 ## Reasoning
 
-Cohere budgets thinking in tokens rather than naming levels, so normalized effort maps to
-a budget:
+Cohere budgets thinking in tokens, so normalized effort maps to a budget: `minimal`
+disables thinking, and `low`/`medium`/`high` map to increasing token budgets. Thinking
+blocks arrive as `ReasoningDelta` events on the
+[event stream](../concepts/events.md) and stay out of `result.text`.
 
 ```python
 result = client.generate(prompt, target="cohere:command-a-03-2025", reasoning="high")
 ```
 
-`minimal` disables thinking outright; `low`, `medium`, and `high` map to increasing token
-budgets. Thinking blocks arrive as `ReasoningDelta` events and stay out of `result.text`.
+## Usage accounting
 
-## Usage: processed, not billed
-
-Cohere reports both `billed_units` and `tokens`. AnyInfer's counts follow **`tokens`** —
+Cohere reports both `billed_units` and `tokens`. AnyInfer's counts follow `tokens` —
 what the model actually processed, which is what a context window measures:
 
 ```python
@@ -72,9 +71,6 @@ If you need billed units for cost reconciliation, build the client with `retain_
 and read them off `result.raw`.
 
 ## Grounded generation
-
-Cohere's document grounding and citations are reachable through the escape hatch, though
-citations are not yet surfaced as typed results:
 
 ```python
 client.generate(
@@ -89,12 +85,15 @@ client.generate(
 )
 ```
 
-Read the citations from `result.raw` (with `retain_raw=True`) until they are modelled.
+Document grounding and citations are reachable through the
+[escape hatch](README.md#reaching-provider-specific-parameters). Citations are not yet
+surfaced as typed results; read them from `result.raw` until they are modeled.
 
 ## Embeddings and reranking
 
 Cohere serves both operations natively (`POST /v2/embed`, `POST /v2/rerank`), and is the
-first provider here with native input intents and native rerank scores:
+first provider here with native [input intents](../concepts/embeddings.md#input-intent)
+and native rerank scores:
 
 ```python
 docs = client.embed(
@@ -117,16 +116,18 @@ Three things worth knowing:
   query and document embeddings are not comparable unless produced with matching
   intents.
 - **Batching engages at 96 inputs.** The endpoint accepts at most 96 texts per call;
-  larger requests are split by the core and re-assembled in input order, invisibly.
-  Requested `dimensions` are forwarded as `output_dimension` (embed-v4 models only).
+  larger requests are [split by the core](../concepts/embeddings.md#batching) and
+  re-assembled in input order, invisibly. Requested `dimensions` are forwarded as
+  `output_dimension` (embed-v4 models only).
 - **Rerank usage is search units, not tokens.** Live rerank responses report only
   `billed_units.search_units`, which AnyInfer never encodes as fake token counts — so
-  `result.usage` is typically empty for rerank. Use `retain_raw=True` and read
+  `result.usage` is typically empty for rerank. The billed units are on
   `result.raw["meta"]["billed_units"]` for cost reconciliation.
 
 ## Discovery
 
-The model listing reports real context lengths, so windows carry `discovered` provenance:
+The model listing reports real context lengths, so windows carry
+[`discovered` provenance](../concepts/capabilities.md#the-five-provenances):
 
 ```python
 for model in client.models("cohere"):
@@ -139,11 +140,15 @@ Every model is listed — embedding and rerank models included — with its oper
 derived from the listing's `endpoints` field, so `client.models("cohere",
 operation="embedding")` answers from discovery rather than a guess.
 
+## Wire contract
+
+For the exact request/response fields this adapter depends on, see
+[contracts/cohere.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/cohere.md).
+
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/cohere.md)
 - [Structured output](../concepts/structured-output.md): how the schema mechanism is chosen.
 
 </div>

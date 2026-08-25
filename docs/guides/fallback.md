@@ -1,5 +1,8 @@
 # Add a fallback chain
 
+A `Route` names the targets to try in order and the retry policy for each; the full
+semantics live in [routing](../concepts/routing.md).
+
 ```python
 import anyinfer as ai
 
@@ -40,6 +43,10 @@ openai:gpt-5: ok
 ```
 </div>
 
+The trail is also visible while a request runs: a [stream](streaming.md) emits an
+`AttemptFailed` event at the moment a target fails, so a UI can show the switch instead of
+a stalled cursor.
+
 ## Handle total failure
 
 ```python
@@ -49,6 +56,10 @@ except ai.AllTargetsFailedError as error:
     for attempt in error.attempts:
         alert(f"{attempt.target}: {attempt.error and attempt.error.detail}")
 ```
+
+Since a chain only proves itself when things fail, the
+[test kit](testing-your-app.md) can script those failures offline: a provider that 503s
+once and then answers exercises this exact path in CI.
 
 ## Route by failure class
 
@@ -77,7 +88,7 @@ ai.Retry(
 A server's `Retry-After` is honored when it is longer than the computed backoff, but the
 sleep is still capped at `backoff_max_s`.
 
-By default, auth failures and context overflows are **not** retried — repeating them cannot
+By default, auth failures and context overflows are not retried — repeating them cannot
 succeed, and the budget is better spent on the next target. Override when you know your
 provider better:
 
@@ -101,4 +112,24 @@ portal, an expired card — a local fallback is the difference between degraded 
 ai.Route(targets=("medium", "llama-cpp:qwen2.5-3b-instruct-q4-k-m"))
 ```
 
-See [routing](../concepts/routing.md) for the full semantics.
+!!! tip "Key takeaways"
+    - Targets are tried strictly in order, and `result.attempts` records what happened to
+      every one, so a slow or rerouted request is explainable after the fact.
+    - Auth failures and context overflows are not retried by default, because repeating
+      them cannot succeed; `retry_on=` overrides the predicate when you know better.
+    - `context_window_targets` sends an overflow to a bigger model instead of down the
+      general chain, where a same-sized target would fail identically.
+    - A local model at the end of the chain keeps your application degraded rather than
+      down when every hosted provider is unreachable.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Routing and rate limits](../concepts/routing.md): the full route semantics, including
+  what per-call `target=` does and does not override.
+- [Stream to a terminal](streaming.md): rendering `AttemptFailed` as it happens.
+- [Test your application offline](testing-your-app.md): scripting failures to prove the
+  chain works.
+
+</div>

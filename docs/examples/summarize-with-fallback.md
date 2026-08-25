@@ -2,8 +2,8 @@
 
 A command-line tool that turns arbitrary text into a schema-validated summary, staying up
 when a provider is not: it tries Anthropic first, falls back to OpenAI, and finally to a
-local Ollama model. Whatever path the request took, the caller gets the same validated
-shape back, or one typed error naming every attempt.
+local Ollama model. As written it needs `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and a
+running Ollama; the shape itself is exercised in CI against in-process fakes.
 
 ```python
 """summarize.py — `python summarize.py < release-notes.txt`"""
@@ -52,21 +52,26 @@ for attempt in result.attempts:
 
 ## What to notice
 
-- **`result.structured` is always valid** against `SUMMARY_SCHEMA`: validation happens
+- `result.structured` is always valid against `SUMMARY_SCHEMA`: validation happens
   client-side regardless of which provider answered, and `result.structured_mechanism`
   tells you how it was enforced (`grammar`, `json_schema`, `json_mode`, or
   `prompt`). See [structured output](../concepts/structured-output.md).
-- **The fallback chain is data, not code.** `Route.targets` is an ordered tuple; retry
+- The fallback chain is data, not code. `Route.targets` is an ordered tuple; retry
   policy applies per target. No `try/except` pyramid, and the
   [attempt trail](../concepts/routing.md) (`result.attempts`) records every hop for your
   logs.
-- **Credentials never appear in source.** `env://ANTHROPIC_API_KEY` is a
+- Credentials never appear in source. `env://ANTHROPIC_API_KEY` is a
   [credential reference](../concepts/credentials.md); the resolved secret is registered
   for redaction, so it cannot leak through errors or telemetry.
-- **The local fallback needs no key at all.** If both hosted providers are down, the same
-  call lands on Ollama, and if *everything* fails, you get one
-  `AllTargetsFailedError` carrying the per-target causes, not the last exception to
-  happen to escape.
+- The local fallback needs no key at all. If both hosted providers are down, the same
+  call lands on Ollama, and if everything fails, you get one `AllTargetsFailedError`
+  carrying the per-target causes, not the last exception to happen to escape.
 
-Related guides: [Add a fallback chain](../guides/fallback.md) ·
-[Enforce a JSON schema](../guides/structured-output.md)
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Add a fallback chain](../guides/fallback.md): retry policy and route design.
+- [Enforce a JSON schema](../guides/structured-output.md): mechanisms and repair.
+
+</div>

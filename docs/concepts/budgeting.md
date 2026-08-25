@@ -5,9 +5,10 @@ Every app that assembles large prompts ends up hand-rolling this arithmetic per 
 AnyInfer answers it once, against the same provenance-tagged capability data that drives
 routing and cost.
 
-The calculator is useful because it is not isolated bookkeeping. Its result feeds the
-context reducer, the pre-dispatch gate, cost planning, and the router's context-overflow
-chain. Changing the target changes all four from the same capability record.
+The result is not isolated bookkeeping: it feeds the
+[context reducer](context-reduction.md), the pre-dispatch gate, cost planning, and the
+router's context-overflow chain, so changing the target changes all four from the same
+capability record.
 
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
@@ -46,26 +47,11 @@ The allowance is the context window minus two deductions:
 An app packing context reads `remaining_tokens` and keeps adding material while it stays
 positive. That is the whole loop.
 
-## One budget, several decisions
-
-The budget joins components that applications otherwise have to keep synchronized:
-
-| Consumer | Value it uses | Decision |
-|---|---|---|
-| Context reduction | `remaining_tokens` | How much approved material to include |
-| Pre-dispatch gate | `estimate.floor` and the trusted window | Whether overflow is provable before a request |
-| Cost planning | The estimate, output reserve, and trusted pricing | The plausible preflight cost range |
-| Overflow routing | `ContextLengthError` | Whether to redirect to a larger-window target |
-
-This does not make the heuristic tokenizer exact. It makes its uncertainty explicit and
-ensures every downstream decision uses the same assumptions.
-
 ## Unknown stays unknown
 
-The verdict is **tri-state**, exactly like [cost](capabilities.md#cost-is-tri-state). When
-no trustworthy context window is known, `fits` and the allowances are `None`; never a
-guessed default window presented as a bound. A budget computed from a placeholder would be
-an answer with manufactured authority.
+The verdict is tri-state, exactly like [cost](cost.md#cost-is-tri-state). When no
+trustworthy context window is known, `fits` and the allowances are `None` — never a
+guessed default window presented as a bound:
 
 ```python
 budget.fits  # None; unknown, distinguishable from both True and False
@@ -78,11 +64,11 @@ explicit about being an estimate by carrying two figures with opposite biases:
 
 | Figure | Bias | Used for |
 |---|---|---|
-| `tokens` | Deliberately **high** (`ceil(bytes/3)`) | Planning; deciding how much more fits. |
-| `floor` | Deliberately **low** (`bytes//8`) | The pre-dispatch gate; refusing a request. |
+| `tokens` | High (`ceil(bytes/3)`) | Planning; deciding how much more fits. |
+| `floor` | Low (`bytes//8`) | The pre-dispatch gate; refusing a request. |
 
-The two consumers need opposite errors: when *packing*, overestimating keeps you safe;
-when *refusing*, only an underestimate justifies the refusal.
+The two consumers need opposite errors: when packing, overestimating keeps you safe;
+when refusing, only an underestimate justifies the refusal.
 
 Anything more accurate plugs in through the `TokenEstimator` protocol; tiktoken, a
 provider's count-tokens endpoint, llama-server's `/tokenize`. An exact tokenizer returns
@@ -100,13 +86,11 @@ client = ai.Client(providers, estimator=TiktokenEstimator())
 
 ## When the provider bills for more than you sent
 
-Some providers do not count the bytes they were handed. A session API wraps your messages
-in a harness of its own; an agent preamble, built-in tool declarations, workspace framing
-— before the model sees them, then bills and window-checks the inflated total. Estimating
-such a provider from message bytes alone under-counts *every* request, and it under-counts
-systematically, so budgets stay optimistic right up to the overflow.
-
-So a provider declares its own correction, and the budget reports it as its own component:
+Some providers wrap your messages in a harness of their own — an agent preamble,
+built-in tool declarations, workspace framing — then bill and window-check the inflated
+total. Estimating such a provider from message bytes alone under-counts every request,
+so the provider declares its own correction and the budget reports it as a separate
+component:
 
 ```python
 budget = client.budget(messages, target="copilot:auto")
@@ -115,21 +99,16 @@ budget.estimate.messages.tokens  # what you sent
 budget.estimate.envelope.tokens  # what the provider wraps around it
 ```
 
-Seeing the envelope separately is the point: an app looking at a tight budget can tell that
-eleven hundred of its tokens belong to the provider's harness rather than to anything it
-wrote. GitHub Copilot is the case in the shipped registry.
-
-The correction moves the **planning figure only**. The floor is what the pre-dispatch gate
-refuses requests on, and a lower bound may only claim tokens the provider certainly
-charges; an envelope correction is one we believe, not one we can prove. A calibrated
-provider therefore packs more conservatively without ever refusing a request it might have
-served.
+[GitHub Copilot](../providers/copilot.md) is the case in the shipped registry. The
+correction moves the planning figure only, never the floor: a lower bound may only claim
+tokens the provider certainly charges, so a calibrated provider packs more
+conservatively without ever refusing a request it might have served.
 
 ## Estimated cost
 
-When trustworthy pricing exists for the target; see
-[where prices come from](capabilities.md#where-prices-come-from); the budget also carries
-a preflight cost **range**:
+When trustworthy pricing exists for the target (see
+[where prices come from](cost.md#where-prices-come-from)), the budget also carries a
+preflight cost range:
 
 ```python
 budget.estimated_cost  # CostEstimate(low=..., high=..., currency="USD") or None
@@ -148,8 +127,8 @@ computed from provider-reported usage, and `estimated_cost` only ever from the e
 
 ## The pre-dispatch gate
 
-A request that provably cannot fit its target's context window fails **before** the round
-trip. The gate is deliberately conservative in what it claims:
+A request that provably cannot fit its target's context window fails before the round
+trip. The gate is conservative in what it claims:
 
 - Only **trusted-provenance** windows gate (`catalog`, `discovered`, `probed`,
   `override`). A `default` window is a placeholder, and a placeholder never blocks a
@@ -184,6 +163,10 @@ The gate is on by default and can be disabled per client with
 
 - [Capabilities and provenance](capabilities.md): where the context window comes from
   and why its provenance decides whether it may gate.
-- [Routing](routing.md): `context_window_targets` and the rest of the fallback model.
+- [Cost and spending](cost.md): the ceiling the preflight range is checked against.
+- [Routing and rate limits](routing.md): `context_window_targets` and the rest of the
+  fallback model.
+- [Context reduction](context-reduction.md): packing material against
+  `remaining_tokens`.
 
 </div>

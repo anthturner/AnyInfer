@@ -1,5 +1,8 @@
 # Enforce a JSON schema
 
+Pass a schema and `result.structured` comes back already validated against it, whichever
+[mechanism](../concepts/structured-output.md) the target supports:
+
 ```python
 import anyinfer as ai
 
@@ -25,6 +28,10 @@ analysis = result.structured  # already validated against REVIEW
 print(analysis["sentiment"], analysis["score"])
 ```
 
+`repair=ai.Repair(max_attempts=1)` allows one corrective round trip against the same
+model before the call fails; see [repair](../concepts/structured-output.md#repair) for
+what that costs and why it never falls back to another provider.
+
 ## Handling failure
 
 ```python
@@ -38,7 +45,8 @@ except ai.SchemaViolationError as error:
 
 You get the bounded raw output, specific validation errors, and any delimiter-confirmed
 complete top-level members in `error.partial`, so your application can inspect the
-response or tighten the prompt.
+response or tighten the prompt. [Fallback](fallback.md) never fires here: the model
+answered, just in the wrong shape.
 
 ## Pydantic models work
 
@@ -68,25 +76,22 @@ Both are worth logging in aggregate. A model that frequently needs repair is usu
 prompt problem; a target that unexpectedly reports `"prompt"` may not be the model you
 thought you configured.
 
-## Repair costs a request
+!!! tip "Key takeaways"
+    - `result.structured` is validated client-side against your original schema, whatever
+      mechanism the provider used to produce it.
+    - A `SchemaViolationError` carries the raw text, the specific validation errors, and
+      any recoverable partial members — enough to debug the prompt, not just the failure.
+    - Repair is opt-in and costs an extra request per attempt; budget for it on
+      latency-sensitive paths.
+    - Pydantic models are accepted directly, with no pydantic dependency in the library.
 
-`Repair(max_attempts=1)` allows one corrective round trip against the **same** model — never
-a different provider ([why](../concepts/structured-output.md#repair)). Budget for it on
-latency-sensitive paths.
+## See also
 
-## Writing schemas that work everywhere
+<div class="anyinfer-see-also" markdown>
 
-Grammar-based engines (llama.cpp, Ollama) compile your schema into a decoding grammar, where
-a few keywords are expensive:
+- [Structured output](../concepts/structured-output.md): how the mechanism is chosen, and
+  how to write schemas that work on grammar-based engines.
+- [Test your application offline](testing-your-app.md): proving a repair budget converges
+  with a scripted provider.
 
-- `minLength` / `maxLength` on strings are stripped **for the wire**.
-- `minItems` / `maxItems` of 2000 or more are stripped **for the wire**.
-
-Both are still enforced by client-side validation, so nothing you asked for is lost. But if
-a local model keeps failing a length constraint, that is why, and clearer prompt wording
-will help more than a tighter constraint.
-
-Two things that improve results under every mechanism: prefer `enum` over free-form strings,
-and keep nesting shallow.
-
-See [structured output](../concepts/structured-output.md) for how the mechanism is chosen.
+</div>
