@@ -4,10 +4,11 @@ name: CI
 #
 # CI runs on every pull request into `develop` and `main`, and again on the merge commit
 # once it lands on `main`. Merges are *blocked* on failure via branch protection: `ci-ok`
-# below is required on both branches (a single stable name, so the required check does not
-# have to enumerate every matrix job); `main` additionally requires `test-extra` and
-# `test-macos`, which only run on the develop -> main step. See
-# docs/contributing/releasing.md for the one-time `gh` commands that configure the rules.
+# below is the single required check on both branches. It tolerates *skipped* upstream
+# jobs, because two kinds of skip are deliberate: the whole test matrix skips when a
+# change touches only documentation (the `changes` job decides), and the expensive
+# `test-extra`/`test-macos` lanes run only on pull requests into `main`. A job that
+# *fails* still fails `ci-ok`; only the explicit skips pass through.
 #
 # Billed-minutes policy, from measured run data rather than intuition. Two numbers set
 # the whole layout, and both are counter-intuitive enough to be worth writing down:
@@ -57,6 +58,50 @@ env:
   UV_SYSTEM_PYTHON: "1"
 
 jobs:
+  # Decide whether this change can skip the test matrix. A change confined to docs/,
+  # mkdocs.yml, and overrides/ cannot alter library behavior, and the `gates` job already
+  # runs every docs gate (link check, doc examples, strict site build) — so the suite rows
+  # would re-prove code that did not change. Everything else, including this workflow and
+  # scripts/, counts as code. Pure API calls, no checkout; bills under a minute.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - name: classify changed paths
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+              --paginate --jq '.[].filename')
+          elif [ "${{ github.event_name }}" = "push" ] && \
+               [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            # The compare endpoint lists at most 300 files and does not paginate; a
+            # larger push is classified as code so the cap can never hide one.
+            compare=$(gh api "repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}")
+            count=$(echo "$compare" | jq '.files | length')
+            if [ "$count" -ge 300 ]; then files="TOO_MANY"; else
+              files=$(echo "$compare" | jq -r '.files[].filename')
+            fi
+          else
+            # workflow_dispatch, or a push with no usable before-sha: assume code changed.
+            files="UNKNOWN"
+          fi
+          docs_only=true
+          [ -z "$files" ] && docs_only=false
+          while IFS= read -r f; do
+            case "$f" in
+              docs/*|mkdocs.yml|overrides/*) ;;
+              *) docs_only=false; break ;;
+            esac
+          done <<< "$files"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "docs_only=$docs_only"
+
   # Every gate that is not the test suite, on one runner. Each ran well under a minute as
   # its own job, so each was billed a full minute for ~20s of work; together they bill
   # about two. `conformance` is here rather than in its own job for a second reason as
@@ -122,6 +167,9 @@ jobs:
     name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    needs: [changes]
+    # Docs-only changes skip the suite; the docs gates in `gates` are their real check.
+    if: needs.changes.outputs.docs_only != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -178,15 +226,15 @@ jobs:
   # The interpreter rows `test` brackets rather than runs. Same reasoning as `test-macos`
   # below, at a smaller multiplier: these are Linux runners, but each is a full ~140s suite
   # run (~4 billed minutes) re-proving what three other rows already ran, and a break
-  # specific to 3.12 or 3.13 alone is rare. So they run on the develop -> main step, where
-  # a merge should prove the whole supported range, and not on every feature PR.
-  #
-  # NOT part of `ci-ok`, for the same reason `test-macos` is not — see the note there.
+  # specific to 3.12 or 3.13 alone is rare. So they run on the pull request into `main`,
+  # where a merge should prove the whole supported range — and not again on the push once
+  # it lands, which would bill a second time for a result the PR already produced.
   test-extra:
     name: tests (ubuntu-latest, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    needs: [changes]
+    if: github.base_ref == 'main' && needs.changes.outputs.docs_only != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -212,21 +260,19 @@ jobs:
 
   # macOS runners bill at 10x Linux *and* run this suite ~4x slower than Linux does
   # (~600s against ~140s), which makes this single job about 110 billed minutes — more
-  # than every other job in this workflow combined. So it does not run on every
-  # feature-branch PR — only on the develop -> main step, where the branch model
-  # (docs/contributing/releasing.md) says a merge should actually prove the release is
-  # buildable. Why the suite is so much slower here has not been profiled; if this lane
-  # needs to get cheaper, that is the thing to look at before dropping coverage. It is
-  # NOT part of `ci-ok`: a job skipped by `if:` still reports a "skipped" check, and a
-  # required check that is merely skipped blocks a GitHub merge just like a failure
-  # would, which would wedge every `develop` PR. Instead this is a second, separate
-  # required status check that only `main`'s branch protection asks for — see the
-  # one-time setup in docs/contributing/releasing.md.
+  # than every other job in this workflow combined. So it runs only on the pull request
+  # into `main`, where the branch model (docs/contributing/releasing.md) says a merge
+  # should actually prove the release is buildable, and never again on the push once it
+  # lands. Why the suite is so much slower here has not been profiled; if this lane needs
+  # to get cheaper, that is the thing to look at before dropping coverage. Its verdict
+  # reaches branch protection through the skip-tolerant `ci-ok` below: skipped on a
+  # `develop` PR or a docs-only change, required to *succeed* whenever it runs.
   test-macos:
     name: tests (macos-latest, py3.14)
     runs-on: macos-latest
     timeout-minutes: 30
-    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    needs: [changes]
+    if: github.base_ref == 'main' && needs.changes.outputs.docs_only != 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -241,23 +287,27 @@ jobs:
       - name: pytest
         run: python workspace.py check --only=test
 
-  # Aggregate gate. Branch protection on `develop` and `main` requires exactly this check,
-  # so adding or renaming upstream jobs (or matrix rows) never silently un-protects a
-  # branch. `if: always()` makes it report a real failure instead of being skipped when a
-  # dependency fails.
+  # Aggregate gate. Branch protection on `develop` and `main` requires exactly this
+  # check and nothing else, so adding or renaming upstream jobs (or matrix rows) never
+  # silently un-protects a branch. `if: always()` makes it report a real failure instead
+  # of being skipped when a dependency fails. "skipped" is accepted alongside "success"
+  # because the only paths to it are the two deliberate conditions above (docs-only
+  # changes, and the main-PR-only lanes); a job that runs and fails reports "failure",
+  # and a job whose own dependency failed is caught through that dependency's result.
   ci-ok:
     name: ci-ok
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [gates, test]
+    needs: [changes, gates, test, test-extra, test-macos]
     if: always()
     steps:
-      - name: verify every upstream job succeeded
+      - name: verify every upstream job succeeded or was deliberately skipped
         run: |
           results='${{ join(needs.*.result, ' ') }}'
           echo "upstream results: $results"
           for result in $results; do
-            if [ "$result" != "success" ]; then
-              echo "a required job did not succeed"; exit 1
-            fi
+            case "$result" in
+              success|skipped) ;;
+              *) echo "a required job did not succeed"; exit 1 ;;
+            esac
           done

@@ -20,29 +20,30 @@ flowchart LR
   gated on CI. Every merge to `main` rebuilds the release packages; a merge that bumps
   the version also publishes them.
 
-Both protected branches require the aggregate `ci-ok` status check, which passes only
-when every lint, type, contract, conformance, docs, and bracketed test-matrix job passed.
-Requiring one stable check name means adding a CI job (or a matrix row) can never silently
-escape the protection rules.
+Both protected branches require exactly one status check: the aggregate `ci-ok`.
+Requiring one stable check name means adding a CI job (or a matrix row) can never
+silently escape the protection rules. `ci-ok` passes when every upstream job either
+succeeded or was skipped by one of two deliberate conditions; a job that runs and fails
+always fails the gate.
 
-`main` requires three additional checks: `tests (ubuntu-latest, py3.12)`,
-`tests (ubuntu-latest, py3.13)`, and `tests (macos-latest, py3.14)`. Those are the
-names GitHub *reports*, which is what a required context matches on: a job's `name:`, not
-its id. Naming the id (`test-macos`) registers a context no job ever reports, and a
-required context that never reports blocks every pull request into the branch forever.
-Each is a lane whose cost is not worth paying on every feature-branch PR into `develop`:
-macOS runners bill at 10x Linux, and the two middle interpreters are two more full
-environment builds to re-prove a suite the 3.11 and 3.14 rows already ran. They run only
-on the develop -> main step, right before a merge triggers a release build. The three are
-kept out of `ci-ok` and listed as their own required contexts, only on `main`'s
-protection rule. A job skipped by `if:` still reports "skipped", and GitHub treats a
-skipped required check the same as a failed one, so folding these release-only lanes into
-`ci-ok` would block every `develop` pull request.
+The two deliberate skips exist to keep billed minutes proportional to risk. First, a
+change confined to `docs/`, `mkdocs.yml`, and `overrides/` skips the whole test matrix
+(the `changes` job classifies it); the docs gates, the executable doc examples, and the
+strict site build still run on every change. Second, the expensive lanes — the two
+middle interpreters and the macOS row, which bills at 10x Linux — run only on the pull
+request into `main`, where a merge should prove the release is buildable, and not on
+feature PRs into `develop`.
 
 CI itself is triggered by pull requests into either protected branch, and by pushes to
-`main`. Pushes to `develop` do not trigger it: `develop` only takes merges through a pull
-request that already had to be green, so re-running the full matrix on the merged commit
-bills a second time for a result CI already produced.
+`main` (which run the bracketed matrix only when code changed, never the main-PR-only
+lanes; their verdict was already produced on the promotion PR). Pushes to `develop` do
+not trigger it: `develop` only takes merges through a pull request that already had to
+be green.
+
+Promotions from `develop` to `main` use a merge commit, never a squash or rebase merge:
+those mint new commit ids on `main` and permanently diverge the two branches. After the
+promotion merges, fast-forward `develop` onto `main` so both branches point at the same
+commit.
 
 ## Versioning
 
