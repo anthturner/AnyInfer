@@ -807,35 +807,57 @@ result = client.generate(
 src/anyinfer/
   __init__.py            # curated public surface
   types/                 # messages.py requests.py results.py events.py capabilities.py
+                         # operations.py
   errors.py
-  _client/               # async_client.py sync_client.py stream.py tools.py
+  _client/               # async_client.py sync_client.py tools.py wire.py models.py
+                         # operations.py providers.py rankers.py
   registry.py
-  routing/               # policy.py health.py attempts.py
-  schema/                # spec.py mechanism.py project.py validate.py repair.py
-  events/                # observers.py dispatch.py redaction.py privacy.py
+  routing/               # policy.py health.py attempts.py limits.py
+  schema/                # mechanism.py project.py validate.py repair.py partial.py
+  events/                # observers.py telemetry.py
+  redaction.py           # event-stream redaction (root module, not under events/)
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
   session.py             # the session handle
   benchmark.py           # throughput measurement, live samples + caller-owned store
   verification.py        # the end-to-end target probe
+  arena.py               # multi-target fan-out
+  compare.py             # target comparison
+  compare_diff.py        # comparison diffing
+  manifest.py            # run manifests
+  context_request.py     # wire-facing context-reduction request type
+  _agents_md.py          # the `agents-md` command's generator
+  _context_wire.py       # context-request wire codec
+  _starter.py            # `init` scaffolding
+  _usage.py              # usage accounting helpers
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
-  capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
+  capabilities/          # assemble.py probes.py pricing.py pricing_table.py estimate.py
+                         # budget.py gating.py cache.py ledger.py pricing.json
   local/                 # hardware.py metrics.py backends.py runtimes.py runtimes.json tuning.py
                          # services.py discovery.py fit.py variants.py artifacts.py downloads.py
-                         # acquire.py store.py sources/ server.py recommend.py
-  providers/             # base.py sse.py openai_compat.py openai.py anthropic.py
+                         # acquire.py store.py server.py recommend.py
+                         # sources/ direct_url.py huggingface.py local_path.py
+                         # attestation.py provenance.py
+  providers/             # base.py sse.py eventstream.py http.py cloud_auth.py
+                         # _multimodal.py openai_compat.py openai_compat_embeddings.py
+                         # openai_shaped_retrieval.py openai.py anthropic.py
                          # ollama.py openrouter.py azure_foundry.py copilot.py
                          # m365_copilot.py llama_cpp.py gemini.py deepseek.py xai.py
-                         # vertex.py bedrock.py cohere.py lm_studio.py nebius.py presets.py
+                         # vertex.py bedrock.py cohere.py lm_studio.py nebius.py
+                         # jina.py voyage.py tei.py confidential_execution.py presets.py
   context/               # corpus reduction: documents.py rank.py structure.py
                          # envelope.py select.py tiers.py pack.py distill.py
                          # settings.py dedup.py compact.py history.py
   mcp/                   # protocol.py transport.py toolset.py
-  testing/               # conformance.py scripted.py fakes.py cassettes.py plugin.py
-  cli.py                 # init, agents-md, run, verify, benchmark, doctor, providers,
-                         # models, runtime, context, mcp, conform, serve
-  serve/                 # openai_codec.py app.py __main__.py — see §22, ADR-009
+  testing/               # conformance.py scripted.py scripted_operations.py fakes.py
+                         # cassettes.py recording.py plugin.py certify.py manifests.py
+                         # mcp_fake.py scaffold.py
+  cli.py                 # init, agents-md, run, embed, rerank, compare, verify,
+                         # benchmark, doctor, providers, models, runtime, context,
+                         # mcp, conform, serve
+  serve/                 # openai_codec.py embeddings_codec.py app.py service.py
+                         # __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
 contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§24)
@@ -845,7 +867,8 @@ docs/                    # provider guides, published site sources (§25)
 **Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]`
 github-copilot-sdk · `[azure]` azure-identity · `[vertex]` cryptography · `[keyring]`
 keyring · `[otel]` opentelemetry-api · `[serve]` ASGI server deps · `[demo]` PySide6 and
-Markdown · `[mcp]` an explicit dependency-free feature marker · `[all]`. The complete local
+Markdown · `[attest]` cryptography, for Tier 4 weight-provenance verification ·
+`[mcp]` an explicit dependency-free feature marker · `[all]`. The complete local
 subsystem is core; llama-server binaries and model weights are runtime-fetched, never pip
 dependencies. Missing-extra errors raise `ConfigError` with an install hint.
 
@@ -1348,13 +1371,14 @@ and (nightly, where auth permits) live modes.
 
 > **Implementation status.** Twenty dedicated adapters are implemented
 > (the original nine plus Gemini, DeepSeek, xAI, Vertex AI, Bedrock, Cohere, LM Studio,
-> Voyage AI, Jina AI, and Text Embeddings Inference), alongside a preset registry of
+> Nebius Token Factory, Voyage AI, Jina AI, and Text Embeddings Inference), alongside a
+> preset registry of
 > eighty-six OpenAI-compatible providers
 > sharing the `openai_compat` adapter. The
 > *executed* matrix — generated from a real conformance run rather than hand-maintained —
 > lives at [docs/reference/conformance-matrix.md](docs/reference/conformance-matrix.md);
 > regenerate it with `workspace matrix`. **Every dedicated adapter now has a row there**,
-> at whatever boundary it actually has: an HTTP transport for the twenty that speak HTTP,
+> at whatever boundary it actually has: an HTTP transport for those that speak HTTP,
 > a fake SDK for `copilot`, and a stub supervisor for `llama-cpp`. The table below remains
 > the design-intent matrix. Cells marked `?` are design questions, several of which the
 > implementation has now answered:

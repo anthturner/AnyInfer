@@ -225,3 +225,47 @@ def test_public_docstrings_carry_no_adr_identifier() -> None:
                 name = getattr(node, "name", "<module>")
                 offenders.append(f"{path.relative_to(ROOT)}:{name}")
     assert offenders == []
+
+
+def _design_section_18_modules() -> set[str]:
+    """Module filenames enumerated in DESIGN.md §18's package-layout block."""
+    design = _read("DESIGN.md")
+    start = design.index("## 18. Package layout")
+    fence = design.index("```\nsrc/anyinfer/", start)
+    block = design[fence : design.index("\n```", fence)]
+    # `__init__.py` is named once for the top-level curated surface; per-package
+    # ones are not enumerated on either side.
+    return set(re.findall(r"[\w.]+\.py", block)) - {"__init__.py"}
+
+
+def _tree_modules() -> set[str]:
+    """Module filenames actually shipped under src/anyinfer/."""
+    package = ROOT / "src" / "anyinfer"
+    return {
+        path.name
+        for path in package.rglob("*.py")
+        if "__pycache__" not in path.parts and path.name != "__init__.py"
+    }
+
+
+def test_design_section_18_layout_matches_the_tree() -> None:
+    """§18 is declared normative, so a stale enumeration there is a bug, not prose drift.
+
+    AGENTS.md sends agents to §18 before they write code; an omitted module means an
+    agent misplaces a new helper or re-implements one that already exists. Both
+    directions fail: a module the tree lost must leave §18 too.
+    """
+    documented = _design_section_18_modules()
+    shipped = _tree_modules()
+
+    missing = sorted(shipped - documented)
+    assert not missing, (
+        f"DESIGN.md §18 omits shipped modules: {missing}. "
+        "Add them to the layout block or delete the module."
+    )
+
+    phantom = sorted(documented - shipped)
+    assert not phantom, (
+        f"DESIGN.md §18 lists modules that do not exist: {phantom}. "
+        "Remove them from the layout block."
+    )

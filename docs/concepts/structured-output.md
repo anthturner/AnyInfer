@@ -130,7 +130,7 @@ except ai.SchemaViolationError as error:
 
 The error carries the validation errors, bounded raw output, and (when a truncated
 top-level JSON object contains delimiter-confirmed complete members) `error.partial` plus
-`error.missing_fields`. Partial members are evidence, not a valid result: AnyInfer never
+`error.missing_required`. Partial members are evidence, not a valid result: AnyInfer never
 guesses a cut-off scalar, asks another provider to continue it, or treats recovered fields
 as schema-validated.
 

@@ -991,7 +991,18 @@ def cmd_check(args: argparse.Namespace) -> int:
 _CONTRACTS_URL = "https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md"
 """Absolute because the matrix page cannot link outside the mkdocs docs/ tree."""
 
-_MATRIX_HEADER = """# Conformance Matrix
+_NON_HTTP_ROWS = frozenset({"copilot", "llama-cpp"})
+"""Matrix rows whose conformance boundary is not an in-process HTTP transport.
+
+Named here so the header's "N that speak HTTP" is derived from the rows actually
+rendered instead of re-counted by hand — the drift that left the number stale before.
+"""
+
+
+def _matrix_header(providers: Sequence[str]) -> str:
+    """Render the matrix preamble, deriving the HTTP-boundary count from the rows."""
+    http_rows = sum(1 for name in providers if name not in _NON_HTTP_ROWS)
+    return f"""# Conformance Matrix
 
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
@@ -1000,7 +1011,7 @@ Legend: ✅ verified · ➖ declared unsupported · ❌ failing
 
 Each cell is one parametrized test case executed against that adapter in fake-server mode,
 at whatever boundary that adapter has: an in-process HTTP transport for the
-twenty that speak HTTP, and a fake SDK module for `copilot`, whose boundary is
+{http_rows} that speak HTTP, and a fake SDK module for `copilot`, whose boundary is
 the ``github-copilot-sdk`` session API rather than a wire protocol. `llama-cpp` speaks
 HTTP to a server it supervises, so its row substitutes a stub supervisor and starts no
 process, downloads nothing, and binds no port.
@@ -1141,7 +1152,7 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
 
     case_names = [case.name for case in CONFORMANCE_CASES]
 
-    lines = [_MATRIX_HEADER]
+    lines = [_matrix_header(sorted(results))]
     lines.append(f"Last generated: {date.today().isoformat()}.\n")
     lines.append("| Provider | " + " | ".join(case_names) + " |")
     lines.append("|---" * (len(case_names) + 1) + "|")

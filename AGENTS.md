@@ -58,7 +58,7 @@ Keep these product surfaces distinct:
 |---|---|---|
 | Core SDK / inference engine | `src/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
 | Demo application | `src/demo_app/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
-| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `init`, `agents-md`, `run`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, and `context`. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`, and endpoint/credential discovery for `init` belongs in `anyinfer.local.discovery`. |
+| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `init`, `agents-md`, `run`, `embed`, `rerank`, `compare`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, `context`, `conform`, `mcp`, and `serve`. `serve`'s parser lives here, but its semantics belong to the sidecar workstream. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`, and endpoint/credential discovery for `init` belongs in `anyinfer.local.discovery`. |
 | OpenAI-compatible sidecar | `src/anyinfer/serve/`, sidecar tests | Owns only the OpenAI wire codec and ASGI lifecycle. It stays a projection over `AsyncClient`; no provider, routing, validation, or config policy belongs here. |
 | Shared configuration | `src/anyinfer/config/`, configuration docs and tests | One versioned format feeds Python SDK callers, the CLI, the sidecar, and compatible demo settings. Frontends may add flags, but they must not fork file semantics. |
 
@@ -111,7 +111,7 @@ changes require the generated reference and runnable examples.
   adapter's own module and the whole core, skipping the `exhaustive` preset matrix and
   `slow` packaging builds. `workspace test --provider <id>` narrows to one provider's
   modules plus the invariants a provider change trips — editing one adapter does not need
-  the other twenty exercised. `workspace check` is the gate and the only thing that says
+  the rest exercised. `workspace check` is the gate and the only thing that says
   the suite passes; run it before committing. `test` cannot be made to run everything, on
   purpose.
 - Every provider adapter must pass the shared conformance suite (`anyinfer.testing`) in

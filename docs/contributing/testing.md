@@ -29,7 +29,7 @@ The fast track skips two markers:
 | `slow` | Packaging and subprocess builds. | Before committing; `check` runs it. |
 
 Adding or editing one adapter changes nothing either marker covers, which is the point:
-that work needs its own module and the shared invariants, not the other twenty adapters.
+that work needs its own module and the shared invariants, not the rest of the adapters.
 
 Everything runs in parallel by default (`pytest-xdist`, `-n auto`), which is worth a ~7x
 speedup: every test builds its own in-process fakes, so there is nothing to
