@@ -148,10 +148,10 @@ navigability tax in the codebase.
 
 **Remediation** (mechanical moves; `tests/test_routing.py`, `test_arena.py`,
 `test_spend_ledger.py`, `test_sync_client.py` are the net):
-- [ ] **A.1.1** Extract `_run_attempt` / `_route_events` / `_routed_stream` + private helpers into
+- [x] **A.1.1** Extract `_run_attempt` / `_route_events` / `_routed_stream` + private helpers into
   `_client/generation.py` (or `routing/execute.py`), keeping `AsyncClient` as the composing
   facade.
-- [ ] **A.1.2** Move `AsyncStream` (and stream helpers) into `_client/stream.py`, matching the
+- [x] **A.1.2** Move `AsyncStream` (and stream helpers) into `_client/stream.py`, matching the
   layout §18 already promises.
 - [ ] **A.1.3** Move arena execution methods into `_client/arena_exec.py`; move spend-check
   helpers beside `capabilities/ledger.py`.
