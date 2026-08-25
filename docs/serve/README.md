@@ -258,6 +258,26 @@ running beside the files. [Context reduction](../concepts/context-reduction.md) 
 the strategies; [fit a corpus to a context budget](../guides/fitting-context.md) covers
 choosing one.
 
+## Attributions
+
+`anyinfer_cite_documents: true` asks the target to attribute its answer to the documents
+the request supplied. Attributions come back on the choice as `anyinfer_citations`, and in
+a stream as their own frames carrying the same objects:
+
+```json
+{"anyinfer_citations": [
+  {"start_index": 0, "end_index": 20, "quoted_text": "Rayleigh scattering",
+   "document_index": 1, "title": "Optics"}
+]}
+```
+
+Chat completions has no citation surface, so without this extension a grounded answer
+arrived with its attributions stranded in the provider's raw payload — visible in Python,
+invisible through the gateway. A field the provider did not state is **absent**, never
+null or zero: an offset of zero and "the provider located this only in the source" are
+different claims, and a wire shape that cannot tell them apart pushes a fabricated
+highlight onto whoever renders it.
+
 ## Sending Video
 
 Chat completions has no content type for video, so a video message part travels as an
@@ -304,8 +324,9 @@ The sidecar, CLI, and Python SDK use the same
     - Any target spelling works as the `model` field, so hosted, hub, and local routes are
       all reachable from a stock OpenAI client.
     - The AnyInfer extensions (`anyinfer_manifest`, `anyinfer_history`, `anyinfer_cache`,
-      `anyinfer_context`, `anyinfer_arena`, and the `anyinfer_video` content item) are
-      additive: a client that does not send them receives a plain OpenAI completion.
+      `anyinfer_context`, `anyinfer_arena`, `anyinfer_cite_documents`/
+      `anyinfer_citations`, and the `anyinfer_video` content item) are additive: a client
+      that does not send them receives a plain OpenAI completion.
     - A non-loopback bind requires both `--allow-remote-exposure` and a bearer token, and
       backend credentials never transit the frontend.
 

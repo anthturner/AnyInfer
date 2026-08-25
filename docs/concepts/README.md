@@ -13,7 +13,7 @@ each other roughly in this order, but each page stands alone.
 | [Structured output](structured-output.md) | A schema is a contract: strongest native mechanism, always client-side validated, optional bounded repair. |
 | [Sessions](sessions.md) | Letting a provider keep what it already knows, without changing any answer. |
 | [Embeddings and reranking](embeddings.md) | Typed, routed inference operations with a fallback safety rule generation does not need. |
-| [Multimodal inputs](multimodal-inputs.md) | Images, documents, and audio enter as typed payloads without fictional token estimates. |
+| [Multimodal inputs](multimodal-inputs.md) | Images, documents, audio, and video enter as typed payloads without fictional token estimates. |
 
 ## Cost and Context
 

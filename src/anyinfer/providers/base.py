@@ -17,7 +17,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from ..types.capabilities import DiscoveredModel, Health
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    CitationDelta,
+    ReasoningDelta,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import Message
 from ..types.operations import EmbeddingInputIntent
 from ..types.requests import Sampling, ToolSpec
@@ -161,6 +167,10 @@ class WireRequest:
             policy, and for every provider whose cache needs no marks. An adapter's whole
             duty here is to spell each mark in its own wire format; deciding *where* they
             go is the core's, and belongs to `anyinfer.capabilities.cache`.
+        cite_documents: Whether the caller asked supplied documents to be cited. Only
+            providers declaring the capability receive ``True``; an adapter that gets it
+            turns on its dialect's citation flag, which for every dialect that has one is
+            a *request-side* opt-in rather than something the model volunteers.
         logprobs: How many alternative tokens per position the caller asked for
             log-probabilities on, or ``None`` for none. Already gated by capability — an
             adapter that receives a value may send it. Each dialect spells the ask
@@ -189,6 +199,7 @@ class WireRequest:
     timeout_s: float = 120.0
     max_response_bytes: int = 1_048_576
     cache_marks: tuple[int, ...] = ()
+    cite_documents: bool = False
     logprobs: int | None = None
     extra_options: Mapping[str, Any] = field(default_factory=dict)
     session_state: Mapping[str, Any] | None = None
@@ -220,7 +231,9 @@ class AdapterFinal:
     logprobs: tuple[TokenLogprob, ...] = ()
 
 
-AdapterEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate | AdapterFinal
+AdapterEvent = (
+    TextDelta | ReasoningDelta | ToolCallDelta | CitationDelta | UsageUpdate | AdapterFinal
+)
 """The strict subset of events an adapter may emit."""
 
 

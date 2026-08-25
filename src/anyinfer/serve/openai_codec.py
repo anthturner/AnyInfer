@@ -25,7 +25,7 @@ from typing import Any, cast
 
 from .._context_wire import decode_context_request, encode_context_request
 from ..evaluate.arena import arena_to_dict
-from ..types.events import StreamEvent, TextDelta, ToolCallDelta
+from ..types.events import CitationDelta, StreamEvent, TextDelta, ToolCallDelta
 from ..types.messages import (
     AudioPart,
     ContentPart,
@@ -47,11 +47,13 @@ from ..types.requests import (
     SchemaSpec,
     ToolSpec,
 )
-from ..types.results import FinishReason, Generation, TokenLogprob, Usage
+from ..types.results import Citation, FinishReason, Generation, TokenLogprob, Usage
 
 __all__ = [
     "ARENA_FIELD",
     "CACHE_FIELD",
+    "CITATIONS_FIELD",
+    "CITE_DOCUMENTS_FIELD",
     "CONTEXT_FIELD",
     "HISTORY_FIELD",
     "MANIFEST_FIELD",
@@ -60,6 +62,7 @@ __all__ = [
     "chunk_from_event",
     "completion_from_generation",
     "decode_messages",
+    "encode_citation",
     "encode_logprobs",
     "encode_messages",
     "final_chunk",
@@ -113,6 +116,22 @@ ARENA_FIELD = "anyinfer_arena"
 CONTEXT_FIELD = "anyinfer_context"
 """Stateless caller-supplied corpus reduction request and content-free summary."""
 
+CITATIONS_FIELD = "anyinfer_citations"
+"""Result-side extension carrying the answer's attributions.
+
+Chat completions has no citation surface, so grounded answers previously came back with
+their attributions stranded in the provider's raw payload — visible in Python, invisible
+through the gateway. This carries them on the buffered body's choice, and as its own
+streamed frame per citation, so a wire caller sees them at the same moment a Python
+caller does.
+
+Request-side, `CITE_DOCUMENTS_FIELD` turns them on. Absent both, a stock OpenAI client's
+response is byte-identical to what it was before citations existed.
+"""
+
+CITE_DOCUMENTS_FIELD = "anyinfer_cite_documents"
+"""Request-body extension asking the target to attribute its answer to supplied documents."""
+
 VIDEO_CONTENT_TYPE = "anyinfer_video"
 """Message-content extension carrying a video input part.
 
@@ -150,6 +169,7 @@ _RESERVED_FIELDS = frozenset(
         "user",
         HISTORY_FIELD,
         CACHE_FIELD,
+        CITE_DOCUMENTS_FIELD,
         MANIFEST_FIELD,
         ARENA_FIELD,
         CONTEXT_FIELD,
@@ -439,8 +459,24 @@ def request_from_openai(
         provider_options=_decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
         logprobs=_decode_logprobs(body),
+        cite_documents=_decode_flag(body, CITE_DOCUMENTS_FIELD),
     )
     return target, request, bool(body.get("stream"))
+
+
+def _decode_flag(body: Mapping[str, Any], field_name: str) -> bool:
+    """Read a boolean request extension, refusing a mis-typed one.
+
+    Raises:
+        ValueError: If the field is present but is not a boolean, so a client that sent
+            the string ``"true"`` learns rather than silently getting the default.
+    """
+    if field_name not in body:
+        return False
+    value = body[field_name]
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} must be true or false")
+    return value
 
 
 def _decode_logprobs(body: Mapping[str, Any]) -> int | None:
@@ -673,6 +709,25 @@ def _opt_int(value: Any) -> int | None:
 # ---- request: AnyInfer -> OpenAI (round-trip verification) ---------------------------
 
 
+def encode_citation(citation: Citation) -> dict[str, Any]:
+    """Encode one `Citation` for the wire, omitting what the provider did not state.
+
+    Absent keys rather than nulls or zeros: an offset of ``0`` and "the provider located
+    this only in the source" are different claims, and a wire shape that cannot tell them
+    apart pushes a fabricated highlight onto whoever renders it.
+    """
+    encoded: dict[str, Any] = {}
+    for key in ("start_index", "end_index", "document_index"):
+        value = getattr(citation, key)
+        if value is not None:
+            encoded[key] = value
+    for key in ("quoted_text", "title", "uri"):
+        value = getattr(citation, key)
+        if value:
+            encoded[key] = value
+    return encoded
+
+
 def encode_logprobs(logprobs: Sequence[TokenLogprob]) -> dict[str, Any]:
     """Encode normalized log-probabilities into the dialect's ``logprobs`` object.
 
@@ -817,6 +872,9 @@ def request_to_openai(
         if request.logprobs > 0:
             body["top_logprobs"] = request.logprobs
 
+    if request.cite_documents:
+        body[CITE_DOCUMENTS_FIELD] = True
+
     if request.reasoning is not None:
         body["reasoning_effort"] = request.reasoning
 
@@ -931,6 +989,10 @@ def completion_from_generation(
     }
     if result.logprobs:
         body["choices"][0]["logprobs"] = encode_logprobs(result.logprobs)
+    if result.citations:
+        body["choices"][0][CITATIONS_FIELD] = [
+            encode_citation(citation) for citation in result.citations
+        ]
     usage = _encode_usage(result.usage)
     if usage is not None:
         body["usage"] = usage
@@ -1010,6 +1072,16 @@ def chunk_from_event(
     if isinstance(event, TextDelta):
         envelope["choices"] = [
             {"index": 0, "delta": {"content": event.text}, "finish_reason": None}
+        ]
+        return envelope
+
+    if isinstance(event, CitationDelta):
+        envelope["choices"] = [
+            {
+                "index": 0,
+                "delta": {CITATIONS_FIELD: [encode_citation(event.citation)]},
+                "finish_reason": None,
+            }
         ]
         return envelope
 

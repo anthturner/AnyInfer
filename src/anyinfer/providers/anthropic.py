@@ -31,7 +31,13 @@ from ..types.capabilities import (
     RateLimitHeaders,
     Sourced,
 )
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    CitationDelta,
+    ReasoningDelta,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import (
     AudioPart,
     DocumentPart,
@@ -43,7 +49,7 @@ from ..types.messages import (
     VideoPart,
 )
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
+from ..types.results import Citation, FinishReason, Usage
 from ._multimodal import base64_data, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
@@ -232,7 +238,10 @@ class AnthropicAdapter:
 
         payload: dict[str, Any] = {
             "model": req.model,
-            "messages": [self._encode_message(m) for m in messages],
+            "messages": [
+                self._encode_message(m, citations_enabled=req.cite_documents)
+                for m in messages
+            ],
             "max_tokens": req.sampling.max_output_tokens or _DEFAULT_MAX_TOKENS,
             "stream": True,
         }
@@ -313,7 +322,9 @@ class AnthropicAdapter:
         if sampling.stop:
             payload["stop_sequences"] = list(sampling.stop)
 
-    def _encode_message(self, message: Message) -> dict[str, Any]:
+    def _encode_message(
+        self, message: Message, *, citations_enabled: bool = False
+    ) -> dict[str, Any]:
         """Encode one message into Anthropic's content-block form."""
         blocks: list[dict[str, Any]] = []
 
@@ -360,7 +371,12 @@ class AnthropicAdapter:
                         "data": base64_data(part.data or b""),
                     }
                 )
-                blocks.append({"type": "document", "source": source})
+                document: dict[str, Any] = {"type": "document", "source": source}
+                if citations_enabled:
+                    # Request-side opt-in: without it the model answers without
+                    # attributions, and Anthropic bills a cited answer differently.
+                    document["citations"] = {"enabled": True}
+                blocks.append(document)
             elif isinstance(part, AudioPart):
                 raise unsupported(self.provider_id, "audio")
             elif isinstance(part, VideoPart):
@@ -428,7 +444,12 @@ class AnthropicAdapter:
             if delta_type == "text_delta":
                 text = delta.get("text")
                 if isinstance(text, str) and text:
+                    state.answer_length += len(text)
                     yield TextDelta(text)
+            elif delta_type == "citations_delta":
+                citation = _parse_citation(delta.get("citation"), state)
+                if citation is not None:
+                    yield CitationDelta(citation)
             elif delta_type == "thinking_delta":
                 thinking = delta.get("thinking")
                 if isinstance(thinking, str) and thinking:
@@ -473,12 +494,21 @@ class AnthropicAdapter:
 class _StreamState:
     """Tracks stop reason, usage, and the mapping from block index to tool slot."""
 
-    __slots__ = ("finish_reason", "tool_slots", "usage")
+    __slots__ = ("answer_length", "cited_through", "finish_reason", "tool_slots", "usage")
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots: dict[int, int] = {}
+        self.answer_length = 0
+        self.cited_through = 0
+        """How far into the answer the citations so far have reached.
+
+        Anthropic reports character offsets into the *cited document*, never into its own
+        answer, but it emits each `citations_delta` immediately after the text that
+        citation supports. So the span in the answer is recoverable — it runs from wherever
+        the last citation ended to wherever the text has reached now — and recovering it is
+        what lets a caller highlight the sentence rather than only name the source."""
 
     def tool_slot(self, block_index: int) -> int:
         """Map a content-block index onto a dense tool-call slot.
@@ -505,6 +535,37 @@ def _option_str(options: Mapping[str, Any], key: str) -> str:
     """Read one option as a stripped string, treating anything else as absent."""
     value = options.get(key)
     return value.strip() if isinstance(value, str) else ""
+
+
+def _parse_citation(raw: Any, state: _StreamState) -> Citation | None:
+    """Translate one Anthropic citation object into a normalized `Citation`.
+
+    Anthropic publishes several location shapes — character, page, and content-block
+    indices into the cited document — which differ only in the unit they count in. None of
+    them is an offset into the answer, so the source location travels as ``quoted_text``
+    plus the document's identity, and the *answer* span is derived from where the stream
+    had reached when this citation arrived (see `_StreamState.cited_through`).
+
+    Returns ``None`` for a shape carrying neither quoted text nor a document identity,
+    since a citation that names nothing is not worth surfacing.
+    """
+    if not isinstance(raw, Mapping):
+        return None
+    quoted = raw.get("cited_text")
+    document_index = raw.get("document_index")
+    title = raw.get("document_title")
+    if not isinstance(quoted, str) and not isinstance(document_index, int):
+        return None
+    start = state.cited_through
+    end = state.answer_length
+    state.cited_through = end
+    return Citation(
+        start_index=start,
+        end_index=end,
+        quoted_text=quoted if isinstance(quoted, str) else "",
+        document_index=document_index if isinstance(document_index, int) else None,
+        title=title if isinstance(title, str) else "",
+    )
 
 
 def _split_system(messages: Sequence[Message]) -> tuple[str, list[Message]]:
@@ -560,6 +621,7 @@ _ANTHROPIC_FEATURES = (
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
     | Feature.CACHE_PLACEMENT
+    | Feature.CITATIONS
 )
 
 

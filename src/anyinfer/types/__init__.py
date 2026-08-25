@@ -15,6 +15,7 @@ from .capabilities import (
 )
 from .events import (
     AttemptFailed,
+    CitationDelta,
     ReasoningDelta,
     StreamEnded,
     StreamEvent,
@@ -85,6 +86,7 @@ from .requests import (
 from .results import (
     DETAIL_MAX_CHARS,
     AttemptRecord,
+    Citation,
     Diagnostic,
     DiagnosticSeverity,
     ErrorInfo,
@@ -115,6 +117,8 @@ __all__ = [
     "CacheMechanism",
     "CacheMode",
     "CachePolicy",
+    "Citation",
+    "CitationDelta",
     "ContentPart",
     "Diagnostic",
     "DiagnosticSeverity",

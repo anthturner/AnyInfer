@@ -39,7 +39,13 @@ from ..types.capabilities import (
     ModelCapabilities,
     Sourced,
 )
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    CitationDelta,
+    ReasoningDelta,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import (
     AudioPart,
     DocumentPart,
@@ -52,7 +58,7 @@ from ..types.messages import (
 )
 from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, TokenLogprob, Usage
+from ..types.results import Citation, FinishReason, TokenLogprob, Usage
 from ._multimodal import base64_data
 from .base import (
     AdapterEvent,
@@ -604,6 +610,9 @@ class GeminiAdapter:
 
         state.logprobs.extend(_parse_logprobs(candidate.get("logprobsResult")))
 
+        for citation in _parse_citations(candidate.get("citationMetadata"), state):
+            yield CitationDelta(citation)
+
         content = candidate.get("content")
         if not isinstance(content, Mapping):
             return
@@ -652,13 +661,19 @@ class GeminiAdapter:
 class _StreamState:
     """Accumulates cross-chunk streaming state so the final event is complete."""
 
-    __slots__ = ("finish_reason", "logprobs", "tool_slots", "usage")
+    __slots__ = ("citations_emitted", "finish_reason", "logprobs", "tool_slots", "usage")
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots = 0
         self.logprobs: list[TokenLogprob] = []
+        self.citations_emitted = 0
+        """How many citation sources have already been yielded.
+
+        `citationMetadata` is cumulative across streamed chunks, not incremental, so this
+        is what stops a long grounded answer re-emitting its first citation on every
+        chunk."""
 
     def next_tool_slot(self) -> int:
         """Allocate the next dense tool-call index.
@@ -677,6 +692,35 @@ class _StreamState:
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
             logprobs=tuple(self.logprobs),
+        )
+
+
+def _parse_citations(metadata: Any, state: _StreamState) -> Iterable[Citation]:
+    """Translate ``citationMetadata.citationSources`` into normalized citations.
+
+    Gemini reports offsets into its own answer, which map straight across. It also resends
+    the *cumulative* list on every streamed chunk rather than only the new entries, so the
+    stream state remembers how many have already been emitted — without that, a long
+    grounded answer would emit the first citation once per chunk.
+    """
+    if not isinstance(metadata, Mapping):
+        return
+    sources = metadata.get("citationSources")
+    if not isinstance(sources, list):
+        return
+    for source in sources[state.citations_emitted :]:
+        state.citations_emitted += 1
+        if not isinstance(source, Mapping):
+            continue
+        uri = source.get("uri")
+        start = source.get("startIndex")
+        end = source.get("endIndex")
+        if not isinstance(uri, str) and not isinstance(start, int):
+            continue
+        yield Citation(
+            start_index=start if isinstance(start, int) and not isinstance(start, bool) else None,
+            end_index=end if isinstance(end, int) and not isinstance(end, bool) else None,
+            uri=uri if isinstance(uri, str) else "",
         )
 
 
@@ -862,6 +906,7 @@ _GEMINI_FEATURES = (
     | Feature.CACHE_USAGE
     | Feature.LOGPROBS
     | Feature.VIDEO_IN
+    | Feature.CITATIONS
 )
 
 

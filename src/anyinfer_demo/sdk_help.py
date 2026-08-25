@@ -682,9 +682,23 @@ TOPICS: dict[str, HelpTopic] = {
                 "parts — built with the system()/user()/assistant() helpers and re-sent "
                 "as history on the next turn. The saved conversations in the sidebar "
                 "are these same values serialized, which is why an exported chat "
-                "replays cleanly."
+                "replays cleanly. Image, document, audio, and video parts round-trip as "
+                "a media-type placeholder rather than embedded bytes: this transcript "
+                "store is deliberately payload-free."
             ),
-            api=("Message", "Role", "Text", "ContentPart", "system", "user", "assistant"),
+            api=(
+                "Message",
+                "Role",
+                "Text",
+                "ContentPart",
+                "ImagePart",
+                "DocumentPart",
+                "AudioPart",
+                "VideoPart",
+                "system",
+                "user",
+                "assistant",
+            ),
             snippet=(
                 "messages = [\n"
                 '    ai.system("You are concise."),\n'

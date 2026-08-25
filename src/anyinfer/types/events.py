@@ -25,10 +25,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from .results import AttemptRecord, Generation, Usage
+from .results import AttemptRecord, Citation, Generation, Usage
 
 __all__ = [
     "AttemptFailed",
+    "CitationDelta",
     "ReasoningDelta",
     "StreamEnded",
     "StreamEvent",
@@ -74,6 +75,27 @@ class ToolCallDelta:
     call_id: str | None
     name: str | None
     arguments_fragment: str
+
+
+@dataclass(frozen=True, slots=True)
+class CitationDelta:
+    """One attribution the model reported, as soon as it reported it.
+
+    Named a *delta* to match its siblings even though a citation arrives whole: it is a
+    stream event that adds to the answer, and callers rendering attributions live need it
+    at the moment it lands rather than at `StreamEnded`. Every citation on the terminal
+    result also appeared here first, so a consumer may use either and never both.
+
+    Deliberately **not** a content event: a citation does not start the first-token clock.
+    Cohere emits its first citation only after the span it supports, so counting one as
+    first content would report a time-to-first-token later than the text the user already
+    saw.
+
+    Attributes:
+        citation: The attribution, with whatever the dialect reported about it.
+    """
+
+    citation: Citation
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +145,7 @@ StreamEvent = (
     TextDelta
     | ReasoningDelta
     | ToolCallDelta
+    | CitationDelta
     | UsageUpdate
     | TimingMark
     | AttemptFailed

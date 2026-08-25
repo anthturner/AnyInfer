@@ -180,6 +180,7 @@ class Feature(Flag):
     AUDIO_IN = auto()
     LOGPROBS = auto()
     VIDEO_IN = auto()
+    CITATIONS = auto()
 
 
 @dataclass(frozen=True, slots=True)

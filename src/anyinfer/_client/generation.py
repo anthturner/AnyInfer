@@ -1037,6 +1037,7 @@ class GenerationExecutionMixin:
             raw=buffer.raw,
             context_reduction=context_summary,
             logprobs=buffer.logprobs,
+            citations=tuple(buffer.citations),
         )
 
     def _plan_cache(

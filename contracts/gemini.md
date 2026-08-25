@@ -95,6 +95,10 @@ native protocol is used instead.
 
 ### Response fields read
 - `candidates[0].content.parts[]` — `text` (with `thought` flag), `functionCall`.
+- `candidates[0].citationMetadata.citationSources[]` — `{startIndex, endIndex, uri,
+  license?}`, with offsets into the **answer**. The list is **cumulative across streamed
+  chunks**, not incremental, so the adapter tracks how many it has emitted; without that a
+  long grounded answer re-reports its first citation on every chunk.
 - `candidates[0].logprobsResult` — `chosenCandidates[{token, logProbability}]` and
   `topCandidates[{candidates[{token, logProbability}]}]`. Google splits what other
   dialects nest: the two arrays are **parallel by position**, so recovering one token with

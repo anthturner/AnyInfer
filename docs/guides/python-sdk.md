@@ -112,6 +112,36 @@ Each `TokenLogprob` carries the natural-log value the provider reported, with
 probabilities are not silently answered without them: the parameter is reported dropped,
 the same as any other unhonored request field.
 
+## Ask for Attributions
+
+When a request supplies documents, `cite_documents=True` asks the target to say which of
+them each part of its answer came from:
+
+```python
+result = client.generate(
+    grounded_messages,
+    cite_documents=True,
+)
+
+for citation in result.citations:
+    supported = citation.span_of(result.text)
+    print(f"{supported!r} ← {citation.title or citation.uri}")
+```
+
+It is off by default and never inferred from the mere presence of a document: every
+dialect that can do this treats it as a request-side opt-in — a model does not volunteer
+citations — and several bill a cited answer differently.
+
+The dialects agree on almost nothing, so `Citation` carries only what a person rendering
+an attribution needs, and every field is optional. An absent offset means the provider did
+not say where in the answer the citation applies; it does not mean position zero. Use
+`span_of()` rather than slicing by hand — it returns `""` for a citation with no offsets,
+which is the honest answer, and clamps a provider's off-by-one to a short span rather than
+raising mid-render.
+
+Streaming callers get each attribution as it lands, via a `CitationDelta`, without waiting
+for the final result.
+
 ## Handle Failures
 
 All public failures derive from `AnyInferError` and carry structured fields. Branch on

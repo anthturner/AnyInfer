@@ -46,6 +46,13 @@ own thinking channel, and usage that separates billed units from processed token
 - Sampling under Cohere's own names: `temperature`, **`p`** (not `top_p`), `max_tokens`,
   `stop_sequences`. `seed`, `presence_penalty`, and `frequency_penalty` keep the OpenAI
   spelling (added 2026-08-25) — the renaming is confined to nucleus/top-k.
+- `citation-start` stream events (read 2026-08-25) carry
+  `delta.message.citations: {start, end, text, sources[]}`. Cohere is the **only** dialect
+  reporting offsets into its own answer, which is what a caller highlighting a sentence
+  needs, so they map straight across. A `sources[]` entry is
+  `{type, id, document: {...}}`; the first is normalized and the rest stay on the raw
+  payload rather than growing the citation type with a nested list every other dialect
+  would fill with one entry.
 - `logprobs` is **not sent**. v2 reports probabilities over text spans
   (`{token_ids, text, logprobs}`) rather than per normalized token, which does not project
   onto `TokenLogprob` without inventing a token boundary; the descriptor declares it in

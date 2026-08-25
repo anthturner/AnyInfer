@@ -612,6 +612,12 @@ class GenerationRequest:
             additionally asks for that many runners-up. A target known not to report them
             emits a dropped-parameter event rather than returning an empty ``logprobs``
             a caller would have to notice for themselves.
+        cite_documents: Ask the target to attribute its answer to the documents this
+            request supplied. Every dialect that can do this treats it as a request-side
+            opt-in — a model does not volunteer citations — and several bill differently
+            for a cited answer, so it is off by default and never inferred from the mere
+            presence of a `DocumentPart`. A target that cannot cite reports a dropped
+            parameter; the answer still arrives, without attributions.
     """
 
     messages: tuple[Message, ...]
@@ -632,6 +638,7 @@ class GenerationRequest:
     arena: ArenaPolicy | None = None
     context: ContextRequest | None = None
     logprobs: int | None = None
+    cite_documents: bool = False
 
     def __post_init__(self) -> None:
         """Enforce multimodal request byte ceilings before any adapter can run."""

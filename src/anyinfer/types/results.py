@@ -19,6 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover — imported for the annotation only
 __all__ = [
     "DETAIL_MAX_CHARS",
     "AttemptRecord",
+    "Citation",
     "Diagnostic",
     "DiagnosticSeverity",
     "ErrorInfo",
@@ -33,6 +34,56 @@ __all__ = [
 
 DETAIL_MAX_CHARS = 512
 """Upper bound on `ErrorInfo.detail`, applied after redaction."""
+
+
+@dataclass(frozen=True, slots=True)
+class Citation:
+    """A span of the answer, and the source material it came from.
+
+    The dialects disagree about almost everything: Anthropic reports character offsets
+    into a supplied document plus the exact passage quoted, Cohere reports offsets into
+    the *answer* plus a source id, and Gemini reports offsets into the answer plus a URI.
+    The union of what they agree is worth saying is: which part of the answer this
+    supports, and enough about the source to show a person. Everything is optional
+    because no dialect fills all of it, and a zero-valued offset is not the same as an
+    absent one — an absent offset means the provider did not say, and rendering a
+    highlight at position zero because of it would be a fabricated claim about the text.
+
+    Attributes:
+        start_index: Character offset into `Generation.text` where the supported span
+            begins, or ``None`` when the provider located the citation only in the source.
+        end_index: Exclusive character offset where the supported span ends.
+        quoted_text: The passage from the source material, when the provider quotes it.
+            Empty when it reports only a location.
+        document_index: Which of the request's supplied documents this cites, in the order
+            they appeared in the request. ``None`` for a provider-retrieved source that
+            was never part of the request.
+        title: Human-readable source name, when the provider supplies one.
+        uri: Source URL, for providers whose grounding reaches the open web.
+    """
+
+    start_index: int | None = None
+    end_index: int | None = None
+    quoted_text: str = ""
+    document_index: int | None = None
+    title: str = ""
+    uri: str = ""
+
+    def span_of(self, text: str) -> str:
+        """The cited span of an answer, or ``""`` when this citation gives no offsets.
+
+        Args:
+            text: The answer text, normally `Generation.text`.
+
+        Returns:
+            The substring the citation supports, clamped to the text's bounds so a
+            provider's off-by-one offset yields a short span rather than an exception.
+        """
+        if self.start_index is None or self.end_index is None:
+            return ""
+        start = max(0, min(self.start_index, len(text)))
+        end = max(start, min(self.end_index, len(text)))
+        return text[start:end]
 
 
 @dataclass(frozen=True, slots=True)
@@ -328,6 +379,10 @@ class Generation:
             the request asked for them and the target returned them. Empty otherwise —
             including for a target that accepted the request and answered without them,
             which is reported as a dropped parameter rather than inferred from this field.
+        citations: Attributions the target reported for this answer, in the order it
+            reported them. Empty when none were returned, which includes every target that
+            does not produce them — the presence of citations is a provider capability,
+            never something AnyInfer derives from the text.
     """
 
     text: str
@@ -347,3 +402,4 @@ class Generation:
     arena: ArenaResult | None = None
     context_reduction: ContextSummary | None = None
     logprobs: tuple[TokenLogprob, ...] = ()
+    citations: tuple[Citation, ...] = ()

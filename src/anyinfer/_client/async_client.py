@@ -1334,6 +1334,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
         logprobs: int | None = None,
+        cite_documents: bool = False,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1352,6 +1353,13 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         ``None`` — the default — for none at all. A target that cannot report them emits a
         `ParameterDropped` event rather than answering with an empty
         `Generation.logprobs`.
+
+        ``cite_documents`` asks the target to attribute its answer to the documents this
+        request supplied, landing them on `Generation.citations`
+        and on `CitationDelta` events as they arrive.
+        Off by default and never inferred from the presence of a document, since every
+        dialect treats it as a request-side opt-in and several bill a cited answer
+        differently.
 
         Returns:
             The assembled `Generation`.
@@ -1374,6 +1382,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             arena=arena,
             context=context,
             logprobs=logprobs,
+            cite_documents=cite_documents,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1627,6 +1636,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
         logprobs: int | None = None,
+        cite_documents: bool = False,
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1645,6 +1655,13 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         ``None`` — the default — for none at all. A target that cannot report them emits a
         `ParameterDropped` event rather than answering with an empty
         `Generation.logprobs`.
+
+        ``cite_documents`` asks the target to attribute its answer to the documents this
+        request supplied, landing them on `Generation.citations`
+        and on `CitationDelta` events as they arrive.
+        Off by default and never inferred from the presence of a document, since every
+        dialect treats it as a request-side opt-in and several bill a cited answer
+        differently.
 
         Returns:
             An `AsyncStream`: an async iterator of
@@ -1665,6 +1682,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             arena=arena,
             context=context,
             logprobs=logprobs,
+            cite_documents=cite_documents,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1803,6 +1821,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
         logprobs: int | None = None,
+        cite_documents: bool = False,
     ) -> GenerationRequest:
         spec = SchemaSpec.coerce(schema) if schema is not None else None
         request = GenerationRequest(
@@ -1819,6 +1838,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             arena=arena,
             context=context,
             logprobs=logprobs,
+            cite_documents=cite_documents,
             provider_options=dict(provider_options or {}),
             metadata=dict(metadata or {}),
             max_input_part_bytes=(
