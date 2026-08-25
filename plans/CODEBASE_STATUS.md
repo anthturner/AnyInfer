@@ -37,7 +37,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 |---|---|---|---|---|---|
 | `[x]` | B.1 | Sidecar docs deny endpoints the sidecar actually serves | 5 | 5 | 25 |
 | `[x]` | F.2 | Relay ASGI app serves decrypted prompt IP with no authentication | 5 | 5 | 25 |
-| `[ ]` | G.1 | Attestation honest-claims pass (reword oversell, pin GPU parse) | 5 | 5 | 25 |
+| `[x]` | G.1 | Attestation honest-claims pass (reword oversell, pin GPU parse) | 5 | 5 | 25 |
 | `[x]` | B.6 | Error docs `missing_fields` → real attribute `missing_required` | 3 | 5 | 15 |
 | `[ ]` | E.1 | Async batch inference APIs (OpenAI Batch, Anthropic Message Batches) | 5 | 3 | 15 |
 | `[ ]` | F.1 | Tier 3 "attested execution" is detection, not attestation (→ plan §G) | 5 | 3 | 15 |
@@ -1349,17 +1349,17 @@ regardless — the honest-gap posture stays defensible only as long as the prose
 
 **Sev 5 · Pri 5** — stop overselling while the gap exists. Hours of work; absorbs F.1.3/F.1.4.
 
-- [ ] **G.1.1** Reword DESIGN.md §30.4's opening sentence ("The only tier with a real
+- [x] **G.1.1** Reword DESIGN.md §30.4's opening sentence ("The only tier with a real
   cryptographic guarantee") to "the only tier *designed for* a real cryptographic guarantee;
   today it performs TEE detection, with quote verification planned" — and sweep
   `docs/guides/confidentiality-tiers.md` plus any marketing surface for equivalent phrasing
   (the guide's own "detection, not cryptographic attestation" wording is the model).
-- [ ] **G.1.2** Pin the GPU CC positive parse (`local/attestation.py:288-297`): switch from
+- [x] **G.1.2** Pin the GPU CC positive parse (`local/attestation.py:288-297`): switch from
   `!= "None"` to an allowlist of observed-positive values with a logged "unknown value treated
   as not capable" fallback; add fixture tests for capable/incapable/garbled
   `nvidia-smi conf-compute -q` outputs (NVIDIA's published samples until G.3 captures real
   ones).
-- [ ] **G.1.3** Document at every `end_to_end` consumer (docstrings on
+- [x] **G.1.3** Document at every `end_to_end` consumer (docstrings on
   `ConfidentialExecutionStatus`, `confidential_execution_status()`, the adapter) that the
   field is advisory-local-only until `quote_verified` (G.4.3) exists.
 

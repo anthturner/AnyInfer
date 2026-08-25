@@ -1807,10 +1807,14 @@ design and by audit) are both stated, with logs carrying metadata only.
 
 ### 30.4 Tier 3 — attested local execution
 
-The only tier with a real cryptographic guarantee, because it targets the local adapters
-rather than a cloud call. Where the host exposes a trusted execution environment, the
-runtime executes inside it and remote attestation proves that to the vendor's software
-before any prompt is sent.
+The only tier *designed for* a real cryptographic guarantee, because it targets the local
+adapters rather than a cloud call. Where the host exposes a trusted execution environment,
+the runtime executes inside it. **What ships today is TEE detection, not attestation:**
+`end_to_end` reflects guest device nodes and `nvidia-smi` output, so it is an
+advisory-local signal, not evidence a remote relying party can check. Quote generation and
+verification against AMD/Intel roots of trust is planned and scoped (§G of the codebase
+status tracker); until it lands, nothing here proves anything *to the vendor's software*,
+and no surface may claim it does.
 
 It **fails closed**: a caller who requests confidential execution on a host that cannot
 provide it gets a refusal and a typed signal, never a silent downgrade to unattested

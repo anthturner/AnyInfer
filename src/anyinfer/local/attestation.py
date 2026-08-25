@@ -97,7 +97,12 @@ class ConfidentialExecutionStatus:
             all; when ``False``, `gpu_cc_capable`/`gpu_cc_enabled` do not gate
             `end_to_end` — a CPU-only backend has no PCIe bridge to worry about.
         end_to_end: The one field most callers branch on — see the module docstring for
-            the exact definition.
+            the exact definition. **Advisory, local-only.** It is derived from TEE
+            detection (guest device nodes, `nvidia-smi` output), not from a verified
+            attestation quote, so it is evidence *this* process can act on and not
+            something a remote party can be asked to trust. A fabricated device node
+            satisfies every probe. Treat it as a precondition for running, never as
+            proof to anyone else, until a `quote_verified` field exists alongside it.
         detail: Human-readable why, the same role `Backend.detail` already plays.
         model_verified: Tier 4 — whether `confidential_execution_status`'s optional
             `manifest`/`vendor_public_key` arguments were supplied and verified against
@@ -137,6 +142,12 @@ def confidential_execution_status(
     Never raises: anything that cannot be determined becomes "not detected," never a
     guess. Callers — including `ConfidentialExecutionAdapter`'s own fail-closed check —
     treat the result as advice about a hardware fact, not as a decision.
+
+    **What this proves, and to whom.** This is TEE *detection*: it reports what the guest
+    kernel believes about its own environment. No attestation quote is generated or
+    verified against AMD's, Intel's, or NVIDIA's roots of trust, so nothing here rules out
+    a lying hypervisor and nothing here is evidence a *remote* relying party can check.
+    `end_to_end=True` is a local precondition, not a cryptographic guarantee.
 
     Args:
         backend: The selected local backend (used only to know whether this run targets
@@ -194,8 +205,9 @@ def _probe(*, backend: Backend, model: ResolvedModel | None) -> ConfidentialExec
 
     gpu_cc_capable = False
     gpu_cc_enabled = False
+    unrecognized_cc_value: str | None = None
     if gpu_offload_required:
-        gpu_cc_capable, gpu_cc_enabled = _detect_gpu_cc()
+        gpu_cc_capable, gpu_cc_enabled, unrecognized_cc_value = _detect_gpu_cc()
 
     if cpu_tee not in ("sev-snp", "tdx"):
         end_to_end = False
@@ -220,6 +232,12 @@ def _probe(*, backend: Backend, model: ResolvedModel | None) -> ConfidentialExec
         detail = (
             f"{cpu_tee.upper()} CPU TEE detected, but the model offloads to a GPU that "
             "is not confidential-computing-capable — the PCIe bridge is unprotected"
+        )
+
+    if unrecognized_cc_value is not None:
+        detail += (
+            f" (nvidia-smi reported an unrecognized GPU CC capability "
+            f"{unrecognized_cc_value!r}, treated as not capable)"
         )
 
     return ConfidentialExecutionStatus(
@@ -255,7 +273,7 @@ def _detect_cpu_tee() -> CpuTeeKind | None:
     return None
 
 
-def _detect_gpu_cc() -> tuple[bool, bool]:
+def _detect_gpu_cc() -> tuple[bool, bool, str | None]:
     """Detect NVIDIA confidential-computing GPU capability and enablement.
 
     **Live-verified pin (2026-08-14, RTX 4090, driver 595.84, non-CC-capable card) —**
@@ -289,26 +307,54 @@ def _detect_gpu_cc() -> tuple[bool, bool]:
     this session** (no CC-capable GPU — Hopper H100/H200 or newer — was available to test
     against): the exact positive value of "GPU CC Capabilities" when a card *is* capable.
     Public secondary sources (NVIDIA's own ACM Queue writeup on confidential GPUs)
-    describe two capability tiers, Ampere's partial "APM" and Hopper's full CC support,
-    which is consistent with this field naming a capability rather than being a bare
-    boolean — so parsing treats any value other than ``None`` as capable rather than
-    requiring one exact string match, which would silently misparse an unanticipated
-    tier name. Re-verify directly against real H100/H200 output when that hardware is
-    reachable and tighten this parse if warranted.
+    describe two capability tiers, Ampere's partial "APM" and Hopper's full CC support.
+
+    Parsing therefore matches an **allowlist** of values documented as positive
+    (`_GPU_CC_CAPABLE_VALUES`) rather than treating everything that is not ``None`` as
+    capable. The earlier not-``None`` rule read novel values — an ``N/A`` on a driver
+    that does not implement the query, an error string — as *capable*, which fails open
+    on the one field the end-to-end claim rests on. An unrecognized value is treated as
+    not capable and named in the status `detail`, so the operator sees exactly what was
+    not understood instead of a silent downgrade. Widen the allowlist from real captured
+    output when CC hardware is reachable.
 
     Returns:
-        ``(capable, enabled)``. Both ``False`` when `nvidia-smi` is absent, the
+        ``(capable, enabled, unrecognized)``. ``unrecognized`` carries the reported
+        capability string when it matched neither allowlist, for the caller to surface;
+        it is ``None`` whenever the value was understood. ``capable`` and ``enabled``
+        are both ``False`` when `nvidia-smi` is absent, the
         ``conf-compute`` subcommand is unsupported, or its output does not parse — this
         surface is newer and less stable than the flags `hardware.py` already depends on,
         so an unparseable result is treated as "not detected," never a guess.
     """
     output = _run(["nvidia-smi", "conf-compute", "-q"])
     if output is None:
-        return False, False
+        return False, False, None
     capable_match = re.search(r"GPU\s+CC\s+Capabilities\s*:\s*(\S.*)", output, re.IGNORECASE)
-    capable = capable_match is not None and capable_match.group(1).strip().lower() != "none"
     enabled = bool(re.search(r"CC\s+State\s*:\s*ON\b", output, re.IGNORECASE))
-    return capable, enabled
+    if capable_match is None:
+        return False, enabled, None
+
+    reported = capable_match.group(1).strip()
+    normalized = reported.lower()
+    if normalized in _GPU_CC_CAPABLE_VALUES:
+        return True, enabled, None
+    if normalized in _GPU_CC_INCAPABLE_VALUES:
+        return False, enabled, None
+    # Fail closed and say so: an unanticipated value is not evidence of capability.
+    return False, enabled, reported
+
+
+_GPU_CC_CAPABLE_VALUES = frozenset({"apm", "cc", "apm, cc", "cc, apm"})
+"""``GPU CC Capabilities`` values NVIDIA documents as indicating a capable card.
+
+Ampere's partial "APM" and Hopper's full "CC" support are the two tiers described in
+NVIDIA's published material. Not yet confirmed against real positive output from CC
+hardware — widen this from a real capture rather than by guessing at spellings.
+"""
+
+_GPU_CC_INCAPABLE_VALUES = frozenset({"none"})
+"""Values that positively mean "not capable", as distinct from ones we do not recognize."""
 
 
 def _run(command: list[str]) -> str | None:

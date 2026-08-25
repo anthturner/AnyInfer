@@ -9,8 +9,9 @@ It does not protect your own prompt IP (templates, orchestration, few-shot curat
 from a customer running your client software on infrastructure they own. No purely
 client-side technique can: the customer owns the machine, the OS, and the network stack.
 This page is a ladder from "raises the cost of extraction" (Tiers 1–2) up to the one
-point where a real cryptographic guarantee becomes possible (Tier 3, hardware-attested
-local execution), plus a verification layer on top of it (Tier 4). Each tier's
+point where a real cryptographic guarantee becomes *possible* (Tier 3, hardware-attested
+local execution — today detection, with quote verification planned), plus a verification
+layer on top of it (Tier 4). Each tier's
 guarantee, cost, and limits are stated once, in the table:
 
 | Tier | What it guarantees | What it costs | Ships in |
@@ -146,8 +147,11 @@ A self-hosting checklist:
 
 ## Tier 3 (Attested Local Execution)
 
-The one tier with a real cryptographic guarantee, because it targets AnyInfer's own
-[local adapters](../concepts/local.md) instead of a cloud call. When the host supports a
+The one tier designed for a real cryptographic guarantee, because it targets AnyInfer's
+own [local adapters](../concepts/local.md) instead of a cloud call. What ships today is
+detection rather than attestation — see
+[detection versus cryptographic attestation](#detection-versus-cryptographic-attestation)
+below, and read `end_to_end` as an advisory local signal until then. When the host supports a
 trusted execution environment (AMD SEV-SNP or Intel TDX today), the local runtime can
 run inside it, and `confidential_execution_status()` reports whether the guarantee holds
 right now, on this box:
