@@ -26,6 +26,8 @@ never rewritten.
 - Credentials can be rotated at runtime: a replaced key takes effect without restarting
   the process.
 - `anyinfer models prune` proposes least-recently-used deletions to fit a disk budget.
+- The sidecar serves `POST /v1/responses`, OpenAI's current-generation dialect, with
+  its semantic streaming events — so a Responses-first SDK no longer 404s.
 - Telemetry sinks, plugin groups, proxy and TLS settings, and a decision log.
 - The confidential Relay paces and bounds its own traffic: pooled provider pacing
   that survives a per-call client, per-tenant admission limits, and 429 responses

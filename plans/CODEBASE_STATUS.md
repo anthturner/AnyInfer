@@ -87,7 +87,7 @@ batch.
 | ✅ | F.2 | new | Unknown credential schemes fall through to LiteralResolver; plugin issues discarded | 3 | 4 | 12 | S |
 | `[ ]` | G.1 | G.2 | Demand gate: identify a confidential-tier design partner | 3 | 4 | 12 | XS |
 | `[ ]` | G.2 | G.3 | CC hardware validation sprint (rent, capture, fixture) | 4 | 3 | 12 | M |
-| `[ ]` | E.5 | E.5 | OpenAI Responses API endpoint on the sidecar | 3 | 3 | 9 | L |
+| ✅ | E.5 | E.5 | OpenAI Responses API endpoint on the sidecar | 3 | 3 | 9 | L |
 | ✅ | E.6 | E.6 | Ship accurate token estimators behind the existing protocol | 3 | 3 | 9 | M |
 | `[ ]` | G.4 | G.5 | Claims and docs update once quote verification lands | 3 | 3 | 9 | S |
 | ✅ | B.1 | new | README embeddings enumeration omits Gemini and llama.cpp | 2 | 4 | 8 | XS |
@@ -595,8 +595,8 @@ Two scope decisions are recorded rather than left implicit:
   quietly loosened for one modality no longer means what its name says, and the
   hosted-URI path providers actually expect carries no bytes to count.
 
-**E.1, E.3, and E.5 remain open**, and are the three largest: two XL and one L. Nothing
-about them changed in this pass.
+**E.5 closed later in the same wave**: `serve/responses_codec.py` and its route, with the
+dialect's semantic streaming events. **E.1 and E.3 remain open**, both XL.
 
 Four v1 misses closed this window with real implementations: per-instance **proxy/CA/mTLS**
 (v1 E.9), **plugin entry-point groups** for credential stores and observers (v1 E.10),
@@ -653,24 +653,6 @@ tool inside one request/response, squarely translate-only territory.
   targets refuse before dispatch.
 - [ ] **E.3.2** Map server-tool result blocks to a typed event; add per-invocation pricing
   line items.
-
-## E.5 — OpenAI Responses API endpoint on the sidecar
-
-**Severity:** Medium · **Confidence:** High · **Was:** E.5
-
-**Expected because:** the Responses API is OpenAI's current-generation surface and
-Responses-first SDKs/frameworks 404 against a chat-completions-only gateway — while
-AnyInfer's *own* OpenAI adapter speaks `POST /responses` upstream, so the project already
-treats it as the real dialect. **Evidence of absence (re-verified):** `serve/app.py`'s route
-table has no `/v1/responses`; the catch-all 404s it.
-
-**Remediation sketch:**
-- [ ] **E.5.1** Add `serve/responses_codec.py` beside `openai_codec.py` mapping
-  `POST /v1/responses` (input items → `Message` parts, `text.format` → `SchemaSpec`,
-  semantic streaming events) under the wire-codec invariants; update the serve README route
-  table in the same commit (B.3's lesson).
-- [ ] **E.5.2** Refuse `previous_response_id` explicitly or map it onto `Session` — never
-  silently emulate server-side state.
 
 # F. Security posture
 

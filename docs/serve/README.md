@@ -62,12 +62,37 @@ the frontend stays a codec.
 | Endpoint | Behavior |
 |---|---|
 | `POST /v1/chat/completions` | Streaming and non-streaming. `model` is parsed as a target. |
+| `POST /v1/responses` | OpenAI's current-generation dialect, streaming and non-streaming. Same targets, same extensions. |
 | `POST /v1/embeddings` | Vectors for a string or batch. `model` is parsed as a target. |
 | `POST /v1/anyinfer/rerank` | Scores documents against a query. Not an OpenAI route. |
 | `POST /v1/anyinfer/compare` | Runs one prompt across several targets. Not an OpenAI route. |
 | `GET /v1/models` | Catalog aliases plus any explicitly exposed targets. |
 | `GET /health` | Liveness. Requires no authentication. |
 | Anything else under `/v1` | 404 with a clear explanation. |
+
+## Two OpenAI Dialects, One Core
+
+`/v1/chat/completions` and `/v1/responses` are separate codecs over the same client. A
+Responses-first SDK 404s against a chat-completions-only gateway, and this project already
+treats Responses as the real dialect — its own OpenAI adapter speaks `POST /responses`
+upstream — so serving only the older shape meant projecting one this library does not
+itself prefer.
+
+They differ in kind, not just in spelling. Responses streams a narrated lifecycle — an
+item was added, a content part opened, text arrived, the part closed — where chat
+completions repeats one chunk shape and leaves reassembly to the client. Each record names
+its type on the SSE `event:` line, which is what those clients dispatch on. Reasoning gets
+its own output item rather than being folded into the answer or dropped, and a grounded
+answer's citations land on the content part's native `annotations` rather than needing an
+extension.
+
+**What is refused rather than emulated.** Responses is a *stateful* API.
+`previous_response_id` continues a conversation the server remembers and `store` asks it
+to remember one; this gateway remembers nothing, so both are 400s with an explanation.
+Silently dropping `previous_response_id` would return an answer assembled without the
+conversation the caller referenced — which reads as a bad model rather than a missing
+feature. A response states `"store": false` so a client learns the posture without having
+to be refused first.
 
 The two `/v1/anyinfer/` routes are deliberate extensions: reranking and comparison have no
 OpenAI equivalent, so they sit under a namespaced prefix rather than pretending to be stock

@@ -914,6 +914,7 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                         "pytest",
                         "tests/test_openai_roundtrip.py",
                         "tests/test_serve_app.py",
+                        "tests/test_serve_responses.py",
                         "-q",
                         env=_headless_env(),
                     ),

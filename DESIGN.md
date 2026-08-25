@@ -861,8 +861,8 @@ src/anyinfer/
   cli.py                 # init, agents-md, run, embed, rerank, compare, verify,
                          # benchmark, doctor, providers, models, runtime, context,
                          # mcp, conform, serve
-  serve/                 # openai_codec.py embeddings_codec.py app.py service.py
-                         # __main__.py — see §22, ADR-009
+  serve/                 # openai_codec.py responses_codec.py embeddings_codec.py
+                         # app.py service.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
 contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§24)
