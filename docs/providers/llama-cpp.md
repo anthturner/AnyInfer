@@ -6,8 +6,8 @@ icon: material/desktop-tower
 # llama.cpp
 
 A supervised `llama-server` subprocess speaking the OpenAI-compatible dialect over loopback.
-In-process `llama-cpp-python` is explicitly not supported: one wire protocol for
-every engine, crash isolation, and no GPU-wheel build matrix in the dependency tree.
+In-process `llama-cpp-python` is not supported: one wire protocol for every engine, crash
+isolation, and no GPU-wheel build matrix in the dependency tree.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
@@ -43,8 +43,7 @@ answers.
 Install a pinned runtime with `anyinfer runtime install`, or supply your own `llama-server`
 through the `binary` option. With multiple installed runtimes, set `runtime` to `cuda`,
 `vulkan`, `metal`, `rocm`, or `cpu`; the default `auto` selects the highest-ranked installed
-backend the detected hardware can drive. AnyInfer fetches runtimes and weights on demand rather than
-embedding them in the wheel, and verifies catalog-managed downloads before use.
+backend the detected hardware can drive.
 
 Aliases: `llamacpp`, `llama`.
 
@@ -93,16 +92,17 @@ projected through the llama.cpp adapter.
 
 ## Structured output
 
-llama.cpp compiles `response_format.json_schema` into a real GBNF grammar. As with Ollama,
-the schema is *also* injected into the prompt, because a grammar constrains form without
-conveying meaning.
+llama.cpp compiles `response_format.json_schema` into a real GBNF grammar. As with
+[Ollama](ollama.md), the schema is *also*
+[injected into the prompt](../concepts/structured-output.md), because a grammar
+constrains form without conveying meaning.
 
-## Tool calling needs `--jinja`
+## Tool calling
 
 The tuner always emits `--jinja`. Without it, llama-server cannot apply a model's chat
 template and tool calling silently does not work at all.
 
-## Embeddings run on a separate resident server from chat
+## Embeddings
 
 `--embeddings` can only be set when llama-server starts — live-verified: an
 already-running chat server answers every `/v1/embeddings` call with a 501 asking you to
@@ -117,27 +117,26 @@ result = client.embed(
 )
 ```
 
-Once started with `--embeddings`, the endpoint is genuinely OpenAI-shaped — the same
-`OpenAICompatEmbeddingsMixin` code every hosted OpenAI-compatible provider uses handles
-it with no llama.cpp-specific parsing.
+Once started with `--embeddings`, the endpoint is genuinely OpenAI-shaped, and the same
+code path every hosted OpenAI-compatible provider uses handles it with no
+llama.cpp-specific parsing.
 
 ## Supervision
 
 - Servers bind `127.0.0.1`. A non-loopback bind requires `allow_remote_exposure=True`.
-- Model swaps are serialized: two unloaded models never race for the same VRAM.
-- Requests block until the server is ready rather than receiving a 503 mid-load.
 - VRAM admission is checked before spawning, so an oversized model is refused with a clear
   message instead of crashing the child process.
-- The idle timer keys on active streams, so a long generation is never mistaken for idle.
 
-See [the local subsystem](../concepts/local.md).
+Serialized model swaps, readiness blocking, and the idle timer are covered in
+[the local subsystem](../concepts/local.md#supervision).
 
-## When the tuner falls back to the CPU
+## CPU fallback
 
 VRAM admission control refuses a model that cannot fit, but it also does something quieter:
 on a machine where the weights plus KV cache leave no room, the plan offloads **no** layers
 and the model is served entirely on the CPU. That is the right call — a slow answer beats no
-answer, and it is invisible from the result.
+answer, and it is invisible from the result. So the adapter reports it as a
+[runtime diagnostic](../concepts/capabilities.md#runtime-diagnostics):
 
 ```python
 for note in client.diagnostics("llama-cpp"):

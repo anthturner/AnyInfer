@@ -50,61 +50,33 @@ demo app are optional extras. Local inference is part of the core. See
 
 Most libraries in this space solve *provider switching* — one function, many APIs, one
 response shape. AnyInfer solves the problem that starts right after: being correct about
-what you sent, what you got back, what it cost, and what quietly didn't happen. Five things
-you won't find bundled together anywhere else:
+what you sent, what you got back, what it cost, and what quietly didn't happen.
 
-- **Your fallback chain has a real test, with no credentials and no network.** The test kit
-  ships with the library — script a 503, a malformed schema response, a rate limit — and
-  assert on the recovery, not on a mock of your own wrapper.
+- **Your fallback chain has a real test, with no credentials and no network.** The test
+  kit ships with the library — script a 503, a malformed schema response, a rate limit —
+  and assert on the recovery, not on a mock of your own wrapper.
   [→ Testing your app](guides/testing-your-app.md)
 - **Every number says where it came from.** A context window, a price, a feature flag is
-  tagged catalogued, discovered, probed, or defaulted — never silently guessed.
-  [→ Capabilities and provenance](concepts/capabilities.md)
-- **Portability is a test result, not a claim.** `compare()` reports exactly what a fixed
-  request becomes on a different target — dropped parameters, weaker mechanisms, cost
-  deltas — before you spend anything, and you can diff two snapshots of it in CI.
-  [→ Comparing targets](guides/comparing-targets.md)
+  tagged cataloged, discovered, probed, or defaulted — and an unknown cost is `None`,
+  never `$0.00`. [→ Capabilities and provenance](concepts/capabilities.md)
+- **Structured output is a contract.** A request carrying a schema always returns a
+  client-side-validated result, using the strongest mechanism the provider offers, with
+  an opt-in bounded repair loop.
+  [→ Structured output](concepts/structured-output.md)
+- **Portability is a test result, not a claim.** `compare()` reports exactly what a
+  fixed request becomes on a different target before you spend anything, and the
+  [conformance matrix](reference/conformance-matrix.md) is generated from executed
+  tests. [→ Comparing targets](guides/comparing-targets.md)
 - **A local model is a target, not a separate product.** Point the same call at
-  `llama-cpp:qwen3-8b-q4-k-m` and AnyInfer acquires, verifies, and supervises the weights
-  itself — the same fallback chain, event stream, and structured-output contract as a
-  hosted model, with no separate daemon to install or operate.
-  [→ Run a model locally, end to end](guides/local-inference.md)
-- **A confidentiality story nobody else in this market ships.** Encrypted-at-rest prompt
-  templates, a zero-retention orchestration relay, and — the genuinely novel part — one
-  function that tells your application whether a box can back local inference with a real
-  hardware-attested guarantee, honest about exactly what it can and can't promise yet.
-  [→ Confidentiality tiers](guides/confidentiality-tiers.md)
+  `llama-cpp:qwen3-8b-q4-k-m` and AnyInfer acquires, verifies, and supervises the
+  weights itself — same fallback chain, event stream, and structured-output contract,
+  no separate daemon. [→ Run a model locally](guides/local-inference.md)
+- **Context engineering is part of dispatch.** A provenance-aware budget estimates
+  input, reserve, and cost before a call; deterministic reducers fit approved corpora
+  to it and report exactly what they omitted.
+  [→ Context reduction](concepts/context-reduction.md)
 
 **→ [Read the full case, with runnable proof for every claim](why-anyinfer.md).**
-
-## What AnyInfer gives you
-
-Applications that talk to more than one model provider accumulate the same layer every
-time: per-provider request shaping, SSE parsing, retry logic, token accounting, and a
-tangle of `if engine == ...` branches that leaks into config screens and error handling.
-AnyInfer is that layer, extracted and made rigorous:
-
-- **One primitive.** A `GenerationRequest` becomes a typed event stream. Non-streaming is
-  the drained stream. It is *not* an OpenAI-API clone — the OpenAI dialect is one edge
-  format among several.
-- **Adapters only translate.** Retry, fallback, health gating, schema validation, repair,
-  TTFT measurement, usage normalization, telemetry, and redaction live in the core, once.
-- **Structured output is a contract.** A request carrying a schema always returns a
-  client-side-validated result, using the strongest mechanism the provider offers
-  (grammar → json_schema → json_mode → prompt), with an opt-in bounded repair loop.
-- **Embeddings and reranking are inference primitives, not provider options.**
-  `client.embed()`/`client.rerank()` are typed, routed, batched, and cost-tracked exactly
-  like generation — with a safety rule generation does not need: a fallback that cannot
-  be proven to share the primary target's vector space is refused before dispatch, not
-  silently served as a wrong-but-plausible vector.
-- **Context engineering is part of dispatch.** A provenance-aware budget estimates input,
-  output reserve, headroom, and cost before a call. Deterministic reducers fit approved
-  corpora to that budget and report exactly what they omitted; hierarchical distillation
-  handles material that cannot fit at any fidelity.
-- **Capabilities carry provenance.** Every context window, price, and feature flag records
-  whether it was catalogued, discovered, probed, or defaulted. Nothing is guessed silently.
-- **Local inference is first-class.** Hardware detection, backend selection, llama-server
-  supervision and tuning, verified GGUF downloads, and hardware→tier recommendation.
 
 ### One engine, four kinds of target
 
@@ -116,15 +88,10 @@ AnyInfer is that layer, extracted and made rigorous:
 | Managed local runtime | `llama.cpp` | Runtime and model acquisition, hardware fit, tuning, supervision, and loopback lifecycle |
 
 **→ [See the compatibility inventory](providers/all.md)** — dedicated protocol adapters
-and declarative presets, from frontier APIs to local engines.
-
-See the [provider guides](providers/README.md) and the
-[conformance matrix](reference/conformance-matrix.md) for exactly what each supports.
-
-Embeddings and reranking are live today on OpenAI, Azure AI Foundry, Google Vertex AI,
-AWS Bedrock, Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio, and four
-OpenAI-compatible presets — see [embeddings and reranking](concepts/embeddings.md) and
-the [semantic-search example](examples/semantic-search.md).
+and declarative presets, from frontier APIs to local engines, with
+[per-provider guides](providers/README.md). Embeddings and reranking are typed, routed
+operations on the same client — see
+[embeddings and reranking](concepts/embeddings.md).
 
 ## Next steps
 
@@ -132,42 +99,27 @@ the [semantic-search example](examples/semantic-search.md).
 
 - **Deciding whether you need this layer?**
 
-    Start with [when to use AnyInfer](guides/when-to-use.md). It names the cases where a
-    provider client, organization gateway, or dedicated local server is the better tool.
+    Start with [why and when to use AnyInfer](why-anyinfer.md). It names the cases where
+    a provider client, organization gateway, or dedicated local server is the better
+    tool.
 
 - **Integrating into an app?**
 
-    The [Python SDK guide](guides/python-sdk.md) covers lifecycle, generation, streaming,
-    and errors. The [Quickstart](guides/quickstart.md) is the five-minute route.
+    The [Quickstart](guides/quickstart.md) is the five-minute route from install to a
+    result; [Integrate AnyInfer](guides/README.md) chooses between the SDK, CLI, and
+    sidecar.
 
 - **Want existing OpenAI clients to use the same route?**
 
-    Run the [sidecar](serve/README.md) — an OpenAI-compatible loopback service, available
-    as a Python extra or a standalone download.
-    Anything that can point at an OpenAI base URL can use the providers, routes, and local
-    models you configured.
-
-- **Working from a shell?**
-
-    [`anyinfer run`](guides/cli.md) sends one prompt through the same routing and
-    structured-output path and streams the answer to stdout, then exits — no server to
-    keep running, no Python to write.
+    Run the [sidecar](serve/README.md) — an OpenAI-compatible loopback service.
+    Anything that can point at an OpenAI base URL can use the providers, routes, and
+    local models you configured.
 
 - **Just want to see it?**
 
     The [pack-in demo app](guides/demo-app.md) runs fully offline against in-process
-    fakes — streaming, retry and fallback, structured output, and live telemetry, no
-    credentials required. Grab a standalone build from [Downloads](downloads.md).
-
-- **Reading code first?**
-
-    Start with the [examples](examples/README.md) — small, complete programs that run
-    verbatim in CI — then the [SDK reference](reference/api/README.md).
-
-- **Configuring more than one path?**
-
-    Use one [shared configuration file](reference/configuration.md) for the Python SDK,
-    command-line tool, and sidecar.
+    fakes — no credentials required. Grab a standalone build from
+    [Downloads](downloads.md).
 
 </div>
 

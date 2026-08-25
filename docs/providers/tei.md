@@ -5,10 +5,10 @@ icon: material/vector-combine
 
 # Text Embeddings Inference
 
-Hugging Face's TEI server, spoken in its **native dialect** — the one local provider in
-the initial set with a real reranking endpoint. TEI serves exactly one model per
-container (an embedding model or a reranker, chosen at startup), so this provider is
-also the library's first retrieval-only adapter: it declares no generation at all.
+Hugging Face's TEI server, spoken in its native dialect — the one local provider with a
+real reranking endpoint. TEI serves exactly one model per container (an embedding model
+or a reranker, chosen at startup), so this provider is also the library's first
+[retrieval-only](../concepts/embeddings.md) adapter: it declares no generation at all.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: embeddings</span>
@@ -19,7 +19,7 @@ also the library's first retrieval-only adapter: it declares no generation at al
 
 ## Setup
 
-Run a server (one model each — an embedding server and a reranker are two containers):
+Run a server:
 
 ```shell
 docker run -p 8080:80 ghcr.io/huggingface/text-embeddings-inference:cpu-1.9 \
@@ -35,9 +35,10 @@ client = ai.Client([ai.ProviderSettings.of("tei")])  # defaults to 127.0.0.1:808
 result = client.embed(["What is deep learning?"], target="tei:bge-large")
 ```
 
-The model half of the target is advisory — the server holds one model, and
-`client.models("tei")` reports its real id and operation, discovered from `GET /info`.
-Two servers (an embedder and a reranker) are two configured instances:
+Since the server holds one model, the model half of the
+[target](../concepts/targets.md) is advisory; `client.models("tei")` reports the real id
+and operation, discovered from `GET /info`. An embedder and a reranker are therefore two
+servers, configured as two instances:
 
 ```python
 client = ai.Client([
@@ -53,15 +54,13 @@ ranked = client.rerank("the query", docs, target="tei-rerank:bge-reranker")
   default is left in force and reported on `result.space.normalized`; a
   `provider_options={"tei": {"normalize": False}}` override is reported as sent.
 - **No usage**: TEI's response body carries no token counts, so `result.usage` stays
-  honestly empty. Real servers do send an `x-compute-tokens` response header, but it is
-  absent from the project's published API document, and accounting built on an
-  undocumented header would disappear without anything noticing. It is recorded in the
-  contract's watchlist instead, to be adopted if upstream documents it.
+  empty; the `x-compute-tokens` header real servers send is absent from the published API
+  document, so it sits on the contract's watchlist rather than in accounting.
 - **`top_n` is applied client-side** — the endpoint has no native parameter; the
   adapter sorts by score and truncates, and the contract snapshot records that.
 - **Batch ceiling is per-deployment**: `GET /info` reports `max_client_batch_size` for
   *your* server, so no static limit is declared. For corpora above it, pass
-  `batch=BatchPolicy(max_items_override=<your server's value>)`.
+  [`batch=BatchPolicy(max_items_override=<your server's value>)`](../concepts/embeddings.md#batching).
 - An `--api-key`-protected server takes `api_key="env://TEI_API_KEY"`.
 
 ## Wire contract
@@ -71,3 +70,14 @@ For the exact request/response fields this adapter depends on, see
 It was verified against real servers on 2026-08-24 — `text-embeddings-inference` 1.8.3
 serving `BAAI/bge-small-en-v1.5` and `BAAI/bge-reranker-base` — and that traffic is
 committed as cassettes, so the lane replays in CI without a server.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Voyage AI and Jina AI](retrieval.md): the hosted counterparts to this retrieval-only
+  shape.
+- [Embeddings and reranking](../concepts/embeddings.md): the normalized operations and
+  batching rules.
+
+</div>

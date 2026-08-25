@@ -2,9 +2,9 @@
 
 A generation **is** an ordered stream of typed events. Everything else — the non-streaming
 `generate()`, the OpenAI chunk format, your progress bar — is a projection of that one
-primitive.
-
-This is the design decision the rest of the library rests on, so it is worth understanding.
+primitive. This page covers the request-scoped stream a caller consumes;
+[telemetry](telemetry.md) is the separate observer-facing channel for what happened
+around the request.
 
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
@@ -34,7 +34,8 @@ flowchart LR
 
 ## The ordering guarantees
 
-These are a **binding contract**, verified by the conformance suite for every adapter:
+These are a binding contract, verified by
+[the conformance suite](../contributing/conformance.md) for every adapter:
 
 1. Zero or more `AttemptFailed` may precede any content (failed targets, retries).
 2. Within one attempt, `TimingMark("attempt_start")` comes first, and
@@ -48,13 +49,14 @@ These are a **binding contract**, verified by the conformance suite for every ad
 Guarantee 4 is what lets you render deltas as they arrive and still trust the final result.
 
 Guarantees 2 and 4 are scoped **per attempt**: when a schema violation triggers the
-opt-in repair loop, the repair re-runs the target inside the same stream, announced by a
+opt-in [repair loop](structured-output.md#repair), the repair re-runs the target inside
+the same stream, announced by a
 fresh `TimingMark("attempt_start")`. Treat each `attempt_start` as "clear and start over"
 — after it, the delta sequence restarts and `result.text` reflects the final attempt only.
 
-## Three ways to consume it
+## Consuming it
 
-**Print deltas as they arrive:**
+Print deltas as they arrive:
 
 ```python
 with client.stream(messages, target="ollama:qwen3:8b") as stream:
@@ -63,7 +65,7 @@ with client.stream(messages, target="ollama:qwen3:8b") as stream:
             print(event.text, end="", flush=True)
 ```
 
-**Watch for first-token latency, then take the authoritative result:**
+Or watch for specific events, then take the authoritative result:
 
 ```python
 async with client.stream(messages, target=target) as stream:
@@ -73,13 +75,8 @@ async with client.stream(messages, target=target) as stream:
     record(stream.result.usage, stream.result.timing)
 ```
 
-**Ignore events entirely:**
-
-```python
-result = client.generate(messages, target=target)
-```
-
-`generate()` drains the stream internally. The three shapes are the same machinery.
+Plain `generate()` is the same machinery with the stream drained internally — ignoring
+events costs nothing and changes nothing.
 
 ## Non-streaming providers still stream
 
@@ -91,11 +88,11 @@ the provider's.
 
 Usage often arrives *after* the finish reason, in a trailing chunk. Two consequences:
 
-- The parser drains to the protocol's terminal sentinel, never stopping at `finish_reason`.
-  Stopping early silently undercounts tokens — a real and widespread bug in comparable
-  gateways.
-- Providers that report usage only on their terminal object (Ollama) still produce a
-  `UsageUpdate` event, because the core synthesizes one. Consumers see one behavior.
+- The parser drains to the protocol's terminal sentinel, never stopping at
+  `finish_reason` — stopping early undercounts tokens.
+- Providers that report usage only on their terminal object
+  ([Ollama](../providers/ollama.md)) still produce a `UsageUpdate` event, because the
+  core synthesizes one. Consumers see one behavior.
 
 ## Finish reasons are an open enum
 
@@ -137,8 +134,9 @@ with client.stream(prompt, target=target) as stream:
 
 <div class="anyinfer-see-also" markdown>
 
-- [Routing](routing.md): where `AttemptFailed` comes from.
+- [Routing and rate limits](routing.md): where `AttemptFailed` comes from.
 - [Telemetry](telemetry.md): the separate, observer-facing event channel.
+- [Stream typed events](../guides/streaming.md): the task-oriented walkthrough.
 - [OpenAI-compatible sidecar](../serve/README.md): the OpenAI chunk projection.
 
 </div>

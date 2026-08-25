@@ -3,9 +3,11 @@
 This section is the compatibility inventory: dedicated adapters for protocols that require
 real translation, plus declarative presets for OpenAI-compatible services and engines.
 Breadth is useful, but it is not AnyInfer's product boundary; start with
-[when to use AnyInfer](../guides/when-to-use.md) if you are choosing an integration layer.
+[why and when to use AnyInfer](../why-anyinfer.md) if you are choosing an integration layer.
 
-The generated [complete inventory](all.md) records the current counts and target prefixes.
+The generated [complete inventory](all.md) is the full accessible rendering — all 106
+providers (20 dedicated adapters, 86 presets), each with its target prefixes, key
+variable or default endpoint, and notes.
 
 <div class="anyinfer-card-grid" markdown>
 
@@ -41,11 +43,11 @@ The generated [complete inventory](all.md) records the current counts and target
   <br>Native v2 chat, grounded generation, thinking channel.
   <br>`Hosted`
 
-- :material-vector-triangle: **[Voyage AI](voyage.md)** `voyage:`
+- :material-vector-triangle: **[Voyage AI](retrieval.md)** `voyage:`
   <br>Specialist embeddings and reranking; query/document intents.
   <br>`Hosted`
 
-- :material-vector-triangle: **[Jina AI](jina.md)** `jina:`
+- :material-vector-triangle: **[Jina AI](retrieval.md)** `jina:`
   <br>Specialist embeddings and reranking; full task vocabulary.
   <br>`Hosted`
 
@@ -96,43 +98,15 @@ The generated [complete inventory](all.md) records the current counts and target
 </div>
 
 See the [conformance matrix](../reference/conformance-matrix.md) for exactly which
-behaviors each one supports, generated from test results rather than asserted, and the
-table below as an accessible alternative to the cards.
-
-| Provider | Target prefix | Extra needed | Notes |
-|---|---|---|---|
-| [openai](openai.md) | `openai:` | — | Responses API |
-| [anthropic](anthropic.md) | `anthropic:` / `claude:` | — | Messages API, thinking deltas |
-| [gemini](gemini.md) | `gemini:` / `google:` | — | Native generateContent, thinking levels |
-| [deepseek](deepseek.md) | `deepseek:` | — | reasoning_content channel, cache split |
-| [xai](xai.md) | `xai:` / `grok:` | — | Reported cost, discovered pricing |
-| [vertex](vertex.md) | `vertex:` | `[vertex]` for service-account signing | Gemini via GCP OAuth; project-scoped |
-| [bedrock](bedrock.md) | `bedrock:` | — | Converse API; SigV4 or Bedrock API key |
-| [cohere](cohere.md) | `cohere:` | — | Native v2 chat, uppercase enums |
-| [voyage](voyage.md) | `voyage:` | — | Specialist embeddings/rerank; query/document intents |
-| [jina](jina.md) | `jina:` | — | Specialist embeddings/rerank; full task vocabulary |
-| [tei](tei.md) | `tei:` | — | Local embeddings/rerank; retrieval-only, one model per server |
-| [lm-studio](lm-studio.md) | `lm-studio:` | — | Native discovery and residency |
-| [ollama](ollama.md) | `ollama:` | — | Native API, grammar schemas, phase timings |
-| [llama-cpp](llama-cpp.md) | `llama-cpp:` | — | Supervised llama-server, loopback only |
-| [openai-compat](openai-compat.md) | `openai-compat:` | — | Any `/chat/completions` endpoint |
-| [openrouter](openrouter.md) | `openrouter:` | — | Rich discovered pricing and context data |
-| [nebius](nebius.md) | `nebius:` | — | Live pricing, context, quantization, reasoning |
-| [azure-foundry](azure-foundry.md) | `azure-foundry:` / `azure:` | `[azure]` for Entra | `max_completion_tokens` |
-| [copilot](copilot.md) | `copilot:` | `[copilot]` | `auto` sentinel, CLI-delegated auth |
-| [m365-copilot](m365-copilot.md) | `m365-copilot:` / `m365:` | `[azure]` | Interactive auth only |
+behaviors each one supports, generated from test results rather than asserted.
 
 ## What is the same everywhere
 
-Because the core owns orchestration, these behave identically no matter which provider
-served a request:
-
-- retries, fallback, and health gating;
-- structured-output validation and repair;
-- TTFT, duration, and throughput measurement;
-- usage normalization and cost computation;
-- telemetry events and secret redaction;
-- the event stream and its ordering guarantees.
+Since the core owns orchestration, [routing and retries](../concepts/routing.md),
+[structured-output validation](../concepts/structured-output.md),
+[cost accounting](../concepts/cost.md), timing, [telemetry](../concepts/telemetry.md),
+and the [event stream](../concepts/events.md) behave identically no matter which
+provider served a request. The [concepts section](../concepts/README.md) documents each.
 
 ## What differs, and how you find out
 
@@ -144,7 +118,7 @@ Real differences are surfaced, never hidden:
 - **`ParameterDropped` events** fire when a provider accepts a parameter and discards it.
 - **Provider pages** document the rest.
 
-## The escape hatch
+## Reaching provider-specific parameters
 
 Anything a provider supports that AnyInfer does not model is reachable verbatim:
 

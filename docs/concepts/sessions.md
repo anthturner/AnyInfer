@@ -1,11 +1,10 @@
 # Sessions
 
-Every request is independent by default. That is the right default — it makes results
-reproducible, routing free, and fallback safe, and it is the wrong one for a conversation,
-where the provider often already has everything the next turn needs.
-
-A **session** is how a caller says *these requests belong together*, without having to know
-what any particular provider does about it.
+Every request is independent by default, which keeps results reproducible and fallback
+safe. A conversation is the case where that default wastes work: the provider often
+already has everything the next turn needs. A **session** is how a caller says *these
+requests belong together*, without having to know what any particular provider does
+about it.
 
 ```python
 with client.session("copilot:auto") as chat:
@@ -68,11 +67,10 @@ stands in — it never overrides an explicit `target` or `route`.
 
 ## Closing is local
 
-`close()` stops the handle being used; it does not reach out to the provider. Server-side
-state expires on the provider's own schedule (Ollama's `keep_alive` timer, Copilot's
-service-side session lifetime), and a library that claimed otherwise would be promising
-something it cannot deliver. Closing the client itself *does* release what an adapter holds
-open locally, such as a Copilot SDK session.
+`close()` stops the handle being used; it does not reach out to the provider.
+Server-side state expires on the provider's own schedule (Ollama's `keep_alive` timer,
+Copilot's service-side session lifetime). Closing the client itself *does* release what
+an adapter holds open locally, such as a Copilot SDK session.
 
 !!! tip "Key takeaways"
     - A session is an opaque handle, not a conversation: the library never interprets what
@@ -85,7 +83,8 @@ open locally, such as a Copilot SDK session.
 
 <div class="anyinfer-see-also" markdown>
 
-- [Routing](routing.md): what happens to a session when a route falls back.
+- [Routing and rate limits](routing.md): what happens to a session when a route falls
+  back.
 - [The local subsystem](local.md): why pinning a supervised server matters.
 - [Capabilities and provenance](capabilities.md): `supports_sessions` on the descriptor.
 

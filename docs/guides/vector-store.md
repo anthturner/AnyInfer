@@ -1,27 +1,16 @@
 # Embed, store, and query — without a database
 
-`anyinfer-store` is a small-scale, single-process, embedded vector store — never a
-clustered, replicated, or "production vector database" story, permanently, not just for
-v1. **Read that boundary before you read anything else on this page.**
-
-**Target corpus size:** documents numbering in the thousands to low hundreds of thousands
-of vectors, at typical embedding dimensions (384-3072). Not millions; not billions.
-**Target deployment shape:** one process, one machine, one writer — no replication, no
-sharding, no distributed consensus, no multi-writer coordination. It fits the same audience
-`llama.cpp` local inference already serves: prototyping, personal tools, small internal
-apps, notebooks, CLI utilities, single-tenant desktop or local-first applications.
-
-**The explicit escape hatch:** when you outgrow this — millions of vectors, multi-region
-reads, a managed control plane — the documented answer is to point a real vector database
-(pgvector, Qdrant, Weaviate, Pinecone, ...) at `anyinfer.embed()`/`anyinfer.rerank()`
-directly. Both consume the exact same public `EmbeddingResult`/`RerankResult` types this
-package does, so nothing about how you call AnyInfer changes when you graduate — only where
-the vectors end up. This package is never a stepping stone toward a hosted, scaled version
-of itself; there isn't going to be one.
+`anyinfer-store` is an embedded vector store: one SQLite file that persists the vectors
+[`client.embed()`](../concepts/embeddings.md) returns and answers similarity queries
+in-process, with no server. It serves the same audience local inference already serves —
+prototypes, personal tools, notebooks, small internal apps, single-tenant desktop and
+local-first applications.
 
 ```bash
 pip install -e src/anyinfer-store   # from a repository checkout, until a first PyPI release
 ```
+
+The core package installs [as usual](installation.md); the store is a separate sub-project.
 
 ## Embed, store, query
 
@@ -44,6 +33,17 @@ for match in matches:
 
 store.close()
 ```
+
+!!! note "The scale boundary"
+    The store targets corpora of thousands to low hundreds of thousands of vectors, at
+    typical embedding dimensions (384–3072), in one process on one machine with one
+    writer. Search is brute-force cosine similarity, and `VectorStore.add` warns past
+    `SIZE_WARNING_THRESHOLD` (200,000 entries) that brute force may stop being comfortably
+    fast. When you outgrow that — millions of vectors, multi-region reads, a managed
+    control plane — point a real vector database (pgvector, Qdrant, Weaviate, Pinecone,
+    ...) at `anyinfer.embed()`/`anyinfer.rerank()` directly: both consume the same public
+    `EmbeddingResult`/`RerankResult` types this package does, so only where the vectors
+    end up changes.
 
 `VectorStore.query` refuses a query whose embedding space doesn't match the store's bound
 space — the identical cross-space safety rule AnyInfer's own routing applies to a fallback
@@ -68,6 +68,9 @@ items = await query_and_rerank(
 Reranking needs text — an entry stored without `text=` cannot be reranked, and
 `query_and_rerank` refuses rather than inventing a document from nothing.
 
+The [semantic search example](../examples/semantic-search.md) puts embedding, storage, and
+reranking together end to end.
+
 ## Lifecycle
 
 ```python
@@ -78,21 +81,35 @@ another_store.import_jsonl("out.jsonl")
 ```
 
 A store is one SQLite file — copying it is a valid backup or migration strategy on its own;
-`export_jsonl`/`import_jsonl` exist for moving data between formats or into the escape
-hatch above, not as the only way to move a store.
+`export_jsonl`/`import_jsonl` exist for moving data between formats or into a real vector
+database, not as the only way to move a store.
 
-## What's deliberately not here
+## Scope
 
-- **No approximate index.** Similarity search is brute-force cosine similarity, in pure
-  Python — the whole point at this package's stated scale, and simpler to reason about
-  than tuning an ANN index for a few thousand rows. `SIZE_WARNING_THRESHOLD` (200,000
-  entries) is where `VectorStore.add` starts warning you may be past the point brute force
-  stays comfortably fast — a signal, not a hard limit.
-- **No network service of its own.** This is a library, matching AnyInfer core's own "no
-  daemon" posture.
-- **No multi-writer concurrency guarantees** beyond SQLite's own file-locking.
-- **No automatic corpus collection.** Your application still owns deciding what gets
-  embedded and stored — the same discipline `anyinfer.context` already applies: nothing is
-  collected or embedded on your behalf.
+The store is a library with no network service of its own, matching AnyInfer core's
+no-daemon posture, and it collects nothing: your application decides what gets embedded
+and stored, the same line [`anyinfer.context`](../concepts/context-reduction.md) draws.
+Concurrent writers get SQLite's own file-locking and nothing more. DESIGN.md §29 in the
+repository is the full design record.
 
-See DESIGN.md §29 in the repository for the full design record.
+!!! tip "Key takeaways"
+    - Every entry carries its embedding space, and a query from a different space is
+      refused rather than compared — the same safety rule routing applies to embedding
+      fallback.
+    - Reranking needs stored text; an entry added without `text=` cannot be reranked.
+    - A store is one SQLite file, so copying it is a complete backup;
+      `export_jsonl`/`import_jsonl` cover interchange.
+    - Outgrowing the store changes where vectors land, not how you call AnyInfer — real
+      vector databases consume the same `EmbeddingResult`/`RerankResult` types.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Embeddings and reranking](../concepts/embeddings.md): the types and the cross-space
+  safety rule.
+- [Semantic search example](../examples/semantic-search.md): the full pipeline in one
+  script.
+- [Installation](installation.md): extras and sub-projects.
+
+</div>

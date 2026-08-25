@@ -5,9 +5,9 @@ acquisition, tuning, fit classification, model acquisition and storage, server s
 and hardware→tier recommendation. Concepts:
 [the local subsystem](../../concepts/local.md) ·
 [the model catalog](../../concepts/catalog.md) ·
-[acquiring models](../../concepts/models.md) · guides:
+[the model catalog](../../concepts/catalog.md#acquiring-a-pick) · guides:
 [run a model locally](../../guides/local-inference.md) ·
-[choose and download a local model](../../guides/local-models.md).
+[run a model locally](../../guides/local-inference.md).
 
 ```python
 from anyinfer import local

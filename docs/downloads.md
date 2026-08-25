@@ -74,31 +74,22 @@ anyinfer serve --config anyinfer.json
 
 </div>
 
-## Installation
-
-```bash
-pip install anyinfer
-```
-
-The core depends on only `httpx2` and `jsonschema`; everything else is an extra. See
-[installation and extras](guides/installation.md) for which extras you need.
-
 ## Notes
 
-- Unzip the demo bundle, then run the `anyinfer-demo` executable inside. The bundled
-  `BUNDLE-INFO.txt` records the exact version. Bundles never embed `llama-server` binaries
-  or model weights — install a runtime explicitly and let the local subsystem acquire
-  verified model artifacts when needed.
-- Unzip the sidecar bundle and run `anyinfer-serve --config anyinfer.json` from inside it.
-  To keep it running across reboots, `anyinfer-serve install` writes the service
-  definition for your platform after showing it to you; the archive's `INSTALL.txt`
-  carries the same text. See
-  [running as a service](serve/running-as-a-service.md).
-  It includes the HTTP frontend and built-in dependency-free adapters. Integrations that
-  require an optional provider SDK, such as GitHub Copilot or Entra authentication, should
+- The core wheel depends on only `httpx2` and `jsonschema`; everything else is an extra.
+  [Installation and extras](guides/installation.md) lists which ones you need.
+- Unzip the demo bundle and run the `anyinfer-demo` executable inside; `BUNDLE-INFO.txt`
+  records the exact version. Bundles never embed `llama-server` binaries or model
+  weights — install a runtime explicitly and let the local subsystem acquire verified
+  model artifacts when needed. (No 32-bit Windows bundle: PySide6 publishes no 32-bit Qt
+  builds, though the pure-Python wheel runs there fine.)
+- Unzip the sidecar bundle and run `anyinfer-serve --config anyinfer.json` from inside
+  it. To keep it running across reboots, `anyinfer-serve install` writes the service
+  definition for your platform after showing it to you (the archive's `INSTALL.txt`
+  carries the same text); see [running as a service](serve/running-as-a-service.md). The
+  bundle covers the HTTP frontend and the dependency-free adapters; integrations that
+  need an optional provider SDK, such as GitHub Copilot or Entra authentication, should
   install the Python distribution with the corresponding extra.
-- On 32-bit Windows (x86) there is no standalone demo bundle: PySide6 publishes no
-  32-bit Qt builds, but the library wheel itself is pure Python and runs there fine.
 
 ## Previous releases and checksums
 

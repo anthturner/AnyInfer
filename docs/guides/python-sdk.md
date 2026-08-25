@@ -1,8 +1,9 @@
 # Integrate the Python SDK
 
-Use the SDK when AnyInfer runs inside a Python application. It exposes typed requests and
-results, the complete event stream, in-process telemetry, provider capabilities, and the
-tool loop without an HTTP hop.
+Use the SDK when AnyInfer runs inside a Python application.
+[Quickstart](quickstart.md) is the fastest path to a first result; this page is the
+reference for embedding the SDK properly — the client lifecycle and the error handling a
+long-lived application needs.
 
 ## Configure the client
 
@@ -37,7 +38,7 @@ Credential references are resolved when an adapter is first used and registered 
 redaction. Prefer `env://` or `credential://` references to literals in source code and
 configuration files.
 
-## Sync or async
+## One client, reused, then closed
 
 `AsyncClient` is the native implementation. `Client` is its thread-safe synchronous
 facade; both accept the same arguments and return the same domain types.
@@ -56,26 +57,15 @@ facade; both accept the same arguments and return the same domain types.
         result = client.generate("Explain the result.")
     ```
 
-Choose `AsyncClient` inside an async application. Choose `Client` for synchronous programs;
-do not create a client per request. A client owns connection pools and any supervised local
-servers, so close it with a context manager or an explicit `close()`/`aclose()` call.
+Choose `AsyncClient` inside an async application and `Client` in a synchronous one.
+Create one client and reuse it; do not create one per request. Since a client owns
+connection pools and any supervised local servers, close it with a context manager or an
+explicit `close()`/`aclose()` call. One client serves many conversations — continuity
+across turns is a [session](../concepts/sessions.md) concern, not a client-lifecycle
+one.
 
-## Generate or stream
-
-`generate()` drains the event stream and returns a `Generation`. `stream()` exposes events
-as they arrive and retains the final result after the stream ends:
-
-```python
-with client.stream("Write one sentence.", target="medium") as stream:
-    for event in stream:
-        if isinstance(event, ai.TextDelta):
-            print(event.text, end="", flush=True)
-
-generation = stream.result
-```
-
-Use the result's `usage`, `timing`, `attempts`, and `warnings` fields instead of parsing
-provider payloads. Raw payload retention is off by default.
+`generate()` returns the finished result; to consume events as they arrive, see
+[streaming](streaming.md).
 
 ## Handle failures
 
@@ -91,11 +81,24 @@ except ai.AnyInferError as exc:
         logger.info("next step: %s", exc.hint)
 ```
 
-## Next steps
+The [error catalog](../reference/errors.md) lists every exception, when it is raised,
+and what the user will see.
 
-- [Stream typed events](streaming.md)
-- [Add a fallback chain](fallback.md)
-- [Enforce a JSON schema](structured-output.md)
-- [Run the tool loop](tool-loop.md)
-- [Observe requests](observability.md)
-- [SDK reference](../reference/api/README.md)
+!!! tip "Key takeaways"
+    - `AsyncClient` is the native implementation; `Client` is its thread-safe
+      synchronous facade over the same surface.
+    - Create one client, reuse it, and close it: it owns connection pools and any
+      supervised local servers.
+    - Catch `AnyInferError`, branch on its structured fields, and surface `hint`.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Quickstart](quickstart.md): from `pip install` to a working result.
+- [Stream typed events](streaming.md): consuming the event stream.
+- [Sessions](../concepts/sessions.md): continuity across conversation turns.
+- [Clients and streams](../reference/api/client.md): the full client API.
+- [Error catalog](../reference/errors.md): every exception and its fields.
+
+</div>

@@ -34,6 +34,16 @@ No API key is handled by AnyInfer — the CLI owns the credential. Override CLI 
 
 Alias: `github-copilot`.
 
+## Supported
+
+| Behavior | Support |
+|---|---|
+| Streaming | SDK event callbacks |
+| Structured output | **Prompt-injected only** — no native mode |
+| Tools | **Not supported** — declared as ignored, so requesting them emits `ParameterDropped` |
+| Usage | Input, output, cache read/write, reasoning tokens |
+| Cost | Not reported |
+
 ## The `auto` sentinel
 
 ```python
@@ -47,17 +57,7 @@ request failed.
 
 See [capabilities](../concepts/capabilities.md#the-auto-sentinel).
 
-## Supported
-
-| Behavior | Support |
-|---|---|
-| Streaming | SDK event callbacks |
-| Structured output | **Prompt-injected only** — no native mode |
-| Tools | **Not supported** — declared as ignored, so requesting them emits `ParameterDropped` |
-| Usage | Input, output, cache read/write, reasoning tokens |
-| Cost | Not reported |
-
-## Prompt tokens run ahead of what you send
+## Token calibration
 
 The CLI runtime builds its own request around your prompt — an agent system preamble, its
 built-in tool declarations, workspace framing — none of which appears in the messages this
@@ -77,11 +77,13 @@ pre-dispatch gate stays as permissive as it is everywhere else.
 ## Structured output
 
 Copilot has no structured-output mode, so a schema is described in the prompt and validated
-client-side — the core's fallback path, which exists precisely for providers like this. You
-still get a validated `result.structured`; `structured_mechanism` will read `"prompt"`.
+client-side — [the core's fallback path](../concepts/structured-output.md) for providers
+without a native mode. You still get a validated `result.structured`;
+`structured_mechanism` will read `"prompt"`.
 
-Consider `repair=ai.Repair(max_attempts=1)` here: prompt-only enforcement has a higher
-first-attempt failure rate than grammar or json_schema modes.
+Consider [`repair=ai.Repair(max_attempts=1)`](../concepts/structured-output.md#repair)
+here: prompt-only enforcement has a higher first-attempt failure rate than grammar or
+json_schema modes.
 
 ## Troubleshooting
 
@@ -95,8 +97,6 @@ first-attempt failure rate than grammar or json_schema modes.
 
 ## Notes
 
-- The SDK is young; its event and session shapes have moved between releases. The adapter
-  reads defensively and tolerates both sync and async SDK surfaces.
 - Sessions take a system prompt plus one user turn, so prior turns are folded into the user
   prompt with role markers rather than being silently dropped.
 

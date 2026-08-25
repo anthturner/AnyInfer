@@ -51,25 +51,11 @@ client.chat.completions.create(
 )
 ```
 
-## Why this is cheap here
-
-The internal primitive was never the OpenAI wire format — it is a normalized event stream.
-Adapters already project provider dialects *into* that stream. The frontend is
-simply the inverse projection at the edge:
-
-```mermaid
-flowchart LR
-  A[OpenAI client] -->|HTTP| B[codec]
-  B --> C[GenerationRequest]
-  C --> D[router]
-  D --> E[any adapter]
-  E -.->|StreamEvent stream| B
-  B -.->|chat.completion.chunk SSE| A
-```
-
-No routing, validation, telemetry, credential, or local-inference code is duplicated. The
-frontend is a wire codec plus an ASGI app around a normal `AsyncClient`, and an
-architecture test enforces that it stays one.
+Since the internal primitive is a normalized event stream that adapters already project
+provider dialects into, the frontend is only the inverse projection at the edge: a wire
+codec plus an ASGI app around a normal `AsyncClient`. No routing, validation, telemetry,
+credential, or local-inference code is duplicated, and an architecture test enforces that
+the frontend stays a codec.
 
 ## What it serves
 
@@ -128,8 +114,8 @@ absence of both response forms. See [run manifests](../concepts/run-manifests.md
   unauthenticated LLM gateway on a network is a credential laundering service.
 - Backend credentials never transit: the frontend authenticates *clients to itself*.
 - Standard redaction applies to logs; payload retention is off by default.
-- There are no configuration-execution endpoints of any kind: a deliberate response to how
-  comparable gateways have been compromised.
+- There are no configuration or execution endpoints of any kind, so a captured token can
+  spend inference, but it cannot rewrite routing or run code.
 
 === "Bash"
 
@@ -169,11 +155,12 @@ appears in deployment, never in local testing.
 
 ## Oversized conversations
 
-The sidecar applies whatever context policy its client was built with, because it is a
-codec over a normal client rather than a second core. Give the shared config a
+The sidecar applies whatever context policy its client was built with, since it is a codec
+over a normal client rather than a second core. Give the shared config a
 [`history` block](../reference/configuration.md#the-history-block) and a conversation that
-outgrows its target's window is compacted instead of refused — the same rules, and the same
-`ContextReduced` telemetry, an SDK caller gets.
+outgrows its target's window is compacted instead of refused, with the same rules and the
+same `ContextReduced` telemetry an SDK caller gets;
+[context reduction](../concepts/context-reduction.md) covers the rules themselves.
 
 A caller with a different tolerance can say so per request. The request body is a documented
 superset of OpenAI chat completions, and this is what that superset is for:
@@ -186,37 +173,74 @@ superset of OpenAI chat completions, and this is what that superset is for:
 }
 ```
 
-`false` refuses compaction for that request — you get the overflow error instead of a
-quietly shortened conversation. `true` accepts the defaults. A malformed value is a `400`
-rather than a silent fallback to the gateway's setting, because a caller that asked for
-something specific should learn it did not get it.
+`false` refuses compaction for that request and returns the overflow error instead of a
+shortened conversation; `true` accepts the defaults. A malformed value is a `400` rather
+than a silent fallback to the gateway's setting.
 
-An application may also supply an explicit, caller-approved corpus in
-`anyinfer_context`. This is a stateless envelope: the sidecar stores nothing, never collects
-files, forbids the inference-spending `distill` strategy, and delegates reduction to the
-normal core client. The response reports selected and omitted counts without echoing
-content. See [reduce an explicit corpus through the sidecar](../guides/sidecar-corpus-context.md)
-for the complete shape, ceilings, and bandwidth tradeoff.
+## Reducing an explicit corpus
+
+An application can also send an explicit, caller-approved corpus with a request:
+
+```json
+{
+  "model": "openai:gpt-5-mini",
+  "messages": [{"role": "user", "content": "Where is token refresh handled?"}],
+  "anyinfer_context": {
+    "documents": [
+      {"path": "src/auth.py", "content": "...", "pinned": true},
+      {"path": "src/session.py", "content": "..."}
+    ],
+    "query": "token refresh",
+    "strategy": "ranked",
+    "max_tokens": 6000,
+    "placement": "system"
+  }
+}
+```
+
+`anyinfer_context` is stateless: every request carries the documents, the sidecar stores
+none of them and never collects files, and reduction is delegated to the normal core
+client. Default ceilings hold the envelope to 1,000 documents and 5 MiB. The
+inference-spending `distill` strategy is refused here, and a request needs either a
+trusted target context window or an explicit `max_tokens` budget, so the reducer always
+has a real ceiling to fit against. The response reports selected and omitted counts
+without echoing paths or content; a stream carries the same summary in its terminal
+extension frame. Since uploading material the server then omits wastes bandwidth, a large
+local corpus is better served by `anyinfer context` or `anyinfer run --context-dir`
+running beside the files. [Context reduction](../concepts/context-reduction.md) explains
+the strategies; [fit a corpus to a context budget](../guides/fitting-context.md) covers
+choosing one.
 
 ## Fixed-target arena requests
 
 An AnyInfer-aware caller can add `anyinfer_arena` with the complete `ArenaPolicy` field set,
 or use a configured arena name as `model`. The response stays a valid single-choice OpenAI
-completion and adds candidate evidence under the same extension name. Streams buffer the
-branches and expose only the winner, so candidate events never interleave. Orchestration
-still lives in `AsyncClient`; the sidecar only translates the extension. See
-[arena runs](../concepts/arena.md).
+completion with candidate evidence added under the same extension name; streams buffer the
+branches and emit only the winner, so candidate events never interleave. Strategies, spend
+reservation, and tool-loop behavior are covered in [arena runs](../concepts/arena.md).
 
 ## Configuration
 
 The sidecar, CLI, and Python SDK use the same
 [shared configuration file](../reference/configuration.md).
 
+!!! tip "Key takeaways"
+    - The sidecar is a wire codec over the same client the SDK uses; routing, credentials,
+      telemetry, and context policy come from the shared configuration, not a second
+      system.
+    - Any target spelling works as the `model` field, so hosted, hub, and local routes are
+      all reachable from a stock OpenAI client.
+    - The AnyInfer extensions (`anyinfer_manifest`, `anyinfer_history`, `anyinfer_context`,
+      `anyinfer_arena`) are additive: a client that does not send them receives a plain
+      OpenAI completion.
+    - A non-loopback bind requires both `--allow-remote-exposure` and a bearer token, and
+      backend credentials never transit the frontend.
+
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
-- [Choosing an integration path](../guides/integration-paths.md)
+- [Integrate AnyInfer](../guides/README.md)
 - [Run a prompt from the shell](../guides/cli.md): the same config file, one prompt, no server
 - [Shared configuration](../reference/configuration.md)
 - [Running as a service](running-as-a-service.md): surviving a reboot

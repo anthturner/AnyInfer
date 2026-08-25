@@ -1,5 +1,8 @@
 # Run the tool loop
 
+`run_tools` runs the generate, call tools, feed results back loop for you, with bounded
+rounds and normalized errors:
+
 ```python
 import anyinfer as ai
 from pathlib import Path
@@ -32,8 +35,8 @@ docstring, so a tool is declared once rather than kept in sync with a hand-writt
 ## Supported parameter types
 
 `str`, `int`, `float`, `bool`, `list`, `dict`, their parameterized forms (`list[str]`), and
-`Optional[T]`. Anything else raises `ToolLoopError` **when the tool is declared** — far
-better than shipping a schema that misdescribes the tool to a model.
+`Optional[T]`. Anything else raises `ToolLoopError` when the tool is declared, before a
+schema that misdescribes the tool ever reaches a model.
 
 Parameters with defaults are optional; the rest are required.
 
@@ -66,8 +69,8 @@ except ai.ToolLoopError as error:
 
 ## Execution is sequential
 
-v1 dispatches tool calls one at a time, in the order the model requested. Parallel execution
-is deliberately deferred: it raises cancellation and ordering questions that no current
+v1 dispatches tool calls one at a time, in the order the model requested. Parallel
+execution is deferred: it raises cancellation and ordering questions that no current
 consumer needs answered.
 
 ## Naming and overrides
@@ -93,9 +96,8 @@ not expose a tool that runs arbitrary commands unless that is genuinely your int
 
 ## Tools from an MCP server
 
-Model Context Protocol servers are how tools are increasingly distributed — filesystems,
-databases, internal APIs, all speaking one protocol. AnyInfer can use one as a *source* of
-tools for the loop above:
+Model Context Protocol servers distribute tools — filesystems, databases, internal APIs —
+behind one protocol, and AnyInfer can use one as a source of tools for the loop above:
 
 ```bash
 pip install "anyinfer[mcp]"
@@ -114,12 +116,9 @@ async with await MCPToolset.connect(
     )
 ```
 
-`toolset.tools` are ordinary AnyInfer tools. Nothing about the loop changes: same bounded
-rounds, same sequential dispatch, same rule that a failing tool becomes a result the model
-can recover from rather than an exception you have to catch.
-
-Tool names are namespaced by their server (`fs__read_file`) so two servers offering
-`search` do not collide.
+`toolset.tools` are ordinary AnyInfer tools: same bounded rounds, same sequential dispatch,
+same rule that a failing tool becomes a result the model can recover from. Names are
+namespaced by server (`fs__read_file`), so two servers offering `search` do not collide.
 
 ### Describing servers in configuration
 
@@ -137,10 +136,10 @@ Tool names are namespaced by their server (`fs__read_file`) so two servers offer
 }
 ```
 
-Loading a configuration file never starts a server — the entries are inert descriptions
-until you connect them. Both stdio `env` values and HTTP `headers` values accept `env://`
-and `credential://` references; they resolve and register for redaction only on connect.
-Inspect what a server offers without running anything:
+Loading a [configuration file](../reference/configuration.md) never starts a server; the
+entries are inert until you connect them. Both stdio `env` values and HTTP `headers` values
+accept `env://` and `credential://` references, which resolve and register for redaction
+only on connect. Inspect what a server offers without running anything:
 
 ```bash
 anyinfer mcp list --config anyinfer.json
@@ -151,33 +150,27 @@ fs__read_file    Read a file from the allowed directory  [read-only — server's
 fs__list_dir     List entries in a directory             [read-only — server's claim]
 ```
 
-### What is deliberately not supported
+### What is not supported
 
-- **Sampling.** MCP lets a server ask the *client* to run a generation. Honouring that
-  would let a remote server drive inference through your credentials. It is not
-  implemented, and enabling it would be a decision you make deliberately, not one you
-  inherit by connecting a tool source.
-- **Prompts, resources, and roots.** Out of scope; this is a tool source.
-- **AnyInfer as an MCP server.** If you want non-Python clients to reach your models, the
-  [OpenAI-compatible sidecar](../serve/README.md) already does that.
+- **Sampling** — a server asking the client to run a generation. Honoring that would let a
+  remote server drive inference through your credentials, so it is not implemented.
+- **Prompts, resources, and roots** — out of scope; this integration is a tool source.
+- **AnyInfer as an MCP server** — non-Python clients reach your models through the
+  [OpenAI-compatible sidecar](../serve/README.md) instead.
 
 ### Trust
 
-Two things are worth stating plainly.
-
-**Tool results enter the model's context**, and a server decides what they say. That is the
-same prompt-injection surface any tool has, and connecting a server you do not control
-widens it. `allow_tools` and `deny_tools` narrow what a server may expose.
-
-**Tool annotations are the server's claims, not guarantees.** A server may advertise a tool
-as read-only or non-destructive; AnyInfer captures those hints on `ToolSpec.annotations` so
-your code can reason about them, and never acts on them itself. Nothing is granted more
-access, skipped, or auto-approved because a server said it was safe.
+Tool results enter the model's context, and the server decides what they say. That is the
+prompt-injection surface every tool has; connecting a server you do not control widens it,
+and `allow_tools`/`deny_tools` narrow what a server may expose. Annotations such as
+"read-only" are the server's claims, not guarantees: AnyInfer captures them on
+`ToolSpec.annotations` so your code can reason about them, and never grants access, skips a
+step, or auto-approves anything because a server said it was safe.
 
 ### Testing it
 
-The [test kit](testing-your-app.md) ships an in-process fake MCP server, so a tool loop fed
-by MCP is testable without a subprocess:
+The [test kit](testing-your-app.md)'s in-process fake MCP server makes an MCP-fed tool loop
+testable without a subprocess:
 
 ```python
 from anyinfer.testing import FakeMCPServer, FakeMCPTool
@@ -188,3 +181,28 @@ toolset = await MCPToolset.connect(
     transport_factory=lambda _: fake.transport(),
 )
 ```
+
+!!! tip "Key takeaways"
+    - A tool is declared once: the schema comes from the signature, the description from
+      the docstring, and an unsupported parameter type fails at declaration rather than
+      misdescribing the tool to a model.
+    - A raising tool becomes a result the model reacts to in conversation; only an unknown
+      tool or an exhausted `max_rounds` raises to your code.
+    - MCP servers plug in as tool sources with identical loop semantics, and configuration
+      entries stay inert until you connect them.
+    - Tool results are a prompt-injection surface and server annotations are unverified
+      claims: narrow exposure with `allow_tools`/`deny_tools` and validate inside your
+      tool implementations.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [A local tool agent](../examples/local-tool-agent.md): the loop end to end against a
+  local model.
+- [Test your application offline](testing-your-app.md): scripted providers and the fake
+  MCP server.
+- [Configuration](../reference/configuration.md): the `mcp` block the CLI and sidecar
+  share.
+
+</div>

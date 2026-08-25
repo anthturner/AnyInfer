@@ -1,19 +1,13 @@
 # Semantic search over a small corpus
 
-AnyInfer core embeds and reranks; it deliberately owns no vector store, no ANN index, and
-no persistence — see [the scope boundary](../concepts/embeddings.md#what-anyinfer-will-not-do-for-you).
-For a corpus small enough to hold in memory, that boundary costs nothing: this example
-embeds a handful of documents, embeds a query with the matching intent, and ranks by
-cosine similarity itself, in about a dozen lines that have no dependency beyond AnyInfer.
-When you want persistence without hand-rolling this loop yourself, the optional
-[`anyinfer-store`](../guides/vector-store.md) add-on does exactly this against a single
-SQLite file — still deliberately small-scale, never a production vector database.
-
-This shape runs offline against `anyinfer.testing.FakeEmbeddingRerankProvider` — a
-deterministic *pseudo*-embedding (a hash of the text, not a trained model), so it proves
-the wiring rather than retrieval quality. Point `EMBED_TARGET`/`RERANK_TARGET` at a real
-provider (`ollama:nomic-embed-text`, `openai:text-embedding-3-small`, a local
-[TEI](../providers/tei.md) server, …) and the same code ranks by actual meaning.
+For a corpus small enough to hold in memory, semantic search needs no vector store: this
+example embeds a handful of documents, embeds a query with the matching intent, and ranks
+by cosine similarity itself, with persistence left to the optional
+[`anyinfer-store`](../guides/vector-store.md) add-on. As written it runs offline against
+`anyinfer.testing.FakeEmbeddingRerankProvider` — a deterministic pseudo-embedding that
+proves the wiring, not retrieval quality — so point `EMBED_TARGET`/`RERANK_TARGET` at a
+real provider (`ollama:nomic-embed-text`, `openai:text-embedding-3-small`, a local
+[TEI](../providers/tei.md) server) when you want ranking by meaning.
 
 ```python
 import math
@@ -71,11 +65,11 @@ with ai.Client(
     )
 ```
 
-Intents (`input_type`), the embedding-space safety rule that makes index/query
-compatibility checkable (`result.space`), and batching are all core concepts, not
-particular to this example — see
-[Embeddings and reranking](../concepts/embeddings.md) for the full explanation. What
-follows here is specific to building a small in-memory index.
+Intents (`input_type`), the
+[embedding-space safety rule](../concepts/embeddings.md#the-embedding-space-safety-rule)
+that `result.space` implements, and batching are core concepts, covered in
+[Embeddings and reranking](../concepts/embeddings.md); what follows is specific to
+building a small in-memory index.
 
 ## Index/query compatibility, applied
 
@@ -87,10 +81,6 @@ if query_embedded.space.compatible_with(stored_space):
     ...  # safe to compare
 ```
 
-`client.embed()`'s fallback routing enforces the same rule *before* dispatch — see
-[the error catalog](../reference/errors.md#embedding-and-rerank-message-contracts-d-15)
-for the exact refusal a mismatched fallback raises.
-
 ## Fallback and local embeddings
 
 `operation_routes={"embedding": ai.Route(targets=[...])}` on the client (or
@@ -101,3 +91,15 @@ Local engines are first-class fallback members: [TEI](../providers/tei.md),
 [Ollama](../providers/ollama.md), and [LM Studio](../providers/lm-studio.md) all embed,
 so a chain like `[local-tei:bge-large, openai:text-embedding-3-small]` tries the free
 local model first and only spends money if it is unreachable.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Embeddings and reranking](../concepts/embeddings.md): intents, spaces, and batching.
+- [Embed, store, and query — without a database](../guides/vector-store.md): the same
+  loop persisted in a single SQLite file.
+- [Error catalog](../reference/errors.md#embedding-and-rerank-refusals):
+  the refusal a mismatched embedding fallback raises.
+
+</div>

@@ -27,6 +27,28 @@ points that only make it discoverable:
 The first two are two halves of one lifecycle: `NEW-PROVIDER.md` produces a contract
 snapshot, `DRIFT-CHECK.md` keeps it true afterwards.
 
+## Scheduled repository checks
+
+Three weekly workflows watch for the world changing underneath the repository.
+
+The pricing-drift check is a detector, not an updater. It compares the bundled pricing
+table's exact provider/model keys against Chutes and Avian as direct sources, with
+OpenRouter as a secondary tripwire for ten mapped entries. A clean run means the sources
+were reachable and every compared value matched; it does not re-verify prices those
+sources no longer list, and a contributor changing a rate still confirms it against the
+provider's own pricing documentation. Run it locally with
+`python scripts/check_pricing_drift.py` (`--format json` for machine output,
+`--report PATH` to write the versioned JSON report, `--live-source NAME` to probe one
+real source). Exit codes: 0 clean, 1 drift found, 2 a source failed or the report is
+invalid. Source fixtures for its tests live under `tests/fixtures/pricing/`, and where
+the bundled prices come from is covered in
+[cost and spending](../concepts/cost.md#where-prices-come-from).
+
+The weekly catalog re-check confirms the model catalog's pinned entries still match
+upstream. The contract drift check audits provider contract snapshots against current
+public API documentation, following
+[`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md).
+
 ## Workstream boundaries
 
 Start in the narrowest workstream that owns the behavior:
@@ -36,8 +58,8 @@ Start in the narrowest workstream that owns the behavior:
 | Core engine and Python SDK | `src/anyinfer/` except `cli.py` and `serve/` | Requests, typed events, routing, adapters, capabilities, local inference, client lifecycle |
 | Shared configuration | `src/anyinfer/config/` | The versioned JSON contract used by every integration path |
 | Command-line tool | `src/anyinfer/cli.py` | Human and shell interface for `run`, `doctor`, `providers`, and sidecar startup |
-| OpenAI-compatible sidecar | `src/anyinfer/serve/` | OpenAI wire codec and ASGI application; never a second routing core |
-| Demo application | `src/demo_app/` | Offline reference UI and integration example; not part of core behavior |
+| OpenAI-compatible sidecar | [`src/anyinfer/serve/`](../serve/README.md) | OpenAI wire codec and ASGI application; never a second routing core |
+| Demo application | [`src/demo_app/`](../guides/demo-app.md) | Offline reference UI and integration example; not part of core behavior |
 
 Tests mirror those boundaries under `tests/`. Shared behavior belongs in the engine or
 configuration package, not copied into the CLI, sidecar, or demo. A change that crosses a

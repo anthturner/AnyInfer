@@ -1,5 +1,9 @@
 # Stream to a terminal
 
+A stream yields typed [events](../concepts/events.md) while the request runs: text deltas,
+reasoning, timing marks, and attempt failures. This page shows the patterns a terminal
+frontend needs; the full event vocabulary is in the [API reference](../reference/api/README.md).
+
 === "Sync"
 
     ```python
@@ -73,9 +77,13 @@ for event in stream:
 ```
 
 TTFT is measured by the core against `time.monotonic()`, identically for every provider, so
-numbers from different backends are directly comparable.
+numbers from different backends are directly comparable. To export timings to a metrics
+system rather than print them, see [observability](observability.md).
 
 ## Show fallback as it happens
+
+When a [fallback chain](fallback.md) is in play, `AttemptFailed` events let you show the
+switch as it happens rather than leaving the user staring at a stalled cursor:
 
 ```python
 for event in stream:
@@ -86,10 +94,22 @@ for event in stream:
             print(t, end="", flush=True)
 ```
 
-## Concurrency
+!!! tip "Key takeaways"
+    - Use the context-manager form; leaving the block early cancels the in-flight request
+      instead of letting a hosted provider keep generating and billing.
+    - Reasoning text arrives as `ReasoningDelta`, a channel separate from the answer, so
+      you can dim it or drop it without parsing anything.
+    - TTFT is measured by the core, not the provider, so numbers from different backends
+      are directly comparable.
+    - `AttemptFailed` events surface retries and fallback while they happen, not after.
 
-Both clients support many concurrent independent streams. The sync facade runs one
-background event loop, so streams started from different threads overlap rather than
-serializing behind each other.
+## See also
 
-See [the event stream](../concepts/events.md) for the ordering guarantees you can rely on.
+<div class="anyinfer-see-also" markdown>
+
+- [The event stream](../concepts/events.md): the ordering guarantees you can rely on.
+- [Add a fallback chain](fallback.md): the routing behind `AttemptFailed`.
+- [Observe requests](observability.md): exporting these events instead of printing them.
+- [API reference](../reference/api/README.md): every event type and its fields.
+
+</div>
