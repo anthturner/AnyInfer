@@ -912,6 +912,15 @@ class GenerationExecutionMixin:
                 active_buffer.phases.update(final.phases)
                 active_buffer.logprobs = final.logprobs
                 active_buffer.server_tool_uses = final.server_tool_uses
+                if final.server_tool_uses:
+                    # Onto usage as well as the result: cost is computed from usage alone,
+                    # and a search is a billed line item like any token.
+                    active_buffer.usage = replace(
+                        active_buffer.usage,
+                        server_tool_uses={
+                            use.kind: use.uses for use in final.server_tool_uses
+                        },
+                    )
                 if self._retain_raw:
                     active_buffer.raw = final.raw
 

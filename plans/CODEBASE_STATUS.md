@@ -599,13 +599,29 @@ Two scope decisions are recorded rather than left implicit:
 Responses route with its semantic streaming events, provider-run server tools across three
 dialects, and deferred batch inference.
 
-E.1's scope, stated so its limits are not mistaken for oversights. The types, the
-`SubmitsBatches` protocol, the client surface, and the lifecycle events are complete and
-provider-agnostic; **Anthropic is the only adapter bound so far.** Its Message Batches API
-takes the whole job as JSON, which is the shape the protocol was designed against. OpenAI's
-Batch API needs a JSONL upload to `/v1/files` and a separate download of an output file —
-the same protocol, two more round trips and a file lifecycle — and Bedrock's needs S3 on
-both ends. Both are additive work behind an interface that already exists, not redesigns.
+**Bindings and remaining scope.** E.1's sketch named five providers. **Anthropic and
+OpenAI are bound**, and they are the two that matter for proving the interface, because
+their APIs have opposite shapes: Anthropic takes the whole job as JSON and returns one
+manifest, while OpenAI uploads it as a file and splits results across two more, one for
+successes and one for rejections. The protocol survives both without either leaking into
+it. **Bedrock, Vertex, and Groq remain unbound** — Bedrock's and Vertex's need S3 and GCS
+on both ends, which is a storage dependency rather than a protocol question; Groq's follows
+OpenAI's shape closely. All three are additive work behind an interface that now exists.
+
+**Also completed on a second pass**, after a review found each spelled out in the plan but
+missing from the first implementation:
+
+- **E.3.2's per-invocation pricing.** `Pricing.per_server_tool_use` and
+  `Usage.server_tool_uses` make a searched generation cost more than its tokens say. An
+  unpriced invocation makes the whole cost unknown rather than free — understating a bill
+  is the one direction a cost-aware caller cannot absorb.
+- **E.5's inverse codec.** `request_to_responses` and the round-trip test that enforces
+  ADR-009's request-superset invariant for that dialect. Writing it found a live bug: the
+  Responses decoder consulted the *chat-completions* reserved-field set, so `input`,
+  `text`, and `reasoning` were treated as unrecognized extra body and forwarded to the
+  provider verbatim. It also surfaced that `provider_options` had been one-way in the chat
+  codec since it shipped — decoded but never re-encoded, so the escape hatch vanished on a
+  gateway's second hop. Both fixed.
 
 E.3 introduced one thing worth knowing about: `ProviderDescriptor.server_tools` is checked
 *unconditionally*, unlike a capability flag. Ninety-five registered adapters never read the

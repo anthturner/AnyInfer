@@ -22,10 +22,11 @@ conversation history, which reads as a bad model rather than a missing feature.
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..types.messages import (
@@ -37,6 +38,7 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.requests import (
     GenerationRequest,
@@ -60,6 +62,7 @@ from .openai_codec import (
     MANIFEST_FIELD,
     SERVER_TOOLS_FIELD,
     VIDEO_CONTENT_TYPE,
+    _data_url,
     _decode_arena,
     _decode_base64,
     _decode_cache,
@@ -67,21 +70,29 @@ from .openai_codec import (
     _decode_data_url,
     _decode_flag,
     _decode_history,
-    _decode_passthrough,
     _decode_reasoning_effort,
     _decode_video,
+    _encode_video,
     _opt_float,
     _opt_int,
     _parse_arguments,
+    decode_passthrough,
     decode_server_tools,
+    encode_arena_policy,
+    encode_cache_policy,
     encode_citation,
+    encode_context_request,
+    encode_history_policy,
+    encode_passthrough,
     encode_server_tool_uses,
 )
 
 __all__ = [
     "RESPONSE_STATUSES",
+    "encode_input_items",
     "encode_response",
     "request_from_responses",
+    "request_to_responses",
     "response_stream_events",
 ]
 
@@ -103,6 +114,45 @@ _INCOMPLETE_REASONS: Mapping[str, str] = {
     "length": "max_output_tokens",
     "content_filter": "content_filter",
 }
+
+_RESERVED_FIELDS = frozenset(
+    {
+        "model",
+        "input",
+        "instructions",
+        "stream",
+        "temperature",
+        "top_p",
+        "top_logprobs",
+        "max_output_tokens",
+        "text",
+        "tools",
+        "tool_choice",
+        "reasoning",
+        "metadata",
+        "parallel_tool_calls",
+        "previous_response_id",
+        "store",
+        "include",
+        "truncation",
+        "user",
+        HISTORY_FIELD,
+        CACHE_FIELD,
+        MANIFEST_FIELD,
+        ARENA_FIELD,
+        CONTEXT_FIELD,
+        CITE_DOCUMENTS_FIELD,
+        SERVER_TOOLS_FIELD,
+    }
+)
+"""Fields this dialect reads itself, and so must never forward as extra body.
+
+Deliberately *not* the chat-completions set. The two dialects reserve different names —
+``input`` and ``text`` are core here and unknown there, ``messages`` and
+``response_format`` the reverse — so a codec consulting the wrong one forwards its own
+request body to the provider as unrecognized extra keys. That is what the round-trip test
+caught, and it is the reason this list exists rather than being shared.
+"""
 
 _UNSUPPORTED_STATEFUL_FIELDS: Mapping[str, str] = {
     "previous_response_id": (
@@ -166,7 +216,7 @@ def request_from_responses(
         cache=_decode_cache(body.get(CACHE_FIELD)),
         arena=_decode_arena(body.get(ARENA_FIELD)),
         context=_decode_context(body.get(CONTEXT_FIELD), context_tuning),
-        provider_options=_decode_passthrough(body),
+        provider_options=decode_passthrough(body, _RESERVED_FIELDS),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
         logprobs=_opt_int(body.get("top_logprobs")),
         cite_documents=_decode_flag(body, CITE_DOCUMENTS_FIELD),
@@ -407,6 +457,187 @@ def _decode_tool_choice(raw: Any) -> str:
         if isinstance(name, str) and name:
             return name
     return "auto"
+
+
+def request_to_responses(
+    target: str, request: GenerationRequest, *, stream: bool = False
+) -> dict[str, Any]:
+    """Encode a request back into Responses wire form.
+
+    The inverse of `request_from_responses`, and the basis of the round-trip test that
+    enforces the request-superset invariant for *this* dialect the way `request_to_openai`
+    does for chat completions. A codec with only one direction is a design bug rather than
+    a shortcut: a gateway chaining to another gateway re-encodes, and a field that decodes
+    into a typed value but never encodes back is silently dropped on the second hop.
+
+    Args:
+        target: The target string, echoed as ``model``.
+        request: The normalized request.
+        stream: Whether to ask for the streamed form.
+
+    Returns:
+        A Responses request body.
+    """
+    body: dict[str, Any] = {"model": target, "input": encode_input_items(request.messages)}
+    if stream:
+        body["stream"] = True
+
+    sampling = request.sampling
+    if sampling.temperature is not None:
+        body["temperature"] = sampling.temperature
+    if sampling.top_p is not None:
+        body["top_p"] = sampling.top_p
+    if sampling.max_output_tokens is not None:
+        body["max_output_tokens"] = sampling.max_output_tokens
+    if request.logprobs is not None:
+        body["top_logprobs"] = request.logprobs
+
+    if request.reasoning is not None:
+        body["reasoning"] = {"effort": request.reasoning}
+
+    text_format = _encode_text_format(request.schema)
+    if text_format is not None:
+        body["text"] = text_format
+
+    tools: list[dict[str, Any]] = [
+        # Native entries: this dialect names a provider-run capability in `type`, so they
+        # re-encode as themselves rather than as the extension they may have arrived in.
+        {"type": _NATIVE_SERVER_TOOL_TYPES[spec.kind]}
+        for spec in request.server_tools
+    ]
+    tools.extend(
+        {
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": dict(tool.parameters),
+        }
+        for tool in request.tools
+    )
+    if tools:
+        body["tools"] = tools
+    if request.tools:
+        body["tool_choice"] = (
+            request.tool_choice
+            if request.tool_choice in ("auto", "none", "required")
+            else {"type": "function", "name": request.tool_choice}
+        )
+
+    # A use ceiling has no native home here, so it rides the extension — which is exactly
+    # where `_decode_response_server_tools` looks for it.
+    ceilings = [spec for spec in request.server_tools if spec.max_uses is not None]
+    if ceilings:
+        body[SERVER_TOOLS_FIELD] = [
+            {"kind": spec.kind, "max_uses": spec.max_uses} for spec in ceilings
+        ]
+    if request.cite_documents:
+        body[CITE_DOCUMENTS_FIELD] = True
+
+    if request.history is not None:
+        body[HISTORY_FIELD] = encode_history_policy(request.history)
+    if request.cache is not None:
+        body[CACHE_FIELD] = encode_cache_policy(request.cache)
+    if request.arena is not None:
+        body[ARENA_FIELD] = encode_arena_policy(request.arena)
+    if request.context is not None:
+        body[CONTEXT_FIELD] = encode_context_request(request.context)
+    if request.metadata:
+        body["metadata"] = dict(request.metadata)
+    encode_passthrough(body, request.provider_options)
+    return body
+
+
+def _encode_text_format(schema: SchemaSpec | None) -> dict[str, Any] | None:
+    """Encode a schema into ``text.format``, flattened as this dialect flattens it."""
+    if schema is None:
+        return None
+    return {
+        "format": {
+            "type": "json_schema",
+            "name": schema.name,
+            "schema": dict(schema.json_schema),
+        }
+    }
+
+
+def encode_input_items(messages: Sequence[Message]) -> list[dict[str, Any]]:
+    """Encode messages as this dialect's typed input items.
+
+    Tool turns are *items*, not roles: a call is a ``function_call`` item and its result a
+    ``function_call_output``, which is the structural difference from chat completions'
+    ``tool_calls`` array and ``tool`` role.
+    """
+    items: list[dict[str, Any]] = []
+    for message in messages:
+        for part in message.content:
+            if isinstance(part, ToolCall):
+                items.append(
+                    {
+                        "type": "function_call",
+                        "call_id": part.id,
+                        "name": part.name,
+                        "arguments": json.dumps(dict(part.arguments)),
+                    }
+                )
+            elif isinstance(part, ToolResult):
+                items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": part.call_id,
+                        "output": part.content,
+                    }
+                )
+        content = _encode_item_content(message)
+        if content:
+            items.append({"role": message.role, "content": content})
+    return items
+
+
+def _encode_item_content(message: Message) -> list[dict[str, Any]]:
+    """Encode one message's non-tool parts, under this dialect's part names."""
+    text_type = "output_text" if message.role == "assistant" else "input_text"
+    content: list[dict[str, Any]] = []
+    for part in message.content:
+        if isinstance(part, Text):
+            if part.text:
+                content.append({"type": text_type, "text": part.text})
+        elif isinstance(part, ImagePart):
+            image: dict[str, Any] = {
+                "type": "input_image",
+                "image_url": part.url or _data_url(part.media_type, part.data or b""),
+            }
+            if part.detail is not None:
+                image["detail"] = part.detail
+            content.append(image)
+        elif isinstance(part, DocumentPart):
+            file: dict[str, Any] = {"type": "input_file"}
+            if part.data is not None:
+                file["file_data"] = _data_url(part.media_type, part.data)
+            else:
+                file["file_url"] = part.url
+            if part.filename is not None:
+                file["filename"] = part.filename
+            content.append(file)
+        elif isinstance(part, AudioPart):
+            fmt = "mp3" if part.media_type in ("audio/mp3", "audio/mpeg") else "wav"
+            content.append(
+                {
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": base64.b64encode(part.data).decode("ascii"),
+                        "format": fmt,
+                    },
+                }
+            )
+        elif isinstance(part, VideoPart):
+            content.append({"type": VIDEO_CONTENT_TYPE, VIDEO_CONTENT_TYPE: _encode_video(part)})
+    return content
+
+
+_NATIVE_SERVER_TOOL_TYPES: Mapping[str, str] = {
+    "web_search": "web_search",
+    "code_execution": "code_interpreter",
+}
 
 
 # ---- the response object -------------------------------------------------------------

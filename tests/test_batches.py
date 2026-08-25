@@ -14,6 +14,8 @@ zipping results against their own inputs should not have to sort first.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 import anyinfer as ai
@@ -320,7 +322,7 @@ def test_only_adapters_that_implement_the_protocol_declare_the_operation() -> No
         for pid in default_registry.known_ids()
         if "batch" in default_registry.get(pid).operations
     }
-    assert declaring == {"anthropic"}
+    assert "anthropic" in declaring
 
     from anyinfer.providers.anthropic import AnthropicAdapter
     from anyinfer.providers.base import ProviderConfig
@@ -372,3 +374,162 @@ def test_the_batch_surface_exists_on_the_sync_client_too() -> None:
         result = client.fetch_batch(handle)
 
     assert [line.custom_id for line in result.lines] == ["0", "1"]
+
+
+# ---- the OpenAI Batch API ----------------------------------------------------------------
+#
+# A three-step lifecycle where Anthropic's is one: upload a JSONL file, submit a batch
+# referencing it, download the results as more files. The plan named this provider first,
+# and the file dance is the reason — it is the shape the protocol has to survive, not the
+# convenient one it was designed against.
+
+from anyinfer.testing.fakes import FakeResponsesBatchServer  # noqa: E402
+
+OPENAI_TARGET = "openai:gpt-5"
+
+
+def _openai_client(server: FakeResponsesBatchServer) -> ai.AsyncClient:
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "openai",
+                api_key="sk-test",
+                base_url="https://fake.invalid/v1",
+                transport=server.transport(),
+            )
+        ],
+        use_default_catalog=False,
+    )
+
+
+async def test_the_job_is_uploaded_as_jsonl_before_the_batch_references_it() -> None:
+    server = FakeResponsesBatchServer(FakeResponse(text="answer"))
+    client = _openai_client(server)
+    try:
+        handle = await client.submit_batch(_batch(3), target=OPENAI_TARGET)
+    finally:
+        await client.aclose()
+
+    assert handle.batch_id == "batch_fake"
+    assert handle.line_count == 3
+
+    uploaded = [json.loads(line) for line in server.uploaded[0].splitlines()]
+    assert [entry["custom_id"] for entry in uploaded] == ["0", "1", "2"]
+    assert all(entry["method"] == "POST" for entry in uploaded)
+    assert all(entry["url"] == "/responses" for entry in uploaded)
+
+    submitted = server.requests[0]
+    assert submitted["input_file_id"] == "file-input"
+    assert submitted["endpoint"] == "/responses"
+    assert submitted["completion_window"] == "24h"
+
+
+async def test_each_uploaded_line_is_the_live_request_body() -> None:
+    """Serialized by the same `build_payload`, so a batched call is not a second dialect."""
+    server = FakeResponsesBatchServer(FakeResponse(text="answer"))
+    client = _openai_client(server)
+    batch = ai.BatchGenerationRequest(
+        requests=(
+            ai.GenerationRequest(
+                messages=(ai.system("Be terse."), ai.user("hi")),
+                sampling=ai.Sampling(temperature=0.3, max_output_tokens=32),
+            ),
+        )
+    )
+    try:
+        await client.submit_batch(batch, target=OPENAI_TARGET)
+    finally:
+        await client.aclose()
+
+    body = json.loads(server.uploaded[0])["body"]
+    assert body["instructions"] == "Be terse."
+    assert body["temperature"] == 0.3
+    assert body["max_output_tokens"] == 32
+    assert "stream" not in body, "a batch is answered whole; the API rejects the flag"
+
+
+async def test_the_openai_lifecycle_polls_then_downloads() -> None:
+    server = FakeResponsesBatchServer(FakeResponse(text="answer"), polls_before_done=2)
+    client = _openai_client(server)
+    try:
+        handle = await client.submit_batch(_batch(2), target=OPENAI_TARGET)
+
+        assert (await client.batch_status(handle)).status == "in_progress"
+        assert (await client.batch_status(handle)).finished
+
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert result.status == "completed"
+    assert [line.custom_id for line in result.lines] == ["0", "1"]
+    assert result.lines[0].result is not None
+    assert result.lines[0].result.text == "answer #0"
+    assert result.lines[0].result.usage.total_tokens == 18
+
+
+async def test_rejected_lines_are_read_from_the_error_file_too() -> None:
+    """Reading only the output file would silently drop every failure.
+
+    OpenAI splits them across two files, unlike Anthropic's single manifest — so a batch
+    would come back looking smaller than it was submitted, with no error to explain it.
+    """
+    server = FakeResponsesBatchServer(FakeResponse(text="answer"), failures=2)
+    client = _openai_client(server)
+    try:
+        handle = await client.submit_batch(_batch(5), target=OPENAI_TARGET)
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert len(result.lines) == 5, "every submitted line is accounted for"
+    assert len(result.succeeded) == 3
+    assert len(result.failed) == 2
+    assert all("rejected" in line.error.detail for line in result.failed if line.error)
+
+
+async def test_openai_statuses_normalize_to_one_vocabulary() -> None:
+    """Richer than Anthropic's two states, mapped so a caller polls one vocabulary."""
+    from anyinfer.providers.openai import _BATCH_STATUSES
+
+    assert _BATCH_STATUSES["validating"] == "queued"
+    assert _BATCH_STATUSES["finalizing"] == "in_progress"
+    assert _BATCH_STATUSES["cancelled"] == "cancelled"
+    assert _BATCH_STATUSES["expired"] == "expired"
+
+
+async def test_cancelling_an_openai_batch_reports_cancelled() -> None:
+    server = FakeResponsesBatchServer(FakeResponse(text="answer"), polls_before_done=99)
+    client = _openai_client(server)
+    try:
+        handle = await client.submit_batch(_batch(2), target=OPENAI_TARGET)
+        report = await client.cancel_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert report.status == "cancelled"
+    assert report.finished
+
+
+async def test_openai_lines_also_come_back_in_submission_order() -> None:
+    server = FakeResponsesBatchServer(FakeResponse(text="answer"))
+    client = _openai_client(server)
+    try:
+        handle = await client.submit_batch(_batch(4), target=OPENAI_TARGET)
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert [line.custom_id for line in result.lines] == ["0", "1", "2", "3"]
+
+
+def test_both_named_providers_now_declare_the_operation() -> None:
+    """The plan named OpenAI first; Anthropic's simpler API was the one to build against."""
+    from anyinfer.registry import default_registry
+
+    declaring = {
+        default_registry.get(pid).id
+        for pid in default_registry.known_ids()
+        if "batch" in default_registry.get(pid).operations
+    }
+    assert declaring == {"anthropic", "openai"}

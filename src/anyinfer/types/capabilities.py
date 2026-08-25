@@ -11,7 +11,8 @@ because a user's explicit correction must never lose to data the library merely 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Flag, auto
 from typing import TYPE_CHECKING, Generic, Literal, TypeVar
@@ -209,6 +210,12 @@ class Pricing:
             by searches rather than tokens. ``None`` when the provider does not bill this
             way or the rate is not recorded — a rerank cost stays unknown rather than
             being priced through an invented token equivalence.
+        per_server_tool_use: Price per invocation of a provider-run tool, keyed by kind.
+            Web search is billed per search rather than per token, so a generation that
+            searched costs more than its token counts say — and a caller who set
+            ``max_uses`` did so precisely because that line item is real. A kind absent
+            from the mapping is not free; it is *unpriced*, and makes the whole cost
+            unknown rather than being silently counted as zero.
     """
 
     input_per_1m: Decimal
@@ -217,6 +224,7 @@ class Pricing:
     cache_write_per_1m: Decimal | None = None
     currency: str = "USD"
     per_search_unit: Decimal | None = None
+    per_server_tool_use: Mapping[str, Decimal] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

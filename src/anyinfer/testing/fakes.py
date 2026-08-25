@@ -26,6 +26,7 @@ __all__ = [
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",
+    "FakeResponsesBatchServer",
     "FakeResponsesServer",
     "FakeRetrievalServer",
     "chunk_text",
@@ -470,6 +471,162 @@ class FakeOpenAIServer(_FakeServerBase):
             "model": "fake-model-small",
             "choices": [{"index": 0, "delta": dict(delta), "finish_reason": None}],
         }
+
+
+class FakeResponsesBatchServer(_FakeServerBase):
+    """The OpenAI Batch API's three-step lifecycle, in process.
+
+    Deliberately models all three steps rather than collapsing them: a JSONL file is
+    uploaded to ``/files``, the batch references it by id, and results come back as *two*
+    more files — successes in ``output_file_id`` and rejections in ``error_file_id``. An
+    adapter that read only the first would silently drop every failure and return a batch
+    that looks smaller than it was, which is a fake's job to catch.
+
+    Args:
+        responses: Scenario script. Only ``text`` and ``status`` apply here.
+        polls_before_done: Status polls the batch reports in progress for before it ends.
+            At least one, so a caller must always poll — a fake that finished immediately
+            could not exercise the poll-then-fetch shape a deferred API exists for.
+        failures: How many lines land in the error file rather than the output file.
+
+    Attributes:
+        requests: Every request body received, for assertions.
+        uploaded: The JSONL text of each uploaded input file, in order.
+    """
+
+    def __init__(
+        self,
+        responses: Sequence[FakeResponse] | FakeResponse | None = None,
+        *,
+        polls_before_done: int = 1,
+        failures: int = 0,
+    ) -> None:
+        super().__init__(responses)
+        self.polls_before_done = max(1, polls_before_done)
+        self.failures = failures
+        self.uploaded: list[str] = []
+        self._lines: list[str] = []
+        self._polls = 0
+        self._cancelled = False
+
+    def next_response(self) -> FakeResponse:
+        """The response every line's body is built from."""
+        return self._responses[min(self._call_index, len(self._responses) - 1)]
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/files") and request.method == "POST":
+            return self._handle_upload(request)
+        if "/files/" in path and path.endswith("/content"):
+            return self._handle_download(path)
+        if path.endswith("/batches") and request.method == "POST":
+            return self._handle_submit(request)
+        if path.endswith("/cancel"):
+            self._cancelled = True
+            return httpx2.Response(200, json=self._batch_object())
+        if "/batches/" in path:
+            self._polls += 1
+            return httpx2.Response(200, json=self._batch_object())
+        return httpx2.Response(404, json={"error": {"message": f"no such path: {path}"}})
+
+    def _handle_upload(self, request: httpx2.Request) -> httpx2.Response:
+        """Accept the multipart upload and remember its JSONL, for assertions."""
+        body = request.content.decode("utf-8", "replace")
+        # Pull the file part out of the multipart envelope without a parser: every line
+        # that looks like one of our own JSONL records is one.
+        self.uploaded.append(
+            "\n".join(line for line in body.splitlines() if line.startswith('{"custom_id"'))
+        )
+        self._lines = [
+            json.loads(line)["custom_id"]
+            for line in self.uploaded[-1].splitlines()
+            if line.strip()
+        ]
+        return httpx2.Response(200, json={"id": "file-input", "object": "file"})
+
+    def _handle_submit(self, request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        self._polls = 0
+        self._cancelled = False
+        return httpx2.Response(200, json=self._batch_object())
+
+    def _batch_object(self) -> dict[str, Any]:
+        done = self._cancelled or self._polls >= self.polls_before_done
+        failures = min(self.failures, len(self._lines))
+        status = "cancelled" if self._cancelled else ("completed" if done else "in_progress")
+        body: dict[str, Any] = {
+            "id": "batch_fake",
+            "object": "batch",
+            "status": status,
+            "request_counts": {
+                "total": len(self._lines),
+                "completed": len(self._lines) - failures if done else 0,
+                "failed": failures if done else 0,
+            },
+        }
+        if done:
+            body["output_file_id"] = "file-output"
+            if failures:
+                body["error_file_id"] = "file-errors"
+        return body
+
+    def _handle_download(self, path: str) -> httpx2.Response:
+        failures = min(self.failures, len(self._lines))
+        succeeded = self._lines[failures:]
+        rejected = self._lines[:failures]
+        if path.endswith("file-errors/content"):
+            return httpx2.Response(200, text=self._error_manifest(rejected))
+        return httpx2.Response(200, text=self._output_manifest(succeeded))
+
+    def _output_manifest(self, custom_ids: Sequence[str]) -> str:
+        """Successful lines, in *completion* order — which is not submission order."""
+        response = self.next_response()
+        entries = [
+            {
+                "id": f"batch_req_{custom_id}",
+                "custom_id": custom_id,
+                "response": {
+                    "status_code": 200,
+                    "body": {
+                        "id": f"resp_{custom_id}",
+                        "object": "response",
+                        "status": "completed",
+                        "model": "fake-gpt",
+                        "output": [
+                            {
+                                "type": "message",
+                                "role": "assistant",
+                                "content": [
+                                    {
+                                        "type": "output_text",
+                                        "text": f"{response.text} #{custom_id}",
+                                    }
+                                ],
+                            }
+                        ],
+                        "usage": {"input_tokens": 11, "output_tokens": 7, "total_tokens": 18},
+                    },
+                },
+                "error": None,
+            }
+            for custom_id in custom_ids
+        ]
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
+
+    def _error_manifest(self, custom_ids: Sequence[str]) -> str:
+        """Rejected lines, which live in their own file rather than beside the successes."""
+        return "\n".join(
+            json.dumps(
+                {
+                    "id": f"batch_req_{custom_id}",
+                    "custom_id": custom_id,
+                    "response": None,
+                    "error": {"code": "invalid_request", "message": "line rejected"},
+                }
+            )
+            for custom_id in custom_ids
+        )
 
 
 class FakeRetrievalServer(_FakeServerBase):

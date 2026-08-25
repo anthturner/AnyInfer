@@ -104,6 +104,28 @@ Verified 2026-08-09 against https://developers.openai.com/api/docs/guides/rate-l
   ($0.02/1M for 3-small, $0.13/1M for 3-large, 2026-08-12) but enters `pricing.json`
   only through the pricing pipeline, never by hand.
 
+### Batch API (added 2026-08-25)
+
+- Three steps, unlike Anthropic's one. `POST /files` with `purpose=batch` takes the job as
+  a **multipart upload** of JSONL and returns a file id; `POST /batches` references it via
+  `input_file_id` alongside `endpoint` (the generation path the lines target) and
+  `completion_window`.
+- Each JSONL record is `{custom_id, method, url, body}` where `body` is a Responses body
+  **minus `stream`**, which a batch cannot use.
+- `GET /batches/{id}` reports a richer status set than Anthropic's — `validating`,
+  `in_progress`, `finalizing`, `completed`, `failed`, `expired`, `cancelling`, `cancelled`
+  — normalized so a caller polls one vocabulary whichever provider ran the job. Counts are
+  under `request_counts` (`total`/`completed`/`failed`).
+- **Results arrive in two files, not one:** `output_file_id` holds succeeded lines and
+  `error_file_id` holds rejected ones. Reading only the first silently drops every failure
+  and returns a batch smaller than it was submitted, with nothing to explain the gap.
+- Each file is fetched from `GET /files/{id}/content`. Output entries are
+  `{custom_id, response: {status_code, body}}` where `body` is byte-identical to a
+  non-streaming Responses body, so it is read by the same output-item reader a live call
+  uses. Error entries carry `{custom_id, error: {code, message}}`.
+- `POST /batches/{id}/cancel` requests cancellation.
+- Manifest order is completion order, not submission order. The core re-sorts.
+
 ## Watchlist
 - Rate-limit header names and the duration format of the reset values
 - Responses API evolves quickly: new event types, `text.format` schema-mode changes

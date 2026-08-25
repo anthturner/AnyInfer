@@ -29,9 +29,9 @@ never rewritten.
 - The sidecar serves `POST /v1/responses`, OpenAI's current-generation dialect, with
   its semantic streaming events — so a Responses-first SDK no longer 404s.
 - Provider-run tools: `server_tools=` asks a target to search the web or run code inside
-  one request, reporting the invocation counts back.
+  one request, with invocation counts reported back and priced.
 - Deferred batch inference at a provider's discounted batch tier, via `submit_batch()`,
-  `batch_status()`, and `fetch_batch()`. Anthropic is the first binding.
+  `batch_status()`, and `fetch_batch()`, bound for Anthropic and OpenAI.
 - Telemetry sinks, plugin groups, proxy and TLS settings, and a decision log.
 - The confidential Relay paces and bounds its own traffic: pooled provider pacing,
   per-tenant admission limits, and 429s carrying `Retry-After` and `RateLimit-*` headers.

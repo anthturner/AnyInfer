@@ -427,3 +427,95 @@ def test_json_round_trips_the_request_extension() -> None:
     )
     _, request, _ = request_from_openai(body)
     assert request.server_tools == (ServerToolSpec(kind="code_execution"),)
+
+
+# ---- per-invocation pricing ------------------------------------------------------------
+#
+# A web search is billed per search, not per token, so a generation that searched costs
+# more than its token counts say. This library's identity is cost-aware dispatch, which
+# makes an unpriced invocation the one thing it must not silently treat as free.
+
+
+def _priced(**rates: object) -> ModelCapabilities:
+    from decimal import Decimal
+
+    from anyinfer.types.capabilities import Pricing
+
+    return ModelCapabilities(
+        pricing=Sourced(
+            Pricing(
+                input_per_1m=Decimal("3"),
+                output_per_1m=Decimal("15"),
+                per_server_tool_use={k: Decimal(str(v)) for k, v in rates.items()},
+            ),
+            "catalog",
+        )
+    )
+
+
+def test_an_invocation_is_added_to_the_token_cost() -> None:
+    from decimal import Decimal
+
+    from anyinfer.capabilities.pricing import compute_cost
+
+    usage = ai.Usage(
+        input_tokens=1_000_000, output_tokens=0, server_tool_uses={"web_search": 3}
+    )
+    cost = compute_cost(usage, _priced(web_search="0.01"))
+    assert cost == Decimal("3") + Decimal("0.03")
+
+
+def test_a_generation_that_searched_costs_more_than_its_tokens_say() -> None:
+    from anyinfer.capabilities.pricing import compute_cost
+
+    tokens_only = ai.Usage(input_tokens=1_000_000, output_tokens=0)
+    searched = ai.Usage(
+        input_tokens=1_000_000, output_tokens=0, server_tool_uses={"web_search": 5}
+    )
+    capabilities = _priced(web_search="0.01")
+
+    assert compute_cost(searched, capabilities) > compute_cost(tokens_only, capabilities)
+
+
+def test_an_unpriced_invocation_makes_the_cost_unknown_rather_than_free() -> None:
+    """Reporting the token figure as the total would understate the bill.
+
+    That is the one direction a cost-aware caller cannot absorb, and it is why this
+    follows the same unknown-stays-unknown rule as every other rate in the module.
+    """
+    from anyinfer.capabilities.pricing import compute_cost
+
+    usage = ai.Usage(
+        input_tokens=1000, output_tokens=10, server_tool_uses={"code_execution": 1}
+    )
+    assert compute_cost(usage, _priced(web_search="0.01")) is None
+
+
+def test_a_generation_that_ran_nothing_is_priced_normally() -> None:
+    from decimal import Decimal
+
+    from anyinfer.capabilities.pricing import compute_cost
+
+    usage = ai.Usage(input_tokens=1_000_000, output_tokens=0)
+    assert compute_cost(usage, _priced()) == Decimal("3")
+
+
+def test_the_counts_reach_usage_so_cost_is_computable_from_it_alone() -> None:
+    """Every other billing dimension lives on usage; this one had to as well."""
+    usage = ai.Usage(server_tool_uses={"web_search": 2})
+    assert usage.server_tool_uses == {"web_search": 2}
+
+
+async def test_a_searched_generation_reports_its_invocations_on_usage() -> None:
+    """End to end: the adapter's counts must reach the field cost is computed from."""
+    from anyinfer.providers.base import AdapterFinal
+    from anyinfer.routing.attempts import AttemptBuffer
+
+    # The buffer is what the router fills from the terminal event; asserting on it keeps
+    # this a test of the plumbing rather than of one provider's block shapes.
+    final = AdapterFinal(
+        finish_reason="stop", server_tool_uses=(ServerToolUse(kind="web_search", uses=2),)
+    )
+    buffer = AttemptBuffer(target=ai.ResolvedTarget(provider_id="anthropic", model="m"))
+    buffer.server_tool_uses = final.server_tool_uses
+    assert buffer.server_tool_uses[0].uses == 2

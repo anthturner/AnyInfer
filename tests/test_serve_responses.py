@@ -375,3 +375,146 @@ def test_a_stock_stream_carries_no_anyinfer_extension() -> None:
     pairs = _events(_client(FakeOpenAIServer(FakeResponse(text="hi"))))
     final = next(p["response"] for n, p in pairs if n == "response.completed")
     assert "anyinfer_manifest" not in final
+
+
+# ---- the wire-codec invariants ---------------------------------------------------------
+#
+# ADR-009's first invariant makes the request surface a *superset*: anything the dialect
+# expresses must survive the codec. The chat route has enforced that with a round-trip
+# test since it shipped; this route had no inverse encoder at all, so nothing enforced it
+# here — and the gap was not theoretical. `_decode_passthrough` consulted the
+# chat-completions reserved-field set, so `input`, `text`, and `reasoning` were treated as
+# unrecognized extra body and forwarded to the provider verbatim. Writing this test is
+# what found it.
+
+FULL_RESPONSES_REQUEST: dict = {
+    "model": "anthropic:claude-sonnet-4-5",
+    "input": [
+        {"role": "system", "content": [{"type": "input_text", "text": "Be precise."}]},
+        {"role": "user", "content": [{"type": "input_text", "text": "What is 2+2?"}]},
+        {"type": "function_call", "call_id": "call_1", "name": "add", "arguments": '{"a":2}'},
+        {"type": "function_call_output", "call_id": "call_1", "output": "4"},
+    ],
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "max_output_tokens": 64,
+    "top_logprobs": 3,
+    "reasoning": {"effort": "low"},
+    "text": {
+        "format": {"type": "json_schema", "name": "Answer", "schema": {"type": "object"}}
+    },
+    "tools": [
+        {"type": "web_search"},
+        {"type": "function", "name": "add", "description": "adds", "parameters": {"type": "object"}},
+    ],
+    "tool_choice": "auto",
+    "metadata": {"tenant": "acme"},
+    "anyinfer_cite_documents": True,
+    "anyinfer_server_tools": [{"kind": "web_search", "max_uses": 3}],
+    "anyinfer_history": {"mode": "proactive", "keep_recent": 2},
+    "my_custom_knob": 7,
+    "provider_options": {"anthropic": {"beta": "some-flag"}},
+}
+
+
+def test_a_full_request_round_trips_losslessly() -> None:
+    """The invariant: decode, re-encode, decode again, and land on the same request."""
+    from anyinfer.serve.responses_codec import request_from_responses, request_to_responses
+
+    target, request, stream = request_from_responses(FULL_RESPONSES_REQUEST)
+    rebuilt = request_to_responses(target, request, stream=stream)
+    target_again, request_again, stream_again = request_from_responses(rebuilt)
+
+    assert target_again == target
+    assert stream_again == stream
+    assert request_again == request, "a field decoded but not re-encoded is a one-way codec"
+
+
+def test_the_dialects_own_fields_never_leak_into_provider_options() -> None:
+    """`input` and `text` are core here and unknown in chat completions.
+
+    A codec consulting the wrong reserved set forwards its own request body to the
+    provider as extra keys — which is what this route did before the round-trip test
+    above existed.
+    """
+    from anyinfer.serve.responses_codec import request_from_responses
+
+    _, request, _ = request_from_responses(FULL_RESPONSES_REQUEST)
+    wildcard = dict(request.provider_options.get("*", {}))
+
+    assert wildcard == {"my_custom_knob": 7}
+    assert request.provider_options["anthropic"] == {"beta": "some-flag"}
+
+
+def test_the_escape_hatch_survives_a_gateway_chaining_to_another_gateway() -> None:
+    """Passthrough must re-encode, or the second hop is less capable than the first."""
+    from anyinfer.serve.responses_codec import request_from_responses, request_to_responses
+
+    _, request, _ = request_from_responses(FULL_RESPONSES_REQUEST)
+    rebuilt = request_to_responses("anthropic:claude-sonnet-4-5", request)
+
+    assert rebuilt["my_custom_knob"] == 7
+    assert rebuilt["provider_options"] == {"anthropic": {"beta": "some-flag"}}
+
+
+def test_a_core_field_outranks_a_passthrough_key_of_the_same_name() -> None:
+    from anyinfer.serve.openai_codec import encode_passthrough
+
+    body = {"temperature": 0.1}
+    encode_passthrough(body, {"*": {"temperature": 0.9}})
+    assert body["temperature"] == 0.1
+
+
+def test_tool_turns_round_trip_as_items_not_as_a_role() -> None:
+    """The structural difference from chat completions: calls and results are items."""
+    from anyinfer.serve.responses_codec import request_from_responses, request_to_responses
+
+    _, request, _ = request_from_responses(FULL_RESPONSES_REQUEST)
+    items = request_to_responses("m", request)["input"]
+    kinds = [item.get("type") or "message" for item in items]
+
+    assert "function_call" in kinds
+    assert "function_call_output" in kinds
+    call = next(i for i in items if i.get("type") == "function_call")
+    assert call["call_id"] == "call_1" and call["name"] == "add"
+
+
+def test_many_concurrent_independent_streams() -> None:
+    """ADR-009 invariant 4, for this route: streams must not interleave or share state.
+
+    The codec's stream state is per-response by construction, but "by construction" is
+    what an untested invariant always sounds like.
+    """
+    import concurrent.futures
+
+    http = _client(FakeOpenAIServer(FakeResponse(text="Hello there, world")))
+
+    def one(_: int) -> list[str]:
+        pairs = _events(http)
+        return [
+            payload["delta"] for name, payload in pairs if name == "response.output_text.delta"
+        ]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(one, range(8)))
+
+    assert all("".join(deltas) == "Hello there, world" for deltas in results)
+    ids = {
+        payload["response"]["id"]
+        for _ in range(1)
+        for name, payload in _events(http)
+        if name == "response.created"
+    }
+    assert len(ids) == 1, "one request, one response id"
+
+
+def test_every_reasoning_effort_level_round_trips() -> None:
+    """Including `none`: refusing it would make this route narrower than the dialect."""
+    from anyinfer.serve.responses_codec import request_from_responses, request_to_responses
+
+    for effort in ("none", "minimal", "low", "medium", "high"):
+        _, request, _ = request_from_responses(
+            {"model": "m", "input": "hi", "reasoning": {"effort": effort}}
+        )
+        assert request.reasoning == effort
+        assert request_to_responses("m", request)["reasoning"] == {"effort": effort}

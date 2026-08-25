@@ -13,6 +13,7 @@ inherited from `anyinfer.providers.openai_compat`.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import aclosing
 from typing import Any, ClassVar
@@ -47,12 +48,40 @@ from ..types.messages import (
     ToolResult,
     VideoPart,
 )
-from ..types.operations import EmbeddingCapabilities
-from ..types.requests import ReasoningEffort, Sampling, ServerToolKind, ToolSpec
-from ..types.results import FinishReason, ServerToolUse, TokenLogprob, Usage
+from ..types.operations import (
+    BatchHandle,
+    BatchLine,
+    BatchReport,
+    BatchResult,
+    BatchStatus,
+    EmbeddingCapabilities,
+)
+from ..types.requests import (
+    ReasoningEffort,
+    ResolvedTarget,
+    Sampling,
+    ServerToolKind,
+    ToolSpec,
+)
+from ..types.results import (
+    DETAIL_MAX_CHARS,
+    ErrorInfo,
+    FinishReason,
+    Generation,
+    ServerToolUse,
+    Timing,
+    TokenLogprob,
+    Usage,
+)
 from ._logprobs import parse_logprob_entries
 from ._multimodal import base64_data, data_url, media_subtype, unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    BatchWireRequest,
+    ProviderConfig,
+    WireRequest,
+)
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 from .sse import iter_sse
@@ -153,13 +182,16 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
 
     # ---- generation ------------------------------------------------------------------
 
+    responses_path: ClassVar[str] = "/responses"
+    """The generation endpoint, named once because the batch API references it by URL."""
+
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
         """Run one generation against ``POST /responses``."""
         payload = self.build_payload(req)
         try:
             async with self._client.stream(
                 "POST",
-                "/responses",
+                self.responses_path,
                 json=payload,
                 timeout=req.timeout_s,
                 headers={"accept": "text/event-stream"},
@@ -336,6 +368,210 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
                 provider=self.provider_id,
             )
 
+    # ---- batches ---------------------------------------------------------------------
+    #
+    # OpenAI's Batch API is a three-step lifecycle where Anthropic's is one: a JSONL file
+    # is uploaded to `/files`, the batch references it by id, and results come back as
+    # another file to download. That file dance is the whole difference — the job itself
+    # is the same set of requests, serialized by the same `build_payload` a live call uses.
+
+    async def submit_batch(self, req: BatchWireRequest) -> BatchHandle:
+        """Upload the job as a JSONL file, then submit a batch referencing it.
+
+        Raises:
+            anyinfer.errors.ProviderError: The upload or the submission was refused.
+        """
+        jsonl = "\n".join(
+            json.dumps(
+                {
+                    "custom_id": custom_id,
+                    "method": "POST",
+                    "url": self.responses_path,
+                    "body": self._batch_body(line),
+                }
+            )
+            for custom_id, line in req.lines
+        )
+        file_id = await self._upload_batch_input(jsonl)
+
+        payload: dict[str, Any] = {
+            "input_file_id": file_id,
+            "endpoint": self.responses_path,
+            "completion_window": req.completion_window or "24h",
+        }
+        if req.metadata:
+            payload["metadata"] = dict(req.metadata)
+        body = await self._batch_call("POST", "/batches", json=payload)
+        return BatchHandle(
+            batch_id=str(body.get("id", "")),
+            provider_id=self.provider_id,
+            model=req.model,
+            line_count=len(req.lines),
+            submitted_at=time.time(),
+        )
+
+    def _batch_body(self, line: WireRequest) -> dict[str, Any]:
+        """One line's request body: the live shape, with streaming removed.
+
+        A batch is answered whole, so `stream` is meaningless and the API rejects it.
+        Everything else is identical, which is the point of reusing `build_payload`.
+        """
+        body = self.build_payload(line)
+        body.pop("stream", None)
+        return body
+
+    async def _upload_batch_input(self, jsonl: str) -> str:
+        """Upload the job to ``POST /files`` with ``purpose=batch``.
+
+        Raises:
+            anyinfer.errors.ProviderError: The upload failed, or returned no file id.
+        """
+        try:
+            response = await self._client.post(
+                "/files",
+                files={"file": ("batch.jsonl", jsonl.encode("utf-8"), "application/jsonl")},
+                data={"purpose": "batch"},
+            )
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise self._classify(
+                response.status_code, read_error_detail(response.content), response.headers
+            )
+        body = response.json()
+        file_id = body.get("id") if isinstance(body, Mapping) else None
+        if not isinstance(file_id, str) or not file_id:
+            raise StreamProtocolError(
+                "the batch input upload returned no file id", provider=self.provider_id
+            )
+        return file_id
+
+    async def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Report state from ``GET /batches/{id}``."""
+        return self._report(handle, await self._batch_call("GET", f"/batches/{handle.batch_id}"))
+
+    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Ask the provider to cancel, via ``POST /batches/{id}/cancel``."""
+        body = await self._batch_call("POST", f"/batches/{handle.batch_id}/cancel")
+        return self._report(handle, body)
+
+    def _report(self, handle: BatchHandle, body: Mapping[str, Any]) -> BatchReport:
+        """Normalize one batch object into a report."""
+        counts = body.get("request_counts")
+        counts = counts if isinstance(counts, Mapping) else {}
+        errors = body.get("errors")
+        detail = ""
+        if isinstance(errors, Mapping):
+            entries = errors.get("data")
+            if isinstance(entries, list) and entries and isinstance(entries[0], Mapping):
+                detail = str(entries[0].get("message", ""))
+        return BatchReport(
+            handle=handle,
+            status=_BATCH_STATUSES.get(str(body.get("status", "")), "in_progress"),
+            completed=int(counts.get("completed", 0) or 0),
+            failed=int(counts.get("failed", 0) or 0),
+            detail=detail,
+        )
+
+    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+        """Download the output file and parse its lines.
+
+        Raises:
+            anyinfer.errors.ProviderError: The batch has not finished, or the download
+                failed. Refused rather than returning an empty result, which a caller
+                would read as "every line failed".
+        """
+        body = await self._batch_call("GET", f"/batches/{handle.batch_id}")
+        report = self._report(handle, body)
+        if not report.finished:
+            raise ProviderError(
+                f"batch {handle.batch_id} is {report.status}, not finished",
+                provider=self.provider_id,
+                retryable=True,
+                hint="poll batch_status until it reports finished",
+            )
+
+        lines: list[BatchLine] = []
+        # Two files, not one: successful lines land in `output_file_id` and rejected ones
+        # in `error_file_id`. Reading only the first would silently drop every failure and
+        # return a batch that looks smaller than it was.
+        for field, ok in (("output_file_id", True), ("error_file_id", False)):
+            file_id = body.get(field)
+            if isinstance(file_id, str) and file_id:
+                lines.extend(self._parse_lines(await self._download_file(file_id), ok=ok))
+        return BatchResult(handle=handle, status=report.status, lines=tuple(lines))
+
+    async def _download_file(self, file_id: str) -> str:
+        """Fetch one result file's content.
+
+        Raises:
+            anyinfer.errors.ProviderError: The download failed.
+        """
+        try:
+            response = await self._client.get(f"/files/{file_id}/content")
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise self._classify(
+                response.status_code, read_error_detail(response.content), response.headers
+            )
+        return response.text
+
+    def _parse_lines(self, jsonl: str, *, ok: bool) -> Iterable[BatchLine]:
+        """Parse one manifest file, one entry per submitted request."""
+        for raw in jsonl.splitlines():
+            if not raw.strip():
+                continue
+            try:
+                entry = json.loads(raw)
+            except ValueError:
+                continue
+            if isinstance(entry, Mapping):
+                yield self._parse_line(entry, ok=ok)
+
+    def _parse_line(self, entry: Mapping[str, Any], *, ok: bool) -> BatchLine:
+        """Turn one manifest entry into a line.
+
+        A successful entry's `response.body` is byte-identical to a non-streaming
+        Responses body, so it is read by the same output-item reader a live call's terminal
+        event uses — which is what makes a batched answer carry the tool calls, usage, and
+        status a live one would.
+        """
+        custom_id = str(entry.get("custom_id", ""))
+        response = entry.get("response")
+        status = response.get("status_code") if isinstance(response, Mapping) else None
+        body = response.get("body") if isinstance(response, Mapping) else None
+
+        if not ok or (isinstance(status, int) and status >= 400) or not isinstance(body, Mapping):
+            return BatchLine(
+                custom_id=custom_id,
+                error=_batch_error(self.provider_id, _line_failure(entry, body)),
+            )
+        return BatchLine(custom_id=custom_id, result=_generation_from_response(body))
+
+    async def _batch_call(
+        self, method: str, path: str, *, json: Any = None
+    ) -> Mapping[str, Any]:
+        """Issue one batch-control request, classifying failures the usual way.
+
+        Raises:
+            anyinfer.errors.ProviderError: The call failed or returned a non-object body.
+        """
+        try:
+            response = await self._client.request(method, path, json=json)
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise self._classify(
+                response.status_code, read_error_detail(response.content), response.headers
+            )
+        body = response.json()
+        if not isinstance(body, Mapping):
+            raise StreamProtocolError(
+                "the provider returned a non-object batch body", provider=self.provider_id
+            )
+        return body
+
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
         await self._client.aclose()
@@ -382,6 +618,115 @@ class _StreamState:
                 for kind, count in sorted(self.server_tools.items())
             ),
         )
+
+
+_BATCH_STATUSES: Mapping[str, BatchStatus] = {
+    "validating": "queued",
+    "in_progress": "in_progress",
+    "finalizing": "in_progress",
+    "completed": "completed",
+    "failed": "failed",
+    "expired": "expired",
+    "cancelling": "in_progress",
+    "cancelled": "cancelled",
+}
+"""OpenAI's batch states, normalized. Richer than Anthropic's two, and mapped rather than
+passed through so a caller polls one vocabulary whichever provider ran the job."""
+
+
+def _batch_error(provider_id: str, detail: str) -> ErrorInfo:
+    """Record one line's failure without inventing a status code for it."""
+    return ErrorInfo(
+        type_name="ProviderError",
+        provider=provider_id,
+        phase="generate",
+        retryable=False,
+        http_status=None,
+        detail=detail[:DETAIL_MAX_CHARS],
+    )
+
+
+def _line_failure(entry: Mapping[str, Any], body: Any) -> str:
+    """Extract the most specific failure message a manifest entry offers.
+
+    Three places can carry it — the entry's own `error`, the response body's `error`, or
+    nothing at all — because the two manifest files use different shapes for the same
+    fact.
+    """
+    body_error = body.get("error") if isinstance(body, Mapping) else None
+    for candidate in (entry.get("error"), body_error):
+        if isinstance(candidate, Mapping):
+            message = candidate.get("message") or candidate.get("code")
+            if message:
+                return str(message)
+        elif isinstance(candidate, str) and candidate:
+            return candidate
+    return "the provider rejected this line without a message"
+
+
+def _generation_from_response(body: Mapping[str, Any]) -> Generation:
+    """Assemble a `Generation` from one batched Responses body.
+
+    Read by the same output-item reader a live call's terminal event uses, so a batched
+    answer carries the tool calls, usage, and status a live one would rather than a second
+    parser that can drift from it.
+
+    Assembled here rather than through the router's attempt buffer: an adapter must not
+    import from `anyinfer.routing` — the "adapters never orchestrate" contract enforces
+    exactly that — and a manifest line has nothing to orchestrate. The routing fields a
+    live result carries are genuinely absent; nothing routed, and no clock of ours ran.
+    """
+    text: list[str] = []
+    calls: list[ToolCall] = []
+    saw_tool_call = False
+
+    for item in body.get("output") or ():
+        if not isinstance(item, Mapping):
+            continue
+        kind = item.get("type")
+        if kind == "message":
+            for part in item.get("content") or ():
+                if isinstance(part, Mapping) and part.get("type") == "output_text":
+                    value = part.get("text")
+                    if isinstance(value, str):
+                        text.append(value)
+        elif kind == "function_call":
+            saw_tool_call = True
+            calls.append(
+                ToolCall(
+                    id=str(item.get("call_id") or item.get("id") or ""),
+                    name=str(item.get("name", "")),
+                    arguments=_batch_arguments(item.get("arguments")),
+                )
+            )
+
+    usage = _parse_usage(body.get("usage")) or Usage()
+    state = _StreamState()
+    state.saw_tool_call = saw_tool_call
+    return Generation(
+        text="".join(text),
+        structured=None,
+        tool_calls=tuple(calls),
+        target=ResolvedTarget(provider_id="openai", model=str(body.get("model", ""))),
+        finish_reason=_finish_reason(body, state),
+        usage=usage.normalized(),
+        timing=Timing(started_at=0.0, total_ms=0.0),
+    )
+
+
+def _batch_arguments(raw: Any) -> Mapping[str, Any]:
+    """Parse one batched tool call's arguments, tolerating an unparseable payload.
+
+    An argument payload that is not a JSON object yields an empty one rather than failing
+    the line — the rest of the answer is still worth returning.
+    """
+    if not isinstance(raw, str):
+        return {}
+    try:
+        parsed = json.loads(raw or "{}")
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
 
 
 _OPENAI_SERVER_TOOLS: Mapping[str, Mapping[str, Any]] = {
@@ -594,7 +939,7 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=_DEFAULT_BASE_URL,
     requires_base_url=False,
-    operations=frozenset({"generation", "embedding"}),
+    operations=frozenset({"generation", "embedding", "batch"}),
     static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(

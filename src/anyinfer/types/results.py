@@ -193,6 +193,11 @@ class Usage:
         search_units: Provider-native billed search units (reranking). A distinct
             billing dimension with its own field on purpose — a search unit is never a
             token count, and encoding one as the other would fabricate usage.
+        server_tool_uses: Invocations of provider-run tools during this generation, keyed
+            by kind. A third billing dimension for the same reason as the second: a web
+            search is billed per search, so a generation that searched costs more than its
+            token counts say. Carried on usage rather than only on the result so that cost
+            can be computed from usage alone, as every other dimension here is.
     """
 
     input_tokens: int | None = None
@@ -203,6 +208,7 @@ class Usage:
     reasoning_tokens: int | None = None
     cost_usd: Decimal | None = None
     search_units: int | None = None
+    server_tool_uses: Mapping[str, int] = field(default_factory=dict)
 
     def normalized(self) -> Usage:
         """Fill ``total_tokens`` from input + output when both are known."""

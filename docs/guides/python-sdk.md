@@ -200,6 +200,11 @@ effort its live twin would. That is the whole argument for batching *through* th
 rather than around it: the typed request model and cost accounting are more valuable on
 your highest-volume traffic, not less.
 
+Anthropic and OpenAI are both bound. Their APIs differ in shape — Anthropic takes the
+whole job as JSON, while OpenAI uploads it as a file and returns results as two more, one
+for successes and one for rejections — but that difference stays behind the interface: the
+same four calls work against either.
+
 The handle is yours to persist. Run retention is a stated non-goal, and a job answered
 hours later in another process is exactly where it would be most tempting to break it —
 so there is no registry here to look it up in later.

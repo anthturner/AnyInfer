@@ -72,10 +72,15 @@ __all__ = [
     "chunk_from_event",
     "completion_from_generation",
     "decode_messages",
+    "decode_passthrough",
     "decode_server_tools",
+    "encode_arena_policy",
+    "encode_cache_policy",
     "encode_citation",
+    "encode_history_policy",
     "encode_logprobs",
     "encode_messages",
+    "encode_passthrough",
     "encode_server_tool_uses",
     "final_chunk",
     "manifest_chunk",
@@ -481,7 +486,7 @@ def request_from_openai(
         cache=_decode_cache(body.get(CACHE_FIELD)),
         arena=_decode_arena(body.get(ARENA_FIELD)),
         context=_decode_context(body.get(CONTEXT_FIELD), context_tuning),
-        provider_options=_decode_passthrough(body),
+        provider_options=decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
         logprobs=_decode_logprobs(body),
         cite_documents=_decode_flag(body, CITE_DOCUMENTS_FIELD),
@@ -737,15 +742,26 @@ def _decode_response_format(raw: Any) -> SchemaSpec | None:
     return SchemaSpec(json_schema=dict(schema), name=str(spec.get("name", "response")))
 
 
-def _decode_passthrough(body: Mapping[str, Any]) -> Mapping[str, Mapping[str, Any]]:
+def decode_passthrough(
+    body: Mapping[str, Any], reserved: frozenset[str] = frozenset()
+) -> Mapping[str, Mapping[str, Any]]:
     """Route unrecognized extra-body fields to ``provider_options``.
 
     OpenAI clients rely on extra-body passthrough to reach provider-specific features; the
     escape hatch must survive the codec or the frontend is strictly less capable than the
     SDK. Fields outside any provider namespace land under the ``"*"`` wildcard, which the
     core forwards to whichever provider ends up serving the request.
+
+    Args:
+        body: The parsed request JSON.
+        reserved: Field names this dialect reads itself, which must therefore *not* be
+            forwarded. Defaults to the chat-completions set. The parameter exists because
+            the two dialects reserve different names — `input` and `text` are core fields
+            in one and unknown in the other — and a codec that consulted the wrong set
+            would forward its own request body to the provider as extra keys.
     """
-    extra = {k: v for k, v in body.items() if k not in _RESERVED_FIELDS}
+    reserved = reserved or _RESERVED_FIELDS
+    extra = {k: v for k, v in body.items() if k not in reserved}
     if not extra:
         return {}
     namespaced = extra.pop("provider_options", None)
@@ -766,6 +782,72 @@ def _opt_int(value: Any) -> int | None:
 
 
 # ---- request: AnyInfer -> OpenAI (round-trip verification) ---------------------------
+
+
+def encode_passthrough(
+    body: dict[str, Any], provider_options: Mapping[str, Mapping[str, Any]]
+) -> None:
+    """Re-emit ``provider_options`` onto a request body, in place.
+
+    The inverse of `decode_passthrough`, and it was missing. A field that decodes into a
+    typed value but never encodes back is one-way, which DESIGN §22's first invariant calls
+    a design bug rather than a shortcut — a gateway chaining to another gateway re-encodes,
+    and the escape hatch vanished on the second hop.
+
+    The wildcard namespace goes back to top-level keys, which is where it came from;
+    explicitly-namespaced entries go under ``provider_options``, which
+    `decode_passthrough` reads. Existing keys are never overwritten: a core field always
+    outranks a passthrough one of the same name.
+    """
+    namespaced = {
+        provider_id: dict(options)
+        for provider_id, options in provider_options.items()
+        if provider_id != "*"
+    }
+    for key, value in provider_options.get("*", {}).items():
+        body.setdefault(key, value)
+    if namespaced:
+        body.setdefault("provider_options", namespaced)
+
+
+def encode_history_policy(policy: HistoryPolicy) -> dict[str, Any]:
+    """Encode a compaction policy for the wire.
+
+    Shared by both dialects rather than inlined in each: the extension objects are the same
+    shape whichever request surface carried them, and a second copy is a second place for
+    a new field to be forgotten — which is exactly how a one-way codec field arises.
+    """
+    return {
+        "enabled": policy.enabled,
+        "mode": policy.mode,
+        "keep_recent": policy.keep_recent,
+        "keep_system": policy.keep_system,
+    }
+
+
+def encode_cache_policy(policy: CachePolicy) -> dict[str, Any]:
+    """Encode a prompt-cache placement policy for the wire."""
+    return {
+        "mode": policy.mode,
+        "min_segment_tokens": policy.min_segment_tokens,
+        "max_marks": policy.max_marks,
+        "include_tools": policy.include_tools,
+        "include_system": policy.include_system,
+    }
+
+
+def encode_arena_policy(policy: ArenaPolicy) -> dict[str, Any]:
+    """Encode a fixed fan-out policy for the wire."""
+    return {
+        "targets": list(policy.targets),
+        "strategy": policy.strategy,
+        "judge_target": policy.judge_target,
+        "instructions": policy.instructions,
+        "concurrency": policy.concurrency,
+        "min_candidates": policy.min_candidates,
+        "reveal_targets": policy.reveal_targets,
+        "memoize_tools": policy.memoize_tools,
+    }
 
 
 def encode_citation(citation: Citation) -> dict[str, Any]:
@@ -962,33 +1044,14 @@ def request_to_openai(
         )
 
     if request.history is not None:
-        body[HISTORY_FIELD] = {
-            "enabled": request.history.enabled,
-            "mode": request.history.mode,
-            "keep_recent": request.history.keep_recent,
-            "keep_system": request.history.keep_system,
-        }
+        body[HISTORY_FIELD] = encode_history_policy(request.history)
     if request.cache is not None:
-        body[CACHE_FIELD] = {
-            "mode": request.cache.mode,
-            "min_segment_tokens": request.cache.min_segment_tokens,
-            "max_marks": request.cache.max_marks,
-            "include_tools": request.cache.include_tools,
-            "include_system": request.cache.include_system,
-        }
+        body[CACHE_FIELD] = encode_cache_policy(request.cache)
     if request.arena is not None:
-        body[ARENA_FIELD] = {
-            "targets": list(request.arena.targets),
-            "strategy": request.arena.strategy,
-            "judge_target": request.arena.judge_target,
-            "instructions": request.arena.instructions,
-            "concurrency": request.arena.concurrency,
-            "min_candidates": request.arena.min_candidates,
-            "reveal_targets": request.arena.reveal_targets,
-            "memoize_tools": request.arena.memoize_tools,
-        }
+        body[ARENA_FIELD] = encode_arena_policy(request.arena)
     if request.context is not None:
         body[CONTEXT_FIELD] = encode_context_request(request.context)
+    encode_passthrough(body, request.provider_options)
 
     if request.schema is not None:
         body["response_format"] = {
