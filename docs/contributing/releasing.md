@@ -26,7 +26,10 @@ Requiring one stable check name means adding a CI job (or a matrix row) can neve
 escape the protection rules.
 
 `main` requires three additional checks — **`tests (ubuntu-latest, py3.12)`**,
-**`tests (ubuntu-latest, py3.13)`**, and **`test-macos`**. Each is a lane whose cost is
+**`tests (ubuntu-latest, py3.13)`**, and **`tests (macos-latest, py3.14)`**. Those are the
+names GitHub *reports*, which is what a required context matches on: a job's `name:`, not
+its id. Naming the id (`test-macos`) registers a context no job ever reports, and a
+required context that never reports blocks every pull request into the branch forever. Each is a lane whose cost is
 not worth paying on every feature-branch PR into `develop`: macOS runners bill at 10x
 Linux, and the two middle interpreters are two more full environment builds to re-prove a
 suite the 3.11 and 3.14 rows already ran. They run only on the develop -> main step, right
@@ -63,7 +66,7 @@ gh api "repos/{owner}/{repo}/branches/main/protection" -X PUT \
   -F 'required_status_checks[contexts][]=ci-ok' \
   -F 'required_status_checks[contexts][]=tests (ubuntu-latest, py3.12)' \
   -F 'required_status_checks[contexts][]=tests (ubuntu-latest, py3.13)' \
-  -F 'required_status_checks[contexts][]=test-macos' \
+  -F 'required_status_checks[contexts][]=tests (macos-latest, py3.14)' \
   -F 'required_pull_request_reviews[required_approving_review_count]=0' \
   -F 'enforce_admins=false' \
   -F 'restrictions=null'
