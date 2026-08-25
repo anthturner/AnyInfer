@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+import pytest
 
 from anyinfer_confidential.cli import main
 from anyinfer_confidential.license import verify_license
@@ -77,6 +80,7 @@ def test_seal_and_issue_license_end_to_end(tmp_path: Path) -> None:
     assert verified.deployment_id == "dep-1"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
 def test_secret_outputs_are_written_mode_0600(tmp_path: Path) -> None:
     """Secret outputs are not readable by other local users.
 

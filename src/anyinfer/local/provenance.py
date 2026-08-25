@@ -376,7 +376,14 @@ def open_verified_weights(
     identities: list[_FileIdentity] = []
     try:
         for file_path in files:
-            fd = os.open(file_path, os.O_RDONLY)
+            # `O_BINARY` matters and is not cosmetic: on Windows `os.open` defaults to
+            # *text* mode, which translates CRLF and stops at the first 0x1A byte. Model
+            # weights are binary and contain both, so without this flag the digest below
+            # would not be the digest of the file — while `hash_model_weights`, which
+            # reads through `path.open("rb")`, computed the real one. Verification could
+            # therefore never succeed on Windows. The flag does not exist on POSIX, where
+            # there is no translation to disable.
+            fd = os.open(file_path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
             fds.append(fd)
             stat = os.fstat(fd)
             identities.append(

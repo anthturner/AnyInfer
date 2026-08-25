@@ -100,6 +100,7 @@ def test_the_jsonl_file_is_not_readable_by_other_local_users(tmp_path: Path) -> 
     assert path.stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
 def test_jsonl_observer_tightens_an_existing_wider_mode_file(tmp_path: Path) -> None:
     """`os.open`'s mode argument applies only on creation; an existing file keeps its own."""
     path = tmp_path / "telemetry.jsonl"

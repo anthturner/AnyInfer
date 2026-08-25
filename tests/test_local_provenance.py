@@ -73,7 +73,10 @@ def test_hashing_matches_on_platforms_without_pread(tmp_path: Path) -> None:
     weights.write_bytes(payload)
     expected = hashlib.sha256(payload).hexdigest()
 
-    descriptor = os.open(weights, os.O_RDONLY)
+    # `O_BINARY` for the same reason the production path needs it: on Windows `os.open`
+    # defaults to text mode, and this payload is random bytes containing both 0x0A and
+    # the 0x1A that text mode treats as end-of-file.
+    descriptor = os.open(weights, os.O_RDONLY | getattr(os, "O_BINARY", 0))
     try:
         assert provenance._hash_fd(descriptor) == expected
 
@@ -208,6 +211,14 @@ def test_open_verified_weights_agrees_on_a_directory_snapshot(tmp_path: Path) ->
         assert verified.digest == hash_model_weights(weights)
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason=(
+        "Windows refuses to unlink or rename a file with an open handle, so the "
+        "swap this test stages cannot happen there — the OS enforces what this "
+        "assertion checks for on POSIX"
+    ),
+)
 def test_a_file_replaced_after_verification_is_caught(tmp_path: Path) -> None:
     """The whole point: a rename over the path is a different inode, and is refused.
 
@@ -241,6 +252,14 @@ def test_a_file_truncated_after_verification_is_caught(tmp_path: Path) -> None:
             verified.assert_unchanged()
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason=(
+        "Windows refuses to unlink or rename a file with an open handle, so the "
+        "swap this test stages cannot happen there — the OS enforces what this "
+        "assertion checks for on POSIX"
+    ),
+)
 def test_a_file_deleted_after_verification_is_caught(tmp_path: Path) -> None:
     weights = tmp_path / "model.gguf"
     weights.write_bytes(b"genuine" * 1000)

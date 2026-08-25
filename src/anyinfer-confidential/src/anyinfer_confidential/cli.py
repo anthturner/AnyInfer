@@ -24,7 +24,12 @@ def _write_private_bytes(path: str, payload: bytes) -> None:
     """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    # `O_BINARY` because `payload` is key material: on Windows `os.open` defaults to text
+    # mode, which would rewrite any 0x0A byte in a key as CRLF and corrupt it on write.
+    # The flag does not exist on POSIX, where there is no translation to disable.
+    descriptor = os.open(
+        target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0), 0o600
+    )
     with os.fdopen(descriptor, "wb") as handle:
         handle.write(payload)
     target.chmod(0o600)
