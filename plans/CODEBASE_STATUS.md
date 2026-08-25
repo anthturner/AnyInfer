@@ -41,7 +41,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[x]` | B.6 | Error docs `missing_fields` → real attribute `missing_required` | 3 | 5 | 15 |
 | `[ ]` | E.1 | Async batch inference APIs (OpenAI Batch, Anthropic Message Batches) | 5 | 3 | 15 |
 | `[ ]` | F.1 | Tier 3 "attested execution" is detection, not attestation (→ plan §G) | 5 | 3 | 15 |
-| `[ ]` | F.3 | Demo app persists literal API keys despite "memory only" guarantee | 3 | 5 | 15 |
+| `[x]` | F.3 | Demo app persists literal API keys despite "memory only" guarantee | 3 | 5 | 15 |
 | `[x]` | F.4 | Confidential CLI writes private keys with default file permissions | 3 | 5 | 15 |
 | `[ ]` | G.4 | CPU attestation-quote verification behind the `attest` extra | 5 | 3 | 15 |
 | `[ ]` | B.2 | Conformance matrix mislabels implemented embeddings (3 providers) | 3 | 4 | 12 |
@@ -1147,12 +1147,13 @@ local users and swept into backups/sync. Bounded to the demo and to users who ty
 but the app both invites the literal and promises it's safe.
 
 **Remediation:**
-- [ ] **F.3.1** Preferred (matches stated intent): detect a literal in a `secret`-kind field and
+- [x] **F.3.1** Preferred (matches stated intent): detect a literal in a `secret`-kind field and
   exclude it from `to_json()`, keeping it in the in-memory config only; tell the user
   ("literal keys are session-only — use env:// to persist").
-- [ ] **F.3.2** Regardless: write `demo.json` at mode 0600 (create-before-write, the
+- [x] **F.3.2** Regardless: write `demo.json` at mode 0600 (create-before-write, the
   `serve/service.py` pattern).
-- [ ] **F.3.3** If F.3.1 is rejected, delete the false docstring guarantee instead.
+- [x] **F.3.3** Not needed: F.3.1 landed, so the docstring guarantee is now true. Its
+  wording was tightened to name the one place that enforces it. *(2026-08-25)*
 
 ## F.4 Confidential CLI writes private keys with default file permissions
 

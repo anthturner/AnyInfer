@@ -7,7 +7,9 @@ requires no change here and no change in the settings dialog.
 
 Secrets are stored as credential *references* (``env://OPENAI_API_KEY``) whenever the user
 supplies one, so the demo's config file on disk holds no key material. Literal keys typed
-into the dialog are kept in memory only.
+into the dialog are kept in memory only: `DemoConfig.to_json` drops any secret-kind field
+whose value is not a reference, so the guarantee is enforced at the one place that writes
+the file rather than trusted to every caller.
 """
 
 from __future__ import annotations
@@ -38,6 +40,51 @@ def _config_dir() -> Path:
 
 CONFIG_PATH = _config_dir() / "demo.json"
 """Where the demo persists its settings."""
+
+
+_CREDENTIAL_REFERENCE_SCHEMES = ("env://", "credential://")
+"""Prefixes that mark a value as a *reference* rather than key material itself.
+
+Mirrors `anyinfer.credentials.resolver`'s documented forms. Anything else in a
+secret-kind field is a literal secret.
+"""
+
+
+def _is_credential_reference(value: str) -> bool:
+    """Whether `value` points at a secret rather than being one."""
+    return value.startswith(_CREDENTIAL_REFERENCE_SCHEMES)
+
+
+def _secret_field_keys(provider_id: str) -> frozenset[str]:
+    """Setup-field keys the given engine declares as secret-kind.
+
+    Read from the registry rather than hard-coded, so this keeps working for providers
+    that do not exist yet — the same reason the rest of this module is generic.
+    """
+    from anyinfer.registry import default_registry
+
+    if not default_registry.has(provider_id):
+        return frozenset()
+    descriptor = default_registry.get(provider_id)
+    return frozenset(
+        field.key for field in descriptor.setup.fields if field.kind == "secret"
+    )
+
+
+def _without_literal_secrets(provider_id: str, values: Mapping[str, str]) -> dict[str, str]:
+    """Drop literal key material, keeping credential references.
+
+    The demo invites a literal in the secret field's placeholder, and this module has
+    always promised those stay in memory. Persisting them would put key material in
+    ``demo.json`` under the user's config directory, where it is swept into backups and
+    file sync. References are safe to keep and are the whole point of the scheme.
+    """
+    secret_keys = _secret_field_keys(provider_id)
+    return {
+        key: value
+        for key, value in values.items()
+        if not (key in secret_keys and value and not _is_credential_reference(value))
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,7 +252,7 @@ class DemoConfig:
                     "id": p.instance_id,
                     **({"adapter": p.provider_id} if p.alias and p.alias != p.provider_id else {}),
                     "enabled": p.enabled,
-                    "values": dict(p.values),
+                    "values": _without_literal_secrets(p.provider_id, p.values),
                     "options": dict(p.options),
                 }
                 for p in self.providers
@@ -264,7 +311,13 @@ class DemoConfig:
         """Write the configuration to disk, creating its directory if needed."""
         destination = path or CONFIG_PATH
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(json.dumps(self.to_json(), indent=2), encoding="utf-8")
+        # Created at 0600 before the first byte: even with literal secrets stripped, the
+        # file names endpoints, tenants, and which environment variables hold keys, and
+        # a default umask leaves that readable by every other local user.
+        descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(self.to_json(), indent=2))
+        destination.chmod(0o600)
 
     @classmethod
     def load(cls, path: Path | None = None) -> DemoConfig:

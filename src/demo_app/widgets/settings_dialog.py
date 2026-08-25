@@ -403,7 +403,10 @@ class _ProviderPanel(QWidget):
         if setup_field.default_value:
             return setup_field.default_value
         if setup_field.kind == "secret":
-            return "env://VARIABLE_NAME or a literal key"
+            # A literal is accepted but never written to disk (see demo_app.config), so
+            # the placeholder says which of the two survives a restart rather than
+            # presenting them as equivalent.
+            return "env://VARIABLE_NAME — a literal key works but is session-only"
         if setup_field.kind == "endpoint" and setup_field.key == "base_url":
             return self._descriptor.default_base_url or "https://…"
         return ""

@@ -7,6 +7,7 @@ offline fake provider, so the demo is verified end to end without credentials or
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 
 import pytest
@@ -76,6 +77,42 @@ class TestConfig:
         restored = DemoConfig.from_json(config.to_json())
         assert restored.for_provider("openai").api_key == "env://KEY"
         assert restored.targets == config.targets
+
+    def test_a_literal_secret_never_reaches_the_saved_file(self, tmp_path):
+        """config.py has always promised literal keys stay in memory; now it holds.
+
+        The settings dialog invites a literal into the secret field, so this is the
+        difference between the guarantee and an API key sitting in ~/.config at 0644.
+        """
+        path = tmp_path / "demo.json"
+        config = default_config().with_provider(
+            ProviderConfig(
+                "openai",
+                enabled=True,
+                values={"api_key": "sk-a-real-looking-secret", "base_url": "https://x"},
+            )
+        )
+        config.save(path)
+
+        written = path.read_text(encoding="utf-8")
+        assert "sk-a-real-looking-secret" not in written
+        assert "https://x" in written, "non-secret fields must still persist"
+        # The in-memory config is untouched: the session keeps working.
+        assert config.for_provider("openai").api_key == "sk-a-real-looking-secret"
+
+    def test_a_credential_reference_still_persists(self, tmp_path):
+        """References are safe in a file and are the whole point of the scheme."""
+        path = tmp_path / "demo.json"
+        default_config().with_provider(
+            ProviderConfig("openai", enabled=True, values={"api_key": "env://OPENAI_API_KEY"})
+        ).save(path)
+        assert DemoConfig.load(path).for_provider("openai").api_key == "env://OPENAI_API_KEY"
+
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
+    def test_the_saved_file_is_not_readable_by_other_local_users(self, tmp_path):
+        path = tmp_path / "demo.json"
+        default_config().save(path)
+        assert path.stat().st_mode & 0o777 == 0o600
 
     def test_corrupt_config_falls_back_to_defaults(self, tmp_path):
         path = tmp_path / "demo.json"
