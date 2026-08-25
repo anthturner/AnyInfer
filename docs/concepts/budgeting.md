@@ -87,6 +87,12 @@ text — widest on code, which tokenizers pack aggressively and a bytes-per-toke
 cannot. Every point of that gap is a request the gate lets through and the provider then
 rejects.
 
+Constructing one loads a vocabulary, which `tiktoken` fetches over the network unless its
+cache (`TIKTOKEN_CACHE_DIR`) already holds it. That happens at construction rather than at
+first count on purpose: a server should discover a missing vocabulary while starting up,
+not part-way through a request. Pre-warm the cache in an image build if run-time network
+access is not available.
+
 The estimator selects an encoding per model, so one client instance serves a route that
 spans model families. Anthropic, Gemini, and Cohere publish no tokenizer; for their models
 it substitutes the current OpenAI encoding and reports the result as a *guess* — the count

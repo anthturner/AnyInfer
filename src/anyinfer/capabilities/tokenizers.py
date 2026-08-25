@@ -92,8 +92,13 @@ class TiktokenEstimator:
     not published — those fall back to `DEFAULT_ENCODING`, which is a better guess than
     counting bytes but is still a guess, and is reported as one.
 
-    Instances are cheap and cache their encodings process-wide, so `for_model` may be
-    called per request.
+    Instances cache their encodings process-wide, so `for_model` may be called per request.
+    The *first* load of a given encoding is not cheap: ``tiktoken`` fetches the vocabulary
+    over the network unless it is already in its cache (``TIKTOKEN_CACHE_DIR``). That
+    happens at construction rather than at first count, deliberately — a server should
+    discover a missing vocabulary while starting up, not part-way through a request.
+    Deployments that must not reach the network at run time should pre-warm the cache in
+    their image build.
 
     Args:
         encoding: Pin one encoding for every model instead of selecting per model. Use
