@@ -55,7 +55,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | E.2 | Typed `seed` / `logprobs` / penalty sampling controls | 4 | 3 | 12 |
 | `[ ]` | G.2 | Demand gate: identify a confidential-tier design partner | 3 | 4 | 12 |
 | `[ ]` | G.3 | CC hardware validation sprint (rent, capture, fixture) | 4 | 3 | 12 |
-| `[ ]` | A.1 | `AsyncClient` god-module split | 3 | 3 | 9 |
+| `[x]` | A.1 | `AsyncClient` god-module split | 3 | 3 | 9 |
 | `[ ]` | C.1 | No API reference for the confidential add-on packages | 3 | 3 | 9 |
 | `[ ]` | E.5 | OpenAI Responses API endpoint on the sidecar | 3 | 3 | 9 |
 | `[ ]` | E.6 | Ship accurate token estimators behind the existing protocol | 3 | 3 | 9 |
@@ -153,9 +153,12 @@ navigability tax in the codebase.
   facade.
 - [x] **A.1.2** Move `AsyncStream` (and stream helpers) into `_client/stream.py`, matching the
   layout §18 already promises.
-- [ ] **A.1.3** Move arena execution methods into `_client/arena_exec.py`; move spend-check
-  helpers beside `capabilities/ledger.py`.
-- [ ] **A.1.4** Update DESIGN.md §18's `_client/` listing to the resulting real layout (do with
+- [x] **A.1.3** Arena execution moved to `_client/arena_exec.py`. Spend checks moved to
+  `_client/spend.py`, **not** beside `capabilities/ledger.py` as proposed: they are client
+  methods reading client state and calling `resolve()`, and `capabilities/` is the lower
+  layer that must not know about the client — moving them there would invert a dependency
+  the import-linter contracts exist to protect. *(2026-08-25)*
+- [x] **A.1.4** Update DESIGN.md §18's `_client/` listing to the resulting real layout (do with
   B.4).
 
 ## A.2 `cli.py` is a 3,776-line single module

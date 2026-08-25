@@ -809,8 +809,9 @@ src/anyinfer/
   types/                 # messages.py requests.py results.py events.py capabilities.py
                          # operations.py
   errors.py
-  _client/               # async_client.py generation.py stream.py sync_client.py
-                         # tools.py wire.py models.py operations.py providers.py rankers.py
+  _client/               # async_client.py generation.py arena_exec.py spend.py
+                         # stream.py messages.py sync_client.py tools.py wire.py
+                         # models.py operations.py providers.py rankers.py
   registry.py
   routing/               # policy.py health.py attempts.py limits.py
   schema/                # mechanism.py project.py validate.py repair.py partial.py

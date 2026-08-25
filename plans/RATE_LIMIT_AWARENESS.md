@@ -1,7 +1,9 @@
 # Relay rate-limit awareness — pacing, admission control, and backoff headers
 
-*Drafted 2026-08-25. Scope: `src/anyinfer-confidential/` (Relay, its ASGI wrapper) plus two
-narrow, explicitly-flagged seams in core. Status: proposed, not started.*
+*Drafted 2026-08-25; design questions settled same day (§5) from the code and the
+Appendix A measurement. Scope: `src/anyinfer-confidential/` (Relay, its ASGI wrapper)
+plus two narrow, explicitly-specified core seams (Phase 1 injection, Phase 4 read-only
+accessor). Status: ready to execute in phase order; not started.*
 
 This is an internal plan; ADR references are fine here and must not leak into anything
 under `docs/` (AGENTS.md's no-ADR-identifiers rule).
@@ -89,37 +91,64 @@ a product change, not an implementation detail.
 Ordered by payoff-per-line; each phase lands independently and `workspace check` gates
 each one. Phase 0 and 1 are worth doing even if nothing later ever lands.
 
-### Phase 0 — stop blocking the event loop; measure before sizing
+### Phase 0 — unblock the revocation path (measured; scope narrowed)
 
-*Prerequisite, not rate limiting — but every capacity number chosen later is wrong if
-this isn't done first.*
+*Prerequisite, not rate limiting. The measurement that sized it is already done
+(Appendix A): crypto render p50 0.17 ms / p99 0.23 ms, ≈6,000 renders/s on one thread —
+so the blanket `to_thread` offload originally considered is **rejected**; only the
+network-capable path gets offloaded.*
 
-- [ ] In `Relay.handle`, move the render off the loop:
-      `prompt = await asyncio.to_thread(self._vault.render, route.template, **slots)`.
-      `TemplateVault` needs a review for thread-safety first: `_last_revocation_ok` is
-      the one piece of mutable state; guard it with a `threading.Lock` or make the
-      offload serialize through a single worker.
-- [ ] Add a benchmark note (not a test) recording assemble-mode throughput before/after
-      on one core, so admission defaults in Phase 2 are picked from a measurement.
-- [ ] Tests: concurrent `handle()` calls make progress while one render is slow
-      (inject a slow `revocation_checker`); revocation state stays consistent under
-      concurrency.
+- [ ] In `Relay.handle`, offload conditionally: when the vault has a
+      `revocation_checker` configured, render via
+      `await asyncio.to_thread(self._vault.render, route.template, **slots)`; otherwise
+      call it inline as today. Spell the condition as a capability the vault exposes
+      (e.g. a `renders_may_block` property on `TemplateVault`) rather than reaching into
+      a private attribute from `relay.py`.
+- [ ] Thread-safety for the offloaded path: `_last_revocation_ok`
+      (`sealed_template.py:245`) is the one piece of mutable vault state — guard read
+      and write with a `threading.Lock`. Everything else `render` touches is frozen or
+      call-local.
+- [ ] Tests: concurrent `handle()` calls make progress while one render sits in a slow
+      injected `revocation_checker`; revocation state stays consistent when two threads
+      observe different checker answers; a vault with no checker never enters
+      `to_thread` (assert via a monkeypatched `asyncio.to_thread` that fails the test
+      if called).
 
 **Exit criterion:** a deliberately slow revocation check no longer stalls unrelated
-in-flight requests.
+in-flight requests, and the no-checker path is bit-for-bit today's.
 
 ### Phase 1 — pooled pacing state across forward calls
 
 *The biggest win; fixes finding 1 without touching credential lifetime.*
 
-**Core seam (small, explicit, flagged):** `AsyncClient` gains an optional
-`limiters: Mapping[str, RateLimiter] | None = None` constructor parameter that pre-seeds
-`self._limiters` (`_client/providers.py:132`). When supplied for a provider id, the
-client wraps the transport with the *given* limiter instead of building a fresh one
-(`_build wiring at providers.py:356-372`). This is the "visible design change" limits.py
-reserves — one parameter, default `None`, zero behaviour change when absent. It also
-keeps limiter semantics honest: limits.py says one limiter belongs to "an account at a
-provider", and pooling by credential digest is precisely that identity.
+**Core seam (decided — injection, not snapshot/restore):** limiter construction has
+exactly one site, `AdapterPool._govern` (`_client/providers.py:356-372`), which builds
+the `RateLimiter` and wraps the transport in `GoverningTransport`. The seam is three
+small edits, zero behaviour change when absent:
+
+1. `AdapterPool.__init__` gains `limiters: Mapping[str, RateLimiter] | None = None`,
+   stored as `self._injected_limiters`.
+2. `_govern` consults it first:
+   `limiter = self._injected_limiters.get(provider_id)` — on a hit, skip construction,
+   still record it in `self._limiters[provider_id]` so `limiter_for` keeps working,
+   and wrap the transport with it exactly as the constructed path does. `limits`
+   inertness is judged from the injected limiter's own config, so an inert injected
+   limiter still means "no wrap".
+3. `AsyncClient.__init__` gains the same keyword and forwards it to the pool it builds
+   (its constructor is already a kwargs surface — `async_client.py:277`).
+
+Snapshot/restore was considered and dropped: it would need export/import of four pieces
+of private limiter state (`_tokens`, `_refilled_at`, two `_Window`s) and re-derives the
+semaphore each call, losing in-flight accounting across the pool. Injection preserves
+limiter identity, which is the semantics limits.py already states: one limiter belongs
+to "an account at a provider", and a pooled key-digest is precisely that identity.
+
+**Loop-affinity constraint (document, then assert):** `RateLimiter` holds an
+`asyncio.Semaphore` and `asyncio.Lock`; on Python ≥3.10 these bind lazily to the running
+loop at first await, so a pooled limiter must only ever be used from one event loop. A
+single-loop ASGI process (uvicorn default) satisfies this. `PacingPool` records
+`id(asyncio.get_running_loop())` on first use and raises on mismatch, turning a
+would-be silent deadlock into a loud configuration error.
 
 **Confidential-package side:** new module
 `src/anyinfer-confidential/src/anyinfer_confidential/pacing.py`:
@@ -144,8 +173,16 @@ class PacingPool:
 
 - [ ] `Relay.__init__` gains `pacing: PacingPool | None = None` (I6: `None` = today's
       behaviour, bit-for-bit).
-- [ ] `_forward` builds `PacingKey` from the salted digest + resolved provider id, gets
-      the pooled limiter, passes it via the new `AsyncClient(limiters=...)` seam. The
+- [ ] `PacingKey` derivation, concretely: `provider_id = provider_settings.instance_id`
+      (the same id `AdapterPool` keys `self._limiters` by, so the injected mapping and
+      the pool agree); `credential_digest = sha256(salt + api_key_bytes)` where `salt`
+      is `secrets.token_bytes(16)` generated once per `PacingPool` and held only in
+      memory, and `api_key` is the same `getattr(provider_settings, "api_key", None)`
+      that `_forward` already reads for redaction. A settings object with no `api_key`
+      falls back to digesting the instance id alone — pacing still pools per instance,
+      just without per-key granularity.
+- [ ] `_forward` builds `PacingKey`, gets the pooled limiter, passes it via the new
+      `AsyncClient(limiters={key.provider_id: limiter})` seam. The
       client itself remains per-call — construction stays cheap once pacing state
       survives; connection pooling is explicitly *out of scope* here because a pooled
       `httpx2` client would hold the credential in its auth state (I2).
@@ -259,9 +296,18 @@ Two sources, kept distinct in code because they answer different questions:
 - [ ] **Exact path:** when the pooled `RateLimiter` holds an observed reset for this
       key's provider, `ThrottleInfo.retry_after_s` is that value clamped by
       `MAX_HEADER_WAIT_S`. Returning it to the caller leaks nothing: it is their own
-      BYOK key's quota (I3). Requires a small read-only accessor on `RateLimiter`
-      exposing the nearest observed reset — second core seam, a property, no behaviour
-      change.
+      BYOK key's quota (I3). Second core seam, read-only, no behaviour change —
+      `_Window.wait_s` already computes exactly this number, so the accessor is:
+
+      ```python
+      def observed_wait_s(self) -> float:
+          """Seconds this provider's own reported windows say to wait; 0.0 when clear."""
+          now = self._clock()
+          return max(
+              self._requests.wait_s(now, self._limits.reserve_fraction),
+              self._tokens_window.wait_s(now, self._limits.reserve_fraction),
+          )
+      ```
 - [ ] **Estimated path:** `estimate = (position_in_tenant_queue × service_quantile) /
       max_in_flight`, where `service_quantile` comes from Phase 1's ring buffer.
       Design decisions, each deliberate:
@@ -343,19 +389,68 @@ Recorded so their absence reads as decided, not forgotten — §30.6 style:
   provider's own token headers (already read by `RateLimiter.observe`) cover the need
   without new content-touching code.
 
-## 5. Open questions (answer before the phase that needs them)
+## 5. Decisions (were open questions; settled 2026-08-25 from the code and measurement)
 
-1. **Phase 1, core seam spelling:** `AsyncClient(limiters=...)` vs. a
-   snapshot/restore pair on `RateLimiter`. The injection parameter is simpler and keeps
-   one limiter identity per account; snapshot/restore keeps `AsyncClient`'s signature
-   untouched. Default: injection, unless core review objects.
-2. **Phase 2 defaults:** ship with all limits `None` (pure opt-in), or have
-   `build_app` warn when serving multi-tenant with no limits configured? Leaning: warn
-   — a hosted deployment with no admission control is the exact gap that motivated
-   this plan.
-3. **Phase 3:** IETF draft header names are still pre-RFC
-   (`draft-ietf-httpapi-ratelimit-headers`) — pin the spelling we emit in the docs page
-   and treat any future RFC rename as a deliberate, versioned change.
-4. **Which mode dominates in real deployments?** If it's assemble, Phase 0 + Phase 2
-   are most of the value and Phase 1/4's provider-side work can trail. Worth checking
-   before scheduling, not before starting Phase 0.
+1. **Core seam: injection.** `AdapterPool._govern` is the single limiter construction
+   site, so `limiters=` injection is a three-edit diff (spelled out in Phase 1);
+   snapshot/restore would export four pieces of private state and lose in-flight
+   accounting. Decided in the plan text; a core reviewer overturning it reopens
+   Phase 1's first block only.
+2. **Phase 2 defaults: warn.** All limits ship `None` (I6), but `build_app` emits one
+   `warnings.warn` when the registry holds ≥2 tenants and no tenant has limits
+   configured — a multi-tenant deployment with no admission control is the exact gap
+   that motivated this plan. Single-tenant stays silent.
+3. **Header spelling: pinned.** Emit `ratelimit-limit` / `ratelimit-remaining` /
+   `ratelimit-reset` (the `draft-ietf-httpapi-ratelimit-headers` names, no `X-`
+   prefix) plus `Retry-After`. Any future RFC rename is a deliberate, versioned change
+   to both the emitter and the Phase 5 dialect constant — the round-trip test is what
+   makes a half-updated rename fail loudly.
+4. **Blanket thread offload: rejected by measurement.** Appendix A's numbers show the
+   crypto path is sub-millisecond; only the revocation-checker path offloads
+   (Phase 0).
+
+**One scheduling input stays external** (does not block starting): which mode dominates
+real deployments. If assemble, Phases 0+2 are most of the value and 1/4 can trail; the
+phase *order* is correct under either answer, so execution proceeds regardless.
+
+## Appendix A — render-cost measurement (2026-08-25)
+
+Grounds Phase 0's scoping and §5's decision 4. Linux, CPython 3.11, this repo's
+`.venv`, one thread, 2 000 renders after 50 warmups, `time.perf_counter()`:
+
+| Workload | p50 | p75 | p99 | implied ceiling |
+|---|---|---|---|---|
+| ~4 KB template, 2 slots (~700 chars fill), Ed25519 license verify + AES-GCM decrypt + format, no revocation checker | 0.168 ms | 0.172 ms | 0.229 ms | ≈5 970 renders/s/thread |
+
+Reproduce (uses only public package API):
+
+```python
+import statistics, time
+from anyinfer_confidential import (
+    KeyRing, TemplateVault, generate_key, generate_signing_keypair,
+    issue_license, seal_template,
+)
+
+key = generate_key()
+private_key, public_key = generate_signing_keypair()
+blob = issue_license("dep-1", private_key=private_key, valid_days=30)
+vault = TemplateVault(key_ring=KeyRing({"k1": key}),
+                      license_public_key=public_key, license_blob=blob)
+body = ("You are a careful assistant. Context: {context}\n"
+        + "Lorem ipsum dolor sit amet. " * 140 + "\nUser input: {question}\n")
+template = seal_template(body, key=key, template_id="t", key_id="k1")
+slots = {"context": "c" * 500, "question": "q" * 200}
+
+for _ in range(50):
+    vault.render(template, **slots)
+samples = []
+for _ in range(2000):
+    t0 = time.perf_counter()
+    vault.render(template, **slots)
+    samples.append((time.perf_counter() - t0) * 1000)
+samples.sort()
+print(f"p50={statistics.median(samples):.3f}ms p99={samples[1979]:.3f}ms")
+```
+
+Re-run when the license or sealing scheme changes; the numbers date like a contract
+snapshot does. If p99 ever crosses ~1 ms, revisit §5 decision 4.

@@ -9,20 +9,16 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import contextvars
 import math
 import time
 import uuid
-from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
-from decimal import Decimal
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Literal
 
-from .._usage import merge_usage
-from ..arena import ArenaResult, Candidate, candidate_envelope, select_candidates
 from ..benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
@@ -69,15 +65,12 @@ from ..errors import (
     ConfigError,
     ProviderError,
     SchemaViolationError,
-    SpendLimitError,
     ToolLoopError,
     UnsupportedInputError,
 )
 from ..events.observers import EventDispatcher, Observer
 from ..events.telemetry import (
-    ArenaCompleted,
     DownloadProgress,
-    ParameterDropped,
     ProviderDiagnostic,
     TelemetryEvent,
 )
@@ -106,11 +99,9 @@ from ..types.capabilities import (
     Health,
     ModelCapabilities,
     Sourced,
-    TokenCalibration,
 )
 from ..types.events import (
     StreamEnded,
-    StreamEvent,
     TextDelta,
     ToolCallDelta,
     UsageUpdate,
@@ -156,7 +147,6 @@ from ..types.requests import (
     ToolSpec,
 )
 from ..types.results import (
-    AttemptRecord,
     Diagnostic,
     Generation,
     Usage,
@@ -170,11 +160,13 @@ from ..verification import (
     excerpt,
     judge_reply,
 )
+from .arena_exec import ArenaExecutionMixin
 from .generation import (
     GenerationExecutionMixin,
     _collect_diagnostics,
     _missing_target_error,
 )
+from .messages import MessagesInput, _coerce_messages
 from .models import (
     CatalogView,
     acquire_catalog_model,
@@ -183,11 +175,11 @@ from .models import (
 )
 from .operations import dispatch_embed, dispatch_rerank
 from .providers import AdapterPool, ProviderSettings
+from .spend import SpendGovernanceMixin
 from .stream import AsyncStream
 from .tools import (
     DEFAULT_MAX_ROUNDS,
     Tool,
-    ToolMemo,
     ToolRegistry,
     build_tool_turn,
 )
@@ -195,28 +187,20 @@ from .wire import build_wire_request, dropped_parameters
 
 __all__ = ["AsyncClient", "AsyncStream", "MessagesInput"]
 
-MessagesInput = str | Message | Sequence[Message]
+# Re-exported: `MessagesInput` is public and moved to a leaf module so the mixins can
+# use it without importing this one back.
+
 """What callers may pass as ``messages``: a bare prompt, one message, or a sequence."""
 
-_spend_prechecked: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "anyinfer_spend_prechecked", default=False
-)
-
-
-def _coerce_messages(value: MessagesInput) -> tuple[Message, ...]:
-    """Normalize the accepted message spellings into a tuple."""
-    if isinstance(value, str):
-        return (user(value),)
-    if isinstance(value, Message):
-        return (value,)
-    return tuple(value)
 
 
 
 
 
 
-class AsyncClient(GenerationExecutionMixin):
+
+
+class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernanceMixin):
     """The asynchronous inference client.
 
     Args:
@@ -1675,340 +1659,11 @@ class AsyncClient(GenerationExecutionMixin):
             builder=builder,
         )
 
-    def _effective_arena(
-        self,
-        arena: ArenaPolicy | None,
-        target: Target | None,
-        route: Route | Target | Sequence[Target] | None,
-    ) -> ArenaPolicy | None:
-        """Resolve request, named, then client-default arena policy without routing."""
-        if arena is not None:
-            return arena
-        if route is None and isinstance(target, str) and target in self._arenas:
-            return self._arenas[target]
-        if target is None and route is None:
-            return self._arena
-        return None
 
-    async def _arena_stream(
-        self, request: GenerationRequest, policy: ArenaPolicy
-    ) -> AsyncGenerator[StreamEvent, None]:
-        """Buffer arena branches, then expose only the selected answer as one stream."""
-        result = await self._run_arena(request, policy)
-        if result.text:
-            yield TextDelta(result.text)
-        yield StreamEnded(result)
 
-    async def _run_arena(
-        self,
-        request: GenerationRequest,
-        policy: ArenaPolicy,
-        *,
-        manifest: bool | None = None,
-        spend_multiplier: int = 1,
-    ) -> Generation:
-        """Fan out fixed independent routes, then select after every branch completes."""
-        arena_id = uuid.uuid4().hex
-        self._reserve_arena_spend(arena_id, request, policy, candidate_multiplier=spend_multiplier)
-        semaphore = asyncio.Semaphore(policy.concurrency)
-        branch_request = replace(request, arena=None)
 
-        async def candidate(target: str) -> tuple[Candidate, tuple[AttemptRecord, ...]]:
-            started = time.monotonic()
-            try:
-                resolved = self.resolve(target)
-            except (AnyInferError, ValueError) as exc:
-                error = exc if isinstance(exc, AnyInferError) else ConfigError(str(exc))
-                return (
-                    Candidate(
-                        ResolvedTarget("unresolved", target),
-                        error=error.snapshot(),
-                        elapsed_ms=(time.monotonic() - started) * 1000.0,
-                    ),
-                    (),
-                )
-            try:
-                async with semaphore:
-                    token = _spend_prechecked.set(True)
-                    try:
-                        generation = await self._generate_request(
-                            branch_request,
-                            Route(targets=(target,)),
-                            manifest=manifest,
-                        )
-                    finally:
-                        _spend_prechecked.reset(token)
-                return (
-                    Candidate(
-                        resolved,
-                        generation=generation,
-                        valid=(generation.structured is not None)
-                        if request.schema is not None
-                        else None,
-                        elapsed_ms=(time.monotonic() - started) * 1000.0,
-                    ),
-                    generation.attempts,
-                )
-            except AnyInferError as exc:
-                attempts = exc.attempts if isinstance(exc, AllTargetsFailedError) else ()
-                return (
-                    Candidate(
-                        resolved,
-                        error=exc.snapshot(),
-                        valid=False if request.schema is not None else None,
-                        elapsed_ms=(time.monotonic() - started) * 1000.0,
-                    ),
-                    attempts,
-                )
 
-        try:
-            rows = await asyncio.gather(*(candidate(target) for target in policy.targets))
-            candidates = tuple(row[0] for row in rows)
-            successful = tuple(item for item in candidates if item.generation is not None)
-            if len(successful) < policy.min_candidates:
-                attempts = tuple(attempt for row in rows for attempt in row[1])
-                raise AllTargetsFailedError(
-                    f"arena produced {len(successful)} candidates; "
-                    f"{policy.min_candidates} required",
-                    attempts=attempts,
-                    hint="fix a failed target or lower arena min_candidates",
-                )
 
-            winner, strategy, agreement, degradation = select_candidates(
-                candidates, policy, has_schema=request.schema is not None
-            )
-            calls = len(policy.targets)
-            judge_generation: Generation | None = None
-            if policy.strategy in ("judge", "synthesize"):
-                judge_generation, judged_winner, judge_reason = await self._arena_verdict(
-                    request, policy, candidates
-                )
-                calls += 1
-                if policy.strategy == "judge" and judged_winner is not None:
-                    winner = judged_winner
-                    strategy = "judge"
-                    degradation = None
-                elif policy.strategy == "synthesize" and judge_generation is not None:
-                    strategy = "synthesize"
-                    degradation = None
-                else:
-                    degradation = judge_reason or "the arena verdict could not be applied"
-
-            if winner is None or winner.generation is None:
-                raise AllTargetsFailedError("arena had no selectable candidate")
-            if degradation:
-                self._emit(
-                    ParameterDropped(
-                        arena_id,
-                        winner.target,
-                        "arena.strategy",
-                        degradation,
-                    )
-                )
-
-            complete = len(successful) == len(candidates)
-            usages = [item.generation.usage for item in successful if item.generation is not None]
-            if judge_generation is not None:
-                usages.append(judge_generation.usage)
-            aggregate = merge_usage(usages) if complete else Usage()
-            arena_result = ArenaResult(
-                candidates=candidates,
-                winner=winner,
-                strategy=strategy,
-                agreement=agreement,
-                synthesized=(judge_generation if policy.strategy == "synthesize" else None),
-                calls=calls,
-                usage=aggregate,
-                usage_complete=complete,
-            )
-            promoted = (
-                judge_generation
-                if policy.strategy == "synthesize" and judge_generation is not None
-                else winner.generation
-            )
-            if promoted is None:
-                raise RuntimeError("arena selected a candidate without a generation")
-            self._emit(
-                ArenaCompleted(
-                    arena_id,
-                    len(candidates),
-                    arena_result.strategy,
-                    arena_result.agreement,
-                    arena_result.calls,
-                    arena_result.memoized_tool_calls,
-                    arena_result.synthesized is not None,
-                )
-            )
-            return replace(promoted, arena=arena_result)
-        finally:
-            if self._ledger is not None:
-                self._ledger.release(arena_id)
-
-    async def _arena_verdict(
-        self,
-        request: GenerationRequest,
-        policy: ArenaPolicy,
-        candidates: tuple[Candidate, ...],
-    ) -> tuple[Generation | None, Candidate | None, str | None]:
-        """Run the one bounded judge or synthesis call and interpret its result."""
-        default = (
-            "Choose the strongest candidate. Return its one-based index and a brief reason."
-            if policy.strategy == "judge"
-            else "Synthesize one accurate answer from the candidates."
-        )
-        envelope = candidate_envelope(candidates, reveal_targets=policy.reveal_targets)
-        prompt = f"{policy.instructions or default}\n\n{envelope}"
-        schema: Mapping[str, Any] | SchemaSpec | None
-        if policy.strategy == "judge":
-            schema = {
-                "type": "object",
-                "properties": {
-                    "pick": {"type": "integer", "minimum": 1},
-                    "why": {"type": "string"},
-                },
-                "required": ["pick", "why"],
-                "additionalProperties": False,
-            }
-        else:
-            schema = request.schema
-        judge_request = replace(
-            request,
-            messages=(user(prompt),),
-            schema=SchemaSpec.coerce(schema) if schema is not None else None,
-            tools=(),
-            tool_choice="none",
-            arena=None,
-        )
-        token = _spend_prechecked.set(True)
-        try:
-            generation = await self._generate_request(
-                judge_request, Route(targets=(str(policy.judge_target),))
-            )
-        except AnyInferError as exc:
-            return None, None, f"arena {policy.strategy} call failed: {exc.detail}"
-        finally:
-            _spend_prechecked.reset(token)
-        if policy.strategy == "synthesize":
-            return generation, None, None
-        structured = generation.structured
-        pick = structured.get("pick") if isinstance(structured, Mapping) else None
-        if isinstance(pick, int) and 1 <= pick <= len(candidates):
-            selected = candidates[pick - 1]
-            if selected.generation is not None:
-                return generation, selected, None
-        return generation, None, "arena judge returned an unusable candidate index"
-
-    def _enforce_spend_ceiling(
-        self,
-        estimate: Decimal | None,
-        *,
-        policy: SpendPolicy,
-        request_id: str,
-        unknown: bool,
-        unknown_message: str,
-        unknown_hint: str | None = None,
-        over_request_message: str,
-        over_request_hint: str | None = None,
-        over_total_message: Callable[[Decimal, Decimal], str],
-        over_total_hint: str | None = None,
-    ) -> None:
-        """Shared tail of every spend check: unknown-cost policy, then the two ceilings.
-
-        Every call site (single-request, operation, and summed-arena) has already produced
-        its own high-end ``estimate`` — or established that it could not, signaled by
-        ``unknown`` — because what is being estimated differs by call site. What repeats
-        everywhere is: refuse (or not) when the cost is unknown, refuse when the per-request
-        ceiling is crossed, and otherwise reserve against the cumulative ceiling through the
-        ledger. Message text is supplied by the caller so each site keeps its exact wording.
-
-        Raises:
-            SpendLimitError: When a ceiling would be crossed, or the cost is unknown and the
-                policy says not to spend blind.
-            RuntimeError: When a cumulative ceiling is configured but no ledger was supplied.
-        """
-        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
-        if unknown and policy.on_unknown == "refuse":
-            raise SpendLimitError(
-                unknown_message,
-                limit_usd=policy.max_request_usd or policy.max_total_usd,
-                spent_usd=spent,
-                hint=unknown_hint,
-            )
-        if estimate is None:
-            return
-
-        if policy.max_request_usd is not None and estimate > policy.max_request_usd:
-            raise SpendLimitError(
-                over_request_message,
-                limit_usd=policy.max_request_usd,
-                spent_usd=spent,
-                estimated_usd=estimate,
-                hint=over_request_hint,
-            )
-
-        if policy.max_total_usd is not None:
-            ledger = self._ledger
-            if ledger is None:
-                raise RuntimeError("a cumulative spend policy requires a spend ledger")
-            accepted, spent, reserved = ledger.reserve(request_id, estimate, policy.max_total_usd)
-            if not accepted:
-                raise SpendLimitError(
-                    over_total_message(spent, reserved),
-                    limit_usd=policy.max_total_usd,
-                    spent_usd=spent,
-                    estimated_usd=estimate,
-                    hint=over_total_hint,
-                )
-
-    def _reserve_arena_spend(
-        self,
-        arena_id: str,
-        request: GenerationRequest,
-        policy: ArenaPolicy,
-        *,
-        candidate_multiplier: int,
-    ) -> None:
-        """Reserve the summed high estimate before any arena branch dispatches."""
-        spend = self._spend_policy
-        if spend is None or not spend.active:
-            return
-        total = Decimal(0)
-        unknown: list[str] = []
-        weighted = [(target, candidate_multiplier) for target in policy.targets]
-        if policy.judge_target is not None:
-            weighted.append((policy.judge_target, 1))
-        for target, multiplier in weighted:
-            try:
-                resolved = self.resolve(target)
-                descriptor = self._pool.descriptor_for(resolved.provider_id)
-                capabilities = self._capabilities_for(descriptor, resolved)
-                estimate = self._estimate_request_cost(request, capabilities)
-            except (AnyInferError, ValueError):
-                estimate = None
-            if estimate is None:
-                unknown.append(str(target))
-            else:
-                total += estimate * multiplier
-        self._enforce_spend_ceiling(
-            total,
-            policy=spend,
-            request_id=arena_id,
-            unknown=bool(unknown),
-            unknown_message=(
-                f"the summed cost of this {len(policy.targets)}-candidate arena cannot "
-                f"be estimated because pricing is unknown for {', '.join(unknown)}"
-            ),
-            unknown_hint="supply trusted pricing or set spend on_unknown='allow'",
-            over_request_message=(
-                f"the summed estimate {total} for {len(policy.targets)} arena candidates "
-                f"exceeds the per-request ceiling {spend.max_request_usd}"
-            ),
-            over_total_message=lambda spent, reserved: (
-                f"this client has spent {spent}, reserved {reserved}, and this "
-                f"{len(policy.targets)}-candidate arena could cost {total}, above "
-                f"the total ceiling {spend.max_total_usd}"
-            ),
-        )
 
     def _new_run(
         self, request: GenerationRequest, route: Route, manifest: bool | None
@@ -2097,162 +1752,6 @@ class AsyncClient(GenerationExecutionMixin):
             hint="raise max_rounds, or simplify the tools so the model converges",
         )
 
-    async def _run_tools_arena(
-        self,
-        messages: MessagesInput,
-        *,
-        tools: Sequence[Tool | Any],
-        policy: ArenaPolicy,
-        max_rounds: int,
-        kwargs: Mapping[str, Any],
-    ) -> Generation:
-        """Run one isolated tool conversation per arena candidate."""
-        template_registry = ToolRegistry(list(tools))
-        base_request = self._build_request(
-            messages,
-            schema=kwargs.get("schema"),
-            tools=template_registry.specs,
-            tool_choice=kwargs.get("tool_choice", "auto"),
-            sampling=kwargs.get("sampling"),
-            reasoning=kwargs.get("reasoning"),
-            timeout_s=kwargs.get("timeout_s"),
-            repair=kwargs.get("repair"),
-            history=kwargs.get("history"),
-            cache=kwargs.get("cache"),
-            provider_options=kwargs.get("provider_options"),
-            metadata=kwargs.get("metadata"),
-            max_response_bytes=kwargs.get("max_response_bytes"),
-            arena=policy,
-        )
-        arena_id = uuid.uuid4().hex
-        self._reserve_arena_spend(arena_id, base_request, policy, candidate_multiplier=max_rounds)
-        memo = ToolMemo()
-        semaphore = asyncio.Semaphore(policy.concurrency)
-
-        async def branch(target: str) -> Candidate:
-            started = time.monotonic()
-            try:
-                resolved = self.resolve(target)
-            except (AnyInferError, ValueError) as exc:
-                error = exc if isinstance(exc, AnyInferError) else ConfigError(str(exc))
-                return Candidate(
-                    ResolvedTarget("unresolved", target),
-                    error=error.snapshot(),
-                    rounds=0,
-                    elapsed_ms=(time.monotonic() - started) * 1000.0,
-                )
-            registry = ToolRegistry(list(tools), memo=memo, memo_mode=policy.memoize_tools)
-            conversation = list(_coerce_messages(messages))
-            rounds = 0
-            try:
-                async with semaphore:
-                    token = _spend_prechecked.set(True)
-                    try:
-                        for rounds in range(1, max_rounds + 1):
-                            result = await self.generate(
-                                conversation,
-                                target=target,
-                                tools=registry.specs,
-                                arena=None,
-                                **dict(kwargs),
-                            )
-                            if result.finish_reason != "tool_calls" or not result.tool_calls:
-                                return Candidate(
-                                    resolved,
-                                    generation=result,
-                                    valid=(result.structured is not None)
-                                    if base_request.schema is not None
-                                    else None,
-                                    elapsed_ms=(time.monotonic() - started) * 1000.0,
-                                    rounds=rounds,
-                                    tool_calls=registry.dispatched,
-                                )
-                            outputs = [await registry.dispatch(call) for call in result.tool_calls]
-                            conversation.extend(build_tool_turn(result.tool_calls, outputs))
-                    finally:
-                        _spend_prechecked.reset(token)
-                raise ToolLoopError(
-                    f"the tool loop ran {max_rounds} rounds without a final answer"
-                )
-            except AnyInferError as exc:
-                return Candidate(
-                    resolved,
-                    error=exc.snapshot(),
-                    valid=False if base_request.schema is not None else None,
-                    elapsed_ms=(time.monotonic() - started) * 1000.0,
-                    rounds=rounds,
-                    tool_calls=registry.dispatched,
-                )
-
-        try:
-            candidates = tuple(
-                await asyncio.gather(*(branch(target) for target in policy.targets))
-            )
-            successful = tuple(item for item in candidates if item.generation is not None)
-            if len(successful) < policy.min_candidates:
-                raise AllTargetsFailedError(
-                    f"arena produced {len(successful)} completed tool loops; "
-                    f"{policy.min_candidates} required"
-                )
-            winner, strategy, agreement, degradation = select_candidates(
-                candidates, policy, has_schema=base_request.schema is not None
-            )
-            calls = sum(item.rounds or 0 for item in candidates)
-            verdict: Generation | None = None
-            if policy.strategy in ("judge", "synthesize"):
-                verdict, selected, reason = await self._arena_verdict(
-                    base_request, policy, candidates
-                )
-                calls += 1
-                if policy.strategy == "judge" and selected is not None:
-                    winner, strategy, degradation = selected, "judge", None
-                elif policy.strategy == "synthesize" and verdict is not None:
-                    strategy, degradation = "synthesize", None
-                else:
-                    degradation = reason or "the arena verdict could not be applied"
-            if winner is None or winner.generation is None:
-                raise AllTargetsFailedError("arena had no selectable completed tool loop")
-            if degradation:
-                self._emit(
-                    ParameterDropped(arena_id, winner.target, "arena.strategy", degradation)
-                )
-            complete = len(successful) == len(candidates)
-            usages = [item.generation.usage for item in successful if item.generation is not None]
-            if verdict is not None:
-                usages.append(verdict.usage)
-            arena_result = ArenaResult(
-                candidates=candidates,
-                winner=winner,
-                strategy=strategy,
-                agreement=agreement,
-                synthesized=verdict if policy.strategy == "synthesize" else None,
-                calls=calls,
-                memoized_tool_calls=memo.hits,
-                usage=merge_usage(usages) if complete else Usage(),
-                usage_complete=complete,
-            )
-            promoted = (
-                verdict
-                if policy.strategy == "synthesize" and verdict is not None
-                else winner.generation
-            )
-            if promoted is None:
-                raise RuntimeError("arena selected a candidate without a generation")
-            self._emit(
-                ArenaCompleted(
-                    arena_id,
-                    len(candidates),
-                    strategy,
-                    agreement,
-                    calls,
-                    memo.hits,
-                    verdict is not None and policy.strategy == "synthesize",
-                )
-            )
-            return replace(promoted, arena=arena_result)
-        finally:
-            if self._ledger is not None:
-                self._ledger.release(arena_id)
 
     def _build_request(
         self,
@@ -2872,129 +2371,8 @@ class AsyncClient(GenerationExecutionMixin):
             merged = merged.overlay(layer)
         return merged
 
-    def _check_operation_spend(
-        self,
-        *,
-        operation: InferenceOperation,
-        route: Route,
-        texts: Sequence[str] | None,
-        request_id: str,
-    ) -> None:
-        """Refuse an embed/rerank call that would cross this client's spending ceiling.
 
-        Embedding costs are estimated from the caller's texts at the first target's
-        trusted input rate. Rerank costs are never estimated — search-unit billing has no
-        verified request-shape formula, and a guessed estimate would enforce nothing
-        while appearing to — so ``on_unknown`` governs rerank calls.
 
-        Raises:
-            SpendLimitError: When a ceiling would be crossed, or when the cost cannot be
-                known and the policy says not to spend blind.
-        """
-        policy = self._spend_policy
-        if policy is None or not policy.active:
-            return
-
-        estimate: Decimal | None = None
-        if operation == "embedding" and texts is not None and route.targets:
-            try:
-                resolved = self.resolve(route.targets[0])
-                capabilities = self._operation_capabilities(resolved)
-            except (AnyInferError, ValueError):
-                capabilities = None
-            if capabilities is not None:
-                tokens = sum(self._estimator.estimate(t).tokens for t in texts)
-                estimate = compute_operation_cost(
-                    Usage(input_tokens=tokens), capabilities, "embedding"
-                )
-
-        self._enforce_spend_ceiling(
-            estimate,
-            policy=policy,
-            request_id=request_id,
-            unknown=estimate is None,
-            unknown_message=f"the cost of this {operation} request cannot be estimated",
-            unknown_hint=(
-                "this target has no trusted pricing (rerank costs are never "
-                "estimated); set on_unknown='allow' to send it anyway, or supply "
-                "pricing as a capability override"
-            ),
-            over_request_message=(
-                f"this {operation} request could cost {estimate}, above the per-request "
-                f"ceiling of {policy.max_request_usd}"
-            ),
-            over_total_message=lambda spent, reserved: (
-                f"this client has spent {spent}, reserved {reserved}, and this "
-                f"{operation} request could cost {estimate}, above the total "
-                f"ceiling {policy.max_total_usd}"
-            ),
-        )
-
-    def _check_spend(
-        self,
-        request: GenerationRequest,
-        resolved: ResolvedTarget,
-        capabilities: ModelCapabilities | None,
-        *,
-        request_id: str,
-    ) -> None:
-        """Refuse a request that would cross this client's spending ceiling.
-
-        Runs before dispatch, so a refusal costs nothing. The estimate is the *high* end of
-        the preflight range and is reported in the error, so a caller can see the arithmetic
-        rather than being told only that they were declined.
-
-        Raises:
-            SpendLimitError: When a ceiling would be crossed, or when the cost cannot be
-                known and the policy says not to spend blind.
-        """
-        if _spend_prechecked.get():
-            return
-        policy = self._spend_policy
-        if policy is None or not policy.active:
-            return
-
-        estimate = self._estimate_request_cost(request, capabilities)
-
-        self._enforce_spend_ceiling(
-            estimate,
-            policy=policy,
-            request_id=request_id,
-            unknown=estimate is None,
-            unknown_message=f"the cost of a request to {resolved} cannot be estimated",
-            unknown_hint=(
-                "this target has no trusted pricing; set on_unknown='allow' to "
-                "send it anyway, or supply pricing as a capability override"
-            ),
-            over_request_message=(
-                f"a request to {resolved} could cost {estimate}, above the per-request "
-                f"ceiling of {policy.max_request_usd}"
-            ),
-            over_request_hint=(
-                "shorten the prompt, cap max_output_tokens, or raise max_request_usd"
-            ),
-            over_total_message=lambda spent, reserved: (
-                f"this client has spent {spent}, reserved {reserved}, and the next "
-                f"request could cost {estimate}, above the ceiling of "
-                f"{policy.max_total_usd}"
-            ),
-            over_total_hint="raise max_total_usd, or reset the ledger to start a new budget",
-        )
-
-    def _estimate_request_cost(
-        self, request: GenerationRequest, capabilities: ModelCapabilities | None
-    ) -> Decimal | None:
-        """The high end of a request's preflight cost range, or ``None`` when unknowable."""
-        if capabilities is None or capabilities.pricing is None:
-            return None
-        budget = build_context_budget(
-            request,
-            capabilities,
-            estimator=self._estimator,
-            calibration=TokenCalibration(),
-        )
-        estimated = budget.estimated_cost
-        return estimated.high if estimated is not None else None
 
     def _check_prefix_stability(
         self,
