@@ -59,12 +59,15 @@ def _manifest(model_id: str, weight_hash: str, private_key: bytes) -> ModelManif
 def test_hashing_matches_on_platforms_without_pread(tmp_path: Path) -> None:
     """`os.pread` is POSIX-only; Windows takes a seek-and-restore fallback.
 
-    Exercised by hiding `os.pread` exactly as Windows lacks it, so the Linux lanes cover
-    the branch only Windows would otherwise reach — which is how a POSIX-only call shipped
-    unnoticed in the first place. Two properties must hold: the digest is identical, and
-    the descriptor's file position is untouched, because the caller hands these same
-    descriptors to the loader after verification and an offset left at EOF would hand it
-    an empty file.
+    On POSIX the fallback is reached by hiding `os.pread` exactly as Windows lacks it, so
+    the Linux lanes cover the branch only Windows would otherwise reach — which is how a
+    POSIX-only call shipped unnoticed in the first place. On Windows the fallback is
+    simply the live path, and there is nothing to hide: `os.pread` is absent, so reaching
+    for it to save and restore would itself raise `AttributeError`.
+
+    Two properties must hold either way: the digest is identical, and the descriptor's
+    file position is untouched, because the caller hands these same descriptors to the
+    loader after verification and an offset left at EOF would hand it an empty file.
     """
     import anyinfer.local.provenance as provenance
 
@@ -81,14 +84,21 @@ def test_hashing_matches_on_platforms_without_pread(tmp_path: Path) -> None:
         assert provenance._hash_fd(descriptor) == expected
 
         os.lseek(descriptor, 12_345, os.SEEK_SET)
-        real_pread = os.pread
-        monkey = pytest.MonkeyPatch()
-        monkey.delattr(os, "pread")
-        try:
+        if hasattr(os, "pread"):
+            real_pread = os.pread
+            monkey = pytest.MonkeyPatch()
+            monkey.delattr(os, "pread")
+            try:
+                assert provenance._hash_fd(descriptor) == expected, (
+                    "fallback digest must match"
+                )
+            finally:
+                monkey.undo()
+            assert os.pread is real_pread
+        else:
+            # Windows: the call above already took the fallback, so re-running it is the
+            # honest check. Deleting an attribute that does not exist would raise.
             assert provenance._hash_fd(descriptor) == expected, "fallback digest must match"
-        finally:
-            monkey.undo()
-        assert os.pread is real_pread
         assert os.lseek(descriptor, 0, os.SEEK_CUR) == 12_345, "file position must survive"
     finally:
         os.close(descriptor)

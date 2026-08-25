@@ -71,13 +71,13 @@ def test_query_with_incompatible_space_is_refused(tmp_path: Path, open_store) ->
         store.query([1.0, 0.0, 0.0, 0.0], space=_space(provider_id="different-provider"))
 
 
-def test_query_on_an_empty_store_raises(open_store) -> None:
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as d:
-        store = open_store(Path(d) / "s.db")
-        with pytest.raises(VectorStoreError):
-            store.query([1.0, 0.0, 0.0, 0.0], space=_space())
+def test_query_on_an_empty_store_raises(tmp_path: Path) -> None:
+    # `tmp_path` rather than a `TemporaryDirectory` block, and the store's own context
+    # manager rather than the `open_store` fixture: the fixture closes at *test* teardown,
+    # which is after a `with TemporaryDirectory()` has already tried to remove the
+    # directory — and Windows refuses to delete a file that still has an open handle.
+    with VectorStore.open(tmp_path / "s.db") as store, pytest.raises(VectorStoreError):
+        store.query([1.0, 0.0, 0.0, 0.0], space=_space())
 
 
 def test_compatibility_id_permits_a_different_model_string(tmp_path: Path, open_store) -> None:
