@@ -44,6 +44,7 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import Diagnostic, FinishReason, Usage
@@ -399,6 +400,8 @@ class OllamaAdapter:
                 raise unsupported(self.provider_id, "document")
             elif isinstance(part, AudioPart):
                 raise unsupported(self.provider_id, "audio")
+            elif isinstance(part, VideoPart):
+                raise unsupported(self.provider_id, "video")
         if images:
             encoded["images"] = images
         calls = [p for p in message.content if isinstance(p, ToolCall)]

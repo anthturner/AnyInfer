@@ -48,6 +48,7 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
@@ -438,14 +439,22 @@ class GeminiAdapter:
                         }
                     }
                 )
-            elif isinstance(part, ImagePart | DocumentPart | AudioPart):
+            elif isinstance(part, ImagePart | DocumentPart | AudioPart | VideoPart):
                 if isinstance(part, AudioPart) or part.data is not None:
                     data = part.data if part.data is not None else b""
-                    parts.append(
-                        {"inlineData": {"mimeType": part.media_type, "data": base64_data(data)}}
-                    )
+                    encoded: dict[str, Any] = {
+                        "inlineData": {"mimeType": part.media_type, "data": base64_data(data)}
+                    }
                 else:
-                    parts.append({"fileData": {"mimeType": part.media_type, "fileUri": part.url}})
+                    encoded = {"fileData": {"mimeType": part.media_type, "fileUri": part.url}}
+                if isinstance(part, VideoPart):
+                    metadata = _video_metadata(part)
+                    if metadata:
+                        # `videoMetadata` is a sibling of the source block, not a member
+                        # of it: the same clip window applies whether the bytes are inline
+                        # or hosted.
+                        encoded["videoMetadata"] = metadata
+                parts.append(encoded)
 
         # Tool results ride on a user turn in this dialect; only the model speaks "model".
         role = "model" if message.role == "assistant" else "user"
@@ -671,6 +680,24 @@ class _StreamState:
         )
 
 
+def _video_metadata(part: VideoPart) -> dict[str, Any]:
+    """Build a ``videoMetadata`` block from a video part's clip and sampling window.
+
+    Offsets are spelled as protobuf durations — a decimal string ending in ``s`` — which
+    is the one place this dialect departs from plain JSON numbers. Returns an empty dict
+    when the caller set none of the three, so the field is omitted rather than sent with
+    provider defaults restated as if the caller had chosen them.
+    """
+    metadata: dict[str, Any] = {}
+    if part.start_offset_s is not None:
+        metadata["startOffset"] = f"{part.start_offset_s}s"
+    if part.end_offset_s is not None:
+        metadata["endOffset"] = f"{part.end_offset_s}s"
+    if part.fps is not None:
+        metadata["fps"] = part.fps
+    return metadata
+
+
 def _parse_logprobs(result: Any) -> tuple[TokenLogprob, ...]:
     """Read a candidate's ``logprobsResult`` into normalized tokens.
 
@@ -834,6 +861,7 @@ _GEMINI_FEATURES = (
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
     | Feature.LOGPROBS
+    | Feature.VIDEO_IN
 )
 
 

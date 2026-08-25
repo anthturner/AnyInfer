@@ -13,7 +13,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
-from .messages import AudioPart, DocumentPart, ImagePart, Message
+from .messages import AudioPart, DocumentPart, ImagePart, Message, VideoPart
 
 if TYPE_CHECKING:
     from ..context_request import ContextRequest
@@ -643,7 +643,9 @@ class GenerationRequest:
         for message in self.messages:
             for part in message.content:
                 data = (
-                    part.data if isinstance(part, ImagePart | DocumentPart | AudioPart) else None
+                    part.data
+                    if isinstance(part, ImagePart | DocumentPart | AudioPart | VideoPart)
+                    else None
                 )
                 if data is None:
                     continue

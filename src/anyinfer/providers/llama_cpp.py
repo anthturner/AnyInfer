@@ -46,7 +46,7 @@ from ..types.capabilities import (
     ModelCapabilities,
     Sourced,
 )
-from ..types.messages import AudioPart, DocumentPart, ImagePart
+from ..types.messages import AudioPart, DocumentPart, ImagePart, VideoPart
 from ..types.results import Diagnostic
 from ._multimodal import unsupported
 from .base import (
@@ -559,6 +559,8 @@ class LlamaCppAdapter:
                     raise unsupported(self.provider_id, "document")
                 elif isinstance(part, AudioPart):
                     raise unsupported(self.provider_id, "audio")
+                elif isinstance(part, VideoPart):
+                    raise unsupported(self.provider_id, "video")
         if image_input and artifact.projector is None:
             raise unsupported(
                 self.provider_id,

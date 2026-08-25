@@ -29,11 +29,12 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.requests import Sampling, ToolSpec
 from ..types.results import FinishReason, TokenLogprob, Usage
 from ._logprobs import parse_openai_logprobs
-from ._multimodal import base64_data, data_url, media_subtype
+from ._multimodal import base64_data, data_url, media_subtype, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .sse import iter_sse
@@ -228,7 +229,10 @@ class OpenAICompatAdapter:
             }
 
         text = "".join(p.text for p in message.content if isinstance(p, Text))
-        modal = any(isinstance(p, ImagePart | DocumentPart | AudioPart) for p in message.content)
+        modal = any(
+            isinstance(p, ImagePart | DocumentPart | AudioPart | VideoPart)
+            for p in message.content
+        )
         content: str | list[dict[str, Any]] | None = text
         if modal:
             content = []
@@ -261,6 +265,12 @@ class OpenAICompatAdapter:
                             },
                         }
                     )
+                elif isinstance(part, VideoPart):
+                    # The chat-completions dialect defines no video content item. Refused
+                    # rather than skipped: a dropped part leaves the model answering a
+                    # question about a video it was never shown, which reads as a bad
+                    # answer rather than as a missing input.
+                    raise unsupported(self.provider_id, "video")
         encoded: dict[str, Any] = {"role": message.role, "content": content}
         calls = [p for p in message.content if isinstance(p, ToolCall)]
         if calls:

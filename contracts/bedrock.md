@@ -260,6 +260,12 @@ document set in one `Rerank` call today (bounded by `RerankCapabilities.max_docu
 so pagination has never been reachable; revisit if that assumption changes.
 
 ## Watchlist
+
+- **`video` content blocks are published but not implemented.** Converse documents a
+  `video` block whose shape parallels `document` exactly, so the projection is nearly free
+  — but it carries no clip window or frame rate, and a `VideoPart` that set either would
+  lose it silently. The adapter refuses video explicitly until the block is verified
+  live and that metadata question has an answer. Noted 2026-08-25.
 - **The OpenAI-compat endpoints.** `bedrock-mantle.{region}.api.aws/v1` (recommended,
   API-key auth) and `bedrock-runtime.{region}.amazonaws.com/v1` exist for select models.
   If coverage broadens, a preset entry may become worthwhile alongside this adapter.

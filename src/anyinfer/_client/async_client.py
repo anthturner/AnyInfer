@@ -112,6 +112,7 @@ from ..types.messages import (
     DocumentPart,
     ImagePart,
     Message,
+    VideoPart,
     user,
 )
 from ..types.operations import (
@@ -2319,6 +2320,8 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
                     required.add(Feature.DOCUMENT)
                 elif isinstance(part, AudioPart):
                     required.add(Feature.AUDIO_IN)
+                elif isinstance(part, VideoPart):
+                    required.add(Feature.VIDEO_IN)
         if not required or capabilities.features.provenance not in TRUSTED_PROVENANCE:
             return
         missing = [feature for feature in required if feature not in capabilities.features.value]

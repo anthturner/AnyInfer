@@ -60,6 +60,7 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent, RerankCapabilities
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
@@ -646,6 +647,13 @@ class BedrockAdapter:
                         }
                     }
                 )
+            elif isinstance(part, VideoPart):
+                # Converse publishes a `video` block whose shape parallels `document`
+                # exactly, so this is one line away from working — but it carries no clip
+                # window or frame rate, and a `VideoPart` that set either would lose it
+                # silently. Refused until the block is verified against the live protocol
+                # and the metadata question has an answer (see contracts/bedrock.md).
+                raise unsupported(self.provider_id, "video")
 
         # Tool results ride on a user turn here, as in the Anthropic dialect.
         role = "user" if message.role in ("user", "tool") else "assistant"

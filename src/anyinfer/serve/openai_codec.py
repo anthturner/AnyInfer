@@ -35,6 +35,7 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.requests import (
     ArenaPolicy,
@@ -55,6 +56,7 @@ __all__ = [
     "HISTORY_FIELD",
     "MANIFEST_FIELD",
     "OPENAI_FINISH_REASONS",
+    "VIDEO_CONTENT_TYPE",
     "chunk_from_event",
     "completion_from_generation",
     "decode_messages",
@@ -110,6 +112,21 @@ ARENA_FIELD = "anyinfer_arena"
 
 CONTEXT_FIELD = "anyinfer_context"
 """Stateless caller-supplied corpus reduction request and content-free summary."""
+
+VIDEO_CONTENT_TYPE = "anyinfer_video"
+"""Message-content extension carrying a video input part.
+
+The other four extensions are top-level request keys; this one is a *content item*,
+because that is how the dialect it extends grows — `input_audio` and `file` were both
+added as content types, not as request fields, and a video belongs inside the message it
+was attached to. Its object is the wire spelling of a
+`VideoPart`: ``{"url"|"data", "media_type",
+"start_offset_s"?, "end_offset_s"?, "fps"?}``.
+
+A stock OpenAI client never sends it and never sees it. It exists so the request surface
+stays a genuine superset — a video part expressible in Python must survive the round trip
+through this codec, and chat completions has no content type of its own to carry one.
+"""
 
 _RESERVED_FIELDS = frozenset(
     {
@@ -212,6 +229,58 @@ def _as_text(content: Any) -> str:
     return ""
 
 
+def _decode_video(raw: Any) -> VideoPart:
+    """Decode the video content extension into a `VideoPart`.
+
+    Raises:
+        ValueError: The object is missing, is not an object, names neither a URL nor
+            inline data, or carries a non-numeric offset or frame rate. Refused rather
+            than defaulted: a video the gateway silently dropped is a question answered
+            about footage the model never saw.
+    """
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{VIDEO_CONTENT_TYPE} content requires an object")
+    url = raw.get("url")
+    data = raw.get("data")
+    if isinstance(url, str) and url:
+        media_type, decoded, resolved_url = _decode_data_url(url)
+    elif isinstance(data, str) and data:
+        media_type, decoded, resolved_url = None, _decode_base64(data), None
+    else:
+        raise ValueError(f"{VIDEO_CONTENT_TYPE} content requires url or base64 data")
+
+    def _number(key: str) -> float | None:
+        value = raw.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, int | float) or isinstance(value, bool):
+            raise ValueError(f"{VIDEO_CONTENT_TYPE}.{key} must be a number")
+        return float(value)
+
+    return VideoPart(
+        data=decoded,
+        url=resolved_url,
+        media_type=str(raw.get("media_type") or media_type or "video/mp4"),
+        start_offset_s=_number("start_offset_s"),
+        end_offset_s=_number("end_offset_s"),
+        fps=_number("fps"),
+    )
+
+
+def _encode_video(part: VideoPart) -> dict[str, Any]:
+    """Encode a `VideoPart` back into the content extension, omitting unset fields."""
+    encoded: dict[str, Any] = {"media_type": part.media_type}
+    if part.url is not None:
+        encoded["url"] = part.url
+    else:
+        encoded["data"] = base64.b64encode(part.data or b"").decode("ascii")
+    for key in ("start_offset_s", "end_offset_s", "fps"):
+        value = getattr(part, key)
+        if value is not None:
+            encoded[key] = value
+    return encoded
+
+
 def _decode_content(content: Any) -> tuple[ContentPart, ...]:
     if isinstance(content, str):
         return (Text(content),) if content else ()
@@ -241,6 +310,8 @@ def _decode_content(content: Any) -> tuple[ContentPart, ...]:
                     detail=(detail if detail in ("auto", "low", "high") else None),
                 )
             )
+        elif kind == VIDEO_CONTENT_TYPE:
+            parts.append(_decode_video(raw.get(VIDEO_CONTENT_TYPE)))
         elif kind == "input_audio":
             audio = raw.get("input_audio")
             if not isinstance(audio, Mapping) or not isinstance(audio.get("data"), str):
@@ -646,7 +717,10 @@ def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
             )
             continue
 
-        modal = any(isinstance(p, ImagePart | DocumentPart | AudioPart) for p in message.content)
+        modal = any(
+            isinstance(p, ImagePart | DocumentPart | AudioPart | VideoPart)
+            for p in message.content
+        )
         if modal:
             modal_content: list[dict[str, Any]] = []
             for part in message.content:
@@ -667,6 +741,10 @@ def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
                     if part.filename is not None:
                         file["filename"] = part.filename
                     modal_content.append({"type": "file", "file": file})
+                elif isinstance(part, VideoPart):
+                    modal_content.append(
+                        {"type": VIDEO_CONTENT_TYPE, VIDEO_CONTENT_TYPE: _encode_video(part)}
+                    )
                 elif isinstance(part, AudioPart):
                     fmt = "mp3" if part.media_type in ("audio/mp3", "audio/mpeg") else "wav"
                     modal_content.append(

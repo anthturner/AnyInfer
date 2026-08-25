@@ -45,7 +45,13 @@ native protocol is used instead.
   `model`; **tool results ride on a `user` turn**, not a dedicated role.
 - `Part` shapes emitted: `{text}`, `{functionCall: {name, args, id?}}`,
   `{functionResponse: {name, response}}`, `{inlineData: {mimeType, data}}`, and
-  `{fileData: {mimeType, fileUri}}`. The media shapes were verified 2026-08-10 against
+  `{fileData: {mimeType, fileUri}}`.
+- Video (added 2026-08-25) reuses the same two source shapes — `inlineData` for a short
+  inline clip, `fileData` for a Files-API URI or a public video URL — with an optional
+  **sibling** `videoMetadata: {startOffset?, endOffset?, fps?}` on the same Part. Offsets
+  are protobuf durations (a decimal string ending in `s`), which is the one place this
+  dialect departs from plain JSON numbers; `fps` is a plain number. All three are omitted
+  when the caller set none, so provider defaults are never restated as caller choices. The media shapes were verified 2026-08-10 against
   the provider-owned file-input guide. A synthesized `call_N` id is *not* echoed back
   as a `functionCall.id` — it is ours, not a key Gemini issued.
 - `functionResponse.response` must be an object: a non-JSON tool result is wrapped as

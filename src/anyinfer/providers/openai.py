@@ -38,12 +38,13 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.operations import EmbeddingCapabilities
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, TokenLogprob, Usage
 from ._logprobs import parse_logprob_entries
-from ._multimodal import base64_data, data_url, media_subtype
+from ._multimodal import base64_data, data_url, media_subtype, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
@@ -411,7 +412,11 @@ def _split_instructions(messages: Sequence[Message]) -> tuple[str, list[dict[str
                 )
 
         text = "".join(p.text for p in message.content if isinstance(p, Text))
-        modal = [p for p in message.content if isinstance(p, ImagePart | DocumentPart | AudioPart)]
+        modal = [
+            p
+            for p in message.content
+            if isinstance(p, ImagePart | DocumentPart | AudioPart | VideoPart)
+        ]
         if text or modal:
             content_type = "output_text" if message.role == "assistant" else "input_text"
             content: list[dict[str, Any]] = []
@@ -445,6 +450,11 @@ def _split_instructions(messages: Sequence[Message]) -> tuple[str, list[dict[str
                             },
                         }
                     )
+                elif isinstance(part, VideoPart):
+                    # The Responses dialect defines no video content item. Refused rather
+                    # than skipped: a dropped part leaves the model answering about a
+                    # video it was never shown.
+                    raise unsupported("openai", "video")
             items.append(
                 {
                     "role": message.role,
