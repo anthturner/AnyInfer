@@ -3,14 +3,42 @@ name: CI
 # Branch model: feature branches -> develop -> main.
 #
 # CI runs on every pull request into `develop` and `main`, and again on the merge commit
-# once it lands. Merges are *blocked* on failure via branch protection: `ci-ok` below is
-# required on both branches (a single stable name, so the required check does not have to
-# enumerate every matrix job); `main` additionally requires `test-macos`, which only runs
-# on the develop -> main step. See docs/contributing/releasing.md for the one-time `gh`
-# commands that configure the protection rules.
+# once it lands on `main`. Merges are *blocked* on failure via branch protection: `ci-ok`
+# below is required on both branches (a single stable name, so the required check does not
+# have to enumerate every matrix job); `main` additionally requires `test-extra` and
+# `test-macos`, which only run on the develop -> main step. See
+# docs/contributing/releasing.md for the one-time `gh` commands that configure the rules.
+#
+# Billed-minutes policy, from measured run data rather than intuition. Two numbers set
+# the whole layout, and both are counter-intuitive enough to be worth writing down:
+#
+#   * The suite, not the install, is the cost. On a Linux runner `pip install -e
+#     ".[all,dev]"` takes ~25s while `pytest` takes ~140s -- roughly three quarters of the
+#     job. The ~1 GB environment looks like the expensive part and is not. Optimizing an
+#     install saves seconds; adding a matrix row costs minutes.
+#   * A test row's price is its runtime times its runner multiplier, and those multiply
+#     brutally. The same suite takes ~140s on Linux, ~205s on Windows (2x), and ~600s on
+#     macOS (10x) -- so one macOS row bills more than every other job in this file
+#     combined. macOS is not "one more platform"; it is the budget.
+#
+# Three consequences:
+#
+#   1. Every test row is justified individually, because each Linux row is ~4 billed
+#      minutes and the macOS row is ~110. Linux brackets the interpreter range (oldest and
+#      newest); the middle two and macOS run only on the develop -> main step.
+#   2. The gates that are *not* the suite are merged onto one runner. They bill one minute
+#      each as separate jobs and about two together, so the saving is small -- but it is
+#      free, since per-gate attribution survives as per-gate steps.
+#   3. Installs go through `uv` rather than `pip`. Worth ~20s a job on Linux and ~60s on
+#      Windows: real, and an order of magnitude less than any matrix decision above.
+#
+# `push` deliberately does not include `develop`: both protected branches only take merges
+# through a pull request that already had to be green, so a push-triggered rerun of a
+# just-merged commit is a second full bill for a result CI already has. `main` keeps its
+# push trigger because that commit is what the release workflow builds from.
 on:
   push:
-    branches: [develop, main]
+    branches: [main]
   pull_request:
     branches: [develop, main]
   workflow_dispatch:
@@ -24,19 +52,36 @@ env:
   # Detection probes must never touch a CI runner's cache directory: a cached profile
   # from one job would silently drive another job's tuning assertions.
   ANYINFER_HARDWARE_CACHE_BYPASS: "1"
+  # uv resolves against the interpreter `setup-python` selected rather than provisioning
+  # its own, so the matrix keeps meaning what it says.
+  UV_SYSTEM_PYTHON: "1"
 
 jobs:
-  lint:
-    name: lint and types
+  # Every gate that is not the test suite, on one runner. Each ran well under a minute as
+  # its own job, so each was billed a full minute for ~20s of work; together they bill
+  # about two. `conformance` is here rather than in its own job for a second reason as
+  # well: the `test` phase already runs the whole suite, conformance cases included, on
+  # every matrix row -- this step exists for the named signal, not for coverage, and
+  # should be priced accordingly.
+  gates:
+    name: gates
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[all,dev]"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+      - run: uv pip install -e ".[all,dev]"
+
+      # mkdocstrings imports every documented package to render its reference pages, so
+      # sharded add-ons (src/anyinfer-*, each its own pyproject.toml and never folded into
+      # the root package) need their own editable install for the docs gates below.
+      - run: uv pip install -e src/anyinfer-store
 
       # Every gate goes through `workspace check` so the phases a contributor runs
       # locally and the commands CI runs cannot drift apart. Each phase echoes the
@@ -58,114 +103,8 @@ jobs:
         # types stay leaf modules.
         run: python workspace.py check --only=contracts
 
-  test:
-    name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # Windows is a first-class platform for all three consumer applications, and the
-        # llama-server supervisor's process-tree handling differs there — so it is tested,
-        # not assumed. But OS quirks aren't Python-version-specific, and Windows runners
-        # cost 2x Linux in billed Actions minutes, so the full interpreter matrix only
-        # runs on Linux; Windows gets a single (latest) version to confirm the platform
-        # still works. macOS is not here at all — see `test-macos` below: at 10x Linux
-        # billing, it only runs on the develop -> main step, not on every feature PR.
-        include:
-          - os: ubuntu-latest
-            python-version: "3.11"
-          - os: ubuntu-latest
-            python-version: "3.12"
-          - os: ubuntu-latest
-            python-version: "3.13"
-          - os: ubuntu-latest
-            python-version: "3.14"
-          - os: windows-latest
-            python-version: "3.14"
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[all,dev]"
-
-      # `workspace build all` (exercised by test_workspace.py) builds the docs site as
-      # part of "all", and mkdocstrings imports every sharded add-on (src/anyinfer-*) to
-      # render its reference pages — same reason the docs job installs it below.
-      - run: pip install -e src/anyinfer-store
-
-      # The PySide6 wheel ships Qt's own libraries but still links against the system's
-      # EGL/GL/xkbcommon/D-Bus stack, which the Linux runner image does not carry. Missing
-      # them is an *import*-time failure (`libEGL.so.1: cannot open shared object file`),
-      # so it takes down collection of the demo app's tests before any display setting
-      # could matter. macOS and Windows runners have their equivalents already.
-      - name: install Qt's system libraries
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libxkbcommon0 libdbus-1-3
-
-      # The test phase sets QT_QPA_PLATFORM=offscreen, so the demo app's Qt tests run
-      # on a runner with no display.
-      - name: pytest
-        run: python workspace.py check --only=test
-
-  # macOS runners bill at 10x Linux, so this does not run on every feature-branch PR —
-  # only on the develop -> main step, where the branch model (docs/contributing/
-  # releasing.md) says a merge should actually prove the release is buildable. It is
-  # NOT part of `ci-ok`: a job skipped by `if:` still reports a "skipped" check, and a
-  # required check that is merely skipped blocks a GitHub merge just like a failure
-  # would, which would wedge every `develop` PR. Instead this is a second, separate
-  # required status check that only `main`'s branch protection asks for — see the
-  # one-time setup in docs/contributing/releasing.md.
-  test-macos:
-    name: tests (macos-latest, py3.14)
-    runs-on: macos-latest
-    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.14"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[all,dev]"
-      - run: pip install -e src/anyinfer-store
-      - name: pytest
-        run: python workspace.py check --only=test
-
-  conformance:
-    name: provider conformance
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -e ".[all,dev]"
-
       - name: conformance and serve invariants (ADR-009)
         run: python workspace.py check --only=conformance
-
-  docs:
-    name: docs build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -e ".[all,dev]"
-
-      # mkdocstrings imports every documented package to render its reference pages, so
-      # sharded add-ons (src/anyinfer-*, each its own pyproject.toml and never folded into
-      # the root package) need their own editable install here too, not just anyinfer core.
-      - run: pip install -e src/anyinfer-store
 
       # Docstring coverage, link check, and the executable doc examples. Examples run
       # against the fake providers, so an example that stops working is a build failure
@@ -179,6 +118,129 @@ jobs:
       - name: site build (strict)
         run: python workspace.py check --only=docs-build
 
+  test:
+    name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The interpreter range is bracketed here and filled in by `test-extra` on the
+        # develop -> main step: a version-specific break shows up at the oldest or the
+        # newest interpreter far more often than in the middle of the range, and each
+        # extra row is a full ~4-billed-minute suite run, not a cheap install.
+        #
+        # Windows is a first-class platform for all three consumer applications, and the
+        # llama-server supervisor's process-tree handling differs there — so it is tested,
+        # not assumed. But OS quirks aren't Python-version-specific, and Windows runners
+        # cost 2x Linux in billed Actions minutes, so it gets a single (latest) version to
+        # confirm the platform still works. macOS is not here at all — see `test-macos`.
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.14"
+          - os: windows-latest
+            python-version: "3.14"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+      - run: uv pip install -e ".[all,dev]"
+
+      # `workspace build all` (exercised by test_workspace.py) builds the docs site as
+      # part of "all", and mkdocstrings imports every sharded add-on (src/anyinfer-*) to
+      # render its reference pages — same reason the gates job installs it above.
+      - run: uv pip install -e src/anyinfer-store
+
+      # The PySide6 wheel ships Qt's own libraries but still links against the system's
+      # EGL/GL/xkbcommon/D-Bus stack, which the Linux runner image does not carry. Missing
+      # them is an *import*-time failure (`libEGL.so.1: cannot open shared object file`),
+      # so it takes down collection of the demo app's tests before any display setting
+      # could matter. macOS and Windows runners have their equivalents already.
+      - name: install Qt's system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3
+
+      # The test phase sets QT_QPA_PLATFORM=offscreen, so the demo app's Qt tests run
+      # on a runner with no display.
+      - name: pytest
+        run: python workspace.py check --only=test
+
+  # The interpreter rows `test` brackets rather than runs. Same reasoning as `test-macos`
+  # below, at a smaller multiplier: these are Linux runners, but each is a full ~140s suite
+  # run (~4 billed minutes) re-proving what three other rows already ran, and a break
+  # specific to 3.12 or 3.13 alone is rare. So they run on the develop -> main step, where
+  # a merge should prove the whole supported range, and not on every feature PR.
+  #
+  # NOT part of `ci-ok`, for the same reason `test-macos` is not — see the note there.
+  test-extra:
+    name: tests (ubuntu-latest, py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+      - run: uv pip install -e ".[all,dev]"
+      - run: uv pip install -e src/anyinfer-store
+      - name: install Qt's system libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3
+      - name: pytest
+        run: python workspace.py check --only=test
+
+  # macOS runners bill at 10x Linux *and* run this suite ~4x slower than Linux does
+  # (~600s against ~140s), which makes this single job about 110 billed minutes — more
+  # than every other job in this workflow combined. So it does not run on every
+  # feature-branch PR — only on the develop -> main step, where the branch model
+  # (docs/contributing/releasing.md) says a merge should actually prove the release is
+  # buildable. Why the suite is so much slower here has not been profiled; if this lane
+  # needs to get cheaper, that is the thing to look at before dropping coverage. It is
+  # NOT part of `ci-ok`: a job skipped by `if:` still reports a "skipped" check, and a
+  # required check that is merely skipped blocks a GitHub merge just like a failure
+  # would, which would wedge every `develop` PR. Instead this is a second, separate
+  # required status check that only `main`'s branch protection asks for — see the
+  # one-time setup in docs/contributing/releasing.md.
+  test-macos:
+    name: tests (macos-latest, py3.14)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+      - run: uv pip install -e ".[all,dev]"
+      - run: uv pip install -e src/anyinfer-store
+      - name: pytest
+        run: python workspace.py check --only=test
+
   # Aggregate gate. Branch protection on `develop` and `main` requires exactly this check,
   # so adding or renaming upstream jobs (or matrix rows) never silently un-protects a
   # branch. `if: always()` makes it report a real failure instead of being skipped when a
@@ -186,7 +248,8 @@ jobs:
   ci-ok:
     name: ci-ok
     runs-on: ubuntu-latest
-    needs: [lint, test, conformance, docs]
+    timeout-minutes: 5
+    needs: [gates, test]
     if: always()
     steps:
       - name: verify every upstream job succeeded

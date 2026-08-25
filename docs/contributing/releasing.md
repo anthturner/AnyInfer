@@ -21,17 +21,25 @@ flowchart LR
   the version also publishes them.
 
 Both protected branches require the aggregate **`ci-ok`** status check, which passes only
-when every lint, type, contract, test-matrix, conformance, and docs job passed. Requiring
-one stable check name means adding a CI job (or a matrix row) can never silently escape
-the protection rules.
+when every lint, type, contract, conformance, docs, and bracketed test-matrix job passed.
+Requiring one stable check name means adding a CI job (or a matrix row) can never silently
+escape the protection rules.
 
-`main` requires one additional check, **`test-macos`**: macOS runners bill at 10x Linux,
-so that suite does not run on every feature-branch PR into `develop` — only on the
-develop -> main step, right before a merge triggers a release build. It is deliberately
-kept out of `ci-ok` (a job skipped by `if:` still reports "skipped", and a required check
-that is merely skipped blocks a GitHub merge same as a failure would — folding it into
-`ci-ok` would wedge every `develop` PR), so it is listed as its own required context, and
-only on `main`'s protection rule.
+`main` requires three additional checks — **`tests (ubuntu-latest, py3.12)`**,
+**`tests (ubuntu-latest, py3.13)`**, and **`test-macos`**. Each is a lane whose cost is
+not worth paying on every feature-branch PR into `develop`: macOS runners bill at 10x
+Linux, and the two middle interpreters are two more full environment builds to re-prove a
+suite the 3.11 and 3.14 rows already ran. They run only on the develop -> main step, right
+before a merge triggers a release build. All three are deliberately kept out of `ci-ok` (a
+job skipped by `if:` still reports "skipped", and a required check that is merely skipped
+blocks a GitHub merge same as a failure would — folding them into `ci-ok` would wedge
+every `develop` PR), so they are listed as their own required contexts, and only on
+`main`'s protection rule.
+
+CI itself is triggered by pull requests into either protected branch, and by pushes to
+`main`. Pushes to `develop` deliberately do **not** trigger it: `develop` only takes
+merges through a pull request that already had to be green, so re-running the full matrix
+on the merged commit bills a second time for a result CI already produced.
 
 ### One-time repository setup
 
@@ -49,10 +57,12 @@ gh api "repos/{owner}/{repo}/branches/develop/protection" -X PUT \
   -F 'enforce_admins=false' \
   -F 'restrictions=null'
 
-# main: also gated on the release-only macOS suite
+# main: also gated on the release-only lanes (middle interpreters and macOS)
 gh api "repos/{owner}/{repo}/branches/main/protection" -X PUT \
   -F 'required_status_checks[strict]=true' \
   -F 'required_status_checks[contexts][]=ci-ok' \
+  -F 'required_status_checks[contexts][]=tests (ubuntu-latest, py3.12)' \
+  -F 'required_status_checks[contexts][]=tests (ubuntu-latest, py3.13)' \
   -F 'required_status_checks[contexts][]=test-macos' \
   -F 'required_pull_request_reviews[required_approving_review_count]=0' \
   -F 'enforce_admins=false' \
@@ -86,8 +96,8 @@ The [release workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/
 runs on every merge to `main`:
 
 1. It reads `project.version` and checks whether tag `v<version>` already exists.
-2. It always rebuilds every release artifact, so `main` is continuously proven releasable:
-    - **the library**: sdist + wheel, `twine check`-ed and smoke-installed;
+2. It rebuilds the release artifacts, so `main` is continuously proven releasable:
+    - **the library**: sdist + wheel, `twine check`-ed and smoke-installed, on every merge;
     - **the demo bundles**: standalone PyInstaller builds of the pack-in demo app on
       native runners for Windows (x64), macOS (arm64 and x64), and Linux (x64 and
       arm64), named without a version
@@ -96,11 +106,19 @@ runs on every merge to `main`:
       never go stale;
     - **the sidecar bundles**: native builds on the same runners, named
       `anyinfer-serve-<os>-<arch>.zip`, with a build-time `--help` smoke test.
+
+    Freezing a PySide6 application is the most expensive thing this repository asks CI to
+    do, and two of those five runners are macOS at 10x Linux billing. So the bundle matrix
+    depends on the version: a **version bump builds all five**, and an **unchanged version
+    builds only Linux x64** — the cheap canary that catches a change breaking the frozen
+    build at all. The trade is that platform-specific freeze breakage surfaces at the
+    version bump rather than at the merge before it; no release can be cut without all
+    five going green.
 3. **Only when the version is new** does it tag `v<version>` and create the GitHub
    Release, with notes generated from the merged pull requests, every package attached,
    and a `SHA256SUMS` file covering every artifact. An unchanged version (docs-only merges,
-   CI tweaks) leaves the packages as
-   workflow artifacts and cuts nothing — releases stay 1:1 with versions.
+   CI tweaks) leaves what it built as workflow artifacts and cuts nothing — releases stay
+   1:1 with versions.
 
 Publishing a release therefore takes exactly one deliberate act: merging a version bump
 to `main`. There is no separate tagging step to forget or get wrong, and a release's tag

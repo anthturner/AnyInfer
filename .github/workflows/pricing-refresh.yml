@@ -29,6 +29,7 @@ jobs:
   check:
     name: deterministic drift check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     outputs:
@@ -71,6 +72,7 @@ jobs:
     needs: check
     if: needs.check.outputs.drift == 'true' || inputs.force_propose
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write

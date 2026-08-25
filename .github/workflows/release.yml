@@ -15,9 +15,20 @@ name: Release
 # A GitHub Release is created only when `project.version` in pyproject.toml has been
 # bumped past the last released tag, and the library distribution is then published to
 # PyPI from that same release's artifacts. When the version is unchanged (docs-only
-# merges, CI tweaks), the packages are still built and kept as workflow artifacts, but
-# no release, tag, or upload happens — releases stay 1:1 with versions. The full
-# strategy lives in docs/contributing/releasing.md.
+# merges, CI tweaks), no release, tag, or upload happens — releases stay 1:1 with
+# versions. The full strategy lives in docs/contributing/releasing.md.
+#
+# Billed-minutes policy for the bundle matrix. A PyInstaller build of a PySide6
+# application is the single most expensive thing this repository asks GitHub to do, and
+# two of the five rows are macOS runners billed at 10x Linux. Building all five on a
+# merge that cuts no release spends that on artifacts nobody downloads. So the matrix is
+# chosen by the `version` job: an unchanged version builds **only** the Linux x64 row,
+# which is the cheap canary that catches the failure this actually guards against — a
+# code or spec change that breaks the frozen build at all — while a version bump builds
+# the full five-platform set that gets attached to the release. What an unchanged-version
+# merge gives up is platform-specific freeze breakage (a macOS-only hidden import, say)
+# surfacing at merge time rather than at release time; the release itself still cannot be
+# cut without all five rows going green.
 #
 # Per AGENTS.md, standalone bundles never contain llama-server binaries, GGUF files, or
 # model weights — those are runtime-fetched by design.
@@ -37,9 +48,11 @@ jobs:
   version:
     name: read version
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.read.outputs.version }}
       is_new: ${{ steps.read.outputs.is_new }}
+      bundle_matrix: ${{ steps.read.outputs.bundle_matrix }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -51,27 +64,39 @@ jobs:
         run: |
           version="$(python -c 'import tomllib, pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The bundle matrix is chosen here rather than with an `if:` on each row,
+          # because a row skipped by `if:` still reports a skipped check while a row that
+          # was never in the matrix costs and says nothing. See the header for why an
+          # unchanged version builds the Linux canary alone.
+          full='[{"label":"windows-x64","os":"windows-latest"},{"label":"macos-arm64","os":"macos-latest"},{"label":"macos-x64","os":"macos-15-intel"},{"label":"linux-x64","os":"ubuntu-latest"},{"label":"linux-arm64","os":"ubuntu-24.04-arm"}]'
+          canary='[{"label":"linux-x64","os":"ubuntu-latest"}]'
           if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null 2>&1; then
-            echo "v$version already exists — packages will be rebuilt but no release cut."
+            echo "v$version already exists — no release cut; building the Linux canary bundle only."
             echo "is_new=false" >> "$GITHUB_OUTPUT"
+            echo "bundle_matrix=$canary" >> "$GITHUB_OUTPUT"
           else
-            echo "v$version is unreleased — a release will be created."
+            echo "v$version is unreleased — a release will be created from the full bundle matrix."
             echo "is_new=true" >> "$GITHUB_OUTPUT"
+            echo "bundle_matrix=$full" >> "$GITHUB_OUTPUT"
           fi
 
   build-library:
     name: library distribution
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-          cache: pip
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: build sdist and wheel
         run: |
-          python -m pip install --upgrade pip build twine
+          uv pip install --system build twine
           python -m build --outdir dist
           twine check dist/*
 
@@ -95,29 +120,30 @@ jobs:
   build-bundles:
     name: standalone bundles (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    needs: version
     strategy:
       fail-fast: false
       # PyInstaller builds only for the machine it runs on, so every OS/architecture
       # pair needs a native runner. The label matches the `<os>-<arch>` tag that
-      # the workspace builder stamps into each archive name.
+      # the workspace builder stamps into each archive name. Which rows run is decided
+      # by the `version` job: the full five on a version bump, the Linux x64 canary
+      # alone otherwise — see this file's header for the reasoning.
       matrix:
-        include:
-          - { label: windows-x64, os: windows-latest }
-          - { label: macos-arm64, os: macos-latest }
-          - { label: macos-x64,   os: macos-15-intel }
-          - { label: linux-x64,   os: ubuntu-latest }
-          - { label: linux-arm64, os: ubuntu-24.04-arm }
+        include: ${{ fromJSON(needs.version.outputs.bundle_matrix) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-          cache: pip
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: build the standalone demo and sidecar bundles
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[demo,serve]" pyinstaller pillow
+          uv pip install --system ".[demo,serve]" pyinstaller pillow
           python workspace.py build demo
           python workspace.py build serve
 
@@ -130,6 +156,7 @@ jobs:
   release:
     name: publish GitHub release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [version, build-library, build-bundles]
     if: needs.version.outputs.is_new == 'true'
     permissions:
@@ -181,6 +208,7 @@ jobs:
   publish-pypi:
     name: publish to PyPI
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [version, release]
     if: needs.version.outputs.is_new == 'true'
     environment:

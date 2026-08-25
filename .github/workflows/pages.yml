@@ -29,6 +29,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # upload-artifact can leave duplicate records when its finalize request succeeds
     # server-side but times out client-side. The cleanup step below needs to delete only
     # those extras; keep that authority out of the deployment job.
@@ -40,15 +41,21 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-          cache: pip
+      # Same installer as CI, for the same reason: the ~1 GB `[all,dev]` environment is
+      # this job's entire cost, and uv's cache hardlinks it into place instead of
+      # re-unpacking it on every deploy.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       # mkdocstrings imports the package to render the SDK reference, so the site
-      # build needs a real install, same as the docs CI job.
-      - run: pip install -e ".[all,dev]"
+      # build needs a real install, same as the docs gates in CI.
+      - run: uv pip install --system -e ".[all,dev]"
 
       # Sharded add-ons (src/anyinfer-*, own pyproject.toml) that ship a mkdocstrings
-      # reference page need their own editable install too — see the docs CI job.
-      - run: pip install -e src/anyinfer-store
+      # reference page need their own editable install too — see the CI gates job.
+      - run: uv pip install --system -e src/anyinfer-store
 
       - name: build the site
         run: python workspace.py build docs
@@ -101,6 +108,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

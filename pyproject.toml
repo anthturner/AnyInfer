@@ -212,7 +212,11 @@ filterwarnings = [
     # third-party drift we cannot act on from here, not a defect in our code.
     "ignore::DeprecationWarning:starlette.testclient",
 ]
-addopts = "-q"
+# `--durations` costs nothing and makes every run, including a CI log, self-profiling.
+# That is how the macOS lane's cost gets diagnosed: it runs this suite roughly four times
+# slower than Linux does, which no core-count difference explains, and the answer is not
+# reproducible on a contributor's machine.
+addopts = "-q --durations=25"
 
 [tool.importlinter]
 root_package = "anyinfer"

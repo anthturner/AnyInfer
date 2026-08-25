@@ -54,6 +54,7 @@ jobs:
   check:
     name: select snapshots due for audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       due: ${{ steps.select.outputs.due }}
     steps:
@@ -93,6 +94,7 @@ jobs:
     needs: check
     if: needs.check.outputs.due == 'true' || inputs.force_propose
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write

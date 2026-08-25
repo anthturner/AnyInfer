@@ -26,8 +26,9 @@ and the risk register. Read it before proposing or writing code. Do not contradi
 or a stated non-goal without flagging it explicitly as a proposed reversal.
 
 **Branch model:** `feature/*` → `develop` → `main`, both protected branches gated on the
-aggregate `ci-ok` check. Merges to `main` rebuild release packages; a version bump cuts a
-GitHub Release. See [docs/contributing/releasing.md](docs/contributing/releasing.md).
+aggregate `ci-ok` check. Merges to `main` rebuild the library distribution and a Linux
+bundle; a version bump builds the full bundle matrix and cuts a GitHub Release. See
+[docs/contributing/releasing.md](docs/contributing/releasing.md).
 
 ## Instruction authority and workstreams
 

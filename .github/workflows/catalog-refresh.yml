@@ -35,6 +35,7 @@ jobs:
   check:
     name: deterministic drift check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       drift: ${{ steps.drift.outputs.drift }}
     steps:
@@ -59,6 +60,7 @@ jobs:
     needs: check
     if: needs.check.outputs.drift == 'true' || inputs.force_propose
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
