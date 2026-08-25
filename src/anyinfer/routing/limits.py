@@ -290,6 +290,34 @@ class RateLimiter:
             self._refill_per_s = 0.0
 
     @property
+    def limits(self) -> RateLimits:
+        """What this limiter was configured to pace against.
+
+        Read-only, and needed by exactly one caller: `AdapterPool._govern` judges an
+        injected limiter's inertness from its own configuration rather than from the
+        settings it is being installed against.
+        """
+        return self._limits
+
+    def observed_wait_s(self) -> float:
+        """Seconds this provider's own reported windows say to wait; ``0.0`` when clear.
+
+        The same number `_dispatch_gate` already computes before pacing, exposed so a
+        caller can *report* it rather than only wait on it. This matters at a fronting
+        layer that must answer a client now: a `Retry-After` derived from the provider's
+        own headers is the provider's number, passed through — not an estimate, and not a
+        figure this library invented.
+
+        Read-only. Nothing here mutates the windows, spends a token, or takes the gate, so
+        calling it never changes what the next request is paced by.
+        """
+        now = self._clock()
+        return max(
+            self._requests.wait_s(now, self._limits.reserve_fraction),
+            self._tokens_window.wait_s(now, self._limits.reserve_fraction),
+        )
+
+    @property
     def reads_headers(self) -> bool:
         """Whether this limiter can act on the provider's reported state.
 

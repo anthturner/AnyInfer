@@ -89,6 +89,7 @@ from ..providers.base import (
 )
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.health import HealthCache
+from ..routing.limits import RateLimiter
 from ..routing.policy import Retry, Route
 from ..schema.mechanism import MechanismRung, choose_mechanism
 from ..schema.validate import extract_json, validate
@@ -267,6 +268,15 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             pool and a stable credential costs nothing. A provider that rejects a
             credential which had been working triggers the same re-resolution immediately,
             whatever the TTL says.
+        limiters: Pre-built `RateLimiter` instances keyed by provider instance id, used
+            instead of constructing one from that instance's ``limits``. For the one
+            situation the constructed path cannot serve: a caller that builds a
+            short-lived client per request around a long-lived credential, where a
+            per-client limiter paces every call against an empty bucket and discards the
+            windows the provider just reported. Limiter identity is the unit of pacing —
+            one account at one provider — so handing in the limiter that identity owns is
+            what carries the state across clients. Injection is deliberately not a
+            cross-process quota mechanism: these are in-memory objects in one loop.
     """
 
     def __init__(
@@ -296,6 +306,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
         credential_ttl_s: float | None = None,
+        limiters: Mapping[str, RateLimiter] | None = None,
     ) -> None:
         self._registry = registry or default_registry
         self._events = EventDispatcher(list(observers or []))
@@ -311,6 +322,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             # flows through the same dispatcher as request-path events.
             events=self._emit,
             credential_ttl_s=credential_ttl_s,
+            limiters=limiters,
         )
         self._default_route = route
         self._operation_routes: dict[str, Route] = dict(operation_routes or {})

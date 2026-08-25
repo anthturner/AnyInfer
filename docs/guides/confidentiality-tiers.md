@@ -160,6 +160,66 @@ A self-hosting checklist:
   only, and answers a forward-mode request with 400. Forwarding needs short-lived
   provider credentials that the wire format deliberately does not accept; call
   `Relay.handle` in-process for that mode.
+- **Set admission limits before serving more than one tenant.** `build_app` warns when
+  you have not; see below for why.
+
+### Pacing and Admission Control
+
+Two bounds, addressing two different failure modes. Both are inert until configured, and
+a Relay with neither behaves exactly as it did before they existed.
+
+**A `PacingPool` makes provider pacing work at all in forward mode.** `Relay._forward`
+builds a client per call and closes it, which is right for a BYOK credential that must die
+with the request that carried it — and wrong for pacing, because the token bucket and the
+provider's reported windows live inside that client. Every forward call therefore paced
+against an empty bucket and discarded what the provider had just said. A pool keeps the
+*limiter* across calls while the client still dies with the credential:
+
+```python
+from anyinfer_confidential.admission import TenantLimits
+from anyinfer_confidential.pacing import PacingPool
+
+relay = Relay(vault=vault, registry=registry, pacing=PacingPool())
+relay.admission().set_limits("customer-42", TenantLimits(max_in_flight=8, max_waiting=32))
+```
+
+The pool holds timing metadata only — bucket levels, window resets, latency samples — and
+keys it by a per-process salted digest of the credential, never the credential. Nothing it
+holds is written anywhere, so the tier's zero-retention claim is unchanged.
+
+**`TenantLimits` bounds what one tenant can occupy.** Over its cap, a caller waits briefly
+and is then refused with a 429 carrying `Retry-After`; what waits is a *caller*, never a
+stored request, because a durable queue would have to persist slot-fills and assembled
+prompts. Isolation is structural rather than scheduled: each tenant has its own counter,
+cap, and queue, so one tenant's burst cannot delay another's single request. There is
+deliberately no process-wide cap — that would make tenants compete for one resource and
+require arbitrating between them; set a process ceiling at the ASGI server instead.
+
+**Every number a caller is told derives only from its own state.** A successful response
+carries `RateLimit-Limit` and `RateLimit-Remaining` for the requesting tenant's own budget,
+which is what lets a client slow down before the wall rather than after it. Computing
+those from process-wide load would reopen the hole `RelayRegistry` closes on purpose: a
+tenant polling in a loop could read another tenant's traffic volume off its own response
+headers.
+
+The emitted header names are the IETF draft ones rather than bespoke `X-Relay-*` ones, so
+an AnyInfer client pointed at a Relay paces itself against them with no new client code:
+
+```python
+from anyinfer_confidential.app import RELAY_RATE_LIMIT_HEADERS
+
+settings = ai.ProviderSettings.of(
+    "openai-compat",
+    base_url="https://relay.example.com/v1",
+    limits=ai.RateLimits(respect_headers=True),
+)
+```
+
+with `RELAY_RATE_LIMIT_HEADERS()` as the dialect on a descriptor fronting that endpoint.
+
+**What this is not.** These bounds govern one process. They are not cross-process quota
+enforcement, and a multi-process Relay behind a load balancer gets one set of bounds per
+process — put a real quota gateway in front if you need a global one.
 
 ## Tier 3 (Attested Local Execution)
 

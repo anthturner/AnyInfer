@@ -163,12 +163,14 @@ class AdapterPool:
         resolver: ResolverChain | None = None,
         events: Callable[[TelemetryEvent], None] | None = None,
         credential_ttl_s: float | None = None,
+        limiters: Mapping[str, RateLimiter] | None = None,
     ) -> None:
         self._registry = registry
         self._catalog = catalog
         self._resolver = resolver or default_resolver()
         self._events = events
         self._credential_ttl_s = credential_ttl_s
+        self._injected_limiters = dict(limiters or {})
         self._credentials: dict[str, _CredentialState] = {}
         self._clock = time.monotonic
         self._settings: dict[str, ProviderSettings] = {}
@@ -512,7 +514,31 @@ class AdapterPool:
         A provider that builds its own transport gets its limiter registered anyway — the
         client applies concurrency around the call, and the limiter is skipped here because
         there is nothing of ours to wrap.
+
+        An **injected** limiter wins over a constructed one. This is the single place a
+        `RateLimiter` is built, which is what makes injection a seam rather than a
+        refactor: a caller that constructs short-lived clients around one long-lived key
+        can hand in the limiter that key's pacing state belongs to, and the token bucket
+        and header-observed windows survive the client. Limiter *identity* is what
+        `anyinfer.routing.limits` already says the unit of pacing is — one account at one
+        provider — so preserving it is exactly the semantics, where exporting and
+        re-importing its private state would not be.
         """
+        injected = self._injected_limiters.get(provider_id)
+        if injected is not None:
+            # Inertness is judged from the injected limiter's own configuration, not the
+            # settings': the caller owning that limiter is the one who decided what it
+            # paces against, and reading the settings here would let an unconfigured
+            # `ProviderSettings` silently discard a limiter the caller deliberately
+            # supplied.
+            if not injected.limits.active:
+                return settings.transport
+            self._limiters[provider_id] = injected
+            if descriptor.governs_own_transport:
+                return settings.transport
+            inner = settings.transport or httpx2.AsyncHTTPTransport()
+            return GoverningTransport(inner, injected)
+
         limits = settings.limits
         if limits is None or not limits.active:
             return settings.transport

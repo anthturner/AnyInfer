@@ -10,7 +10,9 @@ test functions), and prose/comment slop (sampled 10k+ `src/` lines plus `docs/`,
 keeps `file:line` anchors valid at the commit above — paths and symbol names are the
 durable anchors.
 
-**This is a hitlist, not a burn-down.** Nothing here has been changed. Cite items as
+**This is a hitlist, not a burn-down.** Three items have since landed and are ticked in
+place — C.3, F.5, and H.3, all on `feature/core-features-wave`, 2026-08-25. Nothing else
+here has been changed. Cite items as
 `DEBLOAT B.3` to scope future work; check off `- [ ]` when an item lands. Indices are
 local to this document (they do not collide with `CODEBASE_STATUS.md`'s A–H).
 
@@ -272,7 +274,11 @@ the conformance suite, and diff recorded wire bodies where tests capture them.
   corrupts silently. Mandatory guard: golden-file fixtures for all four formats
   (one exists: `tests/manifests/plugin_fixture.json`) asserting byte-stable output
   *before* the consolidation starts. With goldens in place, 🟡.
-- [ ] **C.3 · Sync facade drift guard** — `sync_client.py` is correctly logic-free (every
+- [x] **C.3 · Sync facade drift guard** — *done 2026-08-25
+  (`feature/core-features-wave`): `test_every_forwarded_method_keeps_the_async_signature`
+  walks `inspect.signature` over every forwarded method and compares keyword-only
+  parameters and their defaults. Verified to fail on injected drift rather than passing
+  vacuously.* Original finding: `sync_client.py` is correctly logic-free (every
   method forwards to the async client), but 508 of 918 lines restate 22-param signatures
   with **no parity test and no codegen**: a kwarg added to `AsyncClient.embed` silently
   never exists on `Client.embed`. Cheapest fix is not deletion — add one
@@ -566,10 +572,12 @@ no snapshot-blob problem, `test_library_coverage.py` is real coverage (don't tou
   all hard-reference `contracts/NEW-PROVIDER.md` — that file must keep its path and its
   procedure-owner role; the docs page becomes the pointer, not the other way around. The
   strict docs build catches broken links.
-- [ ] **F.5 · Decide `plans/RATE_LIMIT_AWARENESS.md`** — 27 KB, self-declared "not
-  started", referenced by nothing. Queue it or archive it. **0–27 KB · Effort XS**
-  **Risk:** 🟢 — it's a decision about a file nothing references; git history keeps it
-  either way.
+- [x] **F.5 · Decide `plans/RATE_LIMIT_AWARENESS.md`** — *decided 2026-08-25 by
+  executing it. All six phases landed on `feature/core-features-wave`: the render offload,
+  pooled pacing state with its core injection seam, per-tenant admission control, the
+  429/400/404 taxonomy with IETF rate-limit headers, the exact-and-estimated backoff
+  paths, and the declared dialect with its round-trip guard. The plan file was deleted
+  once implemented; git history keeps it.*
 - [ ] **F.6 · Delete ~50 section-banner comments** — `# ---- selection ----…` navigation
   chrome, concentrated in `anyinfer_demo/` (~35) and `cli.py` (11). The only unambiguous
   comment slop in the codebase. **~50 lines · Effort XS · Conf high**
@@ -607,8 +615,7 @@ no snapshot-blob problem, `test_library_coverage.py` is real coverage (don't tou
    embed/rerank loop sleeps unconditionally (`operations.py:96` vs `generation.py`
    `_route_events`). See C.1. *Fix risk 🟡: either direction is a user-observable timing
    change; pick one deliberately and note it.*
-3. **Sync facade has no drift guard** — see C.3; one XS test closes the class. *Fix risk
-   🟢.*
+3. ~~**Sync facade has no drift guard**~~ — *fixed 2026-08-25; see C.3.*
 4. **`fakes.py:1240 _vector`** hardcodes `range(8)` where its four siblings honor
    `self._dimensions` — a fake that lies about dimensions under non-default config. *Fix
    risk 🟢 internally, 🟡 for downstream users of the documented testing API whose tests
@@ -622,8 +629,7 @@ no snapshot-blob problem, `test_library_coverage.py` is real coverage (don't tou
 ## Suggested order — now organized as risk lanes
 
 **🟢 Green lane (do in any order, no guards needed):**
-G.1 (credential — today), G.2 (targeted purge), C.3 (parity test), H.1 + H.3 (bug fixes),
-F.5, F.6, A.4, A.5, E.2, E.3, E.4, E.6 (mechanical hoists), E.7, A.3 (with the docs-grep
+G.1 (credential — today), G.2 (targeted purge), H.1 (bug fix), F.6, A.4, A.5, E.2, E.3, E.4, E.6 (mechanical hoists), E.7, A.3 (with the docs-grep
 step), B.3, B.6 (spelling-only), D.3, D.4 (either direction), D.10, F.4, D.8's add-tests
 path. **Roughly 2,500–3,000 LOC of pruning with no realistic way to lose.**
 
