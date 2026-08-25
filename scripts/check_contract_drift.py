@@ -111,6 +111,10 @@ def check_url(url: str, *, timeout: float = 15.0) -> dict[str, Any]:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return {"url": url, "status": response.status, "reachable": True}
     except urllib.error.HTTPError as error:
+        # An HTTPError *is* a response object -- it subclasses the same wrapper `urlopen`
+        # returns -- so it holds the connection until it is closed. Every version leaked
+        # it here; 3.14 is the first to say so, warning from the finalizer.
+        error.close()
         return {"url": url, "status": error.code, "reachable": error.code != 404}
     except (urllib.error.URLError, TimeoutError, OSError) as error:
         # A transport failure is not a finding. Treating a flaky network as drift would

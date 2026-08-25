@@ -53,6 +53,8 @@ def _head(url: str) -> tuple[int, int | None]:
             length = response.headers.get("content-length")
             return response.status, int(length) if length and length.isdigit() else None
     except urllib.error.HTTPError as error:
+        # See check_contract_drift.check_url: an HTTPError holds a connection until closed.
+        error.close()
         return error.code, None
 
 
@@ -63,7 +65,9 @@ def _get_json(url: str, headers: dict[str, str] | None = None) -> tuple[int, Any
         with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
             return response.status, json.load(response), response.headers
     except urllib.error.HTTPError as error:
-        return error.code, None, error.headers
+        headers = error.headers
+        error.close()
+        return error.code, None, headers
 
 
 def check_models(path: Path = MODELS_PATH) -> list[str]:

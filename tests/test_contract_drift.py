@@ -8,6 +8,7 @@ that quietly drops snapshots produces a rotation nobody notices is incomplete.
 from __future__ import annotations
 
 import datetime as dt
+import io
 import sys
 from pathlib import Path
 
@@ -127,6 +128,30 @@ class TestUrlChecks:
 
         monkeypatch.setattr(cli.urllib.request, "urlopen", fail)
         assert cli.check_url("https://example.test/gone")["reachable"] is False
+
+    def test_a_404_response_is_closed_rather_than_left_to_the_collector(self) -> None:
+        """An `HTTPError` is a response object, so dropping one leaks its connection.
+
+        Python 3.14 was the first version to say so -- its `tempfile` finalizer warns,
+        and with warnings-as-errors that surfaced as an unraisable exception attributed
+        to whichever test happened to be running when the collector caught up. The leak
+        itself predates that by every version. Asserting the close directly pins the fix
+        on interpreters that still say nothing.
+        """
+        import urllib.error
+
+        leaked = urllib.error.HTTPError(
+            "https://example.test/gone", 404, "Not Found", {}, io.BytesIO(b"")
+        )
+
+        def fail(*_args: object, **_kwargs: object) -> object:
+            raise leaked
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(cli.urllib.request, "urlopen", fail)
+            assert cli.check_url("https://example.test/gone")["status"] == 404
+
+        assert leaked.fp.closed, "check_url must close the HTTPError it consumed"
 
     def test_a_transport_failure_is_not_a_finding(
         self, monkeypatch: pytest.MonkeyPatch
