@@ -42,6 +42,8 @@ from ..types.requests import (
     GenerationRequest,
     Sampling,
     SchemaSpec,
+    ServerToolKind,
+    ServerToolSpec,
     ToolSpec,
 )
 from ..types.results import Generation, Usage
@@ -56,6 +58,7 @@ from .openai_codec import (
     CONTEXT_FIELD,
     HISTORY_FIELD,
     MANIFEST_FIELD,
+    SERVER_TOOLS_FIELD,
     VIDEO_CONTENT_TYPE,
     _decode_arena,
     _decode_base64,
@@ -70,7 +73,9 @@ from .openai_codec import (
     _opt_float,
     _opt_int,
     _parse_arguments,
+    decode_server_tools,
     encode_citation,
+    encode_server_tool_uses,
 )
 
 __all__ = [
@@ -165,8 +170,40 @@ def request_from_responses(
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
         logprobs=_opt_int(body.get("top_logprobs")),
         cite_documents=_decode_flag(body, CITE_DOCUMENTS_FIELD),
+        server_tools=_decode_response_server_tools(body),
     )
     return target, request, bool(body.get("stream"))
+
+
+def _decode_response_server_tools(body: Mapping[str, Any]) -> tuple[ServerToolSpec, ...]:
+    """Read server tools from this dialect's own `tools` array, or from the extension.
+
+    Responses is the one dialect with a native home for these: a provider-run capability
+    is a `tools` entry whose ``type`` names it, sitting beside the function declarations.
+    So a stock client asking for `{"type": "web_search"}` is understood as written, and the
+    `anyinfer_server_tools` extension exists only for the ceiling this dialect cannot
+    express — and for parity with the chat route, which has no native surface at all.
+    """
+    native: Mapping[str, ServerToolKind] = {
+        "web_search": "web_search",
+        "web_search_preview": "web_search",
+        "code_interpreter": "code_execution",
+    }
+    kinds: list[ServerToolKind] = []
+    raw_tools = body.get("tools")
+    if isinstance(raw_tools, list):
+        for entry in raw_tools:
+            if isinstance(entry, Mapping):
+                mapped = native.get(str(entry.get("type", "")))
+                if mapped is not None and mapped not in kinds:
+                    kinds.append(mapped)
+
+    extension = {spec.kind: spec for spec in decode_server_tools(body.get(SERVER_TOOLS_FIELD))}
+    # A `max_uses` from the extension wins for a kind the native array also named: the
+    # native form cannot express one, so the extension is the only place it could come from.
+    specs = [extension.pop(kind, ServerToolSpec(kind=kind)) for kind in kinds]
+    specs.extend(extension.values())
+    return tuple(specs)
 
 
 def _reasoning_effort(raw: Any) -> Any:
@@ -445,6 +482,8 @@ def encode_response(
         "error": None,
         "incomplete_details": _incomplete_details(result),
     }
+    if result.server_tool_uses:
+        body[SERVER_TOOLS_FIELD] = encode_server_tool_uses(result.server_tool_uses)
     usage = _encode_usage(result.usage)
     if usage is not None:
         body["usage"] = usage

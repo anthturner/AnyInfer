@@ -38,6 +38,7 @@ from ..types.messages import (
     VideoPart,
 )
 from ..types.requests import (
+    SERVER_TOOL_KINDS,
     ArenaPolicy,
     CachePolicy,
     GenerationRequest,
@@ -45,9 +46,17 @@ from ..types.requests import (
     ReasoningEffort,
     Sampling,
     SchemaSpec,
+    ServerToolSpec,
     ToolSpec,
 )
-from ..types.results import Citation, FinishReason, Generation, TokenLogprob, Usage
+from ..types.results import (
+    Citation,
+    FinishReason,
+    Generation,
+    ServerToolUse,
+    TokenLogprob,
+    Usage,
+)
 
 __all__ = [
     "ARENA_FIELD",
@@ -58,13 +67,16 @@ __all__ = [
     "HISTORY_FIELD",
     "MANIFEST_FIELD",
     "OPENAI_FINISH_REASONS",
+    "SERVER_TOOLS_FIELD",
     "VIDEO_CONTENT_TYPE",
     "chunk_from_event",
     "completion_from_generation",
     "decode_messages",
+    "decode_server_tools",
     "encode_citation",
     "encode_logprobs",
     "encode_messages",
+    "encode_server_tool_uses",
     "final_chunk",
     "manifest_chunk",
     "request_from_openai",
@@ -132,6 +144,18 @@ response is byte-identical to what it was before citations existed.
 CITE_DOCUMENTS_FIELD = "anyinfer_cite_documents"
 """Request-body extension asking the target to attribute its answer to supplied documents."""
 
+SERVER_TOOLS_FIELD = "anyinfer_server_tools"
+"""Request-body extension asking the provider to run tools of its own, and the result-side
+report of how many times it did.
+
+Chat completions has no surface for these — its ``tools`` array is client-executed
+functions, and putting a provider-run capability there would make a stock client try to
+execute something that already ran. Request form is a list of
+``{"kind": "web_search", "max_uses": 3}``; response form is a list of
+``{"kind": "web_search", "uses": 2}``, counts only. The Responses dialect carries the same
+request shape but has native output items for the results.
+"""
+
 VIDEO_CONTENT_TYPE = "anyinfer_video"
 """Message-content extension carrying a video input part.
 
@@ -170,6 +194,7 @@ _RESERVED_FIELDS = frozenset(
         HISTORY_FIELD,
         CACHE_FIELD,
         CITE_DOCUMENTS_FIELD,
+        SERVER_TOOLS_FIELD,
         MANIFEST_FIELD,
         ARENA_FIELD,
         CONTEXT_FIELD,
@@ -460,8 +485,42 @@ def request_from_openai(
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
         logprobs=_decode_logprobs(body),
         cite_documents=_decode_flag(body, CITE_DOCUMENTS_FIELD),
+        server_tools=decode_server_tools(body.get(SERVER_TOOLS_FIELD)),
     )
     return target, request, bool(body.get("stream"))
+
+
+def decode_server_tools(raw: Any) -> tuple[ServerToolSpec, ...]:
+    """Decode the server-tool request extension, shared by both dialects.
+
+    Raises:
+        ValueError: The value is not a list of objects, or names a kind this library does
+            not have. Refused rather than skipped: a caller who misspelled ``web_serach``
+            would otherwise get a confident answer assembled without any search at all.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError(f"{SERVER_TOOLS_FIELD} must be an array")
+    specs: list[ServerToolSpec] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise ValueError(f"each {SERVER_TOOLS_FIELD} entry must be an object")
+        kind = entry.get("kind")
+        if kind not in SERVER_TOOL_KINDS:
+            raise ValueError(
+                f"unknown server tool kind {kind!r}; known kinds are "
+                + ", ".join(SERVER_TOOL_KINDS)
+            )
+        specs.append(
+            ServerToolSpec(kind=kind, max_uses=_opt_int(entry.get("max_uses")))
+        )
+    return tuple(specs)
+
+
+def encode_server_tool_uses(uses: Sequence[ServerToolUse]) -> list[dict[str, Any]]:
+    """Encode the result-side counts, shared by both dialects."""
+    return [{"kind": use.kind, "uses": use.uses} for use in uses]
 
 
 def _decode_flag(body: Mapping[str, Any], field_name: str) -> bool:
@@ -875,6 +934,12 @@ def request_to_openai(
     if request.cite_documents:
         body[CITE_DOCUMENTS_FIELD] = True
 
+    if request.server_tools:
+        body[SERVER_TOOLS_FIELD] = [
+            {"kind": spec.kind, **({"max_uses": spec.max_uses} if spec.max_uses else {})}
+            for spec in request.server_tools
+        ]
+
     if request.reasoning is not None:
         body["reasoning_effort"] = request.reasoning
 
@@ -989,6 +1054,8 @@ def completion_from_generation(
     }
     if result.logprobs:
         body["choices"][0]["logprobs"] = encode_logprobs(result.logprobs)
+    if result.server_tool_uses:
+        body[SERVER_TOOLS_FIELD] = encode_server_tool_uses(result.server_tool_uses)
     if result.citations:
         body["choices"][0][CITATIONS_FIELD] = [
             encode_citation(citation) for citation in result.citations

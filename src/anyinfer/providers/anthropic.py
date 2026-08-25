@@ -34,6 +34,7 @@ from ..types.capabilities import (
 from ..types.events import (
     CitationDelta,
     ReasoningDelta,
+    ServerToolDelta,
     TextDelta,
     ToolCallDelta,
     UsageUpdate,
@@ -48,8 +49,14 @@ from ..types.messages import (
     ToolResult,
     VideoPart,
 )
-from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import Citation, FinishReason, Usage
+from ..types.requests import (
+    ReasoningEffort,
+    Sampling,
+    ServerToolKind,
+    ServerToolSpec,
+    ToolSpec,
+)
+from ..types.results import Citation, FinishReason, ServerToolUse, Usage
 from ._multimodal import base64_data, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
@@ -258,7 +265,11 @@ class AnthropicAdapter:
 
         self._apply_sampling(payload, req.sampling)
 
-        tools = [self._encode_tool(t) for t in req.tools]
+        # Server tools lead: they are typed blocks the API matches by `type`, not by name,
+        # and keeping them first leaves the caller's own declarations contiguous for the
+        # cache mark below, which covers everything before the *last* entry.
+        tools: list[dict[str, Any]] = [_encode_server_tool(spec) for spec in req.server_tools]
+        tools.extend(self._encode_tool(t) for t in req.tools)
         if req.mechanism in ("json_schema", "grammar") and req.wire_schema is not None:
             # Anthropic has no response-format field: a schema is emulated as a single
             # forced tool call, which the API *does* constrain (open question 7).
@@ -420,6 +431,21 @@ class AnthropicAdapter:
         if kind == "content_block_start":
             block = chunk.get("content_block")
             index = chunk.get("index")
+            if isinstance(block, Mapping) and block.get("type") == "server_tool_use":
+                tool_kind = _SERVER_TOOL_KINDS.get(str(block.get("name", "")))
+                if tool_kind is not None:
+                    state.server_tools[tool_kind] = state.server_tools.get(tool_kind, 0) + 1
+                    yield ServerToolDelta(kind=tool_kind, status="started")
+                return
+            if isinstance(block, Mapping) and block.get("type") in _SERVER_TOOL_RESULTS:
+                tool_kind = _SERVER_TOOL_RESULTS[str(block.get("type"))]
+                failed = isinstance(block.get("content"), Mapping) and (
+                    block["content"].get("type") == "web_search_tool_result_error"
+                )
+                yield ServerToolDelta(
+                    kind=tool_kind, status="failed" if failed else "completed"
+                )
+                return
             if (
                 isinstance(block, Mapping)
                 and isinstance(index, int)
@@ -494,12 +520,24 @@ class AnthropicAdapter:
 class _StreamState:
     """Tracks stop reason, usage, and the mapping from block index to tool slot."""
 
-    __slots__ = ("answer_length", "cited_through", "finish_reason", "tool_slots", "usage")
+    __slots__ = (
+        "answer_length",
+        "cited_through",
+        "finish_reason",
+        "server_tools",
+        "tool_slots",
+        "usage",
+    )
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots: dict[int, int] = {}
+        self.server_tools: dict[ServerToolKind, int] = {}
+        """How many times each server-side tool started, counted from its own blocks.
+
+        Anthropic also reports a `server_tool_use` total in usage, but only for search;
+        counting the blocks covers every kind uniformly and needs no per-kind branch."""
         self.answer_length = 0
         self.cited_through = 0
         """How far into the answer the citations so far have reached.
@@ -528,6 +566,10 @@ class _StreamState:
         return AdapterFinal(
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
+            server_tool_uses=tuple(
+                ServerToolUse(kind=kind, uses=count)
+                for kind, count in sorted(self.server_tools.items())
+            ),
         )
 
 
@@ -535,6 +577,35 @@ def _option_str(options: Mapping[str, Any], key: str) -> str:
     """Read one option as a stripped string, treating anything else as absent."""
     value = options.get(key)
     return value.strip() if isinstance(value, str) else ""
+
+
+_SERVER_TOOL_KINDS: Mapping[str, ServerToolKind] = {
+    "web_search": "web_search",
+    "code_execution": "code_execution",
+}
+"""The tool *name* on a `server_tool_use` block, mapped back to the normalized kind."""
+
+_SERVER_TOOL_RESULTS: Mapping[str, ServerToolKind] = {
+    "web_search_tool_result": "web_search",
+    "code_execution_tool_result": "code_execution",
+}
+"""Result block types, which name their tool in the type rather than in a field."""
+
+_ANTHROPIC_SERVER_TOOLS: Mapping[str, tuple[str, str]] = {
+    # (wire type, tool name). The type carries a date because Anthropic versions these
+    # tools in the type itself — a pin recorded in the contract snapshot, not a guess.
+    "web_search": ("web_search_20250305", "web_search"),
+    "code_execution": ("code_execution_20250522", "code_execution"),
+}
+
+
+def _encode_server_tool(spec: ServerToolSpec) -> dict[str, Any]:
+    """Encode one server tool as Anthropic's dated tool block."""
+    wire_type, name = _ANTHROPIC_SERVER_TOOLS[spec.kind]
+    encoded: dict[str, Any] = {"type": wire_type, "name": name}
+    if spec.max_uses is not None:
+        encoded["max_uses"] = spec.max_uses
+    return encoded
 
 
 def _parse_citation(raw: Any, state: _StreamState) -> Citation | None:
@@ -622,6 +693,8 @@ _ANTHROPIC_FEATURES = (
     | Feature.CACHE_USAGE
     | Feature.CACHE_PLACEMENT
     | Feature.CITATIONS
+    | Feature.WEB_SEARCH
+    | Feature.CODE_EXECUTION
 )
 
 
@@ -699,6 +772,7 @@ descriptor = ProviderDescriptor(
     ),
     reasoning_translator=_translate_reasoning,
     ignored_parameters=("seed", "presence_penalty", "frequency_penalty", "logprobs"),
+    server_tools=frozenset({"web_search", "code_execution"}),
     default_capabilities=ModelCapabilities(features=Sourced(_ANTHROPIC_FEATURES, "default")),
     # Per-segment `cache_control` marks, up to four breakpoints, with a documented
     # minimum cacheable prefix. Recorded in contracts/anthropic.md.

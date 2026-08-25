@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from .messages import ToolCall
-from .requests import CacheMechanism, ResolvedTarget
+from .requests import CacheMechanism, ResolvedTarget, ServerToolKind
 
 if TYPE_CHECKING:  # pragma: no cover — imported for the annotation only
     from ..context_request import ContextSummary
@@ -27,6 +27,7 @@ __all__ = [
     "Generation",
     "Mechanism",
     "Outcome",
+    "ServerToolUse",
     "Timing",
     "TokenLogprob",
     "Usage",
@@ -34,6 +35,25 @@ __all__ = [
 
 DETAIL_MAX_CHARS = 512
 """Upper bound on `ErrorInfo.detail`, applied after redaction."""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerToolUse:
+    """How many times the provider ran one of its own tools during a generation.
+
+    A count, not a transcript. What a provider searched for is caller content and the
+    provider's own reasoning about it; carrying either through this library's result type
+    would put prompt-adjacent text somewhere the zero-payload telemetry rules do not
+    reach. The count is what a caller actually needs — these are billed per invocation, so
+    the question the result must answer is "how many did I just pay for?"
+
+    Attributes:
+        kind: Which capability ran.
+        uses: How many invocations the provider reported.
+    """
+
+    kind: ServerToolKind
+    uses: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -379,6 +399,9 @@ class Generation:
             the request asked for them and the target returned them. Empty otherwise —
             including for a target that accepted the request and answered without them,
             which is reported as a dropped parameter rather than inferred from this field.
+        server_tool_uses: How many times the target ran each of its own tools. Empty when
+            none were requested or none ran. Counts only — see `ServerToolUse` for why the
+            queries and results are deliberately absent.
         citations: Attributions the target reported for this answer, in the order it
             reported them. Empty when none were returned, which includes every target that
             does not produce them — the presence of citations is a provider capability,
@@ -403,3 +426,4 @@ class Generation:
     context_reduction: ContextSummary | None = None
     logprobs: tuple[TokenLogprob, ...] = ()
     citations: tuple[Citation, ...] = ()
+    server_tool_uses: tuple[ServerToolUse, ...] = ()

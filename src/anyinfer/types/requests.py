@@ -28,6 +28,7 @@ __all__ = [
     "DEFAULT_TIMEOUT_S",
     "HISTORY_MODES",
     "MAX_TOP_LOGPROBS",
+    "SERVER_TOOL_KINDS",
     "ArenaPolicy",
     "CacheMechanism",
     "CacheMode",
@@ -41,6 +42,8 @@ __all__ = [
     "ResolvedTarget",
     "Sampling",
     "SchemaSpec",
+    "ServerToolKind",
+    "ServerToolSpec",
     "SpendPolicy",
     "SupportsJSONSchema",
     "Target",
@@ -150,6 +153,59 @@ Not every provider can express it. Where a provider publishes a reasoning enum w
 off value, the descriptor omits the field rather than substituting a level the caller did
 not ask for; each `ReasoningTranslator` documents its own choice.
 """
+
+
+ServerToolKind = Literal["web_search", "code_execution"]
+"""A tool the *provider* runs, rather than one the caller runs.
+
+Only two, and deliberately so: these are the capabilities several providers execute
+server-side inside a single request/response, which is squarely translate-only territory.
+Anything requiring the caller to run code, hold state between turns, or plan is a
+client-executed `ToolSpec` — or an agent framework, which this
+library is explicitly not.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerToolSpec:
+    """A capability the provider executes itself during one generation.
+
+    Distinct from `ToolSpec` in the one way that matters: nothing comes back to the caller
+    to run. The provider searches, or executes code, inside the same request and folds the
+    result into its own answer — so there is no tool-call loop, no arguments to parse, and
+    no result to feed back.
+
+    Kept to a normalized kind plus a use ceiling rather than a per-provider option bag.
+    Each provider spells these very differently (a dated tool type, a bare marker object, a
+    container spec), and a spec that carried every provider's knobs would be the per-engine
+    branch this library exists to remove. Provider-specific tuning stays in
+    ``provider_options``, where it is visibly provider-specific.
+
+    Attributes:
+        kind: Which capability to enable.
+        max_uses: Most invocations the provider may make within one generation, or
+            ``None`` for the provider's own default. Worth having typed because these are
+            billed per invocation: a search tool with no ceiling is an unbounded line
+            item on a request the caller thought was fixed-price.
+    """
+
+    kind: ServerToolKind
+    max_uses: int | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a ceiling no provider could act on.
+
+        Raises:
+            ValueError: The kind is unknown, or the use ceiling is not positive.
+        """
+        if self.kind not in SERVER_TOOL_KINDS:
+            raise ValueError(f"unknown server tool kind {self.kind!r}")
+        if self.max_uses is not None and self.max_uses < 1:
+            raise ValueError("server tool max_uses must be at least 1 when set")
+
+
+SERVER_TOOL_KINDS: tuple[ServerToolKind, ...] = ("web_search", "code_execution")
+"""Every `ServerToolKind`, for validation and for iterating the set."""
 
 
 @runtime_checkable
@@ -612,6 +668,13 @@ class GenerationRequest:
             additionally asks for that many runners-up. A target known not to report them
             emits a dropped-parameter event rather than returning an empty ``logprobs``
             a caller would have to notice for themselves.
+        server_tools: Capabilities the *provider* should run itself during this
+            generation — web search, code execution. Empty by default and never inferred:
+            every one is billed per invocation, and a request that quietly started
+            searching would surprise a caller on their bill rather than in their output.
+            A target whose capabilities trustedly lack one refuses before dispatch, since
+            an answer produced without the search the caller asked for is a different
+            answer, not a degraded one.
         cite_documents: Ask the target to attribute its answer to the documents this
             request supplied. Every dialect that can do this treats it as a request-side
             opt-in — a model does not volunteer citations — and several bill differently
@@ -639,6 +702,7 @@ class GenerationRequest:
     context: ContextRequest | None = None
     logprobs: int | None = None
     cite_documents: bool = False
+    server_tools: tuple[ServerToolSpec, ...] = ()
 
     def __post_init__(self) -> None:
         """Enforce multimodal request byte ceilings before any adapter can run."""

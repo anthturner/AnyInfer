@@ -13,10 +13,23 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..types.events import CitationDelta, ReasoningDelta, TextDelta, ToolCallDelta
+from ..types.events import (
+    CitationDelta,
+    ReasoningDelta,
+    ServerToolDelta,
+    TextDelta,
+    ToolCallDelta,
+)
 from ..types.messages import ToolCall
 from ..types.requests import CacheMechanism, ResolvedTarget
-from ..types.results import Citation, FinishReason, Timing, TokenLogprob, Usage
+from ..types.results import (
+    Citation,
+    FinishReason,
+    ServerToolUse,
+    Timing,
+    TokenLogprob,
+    Usage,
+)
 
 __all__ = ["AttemptBuffer", "ToolCallBuffer"]
 
@@ -90,6 +103,7 @@ class AttemptBuffer:
     raw: Any | None = None
     logprobs: tuple[TokenLogprob, ...] = ()
     citations: list[Citation] = field(default_factory=list)
+    server_tool_uses: tuple[ServerToolUse, ...] = ()
     cache_mechanism: CacheMechanism | None = None
     """Which prompt-cache mechanism was engaged for this attempt, when any was.
 
@@ -97,7 +111,10 @@ class AttemptBuffer:
     once, before dispatch, and a repair round trip reuses it.
     """
 
-    def absorb(self, event: TextDelta | ReasoningDelta | ToolCallDelta | CitationDelta) -> None:
+    def absorb(
+        self,
+        event: TextDelta | ReasoningDelta | ToolCallDelta | CitationDelta | ServerToolDelta,
+    ) -> None:
         """Accumulate one content event."""
         if isinstance(event, TextDelta):
             self.text_parts.append(event.text)
@@ -105,6 +122,11 @@ class AttemptBuffer:
             self.reasoning_parts.append(event.text)
         elif isinstance(event, CitationDelta):
             self.citations.append(event.citation)
+        elif isinstance(event, ServerToolDelta):
+            # Lifecycle only: the terminal event carries the counts, which is the one
+            # thing worth keeping. Accumulating starts and finishes here would double-count
+            # a provider that reports both.
+            return
         else:
             slot = self.tool_calls.get(event.index)
             if slot is None:

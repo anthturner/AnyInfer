@@ -142,6 +142,40 @@ raising mid-render.
 Streaming callers get each attribution as it lands, via a `CitationDelta`, without waiting
 for the final result.
 
+## Let the Provider Run Its Own Tools
+
+Several providers can search the web or execute code *inside* one request, folding the
+result into their own answer. Nothing comes back for you to run:
+
+```python
+result = client.generate(
+    "What shipped in Python 3.14?",
+    target="anthropic:claude-sonnet-4-5",
+    server_tools=(ai.ServerToolSpec(kind="web_search", max_uses=3),),
+)
+
+for use in result.server_tool_uses:
+    print(f"{use.kind} ran {use.uses} time(s)")
+```
+
+Off by default and never inferred, because each invocation is billed. `max_uses` bounds
+that where the provider can express it — a search tool with no ceiling is an unbounded
+line item on a request you thought was fixed-price. Providers that take no ceiling report
+it dropped rather than accepting it silently.
+
+Unlike every other unhonored request parameter, a server tool the target cannot run is
+**refused before dispatch** rather than reported dropped. The distinction is what you get
+back: a dropped `temperature` still answers your question, while an answer produced
+without the search you asked for is a different answer built from stale training data —
+and it looks exactly like a good one. Two things are checked: whether this library has a
+wire form for that provider at all, and whether the model itself supports it.
+
+`ServerToolUse` carries a count and nothing else. What the provider searched for is your
+own content and its reasoning about it; the count is what you actually need, because the
+question a result must answer here is how many invocations you just paid for. Streaming
+callers get a `ServerToolDelta` when one starts and finishes, which is what distinguishes
+a pause for a slow search from a stalled connection.
+
 ## Handle Failures
 
 All public failures derive from `AnyInferError` and carry structured fields. Branch on

@@ -42,6 +42,7 @@ from ..types.capabilities import (
 from ..types.events import (
     CitationDelta,
     ReasoningDelta,
+    ServerToolDelta,
     TextDelta,
     ToolCallDelta,
     UsageUpdate,
@@ -57,8 +58,14 @@ from ..types.messages import (
     VideoPart,
 )
 from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent
-from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import Citation, FinishReason, TokenLogprob, Usage
+from ..types.requests import ReasoningEffort, Sampling, ServerToolKind, ToolSpec
+from ..types.results import (
+    Citation,
+    FinishReason,
+    ServerToolUse,
+    TokenLogprob,
+    Usage,
+)
 from ._multimodal import base64_data
 from .base import (
     AdapterEvent,
@@ -372,10 +379,14 @@ class GeminiAdapter:
         if config:
             payload["generationConfig"] = config
 
+        tools: list[dict[str, Any]] = [
+            dict(_GEMINI_SERVER_TOOLS[spec.kind]) for spec in req.server_tools
+        ]
         if req.tools:
-            payload["tools"] = [
-                {"functionDeclarations": [self._encode_tool(t) for t in req.tools]}
-            ]
+            tools.append({"functionDeclarations": [self._encode_tool(t) for t in req.tools]})
+        if tools:
+            payload["tools"] = tools
+        if req.tools:
             mode = self._encode_tool_choice(req.tool_choice)
             if mode is not None:
                 payload["toolConfig"] = {"functionCallingConfig": mode}
@@ -572,6 +583,7 @@ class GeminiAdapter:
             phases=final.phases,
             raw=body,
             logprobs=final.logprobs,
+            server_tool_uses=final.server_tool_uses,
         )
 
     def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
@@ -625,6 +637,13 @@ class GeminiAdapter:
                 continue
             yield from self._events_from_part(part, state)
 
+        # Search is reported as grounding metadata on the candidate rather than as a part,
+        # so it is counted here; code execution arrives as parts and is counted there.
+        queries = _nested_list(candidate.get("groundingMetadata"), "webSearchQueries")
+        if queries and not state.server_tools.get("web_search"):
+            state.server_tools["web_search"] = len(queries)
+            yield ServerToolDelta(kind="web_search", status="completed")
+
     def _events_from_part(
         self, part: Mapping[str, Any], state: _StreamState
     ) -> Iterable[AdapterEvent]:
@@ -637,6 +656,19 @@ class GeminiAdapter:
                 yield ReasoningDelta(text)
             else:
                 yield TextDelta(text)
+
+        if isinstance(part.get("executableCode"), Mapping):
+            state.server_tools["code_execution"] = (
+                state.server_tools.get("code_execution", 0) + 1
+            )
+            yield ServerToolDelta(kind="code_execution", status="started")
+        result = part.get("codeExecutionResult")
+        if isinstance(result, Mapping):
+            outcome = str(result.get("outcome", ""))
+            yield ServerToolDelta(
+                kind="code_execution",
+                status="completed" if outcome.endswith("OK") else "failed",
+            )
 
         call = part.get("functionCall")
         if isinstance(call, Mapping):
@@ -661,13 +693,21 @@ class GeminiAdapter:
 class _StreamState:
     """Accumulates cross-chunk streaming state so the final event is complete."""
 
-    __slots__ = ("citations_emitted", "finish_reason", "logprobs", "tool_slots", "usage")
+    __slots__ = (
+        "citations_emitted",
+        "finish_reason",
+        "logprobs",
+        "server_tools",
+        "tool_slots",
+        "usage",
+    )
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots = 0
         self.logprobs: list[TokenLogprob] = []
+        self.server_tools: dict[ServerToolKind, int] = {}
         self.citations_emitted = 0
         """How many citation sources have already been yielded.
 
@@ -692,7 +732,28 @@ class _StreamState:
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
             logprobs=tuple(self.logprobs),
+            server_tool_uses=tuple(
+                ServerToolUse(kind=kind, uses=count)
+                for kind, count in sorted(self.server_tools.items())
+            ),
         )
+
+
+_GEMINI_SERVER_TOOLS: Mapping[str, Mapping[str, Any]] = {
+    # Bare marker objects, and they are *siblings* of `functionDeclarations` in the same
+    # `tools` array rather than entries beside the declarations — which is why the tools
+    # list is assembled rather than replaced.
+    "web_search": {"googleSearch": {}},
+    "code_execution": {"codeExecution": {}},
+}
+
+
+def _nested_list(container: Any, key: str) -> list[Any]:
+    """Read a list from a mapping, treating anything else as absent."""
+    if not isinstance(container, Mapping):
+        return []
+    value = container.get(key)
+    return value if isinstance(value, list) else []
 
 
 def _parse_citations(metadata: Any, state: _StreamState) -> Iterable[Citation]:
@@ -907,6 +968,8 @@ _GEMINI_FEATURES = (
     | Feature.LOGPROBS
     | Feature.VIDEO_IN
     | Feature.CITATIONS
+    | Feature.WEB_SEARCH
+    | Feature.CODE_EXECUTION
 )
 
 
@@ -964,6 +1027,9 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
+    server_tools=frozenset({"web_search", "code_execution"}),
+    # Bare marker objects with no per-tool ceiling, as with the Responses dialect.
+    ignored_parameters=("server_tools.max_uses",),
     default_capabilities=ModelCapabilities(features=Sourced(_GEMINI_FEATURES, "default")),
 )
 """Descriptor for the Google Gemini provider."""

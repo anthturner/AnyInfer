@@ -88,6 +88,7 @@ def build_wire_request(
         tool_choice=request.tool_choice,
         cache_marks=cache_marks,
         cite_documents=request.cite_documents and _model_cites(request, capabilities),
+        server_tools=request.server_tools,
         logprobs=request.logprobs if _model_reports_logprobs(request, capabilities) else None,
         stream=stream,
         timeout_s=request.effective_timeout_s,
@@ -215,6 +216,9 @@ def dropped_parameters(
         "frequency_penalty": request.sampling.frequency_penalty,
         "logprobs": request.logprobs,
         "cite_documents": request.cite_documents or None,
+        "server_tools.max_uses": next(
+            (spec.max_uses for spec in request.server_tools if spec.max_uses is not None), None
+        ),
         "reasoning": request.reasoning,
         "tools": request.tools or None,
     }

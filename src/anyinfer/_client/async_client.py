@@ -142,6 +142,7 @@ from ..types.requests import (
     ResolvedTarget,
     Sampling,
     SchemaSpec,
+    ServerToolSpec,
     SpendPolicy,
     SupportsJSONSchema,
     Target,
@@ -1347,6 +1348,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         context: ContextRequest | None = None,
         logprobs: int | None = None,
         cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1373,6 +1375,12 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         dialect treats it as a request-side opt-in and several bill a cited answer
         differently.
 
+        ``server_tools`` asks the *provider* to run capabilities of its own during the
+        generation — web search, code execution. Off by default and never inferred: each is
+        billed per invocation. A target that cannot run one refuses before dispatch rather
+        than answering as though it had, since an answer built without the search that was
+        asked for is a different answer, not a degraded one.
+
         Returns:
             The assembled `Generation`.
 
@@ -1395,6 +1403,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             context=context,
             logprobs=logprobs,
             cite_documents=cite_documents,
+            server_tools=server_tools,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1649,6 +1658,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         context: ContextRequest | None = None,
         logprobs: int | None = None,
         cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1675,6 +1685,12 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         dialect treats it as a request-side opt-in and several bill a cited answer
         differently.
 
+        ``server_tools`` asks the *provider* to run capabilities of its own during the
+        generation — web search, code execution. Off by default and never inferred: each is
+        billed per invocation. A target that cannot run one refuses before dispatch rather
+        than answering as though it had, since an answer built without the search that was
+        asked for is a different answer, not a degraded one.
+
         Returns:
             An `AsyncStream`: an async iterator of
             `StreamEvent`, usable as an async context manager,
@@ -1695,6 +1711,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             context=context,
             logprobs=logprobs,
             cite_documents=cite_documents,
+            server_tools=server_tools,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1834,6 +1851,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         context: ContextRequest | None = None,
         logprobs: int | None = None,
         cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
     ) -> GenerationRequest:
         spec = SchemaSpec.coerce(schema) if schema is not None else None
         request = GenerationRequest(
@@ -1851,6 +1869,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             context=context,
             logprobs=logprobs,
             cite_documents=cite_documents,
+            server_tools=tuple(server_tools),
             provider_options=dict(provider_options or {}),
             metadata=dict(metadata or {}),
             max_input_part_bytes=(
@@ -2376,6 +2395,65 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
                 f"{resolved} does not support attached {labels} input",
                 provider=resolved.provider_id,
                 hint="choose a model whose capabilities include the required input modality",
+            )
+
+    def _check_server_tools(
+        self,
+        request: GenerationRequest,
+        resolved: ResolvedTarget,
+        capabilities: ModelCapabilities,
+    ) -> None:
+        """Refuse a server tool this target cannot run, from either of two facts.
+
+        A refusal rather than a dropped parameter, which is the opposite of how an
+        unhonored sampling knob is handled — and the difference is what the caller gets
+        back. A dropped ``temperature`` still produces the answer they asked for, slightly
+        differently sampled. An answer produced *without* the web search they asked for is
+        a different answer built from stale training data, and it arrives looking exactly
+        like a good one.
+
+        Two checks, because two different things can be missing and only one of them is
+        ever in doubt:
+
+        - **The adapter has no way to ask.** `ProviderDescriptor.server_tools` is a fact
+          about this repository's own code, so it is checked unconditionally. Ninety-five
+          of the registered adapters never read the field, and without this every one of
+          them would answer as though the tool had run.
+        - **The model cannot run it.** That is a capability, so it follows the same
+          trusted-absence rule as everything else: a ``default``-provenance feature set is
+          a guess, and refusing on a guess would break targets that would have worked.
+
+        Raises:
+            anyinfer.errors.UnsupportedInputError: The target cannot run a requested tool.
+        """
+        if not request.server_tools:
+            return
+        requested = {spec.kind for spec in request.server_tools}
+
+        descriptor_tools = self._pool.descriptor_for(resolved.provider_id).server_tools
+        unspeakable = sorted(requested - set(descriptor_tools))
+        if unspeakable:
+            raise UnsupportedInputError(
+                f"{resolved.provider_id} has no wire form for the requested server-side "
+                f"tool(s): {', '.join(unspeakable)}",
+                provider=resolved.provider_id,
+                hint="choose a provider that runs these itself, or drop server_tools",
+            )
+
+        if capabilities.features.provenance not in TRUSTED_PROVENANCE:
+            return
+        required = {
+            "web_search": Feature.WEB_SEARCH,
+            "code_execution": Feature.CODE_EXECUTION,
+        }
+        available = capabilities.features.value
+        missing = sorted(kind for kind in requested if required[kind] not in available)
+        if missing:
+            raise UnsupportedInputError(
+                f"{resolved} cannot run the requested server-side tool(s): "
+                + ", ".join(missing),
+                provider=resolved.provider_id,
+                hint="choose a model whose capabilities include them, or drop server_tools",
             )
 
     def _operation_capabilities(self, resolved: ResolvedTarget) -> ModelCapabilities | None:

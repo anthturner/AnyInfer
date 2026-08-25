@@ -23,6 +23,14 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   `max_output_tokens`, `temperature`, `top_p`, `top_logprobs`,
   `reasoning: {"effort": <none|minimal|low|medium|high>}` (normalized effort translated here),
   `text.format` for structured output (json_schema), `tools`
+- **Server-side tools** (added 2026-08-25) are bare marker objects in `tools[]`:
+  `{"type": "web_search"}` and `{"type": "code_interpreter", "container": {"type": "auto"}}`.
+  Neither takes a per-tool use ceiling, so `server_tools.max_uses` is declared in
+  `ignored_parameters`. Lifecycle arrives as typed stream events —
+  `response.web_search_call.in_progress`/`.completed` and the `code_interpreter_call`
+  pair. The intermediate `.searching`/`.interpreting` events are deliberately not mapped:
+  they say the same thing with more granularity than a normalized status carries, and
+  counting them would inflate the invocation count.
 - **Absent from this dialect** (verified 2026-08-25): `seed`, `presence_penalty`, and
   `frequency_penalty` exist on chat-completions but not on Responses, so the adapter never
   sends them and the descriptor declares all three in `ignored_parameters`.

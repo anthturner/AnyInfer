@@ -45,6 +45,10 @@ The request side of the one primitive: everything a `GenerationRequest` can carr
 
 ::: anyinfer.ToolSpec
 
+::: anyinfer.ServerToolSpec
+
+::: anyinfer.ServerToolKind
+
 ::: anyinfer.ToolChoice
 
 ::: anyinfer.ToolResult

@@ -286,6 +286,13 @@ class GenerationExecutionMixin:
             capabilities: ModelCapabilities,
         ) -> None: ...
 
+        def _check_server_tools(
+            self,
+            request: GenerationRequest,
+            resolved: ResolvedTarget,
+            capabilities: ModelCapabilities,
+        ) -> None: ...
+
         def _check_spend(
             self,
             request: GenerationRequest,
@@ -771,6 +778,7 @@ class GenerationExecutionMixin:
         # Money is checked in the same place as size, and for the same reason: a refusal
         # that costs a round trip is a refusal that already spent something.
         self._check_multimodal(request, resolved, capabilities)
+        self._check_server_tools(request, resolved, capabilities)
         self._check_spend(request, resolved, capabilities, request_id=request_id)
 
         if self._context_gate:
@@ -903,6 +911,7 @@ class GenerationExecutionMixin:
                         yield UsageUpdate(final.usage)
                 active_buffer.phases.update(final.phases)
                 active_buffer.logprobs = final.logprobs
+                active_buffer.server_tool_uses = final.server_tool_uses
                 if self._retain_raw:
                     active_buffer.raw = final.raw
 
@@ -1056,6 +1065,7 @@ class GenerationExecutionMixin:
             context_reduction=context_summary,
             logprobs=buffer.logprobs,
             citations=tuple(buffer.citations),
+            server_tool_uses=buffer.server_tool_uses,
         )
 
     def _plan_cache(

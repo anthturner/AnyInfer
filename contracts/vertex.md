@@ -135,6 +135,14 @@ gecko model). Output dimensions: up to 3,072 for `gemini-embedding-001`, up to 7
 the default when `outputDimensionality` is not set).
 
 ## Watchlist
+
+- **Server-side tools are not claimed here, though the adapter inherits Gemini's
+  projection.** Vertex has published a different spelling for grounded search than the
+  Gemini API at various points (`googleSearchRetrieval` versus `googleSearch`), and the
+  current one has not been verified against Google's own documentation. The descriptor
+  therefore declares no `server_tools`, so a request naming one is refused locally rather
+  than sent as a block Vertex may reject. Verify the spelling on the next drift run and
+  declare it then. Noted 2026-08-25.
 - **Claude on Vertex** uses `rawPredict`/`streamRawPredict` with the Anthropic Messages
   body and an `anthropic_version` field — a different surface this adapter does not cover.
   Reachable today by pointing the **anthropic** adapter's `base_url` at it.

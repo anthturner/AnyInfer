@@ -20,14 +20,22 @@ from ..types.capabilities import DiscoveredModel, Health
 from ..types.events import (
     CitationDelta,
     ReasoningDelta,
+    ServerToolDelta,
     TextDelta,
     ToolCallDelta,
     UsageUpdate,
 )
 from ..types.messages import Message
 from ..types.operations import EmbeddingInputIntent
-from ..types.requests import Sampling, ToolSpec
-from ..types.results import Diagnostic, FinishReason, Mechanism, TokenLogprob, Usage
+from ..types.requests import Sampling, ServerToolSpec, ToolSpec
+from ..types.results import (
+    Diagnostic,
+    FinishReason,
+    Mechanism,
+    ServerToolUse,
+    TokenLogprob,
+    Usage,
+)
 
 if TYPE_CHECKING:
     from ..events.telemetry import TelemetryEvent
@@ -167,6 +175,9 @@ class WireRequest:
             policy, and for every provider whose cache needs no marks. An adapter's whole
             duty here is to spell each mark in its own wire format; deciding *where* they
             go is the core's, and belongs to `anyinfer.capabilities.cache`.
+        server_tools: Capabilities the provider should run itself. Already gated by
+            capability — an adapter that receives one may enable it, and one that cannot
+            never sees it, because the core refuses that request before dispatch.
         cite_documents: Whether the caller asked supplied documents to be cited. Only
             providers declaring the capability receive ``True``; an adapter that gets it
             turns on its dialect's citation flag, which for every dialect that has one is
@@ -199,6 +210,7 @@ class WireRequest:
     timeout_s: float = 120.0
     max_response_bytes: int = 1_048_576
     cache_marks: tuple[int, ...] = ()
+    server_tools: tuple[ServerToolSpec, ...] = ()
     cite_documents: bool = False
     logprobs: int | None = None
     extra_options: Mapping[str, Any] = field(default_factory=dict)
@@ -217,6 +229,8 @@ class AdapterFinal:
             on the result only when the client opted in via ``retain_raw``.
         session_state: Continuation data to remember for the next turn of an open
             session, or ``None`` when there is none. Opaque to the core.
+        server_tool_uses: How many times the provider ran each of its own tools. Counts
+            only; never the queries or their results.
         logprobs: Per-token log-probabilities the provider returned, in generation order.
             Empty when none were requested or the provider returned none. Carried on the
             terminal event rather than streamed per token because no dialect emits them
@@ -229,10 +243,17 @@ class AdapterFinal:
     raw: Any | None = None
     session_state: Mapping[str, Any] | None = None
     logprobs: tuple[TokenLogprob, ...] = ()
+    server_tool_uses: tuple[ServerToolUse, ...] = ()
 
 
 AdapterEvent = (
-    TextDelta | ReasoningDelta | ToolCallDelta | CitationDelta | UsageUpdate | AdapterFinal
+    TextDelta
+    | ReasoningDelta
+    | ToolCallDelta
+    | CitationDelta
+    | ServerToolDelta
+    | UsageUpdate
+    | AdapterFinal
 )
 """The strict subset of events an adapter may emit."""
 

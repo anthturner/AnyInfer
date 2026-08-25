@@ -64,6 +64,15 @@ native protocol is used instead.
   <int>` (added 2026-08-25). The count is the number of *alternatives* per position;
   Gemini rejects `logprobs: 0`, so a request for the chosen token alone sends the boolean
   without the count.
+- **Server-side tools** (added 2026-08-25) are marker objects that are *siblings* of the
+  declarations rather than entries inside them: `tools: [{googleSearch: {}}, {codeExecution:
+  {}}, {functionDeclarations: [...]}]`. No per-tool ceiling exists, so
+  `server_tools.max_uses` is declared in `ignored_parameters`. `toolConfig` applies only to
+  function declarations and is omitted when there are none.
+- Search reports back as `candidates[].groundingMetadata.webSearchQueries` — on the
+  candidate, not as a part — so invocations are counted from that list's length. Code
+  execution arrives as parts: `executableCode` (invocation) and `codeExecutionResult` with
+  an `outcome` (`OUTCOME_OK` or otherwise).
 - `tools[0].functionDeclarations[]`: `{name, description, parameters}` with parameters
   projected to the accepted schema subset.
 - `toolConfig.functionCallingConfig`: `{mode: "NONE"|"ANY", allowedFunctionNames?}`.

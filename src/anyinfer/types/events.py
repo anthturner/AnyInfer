@@ -25,12 +25,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from .requests import ServerToolKind
 from .results import AttemptRecord, Citation, Generation, Usage
 
 __all__ = [
     "AttemptFailed",
     "CitationDelta",
     "ReasoningDelta",
+    "ServerToolDelta",
+    "ServerToolStatus",
     "StreamEnded",
     "StreamEvent",
     "TextDelta",
@@ -98,6 +101,33 @@ class CitationDelta:
     citation: Citation
 
 
+ServerToolStatus = Literal["started", "completed", "failed"]
+"""Where a provider-run tool is in its lifecycle."""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerToolDelta:
+    """The provider started or finished running one of its own tools.
+
+    Emitted so a caller watching a stream can say *why* an answer paused — a web search
+    can take seconds, and a stream that simply stops producing text for that long is
+    indistinguishable from a stalled connection.
+
+    Content-free by construction: the query and the result are not carried. And
+    deliberately **not** a content event, so it does not start the first-token clock; a
+    provider that searches before writing anything has not produced a token yet, and
+    reporting one would make time-to-first-token mean something different for those
+    requests than for every other.
+
+    Attributes:
+        kind: Which capability ran.
+        status: Where in its lifecycle it is.
+    """
+
+    kind: ServerToolKind
+    status: ServerToolStatus
+
+
 @dataclass(frozen=True, slots=True)
 class UsageUpdate:
     """A usage report; may arrive mid-stream and more than once."""
@@ -146,6 +176,7 @@ StreamEvent = (
     | ReasoningDelta
     | ToolCallDelta
     | CitationDelta
+    | ServerToolDelta
     | UsageUpdate
     | TimingMark
     | AttemptFailed

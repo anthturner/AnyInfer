@@ -29,7 +29,14 @@ from ..types.capabilities import (
     RateLimitHeaders,
     Sourced,
 )
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    ReasoningDelta,
+    ServerToolDelta,
+    ServerToolStatus,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import (
     AudioPart,
     DocumentPart,
@@ -41,8 +48,8 @@ from ..types.messages import (
     VideoPart,
 )
 from ..types.operations import EmbeddingCapabilities
-from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, TokenLogprob, Usage
+from ..types.requests import ReasoningEffort, Sampling, ServerToolKind, ToolSpec
+from ..types.results import FinishReason, ServerToolUse, TokenLogprob, Usage
 from ._logprobs import parse_logprob_entries
 from ._multimodal import base64_data, data_url, media_subtype, unsupported
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
@@ -216,8 +223,13 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
         elif req.mechanism == "json_mode":
             payload["text"] = {"format": {"type": "json_object"}}
 
+        server_tools = [_OPENAI_SERVER_TOOLS[spec.kind] for spec in req.server_tools]
+        if req.tools or server_tools:
+            payload["tools"] = [
+                *(dict(tool) for tool in server_tools),
+                *(self._encode_tool(t) for t in req.tools),
+            ]
         if req.tools:
-            payload["tools"] = [self._encode_tool(t) for t in req.tools]
             payload["tool_choice"] = self._encode_tool_choice(req.tool_choice)
 
         payload.update(req.reasoning_wire)
@@ -266,6 +278,13 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
             delta = chunk.get("delta")
             if isinstance(delta, str) and delta:
                 yield ReasoningDelta(delta)
+            return
+
+        if kind in _SERVER_TOOL_EVENTS:
+            tool_kind, status = _SERVER_TOOL_EVENTS[kind]
+            if status == "started":
+                state.server_tools[tool_kind] = state.server_tools.get(tool_kind, 0) + 1
+            yield ServerToolDelta(kind=tool_kind, status=status)
             return
 
         if kind == "response.output_item.added":
@@ -325,7 +344,14 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
 class _StreamState:
     """Tracks finish reason, usage, and output-index to tool-slot mapping."""
 
-    __slots__ = ("finish_reason", "logprobs", "saw_tool_call", "tool_slots", "usage")
+    __slots__ = (
+        "finish_reason",
+        "logprobs",
+        "saw_tool_call",
+        "server_tools",
+        "tool_slots",
+        "usage",
+    )
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
@@ -333,6 +359,7 @@ class _StreamState:
         self.tool_slots: dict[int, int] = {}
         self.saw_tool_call = False
         self.logprobs: list[TokenLogprob] = []
+        self.server_tools: dict[ServerToolKind, int] = {}
 
     def tool_slot(self, output_index: int) -> int:
         """Map an output-item index onto a dense tool-call slot."""
@@ -350,7 +377,31 @@ class _StreamState:
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
             logprobs=tuple(self.logprobs),
+            server_tool_uses=tuple(
+                ServerToolUse(kind=kind, uses=count)
+                for kind, count in sorted(self.server_tools.items())
+            ),
         )
+
+
+_OPENAI_SERVER_TOOLS: Mapping[str, Mapping[str, Any]] = {
+    # Bare marker objects: this dialect names the capability in `type` and takes no
+    # per-tool ceiling, so `max_uses` has nowhere to go here and is reported dropped.
+    "web_search": {"type": "web_search"},
+    "code_execution": {"type": "code_interpreter", "container": {"type": "auto"}},
+}
+
+_SERVER_TOOL_EVENTS: Mapping[str, tuple[ServerToolKind, ServerToolStatus]] = {
+    "response.web_search_call.in_progress": ("web_search", "started"),
+    "response.web_search_call.completed": ("web_search", "completed"),
+    "response.code_interpreter_call.in_progress": ("code_execution", "started"),
+    "response.code_interpreter_call.completed": ("code_execution", "completed"),
+}
+"""Typed lifecycle events this dialect emits per server-tool invocation.
+
+Only the two ends are mapped. The intermediate `.searching`/`.interpreting` events say
+the same thing as `in_progress` with more granularity than a normalized status carries,
+and counting them would inflate the invocation count this feeds."""
 
 
 def _finish_reason(response: Mapping[str, Any], state: _StreamState) -> FinishReason:
@@ -504,6 +555,8 @@ _OPENAI_FEATURES = (
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
     | Feature.LOGPROBS
+    | Feature.WEB_SEARCH
+    | Feature.CODE_EXECUTION
 )
 
 
@@ -567,7 +620,15 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
-    ignored_parameters=("seed", "presence_penalty", "frequency_penalty"),
+    ignored_parameters=(
+        "seed",
+        "presence_penalty",
+        "frequency_penalty",
+        # The dialect names each server tool in `type` and takes no per-tool
+        # ceiling, so a `max_uses` the caller set has nowhere to go.
+        "server_tools.max_uses",
+    ),
+    server_tools=frozenset({"web_search", "code_execution"}),
     default_capabilities=ModelCapabilities(features=Sourced(_OPENAI_FEATURES, "default")),
     # Prompt caching is automatic on a stable prefix — there is nothing to mark, so the
     # core's only duty is to leave the prefix undisturbed. Recorded in contracts/openai.md.

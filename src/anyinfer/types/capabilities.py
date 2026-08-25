@@ -181,6 +181,8 @@ class Feature(Flag):
     LOGPROBS = auto()
     VIDEO_IN = auto()
     CITATIONS = auto()
+    WEB_SEARCH = auto()
+    CODE_EXECUTION = auto()
 
 
 @dataclass(frozen=True, slots=True)

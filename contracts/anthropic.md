@@ -34,6 +34,14 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
   `stop_sequences`, `tools`, `tool_choice`; reasoning-effort wire form recorded in
   `output_config: {"effort": e}` — VERIFY on first drift run (extended
   thinking may instead use `thinking: {"type":"enabled","budget_tokens":N}`)
+- **Server-side tools** (added 2026-08-25) are `tools[]` entries whose `type` carries a
+  **date**: `web_search_20250305` and `code_execution_20250522`, each with a `name` and an
+  optional `max_uses`. The date is part of the wire type, so a version bump upstream is a
+  contract change here rather than a silent behaviour change. Results stream as
+  `server_tool_use` blocks (invocation) and `web_search_tool_result` /
+  `code_execution_tool_result` blocks (outcome); a failure is a nested
+  `web_search_tool_result_error`. Only invocation *counts* are surfaced — the queries and
+  results are caller-adjacent content.
 - Citations (added 2026-08-25) are a **per-document request-side opt-in**:
   `content[].citations: {"enabled": true}` on a `document` block. Without it the model
   answers without attributions, and Anthropic bills a cited answer differently, so it is

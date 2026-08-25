@@ -283,6 +283,29 @@ running beside the files. [Context reduction](../concepts/context-reduction.md) 
 the strategies; [fit a corpus to a context budget](../guides/fitting-context.md) covers
 choosing one.
 
+## Provider-Run Tools
+
+`anyinfer_server_tools` asks the provider to search the web or execute code inside the
+request. Chat completions has no surface for these — its `tools` array is client-executed
+functions, and putting a provider-run capability there would make a stock client try to
+execute something that already ran:
+
+```json
+{"anyinfer_server_tools": [{"kind": "web_search", "max_uses": 3}]}
+```
+
+The response carries the counts back under the same name, `[{"kind": "web_search", "uses":
+2}]` — counts only, since what the provider searched for is caller content.
+
+On `/v1/responses` these have a native home: a `tools` entry whose `type` names the
+capability, beside the function declarations. A stock Responses client asking for
+`{"type": "web_search"}` is understood as written, and the extension is needed only for the
+use ceiling that dialect cannot express.
+
+A target that cannot run a requested tool is refused rather than answering without it. That
+is the opposite of how an unhonored sampling knob is handled, deliberately: an answer built
+without the search that was asked for is a different answer, not a degraded one.
+
 ## Attributions
 
 `anyinfer_cite_documents: true` asks the target to attribute its answer to the documents
@@ -350,7 +373,7 @@ The sidecar, CLI, and Python SDK use the same
       all reachable from a stock OpenAI client.
     - The AnyInfer extensions (`anyinfer_manifest`, `anyinfer_history`, `anyinfer_cache`,
       `anyinfer_context`, `anyinfer_arena`, `anyinfer_cite_documents`/
-      `anyinfer_citations`, and the `anyinfer_video` content item) are additive: a client
+      `anyinfer_citations`, `anyinfer_server_tools`, and the `anyinfer_video` content item) are additive: a client
       that does not send them receives a plain OpenAI completion.
     - A non-loopback bind requires both `--allow-remote-exposure` and a bearer token, and
       backend credentials never transit the frontend.

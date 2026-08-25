@@ -94,7 +94,7 @@ batch.
 | ✅ | B.2 | new | Observability guide contradicts the shipped sinks it never mentions | 2 | 4 | 8 | S |
 | ✅ | C.1 | new | `anyinfer.credential_stores` entry-point group undocumented | 2 | 4 | 8 | S |
 | ✅ | D.1 | new | `anyinfer_cache` wire extension: undocumented, one-way, untested | 2 | 4 | 8 | S |
-| `[ ]` | E.3 | E.3 | Provider-native server-side tools (web search, code execution) | 4 | 2 | 8 | XL |
+| ✅ | E.3 | E.3 | Provider-native server-side tools (web search, code execution) | 4 | 2 | 8 | XL |
 | ✅ | D.2 | new | Proxy/TLS settings do not reach auth token exchanges; boundary unstated | 2 | 3 | 6 | S |
 | ✅ | E.4 | E.4 | Typed citations / grounded-generation output | 3 | 2 | 6 | L |
 | ✅ | F.3 | new | Credential-store plugins can shadow built-in schemes | 2 | 3 | 6 | S |
@@ -595,8 +595,14 @@ Two scope decisions are recorded rather than left implicit:
   quietly loosened for one modality no longer means what its name says, and the
   hosted-URI path providers actually expect carries no bytes to count.
 
-**E.5 closed later in the same wave**: `serve/responses_codec.py` and its route, with the
-dialect's semantic streaming events. **E.1 and E.3 remain open**, both XL.
+**E.5 and E.3 closed later in the same wave**: the Responses route with its semantic
+streaming events, and provider-run server tools across the Anthropic, Responses, and Gemini
+dialects. **E.1 alone remains open.**
+
+E.3 introduced one thing worth knowing about: `ProviderDescriptor.server_tools` is checked
+*unconditionally*, unlike a capability flag. Ninety-five registered adapters never read the
+field, so without a declaration the core could trust, every one of them would have answered
+as though the tool had run.
 
 Four v1 misses closed this window with real implementations: per-instance **proxy/CA/mTLS**
 (v1 E.9), **plugin entry-point groups** for credential stores and observers (v1 E.10),
@@ -635,24 +641,6 @@ and cost accounting on their highest-volume traffic.
   serialization; typed submitted/completed lifecycle events.
 - [ ] **E.1.3** The run-retention non-goal holds: AnyInfer never persists the job registry —
   the handle is the caller's to store.
-
-## E.3 — Provider-native server-side tools (web search, code execution)
-
-**Severity:** Medium-High · **Confidence:** High · **Was:** E.3
-
-**Expected because:** Anthropic, OpenAI, Gemini, and xAI all ship server-executed tools;
-"grounded answer with fresh web results" is a top application feature. **Evidence of absence
-(re-verified):** `grep -rniE "web_search|server_tool|code_interpreter" src/anyinfer` → zero
-code hits; `ToolSpec` models client-executed tools only. The "not an agent framework"
-non-goal fences planning/memory, not provider-native passthrough — the provider executes the
-tool inside one request/response, squarely translate-only territory.
-
-**Remediation sketch:**
-- [ ] **E.3.1** Add a `ServerToolSpec` union member beside `ToolSpec`, typed per capability
-  (`web_search`, `code_execution`), capability-declared with provenance so unsupported
-  targets refuse before dispatch.
-- [ ] **E.3.2** Map server-tool result blocks to a typed event; add per-invocation pricing
-  line items.
 
 # F. Security posture
 
