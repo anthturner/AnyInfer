@@ -199,7 +199,16 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+# The shards' own suites are included, not just `tests/`. They were excluded, so 64 tests
+# — including the Relay's authentication and body-cap tests — never ran in CI or in
+# `workspace check`, on a branch whose whole point was closing security findings. A shard
+# ships as its own distribution but is developed in this tree, so it is gated here.
+testpaths = [
+    "tests",
+    "src/anyinfer-store/tests",
+    "src/anyinfer-shared/tests",
+    "src/anyinfer-confidential/tests",
+]
 markers = [
     # Two tracks, so the inner loop is seconds and the gate is still exhaustive.
     # `workspace test` runs the fast track; `workspace test --all` and CI run everything.

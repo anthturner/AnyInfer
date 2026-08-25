@@ -291,12 +291,41 @@ def _hash_fd(fd: int) -> str:
     digest = hashlib.sha256()
     offset = 0
     while True:
-        block = os.pread(fd, _HASH_CHUNK_BYTES, offset)
+        block = _read_at(fd, _HASH_CHUNK_BYTES, offset)
         if not block:
             break
         offset += len(block)
         digest.update(block)
     return digest.hexdigest()
+
+
+def _read_at(fd: int, size: int, offset: int) -> bytes:
+    """Read from a descriptor at an absolute offset, leaving its file position alone.
+
+    `os.pread` is POSIX-only; Windows has no equivalent, so there the offset is set and
+    restored around a plain `os.read`. What must survive that substitution is the property
+    the caller depends on: the bytes come from *this descriptor*, never from reopening a
+    path that may name a different file by now. Seeking does not weaken it — the
+    descriptor is still the only handle involved.
+
+    The file position is restored because the caller holds these descriptors open past
+    verification and hands them to the loader; leaving the offset at EOF would silently
+    give the loader an empty file.
+
+    Note:
+        Unlike `pread`, the fallback is not atomic against another thread reading the same
+        descriptor concurrently. Nothing here shares a descriptor across threads —
+        verification runs to completion before the fd is handed on — so the two behave
+        identically in this use.
+    """
+    if hasattr(os, "pread"):
+        return os.pread(fd, size, offset)
+    saved = os.lseek(fd, 0, os.SEEK_CUR)
+    try:
+        os.lseek(fd, offset, os.SEEK_SET)
+        return os.read(fd, size)
+    finally:
+        os.lseek(fd, saved, os.SEEK_SET)
 
 
 def _weight_files(weights_path: Path) -> list[Path]:

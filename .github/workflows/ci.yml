@@ -133,7 +133,10 @@ jobs:
       # mkdocstrings imports every documented package to render its reference pages, so
       # sharded add-ons (src/anyinfer-*, each its own pyproject.toml and never folded into
       # the root package) need their own editable install for the docs gates below.
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
 
       # Every gate goes through `workspace check` so the phases a contributor runs
       # locally and the commands CI runs cannot drift apart. Each phase echoes the
@@ -211,7 +214,10 @@ jobs:
       # `workspace build all` (exercised by test_workspace.py) builds the docs site as
       # part of "all", and mkdocstrings imports every sharded add-on (src/anyinfer-*) to
       # render its reference pages — same reason the gates job installs it above.
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
 
       # The PySide6 wheel ships Qt's own libraries but still links against the system's
       # EGL/GL/xkbcommon/D-Bus stack, which the Linux runner image does not carry. Missing
@@ -256,7 +262,10 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
       - run: uv pip install -e ".[all,dev]"
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
       - name: install Qt's system libraries
         run: |
           sudo apt-get update -qq
@@ -290,7 +299,10 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
       - run: uv pip install -e ".[all,dev]"
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
       - name: pytest
         run: python workspace.py check --only=test
 

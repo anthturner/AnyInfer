@@ -457,7 +457,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     # their own test suites must exercise the working tree. A non-editable install here
     # means a shard's tests silently run against a stale copy in site-packages, which is
     # exactly what hid two security fixes from their own tests once already.
-    for shard in ("src/anyinfer-store", "src/anyinfer-shared", "src/anyinfer-confidential"):
+    for shard in SHARDS:
         python("-m", "pip", "install", "-e", shard)
     print()
     print(green("Environment ready.") + " Try `workspace check` or `workspace demo`.")
@@ -540,6 +540,17 @@ _DOCSTRING_INHERITED_EXEMPT = frozenset(
     }
 )
 """Members every exported class inherits; requiring docstrings for these is noise."""
+
+SHARDS = ("src/anyinfer-store", "src/anyinfer-shared", "src/anyinfer-confidential")
+"""The sharded add-ons, each its own pyproject.toml per the monorepo sharding convention.
+
+Named once because two places must agree: `cmd_setup`, which builds a contributor's
+environment, and `.github/workflows/ci.yml`, which builds CI's. When they disagreed, CI
+installed one of the three — so the docs build failed on an unimportable shard, and 64
+shard tests never ran anywhere. `tests/test_workspace.py` asserts the workflow installs
+exactly this list, so adding a shard cannot silently skip either environment again.
+"""
+
 
 _PUBLIC_SURFACES = (
     "anyinfer",

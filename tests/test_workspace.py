@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -534,3 +535,51 @@ class TestParser:
         described = workspace._describe(handler)
         assert "``" not in described
         assert described.startswith("Summary line.")
+
+
+class TestShardParity:
+    """The shards must be installed and gated in every environment that claims to run them.
+
+    These exist because the two environment definitions drifted: `workspace setup`
+    installed all three shards, CI installed one. The docs build then failed on an
+    unimportable shard, and 64 shard tests — including the Relay's authentication and
+    body-cap tests — ran nowhere at all. Neither symptom pointed at the cause.
+    """
+
+    def test_every_shard_on_disk_is_declared(self):
+        """A new shard directory must join `SHARDS`, or it is installed nowhere."""
+        on_disk = sorted(
+            path.as_posix()
+            for path in (workspace.ROOT / "src").glob("anyinfer-*")
+            if path.is_dir() and (path / "pyproject.toml").exists()
+        )
+        declared = sorted((workspace.ROOT / shard).as_posix() for shard in workspace.SHARDS)
+        assert on_disk == declared
+
+    def test_the_ci_workflow_installs_exactly_the_declared_shards(self):
+        """CI's environment and a contributor's are built from one list, not two."""
+        workflow = (workspace.ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        install_lines = [
+            line for line in workflow.splitlines() if "uv pip install -e src/anyinfer-" in line
+        ]
+        assert install_lines, "no shard install step found in ci.yml"
+
+        for line in install_lines:
+            installed = sorted(
+                token for token in line.split() if token.startswith("src/anyinfer-")
+            )
+            assert installed == sorted(workspace.SHARDS), (
+                f"ci.yml installs {installed}, but workspace.SHARDS is "
+                f"{sorted(workspace.SHARDS)} — the two environments would diverge"
+            )
+
+    def test_every_shard_suite_is_collected(self):
+        """A shard's tests must be gated, not merely present in the tree."""
+        testpaths = tomllib.loads(
+            (workspace.ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        )["tool"]["pytest"]["ini_options"]["testpaths"]
+
+        for shard in workspace.SHARDS:
+            suite = f"{shard}/tests"
+            if (workspace.ROOT / suite).is_dir():
+                assert suite in testpaths, f"{suite} exists but is not in testpaths"

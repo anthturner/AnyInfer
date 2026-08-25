@@ -125,6 +125,8 @@ batch.
 | ✅ | H.1 | new | Documented `verify` + `client_cert` combination is a `TypeError` in httpx2 | 4 | 5 | 20 | S |
 | ✅ | H.2 | new | Copilot `cli_path` is a `TypeError`; `aclose` leaks the CLI process | 4 | 5 | 20 | S |
 | ✅ | H.3 | new | Dead `filterwarnings` exemption silently covers future starlette drift | 1 | 4 | 4 | XS |
+| ✅ | I.1 | new | CI installs 1 of 3 shards; 64 shard tests gated nowhere | 4 | 5 | 20 | S |
+| ✅ | I.2 | new | `os.pread` is POSIX-only; every Windows lane fails | 4 | 5 | 20 | XS |
 | 🚧 | C.4 | C.3.2 | Delete add-on install caveats when the first PyPI release ships | 1 | 1 | 1 | XS |
 
 ---
@@ -1164,4 +1166,78 @@ named anywhere in `src/` checked for existence. Only the copilot adapter was bro
 Warnings-as-errors proved nothing about any of it, because a warning only fires on code a
 test actually runs — which is the whole reason the sweep was needed.
 
+---
 
+# I. Gate integrity
+
+## I.0 Why this section exists
+
+Section H covers a dependency changing under us. This one covers the gate itself being
+unable to see a defect: an environment CI builds differently from the one a contributor
+builds, a suite that is present in the tree but collected by nothing, a platform lane
+whose failure no local run can reproduce. Both items below were found the same way — by
+opening the first pull request this branch ever had, which is the first time CI ran on any
+of its nineteen commits.
+
+**Both were pre-existing on this branch, and neither was introduced by the v2 remediation
+pass.** They are recorded here because the pass is what surfaced them, and because a
+status document that reports a green local gate while CI is red would be exactly the kind
+of claim section B exists to prevent.
+
+## I.1 — CI installed one of three shards; 64 shard tests ran nowhere
+
+**Severity:** Medium-High · **Confidence:** High (reproduced in CI) · **Was:** new
+**Paths:** `.github/workflows/ci.yml`, `workspace.py` (`SHARDS`, `cmd_setup`),
+`pyproject.toml` (`testpaths`)
+
+**Brief:** Two environment definitions had drifted apart. `workspace setup` installs all
+three sharded add-ons editable; `ci.yml` installed only `anyinfer-store`, in all four of
+its install sites — while the comment directly above that line correctly said *"sharded
+add-ons (src/anyinfer-*, …) need their own editable install"*. Consequences:
+
+- **`docs-build` failed** — mkdocstrings imports every documented package, and
+  `docs/reference/api/confidential.md` (added in `ae60818`) resolves
+  `anyinfer_confidential`, which was not installed.
+- **`build all` failed** — `cmd_build`'s `all` target includes `docs`, so the same strict
+  mkdocs build ran inside `tests/test_workspace.py::TestBuild`, one test, no useful
+  message beyond `assert 1 == 0`.
+- **64 shard tests were collected by nothing.** `testpaths = ["tests"]` excluded
+  `src/anyinfer-*/tests` entirely, so they ran neither in CI nor in `workspace check` —
+  including the Relay authentication and body-cap tests added by F.4 and F.5 *in this very
+  pass*, on a branch whose purpose was closing security findings.
+
+**Long:** Invisible until now because CI runs on pull requests, and this branch had never
+had one — nineteen commits, first run. Locally everything passed, because a developer
+environment built by `workspace setup` has all three shards.
+
+**Remediation:**
+- [x] **I.1.1** The shard list is now `workspace.SHARDS`, named once. `cmd_setup` reads it;
+  `ci.yml` installs all three at every site (listed inline rather than looped, since the
+  test matrix includes Windows, where the default shell is not bash).
+- [x] **I.1.2** `testpaths` now includes each shard's suite, so the 64 tests are gated.
+- [x] **I.1.3** `tests/test_workspace.py::TestShardParity` asserts every shard on disk is
+  declared in `SHARDS`, that `ci.yml` installs exactly that list, and that each shard's
+  suite is in `testpaths`. All three were confirmed to fail against the pre-fix state.
+
+## I.2 — `os.pread` is POSIX-only; every Windows lane failed
+
+**Severity:** Medium-High · **Confidence:** High (reproduced in CI) · **Was:** new
+**Paths:** `src/anyinfer/local/provenance.py` (`_hash_fd`, `_read_at`)
+
+**Brief:** The F.11 weight-verification work (`eb5fe76`) hashes through a held descriptor
+rather than reopening a path — the right design, since reopening is the TOCTOU hole it
+exists to close — but implemented it with `os.pread`, which Windows does not have. Seven
+tests across `test_local_provenance.py` and `test_local_server.py` failed with
+`AttributeError: module 'os' has no attribute 'pread'` on `windows-latest`.
+
+**Remediation:**
+- [x] **I.2.1** `_read_at()` uses `os.pread` where it exists and otherwise saves, seeks,
+  reads, and restores the file position. The security property is unchanged — the bytes
+  still come from *this descriptor*, never from a reopened path — and the position is
+  restored because the caller hands these same descriptors to the loader afterwards, where
+  an offset left at EOF would hand it an empty file. The one real difference, that the
+  fallback is not atomic against concurrent readers of the same descriptor, is documented;
+  nothing shares a descriptor across threads here.
+- [x] **I.2.2** A test hides `os.pread` exactly as Windows lacks it, asserting an identical
+  digest and an untouched file position — so the Linux lanes now cover the branch only
+  Windows would otherwise reach, which is how the POSIX-only call shipped unnoticed.

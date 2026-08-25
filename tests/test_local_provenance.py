@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -53,6 +54,41 @@ def _manifest(model_id: str, weight_hash: str, private_key: bytes) -> ModelManif
         signed_at=unsigned.signed_at,
         signature=signature,
     )
+
+
+def test_hashing_matches_on_platforms_without_pread(tmp_path: Path) -> None:
+    """`os.pread` is POSIX-only; Windows takes a seek-and-restore fallback.
+
+    Exercised by hiding `os.pread` exactly as Windows lacks it, so the Linux lanes cover
+    the branch only Windows would otherwise reach — which is how a POSIX-only call shipped
+    unnoticed in the first place. Two properties must hold: the digest is identical, and
+    the descriptor's file position is untouched, because the caller hands these same
+    descriptors to the loader after verification and an offset left at EOF would hand it
+    an empty file.
+    """
+    import anyinfer.local.provenance as provenance
+
+    payload = os.urandom(300_000)
+    weights = tmp_path / "weights.bin"
+    weights.write_bytes(payload)
+    expected = hashlib.sha256(payload).hexdigest()
+
+    descriptor = os.open(weights, os.O_RDONLY)
+    try:
+        assert provenance._hash_fd(descriptor) == expected
+
+        os.lseek(descriptor, 12_345, os.SEEK_SET)
+        real_pread = os.pread
+        monkey = pytest.MonkeyPatch()
+        monkey.delattr(os, "pread")
+        try:
+            assert provenance._hash_fd(descriptor) == expected, "fallback digest must match"
+        finally:
+            monkey.undo()
+        assert os.pread is real_pread
+        assert os.lseek(descriptor, 0, os.SEEK_CUR) == 12_345, "file position must survive"
+    finally:
+        os.close(descriptor)
 
 
 def test_hash_model_weights_is_stable_for_a_single_file(tmp_path: Path) -> None:
