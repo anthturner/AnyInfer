@@ -36,11 +36,11 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Relay",
-    "load_registry",
     "RelayError",
     "RelayRegistry",
     "RelayResult",
     "RelayRoute",
+    "load_registry",
 ]
 
 

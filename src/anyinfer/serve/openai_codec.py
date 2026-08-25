@@ -21,7 +21,7 @@ import binascii
 import json
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from .._context_wire import decode_context_request, encode_context_request
 from ..arena import arena_to_dict
@@ -41,6 +41,7 @@ from ..types.requests import (
     CachePolicy,
     GenerationRequest,
     HistoryPolicy,
+    ReasoningEffort,
     Sampling,
     SchemaSpec,
     ToolSpec,
@@ -123,6 +124,7 @@ _RESERVED_FIELDS = frozenset(
         "tools",
         "tool_choice",
         "response_format",
+        "reasoning_effort",
         "metadata",
         "n",
         "user",
@@ -295,11 +297,19 @@ def _parse_arguments(raw: Any) -> Mapping[str, Any]:
     return {}
 
 
-def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest, bool]:
+def request_from_openai(
+    body: Mapping[str, Any], *, context_tuning: Any = None
+) -> tuple[str, GenerationRequest, bool]:
     """Decode an OpenAI chat-completions request body.
 
     Args:
         body: The parsed request JSON.
+        context_tuning: Default ``ContextTuning`` for a request whose context extension
+            omits its own ``tuning``. The gateway supplies the deployment's configured
+            tuning, so wire callers inherit it rather than always falling back to the
+            library defaults. Typed opaquely on purpose: the sidecar is a codec and does
+            not import the context implementation, so it forwards the object onward
+            without inspecting it.
 
     Returns:
         A ``(target, request, stream)`` triple. ``target`` is the ``model`` field taken
@@ -333,14 +343,37 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
         tools=tools,
         tool_choice=_decode_tool_choice(body.get("tool_choice")),
         sampling=sampling,
+        reasoning=_decode_reasoning_effort(body.get("reasoning_effort")),
         history=_decode_history(body.get(HISTORY_FIELD)),
         cache=_decode_cache(body.get(CACHE_FIELD)),
         arena=_decode_arena(body.get(ARENA_FIELD)),
-        context=_decode_context(body.get(CONTEXT_FIELD)),
+        context=_decode_context(body.get(CONTEXT_FIELD), context_tuning),
         provider_options=_decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
     )
     return target, request, bool(body.get("stream"))
+
+
+def _decode_reasoning_effort(raw: Any) -> ReasoningEffort | None:
+    """Decode OpenAI's ``reasoning_effort`` into the normalized effort level.
+
+    Typed rather than passed through, so the core's cross-provider translation engages
+    for sidecar callers too — an Anthropic thinking budget, a Gemini thinking config.
+    Passing it through verbatim silently did nothing for every non-OpenAI dialect.
+
+    Raises:
+        ValueError: The value is not one of the four normalized levels. Refused rather
+            than dropped: now that the field is reserved, silently ignoring an
+            unrecognized value would tell the caller nothing while quietly changing
+            what the model was asked to do.
+    """
+    if raw is None:
+        return None
+    if raw in ("minimal", "low", "medium", "high"):
+        return cast("ReasoningEffort", raw)
+    raise ValueError(
+        f"reasoning_effort must be one of minimal, low, medium, high (got {raw!r})"
+    )
 
 
 def _decode_cache(raw: Any) -> CachePolicy | None:
@@ -408,9 +441,9 @@ def _decode_arena(raw: Any) -> ArenaPolicy | None:
         raise ValueError(f"{ARENA_FIELD} is invalid: {exc}") from exc
 
 
-def _decode_context(raw: Any) -> Any:
+def _decode_context(raw: Any, default_tuning: Any = None) -> Any:
     """Decode the context extension; reduction remains in the core client."""
-    return decode_context_request(raw)
+    return decode_context_request(raw, default_tuning=default_tuning)
 
 
 def _decode_history(raw: Any) -> HistoryPolicy | None:
@@ -612,6 +645,9 @@ def request_to_openai(
         body["max_tokens"] = sampling.max_output_tokens
     if sampling.stop:
         body["stop"] = list(sampling.stop)
+
+    if request.reasoning is not None:
+        body["reasoning_effort"] = request.reasoning
 
     if request.tools:
         body["tools"] = [

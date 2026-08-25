@@ -60,6 +60,7 @@ FULL_REQUEST = {
         }
     ],
     "tool_choice": "auto",
+    "reasoning_effort": "high",
     "response_format": {
         "type": "json_schema",
         "json_schema": {
@@ -89,9 +90,37 @@ def test_full_request_round_trips_losslessly() -> None:
     assert rebuilt["max_tokens"] == FULL_REQUEST["max_tokens"]
     assert rebuilt["stop"] == FULL_REQUEST["stop"]
     assert rebuilt["tool_choice"] == FULL_REQUEST["tool_choice"]
+    assert rebuilt["reasoning_effort"] == FULL_REQUEST["reasoning_effort"]
     assert rebuilt["metadata"] == FULL_REQUEST["metadata"]
     assert rebuilt["tools"] == FULL_REQUEST["tools"]
     assert rebuilt["response_format"] == FULL_REQUEST["response_format"]
+
+
+def test_reasoning_effort_decodes_to_the_typed_field_not_passthrough() -> None:
+    """The one first-class generation parameter the codec used to lose.
+
+    Unreserved, it fell into verbatim provider_options, so the core's cross-provider
+    reasoning translation never engaged: an Anthropic or Gemini backend saw an OpenAI
+    field name it does not speak, and a sidecar caller got no reasoning at all.
+    """
+    _, request, _ = request_from_openai(FULL_REQUEST)
+
+    assert request.reasoning == "high"
+    assert "reasoning_effort" not in request.provider_options.get("*", {})
+
+
+def test_absent_reasoning_effort_stays_absent() -> None:
+    body = {k: v for k, v in FULL_REQUEST.items() if k != "reasoning_effort"}
+    target, request, _ = request_from_openai(body)
+
+    assert request.reasoning is None
+    assert "reasoning_effort" not in request_to_openai(target, request)
+
+
+def test_an_unrecognized_reasoning_effort_is_refused() -> None:
+    """Dropped silently, it would change what the model was asked to do in secret."""
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        request_from_openai({**FULL_REQUEST, "reasoning_effort": "extreme"})
 
 
 def test_messages_round_trip_including_tool_turns() -> None:

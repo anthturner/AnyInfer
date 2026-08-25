@@ -59,6 +59,7 @@ def create_app(
     *,
     auth_token: str | None = None,
     expose_targets: Sequence[str] = (),
+    context_tuning: Any = None,
 ) -> Any:
     """Build the ASGI application.
 
@@ -68,6 +69,9 @@ def create_app(
             which is only appropriate on loopback.
         expose_targets: Concrete ``provider:model`` targets to advertise from
             ``/v1/models``, in addition to catalog aliases.
+        context_tuning: Default `ContextTuning` for wire context requests that omit
+            their own ``tuning`` block — normally the deployment's configured
+            `AnyInferConfig.context`. ``None`` keeps the library defaults.
 
     Returns:
         A Starlette application.
@@ -91,7 +95,9 @@ def create_app(
             return _error(starlette, 400, "request body must be a JSON object")
 
         try:
-            target, generation_request, wants_stream = request_from_openai(body)
+            target, generation_request, wants_stream = request_from_openai(
+                body, context_tuning=context_tuning
+            )
             include_manifest = wants_manifest(body)
         except ValueError as exc:
             # A malformed AnyInfer extension field is the client's mistake, and telling it
@@ -196,7 +202,9 @@ def create_app(
         shaped.pop("targets", None)
         shaped.setdefault("model", targets[0])
         try:
-            _, generation_request, _ = request_from_openai(shaped)
+            _, generation_request, _ = request_from_openai(
+                shaped, context_tuning=context_tuning
+            )
             comparisons = await client.compare(generation_request, targets=targets)
         except AnyInferError as exc:
             return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
@@ -222,7 +230,7 @@ def create_app(
             return _error(starlette, 400, "request body must be a JSON object")
 
         try:
-            target, inputs, kwargs = embedding_request_from_openai(body)
+            target, inputs, kwargs, encoding_format = embedding_request_from_openai(body)
             include_manifest = wants_manifest(body)
         except ValueError as exc:
             return _error(starlette, 400, str(exc))
@@ -232,7 +240,12 @@ def create_app(
         except AnyInferError as exc:
             return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
         return starlette.JSONResponse(
-            embeddings_response(result, model=target, include_manifest=include_manifest)
+            embeddings_response(
+                result,
+                model=target,
+                include_manifest=include_manifest,
+                encoding_format=encoding_format,
+            )
         )
 
     async def rerank(request: Any) -> Any:
@@ -299,6 +312,7 @@ async def _generate(client: Any, target: str, request: Any) -> Any:
         tools=request.tools,
         tool_choice=request.tool_choice,
         sampling=request.sampling,
+        reasoning=request.reasoning,
         history=request.history,
         cache=request.cache,
         arena=request.arena,
@@ -330,6 +344,7 @@ async def _stream_chunks(
         tools=request.tools,
         tool_choice=request.tool_choice,
         sampling=request.sampling,
+        reasoning=request.reasoning,
         history=request.history,
         cache=request.cache,
         arena=request.arena,

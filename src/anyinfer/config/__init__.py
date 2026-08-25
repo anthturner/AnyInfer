@@ -23,6 +23,7 @@ from ..types.requests import (
     CachePolicy,
     HistoryPolicy,
     RateLimits,
+    Repair,
 )
 
 __all__ = [
@@ -61,6 +62,7 @@ _ROOT_KEYS = frozenset(
         "context",
         "history",
         "cache",
+        "repair",
         "arena",
         "arenas",
         "mcp",
@@ -113,6 +115,11 @@ class AnyInferConfig:
         mcp: Model Context Protocol servers described by the optional ``mcp`` block. These
             are inert descriptions: loading a file never spawns a process or opens a
             socket. Pass them to `anyinfer.mcp.MCPToolset.connect` when tools are wanted.
+        repair: Bounded schema-repair budget from the optional ``repair`` block, or
+            ``None`` when the file does not ask for one. Pass to `Client` or
+            `AsyncClient` as ``repair=``. Without it, structured output validates and
+            fails rather than repairing — which is why a sidecar deployment could not
+            reach the repair loop at all before this block existed.
         operation_routes: Per-operation default routes from the optional
             ``operation_routes`` block, keyed ``"embedding"``/``"rerank"``. An
             embedding route can never be selected for generation or vice versa —
@@ -126,6 +133,7 @@ class AnyInferConfig:
     context: ContextTuning = DEFAULT_TUNING
     history: HistoryPolicy | None = None
     cache: CachePolicy | None = None
+    repair: Repair | None = None
     arena: ArenaPolicy | None = None
     arenas: Mapping[str, ArenaPolicy] = field(default_factory=dict)
     mcp: tuple[MCPServer, ...] = ()
@@ -234,6 +242,7 @@ def loads_config(
     context = _parse_context(data.get("context"), source)
     history = _parse_history(data.get("history"), source)
     cache = _parse_cache(data.get("cache"), source)
+    repair = _parse_repair(data.get("repair"), source)
     arena = _parse_arena(data.get("arena"), source, "'arena'")
     arenas = _parse_arenas(data.get("arenas"), source)
     mcp = _parse_mcp(data.get("mcp"), source)
@@ -244,6 +253,7 @@ def loads_config(
         context=context,
         history=history,
         cache=cache,
+        repair=repair,
         arena=arena,
         arenas=arenas,
         mcp=mcp,
@@ -306,6 +316,8 @@ def dumps_config(config: AnyInferConfig, *, comments: bool = False) -> str:
         document["history"] = _changed_fields(config.history, HistoryPolicy())
     if config.cache is not None:
         document["cache"] = _changed_fields(config.cache, CachePolicy())
+    if config.repair is not None:
+        document["repair"] = _changed_fields(config.repair, Repair())
     if config.arena is not None:
         document["arena"] = _arena_json(config.arena)
     if config.arenas:
@@ -806,6 +818,33 @@ def _parse_cache(value: Any, source: str) -> CachePolicy | None:
         return CachePolicy(**fields)
     except ValueError as exc:
         raise _error(source, f"'cache' is invalid: {exc}") from exc
+
+
+def _parse_repair(value: Any, source: str) -> Repair | None:
+    """Validate the optional bounded schema-repair budget.
+
+    Absent means no repair: a schema violation is surfaced as an error rather than
+    retried. That stays the default because a repair round-trip costs another call the
+    caller did not ask for, so a file that did not name it never spends one.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise _error(source, "'repair' must be an object")
+
+    known = {"max_attempts"}
+    unknown = set(value) - known
+    if unknown:
+        raise _unknown_keys(source, "'repair'", unknown)
+
+    fields: dict[str, Any] = {}
+    if "max_attempts" in value:
+        fields["max_attempts"] = _int_field(source, "repair", value, "max_attempts")
+
+    try:
+        return Repair(**fields)
+    except ValueError as exc:
+        raise _error(source, f"'repair' is invalid: {exc}") from exc
 
 
 def _parse_mcp(value: Any, source: str) -> tuple[MCPServer, ...]:

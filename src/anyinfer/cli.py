@@ -976,10 +976,16 @@ def _serve_run(args: argparse.Namespace) -> int:
         operation_routes=config.operation_routes,
         history=config.history,
         cache=config.cache,
+        repair=config.repair,
         arena=config.arena,
         arenas=config.arenas,
     )
-    app = create_app(client, auth_token=token, expose_targets=tuple(args.expose))
+    app = create_app(
+        client,
+        auth_token=token,
+        expose_targets=tuple(args.expose),
+        context_tuning=config.context,
+    )
 
     print(f"anyinfer {__version__} serving on http://{args.host}:{args.port}")
     print(f"  authentication: {'bearer token' if token else 'disabled (loopback only)'}")

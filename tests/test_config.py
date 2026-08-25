@@ -442,3 +442,36 @@ def test_operation_routes_reject_generation_key() -> None:
 def test_operation_routes_reject_empty_target_list() -> None:
     with pytest.raises(ai.ConfigError, match="non-empty list"):
         ai.loads_config(json.dumps({"operation_routes": {"embedding": []}}))
+
+
+def test_repair_block_parses_and_round_trips() -> None:
+    """Without this block a sidecar deployment cannot reach the repair loop at all.
+
+    The Python API takes `repair=` per call and the CLI has `run --repair`; `anyinfer
+    serve` builds its client from the config file, so structured output through the
+    sidecar validated and failed where the Python path would have recovered.
+    """
+    config = ai.loads_config(
+        json.dumps({"format_version": 1, "providers": [], "repair": {"max_attempts": 3}})
+    )
+
+    assert config.repair is not None
+    assert config.repair.max_attempts == 3
+    assert json.loads(ai.dumps_config(config))["repair"] == {"max_attempts": 3}
+
+
+def test_an_absent_repair_block_means_no_repair() -> None:
+    """Repair costs another provider call, so a file that did not ask never spends one."""
+    config = ai.loads_config(json.dumps({"format_version": 1, "providers": []}))
+
+    assert config.repair is None
+    assert "repair" not in json.loads(ai.dumps_config(config))
+
+
+def test_a_misspelled_repair_key_fails_loudly() -> None:
+    with pytest.raises(ai.ConfigError, match="repair"):
+        ai.loads_config(
+            json.dumps(
+                {"format_version": 1, "providers": [], "repair": {"max_attemps": 3}}
+            )
+        )

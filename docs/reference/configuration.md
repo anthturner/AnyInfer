@@ -357,6 +357,9 @@ A misspelled setting is a `ConfigError`, not a silent no-op; a tuning key that s
 does nothing is worse than one that fails loudly. The sidecar reads the same file so one
 config serves every frontend, but it does not reduce context itself: it is a wire codec
 over a normal client, and reduction is the application's call about its own material.
+What the sidecar *does* supply is this block as the default tuning for a wire context
+request that omits its own `tuning`, so a gateway caller inherits the operator's settings
+instead of silently falling back to the library defaults.
 
 The full field list is on [`ContextTuning`](api/context.md#advanced-settings).
 
@@ -402,6 +405,27 @@ Prompt-cache placement is opt-in because it changes provider billing and retenti
 Omitting the block disables placement. An empty object enables the default `CachePolicy`;
 `auto` chooses the strongest mechanism the resolved target offers. See
 [prompt caching](../concepts/caching.md) for the mechanism and billing semantics.
+
+### The `repair` Block
+
+Bounded schema repair, opt-in because a repair round-trip costs another provider call:
+
+```json
+{
+  "repair": {
+    "max_attempts": 1
+  }
+}
+```
+
+Omitting the block means no repair: a response that violates the schema is surfaced as a
+`SchemaViolationError` rather than retried. An empty object enables the default `Repair`.
+
+This block is how a **sidecar deployment** reaches the repair loop at all. The Python API
+takes `repair=` per call and the CLI has `run --repair`, but `anyinfer serve` builds its
+client from this file — without the block, structured output through the sidecar validates
+and 422s where the Python path would have recovered. See
+[structured output](../concepts/structured-output.md#repair).
 
 ### The `operation_routes` Block
 

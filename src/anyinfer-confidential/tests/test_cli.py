@@ -78,8 +78,7 @@ def test_seal_and_issue_license_end_to_end(tmp_path: Path) -> None:
 
 
 def test_secret_outputs_are_written_mode_0600(tmp_path: Path) -> None:
-    """The sealing key, the signing private key, and license blobs are not readable
-    by other local users.
+    """Secret outputs are not readable by other local users.
 
     These are the crown jewels of the confidential tiers: the signing key mints the
     licenses that gate every template decryption, and the AES key decrypts every

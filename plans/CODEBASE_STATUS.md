@@ -49,9 +49,9 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[x]` | B.4 | DESIGN.md §18 package layout has drifted from the tree | 3 | 4 | 12 |
 | `[x]` | B.5 | Stale counts: matrix header, adapter list, "other twenty", "about ten" | 3 | 4 | 12 |
 | `[x]` | C.2 | First-call code snippets are not copy-paste runnable | 3 | 4 | 12 |
-| `[ ]` | D.1 | Sidecar `/v1/embeddings` rejects the OpenAI SDK's default encoding | 3 | 4 | 12 |
-| `[ ]` | D.2 | `reasoning_effort` is unreachable through the sidecar | 3 | 4 | 12 |
-| `[ ]` | D.3 | No repair config for serve; config `context` block ignored | 3 | 4 | 12 |
+| `[x]` | D.1 | Sidecar `/v1/embeddings` rejects the OpenAI SDK's default encoding | 3 | 4 | 12 |
+| `[x]` | D.2 | `reasoning_effort` is unreachable through the sidecar | 3 | 4 | 12 |
+| `[x]` | D.3 | No repair config for serve; config `context` block ignored | 3 | 4 | 12 |
 | `[ ]` | E.2 | Typed `seed` / `logprobs` / penalty sampling controls | 4 | 3 | 12 |
 | `[ ]` | G.2 | Demand gate: identify a confidential-tier design partner | 3 | 4 | 12 |
 | `[ ]` | G.3 | CC hardware validation sprint (rent, capture, fixture) | 4 | 3 | 12 |
@@ -645,9 +645,9 @@ re-encode at the wire; base64-packing a float32 array is ~10 lines. The incompat
 invisible to AnyInfer's own tests because they speak float.
 
 **Remediation:**
-- [ ] **D.1.1** Accept `"base64"` and encode each vector as base64 little-endian float32 in
+- [x] **D.1.1** Accept `"base64"` and encode each vector as base64 little-endian float32 in
   `embeddings_response` (thread the requested format through the codec return).
-- [ ] **D.1.2** Add a conformance case exercising the real `openai` SDK's default request shape.
+- [x] **D.1.2** Add a conformance case exercising the real `openai` SDK's default request shape.
 
 ## D.2 `reasoning_effort` is unreachable through the sidecar
 
@@ -666,10 +666,10 @@ serves the request — plausibly accepted by an OpenAI-compatible backend, never
 Anthropic/Gemini/Bedrock, silently absent elsewhere.
 
 **Remediation:**
-- [ ] **D.2.1** Add `"reasoning_effort"` to `_RESERVED_FIELDS`; decode into
+- [x] **D.2.1** Add `"reasoning_effort"` to `_RESERVED_FIELDS`; decode into
   `GenerationRequest.reasoning` in `request_from_openai`; pass `reasoning=` through
   `_generate`/`_stream_chunks`; mirror in `request_to_openai`.
-- [ ] **D.2.2** Add a round-trip codec test.
+- [x] **D.2.2** Add a round-trip codec test.
 
 ## D.3 Sidecar deployments cannot enable schema repair; config `context` block ignored
 
@@ -687,11 +687,11 @@ the gateway (wire requests fall back to `DEFAULT_TUNING`).
 asymmetry is discovered only by comparing failure rates against the Python path.
 
 **Remediation:**
-- [ ] **D.3.1** Add an optional `repair` block (e.g. `max_attempts`) to `AnyInferConfig`; pass it
+- [x] **D.3.1** Add an optional `repair` block (e.g. `max_attempts`) to `AnyInferConfig`; pass it
   in `cmd_serve`'s `AsyncClient` construction.
-- [ ] **D.3.2** Use `config.context` as the default tuning for wire context requests that omit
+- [x] **D.3.2** Use `config.context` as the default tuning for wire context requests that omit
   `tuning`.
-- [ ] **D.3.3** Document both in `docs/reference/configuration.md`.
+- [x] **D.3.3** Document both in `docs/reference/configuration.md`.
 
 ## D.4 Sidecar silently swallows `n>1` and never projects logprobs back
 
