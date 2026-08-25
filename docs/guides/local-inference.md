@@ -155,6 +155,28 @@ Ollama gives you grammar-enforced structured output and per-phase timings; llama
 gives you control over tuning and the exact model file. Either way it is one target
 string.
 
+## Reclaiming Disk
+
+A machine that has been through a hardware upgrade or two accumulates variants nobody
+runs any more. `models prune` proposes least-recently-used deletions against a limit you
+state, and deletes nothing until you agree:
+
+```console
+$ anyinfer models prune --keep-bytes 60GB --dry-run
+$ anyinfer models prune --older-than-days 90
+```
+
+There is no default limit, and eviction never happens on its own. A prune with no stated
+budget would have to invent one, and an invented number silently deleting multi-gigabyte
+downloads is exactly what this store does not do. `--keep-bytes` accepts both `GB` and
+`GiB` and keeps them distinct, since the difference is real space.
+
+Two things are never proposed: anything used recently enough to fit under the limit, and
+models [adopted from another tool's cache](../concepts/catalog.md) — removing one of those
+only unregisters it, so counting its bytes as reclaimed would be a lie about the outcome.
+`--json` prints the same plan for a script to act on, and `--yes` is required for a
+non-interactive run.
+
 ## Troubleshooting
 
 **`could not find llama-server on PATH`**: run `anyinfer runtime install`, install a
@@ -181,6 +203,8 @@ please report it.
       opt-in that is refused when the driver or GPU is too old.
     - One `generate()` against a `llama-cpp:` target acquires, tunes, supervises, and
       answers; later calls reuse the running server.
+    - `models prune` proposes least-recently-used deletions against a limit you state and
+      waits for confirmation; nothing is ever evicted automatically.
 
 ## See Also
 

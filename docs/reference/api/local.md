@@ -176,6 +176,10 @@ in a provider adapter.
 
 ::: anyinfer.local.RemovalReport
 
+::: anyinfer.local.PrunePlan
+
+::: anyinfer.local.PruneProposal
+
 </div>
 
 ## Sources
