@@ -15,7 +15,7 @@ python workspace.py check                          # every gate CI runs
 
 Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI.
 
-## The task runner
+## The Task Runner
 
 [`workspace.py`](https://github.com/anthturner/AnyInfer/blob/main/workspace.py) is the one
 entry point for routine commands: `python workspace.py <verb>` in a fresh clone,
@@ -36,31 +36,31 @@ every verb.
 | `python workspace.py doctor` / `providers` | Hardware report; registered providers |
 
 Every third-party gate shells out to the same command CI runs and echoes it first, so the
-runner is a convenience rather than a second source of truth — you can always copy the
+runner is a convenience rather than a second source of truth; you can always copy the
 printed line. First-party maintenance code (the docstring-coverage gate, the doc-link
 check, the conformance-matrix generator, the demo-bundle build) lives in `workspace.py`
 itself rather than a scripts directory, so every dev and devops task is in one file with
 one `--help`.
 
-## The quality gates
+## The Quality Gates
 
-`python workspace.py check` runs the gates as named, ordered phases — fastest feedback first — and
-every phase runs in CI and must pass. It keeps going after a failure so one invocation
+`python workspace.py check` runs the gates as named, ordered phases (fastest feedback
+first), and every phase runs in CI and must pass. It keeps going after a failure so one invocation
 tells you everything that is broken:
 
 | Phase | Runs |
 |---|---|
 | `lint` | `ruff check src tests workspace.py` (`--fix` applies fixes) |
 | `types` | `mypy` (strict) |
-| `contracts` | `lint-imports` — the architecture contracts |
+| `contracts` | `lint-imports`: the architecture contracts |
 | `test` | `pytest -q`, the full suite, headless |
 | `conformance` | The provider [conformance suite](conformance.md) and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
-| `docs-build` | `mkdocs build --strict` — the exact artifact the Pages deploy publishes |
+| `docs-build` | `mkdocs build --strict`: the exact artifact the Pages deploy publishes |
 
 That table is the whole pipeline: every step of every CI job is one of these phases,
 invoked as `python workspace.py check --only=<phase>`. A green `check` therefore means what
-a green CI run means, with one exception — CI also runs the `test` phase across
+a green CI run means, with one exception: CI also runs the `test` phase across
 Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners can cover.
 
 `--skip=a,b` leaves phases out; `--only=a,b` runs just those; the two are mutually
@@ -75,19 +75,19 @@ rather than relying only on review. The contracts and what each one forbids are 
 [architecture](architecture.md#enforcement); when one fails, the fix is almost always to
 move code, not to loosen the contract.
 
-## Where to read first
+## Where to Read First
 
 1. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md): architecture and decision rationale. Start with §3 and §23.
 2. [Architecture](architecture.md): the condensed version of the rules.
 
-## Choose the owning workstream
+## Choose the Owning Workstream
 
 Core engine, shared configuration, CLI, sidecar, and demo code have separate ownership
 boundaries. The [coding-agent instructions](automation.md) page maps each workstream to its
 paths and explains the canonical-instructions model the tool-specific files defer to. The
 same boundaries apply whether the contributor is using an agent or editing by hand.
 
-## The one rule
+## The One Rule
 
 > **Adapters only translate. The core orchestrates.**
 
@@ -119,7 +119,7 @@ non-obvious constraints:
 # stream is closed here, on the way out, and nowhere else.
 ```
 
-## Pull requests
+## Pull Requests
 
 A change touching an adapter's wire behavior includes:
 
@@ -131,7 +131,7 @@ A change touching an adapter's wire behavior includes:
 Run the [drift check](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md) before starting adapter work, so you are
 coding against what the provider does *now*.
 
-## Where next
+## Where Next
 
 - [Writing a provider adapter](writing-an-adapter.md): the adapter contract, the
   descriptor, and the OpenAI-dialect shortcut.

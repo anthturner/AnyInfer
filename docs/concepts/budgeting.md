@@ -1,4 +1,4 @@
-# Token estimation and context budgets
+# Token Estimation and Context Budgets
 
 How many input tokens will this request spend, and does it fit the model it is going to?
 Every app that assembles large prompts ends up hand-rolling this arithmetic per provider.
@@ -22,7 +22,7 @@ flowchart LR
 ```
 </div>
 
-## The calculator
+## The Calculator
 
 `budget()` computes a preflight budget without sending anything; no request is issued, no
 network is touched:
@@ -47,17 +47,17 @@ The allowance is the context window minus two deductions:
 An app packing context reads `remaining_tokens` and keeps adding material while it stays
 positive. That is the whole loop.
 
-## Unknown stays unknown
+## Unknown Stays Unknown
 
 The verdict is tri-state, exactly like [cost](cost.md#cost-is-tri-state). When no
-trustworthy context window is known, `fits` and the allowances are `None` — never a
+trustworthy context window is known, `fits` and the allowances are `None`, never a
 guessed default window presented as a bound:
 
 ```python
 budget.fits  # None; unknown, distinguishable from both True and False
 ```
 
-## Estimates are two numbers
+## Estimates Are Two Numbers
 
 No tokenizer ships in the core. The default estimator is a byte heuristic, and it is
 explicit about being an estimate by carrying two figures with opposite biases:
@@ -67,8 +67,8 @@ explicit about being an estimate by carrying two figures with opposite biases:
 | `tokens` | High (`ceil(bytes/3)`) | Planning; deciding how much more fits. |
 | `floor` | Low (`bytes//8`) | The pre-dispatch gate; refusing a request. |
 
-The two consumers need opposite errors: when packing, overestimating keeps you safe;
-when refusing, only an underestimate justifies the refusal.
+The two consumers need opposite errors: when packing, overestimating keeps the
+application safe; when refusing, only an underestimate justifies the refusal.
 
 Anything more accurate plugs in through the `TokenEstimator` protocol; tiktoken, a
 provider's count-tokens endpoint, llama-server's `/tokenize`. An exact tokenizer returns
@@ -84,10 +84,10 @@ class TiktokenEstimator:
 client = ai.Client(providers, estimator=TiktokenEstimator())
 ```
 
-## When the provider bills for more than you sent
+## When the Provider Bills for More Than You Sent
 
-Some providers wrap your messages in a harness of their own — an agent preamble,
-built-in tool declarations, workspace framing — then bill and window-check the inflated
+Some providers wrap your messages in a harness of their own (an agent preamble,
+built-in tool declarations, workspace framing), then bill and window-check the inflated
 total. Estimating such a provider from message bytes alone under-counts every request,
 so the provider declares its own correction and the budget reports it as a separate
 component:
@@ -104,7 +104,7 @@ correction moves the planning figure only, never the floor: a lower bound may on
 tokens the provider certainly charges, so a calibrated provider packs more
 conservatively without ever refusing a request it might have served.
 
-## Estimated cost
+## Estimated Cost
 
 When trustworthy pricing exists for the target (see
 [where prices come from](cost.md#where-prices-come-from)), the budget also carries a
@@ -125,7 +125,7 @@ everything else; no trusted pricing means `None`, never `$0.00`.
 Estimated money and reported money never mix: `result.usage.cost_usd` is only ever
 computed from provider-reported usage, and `estimated_cost` only ever from the estimate.
 
-## The pre-dispatch gate
+## The Pre-Dispatch Gate
 
 A request that provably cannot fit its target's context window fails before the round
 trip. The gate is conservative in what it claims:
@@ -149,7 +149,7 @@ route = ai.Route(
 The gate is on by default and can be disabled per client with
 `Client(..., context_gate=False)`.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - `budget()` never touches the network: it is a preflight calculation against the same
       provenance-tagged capability data that drives routing and cost.
     - The verdict is tri-state: `fits` is `None`, not a guess, when no trusted context
@@ -157,7 +157,7 @@ The gate is on by default and can be disabled per client with
     - Only the estimate's conservative floor, compared against a trusted window, can gate
       a request before dispatch.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

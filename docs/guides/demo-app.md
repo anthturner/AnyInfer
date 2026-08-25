@@ -1,4 +1,4 @@
-# The pack-in demo application
+# The Pack-In Demo Application
 
 AnyInfer ships a PySide6 reference application in
 [`src/demo_app/`](https://github.com/anthturner/AnyInfer/blob/main/src/demo_app). It is
@@ -8,7 +8,7 @@ credentials and no network: the default configuration talks to an in-process fak
 provider built on [`anyinfer.testing.fakes`](../contributing/testing.md), so every
 subsystem it exercises is demonstrable offline.
 
-## Running it
+## Running It
 
 ```bash
 pip install -e ".[demo]"
@@ -28,7 +28,7 @@ python -m demo_app
 | `--config PATH` | Use a specific settings file instead of the per-user default. |
 | `--reset` | Ignore saved settings and start from the offline defaults. |
 
-## The integration pattern worth copying
+## The Integration Pattern Worth Copying
 
 Qt owns the main thread; the `Client` owns a background loop thread.
 [`demo_app/engine.py`](https://github.com/anthturner/AnyInfer/blob/main/src/demo_app/engine.py) keeps them
@@ -45,7 +45,7 @@ Equally important is what the demo *does not* contain: no retry loop, no fallbac
 schema validation, and no timing measurement. Those belong to the library, and the demo's
 job is to show how little an application needs to add on top of it.
 
-## What it demonstrates
+## What It Demonstrates
 
 Each surface is a small, inspectable use of one public subsystem:
 
@@ -92,7 +92,7 @@ which runs headless (`QT_QPA_PLATFORM=offscreen`) and drives real generations
 pytest tests/demo_app             # or the full suite: python workspace.py check --only=test
 ```
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - The demo runs offline against fake providers, with no credentials and no network.
     - Copy the threading pattern in `demo_app/engine.py`: AnyInfer calls on worker
       threads, results back to the GUI thread as Qt signals, no widget touching the SDK.
@@ -100,7 +100,7 @@ pytest tests/demo_app             # or the full suite: python workspace.py check
       those belong to the library.
     - Its tests run headless and drive real generations through the offline provider.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

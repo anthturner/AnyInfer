@@ -1,11 +1,11 @@
-# Semantic search over a small corpus
+# Semantic Search over a Small Corpus
 
 For a corpus small enough to hold in memory, semantic search needs no vector store: this
 example embeds a handful of documents, embeds a query with the matching intent, and ranks
 by cosine similarity itself, with persistence left to the optional
 [`anyinfer-store`](../guides/vector-store.md) add-on. As written it runs offline against
-`anyinfer.testing.FakeEmbeddingRerankProvider` — a deterministic pseudo-embedding that
-proves the wiring, not retrieval quality — so point `EMBED_TARGET`/`RERANK_TARGET` at a
+`anyinfer.testing.FakeEmbeddingRerankProvider` (a deterministic pseudo-embedding that
+proves the wiring, not retrieval quality), so point `EMBED_TARGET`/`RERANK_TARGET` at a
 real provider (`ollama:nomic-embed-text`, `openai:text-embedding-3-small`, a local
 [TEI](../providers/tei.md) server) when you want ranking by meaning.
 
@@ -71,7 +71,7 @@ that `result.space` implements, and batching are core concepts, covered in
 [Embeddings and reranking](../concepts/embeddings.md); what follows is specific to
 building a small in-memory index.
 
-## Index/query compatibility, applied
+## Index/Query Compatibility, Applied
 
 `result.space` is exactly what you store alongside the vectors so a later query can
 check it matches before comparing anything:
@@ -81,18 +81,18 @@ if query_embedded.space.compatible_with(stored_space):
     ...  # safe to compare
 ```
 
-## Fallback and local embeddings
+## Fallback and Local Embeddings
 
 `operation_routes={"embedding": ai.Route(targets=[...])}` on the client (or
 `--config`'s `operation_routes` key) sets the default route `embed()` uses when no
-`target=`/`route=` is passed — the same mechanism `default_route` gives generation, kept
+`target=`/`route=` is passed; it is the same mechanism `default_route` gives generation, kept
 separate so an embedding fallback chain is never accidentally reused for chat traffic.
 Local engines are first-class fallback members: [TEI](../providers/tei.md),
 [Ollama](../providers/ollama.md), and [LM Studio](../providers/lm-studio.md) all embed,
 so a chain like `[local-tei:bge-large, openai:text-embedding-3-small]` tries the free
 local model first and only spends money if it is unreachable.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

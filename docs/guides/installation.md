@@ -1,4 +1,4 @@
-# Installation and extras
+# Installation and Extras
 
 ```bash
 pip install anyinfer
@@ -30,10 +30,10 @@ Optional packages are imported only when their feature is used. A missing packag
 an actionable `ConfigError` or `CredentialError` with the install command, never a raw
 `ImportError` traceback.
 
-## Optional add-on packages
+## Optional Add-On Packages
 
 Some features ship as separate, independently-versioned distributions rather than as
-`anyinfer` extras — never imported by core, never a dependency of it:
+`anyinfer` extras (never imported by core, never a dependency of it):
 
 | Package | Adds | Needed for |
 |---|---|---|
@@ -47,7 +47,7 @@ pip install -e src/anyinfer-shared         # PyPI release ships
 pip install -e src/anyinfer-store
 ```
 
-## Which providers need nothing extra
+## Which Providers Need Nothing Extra
 
 `openai`, `anthropic`, `openai-compat`, `openrouter`, `ollama`, and `llama-cpp` are pure
 `httpx2` and work with a bare install. The local subsystem, including hardware detection and
@@ -66,7 +66,7 @@ For non-Python deployments, release builds of the demo and sidecar are listed on
 the [Downloads](../downloads.md) page. The 0.1 beta native bundles are checksummed but not
 code-signed; verify `SHA256SUMS` from the GitHub Release before running them.
 
-## Verify the install
+## Verify the Install
 
 ```bash
 anyinfer providers   # every registered provider and what it needs

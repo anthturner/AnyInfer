@@ -3,7 +3,7 @@ provider: openai-compat
 icon: material/swap-horizontal
 ---
 
-# OpenAI-compatible
+# OpenAI-Compatible
 
 The base dialect for any endpoint speaking `POST /chat/completions`: vLLM, LM Studio, an
 externally-run llama-server, a corporate gateway, or OpenAI itself.
@@ -31,7 +31,7 @@ client = ai.Client(
 result = client.generate(prompt, target="openai-compat:my-model")
 ```
 
-`base_url` is required — there is no sensible default for "any server".
+`base_url` is required; there is no sensible default for "any server".
 
 Aliases: `openai-compatible`, `oai-compat`.
 
@@ -44,22 +44,22 @@ Aliases: `openai-compatible`, `oai-compat`.
 | Tools | Native |
 | Usage | When the server reports it |
 
-## Capabilities are unknown by default
+## Capabilities Are Unknown by Default
 
 AnyInfer cannot know what an arbitrary server supports, so features default to a
 conservative set and structured output falls back to prompt injection unless told otherwise.
-Client-side validation means you still get a validated result either way.
+Client-side validation means the caller still gets a validated result either way.
 
-To declare what your server actually does, register a descriptor with richer
-`default_capabilities` — see [writing an adapter](../contributing/writing-an-adapter.md).
+In order to declare what a server actually does, register a descriptor with richer
+`default_capabilities`; see [writing an adapter](../contributing/writing-an-adapter.md).
 
-## Servers that ignore `stream`
+## Servers That Ignore `stream`
 
 Some endpoints accept `stream: true` and answer with a buffered body anyway. The adapter
-detects that and consumes the body rather than paying for a second request, so your consumer
+detects that and consumes the body rather than paying for a second request, so consumer
 code is unaffected.
 
-## Known divergences
+## Known Divergences
 
 - `max_tokens` vs `max_completion_tokens`: subclasses override this; the base sends
   `max_tokens`.
@@ -68,7 +68,7 @@ code is unaffected.
 - `response_format` support varies widely between implementations, which is one of the
   reasons validation is always client-side.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openai-compat.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai-compat.md).

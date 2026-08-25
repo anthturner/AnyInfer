@@ -1,13 +1,14 @@
-# AnyInfer documentation
+# AnyInfer Documentation
 
-This page is the table of contents; everything else is one click away. These same pages
-are published, with a generated SDK reference, at
-**[anyinfer.dev](https://anyinfer.dev/)**.
+AnyInfer provides a provider-independent inference runtime for Python applications, as
+well as an OpenAI-compatible sidecar for everything else. This page is the table of
+contents; everything else is one click away. These same pages are published, with a
+generated SDK reference, at **[anyinfer.dev](https://anyinfer.dev/)**.
 
 In a hurry? The [quickstart](guides/quickstart.md) gets you from `pip install` to a
-working `generate()` call in about five minutes.
+working `generate()` call in ~5 minutes.
 
-## Choose your path
+## Choose Your Path
 
 The documentation is organized by what you are trying to do, not by how the code is
 arranged.
@@ -23,17 +24,17 @@ arranged.
 | Look something up | [Reference](reference/README.md) |
 | Write an adapter, or contribute | [Contributor guide](contributing/README.md) |
 
-## For integrators
+## For Integrators
 
 Read in roughly this order:
 
 1. [Quickstart](guides/quickstart.md): install to first result.
-2. [Integrate AnyInfer](guides/README.md): Python SDK, command-line tool, or sidecar —
+2. [Integrate AnyInfer](guides/README.md): Python SDK, command-line tool, or sidecar,
    and the full list of task guides (streaming, schemas, fallback, tool loop, context,
    offline testing, local models).
 3. [Installation and extras](guides/installation.md): which extras you need.
 4. [Shared configuration](reference/configuration.md): one file for every path.
-5. [Concepts](concepts/README.md): eighteen ideas, one line each — read them once and
+5. [Concepts](concepts/README.md): eighteen ideas, one line each; read them once and
    the rest of the API follows.
 
 Letting a coding agent write the integration?
@@ -42,7 +43,7 @@ the [integration procedure](agents/INTEGRATION.md) it can execute. The
 [demo app](guides/demo-app.md) is a complete offline reference integration, with
 standalone builds on the [downloads page](downloads.md).
 
-## For contributors
+## For Contributors
 
 - [Contributor guide](contributing/README.md): setup, the quality gates, and what CI
   checks.
@@ -55,7 +56,7 @@ standalone builds on the [downloads page](downloads.md).
 - [Testing](contributing/testing.md): fakes, cassettes, and what to test where.
 - [Branching and releases](contributing/releasing.md).
 
-## Design documents
+## Design Documents
 
 The sources of truth for *why* things are the way they are:
 

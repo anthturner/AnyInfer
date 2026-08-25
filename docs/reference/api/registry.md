@@ -1,11 +1,11 @@
-# Registry, catalog, and credentials
+# Registry, Catalog, and Credentials
 
 How providers describe themselves (frozen descriptors, declarative setup specs), how
 targets and aliases resolve, and how credential references become secrets. Concepts:
 [targets and aliases](../../concepts/targets.md) ·
 [credentials](../../concepts/credentials.md).
 
-## Provider registry
+## Provider Registry
 
 <div class="anyinfer-api-block" markdown>
 
@@ -51,7 +51,7 @@ See [the model catalog](../../concepts/catalog.md).
 
 </div>
 
-## Browsing the local catalog
+## Browsing the Local Catalog
 
 What `Client.local_catalog()` returns: every catalog model annotated with whether it fits,
 and why.

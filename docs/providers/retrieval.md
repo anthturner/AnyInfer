@@ -35,13 +35,13 @@ batch ceilings, and truncation behavior.
     ranked = client.rerank(question, candidates, target="jina:jina-reranker-v3", top_n=5)
     ```
 
-## Provider differences
+## Provider Differences
 
 | | Voyage AI | Jina AI |
 |---|---|---|
 | [Input intents](../concepts/embeddings.md#input-intent) | `query` and `document` only; `classification`/`clustering` have no wire value, are never sent, and the result carries a warning | All four: `query` → `retrieval.query`, `document` → `retrieval.passage`, `classification` verbatim, `clustering` → `separation` (Jina's clustering-flavored task, recorded in the contract) |
-| Embedding batches | [Batching engages](../concepts/embeddings.md#batching) at 1,000 inputs | No documented ceiling — Jina batches internally, so no limit is invented; requests above the library's sanity ceilings refuse locally, and `BatchPolicy.max_items_override` applies a limit you have verified |
-| Rerank documents | 1,000 is a hard cap — the core refuses larger requests unless `rerank_cross_batch` opts into chunk-local rankings | `top_n` is taken natively by the reranker |
+| Embedding batches | [Batching engages](../concepts/embeddings.md#batching) at 1,000 inputs | No documented ceiling: Jina batches internally, so no limit is invented; requests above the library's sanity ceilings refuse locally, and `BatchPolicy.max_items_override` applies an independently verified limit |
+| Rerank documents | 1,000 is a hard cap; the core refuses larger requests unless `rerank_cross_batch` opts into chunk-local rankings | `top_n` is taken natively by the reranker |
 | Truncation | Defaults on server-side: over-length inputs are cut, not rejected. Disable per call with `provider_options={"voyage": {"truncation": False}}` | — |
 | Dimensionality | — | Matryoshka truncation via `dimensions=`; `late_chunking` via `provider_options={"jina": {"late_chunking": True}}` |
 
@@ -52,16 +52,16 @@ Two behaviors are shared:
 - **No model listing.** Neither API has a listing endpoint, so `client.models("voyage")`
   and `client.models("jina")` return empty lists; the verified model set ships in each
   descriptor's [capabilities](../concepts/capabilities.md).
-- **Usage is `total_tokens` only** — `input_tokens` stays unknown rather than assumed.
+- **Usage is `total_tokens` only**: `input_tokens` stays unknown rather than assumed.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields each adapter depends on, see
 [contracts/voyage.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/voyage.md)
 and
 [contracts/jina.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/jina.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -1,8 +1,8 @@
-# Error catalog
+# Error Catalog
 
 Every exception AnyInfer raises, when it is raised, and what the user will see.
 
-## The shape of every error
+## The Shape of Every Error
 
 The hierarchy is shallow, about ten classes, with rich structured fields, because callers
 branch on fields far more often than on exception class:
@@ -21,7 +21,7 @@ except ai.AnyInferError as error:
 `detail` and `hint` always pass redaction, so no error can leak a credential no matter where
 it is logged.
 
-## The hierarchy
+## The Hierarchy
 
 ```
 AnyInferError
@@ -46,7 +46,7 @@ AnyInferError
 
 `ProviderError` is a distinct branch on purpose: it is exactly what the router catches and
 may retry. `ConfigError`, `SchemaViolationError`, and `AllTargetsFailedError` are *not*
-provider errors and propagate straight to you.
+provider errors and propagate straight to the caller.
 
 ---
 
@@ -68,7 +68,7 @@ ConfigError: the copilot provider requires the github-copilot-sdk extra
   (hint: pip install 'anyinfer[copilot]', then run 'copilot login')
 ```
 
-### Embedding and rerank refusals
+### Embedding and Rerank Refusals
 
 `embed()` and `rerank()` raise no exception types of their own: an unsupported operation,
 a refused embedding fallback, or an oversized batch is a `ConfigError` whose message and
@@ -100,7 +100,7 @@ How references resolve, and what redaction guarantees, is covered in
 
 ## `AuthError` :material-alert-circle:{ title="Not retryable; the same key will fail again" }
 
-**When:** 401 or 403 from a provider — a key that is invalid, expired, or without access to
+**When:** 401 or 403 from a provider: a key that is invalid, expired, or without access to
 the requested model.
 
 **Retryable:** no; the same key will fail the same way, and retrying only spends budget
@@ -165,7 +165,7 @@ fall back to a larger model instead, or trim the prompt with
 **When:** a timeout, connection failure, or TLS error. No usable response arrived.
 
 **Retryable:** yes. Since nothing was delivered, a retry cannot duplicate output the
-consumer already saw — the boundary that makes `StreamProtocolError` different. See
+consumer already saw (the boundary that makes `StreamProtocolError` different). See
 [the event stream](../concepts/events.md).
 
 ```
@@ -230,7 +230,7 @@ UnsupportedInputError: ollama cannot project audio input (model reports no audio
 ceiling, or its cost cannot be estimated and the policy says not to spend blind. Raised
 before dispatch, so nothing was sent and nothing was billed.
 
-**Retryable:** no; deterministic by construction — the identical request refused once will
+**Retryable:** no; deterministic by construction: the identical request refused once will
 be refused again.
 
 ```
@@ -317,7 +317,7 @@ fatal: unable to load model
    have run out of memory)
 ```
 
-The server's own log tail is included, because polling a health endpoint alone tells you
+The server's own log tail is included, because polling a health endpoint alone reveals
 nothing about *why* it failed.
 
 !!! tip "How to fix"
@@ -332,7 +332,7 @@ nothing about *why* it failed.
 
 **When:** `ConfidentialExecutionAdapter.generate()` was called and
 `anyinfer.local.confidential_execution_status()` reported `end_to_end=False` for this
-host. The inner local adapter is never called — this fails closed, not degraded.
+host. The inner local adapter is never called; this fails closed, not degraded.
 
 ```
 ConfidentialExecutionError: confidential execution was requested but is not available:
@@ -340,8 +340,8 @@ no attestable CPU TEE detected (SEV-SNP/TDX guest device not present)
 ```
 
 !!! tip "How to fix"
-    Call `confidential_execution_status()` yourself before committing to a request, so
-    your application can degrade with a message the caller sees instead of hitting this
+    Call `confidential_execution_status()` before committing to a request, so the
+    application can degrade with a message the caller sees instead of hitting this
     error mid-call. See the
     [Confidentiality Tiers guide](../guides/confidentiality-tiers.md#tier-3-attested-local-execution).
 
@@ -349,7 +349,7 @@ no attestable CPU TEE detected (SEV-SNP/TDX guest device not present)
 
 ---
 
-## Things that look like bugs but are not
+## Things That Look Like Bugs but Are Not
 
 Four behaviors are reported as bugs often enough to state as intended:
 
@@ -362,7 +362,7 @@ Four behaviors are reported as bugs often enough to state as intended:
 - An unrecognized finish reason does not crash. `FinishReason` is an open enum, and
   unknown values normalize to `"other"`.
 
-## Handling errors
+## Handling Errors
 
 What the router retries, in what order, and when it falls back to the next target is
 covered in [routing and rate limits](../concepts/routing.md). Application-side handling

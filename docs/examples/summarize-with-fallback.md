@@ -1,4 +1,4 @@
-# Structured summaries with a fallback chain
+# Structured Summaries with a Fallback Chain
 
 A command-line tool that turns arbitrary text into a schema-validated summary, staying up
 when a provider is not: it tries Anthropic first, falls back to OpenAI, and finally to a
@@ -50,7 +50,7 @@ for attempt in result.attempts:
     print(f"  {attempt.target}: {attempt.outcome}", file=sys.stderr)
 ```
 
-## What to notice
+## What to Notice
 
 - `result.structured` is always valid against `SUMMARY_SCHEMA`: validation happens
   client-side regardless of which provider answered, and `result.structured_mechanism`
@@ -67,7 +67,7 @@ for attempt in result.attempts:
   call lands on Ollama, and if everything fails, you get one `AllTargetsFailedError`
   carrying the per-target causes, not the last exception to happen to escape.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

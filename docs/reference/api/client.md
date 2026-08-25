@@ -1,6 +1,6 @@
-# Clients and streams
+# Clients and Streams
 
-The two entry points — `Client` (sync) and `AsyncClient` (async) — expose the same
+The two entry points, `Client` (sync) and `AsyncClient` (async), expose the same
 surface; the sync client is a facade over the async core (see the
 [architecture overview](../../contributing/architecture.md)).
 

@@ -1,4 +1,4 @@
-# Add a fallback chain
+# Add a Fallback Chain
 
 A `Route` names the targets to try in order and the retry policy for each; the full
 semantics live in [routing](../concepts/routing.md).
@@ -19,14 +19,14 @@ result = client.generate(prompt, route=route)
 print("served by", result.target)
 ```
 
-## Set a default route once
+## Set a Default Route Once
 
 ```python
 client = ai.Client(providers, route=ai.Route(targets=("medium", "small")))
 result = client.generate(prompt)  # no target= needed
 ```
 
-## Inspect what happened
+## Inspect What Happened
 
 ```python
 for attempt in result.attempts:
@@ -47,7 +47,7 @@ The trail is also visible while a request runs: a [stream](streaming.md) emits a
 `AttemptFailed` event at the moment a target fails, so a UI can show the switch instead of
 a stalled cursor.
 
-## Handle total failure
+## Handle Total Failure
 
 ```python
 try:
@@ -61,7 +61,7 @@ Since a chain only proves itself when things fail, the
 [test kit](testing-your-app.md) can script those failures offline: a provider that 503s
 once and then answers exercises this exact path in CI.
 
-## Route by failure class
+## Route by Failure Class
 
 A context overflow needs a *bigger* model, not another same-sized one:
 
@@ -75,7 +75,7 @@ route = ai.Route(
 When a `ContextLengthError` occurs, the router switches to that chain instead of continuing
 down the general one.
 
-## Tune retry behavior
+## Tune Retry Behavior
 
 ```python
 ai.Retry(
@@ -88,7 +88,7 @@ ai.Retry(
 A server's `Retry-After` is honored when it is longer than the computed backoff, but the
 sleep is still capped at `backoff_max_s`.
 
-By default, auth failures and context overflows are not retried — repeating them cannot
+By default, auth failures and context overflows are not retried: repeating them cannot
 succeed, and the budget is better spent on the next target. Override when you know your
 provider better:
 
@@ -96,23 +96,23 @@ provider better:
 ai.Retry(retry_on=lambda error: error.retryable or error.http_status == 409)
 ```
 
-## Health gating
+## Health Gating
 
 A target that recently failed with a transport or availability error is skipped for
 `health_ttl_s` seconds, so one dead endpoint does not cost every subsequent request its full
 timeout. Skipped attempts appear in the trail as `skipped_unhealthy`. Turn it off with
 `health_gate=False` when you want every target attempted regardless.
 
-## A good default shape
+## A Good Default Shape
 
-Put a local model last. When every hosted provider is unreachable — an outage, a captive
-portal, an expired card — a local fallback is the difference between degraded and down:
+Put a local model last. When every hosted provider is unreachable (an outage, a captive
+portal, an expired card), a local fallback is the difference between degraded and down:
 
 ```python
 ai.Route(targets=("medium", "llama-cpp:qwen2.5-3b-instruct-q4-k-m"))
 ```
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Targets are tried strictly in order, and `result.attempts` records what happened to
       every one, so a slow or rerouted request is explainable after the fact.
     - Auth failures and context overflows are not retried by default, because repeating
@@ -122,7 +122,7 @@ ai.Route(targets=("medium", "llama-cpp:qwen2.5-3b-instruct-q4-k-m"))
     - A local model at the end of the chain keeps your application degraded rather than
       down when every hosted provider is unreachable.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

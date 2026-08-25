@@ -34,7 +34,7 @@ expands to that port, so a server on another machine needs only its name:
 ai.ProviderSettings.of("lm-studio", base_url="gpu-box")  # http://gpu-box:1234
 ```
 
-An API token is only needed when you have enabled LM Studio's authentication.
+An API token is only needed when LM Studio's authentication has been enabled.
 `lmstudio:` is an accepted alias.
 
 ## Discovery
@@ -49,13 +49,13 @@ for model in client.models("lm-studio"):
     # qwen3-8b 32768 Q4_K_M
 ```
 
-Context length, quantization, artifact size, tool-use and reasoning support — all with
+Context length, quantization, artifact size, tool-use and reasoning support, all with
 [`discovered` provenance](../concepts/capabilities.md#the-five-provenances), because the
 server reported them rather than a table guessing. Embedding models are filtered out;
 they are not chat models.
 
-Older LM Studio builds have no native API. A 404 there degrades to the OpenAI listing —
-ids alone, rather than failing.
+Older LM Studio builds have no native API. A 404 there degrades to the OpenAI listing
+(ids alone) rather than failing.
 
 ## Residency
 
@@ -78,7 +78,7 @@ LM Studio names reasoning levels:
 result = client.generate(prompt, target="lm-studio:qwen3-8b", reasoning="medium")
 ```
 
-`minimal` maps to the server's `low` rather than `off` — disabling reasoning changes the
+`minimal` maps to the server's `low` rather than `off`; disabling reasoning changes the
 answer more than reducing it does. Pass `provider_options={"lm-studio": {"reasoning":
 "off"}}` to turn it off deliberately.
 
@@ -90,30 +90,30 @@ Embedding models loaded in LM Studio serve through the OpenAI-compatible dialect
 result = client.embed(["hello"], target="lm-studio:text-embedding-nomic-embed-text-v1.5")
 ```
 
-`client.models("lm-studio", operation="embedding")` lists which loaded models embed —
+`client.models("lm-studio", operation="embedding")` lists which loaded models embed;
 the native listing's `type` field distinguishes them, so nothing is guessed. LM Studio
 documents no request limits for the endpoint; for large corpora set
-[`BatchPolicy.max_items_override`](../concepts/embeddings.md#batching) to a size your
+[`BatchPolicy.max_items_override`](../concepts/embeddings.md#batching) to a size the
 machine handles.
 
-## Model management
+## Model Management
 
 This adapter *reads* inventory but does not manage it: loading, unloading, and downloading
 stay in LM Studio's own UI and CLI (`lms load`, `lms unload`). Requests load a model on
 demand as usual.
 
-For an engine AnyInfer supervises end to end — downloading artifacts, tuning for your
-hardware, and managing the server process — see [llama.cpp](llama-cpp.md). For other
+For an engine AnyInfer supervises end to end (downloading artifacts, tuning for the local
+hardware, and managing the server process), see [llama.cpp](llama-cpp.md). For other
 engines, [vLLM, SGLang, KoboldCpp, Jan, GPT4All, text-generation-webui, and
 TabbyAPI](presets.md#local-engines) are all preconfigured presets, and any
 OpenAI-compatible server works through [`openai-compat`](openai-compat.md).
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/lm-studio.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/lm-studio.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

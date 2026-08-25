@@ -1,11 +1,11 @@
-# Run a model locally
+# Run a Model Locally
 
 From a bare machine to a generated answer without installing or operating a separate
 model daemon. AnyInfer shows what this machine can run, downloads and hash-verifies the
 weights, fetches a pinned `llama-server` runtime after an explicit install command, and
 supervises the server from the application process.
 
-## 1. See what this machine can run
+## 1. See What This Machine Can Run
 
 The [model catalog](../concepts/catalog.md) classifies every entry against detected
 hardware:
@@ -50,11 +50,11 @@ $ anyinfer models list --all --json
 anything. [Hardware detection](../concepts/local.md#hardware-detection-is-advisory)
 never raises; anything it could not determine stays unknown rather than becoming a
 guess. When the engine runs on a different machine, detection describes the wrong
-computer — see
+computer; see
 [when the model runs somewhere else](../concepts/catalog.md#when-the-model-runs-somewhere-else)
 for supplying that host's specifications.
 
-## 2. Check the cost before committing
+## 2. Check the Cost Before Committing
 
 Large models are large. Ask what a download would take before starting it:
 
@@ -71,7 +71,7 @@ The quantization is a result, not an input: the highest-quality rung that fits t
 machine's memory budget. [The catalog](../concepts/catalog.md#acquiring-a-pick) gives
 the rule and how to override it.
 
-## 3. Download it
+## 3. Download It
 
 ```python
 def show(progress):
@@ -98,7 +98,7 @@ $ anyinfer models add qwen2.5-coder-14b-instruct --dry-run
 $ anyinfer models add qwen3-32b --variant qwen3-32b-q6-k
 ```
 
-## 4. Install a runtime
+## 4. Install a Runtime
 
 ```console
 $ anyinfer runtime list
@@ -130,8 +130,8 @@ result = client.generate(
 
 That single call resolves the artifact, downloads and verifies it if step 3 did not,
 tunes a server plan for the hardware, starts `llama-server` on loopback, waits for
-readiness, and answers. Later calls reuse the running server. How the plan is tuned —
-postures, memory budgets, the KV cache — belongs to
+readiness, and answers. Later calls reuse the running server. How the plan is tuned
+(postures, memory budgets, the KV cache) belongs to
 [the local subsystem](../concepts/local.md#tuning-explains-itself); pass
 `options={"posture": "conservative"}` on the provider settings to change it.
 
@@ -139,10 +139,10 @@ postures, memory budgets, the KV cache — belongs to
 `client.locate_model()` finds a downloaded file again without network I/O; see
 [finding it again](../concepts/catalog.md#finding-it-again). A tier alias such as
 `target="medium"` resolves through the same catalog, and a user's pick can become that
-default — see
+default; see
 [using a pick as your default tier](../concepts/catalog.md#using-a-pick-as-your-default-tier).
 
-## Ollama instead
+## Ollama Instead
 
 If you already run Ollama, it needs no supervision at all:
 
@@ -157,22 +157,22 @@ string.
 
 ## Troubleshooting
 
-**`could not find llama-server on PATH`** — run `anyinfer runtime install`, install a
+**`could not find llama-server on PATH`**: run `anyinfer runtime install`, install a
 llama.cpp build on `PATH`, or pass `options={"binary": "/path/to/llama-server"}`.
 
-**`needs about 40.0 GiB but only 8.0 GiB of VRAM is uncommitted`** — admission control
+**`needs about 40.0 GiB but only 8.0 GiB of VRAM is uncommitted`**: admission control
 refused before spawning, so nothing crashed. Choose a smaller tier or a more
 conservative posture.
 
-**`llama-server exited with code 3 while loading`** — the error includes the server's
+**`llama-server exited with code 3 while loading`**: the error includes the server's
 own log tail, which usually names the real cause (an incompatible quantization, a
 corrupt file, or genuine memory exhaustion).
 
-**A model unloads while you are still reading its output** — it should not: the idle
+**A model unloads while you are still reading its output**: it should not; the idle
 timer keys on active streams, not on when the last request arrived. If you see this,
 please report it.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - `local_catalog()` classifies every catalog entry against this machine, best fit
       first, with the reasons attached.
     - A `dry_run=True` acquisition prices the download without writing anything, and a
@@ -182,7 +182,7 @@ please report it.
     - One `generate()` against a `llama-cpp:` target acquires, tunes, supervises, and
       answers; later calls reuse the running server.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

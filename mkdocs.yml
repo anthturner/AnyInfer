@@ -1,7 +1,8 @@
 site_name: AnyInfer
 site_description: >-
-  An application-owned hybrid inference runtime for Python, spanning hosted APIs,
-  routing hubs, existing local services, and supervised llama.cpp.
+  AnyInfer provides an application-owned hybrid inference runtime for Python,
+  spanning hosted APIs, routing hubs, existing local services, and supervised
+  llama.cpp, as well as the typed contract that makes them behave alike.
 site_url: https://anyinfer.dev/
 repo_url: https://github.com/anthturner/AnyInfer
 repo_name: anthturner/AnyInfer
@@ -121,66 +122,66 @@ nav:
   - Integrate:
       - guides/README.md
       - Quickstart: guides/quickstart.md
-      - Installation and extras: guides/installation.md
-      - Why and when to use AnyInfer: why-anyinfer.md
-      - Shared configuration: reference/configuration.md
+      - Installation and Extras: guides/installation.md
+      - Why and When to Use AnyInfer: why-anyinfer.md
+      - Shared Configuration: reference/configuration.md
       - Surfaces:
           - Python SDK: guides/python-sdk.md
-          - Command-line tool: guides/cli.md
-          - OpenAI-compatible sidecar: serve/README.md
-          - Running the sidecar as a service: serve/running-as-a-service.md
-      - Python tasks:
-          - Stream typed events: guides/streaming.md
-          - Enforce a JSON schema: guides/structured-output.md
-          - Add a fallback chain: guides/fallback.md
-          - Run the tool loop: guides/tool-loop.md
-          - Fit a corpus to a budget: guides/fitting-context.md
-          - Test your application offline: guides/testing-your-app.md
-          - Compare targets without spending: guides/comparing-targets.md
-          - Add your own provider: guides/custom-providers.md
-          - Embed, store, and query a small corpus: guides/vector-store.md
+          - Command-Line Tool: guides/cli.md
+          - OpenAI-Compatible Sidecar: serve/README.md
+          - Running the Sidecar as a Service: serve/running-as-a-service.md
+      - Python Tasks:
+          - Stream Typed Events: guides/streaming.md
+          - Enforce a JSON Schema: guides/structured-output.md
+          - Add a Fallback Chain: guides/fallback.md
+          - Run the Tool Loop: guides/tool-loop.md
+          - Fit a Corpus to a Budget: guides/fitting-context.md
+          - Test Your Application Offline: guides/testing-your-app.md
+          - Compare Targets Without Spending: guides/comparing-targets.md
+          - Add Your Own Provider: guides/custom-providers.md
+          - Embed, Store, and Query a Small Corpus: guides/vector-store.md
       - Operations:
-          - Run a model locally: guides/local-inference.md
+          - Run a Model Locally: guides/local-inference.md
           - Observability: guides/observability.md
-      - Confidentiality tiers: guides/confidentiality-tiers.md
-      - Coding agents: guides/coding-agents.md
-      - Integration procedure: agents/INTEGRATION.md
-      - Reference application: guides/demo-app.md
+      - Confidentiality Tiers: guides/confidentiality-tiers.md
+      - Coding Agents: guides/coding-agents.md
+      - Integration Procedure: agents/INTEGRATION.md
+      - Reference Application: guides/demo-app.md
   - Concepts:
       - concepts/README.md
-      - The request path:
-          - Targets and aliases: concepts/targets.md
-          - The event stream: concepts/events.md
-          - Routing and rate limits: concepts/routing.md
-          - Structured output: concepts/structured-output.md
+      - The Request Path:
+          - Targets and Aliases: concepts/targets.md
+          - The Event Stream: concepts/events.md
+          - Routing and Rate Limits: concepts/routing.md
+          - Structured Output: concepts/structured-output.md
           - Sessions: concepts/sessions.md
-          - Embeddings and reranking: concepts/embeddings.md
-          - Multimodal inputs: concepts/multimodal-inputs.md
-      - Cost and context:
-          - Capabilities and provenance: concepts/capabilities.md
-          - Token estimation and context budgets: concepts/budgeting.md
-          - Cost and spending: concepts/cost.md
-          - Prompt caching: concepts/caching.md
-          - Context reduction: concepts/context-reduction.md
-      - Local execution:
-          - The local subsystem: concepts/local.md
-          - The model catalog: concepts/catalog.md
+          - Embeddings and Reranking: concepts/embeddings.md
+          - Multimodal Inputs: concepts/multimodal-inputs.md
+      - Cost and Context:
+          - Capabilities and Provenance: concepts/capabilities.md
+          - Token Estimation and Context Budgets: concepts/budgeting.md
+          - Cost and Spending: concepts/cost.md
+          - Prompt Caching: concepts/caching.md
+          - Context Reduction: concepts/context-reduction.md
+      - Local Execution:
+          - The Local Subsystem: concepts/local.md
+          - The Model Catalog: concepts/catalog.md
       - Operations:
-          - Credentials and redaction: concepts/credentials.md
+          - Credentials and Redaction: concepts/credentials.md
           - Telemetry: concepts/telemetry.md
-          - Run manifests: concepts/run-manifests.md
-          - Arena runs: concepts/arena.md
+          - Run Manifests: concepts/run-manifests.md
+          - Arena Runs: concepts/arena.md
   - Examples:
       - examples/README.md
-      - Structured summaries with fallback: examples/summarize-with-fallback.md
-      - A local tool-calling assistant: examples/local-tool-agent.md
-      - Distill a corpus: examples/distill-a-corpus.md
-      - Regression-test fallback and repair: examples/golden-manifest.md
-      - Semantic search over a small corpus: examples/semantic-search.md
+      - Structured Summaries with Fallback: examples/summarize-with-fallback.md
+      - A Local Tool-Calling Assistant: examples/local-tool-agent.md
+      - Distill a Corpus: examples/distill-a-corpus.md
+      - Regression-Test Fallback and Repair: examples/golden-manifest.md
+      - Semantic Search over a Small Corpus: examples/semantic-search.md
   - Providers:
       - providers/README.md
-      - Every provider: providers/all.md
-      - Hosted & local presets: providers/presets.md
+      - Every Provider: providers/all.md
+      - Hosted & Local Presets: providers/presets.md
       - OpenAI: providers/openai.md
       - Anthropic: providers/anthropic.md
       - Google Gemini: providers/gemini.md
@@ -199,36 +200,36 @@ nav:
       - llama.cpp: providers/llama-cpp.md
       - Text Embeddings Inference: providers/tei.md
       - Voyage AI and Jina AI: providers/retrieval.md
-      - OpenAI-compatible: providers/openai-compat.md
+      - OpenAI-Compatible: providers/openai-compat.md
   - Reference:
       - reference/README.md
-      - SDK reference:
+      - SDK Reference:
           - reference/api/README.md
-          - Clients and streams: reference/api/client.md
-          - Requests and messages: reference/api/requests.md
-          - Results and stream events: reference/api/results.md
-          - Embeddings and reranking: reference/api/embeddings.md
-          - Portability diff tool: reference/api/compare-diff.md
-          - Vector store add-on: reference/api/vector-store.md
+          - Clients and Streams: reference/api/client.md
+          - Requests and Messages: reference/api/requests.md
+          - Results and Stream Events: reference/api/results.md
+          - Embeddings and Reranking: reference/api/embeddings.md
+          - Portability Diff Tool: reference/api/compare-diff.md
+          - Vector Store Add-On: reference/api/vector-store.md
           - Routing: reference/api/routing.md
           - Capabilities: reference/api/capabilities.md
-          - Context reduction: reference/api/context.md
-          - Telemetry and redaction: reference/api/telemetry.md
-          - Registry, catalog, credentials: reference/api/registry.md
+          - Context Reduction: reference/api/context.md
+          - Telemetry and Redaction: reference/api/telemetry.md
+          - Registry, Catalog, Credentials: reference/api/registry.md
           - Configuration: reference/api/configuration.md
-          - Local inference: reference/api/local.md
-          - Sidecar frontend: reference/api/serve.md
-          - Testing utilities: reference/api/testing.md
+          - Local Inference: reference/api/local.md
+          - Sidecar Frontend: reference/api/serve.md
+          - Testing Utilities: reference/api/testing.md
           - Errors: reference/api/errors.md
-      - Error catalog: reference/errors.md
-      - Conformance matrix: reference/conformance-matrix.md
+      - Error Catalog: reference/errors.md
+      - Conformance Matrix: reference/conformance-matrix.md
       - Glossary: reference/glossary.md
   - Contributing:
       - contributing/README.md
       - Architecture: contributing/architecture.md
-      - Coding agents and workstreams: contributing/automation.md
-      - Branding and visual assets: contributing/branding.md
-      - Writing an adapter: contributing/writing-an-adapter.md
-      - The conformance suite: contributing/conformance.md
+      - Coding Agents and Workstreams: contributing/automation.md
+      - Branding and Visual Assets: contributing/branding.md
+      - Writing an Adapter: contributing/writing-an-adapter.md
+      - The Conformance Suite: contributing/conformance.md
       - Testing: contributing/testing.md
-      - Branching and releases: contributing/releasing.md
+      - Branching and Releases: contributing/releasing.md

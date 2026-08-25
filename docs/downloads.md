@@ -16,7 +16,7 @@ below, built by the
 
 <div class="anyinfer-card anyinfer-download-card" markdown>
 
-### :material-language-python: Python wheel
+### :material-language-python: Python Wheel
 
 For applications. Published to [PyPI](https://pypi.org/project/anyinfer/); installing
 from the repository is byte-identical.
@@ -34,9 +34,9 @@ pip install "anyinfer @ git+https://github.com/anthturner/AnyInfer@main"
 
 <div class="anyinfer-card anyinfer-download-card" markdown>
 
-### :material-monitor-dashboard: Demo app bundle
+### :material-monitor-dashboard: Demo App Bundle
 
-Self-contained — unzip and run, no Python required. Fully offline, no credentials needed.
+Self-contained: unzip and run, no Python required. Fully offline, no credentials needed.
 
 :material-microsoft-windows: [Windows (x64)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-windows-x64.zip)
 <br>:material-apple: [macOS (Apple silicon)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-arm64.zip) · [macOS (Intel)](https://github.com/anthturner/AnyInfer/releases/latest/download/anyinfer-demo-macos-x64.zip)
@@ -52,7 +52,7 @@ pip install "anyinfer[demo]" && anyinfer-demo
 
 <div class="anyinfer-card anyinfer-download-card" markdown>
 
-### :material-server-network: Sidecar bundle
+### :material-server-network: Sidecar Bundle
 
 The OpenAI-compatible service, self-contained for integrations that do not use Python.
 
@@ -80,7 +80,7 @@ anyinfer serve --config anyinfer.json
   [Installation and extras](guides/installation.md) lists which ones you need.
 - Unzip the demo bundle and run the `anyinfer-demo` executable inside; `BUNDLE-INFO.txt`
   records the exact version. Bundles never embed `llama-server` binaries or model
-  weights — install a runtime explicitly and let the local subsystem acquire verified
+  weights; install a runtime explicitly and let the local subsystem acquire verified
   model artifacts when needed. (No 32-bit Windows bundle: PySide6 publishes no 32-bit Qt
   builds, though the pure-Python wheel runs there fine.)
 - Unzip the sidecar bundle and run `anyinfer-serve --config anyinfer.json` from inside
@@ -91,7 +91,7 @@ anyinfer serve --config anyinfer.json
   need an optional provider SDK, such as GitHub Copilot or Entra authentication, should
   install the Python distribution with the corresponding extra.
 
-## Previous releases and checksums
+## Previous Releases and Checksums
 
 The [releases page](https://github.com/anthturner/AnyInfer/releases) keeps every prior
 version with its changelog, generated from the pull requests that landed between

@@ -3,7 +3,7 @@
 The condensed version. [DESIGN.md](https://github.com/anthturner/AnyInfer/blob/main/DESIGN.md) §23 has the complete rationale;
 [the glossary](../reference/glossary.md) defines the vocabulary these rules use.
 
-## The shape
+## The Shape
 
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
@@ -16,7 +16,7 @@ flowchart TD
 ```
 </div>
 
-## The load-bearing rules
+## The Load-Bearing Rules
 
 **1. The primitive is `GenerationRequest → typed event stream`.**
 Never make the OpenAI wire format the internal representation. It is one dialect at the
@@ -66,11 +66,11 @@ forbidden_modules = ["anyinfer.routing", "anyinfer.schema.validate",
                      "anyinfer.capabilities"]
 ```
 
-When one fails, move the code. Loosening a contract requires a documented reason — and
+When one fails, move the code. Loosening a contract requires a documented reason;
 `anyinfer.local` is absent from the adapter contract on purpose, because composing the
 local subsystem is translation, not orchestration.
 
-## Request lifecycle
+## Request Lifecycle
 
 1. Resolve the target: alias or `provider:model` → `ResolvedTarget`.
 2. Gate on health, if the target recently failed.
@@ -85,6 +85,6 @@ local subsystem is translation, not orchestration.
 On failure: record the attempt, emit `AttemptFailed`, then retry or advance to the next
 target. Exhaustion raises `AllTargetsFailedError` with the whole trail.
 
-Behaviors that look like bugs but are intended — unknown cost reported as `None`, no
-fallback on a schema violation, a mid-stream error raising after content — are listed in
+Behaviors that look like bugs but are intended (unknown cost reported as `None`, no
+fallback on a schema violation, a mid-stream error raising after content) are listed in
 [the error catalog](../reference/errors.md#things-that-look-like-bugs-but-are-not).

@@ -1,4 +1,4 @@
-# Requests and messages
+# Requests and Messages
 
 The request side of the one primitive: everything a `GenerationRequest` can carry. See
 [the event stream](../../concepts/events.md) for how a request becomes output.
@@ -51,11 +51,11 @@ The request side of the one primitive: everything a `GenerationRequest` can carr
 
 </div>
 
-## Prompt caching
+## Prompt Caching
 
 Opt-in placement of a provider's prompt cache. Off unless asked for: caching changes what a
-provider bills and how long it keeps a copy of the prompt. What it caches is the prefix you
-send, on the provider's side — it never skips a call or reuses an answer.
+provider bills and how long it keeps a copy of the prompt. What it caches is the prefix the
+caller sends, on the provider's side; it never skips a call or reuses an answer.
 
 <div class="anyinfer-api-block" markdown>
 

@@ -48,7 +48,7 @@ print(result.usage.output_tokens)  # answer + thoughts, because both bill as out
 ```
 
 Gemini's own `candidatesTokenCount` excludes thoughts even though they bill at the
-output rate, so AnyInfer reports `output_tokens` as the sum — cost stays right, and
+output rate, so AnyInfer reports `output_tokens` as the sum; cost stays right, and
 `reasoning_tokens` keeps the breakdown visible.
 
 Thinking text arrives as `ReasoningDelta` events and is excluded from `result.text`:
@@ -65,7 +65,7 @@ with client.stream(prompt, target="gemini:gemini-2.5-flash", reasoning="medium")
 Models that cannot disable thinking (2.5 Pro, and the Gemini 3 family) clamp a low
 request upward server-side rather than failing.
 
-## Structured output
+## Structured Output
 
 ```python
 SUMMARY = {
@@ -82,12 +82,12 @@ print(result.structured["headline"])
 ```
 
 Gemini's `responseSchema` accepts an OpenAPI subset, and rejects the *entire request* on
-an unknown keyword. AnyInfer projects your schema down to the accepted subset before
-sending — dropping things like `$schema`, `pattern`, and `unevaluatedProperties` — and
-then [validates the response](../concepts/structured-output.md) against your original
-schema. You lose some wire-level strictness, never result correctness.
+an unknown keyword. AnyInfer projects the schema down to the accepted subset before
+sending (dropping things like `$schema`, `pattern`, and `unevaluatedProperties`), and
+then [validates the response](../concepts/structured-output.md) against the original
+schema. Some wire-level strictness is lost, never result correctness.
 
-## Tool calling
+## Tool Calling
 
 ```python
 result = client.generate(prompt, target="gemini:gemini-2.5-flash", tools=[lookup_spec])
@@ -97,7 +97,7 @@ for call in result.tool_calls:
 
 Gemini emits complete function calls rather than streamed argument fragments, and
 supports several calls in one turn. Tool results are sent back on a *user* turn as
-`functionResponse` parts — the adapter handles that translation, so
+`functionResponse` parts; the adapter handles that translation, so
 [`run_tools()`](../guides/tool-loop.md) works the same as everywhere else.
 
 ## Embeddings
@@ -114,13 +114,13 @@ result = client.embed(
 
 - The legacy `gemini-embedding-001` accepts task types, mapped from
   [`input_type`](../concepts/embeddings.md#input-intent) (`query` → `RETRIEVAL_QUERY` and
-  so on). The current `gemini-embedding-2` documents no task types — prompt instructions
-  replace them — so an `input_type` there is never sent and the result says so in a
+  so on). The current `gemini-embedding-2` documents no task types (prompt instructions
+  replace them), so an `input_type` there is never sent and the result says so in a
   warning.
 - No batch ceiling is documented, so requests above the library's
   [sanity ceiling](../concepts/embeddings.md#batching) are refused rather than split at a
-  guessed size; set `BatchPolicy.max_items_override` if you have verified a limit
-  yourself.
+  guessed size; set `BatchPolicy.max_items_override` after independently verifying a
+  limit.
 - There is no reranking endpoint on this API.
 
 ## Discovery
@@ -135,10 +135,10 @@ for model in client.models("gemini"):
         print(model.id, caps.context_window.value, caps.context_window.provenance)
 ```
 
-## Reaching native features
+## Reaching Native Features
 
-Anything AnyInfer does not model — context caching, safety settings, grounded search,
-numeric thinking budgets — passes straight through
+Anything AnyInfer does not model (context caching, safety settings, grounded search,
+numeric thinking budgets) passes straight through
 [the escape hatch](README.md#reaching-provider-specific-parameters):
 
 ```python
@@ -156,24 +156,24 @@ client.generate(
 )
 ```
 
-## Content filtering
+## Content Filtering
 
 A prompt Gemini blocks returns **no candidates at all**, with the reason on
 `promptFeedback`. That surfaces as `finish_reason == "content_filter"` rather than an
 empty successful answer, and a [`Route`](../concepts/routing.md) with
 `content_policy_targets` can redirect it to a differently-governed provider.
 
-## Multimodal inputs
+## Multimodal Inputs
 
 Images, documents, and audio use native `inlineData` blocks for bytes and `fileData` for
 remote references. Support and limits remain model-specific.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/gemini.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/gemini.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -1,4 +1,4 @@
-# Targets and aliases
+# Targets and Aliases
 
 A **[target](../reference/glossary.md#target)** says where a request goes. There are two
 spellings and one resolution path.
@@ -20,7 +20,7 @@ client.generate(prompt, target="ollama:qwen3:8b")
 ```
 
 The string is split on the **first** colon only, because model names legitimately contain
-colons — `"ollama:qwen3:8b"` is the provider `ollama` and the model `qwen3:8b`.
+colons: `"ollama:qwen3:8b"` is the provider `ollama` and the model `qwen3:8b`.
 
 Provider names normalize (lowercased, trimmed, `_` → `-`) and honor aliases, so
 `"Claude:claude-sonnet-4-5"` and `"anthropic:claude-sonnet-4-5"` are the same target.
@@ -34,7 +34,7 @@ client.generate(prompt, target="medium")
 ```
 
 The bundled catalog ships `small`, `medium`, and `large`. Which provider serves an alias is
-determined by **the order you configured providers**:
+determined by **the order providers were configured**:
 
 ```python
 client = ai.Client(
@@ -49,18 +49,18 @@ client.generate(prompt, target="medium")  # -> ollama:qwen3:4b
 
 Reverse that list and `medium` resolves to Anthropic instead. The rule is deliberately
 boring: **first configured provider that offers the alias wins**. Nothing is scored, ranked,
-or chosen for you, so the same code makes the same choice every time.
+or chosen on the application's behalf, so the same code makes the same choice every time.
 
-### Why aliases exist
+### Why Aliases Exist
 
-They let an application offer "pick a size" instead of "pick a model id", and they let you
-change which model backs a tier without touching application code. Catalog entries are data;
+They allow an application to offer "pick a size" instead of "pick a model id", and allow a
+developer to change which model backs a tier without touching application code. Catalog entries are data;
 application code refers to tiers.
 
-## Resolution is total
+## Resolution Is Total
 
-Resolution either produces a concrete target or raises a `ConfigError` telling you what to
-do instead. It never silently substitutes a different model:
+Resolution either produces a concrete target or raises a `ConfigError` telling the caller
+what to do instead. It never silently substitutes a different model:
 
 ```python
 client.generate(prompt, target="gpt-5")
@@ -69,7 +69,7 @@ client.generate(prompt, target="gpt-5")
 #          or one of these aliases: large, medium, small)
 ```
 
-You can resolve without issuing a request:
+A target can be resolved without issuing a request:
 
 ```python
 resolved = client.resolve("medium")
@@ -77,15 +77,15 @@ print(resolved.provider_id, resolved.model, resolved.via_alias)
 # ollama qwen3:4b medium
 ```
 
-## Proving a target actually works
+## Proving a Target Actually Works
 
 Resolving a target says it is spelled correctly, nothing more. `verify()` spends one
 tiny request to prove the credential, model, and deployment actually serve, and
-`probe()` measures features on compatibility endpoints — both are covered in
+`probe()` measures features on compatibility endpoints; both are covered in
 [proving a target works](capabilities.md#proving-a-target-works). The CLI wraps the
 first as [`anyinfer verify`](../guides/cli.md#checking-a-target-actually-works).
 
-## Overriding the catalog
+## Overriding the Catalog
 
 Applications overlay their own catalog; app entries win:
 
@@ -108,11 +108,11 @@ client = ai.Client(providers, catalog=ai.load_default_catalog().overlay(overlay)
 ```
 
 An overridden alias replaces the bundled one wholesale rather than merging its target map,
-so you can *remove* a provider from a tier you do not want used.
+so a provider can be *removed* from a tier that should not be used.
 
-Pinning your own catalog is also how you insulate yourself from bundled-catalog churn.
+Pinning a catalog is also how an application insulates itself from bundled-catalog churn.
 
-## Targets are OpenAI model strings
+## Targets Are OpenAI Model Strings
 
 Every target spelling fits in an OpenAI `model` field, which is what makes the
 [sidecar](../serve/README.md) able to federate without inventing a routing syntax:
@@ -124,15 +124,15 @@ curl localhost:8080/v1/chat/completions \
 
 This is enforced by a round-trip test, not just intended.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - A target is either `provider:model` or a catalog alias; both resolve through the
       same path, and resolution either succeeds concretely or raises `ConfigError`.
     - Aliases resolve to the first configured provider that offers them, every time;
-      nothing is scored or chosen for you.
+      nothing is scored or chosen on the application's behalf.
     - Every target spelling is a valid OpenAI `model` string, which is what lets the serve
       frontend federate without inventing a routing syntax.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

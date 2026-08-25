@@ -991,7 +991,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 _CONTRACTS_URL = "https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md"
 """Absolute because the matrix page cannot link outside the mkdocs docs/ tree."""
 
-_MATRIX_HEADER = """# Conformance matrix
+_MATRIX_HEADER = """# Conformance Matrix
 
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
@@ -1010,7 +1010,7 @@ cassette are covered in [the conformance suite](../contributing/conformance.md).
 """
 
 _MATRIX_FOOTER = f"""
-## What the cases check
+## What the Cases Check
 
 | Case | Verifies |
 |---|---|
@@ -1045,10 +1045,11 @@ _MATRIX_FOOTER = f"""
 
 ## Modes
 
-- **fake-server** — in-process transports asserting we handle each protocol *shape*. Runs on
-  every commit.
-- **cassette** — recorded real traffic, asserting we handle what providers *actually send*.
-- **live** — opt-in, requires credentials. `m365-copilot` is exempt: its authentication is
+- **fake-server**: in-process transports asserting the library handles each protocol
+  *shape*. Runs on every commit.
+- **cassette**: recorded real traffic, asserting the library handles what providers
+  *actually send*.
+- **live**: opt-in, requires credentials. `m365-copilot` is exempt: its authentication is
   interactive-only and cannot run headless.
 
 ## See also
@@ -1165,7 +1166,7 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
     lines.append(
         covered_note + " "
         "The `groq`, `moonshot`, `reka` and `venice` rows exercise the shared adapter's "
-        "quirk axes — bearer auth, the renamed output-token field, `x-api-key` auth, and "
+        "quirk axes: bearer auth, the renamed output-token field, `x-api-key` auth, and "
         "the `max_completion_tokens` dialect. Every entry in the "
         "[preset registry](../providers/presets.md) is separately instantiated and checked "
         "for registry invariants; these rows do not claim a live upstream verification."

@@ -29,7 +29,7 @@ client = ai.Client([ai.ProviderSettings.of("copilot")])
 result = client.generate(prompt, target="copilot:gpt-4.1")
 ```
 
-No API key is handled by AnyInfer — the CLI owns the credential. Override CLI discovery with
+No API key is handled by AnyInfer; the CLI owns the credential. Override CLI discovery with
 `options={"cli_path": "/path/to/copilot"}` or the `COPILOT_CLI_PATH` environment variable.
 
 Alias: `github-copilot`.
@@ -39,12 +39,12 @@ Alias: `github-copilot`.
 | Behavior | Support |
 |---|---|
 | Streaming | SDK event callbacks |
-| Structured output | **Prompt-injected only** — no native mode |
-| Tools | **Not supported** — declared as ignored, so requesting them emits `ParameterDropped` |
+| Structured output | **Prompt-injected only** (no native mode) |
+| Tools | **Not supported**; declared as ignored, so requesting them emits `ParameterDropped` |
 | Usage | Input, output, cache read/write, reasoning tokens |
 | Cost | Not reported |
 
-## The `auto` sentinel
+## The `auto` Sentinel
 
 ```python
 result = client.generate(prompt, target="copilot:auto")
@@ -52,15 +52,15 @@ result = client.generate(prompt, target="copilot:auto")
 
 Copilot picks the model at request time. Capabilities for `auto` are therefore the
 **conjunction** across every model it might choose: the minimum of each numeric bound, the
-intersection of feature flags. Claiming more would be a promise you could not verify until a
-request failed.
+intersection of feature flags. Claiming more would be a promise that could not be verified
+until a request failed.
 
 See [capabilities](../concepts/capabilities.md#the-auto-sentinel).
 
-## Token calibration
+## Token Calibration
 
-The CLI runtime builds its own request around your prompt — an agent system preamble, its
-built-in tool declarations, workspace framing — none of which appears in the messages this
+The CLI runtime builds its own request around the prompt (an agent system preamble, its
+built-in tool declarations, workspace framing), none of which appears in the messages this
 library serializes. Copilot's reported prompt tokens therefore run well above the bytes
 sent, and consistently enough to correct for, so the descriptor declares a
 [token calibration](../concepts/budgeting.md#when-the-provider-bills-for-more-than-you-sent):
@@ -74,11 +74,11 @@ budget.estimate.envelope.tokens  # the harness, counted separately from your pro
 It moves the planning figure only, so `budget()` packs conservatively here while the
 pre-dispatch gate stays as permissive as it is everywhere else.
 
-## Structured output
+## Structured Output
 
 Copilot has no structured-output mode, so a schema is described in the prompt and validated
-client-side — [the core's fallback path](../concepts/structured-output.md) for providers
-without a native mode. You still get a validated `result.structured`;
+client-side ([the core's fallback path](../concepts/structured-output.md) for providers
+without a native mode). The caller still gets a validated `result.structured`;
 `structured_mechanism` will read `"prompt"`.
 
 Consider [`repair=ai.Repair(max_attempts=1)`](../concepts/structured-output.md#repair)
@@ -87,12 +87,12 @@ json_schema modes.
 
 ## Troubleshooting
 
-**`the copilot provider requires the github-copilot-sdk extra`** — `pip install
+**`the copilot provider requires the github-copilot-sdk extra`**: `pip install
 'anyinfer[copilot]'`.
 
-**`AuthError` mentioning login** — run `copilot login`.
+**`AuthError` mentioning login**: run `copilot login`.
 
-**CLI not found** — install the Copilot CLI and put it on `PATH`, or set
+**CLI not found**: install the Copilot CLI and put it on `PATH`, or set
 `COPILOT_CLI_PATH`.
 
 ## Notes
@@ -100,7 +100,7 @@ json_schema modes.
 - Sessions take a system prompt plus one user turn, so prior turns are folded into the user
   prompt with role markers rather than being silently dropped.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/copilot.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/copilot.md).

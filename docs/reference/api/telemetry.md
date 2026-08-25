@@ -1,4 +1,4 @@
-# Telemetry and redaction
+# Telemetry and Redaction
 
 Typed in-process events, payload-free by default, plus the redaction registry that keeps
 secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
@@ -14,7 +14,7 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 
 </div>
 
-## Request lifecycle events
+## Request Lifecycle Events
 
 <div class="anyinfer-api-block" markdown>
 
@@ -56,7 +56,7 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 
 </div>
 
-## Local subsystem events
+## Local Subsystem Events
 
 <div class="anyinfer-api-block" markdown>
 
@@ -78,7 +78,7 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 
 </div>
 
-## OpenTelemetry export
+## OpenTelemetry Export
 
 The optional `[otel]` extra maps these events onto OpenTelemetry spans and metrics.
 Guide: [observability](../../guides/observability.md).

@@ -1,13 +1,13 @@
-# Distill a corpus
+# Distill a Corpus
 
 `distill` reads material that will never fit at any fidelity and writes something
 shorter: each chunk is summarized against your question, then the notes are synthesized
-into one answer. Since that spends inference — a corpus of N chunks costs N+1 requests —
+into one answer. Since that spends inference (a corpus of N chunks costs N+1 requests),
 it is a separate function rather than a `select()` strategy, and this example needs a
 live provider: as written, [Anthropic](../providers/anthropic.md) with
 `ANTHROPIC_API_KEY` set.
 
-## The basic shape
+## The Basic Shape
 
 ```python
 import anyinfer as ai
@@ -34,7 +34,7 @@ print(f"{result.calls} calls, {result.usage.output_tokens} output tokens")
 multiplier is never a surprise. `source` may be raw text or `ContextDocument` values;
 documents split per document, because a document boundary is a natural chunk boundary.
 
-## Know the cost before you commit
+## Know the Cost Before You Commit
 
 A distillation over 200 chunks is 201 requests. Size it first:
 
@@ -54,10 +54,10 @@ if estimate is not None:
 
 Afterwards, `result.usage.cost_usd` is what it cost, wherever the provider reports cost.
 
-## Hierarchical reduce, when there are many notes
+## Hierarchical Reduce, When There Are Many Notes
 
 With enough chunks, the notes themselves exceed the window. `distill` handles that by
-reducing in batches — sized by what fits, not by note count — and then reducing those
+reducing in batches (sized by what fits, not by note count) and then reducing those
 summaries:
 
 ```python
@@ -69,7 +69,7 @@ A single-pass merge would overflow here.
 
 ## Variations
 
-If your notes merge structurally — a union of entries, a concatenation, a JSON merge —
+If your notes merge structurally (a union of entries, a concatenation, a JSON merge),
 supply a `reducer` and the reduce call disappears; the map phase is still N calls, the
 reduce is free and reproducible:
 
@@ -149,7 +149,7 @@ with ai.Client([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API
     )
 ```
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 
