@@ -1,5 +1,10 @@
 # Observe requests, and bridge to OpenTelemetry
 
+Every request emits typed [telemetry events](../concepts/telemetry.md) as it runs. This
+page shows how to consume them in-process and how to export them to OpenTelemetry; the
+[event stream](../concepts/events.md) page covers the per-request events a stream consumer
+sees.
+
 ## In-process observers
 
 ```python
@@ -44,8 +49,8 @@ class DegradationWatch:
 mode where `temperature=0` silently does nothing and looks exactly like success.
 
 `RateLimitWaited` belongs to the same family. A request held back by
-[client-side pacing](../concepts/rate-limits.md) is indistinguishable from a slow provider
-unless something says so, which is why the wait also lands in
+[client-side pacing](../concepts/routing.md#pacing-before-the-limit) is indistinguishable
+from a slow provider unless something says so, which is why the wait also lands in
 `result.timing.phases["queued_ms"]`.
 
 ## Payload privacy
@@ -63,20 +68,8 @@ payload-carrying event.
 
 ## A JSONL trail
 
-```python
-import json
-from dataclasses import asdict
-
-
-class JsonlTrail:
-    def __init__(self, path):
-        self._file = open(path, "a", encoding="utf-8")
-
-    def on_event(self, event):
-        record = {"event": type(event).__name__, **asdict(event)}
-        self._file.write(json.dumps(record, default=str) + "\n")
-        self._file.flush()
-```
+An audit trail needs no special support: consume the events directly and have your
+observer serialize each one to a JSONL file.
 
 ## OpenTelemetry
 
@@ -94,18 +87,13 @@ You get one span per request with attempts as span events, plus
 `gen_ai.server.time_to_first_token`, using GenAI semantic-convention attribute names so
 standard tooling reads them.
 
-Every event in the contract crosses the bridge — nothing is dropped. Events carrying a
-`request_id` become span events on that request's span (`target.resolved`,
-`attempt.started`, `first_token`, `retry.scheduled`, `fallback.triggered`,
-`schema.repair`, `parameter.dropped`, `usage.estimated`). The three events that belong to
-no single request — `ContextReduced`, `ServerLifecycle`, `DownloadProgress` — become
-standalone spans (`context.reduced`, `server.lifecycle`, `download.completed`), because
-attaching them to an arbitrary in-flight request would misattribute work that happens
-outside it. A crashed server sets an error status on its span, and only the terminal
-download event becomes a span — per-chunk progress would flood the exporter.
-
-The bridge is a *consumer* of the event contract rather than the contract itself, so
-consuming events directly and exporting to OTel are both first-class, and you can do both.
+Every event in the contract crosses the bridge. Events carrying a `request_id` become span
+events on that request's span, while the three that belong to no single request —
+`ContextReduced`, `ServerLifecycle`, `DownloadProgress` — become standalone spans, since
+attaching them to an arbitrary in-flight request would misattribute the work. The full
+mapping is in [the OpenTelemetry bridge](../concepts/telemetry.md#the-opentelemetry-bridge);
+the bridge is a consumer of the event contract, so consuming events directly and exporting
+to OTel are both first-class, and you can do both.
 
 ## Cost
 
@@ -118,4 +106,28 @@ else:
 
 `None` means unknown, not free. Treating the two the same turns a reporting gap into a
 silent financial error. See
-[capabilities](../concepts/capabilities.md#cost-is-tri-state).
+[cost is tri-state](../concepts/cost.md#cost-is-tri-state).
+
+!!! tip "Key takeaways"
+    - Observers run inline on the request path: keep them fast, and know that one which
+      raises is isolated rather than allowed to fail a generation.
+    - `ParameterDropped`, `UsageEstimated`, and `RateLimitWaited` make degradation visible
+      that would otherwise look exactly like success.
+    - Payloads are opt-in per observer, and redaction runs before any event is delivered.
+    - The OTel bridge consumes the same event contract as your observers, so the two
+      paths never disagree and can run side by side.
+    - Never record an unknown cost as zero; `cost_usd` is `None` when the price is not
+      trusted.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Telemetry and observers](../concepts/telemetry.md): the full event contract and the
+  OTel mapping.
+- [The event stream](../concepts/events.md): per-request events and their ordering
+  guarantees.
+- [Cost and spending](../concepts/cost.md): the ledger and spend ceilings behind
+  `cost_usd`.
+
+</div>

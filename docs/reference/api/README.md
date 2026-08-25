@@ -14,6 +14,7 @@ import anyinfer as ai
 | [Requests and messages](requests.md) | `GenerationRequest`, messages, sampling, schemas, tool specs |
 | [Results and stream events](results.md) | `Generation`, usage, timing, the typed event stream |
 | [Routing](routing.md) | `Route`, `Retry`, target resolution |
+| [Embeddings and reranking](embeddings.md) | The `embed()`/`rerank()` request and result types, embedding spaces, batch policy |
 | [Capabilities](capabilities.md) | Provenance-tagged model capabilities and pricing |
 | [Context reduction](context.md) | Fitting a document corpus to a token budget |
 | [Telemetry and redaction](telemetry.md) | Observers, telemetry events, redaction, the OpenTelemetry bridge |
@@ -22,6 +23,8 @@ import anyinfer as ai
 | [Local inference](local.md) | `anyinfer.local`: hardware, backends, tuning, downloads, supervision |
 | [Serve](serve.md) | `anyinfer.serve`: the embeddable frontend and its OpenAI codec |
 | [Testing utilities](testing.md) | `anyinfer.testing`: fakes, cassettes, the conformance suite |
+| [Portability diff](compare-diff.md) | `anyinfer.compare_diff`: snapshot `compare()` output and diff two snapshots |
+| [Vector store add-on](vector-store.md) | `anyinfer_store`: the small-scale embedded vector store, a separate distribution |
 | [Errors](errors.md) | The exception hierarchy and its structured fields |
 
 If you are looking for *how to use* these rather than their signatures, start with the

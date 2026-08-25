@@ -5,9 +5,9 @@ icon: material/aws
 
 # AWS Bedrock
 
-The **Converse** API — Bedrock's unified interface, where one request shape serves Claude,
-Nova, Llama, Mistral, and DeepSeek alike. That normalization is exactly what AnyInfer
-wants, so `InvokeModel` and its per-model request bodies are never used.
+The Converse API — Bedrock's unified interface, where one request shape serves Claude,
+Nova, Llama, Mistral, and DeepSeek alike. Generation never uses `InvokeModel` and its
+per-model request bodies; only embeddings do, because Converse has no embeddings surface.
 
 <div class="anyinfer-badge-row" markdown="span">
 <span class="anyinfer-badge anyinfer-badge-yes">:material-check: streaming</span>
@@ -61,10 +61,10 @@ client.generate(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5")
 client.generate(prompt, target="bedrock:amazon.nova-pro-v1:0")
 ```
 
-Model ids containing colons work as targets — the target grammar splits on the *first*
-colon only, so everything after `bedrock:` is the model.
+Ids containing colons work because [targets](../concepts/targets.md) split on the first
+colon only.
 
-## Streaming is binary
+## Binary streaming
 
 `ConverseStream` answers with AWS's `vnd.amazon.eventstream` framing and offers no SSE or
 JSON alternative. AnyInfer decodes it, including verifying both frame checksums — so
@@ -86,15 +86,18 @@ with client.stream(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5") as s
 
 ## Structured output
 
-Converse has no response-format field, so a schema is emulated as a single **forced tool
-call** — the same approach the Anthropic adapter takes, because the API genuinely
-constrains tool input:
+Converse has no response-format field, so a schema is emulated as a single forced tool
+call — the same approach the [Anthropic adapter](anthropic.md) takes, because the API
+genuinely constrains tool input:
 
 ```python
 result = client.generate(article, target="bedrock:amazon.nova-pro-v1:0", schema=SUMMARY)
 print(result.structured["headline"])
 print(result.structured_mechanism)  # "json_schema"
 ```
+
+See [structured output](../concepts/structured-output.md) for how mechanisms are chosen
+and validated.
 
 ## Reasoning
 
@@ -108,23 +111,12 @@ result = client.generate(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5"
 Thinking text arrives as `ReasoningDelta` events and stays out of `result.text`. Models
 without extended thinking ignore the field.
 
-## Reaching model-specific parameters
+## Provider-specific parameters
 
 Anything Converse does not model — Claude's `top_k`, guardrail configuration, a service
-tier — passes through:
-
-```python
-client.generate(
-    prompt,
-    target="bedrock:us.anthropic.claude-sonnet-4-5",
-    provider_options={
-        "bedrock": {
-            "additionalModelRequestFields": {"top_k": 40},
-            "guardrailConfig": {"guardrailIdentifier": "gr-123", "guardrailVersion": "1"},
-        }
-    },
-)
-```
+tier — passes through `provider_options`, under keys such as
+`additionalModelRequestFields` and `guardrailConfig`. See
+[the escape hatch](README.md#reaching-provider-specific-parameters).
 
 ## Discovery and health
 
@@ -132,26 +124,20 @@ Discovery reads the Bedrock **control plane**, a different host than the runtime
 account without `bedrock:ListFoundationModels` gets an empty list rather than an error — a
 permission gap should not make the provider look broken.
 
-Health deliberately makes no network call at all: every runtime endpoint costs a
-generation, and the control plane may be denied by policy even when inference works
-perfectly. It reports whether credentials are present.
+Health makes no network call at all: every runtime endpoint costs a generation, and the
+control plane may be denied by policy even when inference works perfectly. It reports
+whether credentials are present.
 
 ## Pricing
 
-Bedrock prices per model and per region, and inference profiles differ from base models.
-The bundled table carries the common `us-east-1` on-demand rates for the Nova family and
-Claude; use `capability_overrides` where your account's rates differ.
-
-## Multimodal inputs
-
-Converse image, document, and audio blocks are used directly. Inline inputs are base64;
-remote image/document references must be S3 URIs. The selected model still decides which
-block types it accepts.
+Bedrock prices per model and per region; the bundled table carries the common `us-east-1`
+on-demand rates for the Nova family and Claude, and `capability_overrides` covers rates
+that differ — see [cost and spending](../concepts/cost.md).
 
 ## Embeddings
 
-Converse has no embeddings surface at all, so this goes through the older `InvokeModel`
-action instead — a separate code path from generation, sharing only auth and addressing:
+Since Converse has no embeddings surface, embeddings go through the older `InvokeModel`
+action — a separate code path from generation, sharing only auth and addressing:
 
 ```python
 result = client.embed(
@@ -160,16 +146,14 @@ result = client.embed(
 )
 ```
 
-Titan Text Embeddings V2 accepts **one `inputText` per call**, a real limit of the model
-(there is no batch field in its request schema) — the adapter declares
-`max_batch_inputs=1` so the core's batching policy fans a multi-text call into one
-`InvokeModel` request per input automatically. `dimensions=` requests native truncation
-to `1024` (default), `512`, or `256`. There is no `input_type`/intent concept on this
-model.
+Titan Text Embeddings V2 accepts one `inputText` per call, so the adapter declares
+`max_batch_inputs=1` and [the core's batching policy](../concepts/embeddings.md#batching)
+fans a multi-text call into one request per input. `dimensions=` requests native
+truncation to `1024` (default), `512`, or `256`; the model has no input-intent concept.
 
-Cohere Embed v3 is also reachable on the same `InvokeModel` action, under a different body
-shape selected by the model id's `cohere.` prefix — batch-capable (up to 96 texts per
-call, unlike Titan), and it **requires** `input_type`:
+Cohere Embed v3 runs on the same action, under a different body shape selected by the
+`cohere.` model-id prefix. It is batch-capable (up to 96 texts per call) and requires
+`input_type`:
 
 ```python
 result = client.embed(
@@ -179,8 +163,8 @@ result = client.embed(
 )
 ```
 
-Bedrock's Cohere embed response reports no token usage at all, unlike Titan's
-`inputTextTokenCount` — `result.usage` is `None`, never a guessed value.
+Bedrock's Cohere embed response reports no token usage, so `result.usage` is `None`,
+never a guessed value.
 
 ## Reranking
 
@@ -199,12 +183,23 @@ result = client.rerank(
 )
 ```
 
+## Multimodal inputs
+
+Converse image, document, and audio blocks are used directly. Inline inputs are base64;
+remote image/document references must be S3 URIs. The selected model still decides which
+block types it accepts.
+
+## Wire contract
+
+For the exact request/response fields this adapter depends on, see
+[contracts/bedrock.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/bedrock.md).
+
 ## See also
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/bedrock.md)
 - [Anthropic](anthropic.md): Claude direct, without the Bedrock layer.
-- [Routing](../concepts/routing.md): retries and fallback across regions or providers.
+- [Routing and rate limits](../concepts/routing.md): retries and fallback across regions
+  or providers.
 
 </div>

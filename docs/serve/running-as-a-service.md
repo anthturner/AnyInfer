@@ -3,7 +3,8 @@
 An application pointing at `http://127.0.0.1:8080/v1` needs that endpoint to exist at boot,
 not just while somebody keeps a terminal window open. `anyinfer serve install` writes the
 systemd unit, launchd agent, or scheduled task that arranges it, and shows you the file
-first.
+first. The service runs from the same
+[shared configuration file](../reference/configuration.md) as the CLI and SDK.
 
 ```bash
 anyinfer serve install --print --config anyinfer.json   # see it, write nothing
@@ -30,12 +31,13 @@ cannot describe different definitions.
 - **`status` is read-only.** It reports whether a definition exists and what the platform's
   manager says about it. It never starts, stops, or restarts anything: that is the
   manager's job, and a command that issued control verbs would have become the process
-  supervisor AnyInfer deliberately is not.
+  supervisor AnyInfer is not.
 
-After a successful install the command runs `anyinfer verify` against the configured route,
-unless you pass `--no-verify`. A service that starts cleanly and then fails every request at
-3am because a credential reference is wrong is the failure that catches. A failure is
-reported; nothing is uninstalled.
+After a successful install the command runs
+[`anyinfer verify`](../guides/cli.md) against the configured route, unless you pass
+`--no-verify`. A service that starts cleanly and then fails every request at 3am because a
+credential reference is wrong is the failure this catches. A failure is reported; nothing
+is uninstalled.
 
 ## What gets generated
 
@@ -78,28 +80,24 @@ reported; nothing is uninstalled.
     `%LOCALAPPDATA%\AnyInfer\anyinfer-serve.xml`, registered with `schtasks` to run at
     logon.
 
-    **Deliberately not a Windows Service.** The standalone sidecar is a console executable
-    with no service-control handshake, and shipping a shim to fake one would be a second
-    supervisor — the thing this feature refuses to become. A logon task is honest about
-    what it is and needs no privileges. If you genuinely need a boot-time service, wrap it
-    with a third-party service wrapper; that wrapper is then yours to maintain.
+    A logon task, not a Windows Service: the sidecar is a console executable, and a
+    service shim would be a second supervisor. For boot-time start, use a third-party
+    service wrapper; that wrapper is then yours to maintain.
 
 ## Tokens and exposure
 
-A loopback service needs no token. Everything below applies only when you deliberately
-expose one.
+A loopback service needs no token. Everything below applies only when you expose one.
 
 - **The token never enters the definition.** On Linux and macOS it goes to a mode-0600
   environment file beside the unit, read as `ANYINFER_SERVE_TOKEN`. The file is created at
   that mode rather than tightened afterwards.
-- **On Windows no token file is written at all.** A POSIX file mode means little there, and
-  a weakly-protected secret file that looks protected is worse than none. The command tells
-  you to set the variable where the OS already guards it:
+- **On Windows no token file is written at all.** A POSIX file mode means little there, so
+  the command tells you to set the variable where the OS already guards it:
   `setx ANYINFER_SERVE_TOKEN <token>`. The task inherits it at logon.
 - **A non-loopback definition cannot be generated without both** `--allow-remote-exposure`
   and a token. The running server enforces that already; generation enforces it too, so a
   unit that would survive reboots as an unauthenticated gateway cannot be produced at all.
-  See the [security guidance](README.md#security) for what exposure actually means.
+  See the [security guidance](README.md#security) for what exposure means.
 - Printed output passes through redaction, so a token cannot reach your terminal or your
   scrollback.
 
@@ -107,16 +105,26 @@ expose one.
 
 Nothing is redirected by default: systemd has the journal and launchd has `os_log`, and
 duplicating them into a file helps nobody. The Windows task has no sink, so `--log-file`
-writes one, and AnyInfer does not rotate it. That is stated in the generated definition
-and here, because a library that silently grows a file on your disk forever is worse than
-one that says it will not manage logs.
+writes one, and AnyInfer does not rotate it. The generated definition states that, and so
+does this page, so the file's growth never comes as a surprise.
 
 ## When the executable moves
 
 The generated definition names an absolute path — the console script, or the standalone
 executable under a frozen build. If the path lies inside a temporary or extraction
-directory the command refuses and explains, because a unit pointing into a scratch
-directory is a unit that breaks on the next boot. Unpack the download somewhere permanent
-and rerun.
+directory the command refuses and explains: once that directory is cleaned up, the service
+fails at the next boot. Unpack the download somewhere permanent and rerun.
 
 After upgrading or relocating, regenerate: `anyinfer serve install --force`.
+
+!!! tip "Key takeaways"
+    - `anyinfer serve install` shows the exact definition before writing it, installs at
+      user scope by default, and runs `anyinfer verify` against the configured route
+      afterwards.
+    - `status` reports and never controls; starting and stopping belong to the platform's
+      service manager.
+    - Exposure rules survive into the definition: no non-loopback unit can be generated
+      without both `--allow-remote-exposure` and a bearer token, and the token lives in a
+      mode-0600 environment file (or the OS environment on Windows), never in the
+      definition itself.
+    - Regenerate with `--force` after the executable moves or is upgraded.

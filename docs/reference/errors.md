@@ -4,8 +4,8 @@ Every exception AnyInfer raises, when it is raised, and what the user will see.
 
 ## The shape of every error
 
-The hierarchy is deliberately shallow (~10 classes) with rich structured fields, because
-callers branch on *fields* far more often than on exception class:
+The hierarchy is shallow, about ten classes, with rich structured fields, because callers
+branch on fields far more often than on exception class:
 
 ```python
 except ai.AnyInferError as error:
@@ -68,39 +68,12 @@ ConfigError: the copilot provider requires the github-copilot-sdk extra
   (hint: pip install 'anyinfer[copilot]', then run 'copilot login')
 ```
 
-!!! tip "How to fix"
-    Read `error.hint`; it names the exact target spelling, alias, or install command to
-    use next.
+### Embedding and rerank refusals
 
-### Embedding and rerank message contracts (D-15)
-
-`embed()` and `rerank()` raise no new exception types — every operation-specific
-refusal is a `ConfigError` with a distinguishing message, per the decisions record in
-DESIGN.md §28.2 decision 5. The four message shapes, verbatim
-from `_client/operations.py`:
-
-```
-ConfigError: provider 'groq' does not support embedding
-  (hint: choose a target whose provider declares the 'embedding' operation)
-
-ConfigError: embedding fallback to voyage:voyage-3-lite refused: it cannot be proven to
-share an embedding space with the route's primary target openai:text-embedding-3-small
-  (hint: vectors from a different embedding space fail silently when compared; keep
-   embedding routes on one provider:model, or set allow_incompatible_fallback=True to
-   accept incomparable vectors)
-
-ConfigError: provider 'openai' does not support reranking
-  (hint: choose a target whose provider declares the 'rerank' operation)
-
-ConfigError: rerank document count 1500 exceeds the resolved batch limit of 1000, and
-scores from separate rerank calls are not globally comparable
-  (hint: reduce the documents, or set BatchPolicy.rerank_cross_batch=True to accept a
-   concatenation of chunk-local rankings — the result will say so in a warning)
-```
-
-Batch-size refusals share a fifth, operation-neutral shape (`... exceeds the resolved
-batch limit of {n} and BatchPolicy.allow_split is False`) reused for both operations
-rather than duplicated per-operation text.
+`embed()` and `rerank()` raise no exception types of their own: an unsupported operation,
+a refused embedding fallback, or an oversized batch is a `ConfigError` whose message and
+hint name the rule that refused it. The rule behind fallback refusals is
+[the embedding-space safety rule](../concepts/embeddings.md#the-embedding-space-safety-rule).
 
 </div>
 
@@ -118,9 +91,8 @@ CredentialError: environment variable OPENAI_API_KEY is not set
   (hint: export OPENAI_API_KEY=<your key> and retry)
 ```
 
-!!! tip "How to fix"
-    Set the referenced environment variable or keyring entry, then retry. See
-    [credentials and redaction](../concepts/credentials.md).
+How references resolve, and what redaction guarantees, is covered in
+[credentials and redaction](../concepts/credentials.md).
 
 </div>
 
@@ -128,19 +100,16 @@ CredentialError: environment variable OPENAI_API_KEY is not set
 
 ## `AuthError` :material-alert-circle:{ title="Not retryable; the same key will fail again" }
 
-**When:** 401 or 403 from a provider.
+**When:** 401 or 403 from a provider — a key that is invalid, expired, or without access to
+the requested model.
 
-**Retryable:** **no**; the same key will fail the same way, and retrying only spends budget
+**Retryable:** no; the same key will fail the same way, and retrying only spends budget
 a transient failure might have needed.
 
 ```
 AuthError: invalid api key
   (hint: check the configured API key or credential reference)
 ```
-
-!!! tip "What to check next"
-    Verify the configured API key or credential reference is current and has access to the
-    requested model.
 
 </div>
 
@@ -175,10 +144,6 @@ ModelNotFoundError: model "qwen3:70b" not found
   (hint: pull it first: ollama pull qwen3:70b)
 ```
 
-!!! tip "How to fix"
-    Follow `error.hint`; usually pulling or deploying the model, or fixing a typo'd
-    model id.
-
 </div>
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
@@ -188,11 +153,8 @@ ModelNotFoundError: model "qwen3:70b" not found
 **When:** the prompt exceeds the model's context window.
 
 **Retryable:** no; the same prompt is the same size. Use `Route.context_window_targets` to
-fall back to a larger model instead.
-
-!!! tip "How to fix"
-    Add a larger-context fallback via `context_window_targets`, or trim the prompt using
-    [token estimation and context budgets](../concepts/budgeting.md).
+fall back to a larger model instead, or trim the prompt with
+[token estimation and context budgets](../concepts/budgeting.md).
 
 </div>
 
@@ -202,7 +164,9 @@ fall back to a larger model instead.
 
 **When:** a timeout, connection failure, or TLS error. No usable response arrived.
 
-**Retryable:** yes.
+**Retryable:** yes. Since nothing was delivered, a retry cannot duplicate output the
+consumer already saw — the boundary that makes `StreamProtocolError` different. See
+[the event stream](../concepts/events.md).
 
 ```
 TransportError: request to ollama timed out
@@ -217,9 +181,10 @@ TransportError: request to ollama timed out
 
 **When:** malformed SSE/NDJSON framing, or a response exceeding `max_response_bytes`.
 
-**Retryable:** no by default. Note that if content had **already been emitted**, this is
-raised rather than retried; the consumer has seen text, and silently restarting would
-duplicate or contradict it.
+**Retryable:** no by default. If content had already been emitted, this is raised rather
+than retried: the consumer has seen text, and silently restarting would duplicate or
+contradict it. The framing and ordering guarantees are in
+[the event stream](../concepts/events.md#the-ordering-guarantees).
 
 </div>
 
@@ -229,7 +194,8 @@ duplicate or contradict it.
 
 **When:** 5xx, or a failed health probe.
 
-**Retryable:** yes. Also marks the target unhealthy, so the health gate skips it briefly.
+**Retryable:** yes. Also marks the target unhealthy, so the
+[health gate](../concepts/routing.md#health-gating) skips it briefly.
 
 ```
 ProviderUnavailableError: cannot connect to ollama: [Errno 111] Connection refused
@@ -245,17 +211,14 @@ ProviderUnavailableError: cannot connect to ollama: [Errno 111] Connection refus
 **When:** a trusted model capability proves the target cannot accept an attached input
 modality (image, document, or audio). Raised before dispatch.
 
-**Retryable:** no; the same attachment against the same target fails the same way.
+**Retryable:** no; the same attachment against the same target fails the same way. What
+each provider accepts is covered in
+[multimodal inputs](../concepts/multimodal-inputs.md).
 
 ```
 UnsupportedInputError: ollama cannot project audio input (model reports no audio support)
   (hint: choose a target that supports this input form or supply supported inline bytes)
 ```
-
-!!! tip "How to fix"
-    Follow `error.hint`: choose a target whose capabilities include the modality, or
-    convert the attachment to a form the target accepts. See
-    [multimodal inputs](../concepts/multimodal-inputs.md).
 
 </div>
 
@@ -289,8 +252,8 @@ per-request ceiling of 0.25
 
 **When:** the response failed validation and the repair budget is spent.
 
-**Retryable:** no, and deliberately **not** a routing failure. The request reached the model
-and the model answered; it just answered the wrong shape.
+**Retryable:** no, and not a routing failure: the request reached the model and the model
+answered; it answered the wrong shape.
 
 ```python
 except ai.SchemaViolationError as error:
@@ -320,10 +283,6 @@ ToolLoopError: tool 'search' parameter 'options' has unsupported type 'MyClass'
   (hint: v1 tools support str, int, float, bool, list, and dict parameters)
 ```
 
-!!! tip "How to fix"
-    Register every tool the model might call, use a v1-supported parameter type, or raise
-    `max_rounds`.
-
 </div>
 
 <div class="anyinfer-error-card anyinfer-severity-medium" markdown>
@@ -338,12 +297,9 @@ except ai.AllTargetsFailedError as error:
         print(attempt.target, attempt.outcome, attempt.error and attempt.error.detail)
 ```
 
-The `attempts` trail is the complete routing history, including retries and health-gated
-skips.
-
-!!! tip "What to check next"
-    Read `error.attempts`; it names exactly which targets were tried, in what order, and
-    why each failed.
+The `attempts` trail is the complete
+[routing history](../concepts/routing.md#the-attempt-trail): every target tried, in what
+order, and why each failed, including retries and health-gated skips.
 
 </div>
 
@@ -393,28 +349,21 @@ no attestable CPU TEE detected (SEV-SNP/TDX guest device not present)
 
 ---
 
-## Handling patterns
+## Things that look like bugs but are not
 
-**Just show the user something useful:**
+Four behaviors are reported as bugs often enough to state as intended:
 
-```python
-except ai.AnyInferError as error:
-    print(error)     # detail, plus "(hint: ...)" when there is one
-```
+- A cost of `None` when pricing is unknown. Coercing it to zero would turn a reporting
+  gap into a silent accounting error; see [cost and spending](../concepts/cost.md).
+- `SchemaViolationError` does not trigger fallback. The request reached the model and the
+  model answered; a different provider does not fix a shape problem.
+- A mid-stream protocol error after content was emitted raises rather than retries. The
+  consumer has already seen text.
+- An unrecognized finish reason does not crash. `FinishReason` is an open enum, and
+  unknown values normalize to `"other"`.
 
-**Distinguish configuration from runtime problems:**
+## Handling errors
 
-```python
-except (ai.ConfigError, ai.CredentialError) as error:
-    sys.exit(f"configuration problem: {error}")
-except ai.AllTargetsFailedError as error:
-    metrics.increment("inference.exhausted")
-```
-
-**Decide whether to retry yourself:**
-
-```python
-except ai.ProviderError as error:
-    if error.retryable:
-        schedule_retry(after=error.retry_after_s or 5.0)
-```
+What the router retries, in what order, and when it falls back to the next target is
+covered in [routing and rate limits](../concepts/routing.md). Application-side handling
+patterns are in [the integration instructions](../agents/INTEGRATION.md).

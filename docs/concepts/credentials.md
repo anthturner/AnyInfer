@@ -42,8 +42,44 @@ CredentialError: environment variable OPENAI_API_KEY is not set
   (hint: export OPENAI_API_KEY=<your key> and retry)
 ```
 
-A typo'd scheme is not silently treated as a literal secret — `LiteralResolver` declines
-anything that looks like a known scheme, so `env:/OPENAI_KEY` fails loudly.
+A typo'd scheme is not treated as a literal secret — `LiteralResolver` declines anything
+that looks like a known scheme, so `env:/OPENAI_KEY` fails loudly.
+
+As a rule of thumb: `env://` is the usual choice for containers and CI, and
+`credential://` for a workstation. A literal key is fine in test code and poor in
+config.
+
+## Using the OS keyring
+
+Install the extra, store the secret, and reference it:
+
+```bash
+pip install "anyinfer[keyring]"
+keyring set AnyInfer openai-api-key
+```
+
+```python
+client = ai.Client(
+    [
+        ai.ProviderSettings.of("openai", api_key="credential://system/openai-api-key"),
+    ]
+)
+```
+
+The service name is `AnyInfer`; the identifier is yours to choose, and the reference
+string is safe to commit — it names where the secret lives, not the secret. Keyring
+failures are actionable like the rest:
+
+```
+CredentialError: no credential stored under 'openai-api-key'
+  (hint: store it with keyring under service 'AnyInfer')
+
+CredentialError: no usable OS credential store is available on this system
+  (hint: configure a system keyring, or use 'env://VAR_NAME' instead)
+```
+
+Headless Linux often has no usable vault; `env://` is the right answer there, and the
+error says so rather than leaving you to guess.
 
 ## Redaction is automatic and global
 
@@ -73,7 +109,8 @@ ai.register_secret(my_token)
 
 ## Custom resolvers
 
-Applications plug in their own vault:
+For anything beyond the keyring — AWS Secrets Manager, HashiCorp Vault — applications
+plug in their own vault:
 
 ```python
 class VaultResolver:
@@ -111,7 +148,8 @@ pointed at the frontend never sees, sends, or needs them.
 
 <div class="anyinfer-see-also" markdown>
 
-- [How-to: store credentials in the OS keyring](../guides/credentials.md)
 - [Telemetry](telemetry.md): payload privacy, the other half of the security posture.
+- [Shared configuration](../reference/configuration.md): where credential references
+  live in the config file.
 
 </div>

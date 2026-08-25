@@ -1,5 +1,11 @@
 # Testing guide
 
+How to run and write tests for AnyInfer itself. If you are testing an application that
+*uses* AnyInfer, the guide is
+[test your application offline](../guides/testing-your-app.md); the fakes it teaches are
+the same public [`anyinfer.testing`](../reference/api/testing.md) package this suite is
+built on.
+
 ## Running
 
 Two tracks, because the gate and the inner loop want different things.
@@ -10,9 +16,10 @@ workspace test --provider cohere           # one provider's modules + shared inv
 workspace check                            # the gate: everything, plus lint/types/docs
 ```
 
-`workspace test` deliberately cannot run the whole suite. `check` is the only thing that
-tells you the suite passes, so there is exactly one answer to "is it green" — `test` tells
-you the code you are editing still works, which is a different question.
+`workspace test` cannot run the whole suite, by design. `check` runs
+[the quality gates](README.md#the-quality-gates) and is the only thing that tells you the
+suite passes, so there is exactly one answer to "is it green" — `test` tells you the code
+you are editing still works, which is a different question.
 
 The fast track skips two markers:
 
@@ -37,15 +44,15 @@ pytest -k "fallback" -q                    # by name
 pytest -q --durations=15                   # find slow tests
 ```
 
-`filterwarnings = ["error"]` is set: a `ResourceWarning` from a leaked socket or an unclosed
-event loop **fails the suite**. That is deliberate — it is how three real concurrency bugs in
-the llama-server supervisor were caught.
+`filterwarnings = ["error"]` is set: a `ResourceWarning` from a leaked socket or an
+unclosed event loop fails the suite. That strictness caught three real concurrency bugs
+in the llama-server supervisor.
 
 ## Where a test belongs
 
 | Testing | Put it in |
 |---|---|
-| A behavior every provider must have | `testing/conformance.py` |
+| A behavior every provider must have | `testing/conformance.py` — [the conformance suite](conformance.md) |
 | One provider's dialect quirks | `tests/test_<provider>.py` |
 | Core logic (routing, schema, events) | The matching `tests/test_*.py` |
 | A serve-frontend invariant | `tests/test_openai_roundtrip.py` |
@@ -70,7 +77,8 @@ client = ai.AsyncClient(
 
 Fakes are httpx2 transports: no ports, no cleanup races, identical on every platform. They
 can be scripted for errors, malformed SSE, servers that ignore `stream`, omitted usage
-chunks, and multi-response sequences for retry and repair tests:
+chunks, and multi-response sequences for retry and repair tests. The full fake-server
+surface is in [the testing API](../reference/api/testing.md).
 
 ```python
 FakeOpenAIServer(
@@ -90,14 +98,10 @@ assert server.call_count == 2
 
 ## Cassettes
 
-Recorded real traffic, replayed deterministically. Bodies pass through redaction before
-touching disk, so a committed cassette cannot carry a key.
-
-```python
-from anyinfer.testing.cassettes import Cassette, CassetteTransport
-
-transport = CassetteTransport(Cassette(path), record=False)
-```
+Recorded real traffic, replayed deterministically; bodies pass through redaction before
+touching disk, so a committed cassette cannot carry a key. The record, replay, and audit
+API is under [recording](../reference/api/testing.md#recording), and
+[contributing a cassette](conformance.md#contributing-a-cassette) covers the workflow.
 
 ## Writing good tests here
 
@@ -134,5 +138,5 @@ suite exist because a comparable tool shipped that exact bug.
 
 `tests/test_local_server.py` spawns a fake `llama-server` (a Python script behind a
 platform-appropriate shim) rather than requiring a real llama.cpp build. It exercises the
-supervisor's genuine contract — spawn, poll, distinguish loading from failed, reap, and is
-the slowest module in the suite for good reason.
+supervisor's real contract: spawn, poll, distinguish loading from failed, reap. Since it
+drives actual subprocesses, it is the slowest module in the suite.

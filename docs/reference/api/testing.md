@@ -8,7 +8,7 @@ certifies itself by running the same conformance suite the built-in adapters run
 
 ## Scripted providers
 
-A provider whose behaviour is declared per model, including the failures that are otherwise
+A provider whose behavior is declared per model, including the failures that are otherwise
 unreachable without a real outage.
 
 <div class="anyinfer-api-block" markdown>

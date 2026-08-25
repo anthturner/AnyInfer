@@ -1,6 +1,6 @@
 # Capabilities
 
-Provenance-tagged model metadata: every value knows whether it was catalogued,
+Provenance-tagged model metadata: every value knows whether it was cataloged,
 discovered, probed, or defaulted. The reasoning is in
 [capabilities and provenance](../../concepts/capabilities.md); token estimation and the
 budget calculator are explained in
@@ -85,7 +85,7 @@ dispatch. Concepts: [cost and spending](../../concepts/cost.md).
 
 Client-side pacing for one provider instance, and the header dialect a provider reports its
 window in. Both are inert until configured. Concepts:
-[rate limits](../../concepts/rate-limits.md).
+[routing and rate limits](../../concepts/routing.md#pacing-before-the-limit).
 
 <div class="anyinfer-api-block" markdown>
 

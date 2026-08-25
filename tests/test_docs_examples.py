@@ -422,7 +422,7 @@ def test_example_golden_manifest_shape(
 
 
 def test_example_compare_targets_spends_nothing() -> None:
-    """docs/examples/compare-targets.md — two records and zero calls."""
+    """docs/guides/comparing-targets.md — two records and zero calls."""
     from anyinfer.testing import ScriptedModel, ScriptedProvider
 
     provider = ScriptedProvider("offline", [ScriptedModel("small"), ScriptedModel("large")])
@@ -734,7 +734,7 @@ def test_module_digest_recipe_shape() -> None:
 
 
 def test_local_models_browse_and_filter(tmp_path) -> None:
-    """docs/guides/local-models.md — step 1, browsing with fit annotations."""
+    """docs/guides/local-inference.md — browsing with fit annotations."""
     from anyinfer import local
 
     specs = local.HardwareProfile.from_user_input(ram_gb=64, vram_gb=24, accelerator="cuda")
@@ -751,7 +751,7 @@ def test_local_models_browse_and_filter(tmp_path) -> None:
 
 
 def test_local_models_remote_host_flow(tmp_path) -> None:
-    """docs/guides/local-models.md — asking the user for a remote host's specs."""
+    """docs/concepts/catalog.md — asking the user for a remote host's specs."""
     from anyinfer import local
 
     settings = ai.ProviderSettings.of("ollama", base_url="http://192.168.1.50:11434")
@@ -766,7 +766,7 @@ def test_local_models_remote_host_flow(tmp_path) -> None:
 
 
 def test_local_models_alias_bridge(tmp_path) -> None:
-    """docs/guides/local-models.md — using a catalog pick as the medium tier."""
+    """docs/concepts/catalog.md — using a catalog pick as the medium tier."""
     catalog = ai.load_default_catalog().with_alias_target(
         "medium", "llama-cpp", "qwen2.5-coder-14b-instruct"
     )
@@ -779,7 +779,7 @@ def test_local_models_alias_bridge(tmp_path) -> None:
 
 
 def test_local_models_locate_returns_none_before_acquisition(tmp_path) -> None:
-    """docs/concepts/models.md — locate() is a lookup, not a download."""
+    """docs/concepts/catalog.md — locate() is a lookup, not a download."""
     with ai.Client(model_dir=tmp_path) as client:
         assert client.locate_model("qwen2.5-7b-instruct") is None
 

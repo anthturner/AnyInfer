@@ -1,9 +1,12 @@
 # Shared configuration
 
-AnyInfer has one JSON configuration format for every integration method. Load it from
-Python, pass it to `anyinfer run`, or start the OpenAI-compatible sidecar with it. Provider
-identity, credentials, endpoint overrides, and the default route therefore do not drift
-between deployments.
+AnyInfer has one JSON configuration format for every integration method: load it from
+Python with `load_config`, pass it to `anyinfer run`, or start the OpenAI-compatible
+sidecar with it — each path is walked through in [the guides](../guides/README.md).
+Since every deployment reads the same file, provider identity, credentials, endpoint
+overrides, and the default route do not drift between them. Full API signatures for the
+loader and the validated config object are in
+[the configuration API](api/configuration.md).
 
 ```json
 {
@@ -16,35 +19,13 @@ between deployments.
 }
 ```
 
-=== "Python SDK"
-
-    ```python
-    import anyinfer as ai
-
-    config = ai.load_config("anyinfer.json")
-    with ai.Client(config.providers, route=config.route) as client:
-        result = client.generate("Explain consistent hashing.")
-    ```
-
-=== "CLI"
-
-    ```bash
-    anyinfer run "Explain consistent hashing." --config anyinfer.json
-    ```
-
-=== "Sidecar"
-
-    ```bash
-    anyinfer serve --config anyinfer.json
-    # or, from a standalone download:
-    anyinfer-serve --config anyinfer.json
-    ```
-
 The current `format_version` is `1`. Omitting it is accepted for files written before the
 field was introduced. Unknown versions, unknown keys, duplicate instance ids, invalid
 types, and files larger than 1 MiB fail with `ConfigError` before a client is created.
 The one exception: an entry with `enabled: false` is skipped without validating its other
-keys, so a disabled entry can hold settings for a provider that is not installed.
+keys, so a disabled entry can hold settings for a provider that is not installed. The
+demo app writes a few UI-only fields of its own alongside the shared ones; the SDK, CLI,
+and sidecar ignore them. See [the demo app guide](../guides/demo-app.md).
 
 ## Provider settings
 
@@ -61,7 +42,7 @@ ai.ProviderSettings.of(
 )
 ```
 
-The **order** you list providers is the preference order for
+The order you list providers in is the preference order for
 [alias resolution](../concepts/targets.md#aliases).
 
 ### Configuring one engine more than once
@@ -115,8 +96,8 @@ ai.ProviderSettings.of("anthropic", options={"oauth_token": "env://ANTHROPIC_OAU
 
 Supply one or the other; if both are set the OAuth token wins.
 
-**Option values for fields a provider declares as `secret` go through the same credential
-resolver as `api_key`**, so they accept `env://` and `credential://` references and are
+Option values for fields a provider declares as `secret` go through the same credential
+resolver as `api_key`, so they accept `env://` and `credential://` references and are
 registered for redaction. Bedrock's explicit AWS credentials work the same way:
 
 ```python
@@ -129,8 +110,8 @@ ai.ProviderSettings.of(
 )
 ```
 
-Fields a provider declares as anything *other* than `secret` are passed through verbatim —
-resolving them would corrupt any literal value that merely looked like a reference.
+Fields a provider declares as anything *other* than `secret` are passed through verbatim,
+since resolving them would corrupt any literal value that merely looked like a reference.
 
 To discover what a provider accepts without hardcoding it, read its setup spec; the
 `any_of` groups are the ones where one of several fields will do:
@@ -146,8 +127,8 @@ setup.requirement_note  # why, in one line
 
 Not every declared field is a question. A provider knows its own endpoint, its API
 version, and where AWS keeps its credentials; what it cannot know is your key or your
-account. The spec draws that line itself, so an application prompting for setup does not
-have to infer it from help text:
+account. The spec draws that line itself, so a setup form does not have to infer it from
+help text:
 
 ```python
 setup = ai.default_registry.get("openai").setup
@@ -156,16 +137,15 @@ setup = ai.default_registry.get("openai").setup
 ```
 
 An advanced field is never required and never part of an `any_of` group, so a form built
-from `essential_fields` alone can always be saved. Each one carries the value it falls
-back to in `SetupField.default_value` (`https://api.openai.com/v1` here), which is what
-lets a collapsed field still say what it will do. Render that value rather than
-pre-filling the editor with it: a saved copy of today's default keeps overriding the real
-default long after it has moved on.
+from `essential_fields` alone can always be saved. Each one carries its fallback in
+`SetupField.default_value` (`https://api.openai.com/v1` here), which lets a collapsed
+field still say what it will do. Render that value rather than pre-filling the editor
+with it: a saved copy of today's default keeps overriding the real default after it has
+moved on.
 
-The two extremes are worth knowing. `ollama`, `vllm`, and the other local engines have no
-essential fields at all; there is nothing to fill in. `azure-foundry`, `runpod`, and
-anything else whose URL embeds an account or endpoint id keeps `base_url` essential,
-because no default could be right.
+The two extremes: `ollama`, `vllm`, and the other local engines have no essential fields
+at all, while `azure-foundry`, `runpod`, and anything else whose URL embeds an account or
+endpoint id keeps `base_url` essential, because no default could be right.
 
 ## Client settings
 
@@ -192,7 +172,7 @@ ai.Client(
 ```
 
 `retain_raw` is off by default because raw payloads carry response text that payload-free
-telemetry deliberately omits.
+telemetry omits.
 
 ## Per-request options
 
@@ -268,39 +248,18 @@ literal secrets before writing or committing them; `anyinfer init` itself writes
 
 ## File format
 
-```json
-{
-  "format_version": 1,
-  "providers": [
-    {"id": "anthropic", "api_key": "env://ANTHROPIC_API_KEY"},
-    {"id": "ollama"},
-    {
-      "id": "llama-cpp",
-      "options": {"posture": "balanced", "runtime": "cuda"}
-    }
-  ],
-  "default_route": ["anthropic:claude-sonnet-4-5", "ollama:qwen3:8b"]
-}
-```
-
-Each provider entry needs an `id`. Top-level provider settings are `adapter`, `base_url`,
-`api_key`, `api_version`, `headers`, `timeout_s`, and `options`. Setup fields declared by
-that provider may also be written directly, or grouped under a `values` object (the shape
-setup UIs write); unrecognized fields fail validation. Two more keys exist for
-compatibility: `provider_id` is the legacy spelling of `adapter`, and `alias`, when
-present, must simply restate the entry's `id`. Credential
-references such as `env://ANTHROPIC_API_KEY` are resolved only when the adapter is first
-used, so parsing a config never prints or expands a secret.
-
-Set `enabled` to `false` to keep a provider entry in a file without loading it. The demo app
-uses that facility and writes its own UI fields alongside the shared fields; the SDK, CLI,
-and sidecar deliberately ignore those known demo-only fields (at the root: `targets`,
-`system_prompt`, `theme`, `context_window_tokens`, and
-`ignore_runtime_hardware_constraints`).
+Each provider entry needs an `id`. The other top-level provider settings are `adapter`,
+`base_url`, `api_key`, `api_version`, `headers`, `timeout_s`, and `options`. Setup fields
+declared by that provider may also be written directly, or grouped under a `values`
+object (the shape setup UIs write); unrecognized fields fail validation. Two more keys
+exist for compatibility: `provider_id` is the legacy spelling of `adapter`, and `alias`,
+when present, must simply restate the entry's `id`. Credential references such as
+`env://ANTHROPIC_API_KEY` are resolved only when the adapter is first used, so parsing a
+config never prints or expands a secret.
 
 ### The `adapter` key
 
-`id` is the **instance** id used in target strings. The optional `adapter` key names the
+`id` is the instance id used in target strings. The optional `adapter` key names the
 engine behind it, which is what lets one engine be configured more than once:
 
 ```json
@@ -326,6 +285,13 @@ engine behind it, which is what lets one engine be configured more than once:
 Omitting `adapter` keeps the single-instance spelling exactly as before: the `id` is both
 the engine selector and the instance id. A duplicate `id` fails fast with a `ConfigError`.
 
+The sidecar can advertise instance-scoped targets from `/v1/models` by writing them in
+instance terms:
+
+```bash
+anyinfer serve --config anyinfer.json --expose work-azure:gpt-4o
+```
+
 ### Provider `limits`
 
 Request pacing is configured per provider instance because two accounts at the same
@@ -350,7 +316,9 @@ provider have independent allowances:
 
 Omitting `limits` disables pacing. An empty object opts into provider-reported rate-limit
 headers without imposing a local fixed limit. Values are validated by `RateLimits`; unknown
-keys and nonpositive or out-of-range values fail during configuration loading.
+keys and nonpositive or out-of-range values fail during configuration loading. How pacing
+behaves at run time is covered in
+[pacing before the limit](../concepts/routing.md#pacing-before-the-limit).
 
 ### The `context` block
 
@@ -373,7 +341,7 @@ in the file, on the command line, and in Python:
 }
 ```
 
-The block is optional, and every field defaults to the behaviour AnyInfer has always had —
+The block is optional, and every field defaults to the behavior AnyInfer has always had —
 a file without it reduces exactly as before. The values above are what
 `ContextTuning.recommended()` sets, which `anyinfer context --preset recommended` applies
 without a file.
@@ -385,7 +353,7 @@ config = ai.load_config("anyinfer.json")
 reduction = context.select(docs, query, max_tokens=8_000, tuning=config.context)
 ```
 
-A misspelled setting is a `ConfigError`, not a silent no-op; a tuning key that quietly
+A misspelled setting is a `ConfigError`, not a silent no-op; a tuning key that silently
 does nothing is worse than one that fails loudly. The sidecar reads the same file so one
 config serves every frontend, but it does not reduce context itself: it is a wire codec
 over a normal client, and reduction is the application's call about its own material.
@@ -463,8 +431,9 @@ targets that are not the identical `provider:model` are refused unless you opt i
 
 ### The `arena` and `arenas` blocks
 
-Arena policies fan one request out to fixed targets and select only after the candidates
-finish. A default policy and named policies use the same complete field set:
+[Arena](../concepts/arena.md) policies fan one request out to fixed targets and select
+only after the candidates finish. A default policy and named policies use the same
+complete field set:
 
 ```json
 {
@@ -524,13 +493,6 @@ to strings; and `timeout_s` must be positive. Credential references in both `env
 redaction. See [the tool-loop guide](../guides/tool-loop.md#tools-from-an-mcp-server)
 for discovery, trust boundaries, and the intentionally unsupported MCP surfaces.
 
-The sidecar can advertise instance-scoped targets from `/v1/models` by writing them in
-instance terms:
-
-```bash
-anyinfer serve --config anyinfer.json --expose work-azure:gpt-4o
-```
-
 ## CLI
 
 ```bash
@@ -549,9 +511,9 @@ anyinfer context src/ --query "…" --max-tokens 8000 --plan   # cost every stra
 `run` reads the same config file as `serve`, so one file drives both. See
 [run a prompt from the shell](../guides/cli.md) for its flags.
 
-A non-loopback bind requires **both** `--allow-remote-exposure` and a token. The CLI refuses
-otherwise, because an unauthenticated LLM gateway on a network is a credential laundering
-service.
+A non-loopback bind requires both `--allow-remote-exposure` and a token. The CLI refuses
+otherwise, since an unauthenticated gateway would let anyone on the network spend your
+provider credentials.
 
 ## Cache and data locations
 

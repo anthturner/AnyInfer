@@ -1,8 +1,9 @@
 # Embeddings and reranking
 
-Embedding and reranking are stateless inference operations, typed and routed the same way
-generation is — but they are not generation. `EmbeddingRequest` and `RerankRequest` are
-their own types; nothing here is ever added as a field on `GenerationRequest`.
+Embedding and reranking are stateless inference operations, typed and
+[routed](routing.md) the same way generation is — but they are not generation.
+`EmbeddingRequest` and `RerankRequest` are their own types; nothing here is ever added as
+a field on `GenerationRequest`.
 
 ```python
 import anyinfer as ai
@@ -26,25 +27,22 @@ for item in ranked.items:
     print(item.document_id, item.score)
 ```
 
-Both accept a single target, a fallback chain, or a route the same way `generate()` does.
+Both accept a single [target](targets.md), a fallback chain, or a route the same way
+`generate()` does.
 
-## What AnyInfer will not do for you
-
-AnyInfer produces vectors and relevance rankings. It does not persist them, build a search
-index, crawl a corpus, or decide what an application sends to a model next. There is no
-vector database in the core, and no plan to grow one — that boundary is deliberate. An
-application that wants storage and search brings its own store (or a small optional add-on
-package built on these same types) and feeds it with `embed()`/`rerank()` results exactly
-like it would feed any other vector database.
+AnyInfer produces vectors and relevance rankings; it does not persist them, build a
+search index, or crawl a corpus. An application brings its own store and feeds it with
+these results — or uses the small optional
+[`anyinfer-store` add-on](../guides/vector-store.md), which draws the boundary in detail.
 
 ## The embedding-space safety rule
 
-Two embedding vectors are only meaningfully comparable when they came from the same model,
-the same revision, and — for models that distinguish it — the same input-intent handling.
-A query re-embedded with a fallback model produces numbers that look exactly as plausible as
-the ones the primary model would have produced, and will silently fail to match anything in
-an index built against the primary model. That failure is worse than an ordinary provider
-error, because nothing in the response says it happened.
+Two embedding vectors are only meaningfully comparable when they came from the same
+model, the same revision, and — for models that distinguish it — the same input-intent
+handling. A query re-embedded by a fallback model produces numbers that look exactly as
+plausible as the primary model's, and will fail to match anything in an index built
+against the primary. Nothing in the response says it happened, which makes this failure
+worse than an ordinary provider error.
 
 AnyInfer's answer is `EmbeddingSpace`, carried on every `EmbeddingResult`:
 
@@ -52,15 +50,15 @@ AnyInfer's answer is `EmbeddingSpace`, carried on every `EmbeddingResult`:
 print(result.space.provider_id, result.space.model, result.space.dimensions)
 ```
 
-By default, embedding routes retry on the **same resolved target only** — no cross-provider
-or cross-model fallback. A fallback chain that reaches a different `provider:model` is
-refused *before* any request is sent: AnyInfer never guesses that two spaces are
-equivalent, so the request fails with an actionable error instead of returning a
-wrong-but-plausible vector. If you genuinely want vectors that may not be comparable —
-an expert recovery workflow, for example — pass `allow_incompatible_fallback=True`; the
-result then always carries a warning naming both targets.
+By default, embedding routes retry on the same resolved target only — no cross-provider
+or cross-model fallback. A chain that reaches a different `provider:model` is refused
+*before* any request is sent, with an actionable
+[`ConfigError`](../reference/errors.md), because AnyInfer never guesses that two spaces
+are equivalent. If you genuinely want vectors that may not be comparable, pass
+`allow_incompatible_fallback=True`; the result then always carries a warning naming both
+targets.
 
-You may also assert the space you expect up front:
+You can also assert the space you expect up front:
 
 ```python
 result = client.embed(
@@ -70,29 +68,28 @@ result = client.embed(
 )
 ```
 
-A successful response from a target that does not match `expected_space` is rejected rather
-than returned.
+A successful response from a target that does not match `expected_space` is rejected
+rather than returned.
 
 ## Input intent
 
-Some embedding models produce measurably better retrieval when a query and the documents it
-will be compared against are embedded with different instructions, even though both pass
-through the same model:
+Some embedding models produce measurably better retrieval when a query and the documents
+it will be compared against are embedded with different instructions:
 
 ```python
 query_vec = client.embed(["capital of France"], target="ollama:nomic-embed-text", input_type="query")
 doc_vecs = client.embed(docs, target="ollama:nomic-embed-text", input_type="document")
 ```
 
-A provider that does not distinguish input intent ignores the field. A model that requires
-it but received none degrades per its own documented default, and that degradation is
-recorded as a warning rather than silently substituted.
+A provider that does not distinguish input intent ignores the field. A model that
+requires it but received none degrades per its own documented default, and that
+degradation is recorded as a warning.
 
 ## Reranking and document identity
 
-`RerankDocument` ids are caller-owned and opaque — AnyInfer never generates or interprets
-them. Every `RankedItem` carries back the original index and the document id it was given,
-so a caller can always map a ranked result back to its source without a lookup table, and a
+`RerankDocument` ids are caller-owned and opaque — AnyInfer never generates or
+interprets them. Every `RankedItem` carries back the original index and the document id
+it was given, so a caller can always map a ranked result back to its source, and a
 malformed provider response (an out-of-range or duplicate index) is rejected rather than
 guessed at.
 
@@ -102,27 +99,53 @@ rerank attempts.
 
 ## Batching
 
-Providers disagree on how many inputs, documents, tokens, or bytes one request may carry.
-Splitting an oversized request is core policy, never something an adapter decides on its
-own: it only happens against a verified limit, and an embedding batch failure is all-or-error
-— you never get back an `EmbeddingResult` silently missing vectors. Reranking is not
-automatically split across documents and concatenated, because scores from separate document
-batches are not assumed globally comparable unless a provider documents otherwise.
+Providers disagree on how many inputs, documents, tokens, or bytes one request may
+carry. Splitting an oversized request is core policy, never an adapter's own decision,
+and it only happens against a verified limit:
 
-An oversized embedding request against a target with a verified batch limit is split into
-ordered chunks, dispatched concurrently, and re-assembled in input order. When no verified
-limit exists, a request up to a bounded default goes out as a single call, and anything
-larger is refused with an actionable error — AnyInfer never guesses a provider maximum.
-The `batch=` parameter on `embed()` and `rerank()` takes an `anyinfer.BatchPolicy`:
-`max_concurrency` bounds parallel chunks, `allow_split=False` refuses splitting outright,
-`max_items_override` supplies a limit you have verified yourself, and
-`rerank_cross_batch=True` is the explicit opt-in for chunk-local rerank rankings — the
-result then always carries a warning saying the scores are not one global ordering.
+- An oversized embedding request against a target with a verified batch limit is split
+  into ordered chunks, dispatched concurrently, and re-assembled in input order. A batch
+  failure is all-or-error; you never get back an `EmbeddingResult` silently missing
+  vectors.
+- When no verified limit exists, a request up to a bounded default goes out as a single
+  call, and anything larger is refused with an actionable error rather than a guessed
+  provider maximum.
+- Reranking is not automatically split, because scores from separate document batches
+  are not globally comparable unless a provider documents otherwise.
+
+The `batch=` parameter takes an `anyinfer.BatchPolicy`: `max_concurrency` bounds
+parallel chunks, `allow_split=False` refuses splitting outright, `max_items_override`
+supplies a limit you have verified yourself, and `rerank_cross_batch=True` is the
+explicit opt-in for chunk-local rerank rankings, with a warning that the scores are not
+one global ordering.
 
 ## Frontends
 
-The sidecar exposes `POST /v1/embeddings` as an OpenAI-compatible codec, and
-`POST /v1/anyinfer/rerank` as an AnyInfer-native route (there is no established OpenAI-shaped
-rerank dialect to emulate). The CLI exposes `anyinfer embed` and `anyinfer rerank`. All three
-surfaces are projections over the same `AsyncClient.embed()`/`AsyncClient.rerank()` calls —
-none of them carry their own routing or validation logic.
+The [sidecar](../serve/README.md) exposes `POST /v1/embeddings` as an OpenAI-compatible
+codec and `POST /v1/anyinfer/rerank` as an AnyInfer-native route (there is no
+established OpenAI-shaped rerank dialect to emulate). The [CLI](../guides/cli.md)
+exposes `anyinfer embed` and `anyinfer rerank`. All three surfaces are projections over
+the same `AsyncClient` calls.
+
+!!! tip "Key takeaways"
+    - Embedding and rerank requests are their own typed operations with their own
+      routing rule: same resolved target only, unless you explicitly allow incompatible
+      fallback.
+    - Every result carries its `EmbeddingSpace`, and `expected_space=` turns a stored
+      index's assumptions into an enforced precondition.
+    - Batch splitting happens only against verified limits and is all-or-error; rerank
+      scores are never merged across batches.
+    - Storage and search stay outside the core; `anyinfer-store` is the optional add-on
+      when you want them without a database.
+
+## See also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Semantic search over a small corpus](../examples/semantic-search.md): the runnable
+  example.
+- [Embed, store, and query](../guides/vector-store.md): the optional persistence add-on.
+- [Text Embeddings Inference](../providers/tei.md) ·
+  [Voyage AI and Jina AI](../providers/retrieval.md): the retrieval-only providers.
+
+</div>

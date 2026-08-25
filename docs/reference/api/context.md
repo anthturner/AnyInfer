@@ -33,7 +33,31 @@ from anyinfer import context
 
 One record carries every algorithmic choice. The same field names are the `context` block
 of the [configuration file](../configuration.md) and the `--context-*` flags of
-[`anyinfer context`](../../guides/cli.md).
+[`anyinfer context`](../../guides/cli.md). Every setting that changes what gets sent is
+off by default; `ContextTuning.recommended()` enables the set worth having for a
+source-code corpus.
+
+| Setting | Default | What it changes |
+|---|---|---|
+| `collapse_duplicates` | `True` | Render byte-identical documents once |
+| `near_duplicate_threshold` | `0.0` | Collapse merely *similar* documents too |
+| `selection_order` | `"rank"` | `"density"` admits by score per token |
+| `diversity` | `0.0` | Penalize candidates resembling what is already chosen |
+| `split_identifiers` | `False` | Tokenize compound identifiers into their parts |
+| `query_expansion` | `False` | Pseudo-relevance feedback before ranking |
+| `salience_weight` | `0.0` | Blend in import-graph centrality |
+| `compact_fallback` | `False` | Shorten a document rather than drop it |
+| `carry_over_bonus` | `0.0` | Keep the previous turn's selection, with `previous=` |
+| `chunk_tokens` | `512` | Chunk size for `packed` and `distill` |
+| `rollup_share` | `0.45` | Budget share `tiered` reserves for its rollup |
+
+Two orderings deserve a note. `"rank"` admits documents strongest-first; `"density"`
+admits them by score divided by token cost, which packs measurably more relevance into a
+fixed budget (the classic knapsack result) at the risk of preferring two good small files
+over one great large one. `diversity` penalizes each candidate by how much it resembles
+what is already selected — multiplicatively, `value * (1 - diversity * similarity)`,
+because the two value scales differ by orders of magnitude — so a budget is not spent on
+eight files that say the same thing.
 
 <div class="anyinfer-api-block" markdown>
 
