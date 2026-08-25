@@ -34,6 +34,7 @@ from ..capabilities.pricing import (
     TRUSTED_PROVENANCE,
     with_cost,
 )
+from ..capabilities.tokenizers import estimator_for
 from ..context.select import select as select_context
 from ..context_request import ContextSummary
 from ..errors import (
@@ -403,6 +404,7 @@ class GenerationExecutionMixin:
             try:
                 target_request, context_summary = self._apply_context_request(
                     active,
+                    resolved=resolved,
                     capabilities=capabilities,
                     calibration=descriptor.token_calibration,
                     builder=builder,
@@ -574,6 +576,7 @@ class GenerationExecutionMixin:
         descriptor = self._pool.descriptor_for(resolved.provider_id)
         return self._compact_to_fit(
             request,
+            resolved=resolved,
             capabilities=self._capabilities_for(descriptor, resolved),
             calibration=descriptor.token_calibration,
             policy=policy,
@@ -589,6 +592,7 @@ class GenerationExecutionMixin:
         self,
         request: GenerationRequest,
         *,
+        resolved: ResolvedTarget,
         capabilities: ModelCapabilities,
         calibration: TokenCalibration | None,
         policy: HistoryPolicy,
@@ -606,8 +610,9 @@ class GenerationExecutionMixin:
         envelope component is treated as fixed even though it shrinks with the content,
         which compacts marginally harder than strictly necessary — the safe direction.
         """
+        estimator = self._estimator_for(resolved)
         budget = build_context_budget(
-            request, capabilities, estimator=self._estimator, calibration=calibration
+            request, capabilities, estimator=estimator, calibration=calibration
         )
         allowance = budget.input_allowance_tokens
         if allowance is None or budget.fits is not False:
@@ -625,7 +630,7 @@ class GenerationExecutionMixin:
         compaction = compact_history(
             request.messages,
             max_tokens=target_tokens,
-            estimator=self._estimator,
+            estimator=estimator,
             keep_recent=policy.keep_recent,
             keep_system=policy.keep_system,
         )
@@ -635,6 +640,16 @@ class GenerationExecutionMixin:
         # explicitly rather than found by correlation.
         self._emit(compaction.event(), builder=builder)
         return request.with_messages(compaction.messages)
+
+    def _estimator_for(self, resolved: ResolvedTarget) -> TokenEstimator:
+        """The estimator to count this target's tokens with.
+
+        A tokenizer is a *model's* fact, but `TokenEstimator.estimate`
+        sees only text — so an estimator that knows how to specialize is asked to, once
+        per target, and one that does not is returned unchanged. The shipped byte
+        heuristic is in the second group, which is why it needed no change.
+        """
+        return estimator_for(self._estimator, resolved.provider_id, resolved.model)
 
     def _client_side_pacing(
         self, limiter: RateLimiter | None, descriptor: ProviderDescriptor
@@ -654,6 +669,7 @@ class GenerationExecutionMixin:
         self,
         request: GenerationRequest,
         *,
+        resolved: ResolvedTarget,
         capabilities: ModelCapabilities,
         calibration: TokenCalibration,
         builder: ManifestBuilder | None,
@@ -663,12 +679,13 @@ class GenerationExecutionMixin:
         policy = request.context
         if policy is None:
             return request, None
+        estimator = self._estimator_for(resolved)
         max_tokens = policy.max_tokens
         if max_tokens is None:
             budget = build_context_budget(
                 request,
                 capabilities,
-                estimator=self._estimator,
+                estimator=estimator,
                 calibration=calibration,
             )
             if (
@@ -690,7 +707,7 @@ class GenerationExecutionMixin:
             strategy=policy.strategy,
             max_documents=policy.max_request_documents,
             max_bytes=policy.max_request_bytes,
-            estimator=self._estimator,
+            estimator=estimator,
             tuning=policy.tuning,
         )
         if emit:
@@ -742,6 +759,7 @@ class GenerationExecutionMixin:
             # never be reached, because there is no longer an overflow to redirect.
             fitted = self._compact_to_fit(
                 request,
+                resolved=resolved,
                 capabilities=capabilities,
                 calibration=descriptor.token_calibration,
                 policy=policy,
@@ -762,7 +780,7 @@ class GenerationExecutionMixin:
             check_context_fit(
                 request,
                 capabilities,
-                estimator=self._estimator,
+                estimator=self._estimator_for(resolved),
                 calibration=descriptor.token_calibration,
                 provider=resolved.provider_id,
                 model=resolved.model,
@@ -1066,7 +1084,7 @@ class GenerationExecutionMixin:
             policy,
             capabilities or ModelCapabilities(),
             descriptor,
-            self._estimator,
+            self._estimator_for(resolved),
         )
 
         if plan.mechanism == "implicit":

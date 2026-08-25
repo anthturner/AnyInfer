@@ -2055,6 +2055,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
                 try:
                     target_request, _ = self._apply_context_request(
                         request,
+                        resolved=resolved,
                         capabilities=capabilities,
                         calibration=descriptor.token_calibration,
                         builder=None,

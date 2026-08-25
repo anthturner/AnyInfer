@@ -70,19 +70,45 @@ explicit about being an estimate by carrying two figures with opposite biases:
 The two consumers need opposite errors: when packing, overestimating keeps the
 application safe; when refusing, only an underestimate justifies the refusal.
 
-Anything more accurate plugs in through the `TokenEstimator` protocol; tiktoken, a
-provider's count-tokens endpoint, llama-server's `/tokenize`. An exact tokenizer returns
-`floor == tokens`, which gives the gate full force:
+## Counting Exactly
+
+`pip install anyinfer[tokenizers]` ships an exact counter for the OpenAI-family
+encodings:
 
 ```python
-class TiktokenEstimator:
-    def estimate(self, text: str) -> ai.TokenEstimate:
-        count = len(encoding.encode(text))
-        return ai.TokenEstimate(count, count)
-
-
-client = ai.Client(providers, estimator=TiktokenEstimator())
+client = ai.Client(providers, estimator=ai.TiktokenEstimator())
 ```
+
+An exact count returns `floor == tokens`, which is what gives the pre-dispatch gate its
+full force. That is the whole benefit, and it is worth being precise about where it lands:
+the planning figure was already roughly right, while the byte **floor** divides by 8 and
+lands somewhere between a third and three quarters of the true count depending on the
+text — widest on code, which tokenizers pack aggressively and a bytes-per-token constant
+cannot. Every point of that gap is a request the gate lets through and the provider then
+rejects.
+
+The estimator selects an encoding per model, so one client instance serves a route that
+spans model families. Anthropic, Gemini, and Cohere publish no tokenizer; for their models
+it substitutes the current OpenAI encoding and reports the result as a *guess* — the count
+becomes the planning figure and the floor is held below it, because a substituted encoding
+can over-count and a floor that over-claims refuses requests that would have fit. Still far
+tighter than counting bytes, which is the point of installing it.
+
+For an open-weight family served through an OpenAI-compatible endpoint, where the model id
+tells the tokenizer nothing, pin the encoding instead — that is your assertion about your
+own deployment, and it is trusted as exact:
+
+```python
+client = ai.Client(providers, estimator=ai.TiktokenEstimator("cl100k_base"))
+```
+
+Anything else plugs in through the `TokenEstimator` protocol, and an estimator that
+implements `for_model()` is specialized per target the same way this one is. Two more
+accurate sources — a provider's own count-tokens endpoint and llama-server's `/tokenize` —
+are deliberately **not** shipped: the protocol is synchronous, and a blocking HTTP call
+inside an async client stalls the event loop for every concurrent request. Making them work
+means an async estimator protocol, which is a change to make deliberately rather than
+smuggle in behind a blocking call.
 
 ## When the Provider Bills for More Than You Sent
 

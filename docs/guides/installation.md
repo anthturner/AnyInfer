@@ -19,6 +19,7 @@ small supply-chain attack surface.
 | `keyring` | `keyring` | `credential://` references |
 | `otel` | `opentelemetry-api` | The OpenTelemetry bridge |
 | `serve` | `starlette`, `uvicorn` | The OpenAI-compatible sidecar |
+| `tokenizers` | `tiktoken` | [Exact token counting](../concepts/budgeting.md#counting-exactly) instead of the byte heuristic |
 | `demo` | `PySide6`, `markdown` | The [pack-in demo app](demo-app.md) (`anyinfer-demo`) |
 | `mcp` | nothing — a feature marker | [MCP tool sources](tool-loop.md#tools-from-an-mcp-server); the protocol is spoken with httpx2 and the standard library |
 | `all` | everything above | |

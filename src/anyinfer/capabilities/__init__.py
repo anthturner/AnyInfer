@@ -31,9 +31,16 @@ from .probes import (
     ProbeOutcome,
     ProbeReport,
 )
+from .tokenizers import (
+    DEFAULT_ENCODING,
+    TargetAwareTokenEstimator,
+    TiktokenEstimator,
+    estimator_for,
+)
 
 __all__ = [
     "AUTO_SENTINELS",
+    "DEFAULT_ENCODING",
     "DEFAULT_OUTPUT_RESERVE_TOKENS",
     "DEFAULT_PRICING_URL",
     "DEFAULT_PROBE_FEATURES",
@@ -52,6 +59,8 @@ __all__ = [
     "SpendLedger",
     "SpendStore",
     "SpendTotals",
+    "TargetAwareTokenEstimator",
+    "TiktokenEstimator",
     "TokenEstimate",
     "TokenEstimator",
     "build_context_budget",
@@ -61,6 +70,7 @@ __all__ = [
     "context_gate_error",
     "estimate_cost",
     "estimate_request",
+    "estimator_for",
     "fetch_pricing",
     "headroom_for",
     "load_default_pricing",

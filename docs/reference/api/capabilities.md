@@ -34,6 +34,10 @@ budget calculator are explained in
 
 ::: anyinfer.HeuristicTokenEstimator
 
+::: anyinfer.TiktokenEstimator
+
+::: anyinfer.TargetAwareTokenEstimator
+
 ::: anyinfer.RequestEstimate
 
 ::: anyinfer.TokenCalibration
