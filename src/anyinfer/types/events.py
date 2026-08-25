@@ -33,6 +33,7 @@ __all__ = [
     "CitationDelta",
     "ReasoningDelta",
     "ServerToolDelta",
+    "ServerToolSource",
     "ServerToolStatus",
     "StreamEnded",
     "StreamEvent",
@@ -106,26 +107,51 @@ ServerToolStatus = Literal["started", "completed", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
+class ServerToolSource:
+    """One source a provider-run search consulted.
+
+    Attributes:
+        url: Where it came from.
+        title: The page's title, when the provider reports one.
+    """
+
+    url: str = ""
+    title: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class ServerToolDelta:
-    """The provider started or finished running one of its own tools.
+    """A provider-run tool started, or finished and returned something.
 
     Emitted so a caller watching a stream can say *why* an answer paused — a web search
-    can take seconds, and a stream that simply stops producing text for that long is
-    indistinguishable from a stalled connection.
+    takes seconds, and a stream that stops producing text for that long is otherwise
+    indistinguishable from a stalled connection — and, on completion, what it found.
 
-    Content-free by construction: the query and the result are not carried. And
-    deliberately **not** a content event, so it does not start the first-token clock; a
+    Carrying the result is the point rather than a nicety. "Grounded answer with fresh web
+    results" is the application feature this exists for, and an application that can render
+    the answer but not the sources behind it has the less useful half. This is a *stream*
+    event, on the content channel beside `TextDelta`, so carrying content is what it is for;
+    the payload-free rule governs telemetry events, which these are not.
+
+    Deliberately **not** a content event, so it does not start the first-token clock: a
     provider that searches before writing anything has not produced a token yet, and
-    reporting one would make time-to-first-token mean something different for those
-    requests than for every other.
+    counting one would make time-to-first-token mean something different for those requests
+    than for every other.
 
     Attributes:
         kind: Which capability ran.
         status: Where in its lifecycle it is.
+        sources: What a search returned, in the order the provider listed it. Empty on a
+            ``started`` event, and for kinds that return no sources.
+        output: What a code execution printed. Empty when there was none.
+        detail: Why a ``failed`` invocation failed, as the provider stated it.
     """
 
     kind: ServerToolKind
     status: ServerToolStatus
+    sources: tuple[ServerToolSource, ...] = ()
+    output: str = ""
+    detail: str = ""
 
 
 @dataclass(frozen=True, slots=True)

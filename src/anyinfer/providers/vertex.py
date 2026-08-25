@@ -268,6 +268,9 @@ descriptor = ProviderDescriptor(
     default_base_url=None,
     requires_base_url=False,
     operations=frozenset({"generation", "embedding"}),
+    # Same encoder as Gemini, because this adapter *is* the Gemini adapter pointed at a
+    # Vertex endpoint; the tools are Google's, not the API surface's.
+    server_tools=frozenset({"web_search", "code_execution"}),
     static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(

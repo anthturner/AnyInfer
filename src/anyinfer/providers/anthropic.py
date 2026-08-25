@@ -37,6 +37,7 @@ from ..types.events import (
     CitationDelta,
     ReasoningDelta,
     ServerToolDelta,
+    ServerToolSource,
     TextDelta,
     ToolCallDelta,
     UsageUpdate,
@@ -463,13 +464,7 @@ class AnthropicAdapter:
                     yield ServerToolDelta(kind=tool_kind, status="started")
                 return
             if isinstance(block, Mapping) and block.get("type") in _SERVER_TOOL_RESULTS:
-                tool_kind = _SERVER_TOOL_RESULTS[str(block.get("type"))]
-                failed = isinstance(block.get("content"), Mapping) and (
-                    block["content"].get("type") == "web_search_tool_result_error"
-                )
-                yield ServerToolDelta(
-                    kind=tool_kind, status="failed" if failed else "completed"
-                )
+                yield _server_tool_result(block)
                 return
             if (
                 isinstance(block, Mapping)
@@ -909,6 +904,9 @@ def _events_from_message(
             tool_kind = _SERVER_TOOL_KINDS.get(str(block.get("name", "")))
             if tool_kind is not None:
                 state.server_tools[tool_kind] = state.server_tools.get(tool_kind, 0) + 1
+                yield ServerToolDelta(kind=tool_kind, status="started")
+        elif kind in _SERVER_TOOL_RESULTS:
+            yield _server_tool_result(block)
 
 
 _SERVER_TOOL_KINDS: Mapping[str, ServerToolKind] = {
@@ -922,6 +920,48 @@ _SERVER_TOOL_RESULTS: Mapping[str, ServerToolKind] = {
     "code_execution_tool_result": "code_execution",
 }
 """Result block types, which name their tool in the type rather than in a field."""
+
+def _server_tool_result(block: Mapping[str, Any]) -> ServerToolDelta:
+    """Decode one server-tool result block into the event that carries its payload.
+
+    Anthropic names the tool in the block *type* rather than in a field, and shapes the
+    payload differently per tool: a search returns a list of result entries, while a code
+    execution returns one object with stdout, stderr, and a return code. Both failure
+    shapes are a `content` object whose own type ends in `_error`.
+    """
+    tool_kind = _SERVER_TOOL_RESULTS[str(block.get("type"))]
+    content = block.get("content")
+    if isinstance(content, Mapping) and str(content.get("type", "")).endswith("_error"):
+        return ServerToolDelta(
+            kind=tool_kind,
+            status="failed",
+            detail=str(content.get("error_code", "") or ""),
+        )
+    if tool_kind == "web_search":
+        entries = content if isinstance(content, Sequence) and not isinstance(content, str) else ()
+        return ServerToolDelta(
+            kind=tool_kind,
+            status="completed",
+            sources=tuple(
+                ServerToolSource(
+                    url=str(entry.get("url", "") or ""),
+                    title=str(entry.get("title", "") or ""),
+                )
+                for entry in entries
+                if isinstance(entry, Mapping) and entry.get("url")
+            ),
+        )
+    if isinstance(content, Mapping):
+        # stderr is appended rather than dropped: a failed execution's message is the
+        # useful half, and a non-zero return code is not itself a tool failure.
+        parts = [
+            str(content.get(field, "") or "") for field in ("stdout", "stderr")
+        ]
+        return ServerToolDelta(
+            kind=tool_kind, status="completed", output="".join(parts)
+        )
+    return ServerToolDelta(kind=tool_kind, status="completed")
+
 
 _ANTHROPIC_SERVER_TOOLS: Mapping[str, tuple[str, str]] = {
     # (wire type, tool name). The type carries a date because Anthropic versions these

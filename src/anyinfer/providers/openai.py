@@ -33,6 +33,7 @@ from ..types.capabilities import (
 from ..types.events import (
     ReasoningDelta,
     ServerToolDelta,
+    ServerToolSource,
     ServerToolStatus,
     TextDelta,
     ToolCallDelta,
@@ -317,6 +318,12 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
             if status == "started":
                 state.server_tools[tool_kind] = state.server_tools.get(tool_kind, 0) + 1
             yield ServerToolDelta(kind=tool_kind, status=status)
+            return
+
+        if kind == "response.output_item.done":
+            item = chunk.get("item")
+            if isinstance(item, Mapping) and item.get("type") in _SERVER_TOOL_ITEMS:
+                yield _server_tool_result(item)
             return
 
         if kind == "response.output_item.added":
@@ -714,6 +721,54 @@ def _generation_from_response(body: Mapping[str, Any]) -> Generation:
     )
 
 
+_SERVER_TOOL_ITEMS: Mapping[str, ServerToolKind] = {
+    "web_search_call": "web_search",
+    "code_interpreter_call": "code_execution",
+}
+"""Output-item types that carry a finished server tool's result."""
+
+
+def _server_tool_result(item: Mapping[str, Any]) -> ServerToolDelta:
+    """Decode a finished server-tool output item into the event carrying its result.
+
+    The `response.*_call.completed` events announce the finish but carry no payload; the
+    output item does. Reading the payload here rather than there is why completion is not
+    in `_SERVER_TOOL_EVENTS`: emitting from both would double-report every invocation.
+    """
+    tool_kind = _SERVER_TOOL_ITEMS[str(item.get("type"))]
+    if str(item.get("status", "")) in ("failed", "incomplete"):
+        error = item.get("error")
+        detail = error.get("message") if isinstance(error, Mapping) else error
+        return ServerToolDelta(
+            kind=tool_kind, status="failed", detail=str(detail or "")
+        )
+    if tool_kind == "web_search":
+        action = item.get("action")
+        entries = action.get("sources") if isinstance(action, Mapping) else None
+        return ServerToolDelta(
+            kind=tool_kind,
+            status="completed",
+            sources=tuple(
+                ServerToolSource(
+                    url=str(entry.get("url", "") or ""),
+                    title=str(entry.get("title", "") or ""),
+                )
+                for entry in (entries or ())
+                if isinstance(entry, Mapping) and entry.get("url")
+            ),
+        )
+    outputs = item.get("outputs")
+    return ServerToolDelta(
+        kind=tool_kind,
+        status="completed",
+        output="".join(
+            str(out.get("logs", "") or "")
+            for out in (outputs or ())
+            if isinstance(out, Mapping)
+        ),
+    )
+
+
 def _batch_arguments(raw: Any) -> Mapping[str, Any]:
     """Parse one batched tool call's arguments, tolerating an unparseable payload.
 
@@ -738,9 +793,7 @@ _OPENAI_SERVER_TOOLS: Mapping[str, Mapping[str, Any]] = {
 
 _SERVER_TOOL_EVENTS: Mapping[str, tuple[ServerToolKind, ServerToolStatus]] = {
     "response.web_search_call.in_progress": ("web_search", "started"),
-    "response.web_search_call.completed": ("web_search", "completed"),
     "response.code_interpreter_call.in_progress": ("code_execution", "started"),
-    "response.code_interpreter_call.completed": ("code_execution", "completed"),
 }
 """Typed lifecycle events this dialect emits per server-tool invocation.
 

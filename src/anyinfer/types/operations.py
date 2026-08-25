@@ -474,6 +474,12 @@ class BatchHandle:
             reclaim it: the id is meaningless anywhere else.
         model: The model every line was submitted against.
         line_count: How many requests went in, so a partial result is recognizable as one.
+        line_ids: The custom ids, in the order they were submitted. Carried because
+            *nothing else can restore that order*: providers return finished lines in
+            completion order, and sorting them by id only recovers submission order when
+            the ids happen to be the positional defaults. A caller who supplied their own
+            row keys and then zipped the results against their inputs would otherwise get
+            silently mispaired answers — every line correct, attached to the wrong row.
         submitted_at: Unix timestamp of submission, for a caller's own bookkeeping.
     """
 
@@ -481,6 +487,7 @@ class BatchHandle:
     provider_id: str
     model: str
     line_count: int
+    line_ids: tuple[str, ...] = ()
     submitted_at: float = 0.0
 
 
@@ -546,7 +553,8 @@ class BatchResult:
         status: The batch's terminal status.
         lines: One entry per line the provider returned, in *submission* order rather than
             the completion order providers return them in — a caller zipping results
-            against their own inputs should not have to sort first.
+            against their own inputs should not have to sort first. Restored from the
+            handle's ``line_ids``; see there for why sorting cannot substitute.
     """
 
     handle: BatchHandle

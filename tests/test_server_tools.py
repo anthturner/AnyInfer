@@ -24,7 +24,7 @@ import anyinfer as ai
 from anyinfer.providers.base import ProviderConfig, WireRequest
 from anyinfer.registry import default_registry
 from anyinfer.types.capabilities import Feature, ModelCapabilities, Sourced
-from anyinfer.types.events import ServerToolDelta
+from anyinfer.types.events import ServerToolDelta, ServerToolSource
 from anyinfer.types.requests import SERVER_TOOL_KINDS, ServerToolSpec
 from anyinfer.types.results import ServerToolUse
 
@@ -136,19 +136,39 @@ def test_every_adapter_that_cannot_spell_one_declares_so() -> None:
         for pid in default_registry.known_ids()
         if default_registry.get(pid).server_tools
     }
-    assert declaring == {"anthropic", "openai", "gemini"}
+    assert declaring == {"anthropic", "openai", "gemini", "vertex", "xai"}
 
 
-def test_vertex_deliberately_does_not_claim_them_despite_sharing_geminis_adapter() -> None:
-    """It inherits the projection, so the omission has to be deliberate to stay honest.
+def test_vertex_claims_them_because_it_is_the_gemini_adapter_pointed_elsewhere() -> None:
+    """It inherits the projection, so the declaration follows the projection.
 
-    Vertex has published a different spelling for grounded search than the Gemini API at
-    various points, and this repository has not verified the current one against Google's
-    own documentation. Declaring the capability would send a tool block that may be
-    rejected; withholding it refuses locally instead, which is the honest failure. Recorded
-    on the vertex contract's watchlist.
+    `VertexAdapter` subclasses `GeminiAdapter` and does not override tool encoding, so a
+    Vertex request carries the identical `googleSearch`/`codeExecution` blocks. Declaring
+    a narrower capability than the encoder actually emits would refuse locally for calls
+    the wire form supports.
     """
-    assert default_registry.get("vertex").server_tools == frozenset()
+    assert default_registry.get("vertex").server_tools == frozenset(
+        {"web_search", "code_execution"}
+    )
+    assert (
+        default_registry.get("vertex").server_tools
+        == default_registry.get("gemini").server_tools
+    )
+
+
+def test_xai_spells_search_beside_the_messages_rather_than_as_a_tool() -> None:
+    """xAI's Live Search is a request-level block, and is counted from usage."""
+    payload = _payload("xai", server_tools=(ServerToolSpec(kind="web_search", max_uses=5),))
+    assert payload["search_parameters"] == {"mode": "on", "max_search_results": 5}
+    assert "tools" not in payload
+
+    adapter = default_registry.get("xai").factory(
+        ProviderConfig(provider_id="xai", base_url="https://fake.invalid/v1", api_key="k")
+    )
+    counted = adapter._parse_usage(
+        {"prompt_tokens": 10, "completion_tokens": 5, "num_sources_used": 3}
+    )
+    assert counted.server_tool_uses == {"web_search": 3}
 
 
 async def test_a_provider_with_no_wire_form_refuses_rather_than_answering_without_it() -> None:
@@ -258,12 +278,29 @@ def test_the_responses_dialect_reports_its_typed_lifecycle_events() -> None:
         [
             {"type": "response.web_search_call.in_progress"},
             {"type": "response.web_search_call.completed"},
+            {
+                "type": "response.output_item.done",
+                "item": {
+                    "type": "web_search_call",
+                    "status": "completed",
+                    "action": {
+                        "type": "search",
+                        "sources": [{"url": "https://example.test/a", "title": "A"}],
+                    },
+                },
+            },
         ],
     )
-    assert [(e.kind, e.status) for e in produced if isinstance(e, ServerToolDelta)] == [
+    deltas = [e for e in produced if isinstance(e, ServerToolDelta)]
+    assert [(e.kind, e.status) for e in deltas] == [
         ("web_search", "started"),
         ("web_search", "completed"),
     ]
+    # Completion is reported once, from the item that carries the payload — not also from
+    # the payload-free `.completed` event, which would double-count every search.
+    assert deltas[-1].sources == (
+        ServerToolSource(url="https://example.test/a", title="A"),
+    )
     assert produced[-1].server_tool_uses == (ServerToolUse(kind="web_search", uses=1),)
 
 
@@ -519,3 +556,158 @@ async def test_a_searched_generation_reports_its_invocations_on_usage() -> None:
     buffer = AttemptBuffer(target=ai.ResolvedTarget(provider_id="anthropic", model="m"))
     buffer.server_tool_uses = final.server_tool_uses
     assert buffer.server_tool_uses[0].uses == 2
+
+
+# ---- the results themselves, not just that a tool ran ---------------------------------------
+
+
+def test_anthropic_search_results_reach_the_caller() -> None:
+    """The sources are the feature; an answer whose citations cannot be rendered is half."""
+    produced = _events(
+        "anthropic",
+        [
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {
+                    "type": "web_search_tool_result",
+                    "content": [
+                        {"type": "web_search_result", "url": "https://a.test", "title": "A"},
+                        {"type": "web_search_result", "url": "https://b.test", "title": "B"},
+                    ],
+                },
+            }
+        ],
+    )
+    delta = next(e for e in produced if isinstance(e, ServerToolDelta))
+    assert delta.sources == (
+        ServerToolSource(url="https://a.test", title="A"),
+        ServerToolSource(url="https://b.test", title="B"),
+    )
+
+
+def test_anthropic_code_output_reaches_the_caller() -> None:
+    produced = _events(
+        "anthropic",
+        [
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {
+                    "type": "code_execution_tool_result",
+                    "content": {"stdout": "42\n", "stderr": "", "return_code": 0},
+                },
+            }
+        ],
+    )
+    delta = next(e for e in produced if isinstance(e, ServerToolDelta))
+    assert (delta.status, delta.output) == ("completed", "42\n")
+
+
+def test_anthropic_reports_why_a_tool_failed() -> None:
+    produced = _events(
+        "anthropic",
+        [
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {
+                    "type": "web_search_tool_result",
+                    "content": {
+                        "type": "web_search_tool_result_error",
+                        "error_code": "max_uses_exceeded",
+                    },
+                },
+            }
+        ],
+    )
+    delta = next(e for e in produced if isinstance(e, ServerToolDelta))
+    assert (delta.status, delta.detail) == ("failed", "max_uses_exceeded")
+
+
+def test_gemini_search_sources_come_from_grounding_chunks() -> None:
+    """Gemini reports what it read separately from what it searched for."""
+    produced = _events(
+        "gemini",
+        [
+            {
+                "candidates": [
+                    {
+                        "content": {"parts": [{"text": "answer"}]},
+                        "groundingMetadata": {
+                            "webSearchQueries": ["a"],
+                            "groundingChunks": [
+                                {"web": {"uri": "https://g.test", "title": "G"}},
+                                {"retrievedContext": {"title": "not a web source"}},
+                            ],
+                        },
+                    }
+                ]
+            }
+        ],
+    )
+    delta = next(e for e in produced if isinstance(e, ServerToolDelta))
+    assert delta.sources == (ServerToolSource(url="https://g.test", title="G"),)
+
+
+def test_gemini_code_output_lands_on_output_when_it_worked_and_detail_when_it_did_not() -> None:
+    ok = _events(
+        "gemini",
+        [
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {"codeExecutionResult": {"outcome": "OUTCOME_OK", "output": "7\n"}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        ],
+    )
+    delta = next(e for e in ok if isinstance(e, ServerToolDelta))
+    assert (delta.status, delta.output, delta.detail) == ("completed", "7\n", "")
+
+    bad = _events(
+        "gemini",
+        [
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "codeExecutionResult": {
+                                        "outcome": "OUTCOME_FAILED",
+                                        "output": "NameError: x",
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        ],
+    )
+    delta = next(e for e in bad if isinstance(e, ServerToolDelta))
+    assert (delta.status, delta.output, delta.detail) == ("failed", "", "NameError: x")
+
+
+def test_openai_code_logs_reach_the_caller() -> None:
+    produced = _events(
+        "openai",
+        [
+            {
+                "type": "response.output_item.done",
+                "item": {
+                    "type": "code_interpreter_call",
+                    "status": "completed",
+                    "outputs": [{"type": "logs", "logs": "hello\n"}],
+                },
+            }
+        ],
+    )
+    delta = next(e for e in produced if isinstance(e, ServerToolDelta))
+    assert (delta.status, delta.output) == ("completed", "hello\n")

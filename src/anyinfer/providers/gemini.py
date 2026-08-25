@@ -43,6 +43,7 @@ from ..types.events import (
     CitationDelta,
     ReasoningDelta,
     ServerToolDelta,
+    ServerToolSource,
     TextDelta,
     ToolCallDelta,
     UsageUpdate,
@@ -639,10 +640,15 @@ class GeminiAdapter:
 
         # Search is reported as grounding metadata on the candidate rather than as a part,
         # so it is counted here; code execution arrives as parts and is counted there.
-        queries = _nested_list(candidate.get("groundingMetadata"), "webSearchQueries")
+        grounding = candidate.get("groundingMetadata")
+        queries = _nested_list(grounding, "webSearchQueries")
         if queries and not state.server_tools.get("web_search"):
             state.server_tools["web_search"] = len(queries)
-            yield ServerToolDelta(kind="web_search", status="completed")
+            yield ServerToolDelta(
+                kind="web_search",
+                status="completed",
+                sources=_grounding_sources(grounding),
+            )
 
     def _events_from_part(
         self, part: Mapping[str, Any], state: _StreamState
@@ -665,9 +671,15 @@ class GeminiAdapter:
         result = part.get("codeExecutionResult")
         if isinstance(result, Mapping):
             outcome = str(result.get("outcome", ""))
+            ok = outcome.endswith("OK")
+            output = str(result.get("output", "") or "")
             yield ServerToolDelta(
                 kind="code_execution",
-                status="completed" if outcome.endswith("OK") else "failed",
+                status="completed" if ok else "failed",
+                # Gemini puts both the printed output and the failure message in the
+                # same `output` field, so it lands on whichever half is accurate.
+                output=output if ok else "",
+                detail="" if ok else (output or outcome),
             )
 
         call = part.get("functionCall")
@@ -737,6 +749,27 @@ class _StreamState:
                 for kind, count in sorted(self.server_tools.items())
             ),
         )
+
+
+def _grounding_sources(grounding: Any) -> tuple[ServerToolSource, ...]:
+    """Pull the pages a Gemini search consulted out of its grounding metadata.
+
+    Gemini reports the sources as `groundingChunks`, each of which is a one-key object
+    naming its retrieval kind; only the `web` kind carries a URL, and the others (a
+    caller's own retrieval corpus) are not the search tool's results.
+    """
+    chunks = _nested_list(grounding, "groundingChunks")
+    sources: list[ServerToolSource] = []
+    for chunk in chunks:
+        web = chunk.get("web") if isinstance(chunk, Mapping) else None
+        if isinstance(web, Mapping) and web.get("uri"):
+            sources.append(
+                ServerToolSource(
+                    url=str(web.get("uri", "") or ""),
+                    title=str(web.get("title", "") or ""),
+                )
+            )
+    return tuple(sources)
 
 
 _GEMINI_SERVER_TOOLS: Mapping[str, Mapping[str, Any]] = {

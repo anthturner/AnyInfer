@@ -38,6 +38,7 @@ from ..capabilities.pricing import (
     TRUSTED_PROVENANCE,
     CostEstimate,
     compute_operation_cost,
+    with_cost,
 )
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import (
@@ -159,7 +160,9 @@ from ..types.requests import (
     ToolSpec,
 )
 from ..types.results import (
+    DETAIL_MAX_CHARS,
     Diagnostic,
+    ErrorInfo,
     Generation,
     Usage,
 )
@@ -1486,6 +1489,9 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
                 metadata=dict(batch.metadata),
             )
         )
+        # Stamped here rather than in the adapter: the submission order is the *caller's*
+        # fact, and an adapter that had to remember it would be holding job state.
+        handle = replace(handle, line_ids=batch.line_ids)
         self._emit(
             BatchSubmitted(
                 batch_id=handle.batch_id,
@@ -1508,16 +1514,49 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         adapter = await self._batch_adapter(self._batch_target(handle))
         return await adapter.batch_status(handle)
 
-    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+    async def fetch_batch(
+        self,
+        handle: BatchHandle,
+        *,
+        schema: SchemaSpec | SupportsJSONSchema | Mapping[str, Any] | None = None,
+    ) -> BatchResult:
         """Download a finished batch's lines, in submission order.
+
+        Args:
+            handle: The batch to collect.
+            schema: The structured-output contract every line was submitted under, applied
+                to each answer here. Supplying it is what keeps a batch from being the one
+                place this library stops enforcing schemas — the reason to batch *through*
+                AnyInfer rather than around it is that the typed request model still holds,
+                and a result that skipped validation would quietly give that up on a
+                caller's highest-volume traffic.
+
+                Taken as an argument rather than remembered: collection happens hours later
+                in another process, and a client that stored the batch's schemas would be
+                the job registry this design does not keep. One schema for the whole batch,
+                because a batch runs one shape — a line that violates it is reported on
+                *that line*, never by failing the batch.
+
+        Returns:
+            The finished batch, lines in submission order, each validated and priced.
 
         Raises:
             anyinfer.errors.ConfigError: The provider does not implement batching.
             anyinfer.errors.ProviderError: The batch has not finished.
         """
-        adapter = await self._batch_adapter(self._batch_target(handle))
+        resolved = self._batch_target(handle)
+        adapter = await self._batch_adapter(resolved)
         result = await adapter.fetch_batch(handle)
-        ordered = _ordered_lines(result)
+        spec = SchemaSpec.coerce(schema) if schema is not None else None
+        capabilities = self._batch_capabilities(resolved)
+        ordered = _ordered_lines(
+            replace(
+                result,
+                lines=tuple(
+                    _finish_line(line, spec, capabilities) for line in result.lines
+                ),
+            )
+        )
         self._emit(
             BatchCompleted(
                 batch_id=handle.batch_id,
@@ -1537,6 +1576,19 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         """
         adapter = await self._batch_adapter(self._batch_target(handle))
         return await adapter.cancel_batch(handle)
+
+    def _batch_capabilities(self, resolved: ResolvedTarget) -> ModelCapabilities | None:
+        """Assembled capabilities for a batch's target, or ``None`` when unknown.
+
+        Unknown is a real answer here: a batch is collected long after submission, possibly
+        against a client configured differently, and an unpriceable line reports no cost
+        rather than a guessed one.
+        """
+        try:
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+        except (AnyInferError, ValueError):
+            return None
+        return self._capabilities_for(descriptor, resolved)
 
     def _batch_target(self, handle: BatchHandle) -> ResolvedTarget:
         """The target a handle names, reconstructed without re-resolving an alias.
@@ -2809,23 +2861,74 @@ def _overlay_catalog_windows(
     return capabilities
 
 
+def _finish_line(
+    line: BatchLine, schema: SchemaSpec | None, capabilities: ModelCapabilities | None
+) -> BatchLine:
+    """Apply the two things a batched line was missing: validation and cost.
+
+    Both are core concerns an adapter must not perform — one needs the caller's schema and
+    the other the assembled capabilities, and neither is available to a translator. Doing
+    them here is what makes a batched result the same kind of object a live one is.
+
+    A schema violation lands on the line as an error rather than raising, because a batch
+    is not all-or-nothing: one malformed answer must not discard the ninety-nine that
+    validated, and the provider billed for all hundred either way. There is deliberately
+    no repair — a repair round trip is a second request, and a deferred job has already
+    ended by the time anyone looks.
+    """
+    if line.result is None:
+        return line
+
+    result = line.result
+    usage = with_cost(result.usage, capabilities)
+    if usage is not result.usage:
+        result = replace(result, usage=usage)
+
+    if schema is not None:
+        candidate, parse_error = extract_json(result.text)
+        errors = (
+            (parse_error,)
+            if parse_error is not None
+            else validate(candidate, schema.json_schema)
+        )
+        if errors:
+            return BatchLine(
+                custom_id=line.custom_id,
+                error=ErrorInfo(
+                    type_name="SchemaViolationError",
+                    provider=result.target.provider_id,
+                    phase="validate",
+                    retryable=False,
+                    http_status=None,
+                    detail="; ".join(errors)[:DETAIL_MAX_CHARS],
+                ),
+            )
+        result = replace(result, structured=candidate, structured_mechanism="json_schema")
+
+    return replace(line, result=result)
+
+
 def _ordered_lines(result: BatchResult) -> BatchResult:
     """Return a result whose lines are in submission order.
 
-    Providers return finished lines in *completion* order, which is whatever finished
-    first. A caller zipping results against their own inputs should not have to sort by a
-    custom id they only supplied so the correlation would work — so the sort happens once,
-    here, keyed by the numeric default when that is what the ids are and lexically
-    otherwise.
+    Providers return finished lines in *completion* order — whatever finished first — and
+    a caller zipping results against their own inputs should not have to reorder them.
+
+    Restored by looking each line up in the handle's recorded ``line_ids`` rather than by
+    sorting. Sorting only recovers submission order when the ids are the positional
+    defaults; for caller-supplied row keys it produces *lexical* order, which pairs every
+    answer with the wrong input while looking perfectly well-formed. Lines the handle does
+    not name are appended rather than dropped: an unexpected id is a provider surprise
+    worth surfacing, not evidence the answer should be thrown away.
     """
-
-    def key(line: BatchLine) -> tuple[int, object]:
-        try:
-            return (0, int(line.custom_id))
-        except ValueError:
-            return (1, line.custom_id)
-
-    return replace(result, lines=tuple(sorted(result.lines, key=key)))
+    order = {custom_id: index for index, custom_id in enumerate(result.handle.line_ids)}
+    if not order:
+        return result
+    unknown = len(order)
+    return replace(
+        result,
+        lines=tuple(sorted(result.lines, key=lambda line: order.get(line.custom_id, unknown))),
+    )
 
 
 def _parse_overrides(

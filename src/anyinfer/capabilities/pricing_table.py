@@ -23,10 +23,12 @@ that operation as unknown rather than guessing.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from importlib import resources
+from types import MappingProxyType
 from typing import Any
 
 from ..errors import ConfigError
@@ -127,10 +129,13 @@ class PricingTable:
         if not isinstance(providers, dict):
             raise ConfigError("pricing table is missing its 'providers' mapping")
 
+        tool_rates = _parse_server_tools(data.get("server_tools"))
         entries: dict[str, tuple[PricingEntry, ...]] = {}
         for provider_id, raw_entries in providers.items():
+            provider_tools = tool_rates.get(str(provider_id), {})
             parsed = tuple(
-                _parse_entry(provider_id, raw) for raw in _require_list(provider_id, raw_entries)
+                _parse_entry(provider_id, raw, provider_tools)
+                for raw in _require_list(provider_id, raw_entries)
             )
             entries[str(provider_id)] = parsed
         return cls(entries)
@@ -142,7 +147,49 @@ def _require_list(provider_id: str, value: Any) -> list[Any]:
     return value
 
 
-def _parse_entry(provider_id: str, raw: Any) -> PricingEntry:
+def _parse_server_tools(raw: Any) -> dict[str, dict[str, Decimal]]:
+    """Parse the provider-level server-tool rate block.
+
+    Provider-run tools are billed per invocation at a rate the provider sets per *tool*,
+    not per model — one search costs the same whichever model asked for it — so the rates
+    live once per provider rather than repeated on every entry. A provider with no block,
+    or a tool missing from one, stays unpriced, and `compute_cost` then reports the whole
+    generation's cost as unknown rather than counting the invocation as free.
+    """
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ConfigError("pricing table's 'server_tools' must be a mapping")
+    parsed: dict[str, dict[str, Decimal]] = {}
+    for provider_id, block in raw.items():
+        if not isinstance(block, dict):
+            raise ConfigError(f"server-tool rates for {provider_id!r} must be an object")
+        rates: dict[str, Decimal] = {}
+        for kind, entry in block.items():
+            if kind.startswith("_"):
+                continue
+            if not isinstance(entry, dict):
+                raise ConfigError(
+                    f"server-tool rate {kind!r} for {provider_id!r} must be an object"
+                )
+            try:
+                # Same discipline as a token rate: the date and source are mandatory, so
+                # an unverified figure cannot be added without saying it is unverified.
+                str(entry["last_verified"])
+                str(entry["source"])
+                rates[str(kind)] = _parse_rate(entry["per_use"])
+            except KeyError as missing:
+                raise ConfigError(
+                    f"server-tool rate {kind!r} for {provider_id!r} is missing "
+                    f"field {missing.args[0]!r}"
+                ) from None
+        parsed[str(provider_id)] = rates
+    return parsed
+
+
+def _parse_entry(
+    provider_id: str, raw: Any, server_tools: Mapping[str, Decimal] = MappingProxyType({})
+) -> PricingEntry:
     if not isinstance(raw, dict):
         raise ConfigError(f"pricing entry for {provider_id!r} must be an object")
     try:
@@ -166,6 +213,7 @@ def _parse_entry(provider_id: str, raw: Any) -> PricingEntry:
             output_per_1m=output_rate,
             currency=str(raw.get("currency", "USD")),
             per_search_unit=per_search_unit,
+            per_server_tool_use=dict(server_tools),
         ),
         last_verified=last_verified,
         source=source,

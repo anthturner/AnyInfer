@@ -209,19 +209,112 @@ async def test_lines_come_back_in_submission_order_not_completion_order() -> Non
     assert [line.custom_id for line in result.lines] == ["0", "1", "2", "3"]
 
 
-async def test_custom_ids_that_are_not_numbers_still_sort_stably() -> None:
+async def test_caller_supplied_ids_come_back_in_submission_order_not_alphabetical() -> None:
+    """Sorting cannot substitute for remembering, and getting this wrong is silent.
+
+    Every answer would be correct and attached to the wrong row — the caller zips
+    `result.lines` against their own inputs and the pairing is off, with nothing anywhere
+    to say so. Which is why the handle records the order rather than the result inferring
+    it.
+    """
+    submitted = ("row-c", "row-a", "row-b")
     server = FakeAnthropicServer(FakeResponse(text="answer"))
     client = _client(server)
     try:
-        handle = await client.submit_batch(
-            _batch(3, custom_ids=("row-c", "row-a", "row-b")), target=TARGET
-        )
+        handle = await client.submit_batch(_batch(3, custom_ids=submitted), target=TARGET)
         result = await client.fetch_batch(handle)
     finally:
         await client.aclose()
 
-    assert sorted(line.custom_id for line in result.lines) == ["row-a", "row-b", "row-c"]
-    assert len(result.lines) == 3
+    assert tuple(line.custom_id for line in result.lines) == submitted
+    assert tuple(line.custom_id for line in result.lines) != tuple(sorted(submitted))
+
+
+def test_the_handle_records_what_was_submitted_and_in_what_order() -> None:
+    """The one piece of state that cannot be recovered from the provider."""
+    from anyinfer._client.async_client import _ordered_lines
+    from anyinfer.types.operations import BatchLine as Line
+
+    handle = ai.BatchHandle(
+        batch_id="b", provider_id="p", model="m", line_count=3, line_ids=("c", "a", "b")
+    )
+    completion_order = ai.BatchResult(
+        handle=handle,
+        status="completed",
+        lines=(Line(custom_id="a"), Line(custom_id="b"), Line(custom_id="c")),
+    )
+    assert tuple(line.custom_id for line in _ordered_lines(completion_order).lines) == ("c", "a", "b")
+
+
+def test_an_unexpected_id_is_appended_rather_than_dropped() -> None:
+    """A provider surprise is worth surfacing, not evidence the answer is worthless."""
+    from anyinfer._client.async_client import _ordered_lines
+    from anyinfer.types.operations import BatchLine as Line
+
+    handle = ai.BatchHandle(
+        batch_id="b", provider_id="p", model="m", line_count=1, line_ids=("a",)
+    )
+    result = ai.BatchResult(
+        handle=handle, status="completed", lines=(Line(custom_id="?"), Line(custom_id="a"))
+    )
+    assert tuple(line.custom_id for line in _ordered_lines(result).lines) == ("a", "?")
+
+
+# ---- what a batched line was missing --------------------------------------------------
+#
+# E.1 exists because callers "lose structured-output enforcement, telemetry, and cost
+# accounting on their highest-volume traffic" by dropping to a raw provider SDK. A batched
+# result that skipped validation and carried no cost would have given up exactly that.
+
+
+async def test_a_schema_is_enforced_on_every_line() -> None:
+    schema = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
+    server = FakeAnthropicServer(FakeResponse(text='{"n": 7}'))
+    client = _client(server)
+    try:
+        handle = await client.submit_batch(_batch(2), target=TARGET)
+        result = await client.fetch_batch(handle, schema=schema)
+    finally:
+        await client.aclose()
+
+    assert all(line.result is not None for line in result.lines)
+    assert [line.result.structured for line in result.lines if line.result] == [
+        {"n": 7},
+        {"n": 7},
+    ]
+
+
+async def test_a_violating_line_fails_alone_rather_than_discarding_the_batch() -> None:
+    """The provider billed for all of them; one bad answer must not throw away the rest."""
+    schema = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
+    server = FakeAnthropicServer(FakeResponse(text="not json at all"))
+    client = _client(server)
+    try:
+        handle = await client.submit_batch(_batch(2), target=TARGET)
+        result = await client.fetch_batch(handle, schema=schema)
+    finally:
+        await client.aclose()
+
+    assert len(result.failed) == 2
+    assert all(
+        line.error is not None and line.error.type_name == "SchemaViolationError"
+        for line in result.failed
+    )
+
+
+async def test_no_schema_means_no_validation_and_no_surprise() -> None:
+    """Collection happens in another process; the schema is passed, never remembered."""
+    server = FakeAnthropicServer(FakeResponse(text="free-form prose"))
+    client = _client(server)
+    try:
+        handle = await client.submit_batch(_batch(1), target=TARGET)
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert result.lines[0].ok
+    assert result.lines[0].result is not None
+    assert result.lines[0].result.structured is None
 
 
 async def test_a_line_carries_the_same_result_a_live_call_would_have() -> None:
