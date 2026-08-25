@@ -509,11 +509,14 @@ async def test_the_job_is_uploaded_as_jsonl_before_the_batch_references_it() -> 
     uploaded = [json.loads(line) for line in server.uploaded[0].splitlines()]
     assert [entry["custom_id"] for entry in uploaded] == ["0", "1", "2"]
     assert all(entry["method"] == "POST" for entry in uploaded)
-    assert all(entry["url"] == "/responses" for entry in uploaded)
+    # The absolute path, not the live `/responses` one: the Batch API validates this
+    # field against a fixed list of full paths rather than resolving it against a base URL,
+    # so the live path is rejected at submit.
+    assert all(entry["url"] == "/v1/responses" for entry in uploaded)
 
     submitted = server.requests[0]
     assert submitted["input_file_id"] == "file-input"
-    assert submitted["endpoint"] == "/responses"
+    assert submitted["endpoint"] == "/v1/responses"
     assert submitted["completion_window"] == "24h"
 
 
@@ -583,12 +586,12 @@ async def test_rejected_lines_are_read_from_the_error_file_too() -> None:
 
 async def test_openai_statuses_normalize_to_one_vocabulary() -> None:
     """Richer than Anthropic's two states, mapped so a caller polls one vocabulary."""
-    from anyinfer.providers.openai import _BATCH_STATUSES
+    from anyinfer.providers._openai_batch import BATCH_STATUSES
 
-    assert _BATCH_STATUSES["validating"] == "queued"
-    assert _BATCH_STATUSES["finalizing"] == "in_progress"
-    assert _BATCH_STATUSES["cancelled"] == "cancelled"
-    assert _BATCH_STATUSES["expired"] == "expired"
+    assert BATCH_STATUSES["validating"] == "queued"
+    assert BATCH_STATUSES["finalizing"] == "in_progress"
+    assert BATCH_STATUSES["cancelled"] == "cancelled"
+    assert BATCH_STATUSES["expired"] == "expired"
 
 
 async def test_cancelling_an_openai_batch_reports_cancelled() -> None:
@@ -616,8 +619,8 @@ async def test_openai_lines_also_come_back_in_submission_order() -> None:
     assert [line.custom_id for line in result.lines] == ["0", "1", "2", "3"]
 
 
-def test_both_named_providers_now_declare_the_operation() -> None:
-    """The plan named OpenAI first; Anthropic's simpler API was the one to build against."""
+def test_the_named_providers_declare_the_operation() -> None:
+    """The plan named five; these are the ones whose endpoints this repo has bound."""
     from anyinfer.registry import default_registry
 
     declaring = {
@@ -625,4 +628,58 @@ def test_both_named_providers_now_declare_the_operation() -> None:
         for pid in default_registry.known_ids()
         if "batch" in default_registry.get(pid).operations
     }
-    assert declaring == {"anthropic", "openai"}
+    assert declaring == {"anthropic", "openai", "groq"}
+
+
+# ---- the same lifecycle on the chat dialect --------------------------------------------------
+#
+# The plan named five providers, not two. Groq sells the OpenAI-shaped batch tier against
+# chat completions rather than Responses, which is the whole difference — so the lifecycle
+# is shared code and only the line bodies differ.
+
+
+async def test_a_chat_dialect_provider_runs_the_same_lifecycle() -> None:
+    server = FakeResponsesBatchServer(
+        FakeResponse(text="answer"), dialect="chat", polls_before_done=2
+    )
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "groq",
+                api_key="gsk-test",
+                base_url="https://fake.invalid/openai/v1",
+                transport=server.transport(),
+            )
+        ],
+        use_default_catalog=False,
+    )
+    try:
+        handle = await client.submit_batch(_batch(2), target="groq:llama-3.3-70b")
+        assert not (await client.batch_status(handle)).finished
+        assert (await client.batch_status(handle)).finished
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    uploaded = [json.loads(line) for line in server.uploaded[0].splitlines()]
+    assert all(entry["url"] == "/v1/chat/completions" for entry in uploaded)
+    assert server.requests[0]["endpoint"] == "/v1/chat/completions"
+
+    assert [line.custom_id for line in result.lines] == ["0", "1"]
+    assert [line.result.text for line in result.lines] == ["answer #0", "answer #1"]
+    assert result.lines[0].result.usage.input_tokens == 11
+    assert result.lines[0].result.finish_reason == "stop"
+
+
+def test_a_preset_without_a_verified_batch_tier_does_not_claim_one() -> None:
+    """Chat compatibility does not imply batch compatibility.
+
+    Every compat preset shares the adapter that now carries the batch lifecycle, so the
+    declaration is the only thing separating a provider that sells the tier from one that
+    would 404 at submit.
+    """
+    from anyinfer.registry import default_registry
+
+    assert "batch" in default_registry.get("groq").operations
+    assert "batch" not in default_registry.get("cerebras").operations
+    assert "batch" not in default_registry.get("together").operations

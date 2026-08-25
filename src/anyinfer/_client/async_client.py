@@ -1602,15 +1602,28 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
     async def _batch_adapter(self, resolved: ResolvedTarget) -> SubmitsBatches:
         """Fetch a provider's adapter and narrow it to the batch protocol.
 
+        The descriptor decides, not the adapter object. Several providers share one
+        adapter class — every OpenAI-compatible preset does — so whether the *class* has
+        the methods says nothing about whether this provider sells the tier. A structural
+        check alone would let a preset with no batch endpoint submit a job and fail at the
+        upload, hours of confusion later than it should.
+
         Raises:
             anyinfer.errors.ConfigError: The provider does not implement batching.
         """
-        adapter = await self._pool.get(resolved.provider_id)
-        if not isinstance(adapter, SubmitsBatches):
+        if "batch" not in self._pool.descriptor_for(resolved.provider_id).operations:
             raise ConfigError(
                 f"provider {resolved.provider_id!r} does not support batch submission",
                 provider=resolved.provider_id,
                 hint="choose a provider whose descriptor declares the 'batch' operation",
+            )
+        adapter = await self._pool.get(resolved.provider_id)
+        if not isinstance(adapter, SubmitsBatches):
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} declares batch submission but its "
+                "adapter does not implement it",
+                provider=resolved.provider_id,
+                hint="fix the descriptor's operations set or the adapter's factory",
             )
         return adapter
 

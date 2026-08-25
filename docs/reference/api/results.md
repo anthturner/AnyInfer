@@ -108,6 +108,8 @@ stream yields on the way there. Ordering guarantees are documented in
 
 ::: anyinfer.ServerToolDelta
 
+::: anyinfer.ServerToolSource
+
 ::: anyinfer.UsageUpdate
 
 ::: anyinfer.TimingMark

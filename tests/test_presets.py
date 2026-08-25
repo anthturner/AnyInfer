@@ -540,9 +540,13 @@ def test_embedding_presets_declare_the_operation_and_adapter() -> None:
     for preset_id in ("together", "fireworks", "mistral", "deepinfra"):
         descriptor = registry.get(preset_id)
         assert descriptor.operations == frozenset({"generation", "embedding"})
-    for preset_id in ("groq", "cerebras"):
-        descriptor = registry.get(preset_id)
-        assert descriptor.operations == frozenset({"generation"})
+    assert registry.get("groq").operations == frozenset({"generation", "batch"})
+    assert registry.get("cerebras").operations == frozenset({"generation"})
+
+
+def test_only_the_verified_batch_preset_declares_the_tier() -> None:
+    """Same rule as embeddings: chat compatibility does not imply a batch endpoint."""
+    assert {p.id for p in COMPAT_PRESETS if p.batches} == {"groq"}
 
 
 async def test_a_verified_preset_embeds_through_the_shared_dialect() -> None:

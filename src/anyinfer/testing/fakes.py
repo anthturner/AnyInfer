@@ -14,7 +14,7 @@ import json
 import struct
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import httpx2
 
@@ -488,6 +488,10 @@ class FakeResponsesBatchServer(_FakeServerBase):
             At least one, so a caller must always poll — a fake that finished immediately
             could not exercise the poll-then-fetch shape a deferred API exists for.
         failures: How many lines land in the error file rather than the output file.
+        dialect: Which body shape answered lines carry. ``responses`` is OpenAI's own;
+            ``chat`` is what every provider that copied the Batch API onto chat
+            completions returns (Groq). The lifecycle is byte-identical between them —
+            only the line bodies differ — which is exactly why one fake covers both.
 
     Attributes:
         requests: Every request body received, for assertions.
@@ -500,10 +504,12 @@ class FakeResponsesBatchServer(_FakeServerBase):
         *,
         polls_before_done: int = 1,
         failures: int = 0,
+        dialect: Literal["responses", "chat"] = "responses",
     ) -> None:
         super().__init__(responses)
         self.polls_before_done = max(1, polls_before_done)
         self.failures = failures
+        self.dialect = dialect
         self.uploaded: list[str] = []
         self._lines: list[str] = []
         self._polls = 0
@@ -588,31 +594,44 @@ class FakeResponsesBatchServer(_FakeServerBase):
                 "custom_id": custom_id,
                 "response": {
                     "status_code": 200,
-                    "body": {
-                        "id": f"resp_{custom_id}",
-                        "object": "response",
-                        "status": "completed",
-                        "model": "fake-gpt",
-                        "output": [
-                            {
-                                "type": "message",
-                                "role": "assistant",
-                                "content": [
-                                    {
-                                        "type": "output_text",
-                                        "text": f"{response.text} #{custom_id}",
-                                    }
-                                ],
-                            }
-                        ],
-                        "usage": {"input_tokens": 11, "output_tokens": 7, "total_tokens": 18},
-                    },
+                    "body": self._line_body(custom_id, f"{response.text} #{custom_id}"),
                 },
                 "error": None,
             }
             for custom_id in custom_ids
         ]
         return "\n".join(json.dumps(entry) for entry in reversed(entries))
+
+    def _line_body(self, custom_id: str, text: str) -> dict[str, Any]:
+        """One answered line's body, in whichever dialect this fake serves."""
+        if self.dialect == "chat":
+            return {
+                "id": f"chatcmpl_{custom_id}",
+                "object": "chat.completion",
+                "model": "fake-chat",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": text},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18},
+            }
+        return {
+            "id": f"resp_{custom_id}",
+            "object": "response",
+            "status": "completed",
+            "model": "fake-gpt",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": text}],
+                }
+            ],
+            "usage": {"input_tokens": 11, "output_tokens": 7, "total_tokens": 18},
+        }
 
     def _error_manifest(self, custom_ids: Sequence[str]) -> str:
         """Rejected lines, which live in their own file rather than beside the successes."""

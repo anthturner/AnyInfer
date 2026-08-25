@@ -772,10 +772,12 @@ class Client:
         self._ensure_open()
         return self._loop.run(self._async.batch_status(handle))
 
-    def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+    def fetch_batch(
+        self, handle: BatchHandle, *, schema: SchemaSpec | None = None
+    ) -> BatchResult:
         """Download a finished batch. See `AsyncClient.fetch_batch()`."""
         self._ensure_open()
-        return self._loop.run(self._async.fetch_batch(handle))
+        return self._loop.run(self._async.fetch_batch(handle, schema=schema))
 
     def cancel_batch(self, handle: BatchHandle) -> BatchReport:
         """Cancel a batch. See `AsyncClient.cancel_batch()`."""

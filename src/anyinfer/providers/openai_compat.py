@@ -32,9 +32,10 @@ from ..types.messages import (
     VideoPart,
 )
 from ..types.requests import Sampling, ToolSpec
-from ..types.results import FinishReason, TokenLogprob, Usage
+from ..types.results import FinishReason, Generation, ResolvedTarget, Timing, TokenLogprob, Usage
 from ._logprobs import parse_openai_logprobs
 from ._multimodal import base64_data, data_url, media_subtype, unsupported
+from ._openai_batch import OpenAIBatchMixin
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .sse import iter_sse
@@ -50,7 +51,7 @@ _FINISH_REASONS: Mapping[str, FinishReason] = {
 }
 
 
-class OpenAICompatAdapter:
+class OpenAICompatAdapter(OpenAIBatchMixin):
     """Adapter for OpenAI-compatible chat-completions endpoints."""
 
     output_tokens_field: ClassVar[str] = "max_tokens"
@@ -481,6 +482,54 @@ class OpenAICompatAdapter:
             finish_reason=finish_reason, usage=usage, raw=payload, logprobs=logprobs
         )
 
+    # ---- batches -----------------------------------------------------------------------
+
+    def generation_from_batch_body(self, body: Mapping[str, Any]) -> Generation:
+        """Assemble a `Generation` from one batched chat-completion body.
+
+        Read through `_events_from_completion`, the same reader the buffered live path
+        uses, so a batched answer carries the text, tool calls, usage, and finish reason a
+        live one would rather than through a second parser that can drift from it.
+
+        Assembled here rather than through the router's attempt buffer: an adapter must not
+        import from `anyinfer.routing` — the "adapters never orchestrate" contract enforces
+        exactly that — and a manifest line has nothing to orchestrate. The routing fields a
+        live result carries are genuinely absent; nothing routed, and no clock of ours ran.
+        """
+        text: list[str] = []
+        calls: dict[int, list[ToolCallDelta]] = {}
+        final: AdapterFinal | None = None
+        for event in self._events_from_completion(body, _BATCH_LINE_REQUEST):
+            if isinstance(event, TextDelta):
+                text.append(event.text)
+            elif isinstance(event, ToolCallDelta):
+                calls.setdefault(event.index, []).append(event)
+            elif isinstance(event, AdapterFinal):
+                final = event
+
+        usage = (final.usage if final is not None else None) or Usage()
+        return Generation(
+            text="".join(text),
+            structured=None,
+            tool_calls=tuple(
+                ToolCall(
+                    id="".join(d.call_id or "" for d in deltas),
+                    name="".join(d.name or "" for d in deltas),
+                    arguments=_batch_tool_arguments(
+                        "".join(d.arguments_fragment for d in deltas)
+                    ),
+                )
+                for _, deltas in sorted(calls.items())
+            ),
+            target=ResolvedTarget(
+                provider_id=self.provider_id, model=str(body.get("model", ""))
+            ),
+            finish_reason=final.finish_reason if final is not None else "stop",
+            usage=usage.normalized(),
+            timing=Timing(started_at=0.0, total_ms=0.0),
+            logprobs=final.logprobs if final is not None else (),
+        )
+
     def _parse_usage(self, usage: Mapping[str, Any]) -> Usage:
         """Read the dialect's usage block."""
         details = usage.get("prompt_tokens_details")
@@ -556,3 +605,19 @@ descriptor = ProviderDescriptor(
     ),
 )
 """Descriptor for the generic OpenAI-compatible provider."""
+
+
+_BATCH_LINE_REQUEST = WireRequest(model="", messages=())
+"""A placeholder for the reader, which consults the request only for fields a manifest
+line does not have. Built once rather than per line."""
+
+
+def _batch_tool_arguments(raw: str) -> Mapping[str, Any]:
+    """Parse one batched tool call's arguments, tolerating a provider that sent none."""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}

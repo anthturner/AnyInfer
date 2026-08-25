@@ -13,7 +13,6 @@ inherited from `anyinfer.providers.openai_compat`.
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import aclosing
 from typing import Any, ClassVar
@@ -50,11 +49,6 @@ from ..types.messages import (
     VideoPart,
 )
 from ..types.operations import (
-    BatchHandle,
-    BatchLine,
-    BatchReport,
-    BatchResult,
-    BatchStatus,
     EmbeddingCapabilities,
 )
 from ..types.requests import (
@@ -65,8 +59,6 @@ from ..types.requests import (
     ToolSpec,
 )
 from ..types.results import (
-    DETAIL_MAX_CHARS,
-    ErrorInfo,
     FinishReason,
     Generation,
     ServerToolUse,
@@ -76,10 +68,10 @@ from ..types.results import (
 )
 from ._logprobs import parse_logprob_entries
 from ._multimodal import base64_data, data_url, media_subtype, unsupported
+from ._openai_batch import OpenAIBatchMixin
 from .base import (
     AdapterEvent,
     AdapterFinal,
-    BatchWireRequest,
     ProviderConfig,
     WireRequest,
 )
@@ -97,7 +89,7 @@ _INCOMPLETE_REASONS: Mapping[str, FinishReason] = {
 }
 
 
-class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
+class OpenAIAdapter(OpenAIBatchMixin, OpenAICompatEmbeddingsMixin):
     """Adapter for the OpenAI Responses API."""
 
     provider_id: ClassVar[str] = "openai"
@@ -184,6 +176,11 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
     # ---- generation ------------------------------------------------------------------
 
     responses_path: ClassVar[str] = "/responses"
+    """Where a live request goes, resolved against a base URL that carries the version."""
+
+    batch_endpoint: ClassVar[str] = "/v1/responses"
+    """Where a *batched* line goes. Absolute, because the Batch API validates this field
+    against a fixed list of full paths rather than resolving it against the base URL."""
     """The generation endpoint, named once because the batch API references it by URL."""
 
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
@@ -375,209 +372,9 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
                 provider=self.provider_id,
             )
 
-    # ---- batches ---------------------------------------------------------------------
-    #
-    # OpenAI's Batch API is a three-step lifecycle where Anthropic's is one: a JSONL file
-    # is uploaded to `/files`, the batch references it by id, and results come back as
-    # another file to download. That file dance is the whole difference — the job itself
-    # is the same set of requests, serialized by the same `build_payload` a live call uses.
-
-    async def submit_batch(self, req: BatchWireRequest) -> BatchHandle:
-        """Upload the job as a JSONL file, then submit a batch referencing it.
-
-        Raises:
-            anyinfer.errors.ProviderError: The upload or the submission was refused.
-        """
-        jsonl = "\n".join(
-            json.dumps(
-                {
-                    "custom_id": custom_id,
-                    "method": "POST",
-                    "url": self.responses_path,
-                    "body": self._batch_body(line),
-                }
-            )
-            for custom_id, line in req.lines
-        )
-        file_id = await self._upload_batch_input(jsonl)
-
-        payload: dict[str, Any] = {
-            "input_file_id": file_id,
-            "endpoint": self.responses_path,
-            "completion_window": req.completion_window or "24h",
-        }
-        if req.metadata:
-            payload["metadata"] = dict(req.metadata)
-        body = await self._batch_call("POST", "/batches", json=payload)
-        return BatchHandle(
-            batch_id=str(body.get("id", "")),
-            provider_id=self.provider_id,
-            model=req.model,
-            line_count=len(req.lines),
-            submitted_at=time.time(),
-        )
-
-    def _batch_body(self, line: WireRequest) -> dict[str, Any]:
-        """One line's request body: the live shape, with streaming removed.
-
-        A batch is answered whole, so `stream` is meaningless and the API rejects it.
-        Everything else is identical, which is the point of reusing `build_payload`.
-        """
-        body = self.build_payload(line)
-        body.pop("stream", None)
-        return body
-
-    async def _upload_batch_input(self, jsonl: str) -> str:
-        """Upload the job to ``POST /files`` with ``purpose=batch``.
-
-        Raises:
-            anyinfer.errors.ProviderError: The upload failed, or returned no file id.
-        """
-        try:
-            response = await self._client.post(
-                "/files",
-                files={"file": ("batch.jsonl", jsonl.encode("utf-8"), "application/jsonl")},
-                data={"purpose": "batch"},
-            )
-        except httpx2.HTTPError as exc:
-            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
-        if response.status_code >= 400:
-            raise self._classify(
-                response.status_code, read_error_detail(response.content), response.headers
-            )
-        body = response.json()
-        file_id = body.get("id") if isinstance(body, Mapping) else None
-        if not isinstance(file_id, str) or not file_id:
-            raise StreamProtocolError(
-                "the batch input upload returned no file id", provider=self.provider_id
-            )
-        return file_id
-
-    async def batch_status(self, handle: BatchHandle) -> BatchReport:
-        """Report state from ``GET /batches/{id}``."""
-        return self._report(handle, await self._batch_call("GET", f"/batches/{handle.batch_id}"))
-
-    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
-        """Ask the provider to cancel, via ``POST /batches/{id}/cancel``."""
-        body = await self._batch_call("POST", f"/batches/{handle.batch_id}/cancel")
-        return self._report(handle, body)
-
-    def _report(self, handle: BatchHandle, body: Mapping[str, Any]) -> BatchReport:
-        """Normalize one batch object into a report."""
-        counts = body.get("request_counts")
-        counts = counts if isinstance(counts, Mapping) else {}
-        errors = body.get("errors")
-        detail = ""
-        if isinstance(errors, Mapping):
-            entries = errors.get("data")
-            if isinstance(entries, list) and entries and isinstance(entries[0], Mapping):
-                detail = str(entries[0].get("message", ""))
-        return BatchReport(
-            handle=handle,
-            status=_BATCH_STATUSES.get(str(body.get("status", "")), "in_progress"),
-            completed=int(counts.get("completed", 0) or 0),
-            failed=int(counts.get("failed", 0) or 0),
-            detail=detail,
-        )
-
-    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
-        """Download the output file and parse its lines.
-
-        Raises:
-            anyinfer.errors.ProviderError: The batch has not finished, or the download
-                failed. Refused rather than returning an empty result, which a caller
-                would read as "every line failed".
-        """
-        body = await self._batch_call("GET", f"/batches/{handle.batch_id}")
-        report = self._report(handle, body)
-        if not report.finished:
-            raise ProviderError(
-                f"batch {handle.batch_id} is {report.status}, not finished",
-                provider=self.provider_id,
-                retryable=True,
-                hint="poll batch_status until it reports finished",
-            )
-
-        lines: list[BatchLine] = []
-        # Two files, not one: successful lines land in `output_file_id` and rejected ones
-        # in `error_file_id`. Reading only the first would silently drop every failure and
-        # return a batch that looks smaller than it was.
-        for field, ok in (("output_file_id", True), ("error_file_id", False)):
-            file_id = body.get(field)
-            if isinstance(file_id, str) and file_id:
-                lines.extend(self._parse_lines(await self._download_file(file_id), ok=ok))
-        return BatchResult(handle=handle, status=report.status, lines=tuple(lines))
-
-    async def _download_file(self, file_id: str) -> str:
-        """Fetch one result file's content.
-
-        Raises:
-            anyinfer.errors.ProviderError: The download failed.
-        """
-        try:
-            response = await self._client.get(f"/files/{file_id}/content")
-        except httpx2.HTTPError as exc:
-            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
-        if response.status_code >= 400:
-            raise self._classify(
-                response.status_code, read_error_detail(response.content), response.headers
-            )
-        return response.text
-
-    def _parse_lines(self, jsonl: str, *, ok: bool) -> Iterable[BatchLine]:
-        """Parse one manifest file, one entry per submitted request."""
-        for raw in jsonl.splitlines():
-            if not raw.strip():
-                continue
-            try:
-                entry = json.loads(raw)
-            except ValueError:
-                continue
-            if isinstance(entry, Mapping):
-                yield self._parse_line(entry, ok=ok)
-
-    def _parse_line(self, entry: Mapping[str, Any], *, ok: bool) -> BatchLine:
-        """Turn one manifest entry into a line.
-
-        A successful entry's `response.body` is byte-identical to a non-streaming
-        Responses body, so it is read by the same output-item reader a live call's terminal
-        event uses — which is what makes a batched answer carry the tool calls, usage, and
-        status a live one would.
-        """
-        custom_id = str(entry.get("custom_id", ""))
-        response = entry.get("response")
-        status = response.get("status_code") if isinstance(response, Mapping) else None
-        body = response.get("body") if isinstance(response, Mapping) else None
-
-        if not ok or (isinstance(status, int) and status >= 400) or not isinstance(body, Mapping):
-            return BatchLine(
-                custom_id=custom_id,
-                error=_batch_error(self.provider_id, _line_failure(entry, body)),
-            )
-        return BatchLine(custom_id=custom_id, result=_generation_from_response(body))
-
-    async def _batch_call(
-        self, method: str, path: str, *, json: Any = None
-    ) -> Mapping[str, Any]:
-        """Issue one batch-control request, classifying failures the usual way.
-
-        Raises:
-            anyinfer.errors.ProviderError: The call failed or returned a non-object body.
-        """
-        try:
-            response = await self._client.request(method, path, json=json)
-        except httpx2.HTTPError as exc:
-            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
-        if response.status_code >= 400:
-            raise self._classify(
-                response.status_code, read_error_detail(response.content), response.headers
-            )
-        body = response.json()
-        if not isinstance(body, Mapping):
-            raise StreamProtocolError(
-                "the provider returned a non-object batch body", provider=self.provider_id
-            )
-        return body
+    def generation_from_batch_body(self, body: Mapping[str, Any]) -> Generation:
+        """Read one batched Responses body with the live path's own output-item reader."""
+        return _generation_from_response(body)
 
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
@@ -625,50 +422,6 @@ class _StreamState:
                 for kind, count in sorted(self.server_tools.items())
             ),
         )
-
-
-_BATCH_STATUSES: Mapping[str, BatchStatus] = {
-    "validating": "queued",
-    "in_progress": "in_progress",
-    "finalizing": "in_progress",
-    "completed": "completed",
-    "failed": "failed",
-    "expired": "expired",
-    "cancelling": "in_progress",
-    "cancelled": "cancelled",
-}
-"""OpenAI's batch states, normalized. Richer than Anthropic's two, and mapped rather than
-passed through so a caller polls one vocabulary whichever provider ran the job."""
-
-
-def _batch_error(provider_id: str, detail: str) -> ErrorInfo:
-    """Record one line's failure without inventing a status code for it."""
-    return ErrorInfo(
-        type_name="ProviderError",
-        provider=provider_id,
-        phase="generate",
-        retryable=False,
-        http_status=None,
-        detail=detail[:DETAIL_MAX_CHARS],
-    )
-
-
-def _line_failure(entry: Mapping[str, Any], body: Any) -> str:
-    """Extract the most specific failure message a manifest entry offers.
-
-    Three places can carry it — the entry's own `error`, the response body's `error`, or
-    nothing at all — because the two manifest files use different shapes for the same
-    fact.
-    """
-    body_error = body.get("error") if isinstance(body, Mapping) else None
-    for candidate in (entry.get("error"), body_error):
-        if isinstance(candidate, Mapping):
-            message = candidate.get("message") or candidate.get("code")
-            if message:
-                return str(message)
-        elif isinstance(candidate, str) and candidate:
-            return candidate
-    return "the provider rejected this line without a message"
 
 
 def _generation_from_response(body: Mapping[str, Any]) -> Generation:

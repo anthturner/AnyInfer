@@ -844,8 +844,8 @@ src/anyinfer/
                          # sources/ direct_url.py huggingface.py local_path.py
                          # attestation.py provenance.py
   providers/             # base.py sse.py eventstream.py http.py cloud_auth.py
-                         # _logprobs.py _multimodal.py openai_compat.py
-                         # openai_compat_embeddings.py
+                         # _logprobs.py _multimodal.py _openai_batch.py
+                         # openai_compat.py openai_compat_embeddings.py
                          # openai_shaped_retrieval.py openai.py anthropic.py
                          # ollama.py openrouter.py azure_foundry.py copilot.py
                          # m365_copilot.py llama_cpp.py gemini.py deepseek.py xai.py
