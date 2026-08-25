@@ -31,4 +31,12 @@ Thumbs.db
 
 # Agent worktrees
 .claude/worktrees/
-COHERE.key
+
+# Local credential material. Patterned rather than named: the previous entry listed one
+# file by name, so a key that happened to be called anything else was committable.
+# Credentials belong in env:// references or the OS keyring, never in the tree.
+*.key
+*.pem
+.env
+.env.*
+!.env.example

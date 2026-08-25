@@ -45,6 +45,26 @@ ai.ProviderSettings.of(
 The order providers are listed in is the preference order for
 [alias resolution](../concepts/targets.md#aliases).
 
+### URLs in Configuration Are Trusted Input
+
+AnyInfer fetches `base_url`, [MCP server](#the-mcp-block) endpoints, and model-source URLs
+as given. It does not filter them by host: a URL pointing at `localhost`, at a private
+range, or at a cloud metadata endpoint such as `169.254.169.254` is fetched like any
+other, and a `file://` model source reads the local path it names. This is deliberate —
+pointing AnyInfer at a service on your own network is the normal case for Ollama, LM
+Studio, vLLM, and a self-hosted gateway, and a blocklist would break it.
+
+The assumption is that **configuration is trusted**: written by the operator, not by a
+user of the application. It holds for a config file under your control, and for the
+sidecar, whose `model` strings resolve only to already-configured providers and so cannot
+introduce a new URL.
+
+It stops holding the moment lower-trust input reaches any of these values — a multi-tenant
+application letting a customer supply a `base_url`, an MCP endpoint, or a model source. If
+you build that, validate the URL against your own allowlist before it reaches
+`ProviderSettings`; treat it as you would any other user-supplied URL your server will
+fetch.
+
 ### Configuring One Engine More Than Once
 
 `alias` gives an entry its own identity, so the same engine can be configured several

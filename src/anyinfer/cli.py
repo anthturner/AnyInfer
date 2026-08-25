@@ -61,6 +61,18 @@ def _add_serve_flags(parser: argparse.ArgumentParser) -> None:
         metavar="TARGET",
         help="advertise a concrete provider:model target from /v1/models (repeatable)",
     )
+    # Default resolved in `cmd_serve`, not here: the constant lives in `serve.app`, which
+    # is imported lazily so building this parser never costs the serve import.
+    parser.add_argument(
+        "--max-request-bytes",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "reject request bodies larger than N bytes with 413 "
+            "(default: 10 MiB; 0 disables the check)"
+        ),
+    )
 
 
 def _copy_parser_actions(
@@ -964,7 +976,7 @@ def _serve_run(args: argparse.Namespace) -> int:
         return 1
 
     from . import AsyncClient
-    from .serve.app import create_app
+    from .serve.app import DEFAULT_MAX_REQUEST_BYTES, create_app
 
     config = _config(args.config)
     settings, route = list(config.providers), config.route
@@ -984,6 +996,11 @@ def _serve_run(args: argparse.Namespace) -> int:
         client,
         auth_token=token,
         expose_targets=tuple(args.expose),
+        max_request_bytes=(
+            DEFAULT_MAX_REQUEST_BYTES
+            if args.max_request_bytes is None
+            else args.max_request_bytes
+        ),
         context_tuning=config.context,
     )
 

@@ -65,14 +65,14 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | E.4 | Typed citations / grounded-generation output | 3 | 2 | 6 |
 | `[ ]` | E.9 | Explicit proxy / custom CA / mTLS configuration | 2 | 3 | 6 |
 | `[ ]` | A.6 | Fix the "tests mirror the package" AGENTS.md claim | 1 | 5 | 5 |
-| `[ ]` | F.9 | `catalog-refresh` workflow write scope on its read-only job | 1 | 5 | 5 |
-| `[ ]` | F.13 | Loose `COHERE.key` credential file in the working tree | 1 | 5 | 5 |
-| `[ ]` | A.3 | `serve/service.py` workstream boundary + import-linter scope | 1 | 4 | 4 |
+| `[x]` | F.9 | `catalog-refresh` workflow write scope on its read-only job | 1 | 5 | 5 |
+| `[x]` | F.13 | Loose `COHERE.key` credential file in the working tree | 1 | 5 | 5 |
+| `[x]` | A.3 | `serve/service.py` workstream boundary + import-linter scope | 1 | 4 | 4 |
 | `[ ]` | B.7 | Extras/snapshot enumerations incomplete (`mcp` extra, `contracts/mcp.md`) | 1 | 4 | 4 |
 | `[ ]` | C.3 | Add-on install story contradicts itself (PyPI vs checkout) | 1 | 4 | 4 |
 | `[ ]` | E.7 | Video input parts | 2 | 2 | 4 |
 | `[ ]` | E.8 | Runtime credential rotation / hot reload | 2 | 2 | 4 |
-| `[ ]` | F.8 | Third-party GitHub Actions pinned to mutable tags | 1 | 4 | 4 |
+| `[x]` | F.8 | Third-party GitHub Actions pinned to mutable tags | 1 | 4 | 4 |
 | `[ ]` | G.7 | Nitro Enclaves decision (resolve or explicitly defer) | 2 | 2 | 4 |
 | `[ ]` | A.4 | Generic top-level `demo_app` package ships in the core wheel | 1 | 3 | 3 |
 | `[ ]` | C.5 | `installation.md` breaks the guide skeleton and dead-ends | 1 | 3 | 3 |
@@ -81,8 +81,8 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | D.5 | `ConfidentialityReport` has no producer anywhere | 1 | 3 | 3 |
 | `[ ]` | D.7 | DESIGN.md's open-decisions ledger drift (both directions) | 1 | 3 | 3 |
 | `[ ]` | E.12 | Shipped logging/JSONL sink for the telemetry stream | 1 | 3 | 3 |
-| `[ ]` | F.6 | Sidecar has no request-body size limit | 1 | 3 | 3 |
-| `[ ]` | F.7 | Config-controlled URLs (SSRF / `file://`) trust assumption undocumented | 1 | 3 | 3 |
+| `[x]` | F.6 | Sidecar has no request-body size limit | 1 | 3 | 3 |
+| `[x]` | F.7 | Config-controlled URLs (SSRF / `file://`) trust assumption undocumented | 1 | 3 | 3 |
 | `[ ]` | F.12 | SECURITY.md canonical org/domain diverges across the repo | 1 | 3 | 3 |
 | `[ ]` | G.6 | GPU SPDM attestation (explicitly deferred; state the ceiling) | 3 | 1 | 3 |
 | `[ ]` | A.2 | `cli.py` is a 3,776-line single module | 1 | 2 | 2 |
@@ -195,9 +195,9 @@ but the import-linter sidecar contract names only `anyinfer.serve.openai_codec` 
 mechanical enforcement — nothing would catch them importing `anyinfer.providers` tomorrow.
 
 **Remediation:**
-- [ ] **A.3.1** Change the import-linter contract's `source_modules` to `["anyinfer.serve"]` so
+- [x] **A.3.1** Change the import-linter contract's `source_modules` to `["anyinfer.serve"]` so
   every present and future serve module is covered (cheap, do regardless).
-- [ ] **A.3.2** Either move `service.py` under CLI ownership, or amend the AGENTS.md sidecar row
+- [x] **A.3.2** Either move `service.py` under CLI ownership, or amend the AGENTS.md sidecar row
   to name service-definition rendering as owned. Amending the row is the smaller change.
 
 ## A.4 Generic top-level `demo_app` package ships in the core wheel
@@ -1213,7 +1213,7 @@ streaming bound — an authenticated (or loopback) client can force unbounded al
 multi-gigabyte JSON body. DoS, not disclosure; matters most under `--allow-remote-exposure`.
 
 **Remediation:**
-- [ ] **F.6.1** Add middleware in `create_app` rejecting bodies over a configurable limit (a few
+- [x] **F.6.1** Add middleware in `create_app` rejecting bodies over a configurable limit (a few
   MB default), enforced while reading to defend against a missing/lying `content-length`.
 
 ## F.7 Config-controlled URLs (SSRF / `file://`) — trust assumption undocumented
@@ -1230,10 +1230,14 @@ but the trust assumption is stated nowhere, and it becomes real the moment an ap
 lower-trust input influence any of these values.
 
 **Remediation:**
-- [ ] **F.7.1** Document the trust assumption ("provider base_urls, MCP URLs, and model-source
+- [x] **F.7.1** Document the trust assumption ("provider base_urls, MCP URLs, and model-source
   URLs are trusted configuration") in the configuration reference and custom-providers guide.
-- [ ] **F.7.2** Optional: an opt-in SSRF guard (resolve-and-check against private ranges) and an
-  explicit opt-in for the `file://` scheme, for apps that expose these to users.
+- [ ] **F.7.2** Optional, not taken. Deliberately deferred: a resolve-and-check guard would
+  need an opt-in flag, a private-range policy, and a re-resolve at connect time to be
+  worth anything against DNS rebinding, and the default posture (configuration is
+  operator-written) does not need it. F.7.1 now states the assumption and tells an app
+  that *does* expose these values what to do instead. Revisit if a first-party
+  multi-tenant surface ever accepts a caller-supplied URL. *(2026-08-25)*
 
 ## F.8 Third-party GitHub Actions pinned to mutable tags
 
@@ -1247,7 +1251,7 @@ lower-trust input influence any of these values.
 risk is purely the mutable-tag surface.
 
 **Remediation:**
-- [ ] **F.8.1** Pin third-party actions to full commit SHAs (version in a comment), prioritizing
+- [x] **F.8.1** Pin third-party actions to full commit SHAs (version in a comment), prioritizing
   secret-bearing and publishing jobs; enable Dependabot for actions.
 
 ## F.9 `catalog-refresh` workflow grants write scope to its read-only job
@@ -1260,7 +1264,7 @@ risk is purely the mutable-tag surface.
 this correctly (read at top, write only in the `propose` job).
 
 **Remediation:**
-- [ ] **F.9.1** Set workflow default `contents: read`; move write permissions into the `propose`
+- [x] **F.9.1** Set workflow default `contents: read`; move write permissions into the `propose`
   job, copying `contract-drift.yml`.
 
 ## F.10 Redaction is exact-substring only
@@ -1321,9 +1325,12 @@ project's own credential story (`env://` references, keyring extra, redaction re
 precisely so keys never live as loose files beside code.
 
 **Remediation:**
-- [ ] **F.13.1** Move the key into an environment variable or the keyring store the SDK already
-  supports; delete the file. Rotate the key if the directory was ever copied, synced, or
-  shared.
+- [x] **F.13.1** Partial, by the owner's call *(2026-08-25)*: the file is kept, but tightened
+  to mode 0600 so other local users cannot read it, and `.gitignore` now patterns `*.key`,
+  `*.pem`, and `.env*` instead of naming this one file — the previous entry meant a
+  credential with any other name was committable. **Still open for the owner:** moving the
+  value to `env://` or the keyring and deleting the file, and rotating it if this directory
+  was ever copied, synced, or shared.
 
 ---
 

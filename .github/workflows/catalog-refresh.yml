@@ -27,20 +27,23 @@ on:
         type: boolean
         default: false
 
+# Scoped per job rather than workflow-wide: `check` only reads the repository and must
+# not carry the write token that `propose` needs to open a PR.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   check:
     name: deterministic drift check
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       drift: ${{ steps.drift.outputs.drift }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
       - name: install dependencies
@@ -57,19 +60,22 @@ jobs:
 
   propose:
     name: re-pin drifted entries and open a PR
+    permissions:
+      contents: write
+      pull-requests: write
     needs: check
     if: needs.check.outputs.drift == 'true' || inputs.force_propose
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
       - name: install dependencies
         run: python -m pip install --upgrade pip && python -m pip install -e .
       - name: re-pin the catalog
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@16b3b310c3d7b5279df73130324d5205aeea8eac # v1
         with:
           # Either secret works; set exactly one (docs/contributing/repository-setup.md).
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}

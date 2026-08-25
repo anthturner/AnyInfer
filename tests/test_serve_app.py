@@ -730,3 +730,120 @@ async def test_client_disconnect_mid_stream_closes_the_provider_connection() -> 
     await generator.aclose()
 
     assert fake_client.underlying.closed is True
+
+
+# ---- request body size limit ---------------------------------------------------------
+
+
+def test_an_oversized_body_is_refused_with_413() -> None:
+    """An unbounded request body is an unbounded allocation.
+
+    Every handler buffers its whole body to parse JSON, so this is the thing that matters
+    once the gateway leaves loopback.
+    """
+    server = FakeOpenAIServer(FakeResponse(text="never reached"))
+    http, _ = _client(server, max_request_bytes=1024)
+
+    response = http.post(
+        "/v1/chat/completions",
+        json={
+            "model": "openai-compat:m",
+            "messages": [{"role": "user", "content": "x" * 4096}],
+        },
+    )
+
+    assert response.status_code == 413
+    assert "limit" in response.json()["error"]["message"]
+
+
+def test_a_body_under_the_limit_passes_through_untouched() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    http, _ = _client(server, max_request_bytes=1024 * 1024)
+
+    response = http.post(
+        "/v1/chat/completions",
+        json={"model": "openai-compat:m", "messages": [{"role": "user", "content": "hi"}]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["content"] == "ok"
+
+
+async def test_the_limit_is_enforced_while_reading_not_from_content_length() -> None:
+    """`content-length` is advisory: absent on a chunked request, forgeable on any other.
+
+    Driven at the raw ASGI layer because an HTTP client will always recompute the header
+    honestly, which would let this pass on the declared-length check and prove nothing
+    about the read-side one. Here the request declares no length at all and streams past
+    the cap in chunks; it must be refused without the wrapped app ever being entered.
+    """
+    from anyinfer.serve.app import _with_body_limit
+
+    reached = False
+
+    async def inner(scope: object, receive: object, send: object) -> None:
+        nonlocal reached
+        reached = True
+
+    app = _with_body_limit(inner, 1024)
+
+    messages = [{"type": "http.request", "body": b"x" * 512, "more_body": True}] * 5
+    messages.append({"type": "http.request", "body": b"", "more_body": False})
+    pending = iter(messages)
+    sent: list[dict] = []
+
+    async def receive() -> dict:
+        return next(pending)
+
+    async def send(message: dict) -> None:
+        sent.append(message)
+
+    await app({"type": "http", "headers": []}, receive, send)
+
+    assert sent[0]["status"] == 413
+    assert not reached, "the oversized body must never reach the wrapped app"
+
+
+async def test_a_chunked_body_under_the_limit_is_reassembled_for_the_app() -> None:
+    """The wrapper replays what it buffered, so a chunked request is not truncated."""
+    from anyinfer.serve.app import _with_body_limit
+
+    received = b""
+
+    async def inner(scope: object, receive: object, send: object) -> None:
+        nonlocal received
+        message = await receive()  # type: ignore[operator]
+        received = message["body"]
+
+    app = _with_body_limit(inner, 1024)
+
+    messages = [
+        {"type": "http.request", "body": b"y" * 100, "more_body": True},
+        {"type": "http.request", "body": b"z" * 50, "more_body": False},
+    ]
+    pending = iter(messages)
+
+    async def receive() -> dict:
+        return next(pending)
+
+    async def send(message: dict) -> None:
+        pass
+
+    await app({"type": "http", "headers": []}, receive, send)
+
+    assert received == b"y" * 100 + b"z" * 50
+
+
+def test_the_limit_can_be_disabled() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    http, _ = _client(server, max_request_bytes=0)
+
+    response = http.post(
+        "/v1/chat/completions",
+        json={
+            "model": "openai-compat:m",
+            "messages": [{"role": "user", "content": "x" * 100_000}],
+        },
+    )
+
+    assert response.status_code == 200

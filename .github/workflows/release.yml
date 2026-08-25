@@ -54,8 +54,8 @@ jobs:
       is_new: ${{ steps.read.outputs.is_new }}
       bundle_matrix: ${{ steps.read.outputs.bundle_matrix }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
 
@@ -85,11 +85,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -111,7 +111,7 @@ jobs:
           ./smoke/bin/anyinfer --version
           ./smoke/bin/python -c "import demo_app"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: library-dist
           path: dist/*
@@ -132,11 +132,11 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.version.outputs.bundle_matrix) }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -147,7 +147,7 @@ jobs:
           python workspace.py build demo
           python workspace.py build serve
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: standalone-bundles-${{ matrix.label }}
           path: dist/bundle/*.zip
@@ -162,9 +162,9 @@ jobs:
     permissions:
       contents: write   # create the tag and the release
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: artifacts
           merge-multiple: true
@@ -217,7 +217,7 @@ jobs:
     permissions:
       id-token: write   # OIDC trusted publishing; no stored secrets
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: library-dist
           path: dist
@@ -234,6 +234,6 @@ jobs:
             echo "expected exactly one wheel and one sdist in dist/"; exit 1
           fi
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: dist

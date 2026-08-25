@@ -245,12 +245,13 @@ forbidden_modules = [
 
 [[tool.importlinter.contracts]]
 # ADR-009: the sidecar is a wire codec around a normal client, never a second core. The
-# contract covers the codec and ASGI app. `serve.__main__` is only a module-runner shim into
-# the separate CLI process boundary, so it is not request-path code.
+# whole package is the source, not a named pair of modules: naming modules meant
+# `embeddings_codec` and `service` sat outside the contract, so nothing would have caught
+# either importing `anyinfer.providers`. A module added tomorrow is covered on arrival.
 name = "Sidecar is a codec around the client, never a second core"
 type = "forbidden"
 allow_indirect_imports = true
-source_modules = ["anyinfer.serve.openai_codec", "anyinfer.serve.app"]
+source_modules = ["anyinfer.serve"]
 forbidden_modules = [
   "anyinfer.providers",
   "anyinfer.routing",
