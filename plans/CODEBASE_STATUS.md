@@ -49,9 +49,12 @@ verified to fail on injected drift); `context_request.py` cannot move to either 
 A.1.1 proposed without breaking an architecture contract (recorded as a decision in DESIGN
 §18 instead); and D.7's never-verified snapshot count is seven, not six.
 
-**One pre-existing issue found and fixed in the same pass** (H.1 below). It was reported
-first as a deprecation; investigating it on the owner's instruction showed it was already
-a live bug.
+**Three pre-existing dependency-drift bugs found and fixed** (new section H). H.1 was
+reported first as a deprecation to plan for; investigating it on the owner's instruction
+showed it was already breaking, and a sweep for the same shape then turned up H.2 (two
+independent breaks in the copilot adapter, one of them a silent subprocess leak) and H.3.
+All three shared a root: the seam where our code meets a dependency was either mocked by
+something more permissive than the real thing, or not executed by any test at all.
 
 ---
 
@@ -113,6 +116,8 @@ batch.
 | `[ ]` | E.9 | E.11 | Local model store guided eviction (`prune`) | 1 | 2 | 2 | M |
 | ✅ | A.3 | new | `cli.py` stay-single-file decision lacks a growth threshold | 1 | 1 | 1 | XS |
 | ✅ | H.1 | new | Documented `verify` + `client_cert` combination is a `TypeError` in httpx2 | 4 | 5 | 20 | S |
+| ✅ | H.2 | new | Copilot `cli_path` is a `TypeError`; `aclose` leaks the CLI process | 4 | 5 | 20 | S |
+| ✅ | H.3 | new | Dead `filterwarnings` exemption silently covers future starlette drift | 1 | 4 | 4 | XS |
 | 🚧 | C.4 | C.3.2 | Delete add-on install caveats when the first PyPI release ships | 1 | 1 | 1 | XS |
 
 ---
@@ -1081,5 +1086,75 @@ properly (2026-08-25), the reproduction showed it was already broken.
 **Note:** the public surface is unchanged — `ProviderSettings.verify` and the config file
 still take a path string and a certificate tuple, which is what an operator can write in
 JSON. The conversion is confined to `tls_kwargs`.
+
+## H.2 — Copilot `cli_path` raises `TypeError`; `aclose` leaks the CLI process
+
+**Severity:** Medium-High · **Confidence:** High (both reproduced) · **Was:** new
+**Paths:** `src/anyinfer/providers/copilot.py` (`_ensure_client`, `aclose`, `_map_error`),
+`contracts/copilot.md`, `docs/providers/copilot.md`
+
+**Brief:** Two independent breaks against `github-copilot-sdk` 1.0.9, found by sweeping for
+H.1's shape.
+
+1. **`cli_path` is a `TypeError`.** The adapter called
+   `CopilotClient(cli_path=...)`. Today's constructor is keyword-only with **no
+   `**kwargs`**, and has no such parameter — the SDK moved to
+   `connection=StdioRuntimeConnection(path=...)`. `cli_path` is a declared `SetupField`
+   (so it renders in the config UI) and is documented in `docs/providers/copilot.md`,
+   `docs/reference/configuration.md`, and `contracts/copilot.md`. Anyone who set it, or
+   who exported `COPILOT_CLI_PATH`, got a hintless `ProviderError` wrapping the
+   `TypeError`. The contract snapshot already named `RuntimeConnection`; the code had not
+   caught up.
+2. **`aclose` shut nothing down.** It probed for `close` then `aclose`; the SDK spells it
+   `stop`. Both probes missed, the `if close is not None` guard skipped the call, and
+   nothing raised — so the spawned CLI subprocess was left running on every client close.
+   Silent by construction: there is no failure to observe.
+
+**Long:** The suite passed throughout because the fake `copilot` module accepted
+`**options` on the constructor and defined `close()`. The fake was more permissive than
+the thing it stood in for, which is precisely what let a renamed parameter and a renamed
+method through. The same lesson as H.1 and D.6: the mocked seam is the one that rots.
+
+**Remediation:**
+- [x] **H.2.1** `cli_path` and `COPILOT_CLI_PATH` now build
+  `connection=StdioRuntimeConnection(path=...)`. The user-facing spelling is unchanged.
+- [x] **H.2.2** `aclose` tries `stop`, `close`, `aclose` in order, falling back to the
+  SDK's `__aexit__` — the one contract that has survived these renames — and the probed
+  names live in `CopilotAdapter._SHUTDOWN_METHODS`.
+- [x] **H.2.3** A `TypeError` naming an unexpected keyword now maps to `ConfigError` with
+  a hint saying an `options` key is not accepted by the installed SDK, instead of a bare
+  repr. The whole `options` block is forwarded to that constructor, so this recurs by
+  design whenever the SDK's parameter set moves.
+- [x] **H.2.4** The fake now mirrors the SDK: it spells shutdown `stop` and counts calls.
+  Two tests bind against the **real** installed SDK rather than the fake — one binds the
+  constructor kwargs to `CopilotClient.__init__`'s signature, one asserts at least one
+  name in `_SHUTDOWN_METHODS` still exists. Both were confirmed to fail against the
+  pre-fix call shape.
+- [x] **H.2.5** `contracts/copilot.md` gained a "Runtime location" section recording the
+  connection mapping and why the flat keyword cannot work.
+
+## H.3 — Dead `filterwarnings` exemption
+
+**Severity:** Low · **Confidence:** High · **Was:** new
+**Paths:** `pyproject.toml` (`[tool.pytest.ini_options] filterwarnings`)
+
+**Brief:** The suite ran `filterwarnings = ["error", "ignore::DeprecationWarning:starlette.testclient"]`.
+starlette 1.6 no longer emits the warning that exemption was added for, so it matched
+nothing — while still standing ready to swallow the *next* deprecation from that module.
+A module-scoped ignore does not expire on its own.
+
+**Remediation:**
+- [x] **H.3.1** Removed; `filterwarnings = ["error"]` with no exemptions. The comment now
+  says to re-add only with a specific message and a reason, never a bare module.
+
+**Sweep note (2026-08-25):** H.2 and H.3 came out of a deliberate sweep prompted by H.1 —
+warnings collected across the whole suite with `-o filterwarnings=always` (zero fired),
+coverage read for dependency-facing blind spots, and then the uncovered paths *executed*
+directly rather than inferred: both MCP transports, the Google service-account RS256/JWT
+signing path against `cryptography` 50, `jsonschema` validate/format/extract, `otel.install`,
+the keyring backend, `azure-identity`'s `get_token` signature, and every vendor attribute
+named anywhere in `src/` checked for existence. Only the copilot adapter was broken.
+Warnings-as-errors proved nothing about any of it, because a warning only fires on code a
+test actually runs — which is the whole reason the sweep was needed.
 
 

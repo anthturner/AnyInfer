@@ -206,12 +206,11 @@ markers = [
     "exhaustive: sweeps the entire preset or provider matrix. Needed when the shared OpenAI-compatible dialect, a descriptor invariant, or the conformance suite itself changes -- not when iterating on one adapter, which its own test module covers.",
     "slow: takes seconds for reasons unrelated to the code under iteration (packaging, subprocess builds). Always run before a commit; skipped while iterating.",
 ]
-filterwarnings = [
-    "error",
-    # Import-time warning from starlette's own test client about its httpx backend —
-    # third-party drift we cannot act on from here, not a defect in our code.
-    "ignore::DeprecationWarning:starlette.testclient",
-]
+# `error` with no exemptions. The starlette.testclient ignore that used to sit here was
+# removed once starlette 1.6 stopped emitting the warning it named: a filter that matches
+# nothing is not free, because it silently swallows the *next* deprecation from that module
+# too. Re-add an exemption only with the specific message and a reason, never a bare module.
+filterwarnings = ["error"]
 # `--durations` costs nothing and makes every run, including a CI log, self-profiling.
 # That is how the macOS lane's cost gets diagnosed: it runs this suite roughly four times
 # slower than Linux does, which no core-count difference explains, and the answer is not
