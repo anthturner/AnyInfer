@@ -1,7 +1,14 @@
 # Codebase Status — AnyInfer (v2)
 
-**Date:** 2026-08-25 · **As of:** commit `ed337b8` on `main` · **Supersedes:** v1 (commit
-`42e2106` baseline; retrievable from this file's git history).
+**Date:** 2026-08-25 · **As of:** commit `ed337b8` on `fix/codebase-status-p1` ·
+**Supersedes:** v1 (commit `42e2106` baseline; retrievable from this file's git history).
+
+**Correction (2026-08-25):** this header previously said `ed337b8` was on `main`. It was
+not, and still is not — `main` and `develop` are both at `42e2106`, the v1 baseline, and
+the entire v2 remediation wave (`48cd786..`) lives on `fix/codebase-status-p1` pending
+merge. Nothing below changes; the review it describes was run against that branch's tree.
+Noted rather than silently amended, since a status document misstating which branch it
+describes is the same defect class as section B.
 
 **Method:** five parallel verification reviews re-checked every v1 closure claim against
 current source — commit messages were not trusted — plus a fresh review of the ~8,400 new
