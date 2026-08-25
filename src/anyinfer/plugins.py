@@ -48,6 +48,9 @@ OBSERVER_GROUP = "anyinfer.observers"
 CREDENTIAL_STORE_GROUP = "anyinfer.credential_stores"
 """Entry-point group for credential resolvers adding a reference scheme."""
 
+_RESERVED_SCHEMES = ("env://", "credential://")
+"""Schemes the built-in resolvers own; a plugin claiming one is refused."""
+
 
 def _load_group(group: str) -> tuple[dict[str, Any], list[PluginLoadIssue]]:
     """Load every entry point in `group`, collecting failures instead of raising.
@@ -95,10 +98,24 @@ def load_observers() -> tuple[dict[str, Any], list[PluginLoadIssue]]:
 def load_credential_stores() -> tuple[dict[str, Any], list[PluginLoadIssue]]:
     """Discover credential resolvers published under `CREDENTIAL_STORE_GROUP`.
 
+    Discovered resolvers are placed ahead of the built-ins in `default_resolver`, so
+    first refusal is exactly what makes a custom scheme work — and exactly what would let
+    an installed distribution interpose on the built-in ones. Any resolver claiming to
+    handle ``env://`` or ``credential://`` is therefore dropped with a ``scheme-reserved``
+    issue, mirroring the id/alias-collision refusal the `anyinfer.providers` group has
+    enforced since it shipped. A plugin is trusted to add a scheme, never to redefine one.
+
+    That guard bounds interposition, not code execution: an installed package already runs
+    arbitrary code at interpreter startup by other means, and this group's entry points are
+    imported and instantiated like any other. What it removes is the specific case where a
+    compromised transitive dependency silently becomes the resolver for every credential
+    in the process without the operator having named it anywhere.
+
     Returns:
         A ``(resolvers, issues)`` pair. Entries that are callable are called with no
         arguments to build the resolver; anything failing the `CredentialResolver`
-        protocol is dropped with an issue rather than reaching the chain.
+        protocol, or claiming a built-in scheme, is dropped with an issue rather than
+        reaching the chain.
     """
     from .credentials.resolver import CredentialResolver
 
@@ -130,5 +147,36 @@ def load_credential_stores() -> tuple[dict[str, Any], list[PluginLoadIssue]]:
                 )
             )
             continue
+        reserved = _reserved_scheme_claimed_by(candidate)
+        if reserved is not None:
+            issues.append(
+                PluginLoadIssue(
+                    entry_point=name,
+                    reason="scheme-reserved",
+                    detail=(
+                        f"{type(candidate).__name__} claims the built-in scheme "
+                        f"{reserved!r}, which plugins may not resolve"
+                    ),
+                )
+            )
+            continue
         resolvers[name] = candidate
     return resolvers, issues
+
+
+def _reserved_scheme_claimed_by(resolver: Any) -> str | None:
+    """Return the first built-in scheme `resolver` claims, or None.
+
+    Probed by asking rather than by inspecting, because `handles` is the only thing the
+    `CredentialResolver` protocol defines — a resolver matching on a prefix, a regex, or a
+    parsed URL all answer the same question the same way. A probe that raises is treated
+    as a claim: a resolver that cannot answer whether it handles ``env://`` is not one to
+    put ahead of the resolver that definitely does.
+    """
+    for scheme in _RESERVED_SCHEMES:
+        try:
+            if resolver.handles(f"{scheme}anyinfer-reserved-probe"):
+                return scheme
+        except Exception:  # noqa: BLE001 — an unanswerable probe counts against the plugin
+            return scheme
+    return None

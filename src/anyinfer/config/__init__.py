@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -548,6 +549,9 @@ def _parse_provider(
                 raise _error(source, f"{location}.{key} must be a string")
             direct[key] = value
 
+    if "api_key" in direct:
+        _check_credential_reference(direct["api_key"], source, location, instance_id)
+
     for key in declared_keys - _DIRECT_SETTING_KEYS:
         value = raw.get(key, values.get(key))
         if value not in (None, "") and key not in merged_options:
@@ -603,6 +607,21 @@ def _parse_provider(
                 f"{location}.client_cert must be a path, or [cert, key], or "
                 "[cert, key, password]",
             )
+
+    if connection and not descriptor.honors_connection_settings:
+        # Rejected rather than accepted-and-ignored, the same rule that makes a redundant
+        # `verify: true` an error: a key the runtime silently drops is worse than one it
+        # refuses, because the operator believes their CA bundle is in effect.
+        raise _error(
+            source,
+            f"{location} sets {', '.join(sorted(connection))}, which the "
+            f"{engine_id!r} adapter cannot honor",
+            provider=instance_id,
+            hint=(
+                "this adapter delegates transport to a vendor SDK it does not configure; "
+                "use the process environment (HTTPS_PROXY, SSL_CERT_FILE) instead"
+            ),
+        )
 
     return ProviderSettings.of(
         engine_id,
@@ -919,6 +938,15 @@ def _parse_observers(value: Any, source: str) -> tuple[ObserverSpec, ...]:
     Each entry is ``{"name": ..., "options": {...}}``, or a bare string when a sink needs
     no options. Names are checked against the built-ins and the entry-point group here,
     so a typo fails at load rather than at the first event.
+
+    **Validating a non-builtin name imports the package that provides it**, because
+    `entry_points` metadata carries only the name and the target string — confirming a
+    name resolves to something real means calling `EntryPoint.load()`. Accepted rather
+    than avoided: the alternative is a name that parses cleanly and fails at
+    `build_observers`, which is the failure this validation exists to move earlier, and a
+    configuration naming a third-party sink has already decided to run that package. The
+    import happens only when a name is *not* a built-in, so the ordinary file pays
+    nothing. Recorded here as the deliberate choice it is.
     """
     if value is None:
         return ()
@@ -1175,6 +1203,58 @@ def _unknown_keys(
         f"{location} has unknown key(s): {names}",
         provider=provider,
         hint="remove misspelled keys or place adapter-specific values under 'options'",
+    )
+
+
+_BUILTIN_CREDENTIAL_SCHEMES = ("env://", "credential://")
+_SCHEME_SHAPED = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*://")
+
+
+def _check_credential_reference(
+    reference: str, source: str | Path, location: str, provider: str
+) -> None:
+    """Reject an `api_key` naming a scheme nothing installed can resolve.
+
+    Observer names are validated at load, and a credential reference deserves the same
+    treatment for a sharper reason: an unresolvable one used to be *accepted as the
+    secret itself* and put on the wire as a bearer token. `LiteralResolver` now declines
+    the whole scheme shape, so the failure is loud either way — but at load time it names
+    the config location and the missing plugin instead of surfacing later as a misleading
+    401 from the provider.
+
+    Only a scheme-shaped, non-built-in reference reaches plugin discovery, so the common
+    cases (a literal, ``env://``, ``credential://``) still parse without importing any
+    third-party code. Discovery here is the same trade the observers block already makes,
+    narrowed to the configurations that opted into it.
+    """
+    ref = reference.strip()
+    if not _SCHEME_SHAPED.match(ref) or ref.startswith(_BUILTIN_CREDENTIAL_SCHEMES):
+        return
+
+    from ..plugins import CREDENTIAL_STORE_GROUP, load_credential_stores
+
+    discovered, issues = load_credential_stores()
+    for resolver in discovered.values():
+        try:
+            if resolver.handles(ref):
+                return
+        except Exception:  # noqa: BLE001 — a resolver that cannot answer does not handle it
+            continue
+
+    scheme = ref.partition("://")[0]
+    hint = (
+        f"install a package publishing it under '{CREDENTIAL_STORE_GROUP}', "
+        "or use 'env://VAR_NAME', 'credential://system/name', or a literal value"
+    )
+    if issues:
+        skipped = "; ".join(issue.summary for issue in issues)
+        hint = f"{hint} — a credential-store plugin was skipped: {skipped}"
+    raise _error(
+        source,
+        f"{location}.api_key uses scheme {scheme + '://'!r}, which no credential "
+        "resolver handles",
+        provider=provider,
+        hint=hint,
     )
 
 

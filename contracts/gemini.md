@@ -73,9 +73,10 @@ native protocol is used instead.
   caller's canonical schema.
 
 ### Reasoning
-- `generationConfig.thinkingConfig.thinkingLevel` ∈ `minimal|low|medium|high`; the four
-  normalized effort levels map straight across. Models that cannot disable thinking
-  clamp server-side.
+- `generationConfig.thinkingConfig.thinkingLevel` ∈ `minimal|low|medium|high`; those four
+  normalized effort levels map straight across. Normalized `none` has no `thinkingLevel`
+  spelling and is sent as `thinkingConfig.thinkingBudget: 0` instead. Models that cannot
+  disable thinking clamp server-side.
 - Thoughts arrive as parts flagged `thought: true` → `ReasoningDelta`, excluded from the
   answer text. Parts may carry `thoughtSignature`, which callers should echo back
   verbatim in multi-turn conversations.

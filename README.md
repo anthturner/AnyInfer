@@ -205,9 +205,10 @@ See the [complete provider list](https://anyinfer.dev/providers/all/),
 the [provider guides](https://anyinfer.dev/providers/) and the
 [conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
 
-Embeddings and/or reranking are live today on OpenAI, Azure AI Foundry, Google Vertex AI,
-AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio, and four
-OpenAI-compatible presets (Together AI, Fireworks AI, DeepInfra, Mistral) — see
+Embeddings and/or reranking are live today on OpenAI, Google Gemini, Azure AI Foundry,
+Google Vertex AI, AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio,
+llama.cpp (against an embeddings-mode server), and four OpenAI-compatible presets
+(Together AI, Fireworks AI, DeepInfra, Mistral) — see
 [Embeddings and reranking](https://anyinfer.dev/concepts/embeddings/) and the
 [semantic-search example](https://anyinfer.dev/examples/semantic-search/).
 

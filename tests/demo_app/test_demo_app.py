@@ -100,6 +100,32 @@ class TestConfig:
         # The in-memory config is untouched: the session keeps working.
         assert config.for_provider("openai").api_key == "sk-a-real-looking-secret"
 
+    def test_an_unregistered_provider_drops_every_literal(self, tmp_path):
+        """When field kinds are unknowable the stripper must fail safe, not fail open.
+
+        A stale entry for a provider plugin that was uninstalled or failed to import has
+        no descriptor, so nothing can say which of its fields are secret. Keeping them all
+        would break the guarantee in exactly the case where nothing else is watching.
+        """
+        path = tmp_path / "demo.json"
+        config = default_config().with_provider(
+            ProviderConfig(
+                "a-provider-that-is-not-installed",
+                enabled=True,
+                values={
+                    "api_key": "sk-a-real-looking-secret",
+                    "token": "another-literal",
+                    "base_url": "env://SOME_URL",
+                },
+            )
+        )
+        config.save(path)
+
+        written = path.read_text(encoding="utf-8")
+        assert "sk-a-real-looking-secret" not in written
+        assert "another-literal" not in written
+        assert "env://SOME_URL" in written, "references stay: they are not key material"
+
     def test_a_credential_reference_still_persists(self, tmp_path):
         """References are safe in a file and are the whole point of the scheme."""
         path = tmp_path / "demo.json"

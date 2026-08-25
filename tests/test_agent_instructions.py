@@ -269,3 +269,40 @@ def test_design_section_18_layout_matches_the_tree() -> None:
         f"DESIGN.md §18 lists modules that do not exist: {phantom}. "
         "Remove them from the layout block."
     )
+
+
+def test_design_section_18_places_each_module_in_the_right_package() -> None:
+    """Filenames matching is not enough — §18's claim is about *where* each module lives.
+
+    The block is laid out per package, so an agent reads it for placement, not inventory.
+    Comparing bare filenames let a module move between packages while §18 kept pointing at
+    its old home and the test stayed green; that is the same silent doc drift §18's
+    enumeration exists to prevent, one level down.
+    """
+    design = _read("DESIGN.md")
+    start = design.index("## 18. Package layout")
+    fence = design.index("```\nsrc/anyinfer/", start)
+    block = design[fence : design.index("\n```", fence)]
+
+    misplaced: list[str] = []
+    package = ROOT / "src" / "anyinfer"
+    for path in sorted(package.rglob("*.py")):
+        if "__pycache__" in path.parts or path.name == "__init__.py":
+            continue
+        relative = path.relative_to(package)
+        if not relative.parent.parts:
+            continue  # root modules are listed bare, with no package line to match
+        # The owning package is named once as a `name/` heading; the module must appear
+        # somewhere at or after it, before the next package heading.
+        owner = f"{relative.parts[0]}/"
+        if owner not in block:
+            misplaced.append(f"{relative.as_posix()} (no '{owner}' entry in §18)")
+            continue
+        section = block[block.index(owner) :]
+        if relative.name not in section:
+            misplaced.append(f"{relative.as_posix()} (listed outside '{owner}')")
+
+    assert not misplaced, (
+        "DESIGN.md §18 places these modules somewhere other than where they ship: "
+        f"{misplaced}"
+    )

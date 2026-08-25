@@ -448,12 +448,22 @@ def _sse(payload: Mapping[str, Any]) -> bytes:
 
 
 def _check_auth(request: Any, auth_token: str | None, starlette: Any) -> Any:
-    """Verify the bearer token, if one is configured."""
+    """Verify the bearer token, if one is configured.
+
+    Both sides are encoded to bytes before comparison: `compare_digest` raises
+    `TypeError` on a str holding any character above U+007F, and Starlette decodes
+    header values as latin-1, so a single byte >= 0x80 in the Authorization value would
+    turn this 401 into an unhandled 500 mintable by any unauthenticated client.
+    Encoding is a bijection on str, so equality is preserved exactly.
+    """
     if auth_token is None:
         return None
     header = request.headers.get("authorization", "")
     presented = header[7:] if header.lower().startswith("bearer ") else ""
-    if not secrets.compare_digest(presented, auth_token):
+    if not secrets.compare_digest(
+        presented.encode("utf-8", "surrogateescape"),
+        auth_token.encode("utf-8", "surrogateescape"),
+    ):
         return _error(starlette, 401, "invalid or missing bearer token", "invalid_api_key")
     return None
 
@@ -505,7 +515,12 @@ def _with_body_limit(app: Any, limit: int) -> Any:
         while more:
             message = await receive()
             if message["type"] == "http.disconnect":
-                await app(scope, _replay(chunks), send)
+                # Forward the disconnect rather than the partial body. Replaying what
+                # arrived so far with ``more_body: False`` would present a truncation as a
+                # complete request: truncated JSON almost always 400s, but a truncation
+                # landing on a JSON boundary would be dispatched for real -- spending
+                # budget and emitting telemetry for a response that goes nowhere.
+                await app(scope, _disconnected(), send)
                 return
             chunks.append(message.get("body", b""))
             total += len(chunks[-1])
@@ -517,6 +532,15 @@ def _with_body_limit(app: Any, limit: int) -> Any:
         await app(scope, _replay(chunks), send)
 
     return limited
+
+
+def _disconnected() -> Any:
+    """A receive channel reporting only that the client went away."""
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.disconnect"}
+
+    return receive
 
 
 def _replay(chunks: list[bytes]) -> Any:

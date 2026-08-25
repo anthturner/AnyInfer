@@ -71,9 +71,22 @@ def test_env_resolver_only_handles_its_scheme() -> None:
     assert EnvResolver().handles("credential://system/x") is False
 
 
-def test_unknown_scheme_is_treated_as_a_literal() -> None:
-    """Only recognized schemes are special; anything else is the secret itself."""
-    assert default_resolver().resolve("weird://thing") == "weird://thing"
+def test_an_unresolvable_scheme_fails_loudly_instead_of_becoming_the_secret() -> None:
+    """The whole scheme *shape* is declined, not just the schemes this build knows.
+
+    The `anyinfer.credential_stores` group makes the valid scheme set open-ended, so
+    `vault://prod/openai` is legitimate when its plugin is installed. If it is missing or
+    failed to import, the reference must not fall through to `LiteralResolver` and be
+    accepted as the secret — that would put an internal vault path on the wire as a bearer
+    token, which is exactly what the literal resolver exists to prevent.
+    """
+    with pytest.raises(ai.CredentialError, match="no credential resolver handles"):
+        default_resolver().resolve("vault://prod/openai")
+
+
+def test_a_bare_secret_is_still_treated_as_a_literal() -> None:
+    """Declining the scheme shape must not decline the values that carry no scheme."""
+    assert default_resolver().resolve("sk-a-literal-value") == "sk-a-literal-value"
 
 
 # ---- keyring -------------------------------------------------------------------------

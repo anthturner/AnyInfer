@@ -396,6 +396,26 @@ def test_bearer_token_is_enforced() -> None:
     )
 
 
+def test_a_non_ascii_token_is_a_401_not_a_500() -> None:
+    """`compare_digest` on str raises `TypeError` above U+007F; bytes never do.
+
+    Starlette decodes header values as latin-1, so any byte >= 0x80 in the Authorization
+    value reaches `_check_auth` as a non-ASCII str. Comparing str would raise, and an
+    unhandled exception is a 500 that an unauthenticated client can mint at will.
+    """
+    server = FakeOpenAIServer()
+    http, _ = _client(server, auth_token="secret-token-value")
+    body = {"model": "openai-compat:m", "messages": [{"role": "user", "content": "hi"}]}
+
+    response = http.post(
+        "/v1/chat/completions",
+        json=body,
+        headers={"authorization": b"Bearer t\xf8k\xe9n-\xfe"},
+    )
+    assert response.status_code == 401
+    assert server.requests == []
+
+
 def test_models_also_requires_the_token() -> None:
     server = FakeOpenAIServer()
     http, _ = _client(server, auth_token="secret-token-value")
@@ -832,6 +852,41 @@ async def test_a_chunked_body_under_the_limit_is_reassembled_for_the_app() -> No
     await app({"type": "http", "headers": []}, receive, send)
 
     assert received == b"y" * 100 + b"z" * 50
+
+
+async def test_a_mid_stream_disconnect_is_forwarded_not_replayed_as_a_whole_body() -> None:
+    """Truncation must not be presented downstream as a complete request.
+
+    Replaying the chunks that arrived before the disconnect with ``more_body: False``
+    would look identical to a client that finished sending. Truncated JSON virtually
+    always 400s, but a truncation landing exactly on a JSON boundary would be dispatched
+    for real — spending budget and emitting telemetry for a response with nowhere to go.
+    """
+    from anyinfer.serve.app import _with_body_limit
+
+    seen: list[dict] = []
+
+    async def inner(scope: object, receive: object, send: object) -> None:
+        seen.append(await receive())  # type: ignore[operator]
+
+    app = _with_body_limit(inner, 1024)
+
+    messages = [
+        {"type": "http.request", "body": b'{"model": "m"}', "more_body": True},
+        {"type": "http.disconnect"},
+    ]
+    pending = iter(messages)
+
+    async def receive() -> dict:
+        return next(pending)
+
+    async def send(message: dict) -> None:
+        pass
+
+    await app({"type": "http", "headers": []}, receive, send)
+
+    assert [m["type"] for m in seen] == ["http.disconnect"]
+    assert not any(m.get("body") for m in seen), "no partial body may be handed downstream"
 
 
 def test_the_limit_can_be_disabled() -> None:

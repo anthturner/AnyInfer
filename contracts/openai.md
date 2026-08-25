@@ -21,7 +21,7 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ### Request fields
 - `model`, `input` (message list), `instructions` (system), `stream`,
   `max_output_tokens`, `temperature`, `top_p`,
-  `reasoning: {"effort": <minimal|low|medium|high>}` (normalized effort translated here),
+  `reasoning: {"effort": <none|minimal|low|medium|high>}` (normalized effort translated here),
   `text.format` for structured output (json_schema), `tools`
 
 ### Multimodal inputs

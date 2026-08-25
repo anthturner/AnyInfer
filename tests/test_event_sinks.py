@@ -54,6 +54,18 @@ def test_a_registered_secret_is_redacted_even_nested() -> None:
         registry.clear()
 
 
+def test_a_secret_in_a_mapping_key_is_redacted_too() -> None:
+    """A key is caller-supplied as often as a value, and nothing else on this path checks it."""
+    registry.clear()
+    try:
+        register_secret("sk-a-very-secret-value")
+        payload = event_to_dict(_started(metadata={"sk-a-very-secret-value": "whose"}))
+        assert "sk-a-very-secret-value" not in json.dumps(payload)
+        assert payload["metadata"] == {REDACTED: "whose"}
+    finally:
+        registry.clear()
+
+
 # ---- JsonlObserver -------------------------------------------------------------------
 
 
@@ -85,6 +97,18 @@ def test_the_jsonl_file_is_not_readable_by_other_local_users(tmp_path: Path) -> 
     path = tmp_path / "telemetry.jsonl"
     with ai.JsonlObserver(path):
         pass
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_jsonl_observer_tightens_an_existing_wider_mode_file(tmp_path: Path) -> None:
+    """`os.open`'s mode argument applies only on creation; an existing file keeps its own."""
+    path = tmp_path / "telemetry.jsonl"
+    path.write_text("")
+    path.chmod(0o644)
+
+    with ai.JsonlObserver(path):
+        pass
+
     assert path.stat().st_mode & 0o777 == 0o600
 
 
@@ -135,6 +159,27 @@ def test_logging_observer_accepts_a_caller_supplied_logger(
     with caplog.at_level(logging.INFO, logger="my.app.telemetry"):
         observer.on_event(_started())
     assert [r.name for r in caplog.records] == ["my.app.telemetry"]
+
+
+def test_logging_observer_accepts_a_level_name(caplog: pytest.LogCaptureFixture) -> None:
+    """A config file can only carry scalars, so ``"DEBUG"`` has to mean `logging.DEBUG`."""
+    observer = ai.LoggingObserver(level="debug")
+    with caplog.at_level(logging.DEBUG, logger="anyinfer.telemetry"):
+        observer.on_event(_started())
+    assert [r.levelno for r in caplog.records] == [logging.DEBUG]
+
+
+def test_logging_observer_accepts_a_logger_name(caplog: pytest.LogCaptureFixture) -> None:
+    observer = ai.LoggingObserver("my.app.telemetry")
+    with caplog.at_level(logging.INFO, logger="my.app.telemetry"):
+        observer.on_event(_started())
+    assert [r.name for r in caplog.records] == ["my.app.telemetry"]
+
+
+def test_an_unknown_level_name_is_rejected_at_construction() -> None:
+    """The alternative is `isEnabledFor` raising on every event and logging nothing."""
+    with pytest.raises(ValueError, match="unknown logging level"):
+        ai.LoggingObserver(level="LOUD")
 
 
 # ---- end to end ----------------------------------------------------------------------

@@ -42,20 +42,36 @@ def _authenticate(request: Request, tokens: Mapping[str, str]) -> str | None:
     looked up in a dict: a dict lookup's timing varies with how much of the token
     matched, which leaks a prefix to a client that can measure it. The scan is over a
     handful of tenants, so the cost is irrelevant next to the property.
+
+    Both sides are encoded to bytes before comparison. `compare_digest` raises
+    `TypeError` on a str holding any character above U+007F, and Starlette decodes
+    header values as latin-1 -- so a single byte >= 0x80 in the Authorization value
+    would turn a clean 401 into an unhandled 500 that any unauthenticated client could
+    mint. Encoding is a bijection on str, so equality is preserved exactly.
     """
     header = request.headers.get("authorization", "")
     scheme, _, presented = header.partition(" ")
     if scheme.lower() != "bearer" or not presented:
         return None
 
+    presented_bytes = presented.encode("utf-8", "surrogateescape")
     matched: str | None = None
     for token, tenant_id in tokens.items():
-        if secrets.compare_digest(token, presented):
+        if secrets.compare_digest(token.encode("utf-8", "surrogateescape"), presented_bytes):
             matched = tenant_id
     return matched
 
 
-def build_app(relay: Relay, *, tokens: Mapping[str, str]) -> Starlette:
+DEFAULT_MAX_REQUEST_BYTES = 256 * 1024
+"""Cap on a relay request body. Slot-fill requests are tiny; this is generous for them."""
+
+
+def build_app(
+    relay: Relay,
+    *,
+    tokens: Mapping[str, str],
+    max_request_bytes: int = DEFAULT_MAX_REQUEST_BYTES,
+) -> Any:
     """Build a Starlette app exposing `relay` at ``POST /v1/relay/assemble``.
 
     A vendor's own script constructs the bound `Relay` (its `TemplateVault` and
@@ -66,6 +82,13 @@ def build_app(relay: Relay, *, tokens: Mapping[str, str]) -> Starlette:
 
     Args:
         relay: The bound `Relay` to serve.
+        max_request_bytes: Refuse a request body larger than this with 413. Enforced
+            while reading rather than from ``content-length``, which is absent on a
+            chunked request and forgeable on any other. Pass ``0`` to disable. The
+            default is deliberately small: this endpoint takes a routing key and a slot
+            mapping, so a body approaching it is already anomalous. Exposure is post-auth
+            only, but one misbehaving tenant must not be able to exhaust the process that
+            is assembling other tenants' prompts.
         tokens: Maps bearer token to the `tenant_id` it authenticates. Required, and
             required non-empty: an empty mapping would serve decrypted prompt IP to
             anyone who can reach the port. Issue one long, random token per tenant
@@ -146,4 +169,11 @@ def build_app(relay: Relay, *, tokens: Mapping[str, str]) -> Starlette:
             }
         )
 
-    return Starlette(routes=[StarletteRoute("/v1/relay/assemble", handle, methods=["POST"])])
+    app = Starlette(routes=[StarletteRoute("/v1/relay/assemble", handle, methods=["POST"])])
+    if max_request_bytes > 0:
+        # Shared with the sidecar rather than reimplemented: it is dependency-free ASGI,
+        # and a second copy would be a second place to fix the next edge case found in it.
+        from anyinfer.serve.app import _with_body_limit
+
+        return _with_body_limit(app, max_request_bytes)
+    return app

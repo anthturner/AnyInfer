@@ -36,7 +36,7 @@ OpenAPI schema (`20260723-111246028`). No credentialed inference request was mad
 ### Request fields
 
 - Shared chat-completions fields from `contracts/openai-compat.md`.
-- `reasoning_effort` receives the normalized `minimal`, `low`, `medium`, or `high` value
+- `reasoning_effort` receives the normalized `none`, `minimal`, `low`, `medium`, or `high` value
   unchanged. The upstream schema also accepts `none`, `xhigh`, and `max`; callers can send
   those through `provider_options`.
 - Structured output uses `response_format`; tool calling uses `tools` and `tool_choice`.

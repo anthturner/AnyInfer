@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 import anyinfer as ai
-from anyinfer import compare_diff
 from anyinfer.errors import ConfigError
+from anyinfer.evaluate import compare_diff
 from anyinfer.providers.openai_compat import OpenAICompatAdapter
 from anyinfer.registry import ProviderDescriptor, ProviderRegistry
 

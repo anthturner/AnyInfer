@@ -127,6 +127,78 @@ def test_a_credential_store_that_raises_while_constructing_is_recorded(
     assert "vault unreachable" in issues[0].detail
 
 
+def test_a_plugin_claiming_a_builtin_scheme_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Discovered resolvers go ahead of the built-ins, so shadowing must be impossible.
+
+    Any installed distribution would otherwise transparently interpose on ``env://`` and
+    ``credential://`` resolution for every credential in the process. The
+    `anyinfer.providers` group has refused id and alias collisions since it shipped; this
+    is the same rule for the same reason.
+    """
+
+    class _Greedy:
+        def handles(self, reference: str) -> bool:
+            return True
+
+        def resolve(self, reference: str) -> str:
+            return "interposed"
+
+    _patch_points(monkeypatch, CREDENTIAL_STORE_GROUP, [_FakePoint("greedy", _Greedy)])
+    resolvers, issues = load_credential_stores()
+
+    assert resolvers == {}
+    assert issues[0].reason == "scheme-reserved"
+    assert "env://" in issues[0].detail
+
+
+def test_a_plugin_whose_probe_raises_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A resolver that cannot say whether it handles `env://` does not go ahead of one that does."""
+
+    class _Unanswerable:
+        def handles(self, reference: str) -> bool:
+            raise RuntimeError("vault unreachable")
+
+        def resolve(self, reference: str) -> str:
+            return "never"
+
+    _patch_points(monkeypatch, CREDENTIAL_STORE_GROUP, [_FakePoint("flaky", _Unanswerable)])
+    resolvers, issues = load_credential_stores()
+
+    assert resolvers == {}
+    assert issues[0].reason == "scheme-reserved"
+
+
+def test_a_plugin_adding_its_own_scheme_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The guard bounds redefinition, not extension — the whole point of the group."""
+    _patch_points(monkeypatch, CREDENTIAL_STORE_GROUP, [_FakePoint("vault", _GoodResolver)])
+    resolvers, issues = load_credential_stores()
+
+    assert issues == []
+    assert set(resolvers) == {"vault"}
+
+
+def test_a_skipped_plugin_is_warned_and_kept_on_the_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A silently skipped resolver is indistinguishable from a mistyped scheme."""
+    from anyinfer.credentials.resolver import default_resolver
+
+    _patch_points(
+        monkeypatch, CREDENTIAL_STORE_GROUP, [_FakePoint("vault", None, raises=True)]
+    )
+    with pytest.warns(RuntimeWarning, match="credential-store plugin skipped"):
+        chain = default_resolver()
+
+    assert [i.entry_point for i in chain.plugin_issues()] == ["vault"]
+
+    # ...and the record reaches the error a user actually sees.
+    with pytest.raises(Exception, match="vault") as excinfo:
+        chain.resolve("vault://prod/openai")
+    assert "import-failed" in str(excinfo.value)
+
+
 def test_the_default_resolver_chain_still_works_with_no_plugins() -> None:
     """The ordinary path pays nothing for the plugin hook."""
     import os

@@ -103,7 +103,7 @@ changes require the generated reference and runnable examples.
 - Secrets: anything credential-shaped goes through `anyinfer.credentials` and is registered
   for redaction. Never log, print, or embed secrets in errors, events, or fixtures.
 - Local servers bind `127.0.0.1` only unless `allow_remote_exposure=True`.
-- Layout: `src/anyinfer/` per DESIGN.md §18. Tests are flat `tests/test_<area>.py` modules — an area is often a group of related adapters, so bedrock's tests live in `test_bedrock_vertex.py` — plus mirrored subpackages for `context/`, `anyinfer_demo/`, `mcp/`, and `testing/`. Grep for the symbol rather than guessing a path from the module name.
+- Layout: `src/anyinfer/` per DESIGN.md §18. Tests are flat `tests/test_<area>.py` modules — an area is often a group of related adapters, so bedrock's tests live in `test_bedrock_vertex.py` — plus mirrored subpackages for `context/`, `demo_app/`, `mcp/`, and `testing/`. Grep for the symbol rather than guessing a path from the module name.
 
 ## Testing and documentation obligations
 

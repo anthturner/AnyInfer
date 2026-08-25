@@ -81,6 +81,9 @@ class VertexAdapter(GeminiAdapter):
             explicit_token=config.api_key,
             options=options,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
         base_url = config.base_url or _default_base_url(self._location)
@@ -94,6 +97,9 @@ class VertexAdapter(GeminiAdapter):
                 options=config.options,
                 timeout_s=config.timeout_s,
                 transport=config.transport,
+                proxy=config.proxy,
+                verify=config.verify,
+                client_cert=config.client_cert,
                 events=config.events,
             )
         )

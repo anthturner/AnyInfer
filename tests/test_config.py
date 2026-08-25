@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import ssl
+import warnings
 from pathlib import Path
 
+import httpx2
 import pytest
 
 import anyinfer as ai
 from anyinfer.config import build_observers
+from support import self_signed_cert
 
 
 def test_loads_config_builds_provider_instances_and_route() -> None:
@@ -479,6 +483,39 @@ def test_a_misspelled_repair_key_fails_loudly() -> None:
         )
 
 
+# ---- credential references -----------------------------------------------------------
+
+
+def test_an_api_key_scheme_nothing_can_resolve_fails_at_load() -> None:
+    """Named at the config location, not later as a misleading 401 from the provider."""
+    with pytest.raises(ai.ConfigError, match="which no credential resolver handles") as excinfo:
+        ai.loads_config(
+            json.dumps(
+                {
+                    "format_version": 1,
+                    "providers": [{"id": "openai", "api_key": "vault://prod/openai"}],
+                }
+            )
+        )
+
+    assert excinfo.value.hint is not None
+    assert "anyinfer.credential_stores" in excinfo.value.hint
+
+
+def test_the_builtin_schemes_and_literals_load_without_plugin_discovery() -> None:
+    """The common cases must not pay for the extension point by importing third-party code."""
+    for reference in ("env://OPENAI_API_KEY", "credential://system/openai", "sk-a-literal"):
+        config = ai.loads_config(
+            json.dumps(
+                {
+                    "format_version": 1,
+                    "providers": [{"id": "openai", "api_key": reference}],
+                }
+            )
+        )
+        assert config.providers[0].api_key == reference
+
+
 # ---- observers -----------------------------------------------------------------------
 
 
@@ -517,6 +554,47 @@ def test_build_observers_constructs_them(tmp_path: Path) -> None:
         assert target.exists()
     finally:
         built[0].close()
+
+
+def test_logging_observer_options_accept_the_string_forms_a_config_file_can_carry() -> None:
+    """TOML and JSON carry scalars, so a level and a logger have to be expressible as names."""
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "format_version": 1,
+                "providers": [],
+                "observers": [
+                    {
+                        "name": "logging",
+                        "options": {"level": "WARNING", "logger": "my.app.telemetry"},
+                    }
+                ],
+            }
+        )
+    )
+
+    built = build_observers(config.observers)
+    assert [type(o).__name__ for o in built] == ["LoggingObserver"]
+
+
+def test_a_bad_logging_level_fails_at_load_not_at_the_first_event() -> None:
+    """A bad level must not survive load.
+
+    Otherwise `isEnabledFor` raises per event, the dispatcher suppresses it after one
+    warning, and the operator gets a silently empty access log.
+    """
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "format_version": 1,
+                "providers": [],
+                "observers": [{"name": "logging", "options": {"level": "LOUD"}}],
+            }
+        )
+    )
+
+    with pytest.raises(ai.ConfigError, match="could not be built"):
+        build_observers(config.observers)
 
 
 def test_observer_block_round_trips(tmp_path: Path) -> None:
@@ -634,3 +712,142 @@ def test_connection_settings_default_to_unset() -> None:
     config = ai.loads_config(json.dumps({"format_version": 1, "providers": [{"id": "openai"}]}))
     settings = config.providers[0]
     assert (settings.proxy, settings.verify, settings.client_cert) == (None, None, None)
+
+
+def test_connection_settings_reach_the_built_http_client() -> None:
+    """The one seam a regression slips through: config→settings was pinned, settings→httpx was not.
+
+    Everything above asserts the settings object carries the values. Nothing asserted the
+    adapter's client is actually built with them, which is where a silently unused CA
+    bundle would live.
+    """
+    from anyinfer.providers.http import build_client
+
+    # A configured proxy makes httpx route through a mounted proxy transport rather than
+    # its default one, so the mount table is the observable proof the value arrived.
+    client = build_client(base_url="https://example.invalid", proxy="http://corp-proxy:3128")
+    assert client._mounts, "a configured proxy must produce a proxy-mounted transport"
+
+    # `verify=False` reaches the SSL context, which is inspectable without the deprecated
+    # string-path form.
+    unverified = build_client(base_url="https://example.invalid", verify=False)
+    assert unverified._transport._pool._ssl_context.verify_mode == ssl.CERT_NONE
+
+    verified = build_client(base_url="https://example.invalid")
+    assert verified._transport._pool._ssl_context.verify_mode == ssl.CERT_REQUIRED
+
+
+def test_a_supplied_transport_takes_over_from_the_connection_settings() -> None:
+    """A supplied transport wins over the connection settings.
+
+    A caller bringing its own transport owns connection handling; this is what the
+    offline fake-server and cassette modes rely on.
+    """
+    from anyinfer.providers.http import build_client
+
+    sentinel = httpx2.AsyncHTTPTransport()
+    client = build_client(
+        base_url="https://example.invalid",
+        transport=sentinel,
+        proxy="http://corp-proxy:3128",
+        verify=False,
+    )
+
+    assert client._transport is sentinel
+    assert not client._mounts
+
+
+def test_a_private_ca_and_mtls_can_be_configured_together(tmp_path: Path) -> None:
+    """The exact combination the TLS section documents, which httpx refuses as two fields.
+
+    httpx once took a CA path as `verify=<str>` and a certificate as `cert=...`; both are
+    deprecated in favour of one `ssl.SSLContext`, and passing them *together* — the
+    corporate-CA-plus-mTLS case — raises `TypeError`. Resolving them into one context is
+    what keeps the documented example working.
+    """
+    from anyinfer.providers.http import build_client
+
+    cert, key, _ = self_signed_cert(tmp_path)
+    client = build_client(
+        base_url="https://example.invalid",
+        proxy="http://corp-proxy:3128",
+        verify=str(cert),
+        client_cert=(str(cert), str(key)),
+    )
+
+    assert client._mounts, "the proxy must still be applied alongside the TLS settings"
+    context = next(iter(client._mounts.values()))._pool._ssl_context
+    assert context.verify_mode == ssl.CERT_REQUIRED
+
+
+@pytest.mark.parametrize("combined", [False, True])
+def test_a_client_certificate_works_with_the_default_trust_store(
+    tmp_path: Path, combined: bool
+) -> None:
+    """MTLS without a private CA must not lose the system trust store."""
+    from anyinfer.providers.http import build_client
+
+    cert, key, both = self_signed_cert(tmp_path)
+    client_cert: object = str(both) if combined else (str(cert), str(key))
+    client = build_client(base_url="https://example.invalid", client_cert=client_cert)  # type: ignore[arg-type]
+
+    assert client._transport._pool._ssl_context.verify_mode == ssl.CERT_REQUIRED
+
+
+def test_tls_settings_raise_no_deprecation_warning(tmp_path: Path) -> None:
+    """Pins the reason this indirection exists, so a revert is caught rather than debated."""
+    from anyinfer.providers.http import build_client
+
+    cert, key, _ = self_signed_cert(tmp_path)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        build_client(
+            base_url="https://example.invalid",
+            verify=str(cert),
+            client_cert=(str(cert), str(key)),
+        )
+
+
+def test_an_unreadable_ca_bundle_names_the_setting() -> None:
+    """`ssl` raises a bare FileNotFoundError naming no setting and offering no next step."""
+    from anyinfer.providers.http import build_client
+
+    with pytest.raises(ai.ConfigError, match="cannot load the CA bundle") as excinfo:
+        build_client(base_url="https://example.invalid", verify="/no/such/ca-bundle.pem")
+
+    assert excinfo.value.hint is not None
+    assert "CA bundle" in excinfo.value.hint
+
+
+def test_an_unreadable_client_certificate_names_the_setting() -> None:
+    from anyinfer.providers.http import build_client
+
+    with pytest.raises(ai.ConfigError, match="cannot load the client certificate"):
+        build_client(base_url="https://example.invalid", client_cert="/no/such/cert.pem")
+
+
+def test_settings_an_adapter_cannot_honor_are_refused_at_load() -> None:
+    """Copilot delegates transport to its SDK, so these keys would silently do nothing.
+
+    Accepted-and-ignored is the worse failure: the operator believes their corporate CA is
+    in effect. This matches the parser's existing rule for a redundant `verify: true`.
+    """
+    with pytest.raises(ai.ConfigError, match="cannot honor") as excinfo:
+        ai.loads_config(
+            json.dumps(
+                {
+                    "format_version": 1,
+                    "providers": [{"id": "copilot", "proxy": "http://corp-proxy:3128"}],
+                }
+            )
+        )
+
+    assert excinfo.value.hint is not None
+    assert "HTTPS_PROXY" in excinfo.value.hint
+
+
+def test_an_adapter_that_cannot_honor_them_still_loads_without_them() -> None:
+    config = ai.loads_config(
+        json.dumps({"format_version": 1, "providers": [{"id": "copilot"}]})
+    )
+    assert config.providers[0].provider_id == "copilot"

@@ -48,6 +48,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job here only reads the repository: the suite, the gates, and the docs build.
+# Nothing publishes, comments, or pushes, so the workflow token needs no write scope --
+# stated explicitly rather than inherited from the repository default, matching the
+# other five workflows. A job that ever needs more elevates itself.
+permissions:
+  contents: read
+
 env:
   PYTHONUNBUFFERED: "1"
   # Detection probes must never touch a CI runner's cache directory: a cached profile

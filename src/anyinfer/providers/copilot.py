@@ -430,6 +430,9 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=None,
     requires_base_url=False,
+    # The SDK owns its own HTTP stack; this adapter never builds an httpx client, so a
+    # proxy or CA bundle set here would be accepted and then quietly do nothing.
+    honors_connection_settings=False,
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

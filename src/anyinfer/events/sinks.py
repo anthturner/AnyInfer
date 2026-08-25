@@ -60,7 +60,10 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, Path):
         return redact(str(value))
     if isinstance(value, dict):
-        return {str(k): _json_safe(v) for k, v in value.items()}
+        # Keys are redacted too. A mapping keyed by anything caller-supplied -- provider
+        # options, HTTP headers, a `values` block -- can carry a secret in the key just as
+        # easily as in the value, and a key is the half nothing else on this path checks.
+        return {redact(str(k)): _json_safe(v) for k, v in value.items()}
     if isinstance(value, list | tuple | set | frozenset):
         return [_json_safe(v) for v in value]
     return redact(str(value))
@@ -78,6 +81,25 @@ def event_to_dict(event: TelemetryEvent) -> dict[str, Any]:
     return payload
 
 
+def _resolve_level(level: int | str) -> int:
+    """Resolve a logging level given as an int or a level name.
+
+    `logging.getLevelName` is the stdlib's only name-to-number lookup and it answers an
+    unknown name with the string ``"Level <name>"`` rather than raising, so the result is
+    type-checked instead of trusted. Custom levels registered with
+    `logging.addLevelName` resolve too, since the lookup is the live table.
+    """
+    if isinstance(level, int):
+        return level
+    resolved = logging.getLevelName(level.strip().upper())
+    if not isinstance(resolved, int):
+        raise ValueError(
+            f"unknown logging level {level!r}; expected an int or one of "
+            "CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET"
+        )
+    return resolved
+
+
 class LoggingObserver:
     """Emit each event as a structured record on a stdlib `logging.Logger`.
 
@@ -85,11 +107,25 @@ class LoggingObserver:
     record attribute, so a JSON log formatter can render it while a plain formatter still
     prints something readable.
 
+    Both arguments accept the string forms a configuration file can express, because
+    `observers` blocks in `anyinfer.toml` reach this constructor through
+    `build_observers` and can only carry JSON/TOML scalars. A bad level is rejected here,
+    at construction, so `build_observers`' promise that a typo fails at load rather than
+    at the first event holds for the option values as well as the observer name — an
+    unresolvable level would otherwise raise inside `isEnabledFor` on every single event,
+    which the dispatcher suppresses after one warning, leaving a silently empty log.
+
     Args:
-        logger: Where to log. Defaults to a logger named `DEFAULT_LOGGER_NAME`.
-        level: Level to log every event at. One level for all of them on purpose —
-            severity is the *application's* judgement, and a library that logs some events
-            at ``WARNING`` decides that for you.
+        logger: Where to log, as a `Logger` or a logger name to resolve. Defaults to a
+            logger named `DEFAULT_LOGGER_NAME`.
+        level: Level to log every event at, as an int or a level name such as ``"INFO"``
+            (case-insensitive). One level for all of them on purpose — severity is the
+            *application's* judgement, and a library that logs some events at ``WARNING``
+            decides that for you.
+
+    Raises:
+        ValueError: If `level` is a string that names no known logging level.
+            `build_observers` maps this to `ConfigError` for the config path.
 
     Example:
         >>> import logging
@@ -98,9 +134,18 @@ class LoggingObserver:
         >>> client.subscribe(observer)  # doctest: +SKIP
     """
 
-    def __init__(self, logger: logging.Logger | None = None, *, level: int = logging.INFO):
-        self._logger = logger or logging.getLogger(DEFAULT_LOGGER_NAME)
-        self._level = level
+    def __init__(
+        self,
+        logger: logging.Logger | str | None = None,
+        *,
+        level: int | str = logging.INFO,
+    ):
+        self._logger = (
+            logging.getLogger(logger)
+            if isinstance(logger, str)
+            else logger or logging.getLogger(DEFAULT_LOGGER_NAME)
+        )
+        self._level = _resolve_level(level)
 
     def on_event(self, event: TelemetryEvent) -> None:
         """Log one event. Never raises."""
@@ -144,10 +189,17 @@ class JsonlObserver:
         # and the confidential CLI's key material use.
         descriptor = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         self._handle = os.fdopen(descriptor, "a", encoding="utf-8")
+        # The mode argument above applies only when `open` creates the file. Appending to
+        # a file that already exists at 0644 would inherit that mode silently, so it is
+        # re-applied unconditionally -- the same follow-up the demo config writer does.
+        self._path.chmod(0o600)
 
     def on_event(self, event: TelemetryEvent) -> None:
         """Append one event. Never raises for a serialization problem."""
-        line = json.dumps(event_to_dict(event), separators=(",", ":"), default=str)
+        # No `default=` fallback: `_json_safe` already has a redacting catch-all for
+        # every unrecognized leaf, so a `default=str` here could only ever fire on a value
+        # that escaped redaction -- writing the one thing this sink must not write.
+        line = json.dumps(event_to_dict(event), separators=(",", ":"))
         with self._lock:
             if self._handle.closed:
                 return

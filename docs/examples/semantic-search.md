@@ -88,7 +88,8 @@ if query_embedded.space.compatible_with(stored_space):
 `target=`/`route=` is passed; it is the same mechanism `default_route` gives generation, kept
 separate so an embedding fallback chain is never accidentally reused for chat traffic.
 Local engines are first-class fallback members: [TEI](../providers/tei.md),
-[Ollama](../providers/ollama.md), and [LM Studio](../providers/lm-studio.md) all embed,
+[Ollama](../providers/ollama.md), [LM Studio](../providers/lm-studio.md), and
+[llama.cpp](../providers/llama-cpp.md) against an embeddings-mode server all embed,
 so a chain like `[local-tei:bge-large, openai:text-embedding-3-small]` tries the free
 local model first and only spends money if it is unreachable.
 

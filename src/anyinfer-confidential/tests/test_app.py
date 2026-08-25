@@ -84,6 +84,22 @@ def test_a_bad_token_gets_nothing() -> None:
     assert "assembled_prompt" not in response.text
 
 
+def test_a_non_ascii_token_is_a_401_not_a_500() -> None:
+    """`compare_digest` on str raises `TypeError` above U+007F; bytes never do.
+
+    Starlette decodes header values as latin-1, so any byte >= 0x80 in the Authorization
+    value reaches `_authenticate` as a non-ASCII str. Comparing str would raise, and an
+    unhandled exception is a 500 that an unauthenticated client can mint at will.
+    """
+    response = _client().post(
+        "/v1/relay/assemble",
+        headers={"Authorization": b"Bearer t\xf8k\xe9n-\xfe"},
+        json={"routing_key": "summarize"},
+    )
+    assert response.status_code == 401
+    assert "assembled_prompt" not in response.text
+
+
 def test_an_authenticated_request_assembles_for_its_own_tenant() -> None:
     response = _client().post(
         "/v1/relay/assemble",
@@ -139,6 +155,31 @@ def test_forward_mode_is_refused_with_an_explanation_not_a_404() -> None:
     )
     assert response.status_code == 400
     assert "assembles only" in response.json()["error"]
+
+
+def test_an_oversized_body_is_refused_with_413() -> None:
+    """Post-auth exposure only, but one tenant must not exhaust the process for the rest."""
+    tokens = {ACME_TOKEN: "acme", OTHER_TOKEN: "other"}
+    client = TestClient(build_app(_relay(), tokens=tokens, max_request_bytes=1024))
+
+    response = client.post(
+        "/v1/relay/assemble",
+        headers={"Authorization": f"Bearer {ACME_TOKEN}"},
+        json={"routing_key": "summarize", "slots": {"audience": "x" * 4096}},
+    )
+    assert response.status_code == 413
+
+
+def test_the_body_cap_can_be_disabled() -> None:
+    tokens = {ACME_TOKEN: "acme", OTHER_TOKEN: "other"}
+    client = TestClient(build_app(_relay(), tokens=tokens, max_request_bytes=0))
+
+    response = client.post(
+        "/v1/relay/assemble",
+        headers={"Authorization": f"Bearer {ACME_TOKEN}"},
+        json={"routing_key": "summarize", "slots": {"audience": "x" * 4096}},
+    )
+    assert response.status_code == 200
 
 
 def test_a_malformed_body_is_a_400() -> None:

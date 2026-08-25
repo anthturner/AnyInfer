@@ -24,7 +24,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, cast
 
 from .._context_wire import decode_context_request, encode_context_request
-from ..arena import arena_to_dict
+from ..evaluate.arena import arena_to_dict
 from ..types.events import StreamEvent, TextDelta, ToolCallDelta
 from ..types.messages import (
     AudioPart,
@@ -382,18 +382,24 @@ def _decode_reasoning_effort(raw: Any) -> ReasoningEffort | None:
     for sidecar callers too — an Anthropic thinking budget, a Gemini thinking config.
     Passing it through verbatim silently did nothing for every non-OpenAI dialect.
 
+    ``none`` is accepted alongside the four effort levels because OpenAI's own vocabulary
+    accepts it on current models: a stock client that worked against this gateway by
+    passthrough must not start getting a 400 for speaking the dialect the gateway claims
+    to project. It decodes to a request for reasoning *off*, which each descriptor spells
+    in its provider's own terms.
+
     Raises:
-        ValueError: The value is not one of the four normalized levels. Refused rather
-            than dropped: now that the field is reserved, silently ignoring an
-            unrecognized value would tell the caller nothing while quietly changing
-            what the model was asked to do.
+        ValueError: The value is not one of the normalized levels. Refused rather than
+            dropped: now that the field is reserved, silently ignoring an unrecognized
+            value would tell the caller nothing while quietly changing what the model was
+            asked to do.
     """
     if raw is None:
         return None
-    if raw in ("minimal", "low", "medium", "high"):
+    if raw in ("none", "minimal", "low", "medium", "high"):
         return cast("ReasoningEffort", raw)
     raise ValueError(
-        f"reasoning_effort must be one of minimal, low, medium, high (got {raw!r})"
+        f"reasoning_effort must be one of none, minimal, low, medium, high (got {raw!r})"
     )
 
 
@@ -694,6 +700,14 @@ def request_to_openai(
             "mode": request.history.mode,
             "keep_recent": request.history.keep_recent,
             "keep_system": request.history.keep_system,
+        }
+    if request.cache is not None:
+        body[CACHE_FIELD] = {
+            "mode": request.cache.mode,
+            "min_segment_tokens": request.cache.min_segment_tokens,
+            "max_marks": request.cache.max_marks,
+            "include_tools": request.cache.include_tools,
+            "include_system": request.cache.include_system,
         }
     if request.arena is not None:
         body[ARENA_FIELD] = {

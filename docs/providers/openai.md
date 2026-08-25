@@ -47,7 +47,7 @@ result = client.generate(prompt, target="openai:gpt-5", reasoning="high")
 result.usage.reasoning_tokens
 ```
 
-Effort levels pass straight through: `minimal`, `low`, `medium`, `high`.
+Effort levels pass straight through: `none`, `minimal`, `low`, `medium`, `high`.
 
 ## Embeddings
 

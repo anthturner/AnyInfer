@@ -7,13 +7,16 @@ the router decides what to do about it.
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 import httpx2
 
 from ..errors import (
     AuthError,
+    ConfigError,
     ContextLengthError,
     ModelNotFoundError,
     Phase,
@@ -33,6 +36,7 @@ __all__ = [
     "parse_retry_after",
     "read_error_detail",
     "read_int",
+    "tls_kwargs",
 ]
 
 
@@ -96,10 +100,7 @@ def build_client(
         # `None`/`False`, and forwarding a default would override its env-var behaviour.
         if proxy is not None:
             tls["proxy"] = proxy
-        if verify is not None:
-            tls["verify"] = verify
-        if client_cert is not None:
-            tls["cert"] = client_cert
+        tls.update(tls_kwargs(verify, client_cert))
     return httpx2.AsyncClient(
         base_url=base_url or "",
         headers=dict(headers or {}),
@@ -108,6 +109,84 @@ def build_client(
         transport=transport,
         **tls,
     )
+
+
+def tls_kwargs(
+    verify: str | bool | None,
+    client_cert: str | tuple[str, str] | tuple[str, str, str] | None,
+) -> dict[str, Any]:
+    """Render this instance's TLS settings as keyword arguments for an httpx client.
+
+    httpx once took a CA-bundle path as ``verify=<str>`` and a client certificate as
+    ``cert=...``. Both spellings are now deprecated in favour of a single
+    `ssl.SSLContext` passed as ``verify``, and — the reason this is not merely tidiness —
+    **combining them raises `TypeError` outright**. That combination is exactly the
+    corporate-CA-plus-mTLS case the configuration reference documents, so the settings
+    are resolved into one context here instead of being forwarded as two.
+
+    The conversion is confined to this function: `ProviderSettings` and the configuration
+    file keep taking a path string and a certificate tuple, which is what an operator can
+    write in JSON.
+
+    Args:
+        verify: CA-bundle path, ``False`` to disable verification, or ``None`` for the
+            default trust store.
+        client_cert: Combined PEM path, or ``(cert, key)`` / ``(cert, key, password)``.
+
+    Returns:
+        ``{"verify": ...}`` when anything is configured, or an empty mapping when nothing
+        is — an empty mapping matters, because passing an explicit default would override
+        httpx's own ``SSL_CERT_FILE``/``SSL_CERT_DIR`` handling.
+
+    Raises:
+        ConfigError: The CA bundle or certificate could not be read or parsed. Raised
+            here rather than left to `ssl`, whose bare `FileNotFoundError` names no
+            setting and offers no next step.
+    """
+    if not isinstance(verify, str) and client_cert is None:
+        # Nothing needs constructing: `None` means "not supplied", and `True`/`False` are
+        # both spellings httpx still accepts unchanged.
+        return {} if verify is None else {"verify": verify}
+
+    context = _ssl_context(verify)
+    if client_cert is not None:
+        parts = (client_cert,) if isinstance(client_cert, str) else tuple(client_cert)
+        try:
+            context.load_cert_chain(*parts)
+        except (OSError, ssl.SSLError) as exc:
+            raise ConfigError(
+                f"cannot load the client certificate: {exc}",
+                hint=(
+                    "'client_cert' takes a combined PEM path, or [cert, key], or "
+                    "[cert, key, password]; check the paths and the key's password"
+                ),
+            ) from exc
+    return {"verify": context}
+
+
+def _ssl_context(verify: str | bool | None) -> ssl.SSLContext:
+    """Build the SSL context a `verify` setting describes."""
+    if verify is None or verify is True:
+        # Delegated rather than rebuilt: this is the branch that consults `truststore`
+        # and the SSL_CERT_FILE/SSL_CERT_DIR environment variables, and reimplementing it
+        # would mean tracking httpx's default trust behaviour by hand.
+        return httpx2.create_ssl_context(verify=True)
+    if verify is False:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return context
+    try:
+        # A directory of hashed certificates is as valid as a bundle file, and an
+        # operator pointing at either expects it to work.
+        if Path(verify).is_dir():
+            return ssl.create_default_context(capath=verify)
+        return ssl.create_default_context(cafile=verify)
+    except (OSError, ssl.SSLError) as exc:
+        raise ConfigError(
+            f"cannot load the CA bundle at {verify!r}: {exc}",
+            hint="'verify' takes a path to a CA bundle file or a directory of them",
+        ) from exc
 
 
 def read_int(payload: Mapping[str, Any], name: str) -> int | None:

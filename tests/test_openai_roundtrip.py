@@ -14,6 +14,7 @@ import pytest
 
 import anyinfer as ai
 from anyinfer.serve.openai_codec import (
+    CACHE_FIELD,
     chunk_from_event,
     completion_from_generation,
     final_chunk,
@@ -96,6 +97,37 @@ def test_full_request_round_trips_losslessly() -> None:
     assert rebuilt["response_format"] == FULL_REQUEST["response_format"]
 
 
+def test_the_cache_extension_round_trips() -> None:
+    """DESIGN §22 invariant 1 calls a one-way codec field a design bug, not a shortcut.
+
+    `anyinfer_cache` decoded into a typed `CachePolicy` but was never re-encoded, and the
+    round-trip test passed only because no case generated the field. A gateway chaining a
+    request onward silently dropped the caller's caching decision — one with a cost
+    attached, which is the whole reason the extension exists.
+    """
+    body = {
+        **FULL_REQUEST,
+        CACHE_FIELD: {"mode": "off", "min_segment_tokens": 2048, "include_tools": False},
+    }
+    target, request, stream = request_from_openai(body)
+
+    assert request.cache is not None
+    assert request.cache.mode == "off"
+
+    rebuilt = request_to_openai(target, request, stream=stream)
+    _, second, _ = request_from_openai(rebuilt)
+
+    assert second.cache == request.cache
+    assert rebuilt[CACHE_FIELD]["min_segment_tokens"] == 2048
+    assert rebuilt[CACHE_FIELD]["include_tools"] is False
+
+
+def test_an_absent_cache_extension_stays_absent() -> None:
+    """A stock OpenAI client must get a byte-identical body back."""
+    target, request, _ = request_from_openai(FULL_REQUEST)
+    assert CACHE_FIELD not in request_to_openai(target, request)
+
+
 def test_reasoning_effort_decodes_to_the_typed_field_not_passthrough() -> None:
     """The one first-class generation parameter the codec used to lose.
 
@@ -115,6 +147,19 @@ def test_absent_reasoning_effort_stays_absent() -> None:
 
     assert request.reasoning is None
     assert "reasoning_effort" not in request_to_openai(target, request)
+
+
+@pytest.mark.parametrize("effort", ["none", "minimal", "low", "medium", "high"])
+def test_every_reasoning_effort_level_round_trips(effort: str) -> None:
+    """`none` included: OpenAI accepts it, so a stock client sending it must not get a 400.
+
+    Refusing it made the gateway narrower than the dialect it claims to project — a
+    client that worked here by passthrough started failing once the field became typed.
+    """
+    target, request, _ = request_from_openai({**FULL_REQUEST, "reasoning_effort": effort})
+
+    assert request.reasoning == effort
+    assert request_to_openai(target, request)["reasoning_effort"] == effort
 
 
 def test_an_unrecognized_reasoning_effort_is_refused() -> None:

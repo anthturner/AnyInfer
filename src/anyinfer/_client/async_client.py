@@ -56,7 +56,6 @@ from ..capabilities.probes import (
 )
 from ..catalog.model import Catalog, TargetEntry
 from ..catalog.resolve import load_default_catalog, resolve_target
-from ..compare import EmbeddingTargetComparison, TargetComparison
 from ..context_request import ContextRequest
 from ..credentials import ResolverChain
 from ..errors import (
@@ -68,6 +67,7 @@ from ..errors import (
     ToolLoopError,
     UnsupportedInputError,
 )
+from ..evaluate.compare import EmbeddingTargetComparison, TargetComparison
 from ..events.observers import EventDispatcher, Observer
 from ..events.telemetry import (
     DownloadProgress,

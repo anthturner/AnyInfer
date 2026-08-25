@@ -198,13 +198,24 @@ class PresetEmbeddingAdapter(OpenAICompatEmbeddingsMixin, PresetCompatAdapter):
 
 
 def _translate_effort(effort: ReasoningEffort | None) -> Mapping[str, Any]:
-    """``reasoning_effort`` pass-through for providers accepting all four levels."""
+    """``reasoning_effort`` pass-through for providers accepting the full OpenAI ladder.
+
+    Including ``none``, which OpenAI's current vocabulary accepts and these providers
+    track. A provider that has not caught up rejects it loudly, which is the right
+    failure: the caller asked for reasoning off, and silently leaving it on would be worse
+    than a 400 naming the value.
+    """
     return {} if effort is None else {"reasoning_effort": effort}
 
 
 def _translate_effort_min_low(effort: ReasoningEffort | None) -> Mapping[str, Any]:
-    """``reasoning_effort`` with ``minimal`` mapped to the provider's lowest level."""
-    if effort is None:
+    """``reasoning_effort`` with ``minimal`` mapped to the provider's lowest level.
+
+    ``none`` is omitted rather than clamped. Clamping it onto ``low`` would ask for more
+    reasoning than the caller wanted — the direction `effort-min-named` exists to avoid —
+    and these providers publish no off value to send instead.
+    """
+    if effort is None or effort == "none":
         return {}
     return {"reasoning_effort": "low" if effort == "minimal" else effort}
 
@@ -217,8 +228,11 @@ def _translate_effort_three_level(effort: ReasoningEffort | None) -> Mapping[str
     documentation differs: these providers publish a three-value enum and validate it,
     whereas ``effort-min-low`` providers merely omit ``minimal`` from a longer ladder.
     Conflating them would lose that distinction the next time either enum moves.
+
+    That validated enum is also why ``none`` is omitted here rather than passed through:
+    these providers would reject it outright.
     """
-    if effort is None:
+    if effort is None or effort == "none":
         return {}
     return {"reasoning_effort": "low" if effort == "minimal" else effort}
 
@@ -229,15 +243,24 @@ def _translate_effort_min_named(effort: ReasoningEffort | None) -> Mapping[str, 
     Requesty documents ``min`` (a synonym for ``none``) alongside low/medium/high.
     Clamping onto ``low`` like the other translators would work but would quietly ask
     for more reasoning than the caller wanted, so the near-homograph is worth honoring.
+    A normalized ``none`` reaches the same ``min``, which is what that synonym means.
     """
     if effort is None:
         return {}
-    return {"reasoning_effort": "min" if effort == "minimal" else effort}
+    return {"reasoning_effort": "min" if effort in ("none", "minimal") else effort}
 
 
 def _translate_reasoning_object(effort: ReasoningEffort | None) -> Mapping[str, Any]:
-    """The gateway-normalized ``reasoning`` object (Vercel AI Gateway)."""
-    return {} if effort is None else {"reasoning": {"effort": effort}}
+    """The gateway-normalized ``reasoning`` object (Vercel AI Gateway).
+
+    ``none`` uses the object's ``enabled: false`` switch: the gateway normalizes across
+    upstream ladders that differ, and the disable flag means the same thing to all of them.
+    """
+    if effort is None:
+        return {}
+    if effort == "none":
+        return {"reasoning": {"enabled": False}}
+    return {"reasoning": {"effort": effort}}
 
 
 def _no_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:

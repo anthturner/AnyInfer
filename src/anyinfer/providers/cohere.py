@@ -744,7 +744,7 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
-    if effort == "minimal":
+    if effort in ("none", "minimal"):
         return {"thinking": {"type": "disabled"}}
     return {"thinking": {"type": "enabled", "token_budget": _THINKING_BUDGETS[effort]}}
 

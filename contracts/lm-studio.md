@@ -44,7 +44,8 @@ are *loaded*.
 - The openai-compat dialect unchanged.
 - `reasoning`: `off`, `low`, `medium`, `high`, or `on` — normalized effort maps across,
   with `minimal` clamped to `low` rather than `off`, since disabling reasoning is a
-  behavior change rather than a reduction.
+  behavior change rather than a reduction. Normalized `none` *is* that behavior change
+  asked for explicitly, and maps to `off`.
 
 ### Response fields read (native discovery)
 - `models[]` — `key` (the model id), `type` (`llm` or `embedding`; only `llm` entries

@@ -36,10 +36,10 @@ from ..capabilities.ledger import SpendLedger, SpendTotals
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import EmbeddingProbeReport, ProbeReport
 from ..catalog.model import Catalog
-from ..compare import EmbeddingTargetComparison, TargetComparison
 from ..context_request import ContextRequest
 from ..credentials import ResolverChain
 from ..errors import ConfigError
+from ..evaluate.compare import EmbeddingTargetComparison, TargetComparison
 from ..events.observers import Observer
 from ..local.acquire import AcquisitionReport, ProgressSink
 from ..local.hardware import HardwareProfile

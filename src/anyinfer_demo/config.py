@@ -55,16 +55,18 @@ def _is_credential_reference(value: str) -> bool:
     return value.startswith(_CREDENTIAL_REFERENCE_SCHEMES)
 
 
-def _secret_field_keys(provider_id: str) -> frozenset[str]:
-    """Setup-field keys the given engine declares as secret-kind.
+def _secret_field_keys(provider_id: str) -> frozenset[str] | None:
+    """Setup-field keys the given engine declares as secret-kind, or None if unknown.
 
     Read from the registry rather than hard-coded, so this keeps working for providers
-    that do not exist yet — the same reason the rest of this module is generic.
+    that do not exist yet — the same reason the rest of this module is generic. `None` is
+    distinct from the empty set on purpose: "this provider declares no secret fields" and
+    "nothing here can say which fields are secret" must not be handled the same way.
     """
     from anyinfer.registry import default_registry
 
     if not default_registry.has(provider_id):
-        return frozenset()
+        return None
     descriptor = default_registry.get(provider_id)
     return frozenset(
         field.key for field in descriptor.setup.fields if field.kind == "secret"
@@ -78,8 +80,15 @@ def _without_literal_secrets(provider_id: str, values: Mapping[str, str]) -> dic
     always promised those stay in memory. Persisting them would put key material in
     ``demo.json`` under the user's config directory, where it is swept into backups and
     file sync. References are safe to keep and are the whole point of the scheme.
+
+    When the registry cannot describe the provider — a stale entry for a plugin that was
+    uninstalled, or one that failed to import — the field kinds are unknowable, so *every*
+    non-reference value is dropped rather than none. Failing open there would break the
+    promise in exactly the case where nothing else is watching.
     """
     secret_keys = _secret_field_keys(provider_id)
+    if secret_keys is None:
+        return {key: value for key, value in values.items() if _is_credential_reference(value)}
     return {
         key: value
         for key, value in values.items()

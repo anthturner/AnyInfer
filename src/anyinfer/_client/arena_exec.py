@@ -19,7 +19,6 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from .._usage import merge_usage
-from ..arena import ArenaResult, Candidate, candidate_envelope, select_candidates
 from ..capabilities.ledger import SpendLedger
 from ..context_request import ContextRequest
 from ..errors import (
@@ -28,6 +27,7 @@ from ..errors import (
     ConfigError,
     ToolLoopError,
 )
+from ..evaluate.arena import ArenaResult, Candidate, candidate_envelope, select_candidates
 from ..events.telemetry import (
     ArenaCompleted,
     ParameterDropped,

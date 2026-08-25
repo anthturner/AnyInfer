@@ -62,6 +62,25 @@ class ProviderSettings:
         limits: Client-side pacing for this instance, or ``None`` for none. Rate limits
             belong to *an account at a provider* rather than to the application, which is
             why they are configured here and not as a client-wide policy.
+        proxy: Proxy URL for this instance's traffic, e.g. ``"http://corp-proxy:3128"``.
+            ``None`` leaves httpx's ``HTTPS_PROXY``/``NO_PROXY`` environment handling in
+            place, which is the default.
+        verify: TLS verification for this instance: a CA-bundle path for a private or
+            intercepting CA, ``False`` to disable verification entirely, or ``None`` for
+            the default trust store. Per instance on purpose — one provider can trust a
+            corporate CA while another keeps the public roots.
+        client_cert: Client certificate for mTLS: a combined PEM path, or
+            ``(cert, key)`` / ``(cert, key, password)``. ``None`` when the endpoint needs
+            no client certificate.
+
+    Note:
+        `proxy`, `verify`, and `client_cert` are ignored when `transport` is supplied — a
+        caller bringing its own transport has taken over connection handling. They also
+        do not reach connections AnyInfer does not open for this instance: MCP servers,
+        model downloads, and auth token endpoints other than Google's follow the process
+        environment instead. An adapter that delegates transport to a vendor SDK declares
+        ``honors_connection_settings=False`` and the config parser refuses the keys
+        outright rather than accepting them and doing nothing.
     """
 
     provider_id: str

@@ -150,8 +150,17 @@ def _features_from_parameters(parameters: Any) -> Feature:
 
 
 def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
-    """OpenRouter accepts a unified ``reasoning`` object across upstream providers."""
-    return {} if effort is None else {"reasoning": {"effort": effort}}
+    """OpenRouter accepts a unified ``reasoning`` object across upstream providers.
+
+    ``none`` uses the object's own ``enabled: false`` switch rather than being sent as an
+    effort level: the gateway normalizes effort across upstreams whose ladders differ, and
+    the disable flag is the one spelling that means the same thing to all of them.
+    """
+    if effort is None:
+        return {}
+    if effort == "none":
+        return {"reasoning": {"enabled": False}}
+    return {"reasoning": {"effort": effort}}
 
 
 _OPENROUTER_FEATURES = (

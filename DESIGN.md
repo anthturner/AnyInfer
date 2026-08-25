@@ -251,7 +251,7 @@ class Sampling:
     stop: tuple[str, ...] = ()
 
 
-ReasoningEffort = Literal["minimal", "low", "medium", "high"]  # normalized; adapters translate
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high"]  # adapters translate
 
 
 @dataclass(frozen=True, slots=True)
@@ -823,11 +823,11 @@ src/anyinfer/
   session.py             # the session handle
   benchmark.py           # throughput measurement, live samples + caller-owned store
   verification.py        # the end-to-end target probe
-  arena.py               # multi-target fan-out
-  compare.py             # target comparison
-  compare_diff.py        # comparison diffing
+  evaluate/              # arena.py compare.py compare_diff.py — questions *about* targets
+                         # (fan-out selection, capability/cost comparison, portability diff)
   manifest.py            # run manifests
-  context_request.py     # wire-facing context-reduction request type
+  context_request.py     # wire-facing context-reduction request type; stays a root module
+                         # because the architecture contracts pin it there — see below
   _agents_md.py          # the `agents-md` command's generator
   _context_wire.py       # context-request wire codec
   _starter.py            # `init` scaffolding
@@ -866,14 +866,26 @@ contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§2
 docs/                    # provider guides, published site sources (§25)
 ```
 
+**`context_request.py` stays a root module — pinned by contract, not by inertia.** The
+obvious homes are both closed. It cannot live under `types/`: it imports
+`anyinfer.context`, which the "Types are leaf modules" contract forbids. It cannot live
+under `context/` either: `types/requests.py` and `types/results.py` refer to
+`ContextRequest`/`ContextSummary`, and moving the definitions inside `anyinfer.context`
+would turn those into direct type-package imports of a forbidden module. The root
+placement is what lets request and result types name the records without depending on the
+reduction implementation, which is the whole reason it was split out. Revisit only if
+those contracts change.
+
 **`cli.py` stays one module — a decision, not an accident.** It is ~3,800 lines across
 sixteen command families, the second-largest module in the repository. It stays single
 because argparse subcommand wiring is the kind of code that reads worse spread across
 sixteen files than gathered in one, and because the lazy per-command import style is what
 keeps `anyinfer --help` cheap: nothing a command needs is imported until that command
 runs. The boundary that matters is enforced separately — the CLI imports only public core
-surfaces and never reaches into `_client`. **Revisit if it keeps growing:** the exit is a
-`cli/` package whose `__init__.py` still exports `main`, so
+surfaces and never reaches into `_client`. **Revisit at 4,500 lines** — a concrete trigger
+rather than a judgement call re-litigated per pull request, and roughly 700 lines of head-
+room from the ~3,800 this decision was recorded at. The exit is a `cli/` package whose
+`__init__.py` still exports `main`, so
 `[project.scripts] anyinfer = "anyinfer.cli:main"` is untouched.
 
 **Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]`
