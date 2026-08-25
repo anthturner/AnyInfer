@@ -65,7 +65,7 @@ do instead. It never silently substitutes a different model:
 ```python
 client.generate(prompt, target="gpt-5")
 # ConfigError: unknown target 'gpt-5'
-#   (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-5'),
+#   (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-4-5'),
 #          or one of these aliases: large, medium, small)
 ```
 

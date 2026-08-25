@@ -615,7 +615,7 @@ HARNESS = ConformanceHarness(
     model="command-a",
     build_client=_build_cohere_client,
     # The fake has no thinking channel of its own; the dialect test above covers it.
-    supports=Capabilities(reasoning=False, embedding=True, rerank=True),
+    supports=Capabilities(reasoning=False, embedding=True, rerank=True, cancellation=True),
     embedding_model="embed-english-light-v3.0",
     rerank_model="rerank-v3.5",
 )
@@ -629,38 +629,9 @@ async def test_cohere_conformance() -> None:
 
 def _lm_studio_server(scenario: str) -> Any:
     """Program an LM Studio fake: native discovery plus the compatible chat endpoint."""
-    from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
+    from anyinfer.testing.fakes import FakeOpenAIServer, scenario_responses
 
-    if scenario == "tools":
-        inner = FakeOpenAIServer(
-            FakeResponse(
-                text="",
-                tool_calls=(("call_0", "lookup", '{"key": "alpha"}'),),
-                finish_reason="tool_calls",
-            )
-        )
-    elif scenario == "structured":
-        inner = FakeOpenAIServer(FakeResponse(text=PROBE_ANSWER))
-    elif scenario == "repair":
-        inner = FakeOpenAIServer(
-            [FakeResponse(text='{"wrong": true}'), FakeResponse(text=PROBE_ANSWER)]
-        )
-    elif scenario == "auth_error":
-        inner = FakeOpenAIServer(FakeResponse(status=401, error_message="invalid token"))
-    elif scenario == "rate_limited":
-        inner = FakeOpenAIServer(
-            [
-                FakeResponse(status=429, error_message="busy", headers={"retry-after": "0"}),
-                FakeResponse(text="recovered"),
-            ]
-        )
-    elif scenario == "oversized":
-        inner = FakeOpenAIServer(FakeResponse(text="x" * 20_000))
-    elif scenario == "odd_finish":
-        inner = FakeOpenAIServer(FakeResponse(text="hello", finish_reason="model_decided"))
-    else:
-        inner = FakeOpenAIServer(FakeResponse(text="Hello from LM Studio."))
-
+    inner = FakeOpenAIServer(scenario_responses(scenario, text="Hello from LM Studio."))
     compat = inner.transport()
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -706,7 +677,7 @@ LM_STUDIO_HARNESS = ConformanceHarness(
     build_client=_build_lm_studio_client,
     # The shared fake has no reasoning channel; the dialect tests above cover the
     # native reasoning translation.
-    supports=Capabilities(reasoning=False),
+    supports=Capabilities(reasoning=False, cancellation=True),
 )
 
 

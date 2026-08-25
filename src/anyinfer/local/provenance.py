@@ -18,7 +18,7 @@ any signing process they already trust) produces the signature; this module only
 check on an unattested host is a real, valid check, but a *weaker and different* claim —
 verifying that the file on disk matches a signature, with no guarantee about who else
 could have read or swapped it before or during the check. Marketing that as "Tier 4" would
-misrepresent the guarantee `plans/TIERED_ENCRYPTED_PLANS.md` §4a defines; the field this
+misrepresent the guarantee DESIGN.md §30.5 defines; the field this
 module populates (`ConfidentialExecutionStatus.model_verified`) is documented accordingly
 — a caller must additionally check `end_to_end` before treating it as the full claim.
 
@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import ConfigError
+from .downloads import _read_and_hash
 
 __all__ = ["ModelManifest", "hash_model_weights", "verify_model_manifest"]
 
@@ -122,11 +123,7 @@ def hash_model_weights(path: Path) -> str:
 
 
 def _hash_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return _read_and_hash(path, hashlib.sha256)
 
 
 def verify_model_manifest(

@@ -5,6 +5,16 @@ on** — nothing else. These are the diff targets for the drift check
 ([DRIFT-CHECK.md](DRIFT-CHECK.md)) and the wire-level specification adapter implementers
 code against (with DESIGN.md §8 as the behavioral contract).
 
+Two procedures own this directory's lifecycle, and both are tool-agnostic:
+
+- [NEW-PROVIDER.md](NEW-PROVIDER.md) — adding a provider. A snapshot is researched and
+  written *before* the adapter it specifies; the rest of the procedure covers registration,
+  the generated docs surfaces, tests, and verification.
+- [DRIFT-CHECK.md](DRIFT-CHECK.md) — auditing an existing snapshot against the provider's
+  current public documentation.
+
+[TEMPLATE.md](TEMPLATE.md) is the starting shape for a new snapshot.
+
 ## Rules
 
 - **Update the snapshot in the same change** whenever an adapter's wire behavior changes.

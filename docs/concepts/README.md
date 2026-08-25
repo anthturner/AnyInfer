@@ -1,6 +1,6 @@
 # Concepts
 
-Nineteen ideas. Read them once and the rest of the API follows from them.
+Twenty ideas. Read them once and the rest of the API follows from them.
 
 They build on each other roughly in this order, but each page stands alone.
 
@@ -10,6 +10,7 @@ They build on each other roughly in this order, but each page stands alone.
 | [The event stream](events.md) | A generation *is* an ordered stream of typed events; everything else is a projection of it. |
 | [Routing](routing.md) | Retries, fallback chains, and health gating — deterministic and fully traceable. |
 | [Structured output](structured-output.md) | A schema is a contract: strongest native mechanism, always client-side validated, optional bounded repair. |
+| [Embeddings and reranking](embeddings.md) | Typed, routed inference operations too, with a fallback safety rule generation does not need. |
 | [Sessions](sessions.md) | Letting a provider keep what it already knows, without changing any answer. |
 | [Capabilities and provenance](capabilities.md) | Every capability value records where it came from, so you know how much to trust it. |
 | [Token estimation and context budgets](budgeting.md) | How many tokens a request will spend, whether it fits, and when to refuse before dispatch. |

@@ -39,6 +39,7 @@ NOT_SNAPSHOTS = frozenset(
         "README.md",
         "DRIFT-CHECK.md",
         "TEMPLATE.md",
+        "NEW-PROVIDER.md",
         # Not a provider snapshot: the presets record verifies eighty-six endpoints against
         # one shared dialect, so it is organized per preset rather than per wire section.
         "openai-compat-presets.md",
@@ -46,8 +47,22 @@ NOT_SNAPSHOTS = frozenset(
 )
 """Files under contracts/ that document a process or a fleet rather than one provider."""
 
-LAST_VERIFIED = re.compile(r"^Last verified:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
-"""Every snapshot states when it was last checked, as a real ISO date."""
+LAST_VERIFIED = re.compile(r"^Last verified:[^\n]*?(\d{4}-\d{2}-\d{2})", re.MULTILINE)
+"""Every snapshot states when it was last checked, as a real ISO date.
+
+The date may be qualified rather than immediate — a snapshot whose sections were verified
+on different days writes ``Last verified: chat 2026-08-07; embeddings 2026-08-12``. That is
+more honest than one rounded date, so the pattern accommodates it instead of forcing the
+snapshot to lie."""
+
+OPERATION_QUALIFIED = re.compile(
+    r"^### (?:\w+ )?(request fields|response)\b", re.IGNORECASE | re.MULTILINE
+)
+"""Retrieval-only providers document fields per operation, not once for a single call.
+
+``### Embeddings request fields`` and ``### Rerank request fields`` together are *more*
+specific than one ``### Request fields``, so they satisfy the requirement rather than
+missing it."""
 
 
 def snapshots() -> list[Path]:
@@ -63,9 +78,16 @@ def problems(path: Path) -> list[str]:
     # Prefix matching, not equality: a snapshot may qualify a heading ("### Response
     # fields read (native discovery)") without having omitted the section.
     headings = {line.rstrip() for line in text.splitlines() if line.startswith("#")}
+    qualified = {m.lower() for m in OPERATION_QUALIFIED.findall(text)}
     for heading in REQUIRED_HEADINGS:
-        if not any(found_heading.startswith(heading) for found_heading in headings):
-            found.append(f"missing section {heading!r}")
+        if any(found_heading.startswith(heading) for found_heading in headings):
+            continue
+        # "### Embeddings request fields" satisfies "### Request fields".
+        if heading == "### Request fields" and "request fields" in qualified:
+            continue
+        if heading == "### Response fields" and "response" in qualified:
+            continue
+        found.append(f"missing section {heading!r}")
 
     if not LAST_VERIFIED.search(text):
         found.append("missing a 'Last verified: YYYY-MM-DD' line")

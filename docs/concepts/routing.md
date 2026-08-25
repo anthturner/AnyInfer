@@ -36,6 +36,42 @@ on. There is no scoring, load balancing, or adaptive selection — that is defer
 decision, and `Route` is a policy object precisely so it can be added later without changing
 any client method.
 
+## Naming a target does not discard your policy
+
+A route configured on the client governs the calls that do not name a route of their own —
+and it keeps governing them when a single call redirects itself with `target=`:
+
+```python
+client = ai.AsyncClient(providers, route=ai.Route(
+    targets=("anthropic:claude-sonnet-4-5",),
+    retry=ai.Retry(max_attempts=5),
+))
+
+# Still five attempts. `target=` changed where the call goes, not how it is governed.
+result = await client.generate(prompt, target="openai:gpt-5")
+```
+
+The same holds for the target-shaped spellings of `route=` (a single string, or a sequence
+of them) and for a [session's](sessions.md) target. What they all have in common is that
+they name *targets* and say nothing about policy, so the policy in force carries: `Retry`,
+the health gate, and its TTL.
+
+A fully constructed `Route` is the opposite — a complete statement of policy, honoured
+exactly as written. Reach for it when the intent really is to depart from the client's
+defaults:
+
+```python
+# Exactly one attempt, whatever the client was configured with.
+result = await client.generate(
+    prompt,
+    route=ai.Route(targets=("openai:gpt-5",), retry=ai.Retry(max_attempts=1)),
+)
+```
+
+One thing is deliberately *not* inherited: the specialized chains. `context_window_targets`
+and `content_policy_targets` name other providers, and quietly redirecting to a target the
+caller did not ask for would be the same surprise pointing the other way.
+
 ## What gets retried
 
 The default predicate declines failures that repetition cannot fix:

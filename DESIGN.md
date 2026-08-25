@@ -271,7 +271,7 @@ class GenerationRequest:
 **Targets** name where a request goes. Three spellings, one resolution path:
 
 ```python
-Target = str  # "anthropic:claude-sonnet-5" | "ollama:qwen3:8b" | alias "medium"
+Target = str  # "anthropic:claude-sonnet-4-5" | "ollama:qwen3:8b" | alias "medium"
 # engine aliases normalize: "claude:..." → "anthropic:..."
 
 
@@ -759,7 +759,7 @@ answer = result.structured  # validated against ANSWER_SCHEMA
 
 # --- fallback chain + retries (router) ---
 route = ai.Route(
-    targets=("anthropic:claude-sonnet-5", "azure-foundry:gpt-5-mini", "ollama:qwen3:8b"),
+    targets=("anthropic:claude-sonnet-4-5", "azure-foundry:gpt-5-mini", "ollama:qwen3:8b"),
     retry=ai.Retry(max_attempts=3),
 )
 result = client.generate(messages, route=route)
@@ -792,7 +792,7 @@ def read_file(path: str) -> str:
 
 
 result = client.run_tools(
-    messages, tools=[read_file], target="anthropic:claude-sonnet-5", max_rounds=8
+    messages, tools=[read_file], target="anthropic:claude-sonnet-4-5", max_rounds=8
 )
 
 # --- provider escape hatch ---
@@ -909,7 +909,7 @@ provider breadth expanded through dedicated adapters and compatibility presets.
 - **R1 — sync facade correctness** (streaming iterators, cancellation, thread affinity).
   Mitigated by the background-loop ownership rules, bounded cancellation, early-exit tests,
   and thread-stress coverage; retain those as release gates.
-- **R2 — multi-provider conformance drift**, now across seventeen dedicated adapters plus a
+- **R2 — multi-provider conformance drift**, now across twenty dedicated adapters plus a
   preset registry. Mitigate: cassette CI + nightly live runs; the matrix doc is the source
   of truth for "native vs emulated vs unsupported", and presets are covered by
   representatives per quirk axis rather than one row each.
@@ -952,8 +952,8 @@ provider breadth expanded through dedicated adapters and compatibility presets.
   reason to exist). Mitigate: same-target-only retries by default, refuse-before-send on
   unknown equivalence, conformance tests asserting the refusal. Separately, "batteries
   included" pressure will keep inviting a built-in vector database; the boundary in §28 and
-  the scale ceiling in `plans/VECTOR_STORE_ADDON.md` §2 exist to keep that pressure from
-  quietly expanding the core's product definition.
+  the scale ceiling in §29.2 exist to keep that pressure from quietly expanding the core's
+  product definition.
 
 ## 22. Serve frontend: OpenAI-compatible loopback federation
 
@@ -979,7 +979,7 @@ frontend is a wire codec plus an ASGI app around an `AsyncClient`.
 
 **Surface (initial):**
 - `POST /v1/chat/completions` — streaming and non-streaming. The request's `model` field is
-  parsed as a `Target`: `"medium"` (alias), `"anthropic:claude-sonnet-5"`,
+  parsed as a `Target`: `"medium"` (alias), `"anthropic:claude-sonnet-4-5"`,
   `"ollama:qwen3:8b"`, or a named route configured server-side. Federation is therefore free.
 - `GET /v1/models` — enumerates catalog aliases, named routes, and (optionally) concrete
   `provider:model` targets, with capability metadata in OpenAI's `model` object shape.
@@ -1333,7 +1333,8 @@ backed ranker built on this guarantee once §9's `ER.6.9` decision is exercised.
 (endpoints, auth headers, version pins, fields sent/read, streaming framing, error shapes)
 are recorded in `contracts/<provider>.md` — updated in the same change as any adapter
 wire-behavior change. A semi-automated **drift check** (procedure:
-`contracts/DRIFT-CHECK.md`, with the tool-specific entry points listed in `AGENTS.md`)
+`contracts/DRIFT-CHECK.md`, with the tool-specific entry points listed in `AGENTS.md`,
+and the weekly `contract-drift` workflow as its scheduled track)
 audits these snapshots against live provider documentation and classifies
 findings as `OK / DRIFT / DEPRECATION / NEW-CAPABILITY / UNVERIFIABLE`, proposing contract,
 adapter, and matrix updates. Division of labor: the conformance suite proves *our code
@@ -1345,14 +1346,17 @@ Legend: ✅ native · Ⓔ emulated by core/adapter · ➖ unsupported (documente
 milestone. Every cell backed by a parametrized conformance case run in cassette, fake-server,
 and (nightly, where auth permits) live modes.
 
-> **Implementation status.** Seventeen dedicated adapters are implemented
-> (the original nine plus Gemini, DeepSeek, xAI, Vertex AI, Bedrock, Cohere, and LM
-> Studio), alongside a preset registry of eighty-six OpenAI-compatible providers
+> **Implementation status.** Twenty dedicated adapters are implemented
+> (the original nine plus Gemini, DeepSeek, xAI, Vertex AI, Bedrock, Cohere, LM Studio,
+> Voyage AI, Jina AI, and Text Embeddings Inference), alongside a preset registry of
+> eighty-six OpenAI-compatible providers
 > sharing the `openai_compat` adapter. The
 > *executed* matrix — generated from a real conformance run rather than hand-maintained —
 > lives at [docs/reference/conformance-matrix.md](docs/reference/conformance-matrix.md);
-> regenerate it with `workspace matrix`. The table below remains the
-> design-intent matrix. Cells marked `?` are design questions, several of which the
+> regenerate it with `workspace matrix`. **Every dedicated adapter now has a row there**,
+> at whatever boundary it actually has: an HTTP transport for the twenty that speak HTTP,
+> a fake SDK for `copilot`, and a stub supervisor for `llama-cpp`. The table below remains
+> the design-intent matrix. Cells marked `?` are design questions, several of which the
 > implementation has now answered:
 >
 > - **anthropic json_schema** — resolved as Ⓔ: emulated with a single forced tool call,
@@ -1364,8 +1368,10 @@ and (nightly, where auth permits) live modes.
 > - **m365-copilot** — resolved as the documented degraded case: no streaming, no tools, no
 >   sampling controls (declared in `ignored_parameters`), interactive auth only.
 >
-> Snapshots in `contracts/` are still code-survey-derived; a drift-check run is
-> required before any of them can claim live verification.
+> Ten snapshots still say, in their own words, that they were never verified against
+> live provider documentation — most of them code-survey-derived. The weekly
+> `contract-drift` workflow ranks exactly that signal above age, so those are what its
+> first rotations audit; until a run clears one, it cannot claim live verification.
 
 | Behavior | openai-compat | openai | anthropic | ollama | openrouter | azure-foundry | copilot | m365-copilot | llama-cpp |
 |---|---|---|---|---|---|---|---|---|---|
@@ -1590,8 +1596,10 @@ for failed-attempt billing.
 
 ## 28. Embedding and reranking operations (`EmbeddingRequest`/`RerankRequest`)
 
-*Amends §2 goal 11 and the multimodal non-goal.* Full implementation plan:
-[plans/EMBEDDING_RERANKING_CONTINUATION.md](plans/EMBEDDING_RERANKING_CONTINUATION.md).
+*Amends §2 goal 11 and the multimodal non-goal.* Implemented. The implementation plan this
+section grew from was retired once its work landed; its full text, per-item audit, and
+progress log are in git history (`plans/EMBEDDING_RERANKING_CONTINUATION.md`, last version
+at commit `b36bb4e`). Everything below is the durable record.
 
 Embeddings and reranking are stateless inference operations, typed and routed on the same
 terms as generation (ADR-017) but never folded into `GenerationRequest`. `EmbeddingRequest`
@@ -1613,12 +1621,11 @@ not assumed globally comparable (ADR-018) unless a provider documents otherwise.
 
 **Retrieval-infrastructure boundary.** AnyInfer produces vectors and rankings; it does not
 persist them, build an index, crawl a corpus, or decide what an application sends to a model.
-A small, separately-packaged, single-process vector store may exist as an optional add-on
-built entirely on these public types (tracked in
-[plans/VECTOR_STORE_ADDON.md](plans/VECTOR_STORE_ADDON.md)), explicitly scoped to
+A small, separately-packaged, single-process vector store exists as an optional add-on
+built entirely on these public types (§29), explicitly scoped to
 personal/prototype-sized corpora and never marketed as a scalable or clustered vector
-database — that remains a deployment the application brings, fed by this operation layer the
-same way any other consumer is.
+database (§29) — that remains a deployment the application brings, fed by this operation
+layer the same way any other consumer is.
 
 **Sidecar.** `POST /v1/embeddings` is a shared OpenAI-compatible codec, implemented
 alongside (not inside) the chat-completions codec, over `AsyncClient.embed`. Reranking has no
@@ -1632,3 +1639,202 @@ establishes for chat completions.
 **Context reduction boundary unchanged.** `anyinfer.context.select()` may accept a caller-
 supplied semantic ranker built on `embed()`, but its default stays lexical and offline
 (ADR-011); nothing here makes an embedding provider a hidden dependency of context reduction.
+
+### 28.1 Scope boundary
+
+**Included:** text embeddings, scalar and batch; query/document intent where providers
+distinguish it; provider-native dimensionality reduction; reranking one query against a
+caller-supplied ordered document collection (text plus caller-owned ids and metadata, with
+only text sent unless a provider option asks for more); usage, provider-native billing
+units, centrally computed cost where pricing is known, timing, attempt trails, warnings,
+and optional raw retention; core-owned batching against verified limits; operation-aware
+discovery, capabilities, routing, and fallback; semantic-ranker injection into context
+reduction through the client-side helper (`anyinfer.semantic_ranker`).
+
+**Excluded:** vector databases, ANN indexes, persistence, corpus lifecycle, and retrieval
+services (§29); automatic embedding of `ContextDocument` values; opaque automatic model
+selection; cross-model vector conversion; training, fine-tuning, and evaluation;
+image/audio/multimodal embeddings; streaming vectors or incremental rerank results — both
+operations are buffered.
+
+### 28.2 Operation decisions
+
+Resolved during implementation and binding on later work:
+
+1. Embeddings and reranking are **core inference primitives**, not provider options, and
+   support is declared **per operation** — retrieval-only providers are first-class (TEI,
+   Voyage, and Jina exist as proof).
+2. Cross-target embedding fallback requires **provable space equivalence**: refused
+   pre-dispatch unless the target is an identical `provider:model`, with an
+   `allow_incompatible_fallback` opt-in that always warns (ADR-018).
+3. Scores from separate rerank batches are **never assumed globally comparable** —
+   `rerank_cross_batch` refuses by default and warns when overridden.
+4. `Usage` stays operation-neutral: billed search units are `Usage.search_units` and are
+   **never encoded as tokens** (`Pricing.per_search_unit` prices them). Because an
+   embedding call has no completion tokens by construction, a provider reporting only
+   `total_tokens` has that read as input tokens for embeddings **only** — never for rerank.
+5. **No new exception types.** The embed/rerank failure classes raise `ConfigError` with
+   distinguishing messages, and those message contracts are documented in the error
+   catalog (`docs/reference/errors.md`).
+6. **No novice embedding aliases** (`embed-small` and friends). Revisit only when each
+   alias would resolve to one verified hosted *and* one verified local target.
+7. The catalog describes embedding models with a `kind` on the existing model table rather
+   than a parallel artifact section, because acquisition is identical and only
+   interpretation differs (§13). An embedding row states `dimensions` and
+   `max_input_tokens` and nothing else: the remaining capability fields are
+   provider-specific or measurable, and `probe_embedding()` measures those. The
+   `small`/`medium`/`large` ladder is a generation-model ladder, and the catalog validator
+   refuses an alias that points at an embedding model.
+8. Per-provider evidence questions — normalized vectors, intent spellings, stable model
+   ids, trustworthy limits, billing units — are answered in dated contract snapshots as
+   each provider lands, never in prose alone.
+
+## 29. Vector store add-on (`anyinfer-store`)
+
+*Implemented.* A separate package, not a core change; its plan retired once the work landed
+and its full text is in git history (`plans/VECTOR_STORE_ADDON.md`, last version at commit
+`b36bb4e`).
+
+### 29.1 Why a separate package
+
+The core produces vectors and rankings; it does not persist them (§28.1). A store built
+*on* the public `embed()`/`rerank()` types does not move that line, but a store built
+*into* the core would. So `anyinfer-store` ships as its own distribution with its own
+`pyproject.toml`, depending on `anyinfer` and never the reverse — the packaging shape §30.1
+established for every optional piece. Nothing in core imports it, and removing it removes
+the feature entirely rather than leaving a stub.
+
+### 29.2 The scale ceiling is stated first, not in a caveats section
+
+It is for personal and prototype-sized corpora: single-process, single-file, brute-force
+cosine similarity in pure Python, no approximate index, no clustering, no concurrent
+writers. The published guide says so in its opening paragraph. This is the discipline that
+keeps "batteries included" pressure (R10) from turning an honest small tool into an
+implied-scalable database — a claim the implementation would not survive.
+
+### 29.3 Resolved by the implementation
+
+- On-disk format is SQLite: one table for the bound `EmbeddingSpace`, one for entries, with
+  vectors packed as `array.array('d')` BLOBs and metadata as JSON text.
+- **No approximate index was built.** The design record's framing was "add one only if
+  benchmark evidence shows it's needed", and no such evidence exists yet; brute force is
+  the whole v1 backend. This is the cost the package deliberately does not pay in advance.
+- A store binds the `EmbeddingSpace` that filled it and refuses vectors from another, which
+  is §28's same-space rule enforced at the persistence boundary rather than restated.
+
+## 30. Confidential execution tiers (`anyinfer-confidential`, `local/attestation.py`)
+
+*Tiers 1-4 implemented.* Its plan retired once the work landed; full text, research
+findings with sources, and the dated decision record are in git history
+(`plans/TIERED_ENCRYPTED_PLANS.md`, last version at commit `b36bb4e`).
+
+### 30.0 The problem this answers, and the one it does not
+
+Two confidentiality problems are easily confused, and only the second is in scope.
+Protecting the *customer's* data from AnyInfer is already answered: the call goes from the
+caller's process to the provider the caller configured, AnyInfer is never a proxy, and
+redaction keeps secrets out of logs, errors, and events. What needed building is protecting
+the *vendor's* prompt IP — templates, orchestration, few-shot curation — when the vendor's
+software runs on the customer's own infrastructure. The customer owns the machine, the OS,
+and the network, so no purely client-side technique produces a cryptographic guarantee. The
+honest ceiling is raising cost and friction (Tiers 1-2) up to the one case where a real
+guarantee exists (Tier 3).
+
+**Every tier states its ceiling in its own first paragraph**, the way §29.2 does. A tier
+that oversells is worse than no tier.
+
+### 30.1 Packaging
+
+`src/anyinfer-confidential/` and `src/anyinfer-shared/`, each with its own
+`pyproject.toml`, hyphenated directory and underscored importable package,
+`anyinfer-confidential` depending on `anyinfer` and never the reverse, `anyinfer-shared`
+imported by neither core nor the add-on's dependents by accident. Tiers 1 and 2 touch
+prompt content, which core's non-goals forbid core from doing, so they cannot live in core;
+Tiers 3 and 4 do not touch prompt content at all and extend `anyinfer/local/` directly.
+
+### 30.2 Tier 1 — `SealedTemplate`: encrypted-at-rest prompt assets
+
+Template plaintext never lives on disk unencrypted. A build step seals templates into an
+opaque asset; at runtime the vault decrypts one into memory immediately before rendering
+and discards it — overwritten where the runtime allows, not merely dereferenced.
+
+**Protects against** static extraction: unzipping the bundle, grepping the binary, reading
+the asset. **Does not protect against** live network capture, memory inspection of a
+running process, or a debugger attached to a live render.
+
+Decryption is gated on a vendor-issued entitlement, which doubles as a licensing hook: an
+install without a valid entitlement cannot produce prompts at all. Entitlement is hybrid —
+an offline signed Ed25519 license blob always applies, with opt-in online revocation
+defaulting to **fail-open to the cached answer**, and a `revocation_fail_closed` override
+for vendors who want the stricter posture. Keys rotate via `key_id`, so a compromised
+historical build's key does not decrypt current templates.
+
+### 30.3 Tier 2 — Relay: zero-retention remote prompt assembly
+
+An optional service owning prompt *orchestration* — which templates fire in what order,
+routing, example selection — so that logic never ships to the client. The client sends
+structured slot-fill inputs; the relay assembles the request server-side.
+
+**Protects** the pipeline, the part of the IP a single captured request would not reveal.
+**Costs** the vendor's re-entry into the customer's data path for that call, which trades
+directly against the BYOK posture in §30.0. That tension is documented rather than hidden:
+what the relay sees (the assembled request, transiently) and what it persists (nothing, by
+design and by audit) are both stated, with logs carrying metadata only.
+
+### 30.4 Tier 3 — attested local execution
+
+The only tier with a real cryptographic guarantee, because it targets the local adapters
+rather than a cloud call. Where the host exposes a trusted execution environment, the
+runtime executes inside it and remote attestation proves that to the vendor's software
+before any prompt is sent.
+
+It **fails closed**: a caller who requests confidential execution on a host that cannot
+provide it gets a refusal and a typed signal, never a silent downgrade to unattested
+execution. A silent downgrade would make the guarantee a lie in exactly the way silent
+relay logging would. `confidential_execution_status()` is the one queryable capability
+check every other Tier 3 behaviour is built on, and the adapter composes the local
+adapters rather than subclassing them.
+
+Market facts that gate what may be *claimed*, and that will move — re-verify on the cadence
+`contracts/DRIFT-CHECK.md` applies to provider claims:
+
+- **Lead with H100 and name it.** H200 is architecturally the same Hopper CC stack but no
+  hyperscaler doc independently names an H200 confidential-VM SKU the way Azure names
+  `NCCadsH100v5-series`; say "architecturally plausible, not SKU-confirmed" rather than
+  rounding up.
+- **Blackwell/B200 CC is not GA on any hyperscaler** — preview or absent, available only
+  through smaller confidential-GPU providers.
+- **AWS GPU confidential computing remains unfound** in AWS's own P5/P5en announcements and
+  instance pages. Document AWS as unsupported for Tier 3 GPU offload; this is a strong
+  negative finding, not proof of absence.
+- **The open-source NVIDIA kernel modules (OpenRM) do support Hopper CC**, implementing the
+  SPDM attestation protocol; Blackwell platforms *require* them. No driver-choice caveat is
+  needed, and OpenRM is the forward-looking default rather than a fallback.
+- **Owner decision: invest in real Nitro Enclaves support**, against the original plan's
+  "skip for v1" lean — real new scope, since enclaves have no GPU, no persistent storage,
+  and vsock-only networking.
+- Attestation-quote cryptographic verification is **deliberately not implemented**: this
+  environment cannot exercise the positive case against real CC-capable hardware, and
+  shipping unverified security-critical code is worse than an honest, documented gap.
+
+### 30.5 Tier 4 — model and weight provenance
+
+Tier 3 proves *where* a prompt ran; Tier 4 proves *what* ran there — that the weights are
+the exact artifact the vendor signed, unmodified. It extends the existing manifest
+discipline (`local/runtimes.json` already pins runtime build identity;
+`GgufArtifact`/`GgufFile` already model the weights) rather than inventing a parallel one,
+and reports through an additional field on `ConfidentialExecutionStatus` so callers keep
+one place to look.
+
+**Each vendor signs their own manifests with their own keys. AnyInfer never operates a
+signing service** — it ships verification tooling and public-key registration only, never
+private-key handling. That keeps AnyInfer out of key-custody liability and makes signing
+the vendor's own PKI problem.
+
+**Excluded:** any model-integrity claim outside the attested path. Verifying a hash on an
+unattested host is a weaker, different claim and must not be marketed as Tier 4.
+
+### 30.6 Considered and not pursued
+
+BYOK fleet governance and allowlisting — deliberately out of scope, not merely unbuilt.
+

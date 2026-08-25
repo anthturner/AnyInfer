@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +25,13 @@ from anyinfer.local.server import ManagedServer, ServerHandle
 from anyinfer.local.store import ModelStore, StoreEntry
 from anyinfer.local.tuning import ServerPlan
 from anyinfer.providers.llama_cpp import LlamaCppAdapter, LlamaCppOptions
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
+from anyinfer.types.capabilities import Feature
 
 GIB = 1024**3
 PAYLOAD = b"gguf-bytes"
@@ -48,6 +56,31 @@ def _catalog(tmp_path: Path) -> Catalog:
                         {
                             "filename": "test-model.gguf",
                             "url": "https://host.invalid/test-model.gguf",
+                            "sha256": DIGEST,
+                            "size_bytes": len(PAYLOAD),
+                        }
+                    ],
+                }
+            },
+        }
+    )
+
+
+def _embedding_catalog(tmp_path: Path) -> Catalog:
+    """A catalog whose one artifact declares itself an embedding model."""
+    return Catalog.from_mapping(
+        {
+            "format_version": 1,
+            "gguf_artifacts": {
+                "embed-model": {
+                    "license": "Apache-2.0",
+                    "parameter_size": "137M",
+                    "quantization": "Q4_K_M",
+                    "embedding": {"dimensions": 768, "max_input_tokens": 8192},
+                    "files": [
+                        {
+                            "filename": "embed-model.gguf",
+                            "url": "https://host.invalid/embed-model.gguf",
                             "sha256": DIGEST,
                             "size_bytes": len(PAYLOAD),
                         }
@@ -265,6 +298,100 @@ async def test_generation_tunes_a_plan_and_delegates_to_the_dialect(tmp_path: Pa
     assert plan.context_size > 0
 
 
+_LLAMA_SERVER_EMBEDDINGS_RESPONSE = {
+    # Live-verified 2026-08-14 against a real llama-server (b10327) started with
+    # --embeddings, serving nomic-embed-text-v1.5: genuinely OpenAI-shaped, unlike the
+    # native (non-/v1) /embedding endpoint, which nests each vector one level deeper.
+    "model": "nomic-embed-text",
+    "object": "list",
+    "usage": {"prompt_tokens": 8, "total_tokens": 8},
+    "data": [
+        {"embedding": [0.1, 0.2, 0.3], "index": 0, "object": "embedding"},
+        {"embedding": [0.4, 0.5, 0.6], "index": 1, "object": "embedding"},
+    ],
+}
+
+
+async def test_embed_starts_a_dedicated_embeddings_server(tmp_path: Path) -> None:
+    """Verify embed() uses its own model key.
+
+    --embeddings can only be set at startup (live-verified), so embed() must not reuse
+    generate()'s model key — it needs its own resident server.
+    """
+    (tmp_path / "test-model.gguf").write_bytes(PAYLOAD)
+    from anyinfer.providers.base import EmbeddingWireRequest
+
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_LLAMA_SERVER_EMBEDDINGS_RESPONSE)
+
+    # _delegate_for builds its HTTP client from the adapter's own ProviderConfig.transport,
+    # so the fake transport an embed test needs is this one, not FakeOpenAIServer's — the
+    # fake is only threaded through _adapter() to satisfy its signature; embed() never
+    # reaches the chat dialect.
+    adapter, supervisor = _adapter(
+        tmp_path, FakeOpenAIServer(FakeResponse(text="unused"))
+    )
+    adapter._config = replace(adapter._config, transport=httpx2.MockTransport(handler))
+    try:
+        result = await adapter.embed(EmbeddingWireRequest(model="test-model", inputs=("hi", "there")))
+    finally:
+        await adapter.aclose()
+
+    assert result.vectors == ((0.1, 0.2, 0.3), (0.4, 0.5, 0.6))
+    assert result.usage is not None
+    assert result.usage.input_tokens == 8
+
+    assert len(supervisor.acquisitions) == 1
+    model_key, model_path, plan = supervisor.acquisitions[0]
+    assert model_key == "test-model:embeddings", "must not collide with generate()'s key"
+    assert model_path.name == "test-model.gguf"
+    assert plan.embeddings is True
+    assert "--embeddings" in plan.server_arguments("m.gguf", host="127.0.0.1", port=1)
+
+    assert seen[0].url.path == "/v1/embeddings"
+    body = json.loads(seen[0].content)
+    assert body == {"model": "test-model", "input": ["hi", "there"]}
+
+
+async def test_embed_and_generate_use_separate_supervisor_keys(tmp_path: Path) -> None:
+    """Verify embed() and generate() never share a resident server.
+
+    A resident chat server for a model must not be handed an embedding request, and vice
+    versa — they are different processes with different startup flags.
+    """
+    (tmp_path / "test-model.gguf").write_bytes(PAYLOAD)
+    from anyinfer.providers.base import EmbeddingWireRequest, WireRequest
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == "/v1/embeddings":
+            return httpx2.Response(200, json=_LLAMA_SERVER_EMBEDDINGS_RESPONSE)
+        return httpx2.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}
+                ]
+            },
+        )
+
+    adapter, supervisor = _adapter(tmp_path, FakeOpenAIServer(FakeResponse(text="hi")))
+    adapter._config = replace(adapter._config, transport=httpx2.MockTransport(handler))
+    try:
+        await adapter.embed(EmbeddingWireRequest(model="test-model", inputs=("hi",)))
+        [
+            e
+            async for e in adapter.generate(WireRequest(model="test-model", messages=(ai.user("hi"),)))
+        ]
+    finally:
+        await adapter.aclose()
+
+    keys = {acquisition[0] for acquisition in supervisor.acquisitions}
+    assert keys == {"test-model:embeddings", "test-model"}
+
+
 async def test_vision_artifact_supplies_projector_and_capability(tmp_path: Path) -> None:
     (tmp_path / "vision-model.gguf").write_bytes(PAYLOAD)
     (tmp_path / "mmproj.gguf").write_bytes(PROJECTOR)
@@ -378,6 +505,55 @@ async def test_list_models_reports_only_downloaded_catalog_artifacts(tmp_path: P
     assert caps is not None and caps.local is not None
     assert caps.local.parameter_size == "7B"
     assert caps.local.quantization == "Q4_K_M"
+
+
+async def test_discovery_reports_what_an_embedding_artifact_actually_serves(
+    tmp_path: Path,
+) -> None:
+    """A model id is not evidence of an operation; the pinned catalog row is.
+
+    Before the catalog could say which kind an artifact is, every llama.cpp model
+    discovered as generation-only with the full chat feature set -- including an embedding
+    GGUF, which serves none of it. `client.models(operation="embedding")` therefore
+    reported nothing for this provider, on a machine with an embedding model installed.
+    """
+    fake = FakeOpenAIServer()
+    adapter, _ = _adapter(tmp_path, fake, options={"catalog": _embedding_catalog(tmp_path)})
+    try:
+        ModelStore(tmp_path).register(
+            StoreEntry(
+                id="installed-embed-model",
+                model_id="embed-family",
+                variant_id="embed-model",
+                engine="llama.cpp",
+            )
+        )
+        models = await adapter.list_models()
+    finally:
+        await adapter.aclose()
+
+    assert [m.id for m in models] == ["embed-model"]
+    caps = models[0].capabilities
+    assert caps is not None
+    assert caps.operations is not None and caps.operations.value == frozenset({"embedding"})
+    assert caps.embedding is not None and caps.embedding.dimensions == 768
+    assert caps.embedding.max_input_tokens == 8192
+    # Not "streaming, tools, grammar": a server started with --embeddings serves none of it.
+    assert caps.features.value == Feature(0)
+
+
+async def test_generation_is_refused_on_a_declared_embedding_artifact(tmp_path: Path) -> None:
+    """The only mismatch the catalog *knows* is impossible, so the only one refused."""
+    fake = FakeOpenAIServer()
+    adapter, _ = _adapter(tmp_path, fake, options={"catalog": _embedding_catalog(tmp_path)})
+    try:
+        with pytest.raises(ConfigError, match="embedding model"):
+            adapter._artifact_for("embed-model", operation="generation")
+        # The reverse is not knowledge: llama.cpp will produce vectors from chat weights,
+        # and an overlay may pin an embedding GGUF without classifying it.
+        assert adapter._artifact_for("embed-model", operation="embedding") is not None
+    finally:
+        await adapter.aclose()
 
 
 async def test_health_reports_binary_availability(tmp_path: Path) -> None:
@@ -679,3 +855,76 @@ async def test_a_corrupted_stored_model_is_re_acquired_not_handed_to_the_server(
 
     assert calls == ["test-model"], "a corrupted file must be re-acquired"
     assert target.read_bytes() == PAYLOAD
+
+
+# ---- conformance -----------------------------------------------------------------------
+#
+# The supervised local engine is a *target*, not a separate product, so it belongs in the
+# same matrix as the hosted providers. What makes it awkward is that the adapter owns a
+# process by design: there is no "point at a server someone else started" option, and
+# inventing one purely to make this row possible would put a test seam into the shipped
+# option surface. Swapping the supervisor on the built adapter keeps that seam inside the
+# harness, where `workspace matrix` gets exactly the behaviour the suite does.
+
+
+def _conformance_model_dir() -> Path:
+    """A directory holding the one GGUF the stub supervisor will be handed."""
+    directory = Path(tempfile.mkdtemp(prefix="anyinfer-llama-conformance-"))
+    (directory / "test-model.gguf").write_bytes(PAYLOAD)
+    return directory
+
+
+_CONFORMANCE_MODEL_DIR = _conformance_model_dir()
+
+
+async def _build_llama_cpp_client(scenario: str) -> ai.AsyncClient:
+    from anyinfer.testing.fakes import FakeOpenAIServer, scenario_responses
+
+    server = FakeOpenAIServer(scenario_responses(scenario), models=("test-model",))
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "llama-cpp",
+                options={
+                    "catalog": _catalog(_CONFORMANCE_MODEL_DIR),
+                    "model_dir": _CONFORMANCE_MODEL_DIR,
+                    "auto_download": False,
+                    "hardware": HardwareProfile(
+                        os_name="linux",
+                        arch="x86_64",
+                        total_ram_bytes=32 * GIB,
+                        physical_cores=8,
+                        accelerators=(Accelerator(kind="cuda", total_vram_bytes=24 * GIB),),
+                    ),
+                },
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("llama-cpp:test-model",), retry=ai.Retry(max_attempts=2, backoff_base_s=0.0)
+        ),
+        use_default_catalog=False,
+    )
+    # Build the adapter now so its supervisor can be replaced before any case runs. No
+    # llama-server process is started, no GGUF is downloaded, and no port is bound.
+    adapter = await client._pool.get("llama-cpp")
+    adapter._supervisor = _StubSupervisor()  # type: ignore[attr-defined]
+    return client
+
+
+HARNESS = ConformanceHarness(
+    provider_id="llama-cpp",
+    model="test-model",
+    build_client=_build_llama_cpp_client,
+    # The supervised server speaks the OpenAI-compatible dialect, which carries token
+    # counts for reasoning but no reasoning channel. Embeddings need a server started
+    # with --embeddings, which is a *different* resident server for the same model, so
+    # they are covered by the dedicated tests above rather than claimed here.
+    supports=Capabilities(reasoning=False, cancellation=True),
+)
+
+
+async def test_llama_cpp_conformance() -> None:
+    results = await run_conformance(HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

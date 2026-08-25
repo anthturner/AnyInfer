@@ -16,7 +16,12 @@ import pytest
 import anyinfer as ai
 from anyinfer.providers.base import ProviderConfig, WireRequest
 from anyinfer.providers.deepseek import DeepSeekAdapter
-from anyinfer.testing.fakes import sse_lines
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
+from anyinfer.testing.fakes import FakeOpenAIServer, scenario_responses, sse_lines
 from anyinfer.types.requests import Sampling
 
 
@@ -359,3 +364,93 @@ async def test_a_compatible_endpoint_can_register_under_its_own_id() -> None:
     error = excinfo.value.attempts[-1].error
     assert error is not None
     assert error.provider == "kimi-messages"
+
+
+# ---- conformance ---------------------------------------------------------------------
+#
+# The dialect tests above prove each adapter's divergences from the OpenAI shape. These
+# harnesses prove the *shared* contract on top of them, and are what the published
+# conformance matrix reports.
+
+
+async def _build_deepseek_client(scenario: str) -> ai.AsyncClient:
+    server = FakeOpenAIServer(
+        scenario_responses(scenario),
+        models=("deepseek-v4-pro", "deepseek-v4-flash"),
+        # DeepSeek's whole dialect is this channel; the suite must exercise it, not skip it.
+        reasoning_field="reasoning_content",
+    )
+    return ai.AsyncClient(
+        [ai.ProviderSettings.of("deepseek", api_key="ds-key", transport=server.transport())],
+        route=ai.Route(
+            targets=("deepseek:deepseek-v4-pro",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+DEEPSEEK_HARNESS = ConformanceHarness(
+    provider_id="deepseek",
+    model="deepseek-v4-pro",
+    build_client=_build_deepseek_client,
+    supports=Capabilities(cancellation=True),
+)
+
+
+async def test_deepseek_conformance() -> None:
+    results = await run_conformance(DEEPSEEK_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+def _xai_server(scenario: str) -> Any:
+    """Rich `/language-models` discovery sits beside xAI's shared chat dialect."""
+    inner = FakeOpenAIServer(scenario_responses(scenario), models=("grok-4.5",))
+    compat = inner.transport()
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.endswith("/language-models"):
+            return httpx2.Response(
+                200,
+                json={
+                    "models": [
+                        {
+                            "id": "grok-4.5",
+                            "max_prompt_length": 256000,
+                            "prompt_text_token_price": 30000,
+                            "completion_text_token_price": 150000,
+                        }
+                    ]
+                },
+            )
+        return compat.handler(request)
+
+    return handler
+
+
+async def _build_xai_client(scenario: str) -> ai.AsyncClient:
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "xai", api_key="xai-key", transport=httpx2.MockTransport(_xai_server(scenario))
+            )
+        ],
+        route=ai.Route(
+            targets=("xai:grok-4.5",), retry=ai.Retry(max_attempts=2, backoff_base_s=0.0)
+        ),
+    )
+
+
+XAI_HARNESS = ConformanceHarness(
+    provider_id="xai",
+    model="grok-4.5",
+    build_client=_build_xai_client,
+    # xAI reports reasoning *token counts*, never a reasoning channel: a declared gap.
+    supports=Capabilities(reasoning=False, cancellation=True),
+)
+
+
+async def test_xai_conformance() -> None:
+    results = await run_conformance(XAI_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

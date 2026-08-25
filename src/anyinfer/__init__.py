@@ -64,8 +64,10 @@ from .capabilities import (
 )
 from .catalog import (
     BEST_AT,
+    MODEL_KINDS,
     Catalog,
     ModelEntry,
+    ModelKind,
     ModelVariant,
     OllamaChannel,
     load_default_catalog,
@@ -235,7 +237,7 @@ from .types import (
 )
 from .verification import Verification
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 __all__ = [
     "BENCHMARK_OUTPUT_TOKENS",
@@ -245,6 +247,7 @@ __all__ = [
     "DEFAULT_PROBE_FEATURES",
     "MANIFEST_FORMAT",
     "MAX_CONFIG_BYTES",
+    "MODEL_KINDS",
     "PROBEABLE_FEATURES",
     "AllTargetsFailedError",
     "AnyInferConfig",
@@ -324,6 +327,7 @@ __all__ = [
     "MessagesInput",
     "ModelCapabilities",
     "ModelEntry",
+    "ModelKind",
     "ModelNotFoundError",
     "ModelVariant",
     "Observer",

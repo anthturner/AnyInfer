@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "interactions": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8080/info",
+      "request_body": "",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "vary": "origin, access-control-request-method, access-control-request-headers",
+        "access-control-allow-origin": "*",
+        "date": "Mon, 24 Aug 2026 20:58:32 GMT"
+      },
+      "body": "{\"model_id\":\"BAAI/bge-small-en-v1.5\",\"model_sha\":null,\"model_dtype\":\"float32\",\"model_type\":{\"embedding\":{\"pooling\":\"cls\"}},\"max_concurrent_requests\":512,\"max_input_length\":512,\"max_batch_tokens\":16384,\"max_batch_requests\":8,\"max_client_batch_size\":32,\"auto_truncate\":false,\"tokenization_workers\":16,\"version\":\"1.8.3\",\"sha\":\"78502d8e61223d2c73d4bb7aeaea46787e90d596\",\"docker_label\":\"sha-78502d8\"}"
+    }
+  ]
+}

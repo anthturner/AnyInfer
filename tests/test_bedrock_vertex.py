@@ -12,9 +12,26 @@ import pytest
 
 import anyinfer as ai
 from anyinfer.errors import ConfigError
-from anyinfer.providers.base import AdapterFinal, EmbeddingWireRequest, ProviderConfig, WireRequest
+from anyinfer.providers.base import (
+    AdapterFinal,
+    EmbeddingWireRequest,
+    ProviderConfig,
+    RerankWireDocument,
+    RerankWireRequest,
+    WireRequest,
+)
 from anyinfer.providers.bedrock import BedrockAdapter
 from anyinfer.providers.vertex import VertexAdapter
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
+from anyinfer.testing.fakes import (
+    FakeBedrockServer,
+    FakeGeminiServer,
+    scenario_responses,
+)
 from anyinfer.types.requests import Sampling, ToolSpec
 
 AWS_OPTIONS = {
@@ -592,6 +609,136 @@ async def test_embed_rejects_a_response_over_the_byte_cap() -> None:
         await adapter.aclose()
 
 
+_COHERE_EMBED_RESPONSE = {
+    "id": "abc",
+    "response_type": "embeddings_floats",
+    "embeddings": {"float": [[0.1, 0.2], [0.3, 0.4]]},
+    "texts": ["hi", "there"],
+}
+
+
+async def test_cohere_embed_batches_all_inputs_into_one_call() -> None:
+    """Unlike Titan, Cohere Embed v3 batches — one InvokeModel call, not one per input."""
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_COHERE_EMBED_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        result = await adapter.embed(
+            EmbeddingWireRequest(
+                model="cohere.embed-english-v3", inputs=("hi", "there"), input_type="document"
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    assert len(seen) == 1
+    assert seen[0].url.path == "/model/cohere.embed-english-v3/invoke"
+    body = json.loads(seen[0].content)
+    assert body == {
+        "texts": ["hi", "there"],
+        "input_type": "search_document",
+        "embedding_types": ["float"],
+    }
+    assert result.vectors == ((0.1, 0.2), (0.3, 0.4))
+    assert result.usage is None  # Bedrock's Cohere embed response reports no token usage
+
+
+async def test_cohere_embed_requires_an_input_type() -> None:
+    adapter = _bedrock(lambda request: httpx2.Response(200, json=_COHERE_EMBED_RESPONSE))
+    try:
+        with pytest.raises(ConfigError, match="input type"):
+            await adapter.embed(
+                EmbeddingWireRequest(model="cohere.embed-english-v3", inputs=("hi",))
+            )
+    finally:
+        await adapter.aclose()
+
+
+_RERANK_RESPONSE = {
+    "results": [
+        {"index": 1, "relevanceScore": 0.9},
+        {"index": 0, "relevanceScore": 0.2},
+    ]
+}
+
+
+async def test_rerank_uses_the_agent_runtime_host_and_maps_model_to_arn() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json=_RERANK_RESPONSE)
+
+    adapter = _bedrock(handler)
+    try:
+        result = await adapter.rerank(
+            RerankWireRequest(
+                model="cohere.rerank-v3-5:0",
+                query="q",
+                documents=(
+                    RerankWireDocument(index=10, text="alpha"),
+                    RerankWireDocument(index=11, text="beta"),
+                ),
+                top_n=2,
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0].url.host == "bedrock-agent-runtime.us-east-1.amazonaws.com"
+    assert seen[0].url.path == "/rerank"
+    body = json.loads(seen[0].content)
+    assert body == {
+        "queries": [{"type": "TEXT", "textQuery": {"text": "q"}}],
+        "sources": [
+            {"type": "INLINE", "inlineDocumentSource": {"type": "TEXT", "textDocument": {"text": "alpha"}}},
+            {"type": "INLINE", "inlineDocumentSource": {"type": "TEXT", "textDocument": {"text": "beta"}}},
+        ],
+        "rerankingConfiguration": {
+            "type": "BEDROCK_RERANKING_MODEL",
+            "bedrockRerankingConfiguration": {
+                "modelConfiguration": {
+                    "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/cohere.rerank-v3-5:0"
+                },
+                "numberOfResults": 2,
+            },
+        },
+    }
+    # Positional index maps back onto the caller-supplied document index, same rule as
+    # every other adapter's rerank parsing.
+    assert result.items[0].index == 11
+    assert result.items[0].score == 0.9
+    assert result.items[1].index == 10
+    assert result.items[1].score == 0.2
+    assert result.usage is None  # Bedrock's Rerank response reports no usage/search units
+
+
+async def test_rerank_is_sigv4_signed() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={"results": []})
+
+    adapter = _bedrock(handler)
+    try:
+        await adapter.rerank(
+            RerankWireRequest(
+                model="amazon.rerank-v1:0",
+                query="q",
+                documents=(RerankWireDocument(index=0, text="d"),),
+            )
+        )
+    finally:
+        await adapter.aclose()
+
+    assert seen[0].headers["authorization"].startswith("AWS4-HMAC-SHA256")
+
+
 # ---- vertex --------------------------------------------------------------------------
 
 
@@ -831,3 +978,82 @@ async def test_vertex_embed_rejects_a_response_over_the_byte_cap() -> None:
             )
     finally:
         await adapter.aclose()
+
+
+# ---- vertex conformance ----------------------------------------------------------------
+
+
+async def _build_vertex_client(scenario: str) -> ai.AsyncClient:
+    # Vertex is Gemini's protocol with different addressing and auth, so the Gemini fake
+    # serves it unchanged; `api_key` here is a pre-acquired OAuth access token.
+    server = FakeGeminiServer(scenario_responses(scenario), models=("gemini-2.5-flash",))
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "vertex",
+                api_key="ya29.test-token",
+                options={"project": "my-project", "location": "global"},
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("vertex:gemini-2.5-flash",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+VERTEX_HARNESS = ConformanceHarness(
+    provider_id="vertex",
+    model="gemini-2.5-flash",
+    build_client=_build_vertex_client,
+    # Embeddings go to `:predict`, which every Vertex embedding model documents. There is
+    # no rerank endpoint.
+    supports=Capabilities(cancellation=True, embedding=True),
+    embedding_model="text-embedding-005",
+)
+
+
+async def test_vertex_conformance() -> None:
+    results = await run_conformance(VERTEX_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+# ---- bedrock conformance ---------------------------------------------------------------
+
+
+async def _build_bedrock_client(scenario: str) -> ai.AsyncClient:
+    server = FakeBedrockServer(scenario_responses(scenario))
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "bedrock",
+                options=dict(AWS_OPTIONS),
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("bedrock:anthropic.claude-sonnet-4-5-v1:0",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+BEDROCK_HARNESS = ConformanceHarness(
+    provider_id="bedrock",
+    model="anthropic.claude-sonnet-4-5-v1:0",
+    build_client=_build_bedrock_client,
+    # The only provider here whose embeddings, rerank, and generation are three
+    # different services; the fake routes all four actions so the suite sees one
+    # provider, the way a caller does.
+    supports=Capabilities(cancellation=True, embedding=True, rerank=True),
+    embedding_model="amazon.titan-embed-text-v2:0",
+    rerank_model="amazon.rerank-v1:0",
+)
+
+
+async def test_bedrock_conformance() -> None:
+    results = await run_conformance(BEDROCK_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

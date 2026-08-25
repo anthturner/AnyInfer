@@ -14,5 +14,5 @@ pip install -e src/anyinfer-confidential
 pip install -e "src/anyinfer-confidential[relay]"   # only if you're running the Relay service
 ```
 
-See `plans/TIERED_ENCRYPTED_PLANS.md` and the published Confidentiality Tiers doc for the
+See DESIGN.md §30 and the published Confidentiality Tiers doc for the
 full design and the honest ceiling on what each tier guarantees.

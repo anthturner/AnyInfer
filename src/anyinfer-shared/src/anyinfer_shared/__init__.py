@@ -10,7 +10,7 @@ attested local execution, Tier 4 model-weight verification, both in
 internals just to describe "what confidentiality actually happened for this call" — so
 the composite lives here, in a package both can depend on.
 
-See `plans/TIERED_ENCRYPTED_PLANS.md` for the tier definitions this type reports against,
+See DESIGN.md §30 for the tier definitions this type reports against,
 and the published Confidentiality Tiers doc for the guarantee each field maps to.
 """
 

@@ -437,7 +437,7 @@ HARNESS = ConformanceHarness(
     provider_id="gemini",
     model="gemini-2.5-flash",
     build_client=_build_client,
-    supports=Capabilities(),
+    supports=Capabilities(cancellation=True),
 )
 
 

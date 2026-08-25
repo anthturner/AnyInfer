@@ -1,8 +1,12 @@
 # tei — Protocol Contract
 
 Status: **implemented** — `providers/tei.py`, the native TEI dialect (embed + rerank).
-Last verified: 2026-08-12 — against the project's OpenAPI specification and quick tour
-(sources below). Not yet verified against a live server; flagged per item below.
+Last verified: 2026-08-24 — **live**, against two real servers running the official
+`ghcr.io/huggingface/text-embeddings-inference:cpu-1.8` image (reporting version 1.8.3),
+one loaded with `BAAI/bge-small-en-v1.5` and one with `BAAI/bge-reranker-base`. The
+traffic is committed as `tests/cassettes/tei_{embed,info,rerank}.json` and replays
+offline. The wire-shape assertions below were confirmed against the project's OpenAPI
+specification on 2026-08-12 and against observed traffic on 2026-08-24.
 
 ## Upstream sources
 - https://huggingface.co/docs/text-embeddings-inference/quick_tour
@@ -38,7 +42,14 @@ model; discovery reports the real id), and the descriptor declares
 - None by default (a loopback service). `Authorization: Bearer <key>` only when the
   server was started with `--api-key`; conventionally `env://TEI_API_KEY`.
 
-### Embed request fields (verified 2026-08-12 from the OpenAPI spec)
+### Version pins
+- **No API version anywhere** — paths are unversioned and TEI sends no version header.
+  The server's build identity comes from `GET /info`'s `version` field, which is the only
+  thing a caller can pin against; the adapter reads it for diagnostics. A breaking change
+  to an unversioned local API is therefore invisible until a request fails, which is why
+  the watchlist below tracks build-specific behaviour explicitly.
+
+### Embed request fields (spec 2026-08-12; live 2026-08-24)
 - `inputs` (string or array of strings, required), `normalize` (default **true**),
   `truncate` (default false — over-length input errors rather than silently truncating),
   `truncation_direction` (default `right`), `prompt_name`, `dimensions` (nullable).
@@ -48,7 +59,7 @@ model; discovery reports the real id), and the descriptor declares
   `provider_options` override changed it, in which case the override's value is
   reported.
 
-### Embed response (verified 2026-08-12)
+### Embed response (spec 2026-08-12; live 2026-08-24 — 384 floats per input, no usage body)
 - A bare array of arrays of floats, in input order. No model field, no usage — usage
   stays `None`, never zero.
 - **Per-request input ceiling**: `/info.max_client_batch_size` reports it per server, so
@@ -56,14 +67,14 @@ model; discovery reports the real id), and the descriptor declares
   deployment); until a discovery channel for embedding capabilities exists, callers with
   large corpora set `BatchPolicy.max_items_override` to their server's reported value.
 
-### Rerank request fields (verified 2026-08-12)
+### Rerank request fields (spec 2026-08-12; live 2026-08-24)
 - `query` (required), `texts` (array of strings, required), `raw_scores` (default
   false), `return_text` (default false), `truncate`, `truncation_direction`.
 - **No native `top_n`**, and the spec does not state a result order. The adapter sorts
   by score descending and applies `top_n` client-side — a deterministic translation
   onto the normalized ranked contract, recorded here rather than assumed of the server.
 
-### Rerank response (verified 2026-08-12)
+### Rerank response (spec 2026-08-12; live 2026-08-24)
 - Array of `{index, score, text?}`; `index` is **positional within the submitted
   `texts` array** and is mapped back onto the caller-supplied document index before the
   core validates it (same treatment as the Cohere adapter).
@@ -77,10 +88,21 @@ model; discovery reports the real id), and the descriptor declares
 Embeddings and rerank responses are not streamed.
 
 ## Watchlist
-- **Not yet live-verified**: everything above comes from the project's own spec and
-  docs, not observed traffic — the first live lane should confirm the `/info`
-  `model_type` spelling (tagged object vs plain string; the adapter accepts both) and
-  the rerank result order.
+- **Undocumented usage headers (observed 2026-08-24, build 1.8.3).** Every `/embed` and
+  `/rerank` response carries `x-compute-tokens`, `x-compute-characters`, and a set of
+  timing headers (`x-compute-time`, `x-tokenization-time`, `x-queue-time`,
+  `x-inference-time`). None appears anywhere in the published OpenAPI document, which is
+  why the adapter does **not** read them: usage built on an undocumented header would
+  vanish silently on any release, and the drift check compares against documentation that
+  never mentioned it, so nothing would notice. If upstream documents them, this becomes
+  the token accounting TEI is currently recorded as not having.
+- **Rerank result order (observed 2026-08-24, build 1.8.3): descending by score.** The
+  OpenAPI document still states no ordering guarantee, so the adapter keeps sorting; the
+  observation is recorded so a future change is visible, not so the sort can be removed.
+- `/info.model_type` is a **tagged object**, confirmed live in both shapes:
+  `{"embedding": {"pooling": "cls"}}` on the embedder and
+  `{"reranker": {"id2label": ..., "label2id": ...}}` on the reranker. The adapter's
+  acceptance of a plain string is now belt-and-braces rather than a hedge.
 - `prompt_name`/prompts, `raw_scores`, sequence-classification (`/predict`) —
   unmodelled; reachable via `provider_options`.
 - `max_client_batch_size` as a discovered batch limit once a discovery channel for

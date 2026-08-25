@@ -9,6 +9,7 @@ import struct
 import httpx2
 import pytest
 
+import anyinfer as ai
 from anyinfer.errors import ProviderError, StreamProtocolError
 from anyinfer.providers.base import EmbeddingWireRequest, ProviderConfig
 from anyinfer.providers.openai_compat import OpenAICompatAdapter
@@ -223,5 +224,53 @@ async def test_openai_adapter_embeds_end_to_end_with_batching() -> None:
         assert calls == [2_048, 452]
         assert result.usage.input_tokens == 2_500
         assert result.space.model == "text-embedding-3-small"
+    finally:
+        await client.aclose()
+
+
+async def test_a_bundled_price_actually_reaches_an_embedding_result() -> None:
+    """The shipped pricing table, not a fake rate, produces the cost on a real adapter.
+
+    The cost machinery is covered against a fake provider carrying a fake price, which
+    proves the arithmetic. It does not prove that the entries in `pricing.json` are keyed
+    the way the embedding path looks them up -- a price present in the file but never
+    found is indistinguishable, from inside those tests, from a price that is absent.
+    This is one end-to-end pass over the real table.
+    """
+    from decimal import Decimal
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content)
+        inputs = body["input"]
+        return httpx2.Response(
+            200,
+            json={
+                "object": "list",
+                "data": [
+                    {"object": "embedding", "index": i, "embedding": [0.1, 0.2]}
+                    for i in range(len(inputs))
+                ],
+                "model": body["model"],
+                "usage": {"prompt_tokens": 1_000_000, "total_tokens": 1_000_000},
+            },
+        )
+
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings(
+                provider_id="openai",
+                api_key="test-key",
+                transport=httpx2.MockTransport(handler),
+            )
+        ],
+        use_default_catalog=False,
+    )
+    try:
+        result = await client.embed(["one text"], target="openai:text-embedding-3-small")
+        # $0.02 per 1M input tokens, verified against developers.openai.com and recorded
+        # in the bundled table; exactly one million tokens makes the expected cost the
+        # rate itself, so a unit-conversion slip cannot hide inside a rounding.
+        assert result.usage is not None
+        assert result.usage.cost_usd == Decimal("0.02")
     finally:
         await client.aclose()

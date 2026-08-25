@@ -129,11 +129,21 @@ def verify_file(path: Path, expected_sha256: str) -> bool:
         return path.exists()
     if not path.exists():
         return False
-    digest = hashlib.sha256()
+    return _read_and_hash(path, hashlib.sha256).lower() == expected_sha256.lower()
+
+
+def _read_and_hash(path: Path, hasher_factory: Callable[[], hashlib._Hash]) -> str:
+    """Chunk-read a file through a fresh hasher and return its hex digest.
+
+    Reads in `_CHUNK_BYTES` blocks so hashing a large model file never holds it fully in
+    memory. Shared by `verify_file` here, `acquire._sha256`/`_git_blob_sha1`, and
+    `provenance._hash_file` — the read loop is the same regardless of which hash it feeds.
+    """
+    digest = hasher_factory()
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(_CHUNK_BYTES), b""):
             digest.update(block)
-    return digest.hexdigest().lower() == expected_sha256.lower()
+    return digest.hexdigest()
 
 
 class FileLock:

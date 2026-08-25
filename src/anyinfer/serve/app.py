@@ -198,7 +198,9 @@ def create_app(
         try:
             _, generation_request, _ = request_from_openai(shaped)
             comparisons = await client.compare(generation_request, targets=targets)
-        except (AnyInferError, ValueError) as exc:
+        except AnyInferError as exc:
+            return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
+        except ValueError as exc:
             return _error(starlette, 400, str(exc), type(exc).__name__)
         return starlette.JSONResponse(
             {

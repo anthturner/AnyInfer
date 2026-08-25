@@ -6,7 +6,7 @@ exactly: detection *proposes*, `ConfidentialExecutionAdapter` (in `providers` �
 thing that actually enforces anything) decides, and every probe here is best-effort. A
 missing device node or an
 unparseable `nvidia-smi` line produces "not detected," never a guess dressed up as a fact
-— see `plans/TIERED_ENCRYPTED_PLANS.md` §4d for the full design this module implements.
+— see DESIGN.md §30.4 for the full design this module implements.
 
 This is a hardware-capability question in the same category as `hardware.py`/`backends.py`
 already answer ("what does this box actually have"), so it stays in core, in `local/`, not
@@ -24,15 +24,15 @@ so a caller can render *why*, not just whether.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from .hardware import _run as _hardware_run
+from .hardware import read_cached, write_cached
 
 if TYPE_CHECKING:
     from .backends import Backend
@@ -62,7 +62,7 @@ did you find" deserves the whole answer — but neither is part of the v1 `end_t
 claim: SGX's enclave-shaped programming model is not the lift-and-shift story SEV-SNP/TDX
 give, and Nitro Enclaves have no persistent storage or general networking, so serving a
 model inside one needs real integration work this module does not attempt to paper over
-(see the research findings in `plans/TIERED_ENCRYPTED_PLANS.md` §4c).
+(see the market findings in DESIGN.md §30.4).
 """
 
 _IS_LINUX = sys.platform.startswith("linux")
@@ -258,17 +258,56 @@ def _detect_cpu_tee() -> CpuTeeKind | None:
 def _detect_gpu_cc() -> tuple[bool, bool]:
     """Detect NVIDIA confidential-computing GPU capability and enablement.
 
+    **Live-verified pin (2026-08-14, RTX 4090, driver 595.84, non-CC-capable card) —**
+    the design this module implements (DESIGN.md §30.4) flagged this
+    CLI surface as newer/less stable than the flags `hardware.py` already depends on and
+    asked for the exact format to be pinned once a real session could check it. ``-f``
+    (``--get-cc-feature``), which the original design guessed carried both a capability and
+    a state field, verifiably carries **only** state:
+
+    .. code-block:: text
+
+        $ nvidia-smi conf-compute -f
+        CC status: OFF
+
+    There is no "CC capable" line anywhere in ``-f``'s output — that guessed field never
+    matched real output, so `gpu_cc_capable` was unconditionally `False` on every host
+    regardless of hardware. Capability lives in ``-q`` (``--query-conf-compute``), which
+    also verifiably repeats state under a different label:
+
+    .. code-block:: text
+
+        ==============NVSMI CONF-COMPUTE LOG==============
+
+            CC State                   : OFF
+            Multi-GPU Mode             : None
+            CPU CC Capabilities        : None
+            GPU CC Capabilities        : None
+            CC GPUs Ready State        : Not Ready
+
+    ``-q`` is used for both facts now, one shared parse. **Not independently verified in
+    this session** (no CC-capable GPU — Hopper H100/H200 or newer — was available to test
+    against): the exact positive value of "GPU CC Capabilities" when a card *is* capable.
+    Public secondary sources (NVIDIA's own ACM Queue writeup on confidential GPUs)
+    describe two capability tiers, Ampere's partial "APM" and Hopper's full CC support,
+    which is consistent with this field naming a capability rather than being a bare
+    boolean — so parsing treats any value other than ``None`` as capable rather than
+    requiring one exact string match, which would silently misparse an unanticipated
+    tier name. Re-verify directly against real H100/H200 output when that hardware is
+    reachable and tighten this parse if warranted.
+
     Returns:
         ``(capable, enabled)``. Both ``False`` when `nvidia-smi` is absent, the
         ``conf-compute`` subcommand is unsupported, or its output does not parse — this
         surface is newer and less stable than the flags `hardware.py` already depends on,
         so an unparseable result is treated as "not detected," never a guess.
     """
-    output = _run(["nvidia-smi", "conf-compute", "-f"])
+    output = _run(["nvidia-smi", "conf-compute", "-q"])
     if output is None:
         return False, False
-    capable = bool(re.search(r"CC\s+capable\s*:\s*TRUE", output, re.IGNORECASE))
-    enabled = bool(re.search(r"CC\s+status\s*:\s*ON", output, re.IGNORECASE))
+    capable_match = re.search(r"GPU\s+CC\s+Capabilities\s*:\s*(\S.*)", output, re.IGNORECASE)
+    capable = capable_match is not None and capable_match.group(1).strip().lower() != "none"
+    enabled = bool(re.search(r"CC\s+State\s*:\s*ON\b", output, re.IGNORECASE))
     return capable, enabled
 
 
@@ -302,53 +341,35 @@ def _probe_signature() -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
 
 
+def _decode_status(payload: dict[str, Any]) -> ConfidentialExecutionStatus:
+    """Rebuild a status from its cached payload dict, raising on anything malformed."""
+    return ConfidentialExecutionStatus(
+        cpu_tee=payload.get("cpu_tee"),
+        gpu_cc_capable=bool(payload["gpu_cc_capable"]),
+        gpu_cc_enabled=bool(payload["gpu_cc_enabled"]),
+        gpu_offload_required=bool(payload["gpu_offload_required"]),
+        end_to_end=bool(payload["end_to_end"]),
+        detail=str(payload["detail"]),
+    )
+
+
+def _encode_status(status: ConfidentialExecutionStatus) -> dict[str, Any]:
+    """The payload dict `_decode_status` rebuilds a status from."""
+    return {
+        "cpu_tee": status.cpu_tee,
+        "gpu_cc_capable": status.gpu_cc_capable,
+        "gpu_cc_enabled": status.gpu_cc_enabled,
+        "gpu_offload_required": status.gpu_offload_required,
+        "end_to_end": status.end_to_end,
+        "detail": status.detail,
+    }
+
+
 def _read_cache(signature: str) -> ConfidentialExecutionStatus | None:
     """Read a cached status, ignoring it if the probe signature changed."""
-    try:
-        data = json.loads(cache_path().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict) or data.get("signature") != signature:
-        return None
-    payload = data.get("status")
-    if not isinstance(payload, dict):
-        return None
-    try:
-        return ConfidentialExecutionStatus(
-            cpu_tee=payload.get("cpu_tee"),
-            gpu_cc_capable=bool(payload["gpu_cc_capable"]),
-            gpu_cc_enabled=bool(payload["gpu_cc_enabled"]),
-            gpu_offload_required=bool(payload["gpu_offload_required"]),
-            end_to_end=bool(payload["end_to_end"]),
-            detail=str(payload["detail"]),
-        )
-    except (KeyError, TypeError, ValueError):
-        return None
+    return read_cached(cache_path(), signature, "status", _decode_status)
 
 
 def _write_cache(signature: str, status: ConfidentialExecutionStatus) -> None:
     """Write the cache atomically, ignoring any failure."""
-    path = cache_path()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".tmp")
-        temporary.write_text(
-            json.dumps(
-                {
-                    "signature": signature,
-                    "status": {
-                        "cpu_tee": status.cpu_tee,
-                        "gpu_cc_capable": status.gpu_cc_capable,
-                        "gpu_cc_enabled": status.gpu_cc_enabled,
-                        "gpu_offload_required": status.gpu_offload_required,
-                        "end_to_end": status.end_to_end,
-                        "detail": status.detail,
-                    },
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        temporary.replace(path)
-    except OSError:
-        return
+    write_cached(cache_path(), signature, "status", lambda: _encode_status(status))

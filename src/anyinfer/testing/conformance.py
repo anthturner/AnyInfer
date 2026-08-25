@@ -33,6 +33,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ..routing import Retry, Route
 from ..types.events import (
     AttemptFailed,
     ReasoningDelta,
@@ -101,6 +102,10 @@ class Capabilities:
         retry_after: Rate limiting surfaces as a retryable, recorded attempt.
         error_mapping: Provider failures map to typed errors with a correct retry flag.
         byte_cap: An oversized response is rejected rather than silently truncated.
+        cancellation: Abandoning a stream mid-flight releases its upstream connection and
+            leaves the client usable. Defaults to ``False``: this is a case a harness opts
+            into, because a fake that cannot be held open mid-stream would fail it for a
+            reason that says nothing about the adapter.
         embedding: `embed()` returns ordered, uniform, finite vectors. Defaults to
             ``False`` — most adapters generate only, and an operation nobody declared
             must skip rather than fail.
@@ -121,6 +126,7 @@ class Capabilities:
     retry_after: bool = True
     error_mapping: bool = True
     byte_cap: bool = True
+    cancellation: bool = False
     embedding: bool = False
     rerank: bool = False
 
@@ -136,6 +142,13 @@ class ConformanceHarness:
             suite passes a scenario name so the harness can program its fake or select its
             cassette.
         supports: Declared capabilities; unsupported cases are skipped.
+        retry: The policy the rate-limiting cases route through. It defaults to no
+            backoff because those cases assert the *attempt trail* -- that a 429 is
+            recorded as a retried attempt and typed retryable -- and never assert how
+            long the client waited. Sleeping the real backoff proves nothing and, at
+            three cases per adapter across every preset, was the single largest block of
+            wall time in the suite. A live-mode harness that talks to a real rate-limited
+            endpoint should override this with a policy that honors ``Retry-After``.
     """
 
     provider_id: str
@@ -144,11 +157,23 @@ class ConformanceHarness:
     supports: Capabilities = Capabilities()
     embedding_model: str | None = None
     rerank_model: str | None = None
+    retry: Retry = Retry(max_attempts=2, backoff_base_s=0.0)
 
     @property
     def target(self) -> str:
         """The target string for this harness."""
         return f"{self.provider_id}:{self.model}"
+
+    def retry_route(self, target: str) -> Route:
+        """A route to ``target`` carrying this harness's retry policy.
+
+        The rate-limiting cases state their policy here rather than passing a bare
+        ``target=`` and relying on the client to supply one. A client whose default route
+        sets a policy would pass it down either way, but a harness is free to build a
+        client without a default route at all, and these three cases are the ones where
+        the difference is measured in seconds of real sleeping.
+        """
+        return Route(targets=(target,), retry=self.retry)
 
     @property
     def embedding_target(self) -> str:
@@ -384,7 +409,7 @@ async def _case_error_mapping(client: AsyncClient, h: ConformanceHarness) -> Non
 
 
 async def _case_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
-    result = await client.generate("Say hello.", target=h.target)
+    result = await client.generate("Say hello.", route=h.retry_route(h.target))
     assert result.attempts, "the attempt trail must be populated"
     retried = [a for a in result.attempts if a.outcome == "retried"]
     assert retried, "a rate-limited attempt must be recorded as retried"
@@ -485,6 +510,47 @@ async def _case_embedding_normalization_probe(client: AsyncClient, h: Conformanc
     assert isinstance(report.normalized, bool), "normalization must be a measured bool"
 
 
+async def _case_cancellation(client: AsyncClient, h: ConformanceHarness) -> None:
+    """A caller who walks away mid-stream must not take the client down with them.
+
+    Two failures this catches, both of which look fine until a second request happens.
+    An adapter that swallows `CancelledError` turns "the user hit stop" into a normal
+    completion, so the caller's own cleanup never runs. An adapter that lets the generator
+    be collected rather than closing it releases the upstream connection whenever the GC
+    gets to it -- which under a connection pool means the next request blocks on a slot
+    that nothing will ever free. So the case cancels a live stream and then asks the same
+    client for a full generation: passing requires both the cancellation to propagate and
+    the client to still work.
+    """
+    import asyncio
+
+    reached_first_event = asyncio.Event()
+
+    async def consume() -> None:
+        async for _event in client.stream("Say hello.", target=h.target):
+            reached_first_event.set()
+            # Hold the stream open, mid-flight, the way a slow consumer does.
+            await asyncio.sleep(3600)
+
+    task = asyncio.create_task(consume())
+    try:
+        await asyncio.wait_for(reached_first_event.wait(), timeout=10)
+    except TimeoutError:
+        task.cancel()
+        raise AssertionError("the stream produced no event to cancel in the middle of") from None
+
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    else:
+        raise AssertionError("cancelling a stream consumer must not complete normally")
+
+    result = await client.generate("Say hello.", target=h.target)
+    assert result.text, "the client must still serve requests after a stream was abandoned"
+
+
 async def _case_embedding_byte_cap(client: AsyncClient, h: ConformanceHarness) -> None:
     from ..errors import AllTargetsFailedError, StreamProtocolError
 
@@ -515,7 +581,9 @@ async def _case_rerank_byte_cap(client: AsyncClient, h: ConformanceHarness) -> N
 
 
 async def _case_embedding_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
-    result = await client.embed(["alpha"], target=h.embedding_target, input_type="document")
+    result = await client.embed(
+        ["alpha"], route=h.retry_route(h.embedding_target), input_type="document"
+    )
     assert result.attempts, "the attempt trail must be populated"
     retried = [a for a in result.attempts if a.outcome == "retried"]
     assert retried, "a rate-limited embed attempt must be recorded as retried"
@@ -525,7 +593,9 @@ async def _case_embedding_retry_after(client: AsyncClient, h: ConformanceHarness
 
 async def _case_rerank_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
     result = await client.rerank(
-        "which text is about the moon landing", ["doc a", "doc b"], target=h.rerank_target
+        "which text is about the moon landing",
+        ["doc a", "doc b"],
+        route=h.retry_route(h.rerank_target),
     )
     assert result.attempts, "the attempt trail must be populated"
     retried = [a for a in result.attempts if a.outcome == "retried"]
@@ -555,6 +625,7 @@ CONFORMANCE_CASES: tuple[ConformanceCase, ...] = (
     ConformanceCase("error_mapping", "auth_error", "error_mapping", _case_error_mapping),
     ConformanceCase("retry_after", "rate_limited", "retry_after", _case_retry_after),
     ConformanceCase("byte_cap", "oversized", "byte_cap", _case_byte_cap),
+    ConformanceCase("cancellation", "streaming", "cancellation", _case_cancellation),
     ConformanceCase(
         "unknown_finish_reason", "odd_finish", "non_streaming", _case_unknown_finish_reason
     ),

@@ -1941,6 +1941,68 @@ class AsyncClient:
                 return generation, selected, None
         return generation, None, "arena judge returned an unusable candidate index"
 
+    def _enforce_spend_ceiling(
+        self,
+        estimate: Decimal | None,
+        *,
+        policy: SpendPolicy,
+        request_id: str,
+        unknown: bool,
+        unknown_message: str,
+        unknown_hint: str | None = None,
+        over_request_message: str,
+        over_request_hint: str | None = None,
+        over_total_message: Callable[[Decimal, Decimal], str],
+        over_total_hint: str | None = None,
+    ) -> None:
+        """Shared tail of every spend check: unknown-cost policy, then the two ceilings.
+
+        Every call site (single-request, operation, and summed-arena) has already produced
+        its own high-end ``estimate`` — or established that it could not, signaled by
+        ``unknown`` — because what is being estimated differs by call site. What repeats
+        everywhere is: refuse (or not) when the cost is unknown, refuse when the per-request
+        ceiling is crossed, and otherwise reserve against the cumulative ceiling through the
+        ledger. Message text is supplied by the caller so each site keeps its exact wording.
+
+        Raises:
+            SpendLimitError: When a ceiling would be crossed, or the cost is unknown and the
+                policy says not to spend blind.
+            RuntimeError: When a cumulative ceiling is configured but no ledger was supplied.
+        """
+        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
+        if unknown and policy.on_unknown == "refuse":
+            raise SpendLimitError(
+                unknown_message,
+                limit_usd=policy.max_request_usd or policy.max_total_usd,
+                spent_usd=spent,
+                hint=unknown_hint,
+            )
+        if estimate is None:
+            return
+
+        if policy.max_request_usd is not None and estimate > policy.max_request_usd:
+            raise SpendLimitError(
+                over_request_message,
+                limit_usd=policy.max_request_usd,
+                spent_usd=spent,
+                estimated_usd=estimate,
+                hint=over_request_hint,
+            )
+
+        if policy.max_total_usd is not None:
+            ledger = self._ledger
+            if ledger is None:
+                raise RuntimeError("a cumulative spend policy requires a spend ledger")
+            accepted, spent, reserved = ledger.reserve(request_id, estimate, policy.max_total_usd)
+            if not accepted:
+                raise SpendLimitError(
+                    over_total_message(spent, reserved),
+                    limit_usd=policy.max_total_usd,
+                    spent_usd=spent,
+                    estimated_usd=estimate,
+                    hint=over_total_hint,
+                )
+
     def _reserve_arena_spend(
         self,
         arena_id: str,
@@ -1970,37 +2032,26 @@ class AsyncClient:
                 unknown.append(str(target))
             else:
                 total += estimate * multiplier
-        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
-        if unknown and spend.on_unknown == "refuse":
-            raise SpendLimitError(
+        self._enforce_spend_ceiling(
+            total,
+            policy=spend,
+            request_id=arena_id,
+            unknown=bool(unknown),
+            unknown_message=(
                 f"the summed cost of this {len(policy.targets)}-candidate arena cannot "
-                f"be estimated because pricing is unknown for {', '.join(unknown)}",
-                limit_usd=spend.max_request_usd or spend.max_total_usd,
-                spent_usd=spent,
-                hint="supply trusted pricing or set spend on_unknown='allow'",
-            )
-        if spend.max_request_usd is not None and total > spend.max_request_usd:
-            raise SpendLimitError(
+                f"be estimated because pricing is unknown for {', '.join(unknown)}"
+            ),
+            unknown_hint="supply trusted pricing or set spend on_unknown='allow'",
+            over_request_message=(
                 f"the summed estimate {total} for {len(policy.targets)} arena candidates "
-                f"exceeds the per-request ceiling {spend.max_request_usd}",
-                limit_usd=spend.max_request_usd,
-                spent_usd=spent,
-                estimated_usd=total,
-            )
-        if spend.max_total_usd is not None:
-            ledger = self._ledger
-            if ledger is None:
-                raise RuntimeError("a cumulative spend policy requires a spend ledger")
-            accepted, spent, reserved = ledger.reserve(arena_id, total, spend.max_total_usd)
-            if not accepted:
-                raise SpendLimitError(
-                    f"this client has spent {spent}, reserved {reserved}, and this "
-                    f"{len(policy.targets)}-candidate arena could cost {total}, above "
-                    f"the total ceiling {spend.max_total_usd}",
-                    limit_usd=spend.max_total_usd,
-                    spent_usd=spent,
-                    estimated_usd=total,
-                )
+                f"exceeds the per-request ceiling {spend.max_request_usd}"
+            ),
+            over_total_message=lambda spent, reserved: (
+                f"this client has spent {spent}, reserved {reserved}, and this "
+                f"{len(policy.targets)}-candidate arena could cost {total}, above "
+                f"the total ceiling {spend.max_total_usd}"
+            ),
+        )
 
     def _new_run(
         self, request: GenerationRequest, route: Route, manifest: bool | None
@@ -2365,6 +2416,39 @@ class AsyncClient:
             output_reserve_tokens=output_reserve_tokens,
         )
 
+    async def _resolve_and_refresh(
+        self, targets: Sequence[Target], refresh: bool
+    ) -> tuple[list[tuple[str, ResolvedTarget | None, str]], dict[str, str]]:
+        """Resolve every target and, if asked, refresh discovered capabilities first.
+
+        Shared by `compare()` and `compare_embedding()`: each target is resolved and its
+        configuration reason recorded; when ``refresh`` is set, every distinct provider that
+        resolved cleanly gets one fresh model listing (not one per target). A refresh failure
+        is captured per provider rather than raised, since it is itself comparison data.
+        """
+        resolved_items: list[tuple[str, ResolvedTarget | None, str]] = []
+        refresh_ids: list[str] = []
+        for requested in targets:
+            spelling = str(requested)
+            try:
+                resolved = self.resolve(requested)
+                reason = self._pool.configuration_reason(resolved.provider_id) or ""
+            except (ConfigError, ValueError) as exc:
+                resolved_items.append((spelling, None, str(exc)))
+                continue
+            resolved_items.append((spelling, resolved, reason))
+            if refresh and not reason and resolved.provider_id not in refresh_ids:
+                refresh_ids.append(resolved.provider_id)
+
+        refresh_errors: dict[str, str] = {}
+        for provider_id in refresh_ids:
+            try:
+                await self.models(provider_id)
+            except Exception as exc:  # noqa: BLE001 — failure is comparison data
+                refresh_errors[provider_id] = str(exc)
+
+        return resolved_items, refresh_errors
+
     async def compare(
         self,
         messages: MessagesInput | GenerationRequest,
@@ -2414,26 +2498,7 @@ class AsyncClient:
             )
         )
 
-        resolved_items: list[tuple[str, ResolvedTarget | None, str]] = []
-        refresh_ids: list[str] = []
-        for requested in targets:
-            spelling = str(requested)
-            try:
-                resolved = self.resolve(requested)
-                reason = self._pool.configuration_reason(resolved.provider_id) or ""
-            except (ConfigError, ValueError) as exc:
-                resolved_items.append((spelling, None, str(exc)))
-                continue
-            resolved_items.append((spelling, resolved, reason))
-            if refresh and not reason and resolved.provider_id not in refresh_ids:
-                refresh_ids.append(resolved.provider_id)
-
-        refresh_errors: dict[str, str] = {}
-        for provider_id in refresh_ids:
-            try:
-                await self.models(provider_id)
-            except Exception as exc:  # noqa: BLE001 — failure is comparison data
-                refresh_errors[provider_id] = str(exc)
+        resolved_items, refresh_errors = await self._resolve_and_refresh(targets, refresh)
 
         results: list[TargetComparison] = []
         policy = request.cache if request.cache is not None else self._cache
@@ -2567,26 +2632,7 @@ class AsyncClient:
         """
         texts = (inputs,) if isinstance(inputs, str) else tuple(inputs)
 
-        resolved_items: list[tuple[str, ResolvedTarget | None, str]] = []
-        refresh_ids: list[str] = []
-        for requested in targets:
-            spelling = str(requested)
-            try:
-                resolved = self.resolve(requested)
-                reason = self._pool.configuration_reason(resolved.provider_id) or ""
-            except (ConfigError, ValueError) as exc:
-                resolved_items.append((spelling, None, str(exc)))
-                continue
-            resolved_items.append((spelling, resolved, reason))
-            if refresh and not reason and resolved.provider_id not in refresh_ids:
-                refresh_ids.append(resolved.provider_id)
-
-        refresh_errors: dict[str, str] = {}
-        for provider_id in refresh_ids:
-            try:
-                await self.models(provider_id)
-            except Exception as exc:  # noqa: BLE001 — failure is comparison data
-                refresh_errors[provider_id] = str(exc)
+        resolved_items, refresh_errors = await self._resolve_and_refresh(targets, refresh)
 
         results: list[EmbeddingTargetComparison] = []
         for requested, item_resolved, reason in resolved_items:
@@ -2733,16 +2779,52 @@ class AsyncClient:
         An open session names a target of its own, and a caller who has one rarely wants to
         repeat it on every turn, so it stands in when nothing more specific was given. It
         never *overrides* anything: a session is about reuse, not routing.
+
+        **Naming a target changes where the request goes, not how it is governed.** A
+        caller who configured the client with ``route=Route(..., retry=Retry(
+        max_attempts=5))`` and then passes ``target="openai:gpt-x"`` for one call is
+        redirecting that call, not silently opting out of their own retry policy — so a
+        target-shaped override inherits the default route's policy knobs (`Retry`, the
+        health gate and its TTL) and replaces only the targets. The same applies to the
+        target-shaped spellings of ``route`` (a string, or a sequence of them) and to a
+        session's target.
+
+        A fully constructed `Route`, by contrast, is a complete statement of policy and is
+        honoured exactly as written — that is the spelling to reach for when the intent
+        really is to depart from the client's defaults.
+
+        The specialized chains are deliberately *not* inherited. ``context_window_targets``
+        and ``content_policy_targets`` name other targets, and quietly redirecting to a
+        target this caller did not name would be the same surprise in a different place.
         """
+        if isinstance(route, Route):
+            return route
         if route is not None:
-            return Route.coerce(route)
+            coerced = Route.coerce(route)
+            return self._governed(coerced.targets)
         if target is not None:
-            return Route(targets=(target,))
+            return self._governed((target,))
         if session is not None:
-            return Route(targets=(str(session.target),))
+            return self._governed((str(session.target),))
         if self._default_route is not None:
             return self._default_route
         raise _missing_target_error(self._pool.configured_ids)
+
+    def _governed(self, targets: tuple[Target, ...]) -> Route:
+        """Route to ``targets`` under the default route's policy, if there is one.
+
+        See `_resolve_route` for why a target-shaped override inherits policy but not the
+        specialized fallback chains.
+        """
+        base = self._default_route
+        if base is None:
+            return Route(targets=targets)
+        return Route(
+            targets=targets,
+            retry=base.retry,
+            health_gate=base.health_gate,
+            health_ttl_s=base.health_ttl_s,
+        )
 
     # ---- the routed loop -------------------------------------------------------------
 
@@ -3594,18 +3676,35 @@ class AsyncClient:
         return self._resolve_route(target, route, None)
 
     def _embedding_capabilities_of(self, resolved: ResolvedTarget) -> Any:
-        """Static embedding capabilities layered under anything a probe measured."""
+        """Embedding facts for one target, weakest evidence first.
+
+        Three layers, in the same order the rest of the capability system uses: what the
+        descriptor states about this model id, then what the model itself declared
+        through discovery (a listing that tags its own vectors, or a pinned catalog row
+        for a local artifact), then what a probe actually measured. Later layers only
+        fill or replace fields they genuinely know, so a probe never erases a declared
+        ceiling it did not test.
+        """
         try:
             descriptor = self._pool.descriptor_for(resolved.provider_id)
         except (AnyInferError, ValueError):
             return None
-        static = descriptor.static_embedding_capabilities.get(resolved.model)
-        probed = self._capabilities.embedding_probed_for(
-            resolved.provider_id, resolved.model
-        )
-        if static is not None and probed is not None:
-            return static.overlay(probed)
-        return probed if probed is not None else static
+        assembled = self._operation_capabilities(resolved)
+        layers = [
+            layer
+            for layer in (
+                descriptor.static_embedding_capabilities.get(resolved.model),
+                assembled.embedding if assembled is not None else None,
+                self._capabilities.embedding_probed_for(resolved.provider_id, resolved.model),
+            )
+            if layer is not None
+        ]
+        if not layers:
+            return None
+        merged = layers[0]
+        for layer in layers[1:]:
+            merged = merged.overlay(layer)
+        return merged
 
     def _check_operation_spend(
         self,
@@ -3629,7 +3728,6 @@ class AsyncClient:
         policy = self._spend_policy
         if policy is None or not policy.active:
             return
-        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
 
         estimate: Decimal | None = None
         if operation == "embedding" and texts is not None and route.targets:
@@ -3644,43 +3742,27 @@ class AsyncClient:
                     Usage(input_tokens=tokens), capabilities, "embedding"
                 )
 
-        if estimate is None:
-            if policy.on_unknown == "refuse":
-                raise SpendLimitError(
-                    f"the cost of this {operation} request cannot be estimated",
-                    limit_usd=policy.max_request_usd or policy.max_total_usd,
-                    spent_usd=spent,
-                    hint=(
-                        "this target has no trusted pricing (rerank costs are never "
-                        "estimated); set on_unknown='allow' to send it anyway, or supply "
-                        "pricing as a capability override"
-                    ),
-                )
-            return
-
-        if policy.max_request_usd is not None and estimate > policy.max_request_usd:
-            raise SpendLimitError(
+        self._enforce_spend_ceiling(
+            estimate,
+            policy=policy,
+            request_id=request_id,
+            unknown=estimate is None,
+            unknown_message=f"the cost of this {operation} request cannot be estimated",
+            unknown_hint=(
+                "this target has no trusted pricing (rerank costs are never "
+                "estimated); set on_unknown='allow' to send it anyway, or supply "
+                "pricing as a capability override"
+            ),
+            over_request_message=(
                 f"this {operation} request could cost {estimate}, above the per-request "
-                f"ceiling of {policy.max_request_usd}",
-                limit_usd=policy.max_request_usd,
-                spent_usd=spent,
-                estimated_usd=estimate,
-            )
-
-        if policy.max_total_usd is not None:
-            ledger = self._ledger
-            if ledger is None:
-                raise RuntimeError("a cumulative spend policy requires a spend ledger")
-            accepted, spent, reserved = ledger.reserve(request_id, estimate, policy.max_total_usd)
-            if not accepted:
-                raise SpendLimitError(
-                    f"this client has spent {spent}, reserved {reserved}, and this "
-                    f"{operation} request could cost {estimate}, above the total "
-                    f"ceiling {policy.max_total_usd}",
-                    limit_usd=policy.max_total_usd,
-                    spent_usd=spent,
-                    estimated_usd=estimate,
-                )
+                f"ceiling of {policy.max_request_usd}"
+            ),
+            over_total_message=lambda spent, reserved: (
+                f"this client has spent {spent}, reserved {reserved}, and this "
+                f"{operation} request could cost {estimate}, above the total "
+                f"ceiling {policy.max_total_usd}"
+            ),
+        )
 
     def _check_spend(
         self,
@@ -3706,49 +3788,32 @@ class AsyncClient:
         if policy is None or not policy.active:
             return
 
-        spent = self._ledger.totals().cost if self._ledger is not None else Decimal(0)
         estimate = self._estimate_request_cost(request, capabilities)
 
-        if estimate is None:
-            if policy.on_unknown == "refuse":
-                raise SpendLimitError(
-                    f"the cost of a request to {resolved} cannot be estimated",
-                    limit_usd=policy.max_request_usd or policy.max_total_usd,
-                    spent_usd=spent,
-                    hint=(
-                        "this target has no trusted pricing; set on_unknown='allow' to "
-                        "send it anyway, or supply pricing as a capability override"
-                    ),
-                )
-            return
-
-        if policy.max_request_usd is not None and estimate > policy.max_request_usd:
-            raise SpendLimitError(
+        self._enforce_spend_ceiling(
+            estimate,
+            policy=policy,
+            request_id=request_id,
+            unknown=estimate is None,
+            unknown_message=f"the cost of a request to {resolved} cannot be estimated",
+            unknown_hint=(
+                "this target has no trusted pricing; set on_unknown='allow' to "
+                "send it anyway, or supply pricing as a capability override"
+            ),
+            over_request_message=(
                 f"a request to {resolved} could cost {estimate}, above the per-request "
-                f"ceiling of {policy.max_request_usd}",
-                limit_usd=policy.max_request_usd,
-                spent_usd=spent,
-                estimated_usd=estimate,
-                hint="shorten the prompt, cap max_output_tokens, or raise max_request_usd",
-            )
-
-        if policy.max_total_usd is not None:
-            ledger = self._ledger
-            if ledger is None:
-                raise RuntimeError("a cumulative spend policy requires a spend ledger")
-            accepted, spent, reserved = ledger.reserve(
-                request_id, estimate, policy.max_total_usd
-            )
-            if not accepted:
-                raise SpendLimitError(
-                    f"this client has spent {spent}, reserved {reserved}, and the next "
-                    f"request could cost {estimate}, above the ceiling of "
-                    f"{policy.max_total_usd}",
-                    limit_usd=policy.max_total_usd,
-                    spent_usd=spent,
-                    estimated_usd=estimate,
-                    hint="raise max_total_usd, or reset the ledger to start a new budget",
-                )
+                f"ceiling of {policy.max_request_usd}"
+            ),
+            over_request_hint=(
+                "shorten the prompt, cap max_output_tokens, or raise max_request_usd"
+            ),
+            over_total_message=lambda spent, reserved: (
+                f"this client has spent {spent}, reserved {reserved}, and the next "
+                f"request could cost {estimate}, above the ceiling of "
+                f"{policy.max_total_usd}"
+            ),
+            over_total_hint="raise max_total_usd, or reset the ledger to start a new budget",
+        )
 
     def _estimate_request_cost(
         self, request: GenerationRequest, capabilities: ModelCapabilities | None

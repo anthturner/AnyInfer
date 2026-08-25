@@ -62,5 +62,5 @@ AnyInfer-operated availability commitment exists to cite yet.
 
 - [Confidentiality tiers](confidentiality-tiers.md) for the full technical detail behind
   every row above.
-- `plans/TIERED_ENCRYPTED_PLANS.md` §5 in the repository for the design record this mapping
+- DESIGN.md §30 in the repository for the design record this mapping
   was drafted from.

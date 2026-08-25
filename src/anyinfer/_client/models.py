@@ -15,7 +15,7 @@ never guesses, because a wrong guess is worse than an admitted gap.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
@@ -36,7 +36,7 @@ from ..local.fit import ModelFit, classify_fit, sort_by_fit
 from ..local.hardware import HardwareProfile, detect
 from ..local.runtimes import install_hint
 from ..local.sources.huggingface import resolve_token
-from ..local.store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
+from ..local.store import ModelStore, ResolvedModel
 from ..local.tuning import Posture
 from ..local.variants import VariantChoice, VariantPrefs, evaluate_variants
 
@@ -48,9 +48,7 @@ __all__ = [
     "build_catalog_view",
     "choose_variant",
     "engine_for_provider",
-    "installed_entries",
     "locate_catalog_model",
-    "remove_entry",
 ]
 
 HardwareSource = Literal["detected", "provided", "unavailable"]
@@ -407,13 +405,3 @@ def locate_catalog_model(
         verify=verify,
         launch_hints=hints,
     )
-
-
-def installed_entries(store: ModelStore) -> Sequence[StoreEntry]:
-    """Every model registered in a store."""
-    return store.list_installed()
-
-
-def remove_entry(store: ModelStore, entry_id: str) -> RemovalReport:
-    """Remove one store entry."""
-    return store.remove(entry_id)

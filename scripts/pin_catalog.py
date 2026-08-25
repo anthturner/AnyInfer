@@ -81,7 +81,15 @@ speculative-decoding draft heads that are a fraction of the size. Matching one o
 the kind of quietly-wrong number that pinning exists to prevent.
 """
 
-# ---- memory estimation (mirrors anyinfer.local.tuning's KV table) -----------------------
+# ---- memory estimation --------------------------------------------------------------
+#
+# A superset of anyinfer.local.tuning's _KV_BYTES_PER_TOKEN_F16, not an import of it: this
+# script deliberately carries no dependency on the anyinfer package (see the module
+# docstring), and the catalog needs finer parameter-size buckets than the runtime tuner's
+# intentionally coarse context-ladder table. Every key this table shares with tuning.py's
+# must carry the same bytes-per-token value — if you change one for a shared key, change
+# the other too, or a catalog fit verdict and the runtime planner's own estimate will
+# silently disagree for the same model.
 
 KV_BYTES_PER_TOKEN_F16: dict[str, int] = {
     "1B": 64 * 1024,
@@ -627,6 +635,44 @@ CANDIDATES: tuple[Mapping[str, Any], ...] = (
         "source": "https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct",
         "ollama": "qwen2.5vl:7b",
     },
+    # --- embeddings ----------------------------------------------------------------------
+    #
+    # An embedding candidate names a `config_repo`: the base repository whose config.json
+    # carries the layer count and hidden size, since a GGUF conversion repository ships
+    # weights and nothing else. `max_input_tokens` is the model card's published sequence
+    # length, which is *not* always config.json's `max_position_embeddings` -- nomic v1.5
+    # trains for 8192 through rotary scaling while its config still reads 2048 -- so it is
+    # declared here beside the source that states it, the same way `context_window` is for
+    # a chat model.
+    {
+        "id": "nomic-embed-text-v1.5",
+        "family": "nomic-embed",
+        "display_name": "Nomic Embed Text v1.5",
+        "context_window": 8192,
+        "license": "apache-2.0",
+        "best_at": ["embeddings", "rag"],
+        "repo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+        "source": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5",
+        "ollama": "nomic-embed-text",
+        "embedding": {
+            "config_repo": "nomic-ai/nomic-embed-text-v1.5",
+            "max_input_tokens": 8192,
+        },
+    },
+    {
+        "id": "nomic-embed-text-v2-moe",
+        "family": "nomic-embed",
+        "display_name": "Nomic Embed Text v2 MoE",
+        "context_window": 512,
+        "license": "apache-2.0",
+        "best_at": ["embeddings", "multilingual", "rag"],
+        "repo": "nomic-ai/nomic-embed-text-v2-moe-GGUF",
+        "source": "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe",
+        "embedding": {
+            "config_repo": "nomic-ai/nomic-embed-text-v2-moe",
+            "max_input_tokens": 512,
+        },
+    },
 )
 
 
@@ -758,6 +804,79 @@ def estimate_memory(parameter_size: str | None, file_bytes: int) -> tuple[int, i
     return file_bytes + kv + _CPU_OVERHEAD, file_bytes + kv + _GPU_OVERHEAD
 
 
+def estimate_embedding_memory(
+    file_bytes: int, *, layers: int, hidden_size: int, max_input_tokens: int
+) -> tuple[int, int]:
+    """Return ``(est_ram_bytes, est_vram_bytes)`` for an embedding model.
+
+    Not `estimate_memory` with different inputs, and the difference is not cosmetic. That
+    function looks a per-token KV cost up in a table keyed by parameter class ("7B",
+    "70B") and multiplies by a fixed 8k context, because that is what sizing a *chat*
+    model means. An embedding model is two orders of magnitude smaller than the table's
+    smallest rung, so it misses and takes the 256 KiB/token default — which, over 8k
+    tokens, budgets 2 GiB of KV cache for a model whose weights are 84 MB. The estimate
+    would be 25x the truth, and the fit engine would refuse it on machines that run it
+    comfortably.
+
+    So the cost is computed instead of looked up. A transformer's f16 KV cache is
+    ``2 (K and V) * layers * hidden_size * 2 bytes`` per token, and the model's own
+    maximum input length is the context that matters, not a chat-sized 8k. Both inputs
+    are read from the model's published ``config.json`` at pin time, so this is
+    arithmetic over upstream facts rather than another table to keep current.
+    """
+    kv = 2 * layers * hidden_size * 2 * max_input_tokens
+    return file_bytes + kv + _CPU_OVERHEAD, file_bytes + kv + _GPU_OVERHEAD
+
+
+def fetch_model_config(client: httpx2.Client, repo: str) -> dict[str, int] | None:
+    """Read layer count, hidden size, and parameter count from a model's own repository.
+
+    GGUF conversion repositories carry only weights, so the architecture facts come from
+    the base repository the conversion names. Two key spellings are accepted because
+    both appear in the wild — ``hidden_size``/``num_hidden_layers`` from a Transformers
+    config, ``n_embd``/``n_layer`` from the GPT-2 lineage many BERT-family embedders
+    inherited. Returns ``None`` when any required fact is missing, so the caller skips
+    the entry rather than shipping a guess.
+    """
+    response = client.get(f"{HF_RESOLVE}/{repo}/resolve/main/config.json")
+    if response.status_code != 200:
+        return None
+    try:
+        config = response.json()
+    except ValueError:
+        return None
+    if not isinstance(config, Mapping):
+        return None
+
+    def _first(*names: str) -> int | None:
+        for name in names:
+            value = config.get(name)
+            if isinstance(value, int) and value > 0:
+                return value
+        return None
+
+    layers = _first("num_hidden_layers", "n_layer")
+    hidden = _first("hidden_size", "n_embd")
+    if layers is None or hidden is None:
+        return None
+
+    facts = {"layers": layers, "hidden_size": hidden}
+    meta = client.get(f"{HF_API}/{repo}")
+    if meta.status_code == 200:
+        safetensors = meta.json().get("safetensors")
+        if isinstance(safetensors, Mapping) and isinstance(safetensors.get("total"), int):
+            facts["parameters"] = int(safetensors["total"])
+    return facts
+
+
+def format_parameter_size(parameters: int) -> str:
+    """Render an exact parameter count as the catalog's parameter class ("137M")."""
+    if parameters >= 1_000_000_000:
+        billions = parameters / 1_000_000_000
+        return f"{billions:.1f}B".replace(".0B", "B")
+    return f"{round(parameters / 1_000_000)}M"
+
+
 # ---- pinning ------------------------------------------------------------------------------
 
 
@@ -775,6 +894,16 @@ def pin_model(
     if not tree:
         return None, [f"{candidate['id']}: empty or unreadable tree for {repo}@{sha[:12]}"]
 
+    embedding_spec = candidate.get("embedding")
+    config: dict[str, int] | None = None
+    if embedding_spec is not None:
+        config_repo = str(embedding_spec["config_repo"])
+        config = fetch_model_config(client, config_repo)
+        if config is None:
+            return None, [
+                f"{candidate['id']}: cannot read layers/hidden_size from {config_repo}"
+            ]
+
     grouped = group_gguf_variants(tree)
     projector: Mapping[str, Any] | None = None
     projector_name = candidate.get("projector")
@@ -787,6 +916,7 @@ def pin_model(
             return None, [
                 f"{candidate['id']}: projector {projector_name!r} is absent or unverifiable"
             ]
+    projector_digest = digest_of(projector) if projector is not None else None
     artifact_ids = dict(candidate.get("artifact_ids") or {})
     variants: list[dict[str, Any]] = []
 
@@ -806,10 +936,8 @@ def pin_model(
             digests[path] = digest
             sizes[path] = int(entry.get("size", 0))
         roles: dict[str, str] = {}
-        if projector is not None:
+        if projector is not None and projector_digest is not None:
             path = str(projector["path"])
-            projector_digest = digest_of(projector)
-            assert projector_digest is not None
             digests[path] = projector_digest
             sizes[path] = int(projector.get("size", 0))
             roles[path] = "projector"
@@ -818,7 +946,15 @@ def pin_model(
             continue
 
         total = sum(sizes.values())
-        est_ram, est_vram = estimate_memory(candidate.get("parameter_size"), total)
+        if embedding_spec is not None and config is not None:
+            est_ram, est_vram = estimate_embedding_memory(
+                total,
+                layers=config["layers"],
+                hidden_size=config["hidden_size"],
+                max_input_tokens=int(embedding_spec["max_input_tokens"]),
+            )
+        else:
+            est_ram, est_vram = estimate_memory(candidate.get("parameter_size"), total)
         variant_id = f"{candidate['id']}-{quant.lower().replace('_', '-')}"
         variants.append(
             {
@@ -858,12 +994,24 @@ def pin_model(
             notes.append(f"{candidate['id']}: Ollama tag {tag} has no resolvable digest")
         sources["ollama"] = entry_ollama
 
+    parameter_size = candidate.get("parameter_size")
+    if parameter_size is None and config is not None and "parameters" in config:
+        parameter_size = format_parameter_size(config["parameters"])
+
+    embedding: dict[str, Any] = {}
+    if embedding_spec is not None and config is not None:
+        embedding = {
+            "dimensions": config["hidden_size"],
+            "max_input_tokens": int(embedding_spec["max_input_tokens"]),
+        }
+
     return (
         {
             "id": candidate["id"],
+            **({"kind": "embedding"} if embedding_spec is not None else {}),
             "family": candidate.get("family", ""),
             "display_name": candidate.get("display_name", ""),
-            "parameter_size": candidate.get("parameter_size"),
+            "parameter_size": parameter_size,
             "quantization": str(default["quantization"]),
             "context_window": candidate.get("context_window"),
             "license": candidate.get("license", ""),
@@ -874,6 +1022,7 @@ def pin_model(
             "last_verified": today,
             "source": candidate.get("source", f"https://huggingface.co/{repo}"),
             "sources": sources,
+            **({"embedding": embedding} if embedding else {}),
             "variants": variants,
         },
         notes,

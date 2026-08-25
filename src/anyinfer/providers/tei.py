@@ -32,6 +32,7 @@ from .base import (
     RerankWireRequest,
     RerankWireResult,
     WireRankedItem,
+    resolve_rerank_index,
 )
 from .http import build_client, check_response_size, classify_status, map_transport_error
 
@@ -218,11 +219,7 @@ class TEIAdapter:
                 raise ProviderError(
                     "rerank rank is missing a numeric 'score'", phase="validate"
                 )
-            index = (
-                req.documents[position].index
-                if 0 <= position < len(req.documents)
-                else position
-            )
+            index = resolve_rerank_index(req, position)
             items.append(WireRankedItem(index=index, score=float(score)))
         items.sort(key=lambda item: item.score, reverse=True)
         if req.top_n is not None:

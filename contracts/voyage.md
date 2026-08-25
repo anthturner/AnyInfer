@@ -28,6 +28,11 @@ counterpart to TEI's retrieval-only shape.
 ### Auth
 - `Authorization: Bearer <api_key>`. Conventionally `env://VOYAGE_API_KEY`.
 
+### Version pins
+- The API version is in the path (`/v1`). No header or query parameter carries a version,
+  and no dated preview channel is documented, so a version change would arrive as a new
+  path — visible in the endpoint list above rather than silently.
+
 ### Embeddings request fields (verified 2026-08-12)
 - `model` (required), `input` (string or array, **maximum 1,000 entries**),
   `input_type` (default null; `"query"` or `"document"` — the only two intents, mapped

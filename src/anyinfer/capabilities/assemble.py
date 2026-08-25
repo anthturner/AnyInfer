@@ -104,8 +104,16 @@ def _apply_override(result: ModelCapabilities, caps: ModelCapabilities) -> Model
         result = replace(result, features=Sourced(caps.features.value, "override"))
     if caps.pricing is not None:
         result = replace(result, pricing=Sourced(caps.pricing.value, "override"))
+    if caps.default_temperature is not None:
+        result = replace(
+            result, default_temperature=Sourced(caps.default_temperature.value, "override")
+        )
+    if caps.default_top_p is not None:
+        result = replace(result, default_top_p=Sourced(caps.default_top_p.value, "override"))
     if caps.local is not None:
         result = replace(result, local=caps.local)
+    if caps.operations is not None:
+        result = replace(result, operations=Sourced(caps.operations.value, "override"))
     return result
 
 
@@ -183,10 +191,6 @@ class CapabilityStore:
         """Measured embedding capabilities for one model, when a probe recorded any."""
         return self._embedding_probed.get(provider_id, {}).get(model)
 
-    def has_discovery(self, provider_id: str) -> bool:
-        """Whether a discovery layer has been recorded for this provider."""
-        return provider_id in self._discovered
-
     def discovered_has_model(self, provider_id: str, model: str) -> bool | None:
         """Whether a completed discovery listed ``model``; ``None`` means not discovered."""
         layer = self._discovered.get(provider_id)
@@ -199,9 +203,11 @@ class CapabilityStore:
         if provider_id is None:
             self._discovered.clear()
             self._probed.clear()
+            self._embedding_probed.clear()
             return
         self._discovered.pop(provider_id, None)
         self._probed.pop(provider_id, None)
+        self._embedding_probed.pop(provider_id, None)
 
     def capabilities_for(
         self,

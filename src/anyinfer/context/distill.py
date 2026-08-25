@@ -189,16 +189,18 @@ async def distill(
     """
     from ..types.messages import user
 
-    map_prompt = map_instructions or _MAP_INSTRUCTIONS
-    resolved_chunk_tokens = chunk_tokens or _derive_chunk_tokens(
-        client, target=target, map_prompt=map_prompt, query=query
+    map_prompt, chunks, map_cap = _prepare_map_phase(
+        source,
+        query,
+        client=client,
+        target=target,
+        chunk_tokens=chunk_tokens,
+        map_instructions=map_instructions,
+        max_output_tokens=max_output_tokens,
     )
-
-    chunks = _chunks_for(source, chunk_tokens=resolved_chunk_tokens)
     if not chunks:
         return Distillation(text="", chunk_count=0, calls=0, usage=Usage())
 
-    map_cap = _map_output_cap(len(chunks), max_output_tokens)
     semaphore = asyncio.Semaphore(max(1, concurrency))
 
     async def run_map(position: int, chunk: str) -> Generation:
@@ -212,8 +214,7 @@ async def distill(
     results = await asyncio.gather(
         *(run_map(index, text) for index, text in enumerate(chunks, start=1))
     )
-    notes = [result.text for result in results]
-    usage = merge_usage(result.usage for result in results)
+    notes, usage = _collect_map_results(results)
     calls = len(results)
 
     if reducer is not None:
@@ -259,15 +260,18 @@ def distill_sync(
     """
     from ..types.messages import user
 
-    map_prompt = map_instructions or _MAP_INSTRUCTIONS
-    resolved_chunk_tokens = chunk_tokens or _derive_chunk_tokens(
-        client, target=target, map_prompt=map_prompt, query=query
+    map_prompt, chunks, map_cap = _prepare_map_phase(
+        source,
+        query,
+        client=client,
+        target=target,
+        chunk_tokens=chunk_tokens,
+        map_instructions=map_instructions,
+        max_output_tokens=max_output_tokens,
     )
-    chunks = _chunks_for(source, chunk_tokens=resolved_chunk_tokens)
     if not chunks:
         return Distillation(text="", chunk_count=0, calls=0, usage=Usage())
 
-    map_cap = _map_output_cap(len(chunks), max_output_tokens)
     results = [
         client.generate(
             [user(_map_message(map_prompt, query, text, index, len(chunks)))],
@@ -276,8 +280,7 @@ def distill_sync(
         )
         for index, text in enumerate(chunks, start=1)
     ]
-    notes = [result.text for result in results]
-    usage = merge_usage(result.usage for result in results)
+    notes, usage = _collect_map_results(results)
 
     if reducer is not None:
         return _finish(
@@ -420,6 +423,38 @@ def _finish(
     if observer is not None:
         observer.on_event(distillation.event(max_tokens=max_output_tokens))
     return distillation
+
+
+def _prepare_map_phase(
+    source: str | Iterable[ContextDocument],
+    query: str,
+    *,
+    client: SupportsGenerate | SupportsGenerateSync,
+    target: str,
+    chunk_tokens: int | None,
+    map_instructions: str | None,
+    max_output_tokens: int,
+) -> tuple[str, list[str], int | None]:
+    """Resolve the map prompt, split the source into chunks, and cap map output.
+
+    Shared setup for `distill` and `distill_sync`: prompt resolution, chunk-size
+    derivation, chunking, and the per-note output cap do not depend on whether the map
+    calls themselves are dispatched concurrently or sequentially.
+    """
+    map_prompt = map_instructions or _MAP_INSTRUCTIONS
+    resolved_chunk_tokens = chunk_tokens or _derive_chunk_tokens(
+        client, target=target, map_prompt=map_prompt, query=query
+    )
+    chunks = _chunks_for(source, chunk_tokens=resolved_chunk_tokens)
+    map_cap = _map_output_cap(len(chunks), max_output_tokens)
+    return map_prompt, chunks, map_cap
+
+
+def _collect_map_results(results: Sequence[Generation]) -> tuple[list[str], Usage]:
+    """Pull notes and merged usage out of the map phase's generation results."""
+    notes = [result.text for result in results]
+    usage = merge_usage(result.usage for result in results)
+    return notes, usage
 
 
 def _chunks_for(source: str | Iterable[ContextDocument], *, chunk_tokens: int) -> list[str]:

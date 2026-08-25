@@ -34,7 +34,7 @@ from ..types.requests import Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data, data_url, media_subtype
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .sse import iter_sse
 
 __all__ = ["OpenAICompatAdapter", "descriptor"]
@@ -448,19 +448,17 @@ class OpenAICompatAdapter:
     def _parse_usage(self, usage: Mapping[str, Any]) -> Usage:
         """Read the dialect's usage block."""
         details = usage.get("prompt_tokens_details")
-        cache_read = None
-        if isinstance(details, Mapping):
-            cached = details.get("cached_tokens")
-            cache_read = cached if isinstance(cached, int) else None
+        cache_read = read_int(details, "cached_tokens") if isinstance(details, Mapping) else None
         completion_details = usage.get("completion_tokens_details")
-        reasoning = None
-        if isinstance(completion_details, Mapping):
-            raw = completion_details.get("reasoning_tokens")
-            reasoning = raw if isinstance(raw, int) else None
+        reasoning = (
+            read_int(completion_details, "reasoning_tokens")
+            if isinstance(completion_details, Mapping)
+            else None
+        )
         return Usage(
-            input_tokens=_int_or_none(usage.get("prompt_tokens")),
-            output_tokens=_int_or_none(usage.get("completion_tokens")),
-            total_tokens=_int_or_none(usage.get("total_tokens")),
+            input_tokens=read_int(usage, "prompt_tokens"),
+            output_tokens=read_int(usage, "completion_tokens"),
+            total_tokens=read_int(usage, "total_tokens"),
             cache_read_tokens=cache_read,
             reasoning_tokens=reasoning,
         ).normalized()
@@ -468,10 +466,6 @@ class OpenAICompatAdapter:
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
         await self._client.aclose()
-
-
-def _int_or_none(value: Any) -> int | None:
-    return value if isinstance(value, int) else None
 
 
 class _StreamState:

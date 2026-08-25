@@ -52,7 +52,6 @@ __all__ = [
     "read_manifest",
     "remove_runtime",
     "runtime_root",
-    "runtime_search_paths",
 ]
 
 MANIFEST_NAME = "runtime.json"
@@ -657,14 +656,6 @@ def _clear(path: Path) -> None:
     """Remove a directory tree if it exists, ignoring failures."""
     if path.exists():
         shutil.rmtree(path, ignore_errors=True)
-
-
-def runtime_search_paths(root: Path | None = None) -> list[Path]:
-    """Directories `available_backends` should search, best-known first."""
-    base = root or runtime_root()
-    if not base.is_dir():
-        return []
-    return [entry for entry in sorted(base.iterdir()) if entry.is_dir()]
 
 
 def install_hint(hardware: HardwareProfile | None, table: RuntimeTable | None = None) -> str:

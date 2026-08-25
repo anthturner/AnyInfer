@@ -66,6 +66,7 @@ from .http import (
     classify_status,
     map_transport_error,
     read_error_detail,
+    read_int,
 )
 from .sse import iter_sse
 
@@ -684,21 +685,17 @@ def _parse_usage(payload: Any) -> Usage | None:
     if not isinstance(payload, Mapping):
         return None
 
-    def field(name: str) -> int | None:
-        value = payload.get(name)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
-
-    candidates = field("candidatesTokenCount")
-    thoughts = field("thoughtsTokenCount")
+    candidates = read_int(payload, "candidatesTokenCount")
+    thoughts = read_int(payload, "thoughtsTokenCount")
     output = None
     if candidates is not None or thoughts is not None:
         output = (candidates or 0) + (thoughts or 0)
 
     usage = Usage(
-        input_tokens=field("promptTokenCount"),
+        input_tokens=read_int(payload, "promptTokenCount"),
         output_tokens=output,
-        total_tokens=field("totalTokenCount"),
-        cache_read_tokens=field("cachedContentTokenCount"),
+        total_tokens=read_int(payload, "totalTokenCount"),
+        cache_read_tokens=read_int(payload, "cachedContentTokenCount"),
         reasoning_tokens=thoughts,
     )
     return usage if usage != Usage() else None

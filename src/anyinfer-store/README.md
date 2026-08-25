@@ -22,5 +22,5 @@ store.add("doc-1", result.vectors[0], space=result.space, text="the document tex
 matches = store.query(query_vector, space=result.space, top_k=5)
 ```
 
-See `plans/VECTOR_STORE_ADDON.md` and the published vector store guide for the full design
+See DESIGN.md §29 and the published vector store guide for the full design
 and the explicit, permanent scale boundary.

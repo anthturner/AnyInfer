@@ -138,6 +138,17 @@ class CassetteTransport(httpx2.AsyncBaseTransport):
         self._inner = inner
         self._cursor = 0
 
+    async def aclose(self) -> None:
+        """Close the recording-mode inner transport, when one was opened.
+
+        `AsyncBaseTransport.aclose` is a no-op by default; recording opens a real
+        `httpx2.AsyncHTTPTransport` in `__init__` and nothing else was closing its
+        connection pool, which leaked a socket per test under this project's
+        ``filterwarnings = ["error"]`` gate. Replay mode has no `inner` to close.
+        """
+        if self._inner is not None:
+            await self._inner.aclose()
+
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         """Serve one request from the cassette, or record it live."""
         if self._record:

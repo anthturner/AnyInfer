@@ -167,7 +167,7 @@ python workspace.py demo     # launch the demo app
 
 ## Compatibility surface
 
-Provider breadth is compatibility inventory, not the product thesis. AnyInfer ships 17
+Provider breadth is compatibility inventory, not the product thesis. AnyInfer ships 20
 dedicated adapters plus 86 declarative OpenAI-compatible presets.
 **[See the complete inventory →](https://anyinfer.dev/providers/all/)**
 
@@ -184,6 +184,9 @@ The dedicated adapters, each handling provider-specific protocol or discovery be
 | Google Vertex AI | `vertex:` | Gemini with GCP OAuth/ADC auth |
 | AWS Bedrock | `bedrock:` | Converse API, SigV4 or Bedrock API key |
 | Cohere | `cohere:` | Native v2 chat API |
+| Voyage AI | `voyage:` | Specialist embeddings/rerank; query/document intents |
+| Jina AI | `jina:` | Specialist embeddings/rerank; full task vocabulary |
+| Text Embeddings Inference | `tei:` | Local embeddings/rerank; retrieval-only, one model per server |
 | LM Studio | `lm-studio:` | Native model discovery and residency |
 | Azure AI Foundry | `azure-foundry:` | Entra or API key |
 | GitHub Copilot | `copilot:` | Includes the `auto` sentinel |

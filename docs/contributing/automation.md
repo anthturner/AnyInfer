@@ -6,17 +6,26 @@ of truth for repository rules, architecture constraints, tests, and workstream o
 
 The tool-specific files are discovery shims only:
 
-| Tool | Discovery file | Workflow shim |
+| Tool | Discovery file | Workflow shims |
 |---|---|---|
-| Codex | `AGENTS.md` | `.agents/skills/check-provider-drift/SKILL.md` |
-| Claude Code | `CLAUDE.md` | `.claude/skills/check-provider-drift/SKILL.md` |
-| GitHub Copilot | `.github/copilot-instructions.md` | `.github/prompts/check-provider-drift.prompt.md` |
+| Codex | `AGENTS.md` | `.agents/skills/<workflow>/SKILL.md` |
+| Claude Code | `CLAUDE.md` | `.claude/skills/<workflow>/SKILL.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` | `.github/prompts/<workflow>.prompt.md` |
 
 The shims point back to the canonical source and must not restate repository rules. This
-prevents one tool from operating under a stale or subtly different architecture. Provider
-drift works the same way: [`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md)
-owns the procedure and report format; the Codex and Claude skills and Copilot prompt only
-make it discoverable in those tools.
+prevents one tool from operating under a stale or subtly different architecture.
+
+Each workflow follows the same shape — one tool-neutral procedure file, three thin entry
+points that only make it discoverable:
+
+| Workflow | Canonical procedure | What it owns |
+|---|---|---|
+| `add-provider` | [`contracts/NEW-PROVIDER.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/NEW-PROVIDER.md) | Adding a preset, a dedicated adapter, or a new embedding/rerank binding: research first, then adapter, registration, docs, tests, verification |
+| `check-provider-drift` | [`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md) | Auditing existing contract snapshots against current upstream docs, and the report format |
+| `anyinfer-integration` | [`docs/agents/INTEGRATION.md`](../agents/INTEGRATION.md) | Using AnyInfer from an application, read in somebody else's repository |
+
+The first two are two halves of one lifecycle: `NEW-PROVIDER.md` produces a contract
+snapshot, `DRIFT-CHECK.md` keeps it true afterwards.
 
 ## Workstream boundaries
 

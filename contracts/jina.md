@@ -23,6 +23,11 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
 ### Auth
 - `Authorization: Bearer <api_key>`. Conventionally `env://JINA_API_KEY`.
 
+### Version pins
+- The API version is in the path (`/v1`). No header or query parameter carries a version.
+  Jina publishes model generations (v3, v4, m0) as *model ids* rather than API versions,
+  so a new generation is a catalog change, not a wire change.
+
 ### Embeddings request fields (verified 2026-08-12)
 - `model` (required), `input` (array of strings; no per-request ceiling documented —
   "batches inputs internally"), `task` — Jina's intent vocabulary, covering all four
@@ -50,6 +55,14 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
   back onto the caller-supplied index before core validation) and `relevance_score`;
   `model`; `usage.total_tokens`.
 - **Cross-batch comparability: not documented** — refuse-by-default stands.
+
+### Errors
+- **Not yet verified.** Jina's error bodies are documented only in the interactive
+  reference (`api.jina.ai/redoc`), which is JS-rendered and unfetchable headlessly, and no
+  live lane has run. The adapter maps HTTP status alone through the shared status
+  classification and reads no provider-specific error field — which is safe precisely
+  because nothing here claims to know the body shape. Confirming it is the first task of
+  the live lane, tracked on the watchlist below.
 
 ### Streaming
 Embeddings and rerank responses are not streamed.

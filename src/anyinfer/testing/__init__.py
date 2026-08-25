@@ -21,16 +21,24 @@ from .conformance import (
     run_conformance,
 )
 from .fakes import (
+    CONFORMANCE_SCENARIOS,
+    FakeAnthropicServer,
+    FakeBedrockServer,
     FakeGeminiServer,
     FakeOllamaServer,
     FakeOpenAIServer,
     FakeResponse,
+    FakeResponsesServer,
+    FakeRetrievalServer,
     chunk_text,
+    eventstream_frame,
     ndjson_lines,
+    scenario_responses,
     sse_lines,
 )
 from .manifests import VOLATILE_FIELDS, assert_manifest_matches, normalize
 from .mcp_fake import FakeMCPServer, FakeMCPTool
+from .recording import SECRET_SHAPES, AuditFinding, audit_cassette, audit_interaction
 from .scripted import (
     DEFAULT_SCRIPTED_CAPABILITIES,
     FailureKind,
@@ -42,8 +50,11 @@ from .scripted_operations import FakeEmbeddingRerankProvider, ScriptedEmbeddingF
 
 __all__ = [
     "CONFORMANCE_CASES",
+    "CONFORMANCE_SCENARIOS",
     "DEFAULT_SCRIPTED_CAPABILITIES",
+    "SECRET_SHAPES",
     "VOLATILE_FIELDS",
+    "AuditFinding",
     "Capabilities",
     "CaseResult",
     "Cassette",
@@ -51,6 +62,8 @@ __all__ = [
     "ConformanceCase",
     "ConformanceHarness",
     "FailureKind",
+    "FakeAnthropicServer",
+    "FakeBedrockServer",
     "FakeEmbeddingRerankProvider",
     "FakeGeminiServer",
     "FakeMCPServer",
@@ -58,17 +71,23 @@ __all__ = [
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",
+    "FakeResponsesServer",
+    "FakeRetrievalServer",
     "Interaction",
     "ScriptedEmbeddingFailure",
     "ScriptedFailure",
     "ScriptedModel",
     "ScriptedProvider",
     "assert_manifest_matches",
+    "audit_cassette",
+    "audit_interaction",
     "chunk_text",
+    "eventstream_frame",
     "matrix_row",
     "ndjson_lines",
     "normalize",
     "results_to_json",
     "run_conformance",
+    "scenario_responses",
     "sse_lines",
 ]

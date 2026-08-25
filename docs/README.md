@@ -41,7 +41,8 @@ You are embedding AnyInfer in an application.
    core is deliberately small.
 5. [Shared configuration](reference/configuration.md): one file for every integration path.
 
-**Concepts** — read these once and the rest of the API explains itself.
+**Concepts** — read these once and the rest of the API explains itself. This is a curated
+subset; see the [complete concepts index](concepts/README.md) for the rest.
 
 - [Targets and aliases](concepts/targets.md): how `"medium"` and
   `"anthropic:claude-sonnet-4-5"` both resolve.

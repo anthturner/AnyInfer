@@ -30,7 +30,7 @@ from urllib.request import url2pathname
 import httpx2
 
 from ..errors import LocalRuntimeError
-from .downloads import FileLock, license_allowed
+from .downloads import FileLock, _read_and_hash, license_allowed
 from .sources import RemoteFile, ResolvedArtifact, SourceRef, get_resolver
 from .store import ModelStore, StoredFile, StoreEntry, entry_id_for, placement_for
 
@@ -778,21 +778,15 @@ def _verify(path: Path, remote: RemoteFile) -> bool:
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(_CHUNK_BYTES), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    return _read_and_hash(path, hashlib.sha256)
 
 
 def _git_blob_sha1(path: Path) -> str:
     """Compute the git blob hash small Hugging Face files are identified by."""
     size = path.stat().st_size
-    digest = hashlib.sha1(f"blob {size}\0".encode(), usedforsecurity=False)
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(_CHUNK_BYTES), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    return _read_and_hash(
+        path, lambda: hashlib.sha1(f"blob {size}\0".encode(), usedforsecurity=False)
+    )
 
 
 def _preflight_disk(root: Path, plan: AcquisitionPlan) -> None:

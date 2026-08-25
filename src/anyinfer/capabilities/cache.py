@@ -164,11 +164,7 @@ def _plan_explicit(
     # turn is what changed, and marking it would cache something no later request reuses.
     last_stable = _last_stable_message(request)
     if last_stable is not None:
-        prefix_tokens = sum(
-            estimator.estimate(message.text).tokens
-            for message in request.messages[: last_stable + 1]
-            if message.role != "system"
-        )
+        prefix_tokens = _stable_prefix_tokens(request, estimator, last_stable)
         if prefix_tokens:
             candidates.append(CacheMark(last_stable, prefix_tokens))
 
@@ -227,12 +223,19 @@ def _estimate_prefix(
         total += _tools_tokens(request, estimator)
     last_stable = _last_stable_message(request)
     if last_stable is not None:
-        total += sum(
-            estimator.estimate(message.text).tokens
-            for message in request.messages[: last_stable + 1]
-            if message.role != "system"
-        )
+        total += _stable_prefix_tokens(request, estimator, last_stable)
     return total
+
+
+def _stable_prefix_tokens(
+    request: GenerationRequest, estimator: TokenEstimator, last_stable: int
+) -> int:
+    """Estimated size of the non-system messages up to and including ``last_stable``."""
+    return sum(
+        estimator.estimate(message.text).tokens
+        for message in request.messages[: last_stable + 1]
+        if message.role != "system"
+    )
 
 
 def _last_stable_message(request: GenerationRequest) -> int | None:

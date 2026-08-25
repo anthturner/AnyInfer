@@ -78,6 +78,7 @@ The typed form of this table, for programmatic construction:
 | Usage | Input and output tokens |
 | Cost | Free — a genuine zero, not an unknown |
 | Images | OpenAI-compatible image content when the artifact pins a projector |
+| Embeddings | `--embeddings`-started server, genuinely OpenAI-shaped `/v1/embeddings` |
 
 ## Vision models and projector companions
 
@@ -100,6 +101,25 @@ conveying meaning.
 
 The tuner always emits `--jinja`. Without it, llama-server cannot apply a model's chat
 template and tool calling silently does not work at all.
+
+## Embeddings run on a separate resident server from chat
+
+`--embeddings` can only be set when llama-server starts — live-verified: an
+already-running chat server answers every `/v1/embeddings` call with a 501 asking you to
+restart it with the flag, and there is no way to toggle it afterward. So `embed()` never
+reuses a chat server's resident process, even for the same GGUF: it starts (or reuses) a
+second one, keyed separately, specifically for embedding calls.
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="llama-cpp:nomic-embed-text-v1.5",
+)
+```
+
+Once started with `--embeddings`, the endpoint is genuinely OpenAI-shaped — the same
+`OpenAICompatEmbeddingsMixin` code every hosted OpenAI-compatible provider uses handles
+it with no llama.cpp-specific parsing.
 
 ## Supervision
 

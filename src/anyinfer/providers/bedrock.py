@@ -20,12 +20,23 @@ Model-specific parameters that Converse does not model (Claude's ``top_k`` or ex
 thinking, for instance) pass through ``additionalModelRequestFields``.
 
 Embeddings are the one operation Converse does not offer at all — Bedrock only serves
-them through the older, per-model ``InvokeModel`` action. `embed()` therefore speaks
-Titan Text Embeddings V2's own body shape (``inputText``/``dimensions``/``normalize`` in,
-``embedding``/``inputTextTokenCount`` out), verified live 2026-08-12 against
-docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-titan-embed-text.html.
-Cohere-on-Bedrock embeddings and Bedrock's separate agent-runtime Rerank action are
-scoped out for now — see `contracts/bedrock.md`'s watchlist.
+them through the older, per-model ``InvokeModel`` action. `embed()` therefore speaks two
+per-model dialects on one action, chosen by `req.model`'s prefix: Titan Text Embeddings
+V2's own body shape (``inputText``/``dimensions``/``normalize`` in,
+``embedding``/``inputTextTokenCount`` out, one input per call), verified live 2026-08-12
+against docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-titan-embed-text.html;
+and Cohere Embed v3's shape (``texts``/``input_type``/``embedding_types`` in, a
+type-keyed ``embeddings`` dict out — the same shape and parse as hosted Cohere, see
+`cohere.py`), verified live 2026-08-14 against
+docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-embed-v3.html.
+
+Rerank is a third action entirely — ``bedrock-agent-runtime``'s ``POST /rerank``, a
+different host and a different SigV4-signed service than ``InvokeModel``/``Converse``
+(though verified via botocore's own service model 2026-08-14 to share the same SigV4
+signing name, ``bedrock``). It is genuinely model-agnostic at the wire level: the same
+request/response shape serves both ``amazon.rerank-v1:0`` and ``cohere.rerank-v3-5:0``,
+selected only by the ``modelArn`` inside `rerankingConfiguration`, never by a per-model
+body dialect the way `embed()` needs. See `contracts/bedrock.md` for the citations.
 """
 
 from __future__ import annotations
@@ -50,7 +61,7 @@ from ..types.messages import (
     ToolCall,
     ToolResult,
 )
-from ..types.operations import EmbeddingCapabilities
+from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent, RerankCapabilities
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data, media_subtype, neutral_filename, unsupported
@@ -60,7 +71,11 @@ from .base import (
     EmbeddingWireRequest,
     EmbeddingWireResult,
     ProviderConfig,
+    RerankWireRequest,
+    RerankWireResult,
+    WireRankedItem,
     WireRequest,
+    resolve_rerank_index,
 )
 from .cloud_auth import AwsCredentials, resolve_aws_credentials, sigv4_headers
 from .eventstream import EventStreamMessage, iter_event_stream
@@ -70,6 +85,7 @@ from .http import (
     classify_status,
     map_transport_error,
     read_error_detail,
+    read_int,
 )
 
 __all__ = ["BedrockAdapter", "descriptor"]
@@ -98,6 +114,18 @@ _RETRYABLE_EXCEPTIONS: Mapping[str, int] = {
     "modelTimeoutException": 408,
 }
 """In-stream exception frames, mapped to the status the shared classifier expects."""
+
+_COHERE_INPUT_TYPES: Mapping[EmbeddingInputIntent, str] = {
+    "query": "search_query",
+    "document": "search_document",
+    "classification": "classification",
+    "clustering": "clustering",
+}
+"""Same spellings, same mapping, as hosted Cohere's own ``_INPUT_TYPES`` in `cohere.py` —
+Bedrock's Cohere Embed v3 speaks Cohere's own vocabulary verbatim, just through
+``InvokeModel`` instead of Cohere's REST API."""
+
+_COHERE_EMBED_INTENTS: tuple[EmbeddingInputIntent, ...] = tuple(_COHERE_INPUT_TYPES)
 
 
 class BedrockAdapter:
@@ -212,6 +240,18 @@ class BedrockAdapter:
     # ---- embedding -------------------------------------------------------------------
 
     async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Dispatch to the InvokeModel body Titan or Cohere Embed v3 actually speaks.
+
+        Bedrock's two embedding families use unrelated request/response shapes on the
+        same `InvokeModel` action — there is no third, unified embeddings action the way
+        Converse unifies generation — so this branches on `req.model`'s prefix rather
+        than pretending one shape fits both.
+        """
+        if req.model.startswith("cohere."):
+            return await self._embed_cohere(req)
+        return await self._embed_titan(req)
+
+    async def _embed_titan(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
         """Run one or more Titan Text Embeddings V2 calls through ``InvokeModel``.
 
         Titan accepts exactly one ``inputText`` per call — there is no batch field —
@@ -287,6 +327,200 @@ class BedrockAdapter:
             usage=usage,
             raw=last_payload,
         )
+
+    async def _embed_cohere(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Run one Cohere Embed v3 call through ``InvokeModel``.
+
+        Unlike Titan, Cohere Embed v3 accepts a batch of ``texts`` per call (up to 96,
+        live-verified 2026-08-14) — one request regardless of `req.inputs` length.
+        ``embedding_types`` is always sent explicitly as ``["float"]`` so the response
+        shape is deterministic (a type-keyed dict), the same choice `cohere.py` already
+        makes for hosted Cohere and the same parse this reuses.
+        """
+        if req.input_type is None:
+            raise ConfigError(
+                "Cohere Embed v3 requires an input type and documents no default",
+                provider=self.provider_id,
+                hint=(
+                    "pass input_type='document' for corpus text, 'query' for search "
+                    "queries, or 'classification'/'clustering' — AnyInfer never guesses "
+                    "an intent, because query and document embeddings are not comparable "
+                    "unless produced with matching intents"
+                ),
+            )
+        body_fields: dict[str, Any] = {
+            "texts": list(req.inputs),
+            "input_type": _COHERE_INPUT_TYPES[req.input_type],
+            "embedding_types": ["float"],
+        }
+        body = json.dumps(body_fields).encode("utf-8")
+        path = f"/model/{_quote_model(req.model)}/invoke"
+        try:
+            response = await self._client.post(
+                path,
+                content=body,
+                headers=self._auth_headers(method="POST", path=path, body=body),
+                timeout=req.timeout_s,
+            )
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id) from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                headers=response.headers,
+            )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
+
+        try:
+            parsed = json.loads(response.content)
+        except ValueError as exc:
+            raise ProviderError(
+                f"bedrock returned a non-JSON embedding body: {exc}",
+                provider=self.provider_id,
+                phase="validate",
+            ) from exc
+        if not isinstance(parsed, Mapping):
+            raise ProviderError("cohere embedding response is not a JSON object", phase="validate")
+
+        embeddings = parsed.get("embeddings")
+        floats = embeddings.get("float") if isinstance(embeddings, Mapping) else None
+        if not isinstance(floats, list):
+            raise ProviderError(
+                "cohere embedding response is missing an 'embeddings.float' array",
+                phase="validate",
+            )
+        if len(floats) != len(req.inputs):
+            raise ProviderError(
+                f"cohere embedding response returned {len(floats)} vectors for "
+                f"{len(req.inputs)} inputs",
+                phase="validate",
+            )
+        vectors: list[tuple[float, ...]] = []
+        for entry in floats:
+            if not isinstance(entry, list):
+                raise ProviderError(
+                    "cohere embedding response contains a non-array vector", phase="validate"
+                )
+            vectors.append(tuple(float(v) for v in entry))
+
+        # No usage/token-count field anywhere in this response — verified live
+        # 2026-08-14, unlike Titan's `inputTextTokenCount`. Unknown, never zero.
+        return EmbeddingWireResult(
+            vectors=tuple(vectors),
+            dimensions=len(vectors[0]) if vectors else None,
+            usage=None,
+            raw=parsed,
+        )
+
+    # ---- reranking ---------------------------------------------------------------------
+
+    async def rerank(self, req: RerankWireRequest) -> RerankWireResult:
+        """Run one rerank call through the ``bedrock-agent-runtime`` ``Rerank`` action.
+
+        A genuinely different host and service surface than `embed()`/`generate()`
+        (``bedrock-agent-runtime`` vs. ``bedrock-runtime``), though SigV4-signed under
+        the same ``bedrock`` signing name — confirmed 2026-08-14 against botocore's own
+        ``bedrock-agent-runtime`` service model, not guessed. Model-agnostic at the wire
+        level: `req.model` becomes a `modelArn`
+        (``arn:aws:bedrock:{region}::foundation-model/{model}``), the only thing that
+        distinguishes ``amazon.rerank-v1:0`` from ``cohere.rerank-v3-5:0`` on this action.
+        """
+        payload: dict[str, Any] = {
+            "queries": [{"type": "TEXT", "textQuery": {"text": req.query}}],
+            "sources": [
+                {
+                    "type": "INLINE",
+                    "inlineDocumentSource": {"type": "TEXT", "textDocument": {"text": doc.text}},
+                }
+                for doc in req.documents
+            ],
+            "rerankingConfiguration": {
+                "type": "BEDROCK_RERANKING_MODEL",
+                "bedrockRerankingConfiguration": {
+                    "modelConfiguration": {
+                        "modelArn": f"arn:aws:bedrock:{self._region}::foundation-model/{req.model}"
+                    },
+                    **({"numberOfResults": req.top_n} if req.top_n is not None else {}),
+                },
+            },
+        }
+        payload.update(req.extra_options)
+        body = json.dumps(payload).encode("utf-8")
+
+        host = f"https://bedrock-agent-runtime.{self._region}.amazonaws.com"
+        path = "/rerank"
+        headers = {"content-type": "application/json"}
+        if self._api_key:
+            headers["authorization"] = f"Bearer {self._api_key}"
+        elif self._credentials is not None:
+            headers.update(
+                sigv4_headers(
+                    credentials=self._credentials,
+                    method="POST",
+                    url=f"{host}{path}",
+                    region=self._region,
+                    service=_SIGNING_SERVICE,
+                    body=body,
+                    headers=headers,
+                )
+            )
+        else:
+            raise ConfigError("bedrock AWS credentials are unavailable", provider=self.provider_id)
+
+        try:
+            response = await self._client.post(
+                f"{host}{path}", content=body, headers=headers, timeout=req.timeout_s
+            )
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                headers=response.headers,
+                phase="generate",
+            )
+        check_response_size(response.content, req.max_response_bytes, provider=self.provider_id)
+
+        try:
+            parsed = json.loads(response.content)
+        except ValueError as exc:
+            raise ProviderError(
+                f"bedrock returned a non-JSON rerank body: {exc}",
+                provider=self.provider_id,
+                phase="validate",
+            ) from exc
+        if not isinstance(parsed, Mapping):
+            raise ProviderError("rerank response is not a JSON object", phase="validate")
+        results = parsed.get("results")
+        if not isinstance(results, list):
+            raise ProviderError("rerank response is missing a 'results' array", phase="validate")
+
+        items: list[WireRankedItem] = []
+        for entry in results:
+            if not isinstance(entry, Mapping):
+                raise ProviderError(
+                    "rerank response contains a non-object result", phase="validate"
+                )
+            position = entry.get("index")
+            score = entry.get("relevanceScore")
+            if not isinstance(position, int) or isinstance(position, bool):
+                raise ProviderError(
+                    "rerank result is missing an integer 'index'", phase="validate"
+                )
+            if not isinstance(score, int | float) or isinstance(score, bool):
+                raise ProviderError(
+                    "rerank result is missing a numeric 'relevanceScore'", phase="validate"
+                )
+            index = resolve_rerank_index(req, position)
+            items.append(WireRankedItem(index=index, score=float(score)))
+
+        # No usage/search-unit field anywhere in this response — verified live 2026-08-14
+        # against AWS's own Rerank guide and its boto3 code example.
+        return RerankWireResult(items=tuple(items), usage=None, raw=parsed)
 
     # ---- generation ------------------------------------------------------------------
 
@@ -735,16 +969,12 @@ def _parse_usage(payload: Any) -> Usage | None:
     if not isinstance(payload, Mapping):
         return None
 
-    def field(name: str) -> int | None:
-        value = payload.get(name)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
-
     usage = Usage(
-        input_tokens=field("inputTokens"),
-        output_tokens=field("outputTokens"),
-        total_tokens=field("totalTokens"),
-        cache_read_tokens=field("cacheReadInputTokens"),
-        cache_write_tokens=field("cacheWriteInputTokens"),
+        input_tokens=read_int(payload, "inputTokens"),
+        output_tokens=read_int(payload, "outputTokens"),
+        total_tokens=read_int(payload, "totalTokens"),
+        cache_read_tokens=read_int(payload, "cacheReadInputTokens"),
+        cache_write_tokens=read_int(payload, "cacheWriteInputTokens"),
     )
     return usage if usage != Usage() else None
 
@@ -836,6 +1066,33 @@ _STATIC_EMBEDDING_CAPABILITIES = {
         max_input_tokens=8_192,
         input_intents=(),
     ),
+    # Verified live 2026-08-14 against docs.aws.amazon.com/bedrock/latest/userguide/
+    # model-parameters-embed-v3.html: 96 texts per call, 2,048 characters per text
+    # (stated in characters, not tokens, on this page; converted at the page's own
+    # "1 token is about 4 characters" rule to stay consistent with every other
+    # provider's token-denominated `max_input_tokens` here). 1,024 dims, no `dimensions`
+    # override on this action (Bedrock's Cohere v3 has no `output_dimension` field).
+    "cohere.embed-english-v3": EmbeddingCapabilities(
+        dimensions=1_024,
+        max_batch_inputs=96,
+        max_input_tokens=512,
+        input_intents=_COHERE_EMBED_INTENTS,
+    ),
+    "cohere.embed-multilingual-v3": EmbeddingCapabilities(
+        dimensions=1_024,
+        max_batch_inputs=96,
+        max_input_tokens=512,
+        input_intents=_COHERE_EMBED_INTENTS,
+    ),
+}
+
+_STATIC_RERANK_CAPABILITIES: Mapping[str, RerankCapabilities] = {
+    # Verified 2026-08-14 against botocore's own bedrock-agent-runtime service model:
+    # RerankSourcesList allows 1-1000 documents, and the numberOfResults integer field
+    # allows 1-1000 too — both action-level constraints on `Rerank`, not per-model, so
+    # the same figures apply to every model reachable through this one action.
+    model: RerankCapabilities(max_documents=1_000, native_top_n=True)
+    for model in ("amazon.rerank-v1:0", "cohere.rerank-v3-5:0")
 }
 
 
@@ -847,8 +1104,9 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=None,
     requires_base_url=False,
-    operations=frozenset({"generation", "embedding"}),
+    operations=frozenset({"generation", "embedding", "rerank"}),
     static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
+    static_rerank_capabilities=_STATIC_RERANK_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

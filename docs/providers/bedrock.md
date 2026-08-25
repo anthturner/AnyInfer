@@ -167,8 +167,37 @@ Titan Text Embeddings V2 accepts **one `inputText` per call**, a real limit of t
 to `1024` (default), `512`, or `256`. There is no `input_type`/intent concept on this
 model.
 
-Cohere Embed on Bedrock and Bedrock's separate Rerank action are not yet implemented —
-see the contract snapshot's watchlist.
+Cohere Embed v3 is also reachable on the same `InvokeModel` action, under a different body
+shape selected by the model id's `cohere.` prefix — batch-capable (up to 96 texts per
+call, unlike Titan), and it **requires** `input_type`:
+
+```python
+result = client.embed(
+    ["first text", "second text"],
+    target="bedrock:cohere.embed-english-v3",
+    input_type="document",
+)
+```
+
+Bedrock's Cohere embed response reports no token usage at all, unlike Titan's
+`inputTextTokenCount` — `result.usage` is `None`, never a guessed value.
+
+## Reranking
+
+Rerank is a third action entirely — `bedrock-agent-runtime`'s `POST /rerank`, a different
+host than `InvokeModel`/`Converse` (though SigV4-signed under the same `bedrock` service
+name). It is model-agnostic at the wire level: the same request/response shape serves
+both `amazon.rerank-v1:0` and `cohere.rerank-v3-5:0`, selected only by the `modelArn` the
+adapter builds from the model id. Up to 1,000 documents per call; `top_n` maps to the
+action's native `numberOfResults`. No usage/search-unit field is reported.
+
+```python
+result = client.rerank(
+    query="What is Amazon Bedrock?",
+    documents=["Amazon Bedrock is a fully managed service.", "Amazon S3 is storage."],
+    target="bedrock:cohere.rerank-v3-5:0",
+)
+```
 
 ## See also
 

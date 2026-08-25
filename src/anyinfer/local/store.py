@@ -29,7 +29,7 @@ import json
 import os
 import shutil
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -49,7 +49,6 @@ __all__ = [
     "StoredFile",
     "default_store_root",
     "entry_id_for",
-    "iter_entry_dirs",
     "placement_for",
 ]
 
@@ -748,14 +747,3 @@ def _slug(value: str) -> str:
     """Reduce a string to a filesystem-safe token."""
     safe = [c if c.isalnum() or c in "-._" else "-" for c in value.strip().lower()]
     return "".join(safe).strip("-.") or "x"
-
-
-def iter_entry_dirs(root: Path) -> Iterator[Path]:
-    """Every entry-shaped directory under a store root, ignoring the reserved ones."""
-    for top in ("gguf", "hf"):
-        base = root / top
-        if not base.is_dir():
-            continue
-        for publisher in sorted(p for p in base.iterdir() if p.is_dir()):
-            for name in sorted(p for p in publisher.iterdir() if p.is_dir()):
-                yield from sorted(p for p in name.iterdir() if p.is_dir())

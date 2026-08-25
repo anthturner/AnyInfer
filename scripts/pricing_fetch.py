@@ -36,7 +36,13 @@ def fetch_json(
             if length is not None and int(length) > max_bytes:
                 raise ValueError(f"pricing source response exceeds {max_bytes} bytes")
             body = response.read(max_bytes + 1)
-    except (TimeoutError, urllib.error.URLError, urllib.error.HTTPError) as error:
+    except urllib.error.HTTPError as error:
+        # Split out from the transport failures below because an HTTPError carries a
+        # response body, and an unclosed one leaks the connection holding it. It has to
+        # come first: HTTPError is a subclass of URLError.
+        error.close()
+        raise RuntimeError(f"pricing source request failed: {error}") from error
+    except (TimeoutError, urllib.error.URLError) as error:
         raise RuntimeError(f"pricing source request failed: {error}") from error
     if len(body) > max_bytes:
         raise ValueError(f"pricing source response exceeds {max_bytes} bytes")

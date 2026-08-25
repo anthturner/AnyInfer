@@ -2,7 +2,7 @@
 
 Never imported by `anyinfer` core, and never a dependency of it. See the module docstring
 of `store` for the permanent scale boundary this package commits to, and
-`plans/VECTOR_STORE_ADDON.md` for the full design record.
+DESIGN.md §29 for the full design record.
 """
 
 from __future__ import annotations

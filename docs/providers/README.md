@@ -41,6 +41,18 @@ The generated [complete inventory](all.md) records the current counts and target
   <br>Native v2 chat, grounded generation, thinking channel.
   <br>`Hosted`
 
+- :material-vector-triangle: **[Voyage AI](voyage.md)** `voyage:`
+  <br>Specialist embeddings and reranking; query/document intents.
+  <br>`Hosted`
+
+- :material-vector-triangle: **[Jina AI](jina.md)** `jina:`
+  <br>Specialist embeddings and reranking; full task vocabulary.
+  <br>`Hosted`
+
+- :material-vector-triangle: **[Text Embeddings Inference](tei.md)** `tei:`
+  <br>Local embeddings and reranking; retrieval-only, one model per server.
+  <br>`Local`
+
 - :material-laptop: **[LM Studio](lm-studio.md)** `lm-studio:`
   <br>Native discovery: context, quantization, residency.
   <br>`Local`
@@ -97,6 +109,9 @@ table below as an accessible alternative to the cards.
 | [vertex](vertex.md) | `vertex:` | `[vertex]` for service-account signing | Gemini via GCP OAuth; project-scoped |
 | [bedrock](bedrock.md) | `bedrock:` | — | Converse API; SigV4 or Bedrock API key |
 | [cohere](cohere.md) | `cohere:` | — | Native v2 chat, uppercase enums |
+| [voyage](voyage.md) | `voyage:` | — | Specialist embeddings/rerank; query/document intents |
+| [jina](jina.md) | `jina:` | — | Specialist embeddings/rerank; full task vocabulary |
+| [tei](tei.md) | `tei:` | — | Local embeddings/rerank; retrieval-only, one model per server |
 | [lm-studio](lm-studio.md) | `lm-studio:` | — | Native discovery and residency |
 | [ollama](ollama.md) | `ollama:` | — | Native API, grammar schemas, phase timings |
 | [llama-cpp](llama-cpp.md) | `llama-cpp:` | — | Supervised llama-server, loopback only |

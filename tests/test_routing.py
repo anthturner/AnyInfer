@@ -320,6 +320,119 @@ async def test_route_accepts_a_sequence_of_targets_as_a_fallback_chain() -> None
     assert result.target.provider_id == "secondary"
 
 
+# ---- policy inheritance across the route spellings -----------------------------------
+#
+# Naming a target says *where* a call goes, not *how* it is governed. These four pin that
+# down, because the alternative -- a target-shaped override silently reverting to stock
+# `Retry()` -- is invisible at the call site and was live long enough to make the
+# conformance suite sleep through backoff it had explicitly configured away.
+
+
+async def test_a_bare_target_inherits_the_clients_retry_policy() -> None:
+    """`target=` redirects the call; it does not opt the caller out of their own policy."""
+    server = FakeOpenAIServer(
+        [
+            FakeResponse(status=503, error_message="down"),
+            FakeResponse(status=503, error_message="still down"),
+            FakeResponse(text="third time lucky"),
+        ]
+    )
+    # Stock `Retry()` allows two attempts, so this only survives if max_attempts=3 carries.
+    async with make_client(
+        server,
+        route=ai.Route(
+            targets=("openai-compat:m",),
+            retry=ai.Retry(max_attempts=3, backoff_base_s=0.0),
+        ),
+    ) as client:
+        result = await client.generate("hi", target="openai-compat:m")
+
+    assert result.text == "third time lucky"
+    assert [a.outcome for a in result.attempts] == ["retried", "retried", "ok"]
+
+
+async def test_a_target_shaped_route_string_inherits_the_clients_retry_policy() -> None:
+    """The string spelling of ``route`` names targets only, so it inherits policy too."""
+    server = FakeOpenAIServer(
+        [
+            FakeResponse(status=503, error_message="down"),
+            FakeResponse(status=503, error_message="still down"),
+            FakeResponse(text="recovered"),
+        ]
+    )
+    async with make_client(
+        server,
+        route=ai.Route(
+            targets=("openai-compat:m",),
+            retry=ai.Retry(max_attempts=3, backoff_base_s=0.0),
+        ),
+    ) as client:
+        result = await client.generate("hi", route="openai-compat:m")
+
+    assert result.text == "recovered"
+
+
+async def test_an_explicit_route_object_overrides_the_clients_policy_exactly() -> None:
+    """A constructed `Route` is a complete statement of policy, not a partial one."""
+    server = FakeOpenAIServer(
+        [
+            FakeResponse(status=503, error_message="down"),
+            FakeResponse(text="never reached"),
+        ]
+    )
+    async with make_client(
+        server,
+        route=ai.Route(
+            targets=("openai-compat:m",),
+            retry=ai.Retry(max_attempts=3, backoff_base_s=0.0),
+        ),
+    ) as client:
+        with pytest.raises(ai.errors.AllTargetsFailedError):
+            await client.generate(
+                "hi",
+                route=ai.Route(targets=("openai-compat:m",), retry=ai.Retry(max_attempts=1)),
+            )
+
+
+async def test_a_bare_target_does_not_inherit_the_specialized_chains() -> None:
+    """Policy knobs carry; other people's targets do not.
+
+    Inheriting ``context_window_targets`` would send the call to a provider the caller
+    did not name -- the same surprise this inheritance exists to remove, pointing the
+    other way.
+    """
+    overflowing = FakeOpenAIServer(
+        FakeResponse(status=422, error_message="maximum context length exceeded")
+    )
+    roomy = FakeOpenAIServer(FakeResponse(text="fits here"))
+
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "primary", base_url="https://a.invalid/v1", transport=overflowing.transport()
+            ),
+            ai.ProviderSettings.of(
+                "tertiary", base_url="https://c.invalid/v1", transport=roomy.transport()
+            ),
+        ],
+        registry=_alias_registry(),
+        route=ai.Route(
+            targets=("primary:m",),
+            retry=ai.Retry(max_attempts=1),
+            context_window_targets=("tertiary:big-model",),
+        ),
+    )
+    async with client:
+        with pytest.raises(ai.errors.AllTargetsFailedError) as failure:
+            await client.generate("a very long prompt", target="primary:m")
+
+    # The overflow surfaced instead of being redirected, and nothing tried `tertiary`.
+    attempts = failure.value.attempts
+    assert [a.target.provider_id for a in attempts] == ["primary"]
+    assert attempts[0].error is not None
+    assert attempts[0].error.type_name == "ContextLengthError"
+
+
 # ---- attempt timeout -----------------------------------------------------------------
 
 

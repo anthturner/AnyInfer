@@ -61,12 +61,24 @@ class TestRegistry:
             "format",
             "types",
             "contracts",
-            "test",
             "conformance",
             "docs-check",
             "docs-build",
         ):
             assert name not in workspace.REGISTRY
+
+    def test_the_test_verb_cannot_run_the_whole_suite(self):
+        """`test` is the inner loop, `check` is the gate, and they must not overlap.
+
+        The gates were absorbed into `check` so there would be exactly one thing that can
+        say the suite passes. `test` exists for the edit-run-edit cycle and is therefore
+        allowed back only on the condition that it always runs a subset -- no `--all`, no
+        way to spell the complete run through it.
+        """
+        assert "test" in workspace.REGISTRY
+        parser = workspace.build_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["test", "--all"])
 
     def test_help_lists_every_registered_verb(self):
         epilog = workspace._epilog()
@@ -226,10 +238,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The seven default phases comprise ten steps — eight subprocesses plus the two
+        # The seven default phases comprise eleven steps — nine subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
-        # (conformance has two steps, docs-check three).
-        assert len(calls) == 10
+        # (contracts and conformance have two steps each, docs-check three).
+        assert len(calls) == 11
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0
@@ -287,6 +299,7 @@ class TestBuild:
         assert workspace.main(["build", "serve"]) == 0
         assert built == ["serve"]
 
+    @pytest.mark.slow
     def test_all_builds_wheel_then_both_native_bundles(self, built):
         assert workspace.main(["build", "all"]) == 0
         assert built == ["wheel", "demo", "serve"]

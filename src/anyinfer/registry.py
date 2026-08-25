@@ -719,8 +719,8 @@ class ProviderRegistry:
         """Third-party entry points that did not become usable providers.
 
         Empty when every installed provider package loaded, which is the ordinary case.
-        Populated only once discovery has run, so callers that want a complete answer
-        should touch the registry first (any lookup does).
+        This call itself triggers discovery if it has not already run, so callers get a
+        complete answer without touching the registry first.
         """
         with self._lock:
             self._ensure_loaded()

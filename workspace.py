@@ -835,13 +835,28 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
         Phase("types", "mypy --strict over src and the runner", (("mypy", lambda: tool("mypy")),)),
         Phase(
             "contracts",
-            "architecture contracts (import-linter, the ADRs)",
-            (("lint-imports", lambda: tool("lint-imports")),),
+            "architecture contracts (import-linter) and snapshot structure",
+            (
+                ("lint-imports", lambda: tool("lint-imports")),
+                # Two different things share the word "contract" here. The first is the
+                # ADRs' import boundaries; the second is whether each provider snapshot
+                # still carries the sections the drift check reads. A snapshot missing
+                # its Auth section is not a smaller snapshot -- it is one the drift
+                # procedure cannot audit, and the gap stays invisible until someone runs
+                # the check and finds nothing to compare.
+                (
+                    "validate contract snapshots",
+                    lambda: run(
+                        [sys.executable, str(ROOT / "scripts" / "validate_contracts.py")],
+                        check=False,
+                    ),
+                ),
+            ),
         ),
         Phase(
             "test",
-            "the full pytest suite, headless",
-            (("pytest", lambda: tool("pytest", "-q", env=_headless_env())),),
+            "the full pytest suite, headless and parallel",
+            (("pytest", lambda: tool("pytest", "-q", "-n", "auto", env=_headless_env())),),
         ),
         Phase(
             "conformance",
@@ -983,7 +998,12 @@ Regenerate with `python workspace.py matrix`.
 
 Legend: ✅ verified · ➖ declared unsupported · ❌ failing
 
-Each cell is one parametrized test case executed against that adapter in fake-server mode.
+Each cell is one parametrized test case executed against that adapter in fake-server mode,
+at whatever boundary that adapter actually has: an in-process HTTP transport for the
+twenty that speak HTTP, and a fake SDK module for `copilot`, whose boundary genuinely is
+the ``github-copilot-sdk`` session API rather than a wire protocol. `llama-cpp` speaks
+HTTP to a server it supervises, so its row substitutes a stub supervisor and starts no
+process, downloads nothing, and binds no port.
 A ➖ is an honest, declared limitation; it is not a pass.
 
 """
@@ -1009,11 +1029,18 @@ _MATRIX_FOOTER = f"""
 | `error_mapping` | Failures are typed, carry an attempt trail, and mark retryability. |
 | `retry_after` | A rate-limited attempt is retried and recorded. |
 | `byte_cap` | An oversized response is rejected rather than silently truncated. |
+| `cancellation` | Abandoning a stream releases its connection and leaves the client usable. |
 | `unknown_finish_reason` | An unrecognized finish reason normalizes instead of crashing. |
 | `embedding` | One vector per input, uniform non-zero dimensions, a space identity. |
 | `embedding_duplicates` | Duplicate inputs come back positionally, never deduplicated. |
 | `rerank` | Rankings descend, and caller document identity survives the round trip. |
 | `rerank_top_n` | `top_n` truncates the ranking to the requested size. |
+| `rerank_duplicate_text` | Identical document text keeps its distinct caller-owned ids. |
+| `embedding_normalization_probe` | A probe measures normalization instead of assuming it. |
+| `embedding_byte_cap` | An oversized embedding response is refused, not parsed. |
+| `rerank_byte_cap` | An oversized rerank response is refused, not parsed. |
+| `embedding_retry_after` | A rate-limited embedding call is retried and recorded. |
+| `rerank_retry_after` | A rate-limited rerank call is retried and recorded. |
 
 ## Modes
 
@@ -1040,13 +1067,20 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     # The harnesses are defined by the test modules, which is the point: the published
     # matrix and the suite cannot disagree, because they run the same objects.
     sys.path.insert(0, str(ROOT / "tests"))
+    import test_bedrock_vertex
     import test_cohere_lmstudio
     import test_conformance
+    import test_copilot
+    import test_deepseek_xai
     import test_gemini
+    import test_hosted_adapters
+    import test_jina
+    import test_llama_cpp
     import test_nebius
     import test_ollama
     import test_presets
     import test_tei
+    import test_voyage
 
     harnesses = {
         "openai-compat": test_conformance.HARNESS,
@@ -1056,6 +1090,19 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
         "lm-studio": test_cohere_lmstudio.LM_STUDIO_HARNESS,
         "nebius": test_nebius.HARNESS,
         "tei": test_tei.HARNESS,
+        "deepseek": test_deepseek_xai.DEEPSEEK_HARNESS,
+        "xai": test_deepseek_xai.XAI_HARNESS,
+        "azure-foundry": test_hosted_adapters.AZURE_HARNESS,
+        "openrouter": test_hosted_adapters.OPENROUTER_HARNESS,
+        "voyage": test_voyage.HARNESS,
+        "jina": test_jina.HARNESS,
+        "anthropic": test_hosted_adapters.ANTHROPIC_HARNESS,
+        "openai": test_hosted_adapters.OPENAI_HARNESS,
+        "m365-copilot": test_hosted_adapters.M365_HARNESS,
+        "vertex": test_bedrock_vertex.VERTEX_HARNESS,
+        "bedrock": test_bedrock_vertex.BEDROCK_HARNESS,
+        "llama-cpp": test_llama_cpp.HARNESS,
+        "copilot": test_copilot.HARNESS,
     }
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed
@@ -1065,6 +1112,23 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
             test_presets.PRESETS_BY_ID[preset_id], "fake-model-small"
         )
     return {name: await run_conformance(h) for name, h in harnesses.items()}
+
+
+def _uncovered_adapters(results: dict[str, list[CaseResult]]) -> list[str]:
+    """Dedicated adapters with no shared-harness row, derived from the registry.
+
+    Hand-maintaining this list is how a matrix ends up claiming coverage it lost, or
+    confessing a gap it already closed. Deriving it means adding a harness updates the
+    prose in the same run that adds the row.
+    """
+    from anyinfer.providers import _BUILTIN_MODULES
+
+    covered = set(results)
+    return [
+        name
+        for name in (module.replace("_", "-") for module in _BUILTIN_MODULES)
+        if name not in covered
+    ]
 
 
 def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
@@ -1086,12 +1150,20 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
         lines.append(f"| {provider} | " + " | ".join(cells) + " |")
 
     lines.append("")
+    uncovered = _uncovered_adapters(results)
+    covered_note = (
+        "Every dedicated adapter now has a shared-harness row."
+        if not uncovered
+        else (
+            "Adapters without a harness yet ("
+            + ", ".join(f"`{name}`" for name in uncovered)
+            + ") are covered by their own dialect tests; the public matrix reports only "
+            "shared-harness results."
+        )
+    )
     lines.append(
-        "Adapters without a harness yet (`openai`, `anthropic`, `azure-foundry`, "
-        "`openrouter`, `copilot`, `m365-copilot`, `llama-cpp`, `deepseek`, `xai`, "
-        "`bedrock`, `vertex`) are covered by their own dialect tests; "
-        "the public matrix reports only shared-harness results. Expanding cassette-backed "
-        "coverage is tracked as release follow-up work. "
+        covered_note + " Expanding cassette-backed coverage is tracked as release "
+        "follow-up work. "
         "The `groq`, `moonshot`, `reka` and `venice` rows exercise the shared adapter's "
         "quirk axes — bearer auth, the renamed output-token field, `x-api-key` auth, and "
         "the `max_completion_tokens` dialect. Every entry in the "
@@ -1100,6 +1172,127 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
     )
     lines.append(_MATRIX_FOOTER)
     return "\n".join(lines)
+
+
+def _test_arguments(parser: argparse.ArgumentParser) -> None:
+    """Flags for the ``test`` verb."""
+    parser.add_argument(
+        "--provider",
+        metavar="ID",
+        help="run only the modules that mention this provider, plus the shared invariants",
+    )
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        default="auto",
+        help="worker processes (default: auto; pass 0 to run in one process)",
+    )
+
+
+CORE_INVARIANT_MODULES = (
+    "tests/test_registry_and_catalog.py",
+    "tests/test_docs_examples.py",
+    "tests/test_agent_instructions.py",
+)
+"""Modules a provider-scoped run always includes, whatever the provider.
+
+These are the enumeration gates a new or edited provider trips: the descriptor invariants,
+the generated documentation index, and the shims. They are cheap and they are exactly what
+someone changing one adapter forgets to run.
+"""
+
+
+def _known_provider_ids() -> set[str]:
+    """Every registered provider id and alias, read from the registry itself."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from anyinfer.registry import ProviderRegistry
+
+    known: set[str] = set()
+    for descriptor in ProviderRegistry(load_builtins=True, load_entry_points=False):
+        known.add(descriptor.id)
+        known.update(descriptor.aliases)
+    return known
+
+
+def _modules_mentioning(provider_id: str) -> list[str]:
+    """Test modules that name this provider, by reading them rather than by a lookup table.
+
+    A hard-coded provider-to-module map is a map that drifts the first time a test file is
+    split or renamed -- and the file names genuinely do not follow the ids: `cohere` lives
+    across three modules, `azure-foundry` lives in `test_hosted_adapters.py`. Grepping for
+    the id and its module spelling finds all of them and keeps finding them.
+    """
+    needles = {provider_id, provider_id.replace("-", "_")}
+    found: list[str] = []
+    for path in sorted((ROOT / "tests").rglob("test_*.py")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if any(needle in text for needle in needles):
+            found.append(str(path.relative_to(ROOT)))
+    return found
+
+
+@verb(
+    "test",
+    "The inner loop: the fast track, or one provider's modules.",
+    group="Quality",
+    arguments=_test_arguments,
+)
+def cmd_test(args: argparse.Namespace) -> int:
+    """Run a *subset* of the suite, for the edit-run-edit cycle.
+
+    This verb never runs the complete suite, which is what keeps it from being a second
+    way to do what `check` already does: the gate is `workspace check` (or
+    `workspace check --only=test`), and it stays the only thing that can tell you the
+    suite passes. This tells you the code you are touching still works, in seconds.
+
+    Default is the **fast track**: everything except the tests marked `exhaustive` (the
+    eighty-six-preset conformance sweep, which re-proves the shared OpenAI dialect) and
+    `slow` (packaging builds). That still covers every adapter's own module, the core,
+    the CLI, the sidecar, and the docs examples -- roughly a tenth of the wall time for
+    nearly all of the signal.
+
+    ``--provider <id>`` narrows further: the modules that mention that provider, plus the
+    shared invariants any provider change trips. Adding or editing one adapter does not
+    need the other twenty exercised, and this is how you say so.
+
+    Both tracks run in parallel by default (``-j0`` to disable); each test builds its own
+    in-process fakes, so there is nothing to share and nothing to serialize on.
+    """
+    command = ["-q"]
+    if args.jobs != "0":
+        command += ["-n", str(args.jobs)]
+
+    if args.provider:
+        # Validated against the registry, not against whether the grep found anything: an
+        # unknown id usually *does* match some module by accident (a fixture name, a
+        # docstring), and a typo that runs four unrelated modules and reports green is
+        # worse than no shortcut at all.
+        known = _known_provider_ids()
+        if args.provider not in known:
+            print(red(f"{args.provider!r} is not a registered provider"))
+            close = sorted(k for k in known if args.provider in k or k in args.provider)
+            if close:
+                print(dim(f"  did you mean: {', '.join(close[:6])}"))
+            print(dim("  `workspace run providers` lists every id."))
+            return 2
+        modules = _modules_mentioning(args.provider)
+        if not modules:
+            print(red(f"no test module mentions {args.provider!r} — nothing to narrow to"))
+            print(dim("  run the fast track instead: `workspace test`"))
+            return 2
+        extra = [m for m in CORE_INVARIANT_MODULES if m not in modules]
+        command += modules + extra
+        track = f"provider:{args.provider} ({len(modules) + len(extra)} modules)"
+    else:
+        command += ["-m", "not exhaustive and not slow"]
+        track = "fast"
+
+    print(f"{bold('track')} {cyan(track)}")
+    code = tool("pytest", *command, env=_headless_env())
+    if code == 0:
+        print()
+        print(dim("a subset passed — `workspace check` is the gate, and it is not this."))
+    return code
 
 
 @verb("matrix", "Regenerate the conformance matrix from an actual suite run.", group="Quality")

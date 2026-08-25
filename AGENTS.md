@@ -16,7 +16,9 @@ bespoke provider layer an application would otherwise hand-roll.
 Adding a provider: if it needs real protocol translation, write a dedicated adapter with a
 `contracts/<id>.md` snapshot. If it only differs by endpoint, auth spelling, and quirks, add
 a `CompatPreset` entry instead — and record its verification in
-`contracts/openai-compat-presets.md`.
+`contracts/openai-compat-presets.md`. Either way the procedure is
+[contracts/NEW-PROVIDER.md](contracts/NEW-PROVIDER.md) — including when the addition is a
+new embedding or reranking binding on a provider that already exists.
 
 **Current status: implemented, pre-1.0.** [DESIGN.md](DESIGN.md) is the authoritative
 architecture document — it carries the goals and non-goals, the ADRs, the open questions,
@@ -24,8 +26,9 @@ and the risk register. Read it before proposing or writing code. Do not contradi
 or a stated non-goal without flagging it explicitly as a proposed reversal.
 
 **Branch model:** `feature/*` → `develop` → `main`, both protected branches gated on the
-aggregate `ci-ok` check. Merges to `main` rebuild release packages; a version bump cuts a
-GitHub Release. See [docs/contributing/releasing.md](docs/contributing/releasing.md).
+aggregate `ci-ok` check. Merges to `main` rebuild the library distribution and a Linux
+bundle; a version bump builds the full bundle matrix and cuts a GitHub Release. See
+[docs/contributing/releasing.md](docs/contributing/releasing.md).
 
 ## Instruction authority and workstreams
 
@@ -33,9 +36,10 @@ This file is the single authoritative instruction set for Codex, Claude Code, Gi
 Copilot, and other coding agents. `CLAUDE.md` and `.github/copilot-instructions.md` are
 discovery shims only: they point here and contain no independent engineering policy. A
 tool-specific skill or prompt may adapt invocation syntax, but the procedure it runs must
-live in one tool-neutral canonical file. Today two procedures follow that model:
-`contracts/DRIFT-CHECK.md` and `docs/agents/INTEGRATION.md` are authoritative; the Codex
-and Claude skills and the Copilot prompts beside each are thin entry points.
+live in one tool-neutral canonical file. Today three procedures follow that model:
+`contracts/NEW-PROVIDER.md`, `contracts/DRIFT-CHECK.md`, and `docs/agents/INTEGRATION.md`
+are authoritative; the Codex and Claude skills and the Copilot prompts beside each are thin
+entry points.
 
 **The same rule governs instruction text that ships outward.** Agent instructions this
 project *emits* — `anyinfer agents-md`, the `llms.txt` pair built with the docs site, and
@@ -103,6 +107,13 @@ changes require the generated reference and runnable examples.
 
 ## Testing and documentation obligations
 
+- **Two test tracks.** `workspace test` is the inner loop: the fast track, seconds, every
+  adapter's own module and the whole core, skipping the `exhaustive` preset matrix and
+  `slow` packaging builds. `workspace test --provider <id>` narrows to one provider's
+  modules plus the invariants a provider change trips — editing one adapter does not need
+  the other twenty exercised. `workspace check` is the gate and the only thing that says
+  the suite passes; run it before committing. `test` cannot be made to run everything, on
+  purpose.
 - Every provider adapter must pass the shared conformance suite (`anyinfer.testing`) in
   cassette and fake-server modes; live mode is opt-in via real credentials. A new adapter PR
   includes: adapter, conformance run, its column in the conformance matrix (DESIGN.md §24),
@@ -110,6 +121,18 @@ changes require the generated reference and runnable examples.
 - Doc examples must run against the fake providers in CI — do not write examples that can't
   execute.
 - Public symbols require docstrings; the docs build fails otherwise.
+- **Documentation must not contradict itself.** A page that states a count (of concept
+  pages, providers, error classes) or enumerates a set (an index table, a hierarchy
+  diagram) must match the actual file tree and source — verify it, don't estimate it, and
+  re-verify it whenever the thing it counts changes. When the same claim is deliberately
+  restated in more than one file (README.md mirroring `docs/index.md`, a hand-written
+  reference page next to its generated twin), treat every copy as one edit: grep for the
+  other instances before considering the change done, and use identical wording where the
+  claim is meant to be identical. Prefer a short curated list with a link to the canonical
+  full index over hand-duplicating that index's contents — a link cannot drift the way a
+  copied list can. A stale count or a self-contradictory claim is a documentation bug, not
+  a style nit; it is exactly the kind of thing this project's own docs promise readers they
+  can trust.
 - **No ADR mentions in user-facing text.** `ADR-NNN` numbers are internal shorthand: they
   must not appear anywhere under `docs/`, in the root `README.md`, or in any public
   docstring (mkdocstrings renders those onto the published site). State the rule in plain
@@ -124,10 +147,22 @@ fields read, streaming framing, and error-mapping inputs — each with a last-ve
 One snapshot is not an inference provider: `contracts/huggingface.md` covers the weights
 source model acquisition depends on, and is audited by the same procedure.
 
-These snapshots are the input to the **provider drift check**, a semi-automated audit that
-compares each snapshot against the provider's *current* public documentation and changelogs:
+A snapshot is written **before** the adapter it specifies, as Step 1 of
+[contracts/NEW-PROVIDER.md](contracts/NEW-PROVIDER.md) — the canonical, tool-agnostic
+procedure for adding a provider, a preset, or a new embedding/rerank binding on an existing
+provider. Its entry points follow the same shape as the drift check's below: the
+`add-provider` skill (Codex `$add-provider`, Claude Code `/add-provider`), the
+`add-provider` Copilot prompt, or the file itself.
+
+These snapshots are then the input to the **provider drift check**, a semi-automated audit
+that compares each snapshot against the provider's *current* public documentation and
+changelogs:
 
 - Procedure (canonical, tool-agnostic): [contracts/DRIFT-CHECK.md](contracts/DRIFT-CHECK.md)
+- Scheduled: the weekly `contract-drift` workflow selects snapshots deterministically
+  (`scripts/check_contract_drift.py`, never-live-verified first, then oldest) and runs the
+  procedure against them. Needs no provider credentials — snapshots record what a provider
+  publishes, not what an authenticated call returns.
 - Codex: invoke the `check-provider-drift` skill (`$check-provider-drift`).
 - Claude Code: invoke the `check-provider-drift` skill (`/check-provider-drift`).
 - Copilot Chat: run the `check-provider-drift` prompt (`.github/prompts/`).

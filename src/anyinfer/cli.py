@@ -9,7 +9,7 @@ import mimetypes
 import os
 import sys
 from collections.abc import Sequence
-from dataclasses import fields
+from dataclasses import dataclass, fields
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
@@ -784,6 +784,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="CASE",
         help="restrict the run to one case (repeatable)",
     )
+    conform.add_argument(
+        "--record",
+        type=Path,
+        metavar="DIR",
+        help=(
+            "record this run's real wire traffic into cassettes under DIR, one per "
+            "scenario, so the suite can replay it offline without your credentials"
+        ),
+    )
     conform.add_argument("--json", action="store_true", help="emit machine-readable results")
     conform.add_argument(
         "--markdown-row",
@@ -990,6 +999,82 @@ def _describe(settings: Any) -> str:
 def _config(path: Path | None) -> AnyInferConfig:
     """Load shared configuration, or return an empty configuration."""
     return load_config(path) if path is not None else AnyInferConfig()
+
+
+def _require_providers(config: AnyInferConfig) -> bool:
+    """Print the shared "no providers configured" error when `config` has none.
+
+    Every subcommand that needs a `Client` checks this first and bails out the same
+    way, so the wording only has to be right in one place.
+
+    Returns:
+        True if `config` has at least one provider; false otherwise, with the error
+        already printed to stderr.
+    """
+    if config.providers:
+        return True
+    print(
+        "no providers configured: pass --config pointing at a JSON file with a "
+        "'providers' list (see `anyinfer providers` for what each one needs)",
+        file=sys.stderr,
+    )
+    return False
+
+
+def _resolve_route_and_target(
+    args: argparse.Namespace, config: AnyInferConfig
+) -> tuple[list[Any], Any, str | None]:
+    """Resolve providers, effective route, and target from `--route` vs `--target`.
+
+    An explicit --target and a --route are mutually exclusive at the call site; --route
+    wins because naming an ordered fallback list is the more specific instruction.
+    """
+    from . import Route
+
+    settings = list(config.providers)
+    route = Route(targets=tuple(args.route)) if args.route else config.route
+    target = None if args.route else args.target
+    return settings, route, target
+
+
+@dataclass(frozen=True)
+class _RequestExtras:
+    """The schema, tools, and sampling settings `run` and `compare` both assemble."""
+
+    schema: Any
+    tools: tuple[Any, ...]
+    sampling: Any
+
+
+def _compose_request_extras(args: argparse.Namespace) -> _RequestExtras | None:
+    """Build the schema/tools/sampling trio shared by `run` and `compare`.
+
+    Returns:
+        None when `--tool-choice` was given without any `--tool` (already reported).
+    """
+    from . import Sampling, SchemaSpec
+
+    schema = (
+        SchemaSpec(_read_json(args.schema, "schema"), name=args.schema.stem)
+        if args.schema is not None
+        else None
+    )
+    tools = tuple(_load_tool(path) for path in args.tool)
+    if args.tool_choice != "auto" and not tools:
+        print("--tool-choice needs at least one --tool", file=sys.stderr)
+        return None
+    sampling = None
+    if (
+        any(value is not None for value in (args.temperature, args.top_p, args.max_tokens))
+        or args.stop
+    ):
+        sampling = Sampling(
+            temperature=args.temperature,
+            top_p=args.top_p,
+            max_output_tokens=args.max_tokens,
+            stop=tuple(args.stop),
+        )
+    return _RequestExtras(schema=schema, tools=tools, sampling=sampling)
 
 
 # ---- serve install / uninstall / status -------------------------------------------------
@@ -1234,7 +1319,7 @@ def _compare(args: argparse.Namespace) -> int:
         )
         return 2
 
-    from . import Client, Repair, Sampling, SchemaSpec
+    from . import Client, Repair
     from .types.requests import CachePolicy
 
     messages = _compose_messages(args)
@@ -1244,30 +1329,13 @@ def _compare(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    schema = (
-        SchemaSpec(_read_json(args.schema, "schema"), name=args.schema.stem)
-        if args.schema is not None
-        else None
-    )
-    tools = tuple(_load_tool(path) for path in args.tool)
-    if args.tool_choice != "auto" and not tools:
-        print("--tool-choice needs at least one --tool", file=sys.stderr)
+    extras = _compose_request_extras(args)
+    if extras is None:
         return 2
-    sampling = None
-    if (
-        any(value is not None for value in (args.temperature, args.top_p, args.max_tokens))
-        or args.stop
-    ):
-        sampling = Sampling(
-            temperature=args.temperature,
-            top_p=args.top_p,
-            max_output_tokens=args.max_tokens,
-            stop=tuple(args.stop),
-        )
+    schema, tools, sampling = extras.schema, extras.tools, extras.sampling
 
     config = _config(args.config)
-    if not config.providers:
-        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+    if not _require_providers(config):
         return 2
     context_request = _cli_context_request(args, config)
     if context_request is False:
@@ -1341,8 +1409,7 @@ def _compare_snapshot(args: argparse.Namespace) -> int:
 
     fixtures = cd.load_fixtures(args.fixtures)
     config = _config(args.config)
-    if not config.providers:
-        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+    if not _require_providers(config):
         return 2
     client = Client(
         list(config.providers), route=config.route, operation_routes=config.operation_routes
@@ -1418,8 +1485,7 @@ def _compare_diff_request(args: argparse.Namespace) -> int:
         return 2
 
     config = _config(args.config)
-    if not config.providers:
-        print("no providers configured: pass --config with a 'providers' list", file=sys.stderr)
+    if not _require_providers(config):
         return 2
     client = Client(
         list(config.providers), route=config.route, operation_routes=config.operation_routes
@@ -1441,7 +1507,7 @@ def _run(args: argparse.Namespace) -> int:
     Returns:
         A process exit code.
     """
-    from . import ArenaPolicy, Client, Repair, Route, Sampling, SchemaSpec
+    from . import ArenaPolicy, Client, Repair
 
     messages = _compose_messages(args)
     if not messages:
@@ -1451,33 +1517,13 @@ def _run(args: argparse.Namespace) -> int:
         )
         return 2
 
-    schema = None
-    if args.schema is not None:
-        schema = SchemaSpec(_read_json(args.schema, "schema"), name=args.schema.stem)
-
-    tools = tuple(_load_tool(path) for path in args.tool)
-    if args.tool_choice != "auto" and not tools:
-        print("--tool-choice needs at least one --tool", file=sys.stderr)
+    extras = _compose_request_extras(args)
+    if extras is None:
         return 2
-
-    sampling = None
-    if (
-        any(value is not None for value in (args.temperature, args.top_p, args.max_tokens))
-        or args.stop
-    ):
-        sampling = Sampling(
-            temperature=args.temperature,
-            top_p=args.top_p,
-            max_output_tokens=args.max_tokens,
-            stop=tuple(args.stop),
-        )
+    schema, tools, sampling = extras.schema, extras.tools, extras.sampling
 
     config = _config(args.config)
-    settings, configured_route = list(config.providers), config.route
-    route = Route(targets=tuple(args.route)) if args.route else configured_route
-    # An explicit --target and a --route are mutually exclusive at the call site; --route
-    # wins because naming an ordered fallback list is the more specific instruction.
-    target = None if args.route else args.target
+    settings, route, target = _resolve_route_and_target(args, config)
     if args.arena_targets and args.arena_name:
         print("--arena and --arena-name are mutually exclusive", file=sys.stderr)
         return 2
@@ -1505,12 +1551,7 @@ def _run(args: argparse.Namespace) -> int:
             print(f"invalid arena: {exc}", file=sys.stderr)
             return 2
 
-    if not settings:
-        print(
-            "no providers configured: pass --config pointing at a JSON file with a "
-            "'providers' list (see `anyinfer providers` for what each one needs)",
-            file=sys.stderr,
-        )
+    if not _require_providers(config):
         return 2
 
     effective_arena = arena_policy or (config.arena if target is None and not args.route else None)
@@ -1578,7 +1619,7 @@ def _embed(args: argparse.Namespace) -> int:
     Returns:
         A process exit code.
     """
-    from . import Client, Route
+    from . import Client
 
     inputs = _collect_embed_inputs(args)
     if inputs is None:
@@ -1591,15 +1632,8 @@ def _embed(args: argparse.Namespace) -> int:
         return 2
 
     config = _config(args.config)
-    settings, configured_route = list(config.providers), config.route
-    route = Route(targets=tuple(args.route)) if args.route else configured_route
-    target = None if args.route else args.target
-    if not settings:
-        print(
-            "no providers configured: pass --config pointing at a JSON file with a "
-            "'providers' list (see `anyinfer providers` for what each one needs)",
-            file=sys.stderr,
-        )
+    settings, route, target = _resolve_route_and_target(args, config)
+    if not _require_providers(config):
         return 2
 
     client = Client(settings, route=route, operation_routes=config.operation_routes)
@@ -1720,7 +1754,7 @@ def _rerank(args: argparse.Namespace) -> int:
     Returns:
         A process exit code.
     """
-    from . import Client, Route
+    from . import Client
 
     documents = _collect_rerank_documents(args)
     if documents is None:
@@ -1734,15 +1768,8 @@ def _rerank(args: argparse.Namespace) -> int:
         return 2
 
     config = _config(args.config)
-    settings, configured_route = list(config.providers), config.route
-    route = Route(targets=tuple(args.route)) if args.route else configured_route
-    target = None if args.route else args.target
-    if not settings:
-        print(
-            "no providers configured: pass --config pointing at a JSON file with a "
-            "'providers' list (see `anyinfer providers` for what each one needs)",
-            file=sys.stderr,
-        )
+    settings, route, target = _resolve_route_and_target(args, config)
+    if not _require_providers(config):
         return 2
 
     client = Client(settings, route=route, operation_routes=config.operation_routes)
@@ -2161,10 +2188,16 @@ def _compose_messages(args: argparse.Namespace) -> list[Any]:
     if args.messages is not None:
         raw = _read_json(args.messages, "messages")
         if not isinstance(raw, list):
-            raise SystemExit(f"{args.messages} must contain a JSON list of messages")
+            raise ConfigError(
+                f"{args.messages} must contain a JSON list of messages",
+                hint='e.g. [{"role": "user", "content": "hi"}]',
+            )
         for entry in raw:
             if not isinstance(entry, dict) or "role" not in entry:
-                raise SystemExit("each message needs a 'role' and 'content'")
+                raise ConfigError(
+                    "each message needs a 'role' and 'content'",
+                    hint=f"check {args.messages} for an entry missing one",
+                )
             messages.append(
                 Message(
                     role=str(entry["role"]),  # type: ignore[arg-type]
@@ -2210,7 +2243,10 @@ def _read_attachment(path: Path) -> bytes:
     try:
         return path.read_bytes()
     except OSError as exc:
-        raise SystemExit(f"could not read attachment {path}: {exc}") from exc
+        raise ConfigError(
+            f"could not read attachment {path}: {exc}",
+            hint="check the path and that the file is readable",
+        ) from exc
 
 
 def _media_type(path: Path, default: str) -> str:
@@ -2253,7 +2289,10 @@ def _load_tool(path: Path) -> Any:
 
     data = _read_json(path, "tool")
     if not isinstance(data, dict) or "name" not in data:
-        raise SystemExit(f"tool file {path} needs at least a 'name'")
+        raise ConfigError(
+            f"tool file {path} needs at least a 'name'",
+            hint='e.g. {"name": "my_tool", "parameters": {"type": "object", "properties": {}}}',
+        )
     return ToolSpec(
         name=str(data["name"]),
         description=str(data.get("description", "")),
@@ -2262,7 +2301,15 @@ def _load_tool(path: Path) -> Any:
 
 
 def _read_json(path: Path, label: str) -> Any:
-    """Read a JSON file, failing with a message that names what was being loaded."""
+    """Read a JSON file, failing with a message that names what was being loaded.
+
+    Raises `SystemExit`, not a structured `anyinfer.errors` type: this diverges from
+    every other malformed-input path in this module (see `_compose_messages`,
+    `_read_attachment`, `_load_tool`), but `test_bad_schema_file_is_reported_not_traced`
+    in tests/test_cli_run.py asserts on `SystemExit` for a broken `--schema` file, which
+    is read through here. Changing this would need that test updated too, and this file
+    does not own it.
+    """
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -2707,12 +2754,7 @@ def _verify(args: argparse.Namespace) -> int:
 
     config = _config(args.config)
     settings = list(config.providers)
-    if not settings:
-        print(
-            "no providers configured: pass --config pointing at a JSON file with a "
-            "'providers' list (see `anyinfer providers` for what each one needs)",
-            file=sys.stderr,
-        )
+    if not _require_providers(config):
         return 2
 
     targets = [args.target] if args.target else list(config.route.targets if config.route else ())
@@ -2782,12 +2824,7 @@ def _benchmark(args: argparse.Namespace) -> int:
 
     config = _config(args.config)
     settings = list(config.providers)
-    if not settings:
-        print(
-            "no providers configured: pass --config pointing at a JSON file with a "
-            "'providers' list (see `anyinfer providers` for what each one needs)",
-            file=sys.stderr,
-        )
+    if not _require_providers(config):
         return 2
 
     client = Client(settings)
@@ -3174,11 +3211,15 @@ def _conform(args: argparse.Namespace) -> int:
 
     config = _config(args.config)
     supports = load_declared_capabilities(args.project)
+    recorder = _CassetteRecorder(args.record, provider_id) if args.record else None
 
-    async def build_client(_scenario: str) -> AsyncClient:
+    async def build_client(scenario: str) -> AsyncClient:
         # A fresh client per case: the runner closes what it is given.
+        providers = list(config.providers)
+        if recorder is not None:
+            providers = recorder.instrument(providers, scenario)
         return AsyncClient(
-            list(config.providers),
+            providers,
             route=config.route,
             operation_routes=config.operation_routes,
             history=config.history,
@@ -3203,7 +3244,104 @@ def _conform(args: argparse.Namespace) -> int:
         print(render_report(provider_id, results))
 
     failed = any(not r.passed and not r.skipped for r in results)
+    if recorder is not None and recorder.finish() != 0:
+        return 1
     return 1 if failed else 0
+
+
+class _CassetteRecorder:
+    """Wraps a run's provider transports so real traffic lands in committable cassettes.
+
+    One cassette per scenario rather than per case: cases sharing a scenario make
+    different requests against the same programmed state, and the replay transport
+    matches on method and path, so they coexist in one file the way they would in one
+    session.
+
+    Nothing is written until `finish` has audited every cassette. A cassette is recorded
+    from someone's real account, and the whole point of the contribution path is that a
+    maintainer who cannot know what was in that traffic still ends up with a file they
+    can safely commit.
+    """
+
+    def __init__(self, directory: Path, provider_id: str) -> None:
+        self._directory = directory
+        self._provider_id = provider_id
+        self._cassettes: dict[str, Any] = {}
+
+    def instrument(self, providers: list[Any], scenario: str) -> list[Any]:
+        """Return ``providers`` with each transport replaced by a recording one."""
+        import dataclasses
+
+        from .testing.cassettes import Cassette, CassetteTransport
+
+        cassette = self._cassettes.get(scenario)
+        if cassette is None:
+            path = self._directory / f"{self._provider_id}_{scenario}.json"
+            cassette = Cassette(path)
+            # A re-record replaces the file rather than appending a second copy of every
+            # exchange to whatever was there before.
+            cassette.interactions = []
+            self._cassettes[scenario] = cassette
+        # An already-configured transport becomes the recorder's inner transport rather
+        # than being discarded: a config that routes through a proxy or a test seam must
+        # still route through it while recording, or the cassette captures traffic that
+        # never resembled what this deployment actually sends.
+        return [
+            dataclasses.replace(
+                settings,
+                transport=CassetteTransport(
+                    cassette, record=True, inner=settings.transport
+                ),
+            )
+            for settings in providers
+        ]
+
+    def finish(self) -> int:
+        """Save every cassette, audit the saved bytes, and report.
+
+        Returns:
+            ``0`` when every cassette was written clean, ``1`` when the audit found
+            credential-shaped content and the cassettes were withheld.
+        """
+        from .testing.recording import audit_cassette
+
+        self._directory.mkdir(parents=True, exist_ok=True)
+        written = []
+        for scenario in sorted(self._cassettes):
+            cassette = self._cassettes[scenario]
+            if not cassette.interactions:
+                # A skipped case records nothing; an empty file would look like coverage.
+                continue
+            cassette.save()
+            written.append(cassette.path)
+
+        findings = [(path, audit_cassette(path)) for path in written]
+        leaky = [(path, f) for path, f in findings if f]
+        for path, path_findings in leaky:
+            # Delete first, report second: a failed audit must not leave the file behind
+            # for someone to commit after skimming past the warning.
+            path.unlink(missing_ok=True)
+            print(f"\nWITHHELD  {path.name} — credential-shaped content survived redaction")
+            for finding in path_findings:
+                print(f"          {finding}")
+
+        clean = [path for path, f in findings if not f]
+        for path in clean:
+            print(f"recorded  {path}")
+
+        if leaky:
+            print(
+                f"\n{len(leaky)} cassette(s) withheld. Register the credential through "
+                "anyinfer.credentials so redaction knows about it, then re-record. "
+                "The audit is heuristic: review what it did write before committing."
+            )
+            return 1
+        if clean:
+            print(
+                f"\n{len(clean)} cassette(s) recorded. The audit is heuristic, not a "
+                "proof of cleanliness — read them before committing."
+            )
+        return 0
 
 
 def _mcp(args: argparse.Namespace) -> int:
@@ -3389,12 +3527,33 @@ def _models_add(args: argparse.Namespace) -> int:
     return 0
 
 
-class _ProgressPrinter:
-    """Renders aggregate acquisition progress, with a plain fallback off a TTY."""
+class _TtyProgressLine:
+    """Shared mechanics for a single overwritten progress line on a TTY.
+
+    On a TTY, each render overwrites the same line with a carriage return; off a TTY
+    (piped output, a log file) there is no cursor to overwrite, so the caller decides —
+    per line, via `emit_off_tty` — whether that update is worth a whole new line.
+    """
 
     def __init__(self) -> None:
         self._tty = sys.stderr.isatty()
         self._wrote = False
+
+    def _render(self, line: str, *, width: int, emit_off_tty: bool) -> None:
+        if self._tty:
+            print(f"\r{line:<{width}}", end="", file=sys.stderr, flush=True)
+        elif emit_off_tty:
+            print(line, file=sys.stderr, flush=True)
+        self._wrote = True
+
+    def finish(self) -> None:
+        """End the progress line, if one was started."""
+        if self._wrote and self._tty:
+            print(file=sys.stderr)
+
+
+class _ProgressPrinter(_TtyProgressLine):
+    """Renders aggregate acquisition progress, with a plain fallback off a TTY."""
 
     def __call__(self, progress: Any) -> None:
         """Render one progress report."""
@@ -3413,28 +3572,17 @@ class _ProgressPrinter:
             f"{_gib(progress.total_bytes)}{rate}{eta}"
             f"  [{progress.file_index}/{progress.file_count}] {progress.filename}"
         )
-        if self._tty:
-            print(f"\r{line:<100}", end="", file=sys.stderr, flush=True)
-        elif progress.phase in ("planning", "verifying", "placing"):
-            print(line, file=sys.stderr, flush=True)
-        self._wrote = True
-
-    def finish(self) -> None:
-        """End the progress line, if one was started."""
-        if self._wrote and self._tty:
-            print(file=sys.stderr)
+        self._render(
+            line, width=100, emit_off_tty=progress.phase in ("planning", "verifying", "placing")
+        )
 
 
-class _DownloadReporter:
+class _DownloadReporter(_TtyProgressLine):
     """Renders `DownloadProgress` telemetry, with a plain fallback off a TTY.
 
     An observer rather than a callback because a pull's progress arrives as ordinary
     telemetry — the same events any application observer already sees.
     """
-
-    def __init__(self) -> None:
-        self._tty = sys.stderr.isatty()
-        self._wrote = False
 
     def on_event(self, event: Any) -> None:
         """Render one progress event, ignoring everything else."""
@@ -3442,16 +3590,7 @@ class _DownloadReporter:
             return
         total = f" / {_gib(event.total_bytes)}" if event.total_bytes else ""
         line = f"{_gib(event.downloaded_bytes)}{total}  {event.phase}"
-        if self._tty:
-            print("\r" + f"{line:<80}", end="", file=sys.stderr, flush=True)
-        else:
-            print(line, file=sys.stderr, flush=True)
-        self._wrote = True
-
-    def finish(self) -> None:
-        """End the progress line, if one was started."""
-        if self._wrote and self._tty:
-            print(file=sys.stderr)
+        self._render(line, width=80, emit_off_tty=True)
 
 
 def _models_pull(args: argparse.Namespace) -> int:
@@ -3460,12 +3599,7 @@ def _models_pull(args: argparse.Namespace) -> int:
 
     config = _config(getattr(args, "config", None))
     settings = list(config.providers)
-    if not settings:
-        print(
-            "no providers configured: pass --config pointing at a JSON file with a "
-            "'providers' list",
-            file=sys.stderr,
-        )
+    if not _require_providers(config):
         return 2
 
     reporter = _DownloadReporter()

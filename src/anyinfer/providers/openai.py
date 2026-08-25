@@ -19,7 +19,7 @@ from typing import Any, ClassVar
 
 import httpx2
 
-from ..errors import ProviderError, StreamProtocolError
+from ..errors import Phase, ProviderError, StreamProtocolError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import (
     DiscoveredModel,
@@ -44,7 +44,7 @@ from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import FinishReason, Usage
 from ._multimodal import base64_data, data_url, media_subtype
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
-from .http import build_client, classify_status, map_transport_error, read_error_detail
+from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 from .sse import iter_sse
 
@@ -74,6 +74,30 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+        )
+
+    def _classify(
+        self,
+        status: int,
+        detail: str,
+        headers: Mapping[str, str],
+        phase: Phase = "generate",
+    ) -> ProviderError:
+        """Error-classification hook required by `OpenAICompatEmbeddingsMixin`.
+
+        Every other adapter composing that mixin also inherits `OpenAICompatAdapter`,
+        which supplies this. This one does not -- the Responses API is its own dialect --
+        so without this method the mixin's error path raised `AttributeError` instead of a
+        typed, retryable `ProviderError`, and the router could not retry a rate-limited
+        embeddings call because what it caught was not a provider error at all.
+
+        A default on the mixin would fix it in the wrong place: `openrouter` and `ollama`
+        override `_classify` for dialect-specific mapping, and the mixin sits *before*
+        the compat adapter in every other user's MRO, so a default there would shadow
+        those overrides.
+        """
+        return classify_status(
+            status, provider=self.provider_id, detail=detail, headers=headers, phase=phase
         )
 
     # ---- discovery -------------------------------------------------------------------
@@ -422,24 +446,20 @@ def _parse_usage(payload: Any) -> Usage | None:
     if not isinstance(payload, Mapping):
         return None
 
-    def field(source: Mapping[str, Any], name: str) -> int | None:
-        value = source.get(name)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
-
     reasoning = None
     details = payload.get("output_tokens_details")
     if isinstance(details, Mapping):
-        reasoning = field(details, "reasoning_tokens")
+        reasoning = read_int(details, "reasoning_tokens")
 
     cached = None
     input_details = payload.get("input_tokens_details")
     if isinstance(input_details, Mapping):
-        cached = field(input_details, "cached_tokens")
+        cached = read_int(input_details, "cached_tokens")
 
     usage = Usage(
-        input_tokens=field(payload, "input_tokens"),
-        output_tokens=field(payload, "output_tokens"),
-        total_tokens=field(payload, "total_tokens"),
+        input_tokens=read_int(payload, "input_tokens"),
+        output_tokens=read_int(payload, "output_tokens"),
+        total_tokens=read_int(payload, "total_tokens"),
         cache_read_tokens=cached,
         reasoning_tokens=reasoning,
     )

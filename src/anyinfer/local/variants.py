@@ -308,7 +308,8 @@ def _consider(
     quant = variant.quantization.upper()
 
     if variant.engine == "llama.cpp":
-        if quant not in LLAMA_CPP_LADDER and not prefs.allow_low_quality:
+        low_quality_ok = prefs.allow_low_quality and quant in LOW_QUALITY_LADDER
+        if quant not in LLAMA_CPP_LADDER and not low_quality_ok:
             return _Rejection(
                 variant.id,
                 f"{variant.quantization} is below the Q4_K_M quality floor; a smaller model "

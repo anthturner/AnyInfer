@@ -55,8 +55,9 @@ _DEFAULT_FEATURES = Feature.STREAMING | Feature.TOOLS | Feature.SYSTEM_PROMPT
 ReasoningStyle = Literal[
     "effort", "effort-min-low", "effort-three-level", "effort-min-named", "reasoning-object"
 ]
-"""Reasoning-field dialect used by an OpenAI-compatible preset."""
-"""How a preset spells reasoning effort on the wire.
+"""Reasoning-field dialect used by an OpenAI-compatible preset.
+
+How a preset spells reasoning effort on the wire:
 
 - ``effort``: a top-level ``reasoning_effort`` string, all four normalized levels accepted.
 - ``effort-min-low``: as above, but the provider documents no ``minimal`` level, so

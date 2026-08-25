@@ -66,6 +66,39 @@ platform.
 `m365-copilot` is exempt from live mode — its authentication is interactive-only and cannot
 run headless. That is recorded rather than worked around.
 
+## Contributing a cassette
+
+Cassette coverage is the one thing here that does not scale with maintainer effort: it
+needs an account on the provider, and no maintainer holds accounts on every supported
+service. If you already have one, recording is a single command.
+
+```bash
+anyinfer conform groq --model llama-3.3-70b --config anyinfer.json --record tests/cassettes
+```
+
+The run makes real calls against your account, and writes one cassette per scenario. From
+then on the suite replays them offline, in CI, with no credentials — which is the whole
+point: you spend a few cents once, and every future run of that adapter's suite is free
+for everyone.
+
+**Two passes stand between your traffic and the committed file, and they are
+complementary.** Saving a cassette strips the known auth headers wholesale and runs every
+body through the redaction registry, which removes the secrets AnyInfer was *told* about —
+anything resolved through `env://`, `credential://`, or `anyinfer.credentials`. Then
+`audit_cassette` re-reads the saved bytes looking for credential *shapes* it was never told
+about: vendor-prefixed keys, bearer tokens written into a body, JWTs, AWS key ids, private
+key material. A finding withholds that cassette rather than warning about it, because a
+file left on disk after a warning is a file someone commits after skimming past it.
+
+The audit is heuristic and says so. It cannot find a genuinely opaque, unprefixed secret,
+so **read the cassettes before committing them** — they are small, and they are your own
+traffic. If the audit withholds one, the usual cause is a credential passed as a literal
+rather than through a reference; route it through `anyinfer.credentials` so redaction knows
+about it, and re-record.
+
+Recording preserves any transport your config already sets, so a deployment that routes
+through a proxy records what it actually sends rather than bypassing it.
+
 ## Adding a case
 
 Add it to `CONFORMANCE_CASES` in `anyinfer/testing/conformance.py`:

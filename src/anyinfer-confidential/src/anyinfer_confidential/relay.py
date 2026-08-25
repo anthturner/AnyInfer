@@ -5,7 +5,7 @@ routing/scoring logic, few-shot example selection — the part of a vendor's IP 
 prompt *text* at all, and that a single captured request on the wire would not reveal.
 **What it costs:** the vendor is back in the customer's data path for that call, which
 trades directly against the BYOK privacy posture Tier 0 already provides (see
-`plans/TIERED_ENCRYPTED_PLANS.md` §0, §3). A vendor deploying this must document exactly
+DESIGN.md §30.0, §30.3). A vendor deploying this must document exactly
 what the Relay sees (the assembled request, transiently) and what it persists (nothing,
 by design and by construction — this module never writes a request or response body to
 any durable store; nothing here opens a file or a database connection).

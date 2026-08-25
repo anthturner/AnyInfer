@@ -19,7 +19,18 @@ from anyinfer.providers.anthropic import ANTHROPIC_VERSION
 from anyinfer.providers.azure_foundry import AzureFoundryAdapter
 from anyinfer.providers.base import ProviderConfig
 from anyinfer.providers.openrouter import OpenRouterAdapter
-from anyinfer.testing.fakes import sse_lines
+from anyinfer.testing.conformance import (
+    Capabilities,
+    ConformanceHarness,
+    run_conformance,
+)
+from anyinfer.testing.fakes import (
+    FakeAnthropicServer,
+    FakeOpenAIServer,
+    FakeResponsesServer,
+    scenario_responses,
+    sse_lines,
+)
 
 
 def _client(provider: str, handler: Any, **settings: Any) -> ai.AsyncClient:
@@ -811,3 +822,245 @@ async def test_m365_health_does_not_trigger_an_interactive_prompt() -> None:
 
     assert health.ok is False
     assert "interactive" in health.detail
+
+
+# ---- conformance ---------------------------------------------------------------------
+#
+# The dialect tests above prove each adapter's divergences. These harnesses prove the
+# shared contract on top of them, and are what the published conformance matrix reports.
+
+
+async def _build_azure_client(scenario: str) -> ai.AsyncClient:
+    server = FakeOpenAIServer(
+        scenario_responses(scenario), models=("gpt-5-deployment", "text-embedding-3-small")
+    )
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "azure-foundry",
+                api_key="azure-key",
+                base_url="https://fake.services.ai.azure.com/openai/v1",
+                transport=server.transport(),
+            )
+        ],
+        route=ai.Route(
+            targets=("azure-foundry:gpt-5-deployment",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+AZURE_HARNESS = ConformanceHarness(
+    provider_id="azure-foundry",
+    model="gpt-5-deployment",
+    build_client=_build_azure_client,
+    # Foundry deployments serve embeddings from the same resource, model-addressed by
+    # deployment name. No rerank endpoint exists, and the compat dialect carries token
+    # counts for reasoning but no reasoning channel.
+    supports=Capabilities(reasoning=False, cancellation=True, embedding=True),
+    embedding_model="text-embedding-3-small",
+)
+
+
+async def test_azure_foundry_conformance() -> None:
+    results = await run_conformance(AZURE_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+async def _build_openrouter_client(scenario: str) -> ai.AsyncClient:
+    server = FakeOpenAIServer(
+        scenario_responses(scenario), models=("anthropic/claude-sonnet-4-5",)
+    )
+    return ai.AsyncClient(
+        [ai.ProviderSettings.of("openrouter", api_key="or-key", transport=server.transport())],
+        route=ai.Route(
+            targets=("openrouter:anthropic/claude-sonnet-4-5",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+OPENROUTER_HARNESS = ConformanceHarness(
+    provider_id="openrouter",
+    model="anthropic/claude-sonnet-4-5",
+    build_client=_build_openrouter_client,
+    # Reasoning availability is per-upstream-model and discovered, never a property of
+    # the router itself; the dialect test above covers the translation.
+    supports=Capabilities(reasoning=False, cancellation=True),
+)
+
+
+async def test_openrouter_conformance() -> None:
+    results = await run_conformance(OPENROUTER_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+async def _build_anthropic_client(scenario: str) -> ai.AsyncClient:
+    server = FakeAnthropicServer(scenario_responses(scenario))
+    return ai.AsyncClient(
+        [ai.ProviderSettings.of("anthropic", api_key="sk-ant-test", transport=server.transport())],
+        route=ai.Route(
+            targets=("anthropic:claude-sonnet-4-5",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+ANTHROPIC_HARNESS = ConformanceHarness(
+    provider_id="anthropic",
+    model="claude-sonnet-4-5",
+    build_client=_build_anthropic_client,
+    supports=Capabilities(cancellation=True),
+)
+
+
+async def test_anthropic_conformance() -> None:
+    results = await run_conformance(ANTHROPIC_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+async def _build_openai_client(scenario: str) -> ai.AsyncClient:
+    server = FakeResponsesServer(
+        scenario_responses(scenario), models=("gpt-5", "text-embedding-3-small")
+    )
+    return ai.AsyncClient(
+        [ai.ProviderSettings.of("openai", api_key="sk-test", transport=server.transport())],
+        route=ai.Route(
+            targets=("openai:gpt-5",), retry=ai.Retry(max_attempts=2, backoff_base_s=0.0)
+        ),
+    )
+
+
+OPENAI_HARNESS = ConformanceHarness(
+    provider_id="openai",
+    model="gpt-5",
+    build_client=_build_openai_client,
+    # The Responses API carries a real reasoning channel and a real response-format
+    # field, so neither is emulated here. Embeddings share the resource; there is no
+    # rerank endpoint.
+    supports=Capabilities(cancellation=True, embedding=True),
+    embedding_model="text-embedding-3-small",
+)
+
+
+async def test_openai_conformance() -> None:
+    results = await run_conformance(OPENAI_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"
+
+
+async def test_openai_embedding_errors_are_typed_not_attribute_errors() -> None:
+    """A failing embeddings call must raise a retryable provider error.
+
+    `OpenAIAdapter` composes the embeddings mixin without inheriting the compat adapter,
+    so it is the one adapter that has to supply `_classify` itself. When it did not, the
+    mixin's error path raised `AttributeError` — which the router cannot retry, because
+    what it caught was not a provider error at all. A 429 became a crash.
+    """
+    from anyinfer.errors import ProviderError
+    from anyinfer.providers.base import EmbeddingWireRequest
+    from anyinfer.providers.openai import OpenAIAdapter
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            429, json={"error": {"message": "slow down"}}, headers={"retry-after": "3"}
+        )
+
+    adapter = OpenAIAdapter(
+        ProviderConfig(
+            provider_id="openai",
+            api_key="sk-test",
+            transport=httpx2.MockTransport(handler),
+        )
+    )
+    try:
+        with pytest.raises(ProviderError) as caught:
+            await adapter.embed(
+                EmbeddingWireRequest(model="text-embedding-3-small", inputs=("alpha",))
+            )
+    finally:
+        await adapter.aclose()
+
+    assert caught.value.retryable is True
+    assert caught.value.retry_after_s == 3
+
+
+# ---- m365-copilot conformance ----------------------------------------------------------
+#
+# The documented degraded case, and the reason it gets a row at all: a provider absent
+# from the matrix looks untested, while a row of declared gaps says exactly what it does
+# and does not do. Its authentication is interactive-only, so the live lane is exempt --
+# but the *dialect* is a single buffered POST, which a fake models completely.
+
+
+def _m365_server(scenario: str) -> Any:
+    """One buffered endpoint: `POST /copilot/conversations` returning `{"text": ...}`."""
+    responses = scenario_responses(scenario)
+    state = {"call": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        index = min(state["call"], len(responses) - 1)
+        response = responses[index]
+        state["call"] += 1
+        if response.status >= 400:
+            return httpx2.Response(
+                response.status,
+                json={"error": {"message": response.error_message}},
+                headers=dict(response.headers),
+            )
+        return httpx2.Response(
+            200,
+            json={
+                "text": response.text,
+                "usage": {"promptTokens": 11, "completionTokens": 7},
+            },
+            headers=dict(response.headers),
+        )
+
+    return handler
+
+
+async def _build_m365_client(scenario: str) -> ai.AsyncClient:
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "m365-copilot",
+                # A pre-acquired token: the adapter only signs in interactively when it
+                # has none, which is precisely what it must never do in a test.
+                api_key="m365-test-token",
+                transport=httpx2.MockTransport(_m365_server(scenario)),
+            )
+        ],
+        route=ai.Route(
+            targets=("m365-copilot:m365-copilot",),
+            retry=ai.Retry(max_attempts=2, backoff_base_s=0.0),
+        ),
+    )
+
+
+M365_HARNESS = ConformanceHarness(
+    provider_id="m365-copilot",
+    model="m365-copilot",
+    build_client=_build_m365_client,
+    # Every False here is a documented property of the service, not a gap in this fake.
+    # The response arrives whole, so there is no incremental stream and no meaningful
+    # first-token time; there are no tools, no reasoning channel, and no response-format
+    # field. A schema is prompt-injected and validated client-side, which is why
+    # structured output and repair stay on.
+    supports=Capabilities(
+        streaming=False,
+        ttft=False,
+        tools=False,
+        reasoning=False,
+        cancellation=False,
+    ),
+)
+
+
+async def test_m365_copilot_conformance() -> None:
+    results = await run_conformance(M365_HARNESS)
+    failures = [r for r in results if not r.passed and not r.skipped]
+    assert not failures, f"conformance failures: {[(f.name, f.detail) for f in failures]}"

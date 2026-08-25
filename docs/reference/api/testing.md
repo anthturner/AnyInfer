@@ -76,17 +76,31 @@ without credentials or a network.
 
 ::: anyinfer.testing.FakeOpenAIServer
 
+::: anyinfer.testing.FakeResponsesServer
+
+::: anyinfer.testing.FakeAnthropicServer
+
+::: anyinfer.testing.FakeBedrockServer
+
 ::: anyinfer.testing.FakeOllamaServer
 
 ::: anyinfer.testing.FakeGeminiServer
 
+::: anyinfer.testing.FakeRetrievalServer
+
 ::: anyinfer.testing.FakeResponse
+
+::: anyinfer.testing.scenario_responses
+
+::: anyinfer.testing.CONFORMANCE_SCENARIOS
 
 ::: anyinfer.testing.chunk_text
 
 ::: anyinfer.testing.sse_lines
 
 ::: anyinfer.testing.ndjson_lines
+
+::: anyinfer.testing.eventstream_frame
 
 </div>
 
@@ -101,6 +115,24 @@ Record/replay of real provider exchanges.
 ::: anyinfer.testing.CassetteTransport
 
 ::: anyinfer.testing.Interaction
+
+</div>
+
+## Recording
+
+Turning a live run against your own account into committable cassettes. The audit is a
+second, independent pass over the *saved* bytes: redaction removes secrets it was told
+about, and this looks for credential shapes it was not.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.testing.audit_cassette
+
+::: anyinfer.testing.audit_interaction
+
+::: anyinfer.testing.AuditFinding
+
+::: anyinfer.testing.SECRET_SHAPES
 
 </div>
 

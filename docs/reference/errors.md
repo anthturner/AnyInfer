@@ -34,11 +34,14 @@ AnyInferError
 │   ├── ContextLengthError
 │   ├── TransportError
 │   ├── StreamProtocolError
-│   └── ProviderUnavailableError
+│   ├── ProviderUnavailableError
+│   └── UnsupportedInputError
+├── SpendLimitError           a caller-set spending ceiling would be crossed
 ├── SchemaViolationError      validation failed after the repair budget
 ├── ToolLoopError             unknown tool, bad signature, or round bound exceeded
 ├── AllTargetsFailedError     the router exhausted every target
 └── LocalRuntimeError         llama-server lifecycle, or model integrity
+    └── ConfidentialExecutionError   the attested guarantee isn't available on this host
 ```
 
 `ProviderError` is a distinct branch on purpose: it is exactly what the router catches and
@@ -58,7 +61,7 @@ a provider whose optional extra is not installed.
 
 ```
 ConfigError: unknown target 'gpt-5'
-  (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-5'), or one of these
+  (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-4-5'), or one of these
    aliases: large, medium, small)
 
 ConfigError: the copilot provider requires the github-copilot-sdk extra
@@ -73,7 +76,7 @@ ConfigError: the copilot provider requires the github-copilot-sdk extra
 
 `embed()` and `rerank()` raise no new exception types — every operation-specific
 refusal is a `ConfigError` with a distinguishing message, per the decisions record in
-`plans/EMBEDDING_RERANKING_CONTINUATION.md` §10 (D-15). The four message shapes, verbatim
+DESIGN.md §28.2 decision 5. The four message shapes, verbatim
 from `_client/operations.py`:
 
 ```
@@ -149,6 +152,10 @@ AuthError: invalid api key
 
 **Retryable:** yes, honoring `Retry-After` when longer than the computed backoff.
 
+```
+RateLimitError: provider returned HTTP 429
+```
+
 !!! tip "What to check next"
     If this recurs often, lower request concurrency or add a slower fallback target with
     [`Route.targets`](../concepts/routing.md).
@@ -197,6 +204,11 @@ fall back to a larger model instead.
 
 **Retryable:** yes.
 
+```
+TransportError: request to ollama timed out
+  (hint: raise timeout_s, or choose a faster model)
+```
+
 </div>
 
 <div class="anyinfer-error-card anyinfer-severity-high" markdown>
@@ -218,6 +230,56 @@ duplicate or contradict it.
 **When:** 5xx, or a failed health probe.
 
 **Retryable:** yes. Also marks the target unhealthy, so the health gate skips it briefly.
+
+```
+ProviderUnavailableError: cannot connect to ollama: [Errno 111] Connection refused
+  (hint: check the base URL and that the server is running)
+```
+
+</div>
+
+<div class="anyinfer-error-card anyinfer-severity-high" markdown>
+
+## `UnsupportedInputError` :material-alert-circle:{ title="Not retryable; the target cannot accept this input" }
+
+**When:** a trusted model capability proves the target cannot accept an attached input
+modality (image, document, or audio). Raised before dispatch.
+
+**Retryable:** no; the same attachment against the same target fails the same way.
+
+```
+UnsupportedInputError: ollama cannot project audio input (model reports no audio support)
+  (hint: choose a target that supports this input form or supply supported inline bytes)
+```
+
+!!! tip "How to fix"
+    Follow `error.hint`: choose a target whose capabilities include the modality, or
+    convert the attachment to a form the target accepts. See
+    [multimodal inputs](../concepts/multimodal-inputs.md).
+
+</div>
+
+<div class="anyinfer-error-card anyinfer-severity-high" markdown>
+
+## `SpendLimitError` :material-alert-circle:{ title="Not retryable; the same request costs the same again" }
+
+**When:** a request would cross a caller-set `max_request_usd` or `max_total_usd` spending
+ceiling, or its cost cannot be estimated and the policy says not to spend blind. Raised
+before dispatch, so nothing was sent and nothing was billed.
+
+**Retryable:** no; deterministic by construction — the identical request refused once will
+be refused again.
+
+```
+SpendLimitError: a request to anthropic:claude-sonnet-4-5 could cost 0.42, above the
+per-request ceiling of 0.25
+  (hint: shorten the prompt, cap max_output_tokens, or raise max_request_usd)
+```
+
+!!! tip "How to fix"
+    Read `error.hint`, and inspect `error.limit_usd`, `error.spent_usd`, and
+    `error.estimated_usd` for the exact numbers behind the refusal. See
+    [cost and spending](../concepts/cost.md).
 
 </div>
 
@@ -308,11 +370,9 @@ nothing about *why* it failed.
 
 </div>
 
----
+<div class="anyinfer-error-card anyinfer-severity-high" markdown>
 
 ## `ConfidentialExecutionError` :material-alert-circle:{ title="Not retryable; the attested guarantee is unavailable" }
-
-<div class="anyinfer-error" markdown>
 
 **When:** `ConfidentialExecutionAdapter.generate()` was called and
 `anyinfer.local.confidential_execution_status()` reported `end_to_end=False` for this

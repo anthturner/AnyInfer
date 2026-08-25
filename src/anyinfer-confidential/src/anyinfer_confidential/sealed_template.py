@@ -4,7 +4,7 @@
 unzipping the app bundle, grepping the binary, or reading the on-disk asset. **What it
 does not protect against:** live network capture, memory inspection while the process
 runs, or a debugger attached to a live render. That ceiling is deliberate and must be
-stated up front — see `plans/TIERED_ENCRYPTED_PLANS.md` §2 for the full reasoning.
+stated up front — see DESIGN.md §30.2 for the full reasoning.
 
 A template is authored as plaintext, sealed at build time into an `EncryptedTemplate`
 asset (AES-256-GCM, keyed by a rotatable `key_id`), and shipped inside the vendor's
@@ -195,7 +195,7 @@ class TemplateVault:
                 degraded state for a feature whose baseline guarantee is already offline.
                 Set `True` only when a deployment's security posture requires guaranteed
                 revocation over availability; this is a real tradeoff, not a bug either
-                way (see `plans/TIERED_ENCRYPTED_PLANS.md` §2, §7).
+                way (see DESIGN.md §30.2).
         """
         self._key_ring = key_ring
         self._license_public_key = license_public_key

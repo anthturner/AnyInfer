@@ -49,10 +49,32 @@ from ..types.capabilities import (
 from ..types.messages import AudioPart, DocumentPart, ImagePart
 from ..types.results import Diagnostic
 from ._multimodal import unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    EmbeddingWireRequest,
+    EmbeddingWireResult,
+    ProviderConfig,
+    WireRequest,
+)
 from .openai_compat import OpenAICompatAdapter
+from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 
 __all__ = ["LlamaCppAdapter", "LlamaCppOptions", "descriptor"]
+
+
+class _Delegate(OpenAICompatAdapter, OpenAICompatEmbeddingsMixin):
+    """The supervised server's dialect.
+
+    OpenAI-compatible chat, and — only for a server started with
+    ``ServerPlan.embeddings=True`` — OpenAI-compatible embeddings too.
+
+    Calling `embed()` against a delegate for a plain generation server is a normal,
+    correctly-classified provider error (llama-server answers 501, live-verified
+    2026-08-14), not a structural failure — `LlamaCppAdapter.embed()` is the thing that
+    actually keeps embedding and generation servers for the same model separate (see its
+    docstring), this class just needs to be able to speak both dialects when asked.
+    """
 
 
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -244,7 +266,7 @@ class LlamaCppAdapter:
             allow_remote_exposure=self._options.allow_remote_exposure,
             on_lifecycle=config.events,
         )
-        self._delegates: dict[str, OpenAICompatAdapter] = {}
+        self._delegates: dict[str, _Delegate] = {}
         self._model_store: ModelStore | None = None
         self._lock = asyncio.Lock()
 
@@ -266,8 +288,21 @@ class LlamaCppAdapter:
             self._supervisor.set_hardware(self._hardware)
         return self._hardware
 
-    def _artifact_for(self, model: str) -> GgufArtifact:
-        """Resolve a model reference to a pinned catalog artifact."""
+    def _artifact_for(self, model: str, *, operation: str = "generation") -> GgufArtifact:
+        """Resolve a model reference to a pinned catalog artifact.
+
+        Args:
+            model: The artifact id, as an alias target or a direct reference.
+            operation: What the caller is about to ask the weights to do.
+
+        Exactly one combination is refused here, and only because it is *known* to be
+        impossible: a catalog row that declares itself an embedding model cannot serve a
+        chat request, so saying so beats downloading the weights, starting a server, and
+        relaying whatever llama-server reports. The reverse is not refused — llama.cpp
+        will produce vectors from a chat model, and an application overlay may pin an
+        embedding GGUF without classifying it — so an undeclared artifact keeps the
+        behaviour it had before the catalog could describe this at all.
+        """
         catalog = self._options.catalog
         if catalog is None:
             raise ConfigError(
@@ -278,7 +313,14 @@ class LlamaCppAdapter:
                     "bundled catalog"
                 ),
             )
-        return catalog.artifact(model)
+        artifact = catalog.artifact(model)
+        if operation == "generation" and artifact.embedding is not None:
+            raise ConfigError(
+                f"{model!r} is an embedding model and cannot serve a chat request",
+                provider=self.provider_id,
+                hint="embed with client.embed(...), or pick a generation model",
+            )
+        return artifact
 
     def _store(self) -> ModelStore:
         """The model store this adapter reads from and writes into."""
@@ -377,12 +419,12 @@ class LlamaCppAdapter:
             )
         return plan
 
-    async def _delegate_for(self, base_url: str) -> OpenAICompatAdapter:
+    async def _delegate_for(self, base_url: str) -> _Delegate:
         """Reuse one HTTP client per supervised server."""
         async with self._lock:
             delegate = self._delegates.get(base_url)
             if delegate is None:
-                delegate = OpenAICompatAdapter(
+                delegate = _Delegate(
                     ProviderConfig(
                         provider_id=self.provider_id,
                         base_url=base_url,
@@ -392,6 +434,18 @@ class LlamaCppAdapter:
                 )
                 self._delegates[base_url] = delegate
             return delegate
+
+    def _plan_for_embed(self, artifact: GgufArtifact) -> ServerPlan:
+        """Tune a server plan for an embedding call — no chat request to read context from."""
+        plan = plan_server(
+            self._hardware_profile(),
+            TuningInputs(
+                artifact_size_bytes=artifact.total_size_bytes,
+                parameter_size=artifact.parameter_size,
+            ),
+            posture=self._options.posture,
+        )
+        return replace(plan, embeddings=True)
 
     # ---- adapter contract ------------------------------------------------------------
 
@@ -414,15 +468,28 @@ class LlamaCppAdapter:
         models: list[DiscoveredModel] = []
         for artifact_id in sorted(installed_ids & catalog.artifacts.keys()):
             artifact = catalog.artifacts[artifact_id]
+            embedding = artifact.embedding
+            # An embedding artifact serves exactly one operation and supports none of the
+            # chat features. Reporting the generation feature set for it would be a claim
+            # the weights cannot honour: llama-server started with --embeddings answers a
+            # chat completion with an error, so "streaming, tools, grammar" would describe
+            # a server that does not exist.
             models.append(
                 DiscoveredModel(
                     id=artifact_id,
                     capabilities=ModelCapabilities(
                         features=Sourced(
-                            _LLAMA_FEATURES
+                            Feature(0)
+                            if embedding is not None
+                            else _LLAMA_FEATURES
                             | (Feature.VISION if artifact.projector is not None else Feature(0)),
                             "catalog",
                         ),
+                        operations=Sourced(
+                            frozenset({"embedding" if embedding is not None else "generation"}),
+                            "catalog",
+                        ),
+                        embedding=embedding,
                         local=LocalModelInfo(
                             artifact_size_bytes=artifact.total_size_bytes,
                             parameter_size=artifact.parameter_size,
@@ -536,6 +603,28 @@ class LlamaCppAdapter:
                         continue
                     yield event
 
+    async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:
+        """Ensure a server started with ``--embeddings`` is running, then delegate.
+
+        A separate model key from `generate()`'s (``f"{model}:embeddings"``), not
+        `req.model` alone: `--embeddings` can only be set at server startup (live-verified
+        2026-08-14 — an already-running plain generation server answers every embedding
+        request with a 501, and there is no runtime toggle), so reusing `generate()`'s key
+        would either hand an embedding call to a server that cannot serve it, or silently
+        flip a resident chat server's capability out from under a caller mid-session.
+        Paying for a second resident process per model is the honest cost of that
+        constraint, not a bug to paper over.
+        """
+        artifact = self._artifact_for(req.model, operation="embedding")
+        model_path = await self._ensure_downloaded(artifact)
+        plan = self._plan_for_embed(artifact)
+
+        await self._supervisor.collect_idle()
+        managed = await self._supervisor.acquire(f"{req.model}:embeddings", model_path, plan)
+        with managed:
+            delegate = await self._delegate_for(managed.base_url)
+            return await delegate.embed(req)
+
     async def aclose(self) -> None:
         """Close delegates and stop every supervised server."""
         for delegate in self._delegates.values():
@@ -567,6 +656,12 @@ descriptor = ProviderDescriptor(
     locality="local",
     default_base_url=None,
     requires_base_url=False,
+    # No static_embedding_capabilities: a descriptor table is keyed by model id, and this
+    # provider's ids are catalog artifact ids that vary per installation. The facts live
+    # where the artifact does -- the catalog's embedding rows -- and reach the client
+    # through list_models(), which is how a provider states model-level facts. Anything
+    # the catalog does not declare, probe_embedding() measures.
+    operations=frozenset({"generation", "embedding"}),
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

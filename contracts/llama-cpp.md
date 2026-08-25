@@ -1,9 +1,12 @@
 # llama-cpp — Protocol Contract (supervised llama-server)
 
-Status: M1 adapter — **implemented** (openai-compat subclass over a supervised local subprocess).
-Last verified: 2026-08-10 — multimodal endpoint and `--mmproj` invocation checked against
-the current upstream server README; the remaining protocol snapshot retains its 2026-08-05
-code-survey basis.
+Status: M1 adapter — **implemented** (openai-compat subclass over a supervised local subprocess),
+now including embeddings.
+Last verified: 2026-08-14 — embeddings section live-verified end to end (real pinned
+llama-server b10327 build, real nomic-embed-text-v1.5 GGUF, real HTTP calls through the
+production adapter code, not just documentation); multimodal endpoint and `--mmproj`
+invocation checked 2026-08-10 against the current upstream server README; the remaining
+protocol snapshot retains its 2026-08-05 code-survey basis.
 
 ## Upstream sources
 - https://github.com/ggml-org/llama.cpp/tree/master/tools/server (server README = API doc)
@@ -12,6 +15,8 @@ code-survey basis.
 ## Wire contract
 ### Endpoints
 - `POST http://127.0.0.1:{port}/v1/chat/completions` — generation (openai-compat dialect)
+- `POST http://127.0.0.1:{port}/v1/embeddings` — embeddings, **only on a server started
+  with `--embeddings`** (live-verified 2026-08-14, see below)
 - `GET  http://127.0.0.1:{port}/health` — readiness (`{"status":"ok"}` when model loaded)
 - `GET  http://127.0.0.1:{port}/v1/models` — reports the single loaded model
 ### Auth
@@ -36,6 +41,28 @@ code-survey basis.
 ### Errors
 - Connection refused/reset during load → supervisor state consulted before classifying
   (starting vs crashed → LocalRuntimeError with server log tail in `detail`)
+- `/v1/embeddings` against a server started **without** `--embeddings`: `501` with body
+  `{"error":{"code":501,"message":"This server does not support embeddings. Start it
+  with \`--embeddings\`","type":"not_supported_error"}}` — live-verified 2026-08-14.
+  There is no runtime toggle; the flag is startup-only, which is why
+  `LlamaCppAdapter.embed()` uses a distinct supervisor key (`f"{model}:embeddings"`) from
+  `generate()`'s, never sharing a resident process between the two.
+
+### Embeddings — live-verified 2026-08-14
+`POST /v1/embeddings` is **genuinely OpenAI-shaped** once `--embeddings` is set — request
+`{"model": "...", "input": "..."|[...]}`, response
+`{"model": "...", "object": "list", "usage": {"prompt_tokens", "total_tokens"},
+"data": [{"embedding": [...], "index": 0, "object": "embedding"}, ...]}`, checked live
+against `nomic-embed-text-v1.5` (768 dims). `OpenAICompatEmbeddingsMixin` — the same code
+`openai.py`/`lm_studio.py` use — handles it with zero changes; no llama.cpp-specific
+parsing was needed. `providers/llama_cpp.py`'s `_Delegate` composes it onto
+`OpenAICompatAdapter`.
+
+The **native**, non-`/v1`, `/embedding` endpoint (singular) also exists and was checked
+for contrast — its shape is different (a bare list of results, not an OpenAI `data`
+envelope, and each vector is nested one level deeper: `{"index": 0, "embedding":
+[[...]]}`) — deliberately **not used**, since `/v1/embeddings` requires no
+llama.cpp-specific parsing at all.
 
 ## Server invocation contract (supervisor → llama-server CLI)
 - Flags emitted by the tuner: `--model <gguf>`, optional `--mmproj <projector.gguf>` for a
@@ -43,8 +70,13 @@ code-survey basis.
   `--batch-size`, `--ubatch-size`, `--n-gpu-layers` (999 accelerated / 0 cpu),
   `--cache-type-k`, `--cache-type-v` (q8_0 under aggressive posture), `--no-kv-offload`
   (when applicable), `--flash-attn on` (accelerated), `--host 127.0.0.1`,
-  `--port <ephemeral>`
+  `--port <ephemeral>`, `--embeddings` (only when `ServerPlan.embeddings=True`,
+  live-verified 2026-08-14 — see "Embeddings" above for why this is startup-only)
 - CLI flag names are a drift surface: verify against the pinned release's `--help`
+- Live-verified 2026-08-14: when `--embeddings` is set and the plan's `batch_size` (2048
+  default) exceeds `ubatch_size`, the server itself logs a warning and clamps
+  `batch_size` down to `ubatch_size` to avoid an assertion failure — a server-side safety
+  net, not something the tuner needs to pre-empt.
 
 ## Watchlist
 - Server API additions/renames between pinned builds (health shape, timings fields,
@@ -53,3 +85,16 @@ code-survey basis.
 - CLI flag renames (tuner emission table must match the pinned build)
 - Multimodal support is marked experimental upstream; watch typed content shapes,
   projector discovery, and the `/v1/models` multimodal capability.
+- No pinned CUDA build exists yet for `linux-amd64` in the runtime table (confirmed
+  2026-08-14 via `anyinfer runtime install cuda`: "no pinned cuda llama-server build
+  exists for this platform") — only cpu/rocm/vulkan are pinned. A real NVIDIA GPU on this
+  platform currently falls back to the Vulkan backend rather than CUDA; re-pinning a CUDA
+  build is a `scripts/pin_runtimes.py` maintainer decision, not made here.
+- Embedding artifacts are described by the catalog as of 2026-08-24: a row states
+  `kind: "embedding"` with its `dimensions` and `max_input_tokens`, and the adapter
+  reports those through `list_models()` rather than through
+  `static_embedding_capabilities`, which stays empty because a descriptor table keyed by
+  model id cannot serve a provider whose ids are per-installation artifact ids. Pooling
+  type is still not recorded: llama-server takes it from GGUF metadata and no catalog
+  consumer would read it. Whether vectors come back normalized is measured by
+  `probe_embedding()`, not declared.
