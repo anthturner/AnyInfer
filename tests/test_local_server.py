@@ -23,7 +23,7 @@ from anyinfer.local.tuning import ServerPlan
 GIB = 1024**3
 
 FAKE_SERVER = """
-import http.server, sys, threading, time
+import http.server, socketserver, sys, threading, time
 
 mode = "ok"
 port = 8080
@@ -53,8 +53,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+class Server(http.server.HTTPServer):
+    # `HTTPServer.server_bind` calls `socket.getfqdn()` on the bind address purely to
+    # fill in `server_name`, which nothing here reads. On a macOS CI runner the reverse
+    # lookup for 127.0.0.1 has no local answer and goes to the network resolver, where
+    # it blocks for around thirty seconds -- and it runs *during construction*, after
+    # the line below has already announced the server. Every supervisor test therefore
+    # polled a socket that was not accepting yet and took ~36s to pass instead of ~1s.
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
 print("server listening", flush=True)
-http.server.HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+Server(("127.0.0.1", port), Handler).serve_forever()
 """
 
 
