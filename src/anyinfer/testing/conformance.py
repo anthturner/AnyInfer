@@ -33,6 +33,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ..routing import Retry, Route
 from ..types.events import (
     AttemptFailed,
     ReasoningDelta,
@@ -141,6 +142,13 @@ class ConformanceHarness:
             suite passes a scenario name so the harness can program its fake or select its
             cassette.
         supports: Declared capabilities; unsupported cases are skipped.
+        retry: The policy the rate-limiting cases route through. It defaults to no
+            backoff because those cases assert the *attempt trail* -- that a 429 is
+            recorded as a retried attempt and typed retryable -- and never assert how
+            long the client waited. Sleeping the real backoff proves nothing and, at
+            three cases per adapter across every preset, was the single largest block of
+            wall time in the suite. A live-mode harness that talks to a real rate-limited
+            endpoint should override this with a policy that honors ``Retry-After``.
     """
 
     provider_id: str
@@ -149,11 +157,23 @@ class ConformanceHarness:
     supports: Capabilities = Capabilities()
     embedding_model: str | None = None
     rerank_model: str | None = None
+    retry: Retry = Retry(max_attempts=2, backoff_base_s=0.0)
 
     @property
     def target(self) -> str:
         """The target string for this harness."""
         return f"{self.provider_id}:{self.model}"
+
+    def retry_route(self, target: str) -> Route:
+        """A route to ``target`` carrying this harness's retry policy.
+
+        The rate-limiting cases state their policy here rather than passing a bare
+        ``target=`` and relying on the client to supply one. A client whose default route
+        sets a policy would pass it down either way, but a harness is free to build a
+        client without a default route at all, and these three cases are the ones where
+        the difference is measured in seconds of real sleeping.
+        """
+        return Route(targets=(target,), retry=self.retry)
 
     @property
     def embedding_target(self) -> str:
@@ -389,7 +409,7 @@ async def _case_error_mapping(client: AsyncClient, h: ConformanceHarness) -> Non
 
 
 async def _case_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
-    result = await client.generate("Say hello.", target=h.target)
+    result = await client.generate("Say hello.", route=h.retry_route(h.target))
     assert result.attempts, "the attempt trail must be populated"
     retried = [a for a in result.attempts if a.outcome == "retried"]
     assert retried, "a rate-limited attempt must be recorded as retried"
@@ -561,7 +581,9 @@ async def _case_rerank_byte_cap(client: AsyncClient, h: ConformanceHarness) -> N
 
 
 async def _case_embedding_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
-    result = await client.embed(["alpha"], target=h.embedding_target, input_type="document")
+    result = await client.embed(
+        ["alpha"], route=h.retry_route(h.embedding_target), input_type="document"
+    )
     assert result.attempts, "the attempt trail must be populated"
     retried = [a for a in result.attempts if a.outcome == "retried"]
     assert retried, "a rate-limited embed attempt must be recorded as retried"
@@ -571,7 +593,9 @@ async def _case_embedding_retry_after(client: AsyncClient, h: ConformanceHarness
 
 async def _case_rerank_retry_after(client: AsyncClient, h: ConformanceHarness) -> None:
     result = await client.rerank(
-        "which text is about the moon landing", ["doc a", "doc b"], target=h.rerank_target
+        "which text is about the moon landing",
+        ["doc a", "doc b"],
+        route=h.retry_route(h.rerank_target),
     )
     assert result.attempts, "the attempt trail must be populated"
     retried = [a for a in result.attempts if a.outcome == "retried"]
