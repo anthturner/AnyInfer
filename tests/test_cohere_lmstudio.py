@@ -677,7 +677,10 @@ LM_STUDIO_HARNESS = ConformanceHarness(
     build_client=_build_lm_studio_client,
     # The shared fake has no reasoning channel; the dialect tests above cover the
     # native reasoning translation.
+    # LM Studio embeds through the shared OpenAI-compatible /v1/embeddings mixin,
+    # exercised by the dedicated test below rather than this harness's fake.
     supports=Capabilities(reasoning=False, cancellation=True),
+    covered_elsewhere=frozenset({"embedding"}),
 )
 
 

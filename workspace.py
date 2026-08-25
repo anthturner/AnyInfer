@@ -1008,7 +1008,8 @@ def _matrix_header(providers: Sequence[str]) -> str:
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
 
-Legend: ✅ verified · ➖ declared unsupported · ❌ failing
+Legend: ✅ verified · 🔗 implemented, verified by that adapter's dedicated tests ·
+➖ declared unsupported · ❌ failing
 
 Each cell is one parametrized test case executed against that adapter in fake-server mode,
 at whatever boundary that adapter has: an in-process HTTP transport for the
@@ -1016,8 +1017,11 @@ at whatever boundary that adapter has: an in-process HTTP transport for the
 the ``github-copilot-sdk`` session API rather than a wire protocol. `llama-cpp` speaks
 HTTP to a server it supervises, so its row substitutes a stub supervisor and starts no
 process, downloads nothing, and binds no port.
-A ➖ is a declared limitation, not a pass. How a case is defined and how to record a
-cassette are covered in [the conformance suite](../contributing/conformance.md).
+A ➖ is a declared limitation, not a pass. A 🔗 is neither: the adapter implements the
+operation and a dedicated test in its own module proves it, but exercising it through this
+shared harness would need a second fake with a different shape. How a case is defined and
+how to record a cassette are covered in
+[the conformance suite](../contributing/conformance.md).
 
 """
 

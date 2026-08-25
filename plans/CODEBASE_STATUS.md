@@ -44,7 +44,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[x]` | F.3 | Demo app persists literal API keys despite "memory only" guarantee | 3 | 5 | 15 |
 | `[x]` | F.4 | Confidential CLI writes private keys with default file permissions | 3 | 5 | 15 |
 | `[ ]` | G.4 | CPU attestation-quote verification behind the `attest` extra | 5 | 3 | 15 |
-| `[ ]` | B.2 | Conformance matrix mislabels implemented embeddings (3 providers) | 3 | 4 | 12 |
+| `[x]` | B.2 | Conformance matrix mislabels implemented embeddings (3 providers) | 3 | 4 | 12 |
 | `[x]` | B.3 | CLI subcommand enumerations stale in AGENTS.md and DESIGN.md | 3 | 4 | 12 |
 | `[x]` | B.4 | DESIGN.md §18 package layout has drifted from the tree | 3 | 4 | 12 |
 | `[x]` | B.5 | Stale counts: matrix header, adapter list, "other twenty", "about ten" | 3 | 4 | 12 |
@@ -342,13 +342,16 @@ contradict the matrix. A user choosing an embedding target from the matrix would
 them out.
 
 **Remediation:**
-- [ ] **B.2.1** Extend the three harnesses with `Capabilities(embedding=True)` + embedding fakes
-  (mirror the azure-foundry harness's `/v1/embeddings` wiring; add a `batchEmbedContents`
-  scenario to the gemini fake).
-- [ ] **B.2.2** Alternatively (or additionally), add a third matrix glyph ("✅ via dedicated
+- [ ] **B.2.1** Not taken in favour of B.2.2. llama-cpp's harness cannot honestly claim
+  embeddings — they need a server started with `--embeddings`, a *different* resident
+  server for the same model — so a shared-harness flag would misrepresent it, and the
+  same "the proof lives next door" shape covers all three. B.2.2's 🔗 glyph makes that
+  state legible instead of collapsing it onto ➖. Still worth doing later as extra
+  coverage; it is no longer needed to fix the mislabeling. *(2026-08-25)*
+- [x] **B.2.2** Alternatively (or additionally), add a third matrix glyph ("✅ via dedicated
   tests") emitted from an explicit harness annotation, so `➖` stops covering two different
   truths.
-- [ ] **B.2.3** Regenerate with `python workspace.py matrix`.
+- [x] **B.2.3** Regenerate with `python workspace.py matrix`.
 
 ## B.3 CLI subcommand enumerations stale in AGENTS.md and DESIGN.md
 

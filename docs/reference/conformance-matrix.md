@@ -3,19 +3,23 @@
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
 
-Legend: ✅ verified · ➖ declared unsupported · ❌ failing
+Legend: ✅ verified · 🔗 implemented, verified by that adapter's dedicated tests ·
+➖ declared unsupported · ❌ failing
 
 Each cell is one parametrized test case executed against that adapter in fake-server mode,
 at whatever boundary that adapter has: an in-process HTTP transport for the
-twenty that speak HTTP, and a fake SDK module for `copilot`, whose boundary is
+22 that speak HTTP, and a fake SDK module for `copilot`, whose boundary is
 the ``github-copilot-sdk`` session API rather than a wire protocol. `llama-cpp` speaks
 HTTP to a server it supervises, so its row substitutes a stub supervisor and starts no
 process, downloads nothing, and binds no port.
-A ➖ is a declared limitation, not a pass. How a case is defined and how to record a
-cassette are covered in [the conformance suite](../contributing/conformance.md).
+A ➖ is a declared limitation, not a pass. A 🔗 is neither: the adapter implements the
+operation and a dedicated test in its own module proves it, but exercising it through this
+shared harness would need a second fake with a different shape. How a case is defined and
+how to record a cassette are covered in
+[the conformance suite](../contributing/conformance.md).
 
 
-Last generated: 2026-08-24.
+Last generated: 2026-08-25.
 
 | Provider | list_models | health | non_streaming | streaming | event_ordering | ttft | usage | usage_survives_streaming | tool_calls | streaming_tool_calls | reasoning | structured_output | schema_repair | error_mapping | retry_after | byte_cap | cancellation | unknown_finish_reason | embedding | embedding_duplicates | rerank | rerank_top_n | rerank_duplicate_text | embedding_normalization_probe | embedding_byte_cap | rerank_byte_cap | embedding_retry_after | rerank_retry_after |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -25,11 +29,11 @@ Last generated: 2026-08-24.
 | cohere | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | copilot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | deepseek | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
-| gemini | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
+| gemini | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🔗 | 🔗 | ➖ | ➖ | ➖ | 🔗 | 🔗 | ➖ | 🔗 | ➖ |
 | groq | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | jina | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| llama-cpp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
-| lm-studio | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
+| llama-cpp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🔗 | 🔗 | ➖ | ➖ | ➖ | 🔗 | 🔗 | ➖ | 🔗 | ➖ |
+| lm-studio | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🔗 | 🔗 | ➖ | ➖ | ➖ | 🔗 | 🔗 | ➖ | 🔗 | ➖ |
 | m365-copilot | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | moonshot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | nebius | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
@@ -88,7 +92,7 @@ Every dedicated adapter now has a shared-harness row. The `groq`, `moonshot`, `r
 - **live**: opt-in, requires credentials. `m365-copilot` is exempt: its authentication is
   interactive-only and cannot run headless.
 
-## See Also
+## See also
 
 - [Provider pages](../providers/README.md) for the human-readable version.
 - [Contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md) for the wire details each adapter depends on.
