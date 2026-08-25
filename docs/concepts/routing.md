@@ -1,8 +1,8 @@
-# Routing and rate limits
+# Routing and Rate Limits
 
 A route decides where a request goes and what happens when an attempt fails: retries,
 fallback chains, and health gating, all deterministic and fully traceable afterward.
-Rate limiting is the other half of the same concern — pacing dispatch so a predictable
+Rate limiting is the other half of the same concern: pacing dispatch so a predictable
 429 never arrives. Both live here.
 
 <div class="anyinfer-hero-diagram" markdown>
@@ -20,7 +20,7 @@ flowchart TD
 ```
 </div>
 
-## A route is a policy object
+## A Route Is a Policy Object
 
 ```python
 route = ai.Route(
@@ -38,7 +38,7 @@ on. There is no scoring, load balancing, or adaptive selection; `Route` is a pol
 object precisely so smarter selection could be added later without changing any client
 method.
 
-## Naming a target does not discard your policy
+## Naming a Target Does Not Discard Your Policy
 
 A route configured on the client governs calls that do not name a route of their own,
 and it keeps governing them when a call redirects itself with `target=`:
@@ -56,7 +56,7 @@ result = await client.generate(prompt, target="openai:gpt-5")
 The same holds for target-shaped spellings of `route=` (a single string, or a sequence of
 them) and for a [session's](sessions.md) target: they name targets and say nothing about
 policy, so the policy in force carries. To depart from the client's defaults, pass a
-fully constructed `Route` — that is a complete statement of policy, honored exactly as
+fully constructed `Route`; that is a complete statement of policy, honored exactly as
 written.
 
 The specialized chains are the exception: `context_window_targets` and
@@ -64,7 +64,7 @@ The specialized chains are the exception: `context_window_targets` and
 caller did not ask for would be the same surprise pointing the other way. They are never
 inherited by a call that names its own target.
 
-## What gets retried
+## What Gets Retried
 
 The default predicate declines failures that repetition cannot fix, since retrying a
 deterministic failure burns budget a transient one might have needed:
@@ -74,8 +74,8 @@ deterministic failure burns budget a transient one might have needed:
 | `RateLimitError` (429) | Yes, honoring `Retry-After` |
 | `TransportError` (timeout, connection) | Yes |
 | `ProviderUnavailableError` (5xx) | Yes |
-| `AuthError` (401/403) | No — the same key will fail the same way |
-| `ContextLengthError` | No — the same prompt is the same size |
+| `AuthError` (401/403) | No; the same key will fail the same way |
+| `ContextLengthError` | No; the same prompt is the same size |
 | `ModelNotFoundError` (404) | No |
 
 Override it when you know better:
@@ -88,7 +88,7 @@ Backoff is exponential from `backoff_base_s`, raised to the server's `Retry-Afte
 that is longer, and capped by `backoff_max_s`. The
 [error catalog](../reference/errors.md) records the retry semantics of every error type.
 
-## Failure-specific fallback chains
+## Failure-Specific Fallback Chains
 
 The right *next* target depends on why the last one failed. A context overflow needs a
 larger model, not another same-sized one, and a content-policy refusal needs a
@@ -105,15 +105,15 @@ route = ai.Route(
 On a `ContextLengthError`, the router switches to `context_window_targets` instead of
 continuing down the general chain. When a generation finishes with
 `finish_reason == "content_filter"`, the router discards the refusal and redirects to
-`content_policy_targets` — at most once per request, and never after streamed text from
-the refusing attempt has reached your consumer, since a silent restart would contradict
-what you already rendered. The redirected attempt is recorded with outcome
+`content_policy_targets`, at most once per request, and never after streamed text from
+the refusing attempt has reached the consumer, since a silent restart would contradict
+what was already rendered. The redirected attempt is recorded with outcome
 `"redirected"`. If the chain refuses too, that refusal surfaces normally.
 
-## Health gating
+## Health Gating
 
 A target that recently failed with a transport or availability error is skipped for
-`health_ttl_s` seconds — the [health gate](../reference/glossary.md#health-gate) — rather
+`health_ttl_s` seconds (the [health gate](../reference/glossary.md#health-gate)) rather
 than costing every subsequent request its full timeout:
 
 ```python
@@ -124,10 +124,10 @@ result.attempts
 
 The TTL is short on purpose: a stale "unhealthy" verdict costs more than one extra
 failed attempt. Health state is keyed per `provider:model`, so one bad model does not
-gate a provider's others. Disable it with `health_gate=False` when you want every target
-attempted.
+gate a provider's others. Disable it with `health_gate=False` when every target should
+be attempted.
 
-## The attempt trail
+## The Attempt Trail
 
 Every result carries its complete routing history:
 
@@ -150,10 +150,10 @@ except ai.AllTargetsFailedError as error:
         log.warning("%s: %s", attempt.target, attempt.error and attempt.error.detail)
 ```
 
-## What is not a routing failure
+## What Is Not a Routing Failure
 
 A schema violation raises `SchemaViolationError` directly and does not trigger fallback.
-The request reached the model and the model answered — it just answered the wrong shape,
+The request reached the model and the model answered; it just answered the wrong shape,
 and sending it to a different provider addresses the wrong problem. Use
 [repair](structured-output.md#repair) for that. Note that
 [embedding and rerank routes](embeddings.md) fall back under a stricter rule, because
@@ -163,11 +163,11 @@ Similarly, a mid-stream protocol error after content has been emitted is raised 
 than retried: the consumer has already seen text, and a silent restart would duplicate
 or contradict it.
 
-## Pacing before the limit
+## Pacing Before the Limit
 
 Everything above reacts to failure. Rate limiting anticipates one kind: an
 `asyncio.gather` over a hundred requests would otherwise send a hundred requests, take a
-wall of 429s, and only then back off. Client-side pacing is opt-in — with no limits
+wall of 429s, and only then back off. Client-side pacing is opt-in: with no limits
 configured, requests dispatch exactly as before.
 
 Limits belong to a provider instance, not to the application, because a rate limit is a
@@ -203,21 +203,21 @@ spending down to the last request in a window means whichever other consumer arr
 next is the one that gets throttled.
 
 Pacing is bounded to one process. There is no shared state across workers or hosts, no
-quota enforcement beyond what you configure, and no routing around a busy provider —
+quota enforcement beyond what is configured, and no routing around a busy provider;
 choosing a different target because one is throttled would be load balancing, which
 AnyInfer does not do.
 
-### Learning from the provider
+### Learning from the Provider
 
 Providers publish their remaining allowance in response headers. Which headers a
 provider uses is declared on its descriptor and recorded in its contract snapshot
 (OpenAI uses durations like `6m0s`; Anthropic uses RFC 3339 instants). Every derived
 wait is clamped, so a skewed clock costs a bounded pause rather than a hang. A provider
-that declares no header dialect is paced by your configured bounds alone. Asking for
+that declares no header dialect is paced by the configured bounds alone. Asking for
 `respect_headers` where it cannot work produces a
 [`ParameterDropped` event](telemetry.md) saying so.
 
-### Seeing the wait
+### Seeing the Wait
 
 A paced request looks slow, so the wait is reported in the result and in the event
 stream:
@@ -240,19 +240,19 @@ limits for the same reason.
 
 One interaction worth knowing: queue time counts against the request's own `timeout_s`.
 Aggressive pacing and a tight timeout will fight each other, so raise `timeout_s` when
-you pace hard.
+pacing hard.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Targets are tried in order with no scoring or load balancing; only failures that
       repetition can plausibly fix are retried.
-    - Per-call `target=` changes where a request goes, not how it is governed — the
+    - Per-call `target=` changes where a request goes, not how it is governed; the
       client route's retry and health policy still apply.
     - Every result carries its full attempt trail, and every pacing wait appears as
       `queued_ms` and a typed event, so slowness is attributable after the fact.
     - Rate limits are opt-in, per provider instance, and pace one process; they never
       reroute a request or invent a quota the provider did not state.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

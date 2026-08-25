@@ -55,9 +55,9 @@ Normalized reasoning levels are sent as `reasoning_effort`. Reasoning fragments 
 surfaced as `ReasoningDelta` events on the [event stream](../concepts/events.md) and
 remain separate from `Generation.text`. The upstream API also accepts reasoning levels
 outside AnyInfer's normalized four-level scale; send those explicitly through
-`provider_options` when you need them.
+`provider_options` when needed.
 
-## Wire contract
+## Wire Contract
 
 For the exact fields this adapter sends and reads, see
 [contracts/nebius.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/nebius.md).

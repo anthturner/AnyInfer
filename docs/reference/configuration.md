@@ -1,8 +1,8 @@
-# Shared configuration
+# Shared Configuration
 
 AnyInfer has one JSON configuration format for every integration method: load it from
 Python with `load_config`, pass it to `anyinfer run`, or start the OpenAI-compatible
-sidecar with it — each path is walked through in [the guides](../guides/README.md).
+sidecar with it; each path is walked through in [the guides](../guides/README.md).
 Since every deployment reads the same file, provider identity, credentials, endpoint
 overrides, and the default route do not drift between them. Full API signatures for the
 loader and the validated config object are in
@@ -27,7 +27,7 @@ keys, so a disabled entry can hold settings for a provider that is not installed
 demo app writes a few UI-only fields of its own alongside the shared ones; the SDK, CLI,
 and sidecar ignore them. See [the demo app guide](../guides/demo-app.md).
 
-## Provider settings
+## Provider Settings
 
 ```python
 ai.ProviderSettings.of(
@@ -42,10 +42,10 @@ ai.ProviderSettings.of(
 )
 ```
 
-The order you list providers in is the preference order for
+The order providers are listed in is the preference order for
 [alias resolution](../concepts/targets.md#aliases).
 
-### Configuring one engine more than once
+### Configuring One Engine More Than Once
 
 `alias` gives an entry its own identity, so the same engine can be configured several
 times; two Azure tenants, a local and a remote Ollama; each with its own endpoint and
@@ -77,7 +77,7 @@ ordinary single-instance case, where the provider id is the instance id. Two ent
 sharing an instance id is a `ConfigError`, as is an alias that would shadow a registered
 provider id.
 
-### Providers that take a choice of credential
+### Providers That Take a Choice of Credential
 
 `api_key` is the top-level slot for the *usual* credential. A provider that accepts more
 than one kind declares each as its own setup field and reads the extra ones from
@@ -123,11 +123,11 @@ setup.any_of  # (('api_key', 'oauth_token'),)
 setup.requirement_note  # why, in one line
 ```
 
-### Which fields to actually ask for
+### Which Fields to Actually Ask For
 
 Not every declared field is a question. A provider knows its own endpoint, its API
-version, and where AWS keeps its credentials; what it cannot know is your key or your
-account. The spec draws that line itself, so a setup form does not have to infer it from
+version, and where AWS keeps its credentials; what it cannot know is the developer's key
+or account. The spec draws that line itself, so a setup form does not have to infer it from
 help text:
 
 ```python
@@ -147,7 +147,7 @@ The two extremes: `ollama`, `vllm`, and the other local engines have no essentia
 at all, while `azure-foundry`, `runpod`, and anything else whose URL embeds an account or
 endpoint id keeps `base_url` essential, because no default could be right.
 
-## Client settings
+## Client Settings
 
 ```python
 ai.Client(
@@ -174,7 +174,7 @@ ai.Client(
 `retain_raw` is off by default because raw payloads carry response text that payload-free
 telemetry omits.
 
-## Per-request options
+## Per-Request Options
 
 ```python
 client.generate(
@@ -198,7 +198,7 @@ client.generate(
 `Sampling` fields default to `None`, meaning *provider default*. AnyInfer never invents a
 temperature; an unset value is omitted from the wire request entirely.
 
-## Environment variables
+## Environment Variables
 
 | Variable | Effect |
 |---|---|
@@ -209,13 +209,13 @@ temperature; an unset value is omitted from the wire request entirely.
 | `ANYINFER_SERVE_TOKEN` | Bearer token for `anyinfer serve`. |
 | `COPILOT_CLI_PATH` | Override Copilot CLI discovery. |
 
-Credential references (`env://NAME`) read any variable you name; there are no magic
-credential variable names.
+Credential references (`env://NAME`) read any variable the reference names; there are no
+magic credential variable names.
 
-## Generating a file
+## Generating a File
 
-`anyinfer init` writes a valid configuration from what the machine can already do —
-running loopback engines and credential variables that are actually set; plus a runnable
+`anyinfer init` writes a valid configuration from what the machine can already do
+(running loopback engines and credential variables that are actually set), plus a runnable
 starter program beside it. See [the CLI guide](../guides/cli.md#getting-a-config-file-in-the-first-place).
 
 In Python, the same format is written by `anyinfer.dumps_config` and `anyinfer.dump_config`:
@@ -232,7 +232,7 @@ text = ai.dumps_config(config, comments=True)  # the same JSON, with a leading n
 ```
 
 Round-tripping is the contract: `loads_config(dumps_config(c)) == c` for every
-configuration the loader accepts. Two consequences are worth knowing:
+configuration the loader accepts. Two consequences follow:
 
 - An opt-in policy left entirely at its defaults still writes its block, as `{}`. The
   block's *presence* is what asks for the policy; dropping it would turn "pace this
@@ -246,7 +246,7 @@ reference. An `env://` or `credential://` value therefore stays safe to store, w
 literal credential stays literal. Review configurations constructed programmatically with
 literal secrets before writing or committing them; `anyinfer init` itself writes references.
 
-## File format
+## File Format
 
 Each provider entry needs an `id`. The other top-level provider settings are `adapter`,
 `base_url`, `api_key`, `api_version`, `headers`, `timeout_s`, and `options`. Setup fields
@@ -257,7 +257,7 @@ when present, must simply restate the entry's `id`. Credential references such a
 `env://ANTHROPIC_API_KEY` are resolved only when the adapter is first used, so parsing a
 config never prints or expands a secret.
 
-### The `adapter` key
+### The `adapter` Key
 
 `id` is the instance id used in target strings. The optional `adapter` key names the
 engine behind it, which is what lets one engine be configured more than once:
@@ -320,7 +320,7 @@ keys and nonpositive or out-of-range values fail during configuration loading. H
 behaves at run time is covered in
 [pacing before the limit](../concepts/routing.md#pacing-before-the-limit).
 
-### The `context` block
+### The `context` Block
 
 Advanced settings for [context reduction](../concepts/context-reduction.md), parsed into a
 `ContextTuning`. Every key is a field of that record, so a setting is spelled the same way
@@ -341,7 +341,7 @@ in the file, on the command line, and in Python:
 }
 ```
 
-The block is optional, and every field defaults to the behavior AnyInfer has always had —
+The block is optional, and every field defaults to the behavior AnyInfer has always had;
 a file without it reduces exactly as before. The values above are what
 `ContextTuning.recommended()` sets, which `anyinfer context --preset recommended` applies
 without a file.
@@ -360,7 +360,7 @@ over a normal client, and reduction is the application's call about its own mate
 
 The full field list is on [`ContextTuning`](api/context.md#advanced-settings).
 
-### The `history` block
+### The `history` Block
 
 Conversation compaction, applied by the client when a request outgrows its target's
 window. Because it is a client setting rather than a frontend one, this block makes the
@@ -383,7 +383,7 @@ as before. Set `"enabled": false` to keep a tuned block switched off.
 Sidecar callers can override it per request with the `anyinfer_history` field; see
 [the sidecar](../serve/README.md).
 
-### The `cache` block
+### The `cache` Block
 
 Prompt-cache placement is opt-in because it changes provider billing and retention:
 
@@ -403,7 +403,7 @@ Omitting the block disables placement. An empty object enables the default `Cach
 `auto` chooses the strongest mechanism the resolved target offers. See
 [prompt caching](../concepts/caching.md) for the mechanism and billing semantics.
 
-### The `operation_routes` block
+### The `operation_routes` Block
 
 Embedding and reranking calls get their own default routes, so a client configured for
 chat fallback never accidentally embeds with it:
@@ -418,7 +418,7 @@ chat fallback never accidentally embeds with it:
 }
 ```
 
-Valid keys are `embedding` and `rerank` — the generation default belongs in
+Valid keys are `embedding` and `rerank`; the generation default belongs in
 `default_route`, and the loader rejects a `generation` key here so the two can never be
 confused. `embed()` and `rerank()` use the matching entry when the caller names no
 target; an explicit `target=` or `route=` argument always wins. With no entry configured,
@@ -426,10 +426,10 @@ they fall through to `default_route`, whose targets must actually declare the op
 or the call is refused before dispatch.
 
 Note that an embedding fallback chain is still held to the embedding-space safety rule:
-targets that are not the identical `provider:model` are refused unless you opt in — see
-[Embeddings and reranking](../concepts/embeddings.md).
+targets that are not the identical `provider:model` are refused unless the caller opts
+in; see [Embeddings and reranking](../concepts/embeddings.md).
 
-### The `arena` and `arenas` blocks
+### The `arena` and `arenas` Blocks
 
 [Arena](../concepts/arena.md) policies fan one request out to fixed targets and select
 only after the candidates finish. A default policy and named policies use the same
@@ -461,7 +461,7 @@ string of `review-panel` resolve the named policy without moving orchestration i
 frontend. See [Arena runs](../concepts/arena.md) for cost ceilings, selection rules, tool
 loops, and the response evidence envelope.
 
-### The `mcp` block
+### The `mcp` Block
 
 MCP entries are inert server descriptions. Loading the file never starts a subprocess or
 opens a connection:
@@ -512,10 +512,10 @@ anyinfer context src/ --query "…" --max-tokens 8000 --plan   # cost every stra
 [run a prompt from the shell](../guides/cli.md) for its flags.
 
 A non-loopback bind requires both `--allow-remote-exposure` and a token. The CLI refuses
-otherwise, since an unauthenticated gateway would let anyone on the network spend your
-provider credentials.
+otherwise, since an unauthenticated gateway would let anyone on the network spend the
+configured provider credentials.
 
-## Cache and data locations
+## Cache and Data Locations
 
 | Purpose | Windows | macOS | Linux |
 |---|---|---|---|

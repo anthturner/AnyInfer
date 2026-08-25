@@ -33,10 +33,10 @@ result = client.generate(prompt, target="xai:grok-4.5")
 
 `grok:` is accepted as an alias.
 
-## Exact cost
+## Exact Cost
 
-Most providers give you token counts and leave the arithmetic to a price table. xAI
-returns `cost_in_usd_ticks` — the amount actually billed, including server-side tool
+Most providers report token counts and leave the arithmetic to a price table. xAI
+returns `cost_in_usd_ticks`: the amount actually billed, including server-side tool
 fees and tiered pricing, and AnyInfer adopts it directly for
 [cost accounting](../concepts/cost.md):
 
@@ -63,8 +63,8 @@ for model in client.models("xai"):
         print(model.id, caps.pricing.value.input_per_1m, caps.pricing.provenance)
 ```
 
-If that endpoint is unavailable, discovery degrades to the plain model listing — ids
-only, rather than failing.
+If that endpoint is unavailable, discovery degrades to the plain model listing (ids
+only) rather than failing.
 
 ## Reasoning
 
@@ -73,25 +73,25 @@ result = client.generate(prompt, target="xai:grok-4.5", reasoning="medium")
 ```
 
 `minimal` clamps to `low`: only some Grok models accept `none`, and silently disabling
-reasoning on a reasoning model would change the answer more than you asked for. Pass
+reasoning on a reasoning model would change the answer more than was asked for. Pass
 `provider_options={"xai": {"reasoning_effort": "none"}}` to disable it deliberately on a
 model that supports it. The `grok-4.20` generation ships as separate `-reasoning` and
 `-non-reasoning` model ids instead of taking the parameter.
 
-## The Anthropic-compatible endpoint
+## The Anthropic-Compatible Endpoint
 
 xAI also exposes a Messages endpoint at `https://api.x.ai`, which the Anthropic adapter
-serves through a base-URL override — see
+serves through a base-URL override; see
 [pointing that adapter elsewhere](anthropic.md#pointing-this-adapter-elsewhere). Use the
-native `xai:` provider unless you need Messages-dialect behavior; the reported cost and
+native `xai:` provider unless Messages-dialect behavior is needed; the reported cost and
 discovered pricing above are only wired there.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/xai.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/xai.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

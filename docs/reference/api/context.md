@@ -1,6 +1,6 @@
-# Context reduction
+# Context Reduction
 
-Fit a document corpus to a token budget. Your application collects; this subpackage
+Fit a document corpus to a token budget. The application collects; this subpackage
 reduces. The reasoning and the strategy tradeoffs are in
 [context reduction](../../concepts/context-reduction.md); the task-oriented walkthrough is
 [fitting a corpus to a budget](../../guides/fitting-context.md).
@@ -11,7 +11,7 @@ Imported from its own path, like the other optional subsystems:
 from anyinfer import context
 ```
 
-## Documents and results
+## Documents and Results
 
 <div class="anyinfer-api-block" markdown>
 
@@ -29,7 +29,7 @@ from anyinfer import context
 
 </div>
 
-## Advanced settings
+## Advanced Settings
 
 One record carries every algorithmic choice. The same field names are the `context` block
 of the [configuration file](../configuration.md) and the `--context-*` flags of
@@ -55,8 +55,8 @@ Two orderings deserve a note. `"rank"` admits documents strongest-first; `"densi
 admits them by score divided by token cost, which packs measurably more relevance into a
 fixed budget (the classic knapsack result) at the risk of preferring two good small files
 over one great large one. `diversity` penalizes each candidate by how much it resembles
-what is already selected — multiplicatively, `value * (1 - diversity * similarity)`,
-because the two value scales differ by orders of magnitude — so a budget is not spent on
+what is already selected (multiplicatively, `value * (1 - diversity * similarity)`,
+because the two value scales differ by orders of magnitude), so a budget is not spent on
 eight files that say the same thing.
 
 <div class="anyinfer-api-block" markdown>
@@ -99,7 +99,7 @@ Cost every strategy before committing to one. Spends no inference and performs n
 
 </div>
 
-## Duplicate collapse
+## Duplicate Collapse
 
 <div class="anyinfer-api-block" markdown>
 
@@ -109,10 +109,10 @@ Cost every strategy before committing to one. Spends no inference and performs n
 
 </div>
 
-## History compaction
+## History Compaction
 
 Reduce a conversation rather than a corpus, without breaking tool-call pairing. Call it
-yourself, or hand `anyinfer.HistoryPolicy` to a client and let every frontend built on that
+directly, or hand `anyinfer.HistoryPolicy` to a client and let every frontend built on that
 client apply the same rules on the request path.
 
 <div class="anyinfer-api-block" markdown>
@@ -150,7 +150,7 @@ semantic retrieval ranks its own documents and passes the result through.
 
 </div>
 
-## Structure and tiers
+## Structure and Tiers
 
 <div class="anyinfer-api-block" markdown>
 

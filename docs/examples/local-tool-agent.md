@@ -1,4 +1,4 @@
-# A local tool-calling assistant
+# A Local Tool-Calling Assistant
 
 An assistant that answers questions about your project by calling Python functions you
 hand it. It does not run offline as written: it needs a running
@@ -39,12 +39,12 @@ print(result.text)
 ```
 
 The model decides when to call `read_file` or `list_files`; AnyInfer runs the function,
-feeds the result back, and loops until the model produces a final answer (bounded — a
+feeds the result back, and loops until the model produces a final answer (bounded: a
 runaway loop raises `ToolLoopError` rather than spinning). To stream the answer token by
 token instead of waiting for it, see [streaming](../guides/streaming.md); nothing else
 about the program changes.
 
-## What to notice
+## What to Notice
 
 - `@ai.tool` derives the wire schema from the signature: name, docstring, and type hints
   become the provider-facing tool spec, and `read_file.spec` shows exactly what the model
@@ -56,7 +56,7 @@ about the program changes.
   `llama-server` for you, the [local inference guide](../guides/local-inference.md)
   covers the end-to-end path, including picking a model tier that fits your hardware.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

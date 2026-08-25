@@ -1,4 +1,4 @@
-# Test your application offline
+# Test Your Application Offline
 
 Your application's inference code has behavior worth testing: it falls back when a
 provider is down, it repairs a malformed structured answer, it reduces a corpus to fit a
@@ -14,7 +14,7 @@ no sockets, no credentials, no network, and the same result on every machine.
 pip install anyinfer     # the fixtures come with it — no extra to install
 ```
 
-## Declare a provider, get a real client
+## Declare a Provider, Get a Real Client
 
 The fixtures are available as soon as `anyinfer` is installed. `anyinfer_scripted` builds a
 provider; `anyinfer_client` builds a client wired to it.
@@ -35,10 +35,10 @@ def test_summarizer_returns_the_models_answer(anyinfer_client, anyinfer_scripted
 Everything between your call and that assertion is the real library: the router resolved
 the target, the adapter spoke the wire dialect, the core measured the timings.
 
-## Prove your fallback chain works
+## Prove Your Fallback Chain Works
 
 A scripted model can be told to fail. Failures are consumed in order, then the model
-answers normally, so "fails once, then succeeds" is one line — enough to exercise the
+answers normally, so "fails once, then succeeds" is one line, enough to exercise the
 [fallback chain](fallback.md) you configured.
 
 ```python
@@ -58,7 +58,7 @@ def test_retries_a_transient_failure(anyinfer_client, anyinfer_scripted):
 
 `retry_after_s=0.0` advertises the header without making your suite wait for it.
 
-## Prove your repair budget converges
+## Prove Your Repair Budget Converges
 
 `malformed-json` answers with something that will not validate, so the
 [repair loop](structured-output.md) runs for real:
@@ -93,7 +93,7 @@ def test_repairs_an_invalid_structured_answer(anyinfer_client, anyinfer_scripted
     assert result.repair_attempts == 1
 ```
 
-## The failures you can script
+## The Failures You Can Script
 
 | `kind` | What the provider does | What it lets you test |
 |---|---|---|
@@ -103,7 +103,7 @@ def test_repairs_an_invalid_structured_answer(anyinfer_client, anyinfer_scripted
 | `timeout` | Raises a read timeout | Your timeout handling, without waiting |
 | `refusal` | Finishes with `content_filter` | Your content-policy fallback |
 
-## Assert on telemetry
+## Assert on Telemetry
 
 `anyinfer_events` collects the same typed event stream your
 [observers](observability.md) consume in production. It is payload-free: it never captures
@@ -122,7 +122,7 @@ def test_emits_a_retry_event(anyinfer_client, anyinfer_scripted, anyinfer_events
     assert anyinfer_events.of_type(RetryScheduled)
 ```
 
-## Model capabilities are declarable too
+## Model Capabilities Are Declarable Too
 
 A scripted model states what it supports. Declaring a model *without* JSON support is how
 you test what your code does on the weakest structured-output mechanism:
@@ -140,11 +140,11 @@ ScriptedModel(
 )
 ```
 
-The result still validates — client-side validation is always authoritative — but
+The result still validates (client-side validation is always authoritative), but
 `result.structured_mechanism` reports `prompt` instead of `json_schema`, which is what your
 production code will see against a model that cannot do better.
 
-## Regression-test inference behavior
+## Regression-Test Inference Behavior
 
 When the route, repair budget, cache placement, or context policy is the contract you care
 about, compare a golden [run manifest](../concepts/run-manifests.md) instead of asserting
@@ -161,7 +161,7 @@ beside your test. Run `pytest --update-manifests` only after an intentional beha
 then review the JSON diff. The [complete fallback-and-repair example](../examples/golden-manifest.md)
 runs offline in AnyInfer's own suite.
 
-## The fixtures
+## The Fixtures
 
 | Fixture | What it gives you |
 |---|---|
@@ -178,9 +178,9 @@ Each test gets its own provider registry, so two tests may register the same pro
 without depending on execution order. Every fixture and scripted type is specified in the
 [testing API reference](../reference/api/testing.md).
 
-## Recording real traffic
+## Recording Real Traffic
 
-When you do want to test against what a provider *actually* sent, record it once and replay
+In order to test against what a provider *actually* sent, record it once and replay
 it forever:
 
 ```python
@@ -193,7 +193,7 @@ Run your suite with `ANYINFER_RECORD_CASSETTES=1` to record; unset it to replay.
 bodies pass through the redaction registry before reaching disk, so a cassette you commit
 alongside a test cannot carry a registered credential.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - A scripted provider exercises the real router, adapter layer, and core, so the suite
       tests the library's behavior rather than your mocks.
     - Failures are consumed in order before the model answers normally, which makes
@@ -205,7 +205,7 @@ alongside a test cannot carry a registered credential.
     - Recorded cassettes pass through redaction before reaching disk, so committing one
       cannot leak a registered credential.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -37,10 +37,10 @@ result = client.generate(prompt, target="llama-cpp:qwen2.5-7b-instruct-q4-k-m")
 ```
 
 The model reference is a **catalog artifact id**, not a file path. That one call resolves
-the artifact, downloads and verifies it, tunes a server for your hardware, starts it, and
-answers.
+the artifact, downloads and verifies it, tunes a server for the local hardware, starts it,
+and answers.
 
-Install a pinned runtime with `anyinfer runtime install`, or supply your own `llama-server`
+Install a pinned runtime with `anyinfer runtime install`, or supply an existing `llama-server`
 through the `binary` option. With multiple installed runtimes, set `runtime` to `cuda`,
 `vulkan`, `metal`, `rocm`, or `cpu`; the default `auto` selects the highest-ranked installed
 backend the detected hardware can drive.
@@ -72,14 +72,14 @@ The typed form of this table, for programmatic construction:
 | Behavior | Support |
 |---|---|
 | Streaming | Native SSE |
-| Structured output | **Grammar (GBNF)**, compiled from your schema |
+| Structured output | **Grammar (GBNF)**, compiled from the schema |
 | Tools | Native, via `--jinja` |
 | Usage | Input and output tokens |
-| Cost | Free — a genuine zero, not an unknown |
+| Cost | Free (a genuine zero, not an unknown) |
 | Images | OpenAI-compatible image content when the artifact pins a projector |
 | Embeddings | `--embeddings`-started server, genuinely OpenAI-shaped `/v1/embeddings` |
 
-## Vision models and projector companions
+## Vision Models and Projector Companions
 
 A vision artifact is two verified files: the model GGUF and its multimodal projector.
 AnyInfer counts both for fit and download admission, fetches both through the normal model
@@ -90,23 +90,23 @@ An image request against an artifact without a projector fails before generation
 of starting a text-only server that would ignore the image. Documents and audio are not
 projected through the llama.cpp adapter.
 
-## Structured output
+## Structured Output
 
 llama.cpp compiles `response_format.json_schema` into a real GBNF grammar. As with
 [Ollama](ollama.md), the schema is *also*
 [injected into the prompt](../concepts/structured-output.md), because a grammar
 constrains form without conveying meaning.
 
-## Tool calling
+## Tool Calling
 
 The tuner always emits `--jinja`. Without it, llama-server cannot apply a model's chat
 template and tool calling silently does not work at all.
 
 ## Embeddings
 
-`--embeddings` can only be set when llama-server starts — live-verified: an
-already-running chat server answers every `/v1/embeddings` call with a 501 asking you to
-restart it with the flag, and there is no way to toggle it afterward. So `embed()` never
+`--embeddings` can only be set when llama-server starts. This is live-verified: an
+already-running chat server answers every `/v1/embeddings` call with a 501 asking for a
+restart with the flag, and there is no way to toggle it afterward. So `embed()` never
 reuses a chat server's resident process, even for the same GGUF: it starts (or reuses) a
 second one, keyed separately, specifically for embedding calls.
 
@@ -130,11 +130,11 @@ llama.cpp-specific parsing.
 Serialized model swaps, readiness blocking, and the idle timer are covered in
 [the local subsystem](../concepts/local.md#supervision).
 
-## CPU fallback
+## CPU Fallback
 
 VRAM admission control refuses a model that cannot fit, but it also does something quieter:
 on a machine where the weights plus KV cache leave no room, the plan offloads **no** layers
-and the model is served entirely on the CPU. That is the right call — a slow answer beats no
+and the model is served entirely on the CPU. That is the right call: a slow answer beats no
 answer, and it is invisible from the result. So the adapter reports it as a
 [runtime diagnostic](../concepts/capabilities.md#runtime-diagnostics):
 
@@ -145,11 +145,11 @@ for note in client.diagnostics("llama-cpp"):
 #                     the CPU despite this machine having a cuda accelerator. ...
 ```
 
-Reported only when an accelerator was actually detected — on a CPU-only machine this is the
+Reported only when an accelerator was actually detected; on a CPU-only machine this is the
 plan working, not the plan degrading, and read from the supervisor's own state, so it costs
 nothing and never triggers hardware detection on its own.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/llama-cpp.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/llama-cpp.md).

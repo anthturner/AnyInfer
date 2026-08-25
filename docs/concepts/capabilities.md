@@ -1,6 +1,6 @@
-# Capabilities and provenance
+# Capabilities and Provenance
 
-Every capability value records where it came from — its
+Every capability value records where it came from: its
 [provenance](../reference/glossary.md#provenance). Providers omit, misreport, and change
 these numbers, so before routing, budgeting, or billing against one, a consumer needs to
 know how much to trust it.
@@ -21,7 +21,7 @@ caps.context_window
 # Sourced(value=128000, provenance='discovered')
 ```
 
-## The five provenances
+## The Five Provenances
 
 Weakest to strongest:
 
@@ -48,15 +48,15 @@ Some providers report rich model listings. OpenRouter includes per-model pricing
 provenance and beat the catalog. Where a listing is unavailable, assembly degrades to the
 weaker layers rather than failing.
 
-## What capabilities drive
+## What Capabilities Drive
 
 - **Structured-output mechanism selection.** The feature flags decide grammar vs
-  `json_schema` vs JSON mode vs prompt — see
+  `json_schema` vs JSON mode vs prompt; see
   [structured output](structured-output.md).
-- **Cost computation.** Only trusted-provenance pricing produces money — see
+- **Cost computation.** Only trusted-provenance pricing produces money; see
   [cost and spending](cost.md).
 - **Pre-dispatch gating.** A request that provably cannot fit a known context window
-  fails fast instead of paying a round trip. Only trusted-provenance windows gate — see
+  fails fast instead of paying a round trip. Only trusted-provenance windows gate; see
   [context budgets](budgeting.md).
 - **Probe sizing.** A target known to reason gets a larger budget for the `verify()`
   probe, since a thinking model spends the ordinary one before it says anything.
@@ -66,9 +66,9 @@ for a model, populated only from the provider's own documentation via its contra
 snapshot. Almost every provider answers `None`, and that is the finished state, not a gap:
 inventing a plausible number would defeat the point of tagging where numbers come from.
 
-## Overriding capabilities
+## Overriding Capabilities
 
-`capability_overrides` applies your own numbers at `override` provenance, the strongest
+`capability_overrides` applies the application's own numbers at `override` provenance, the strongest
 layer, so a deliberate correction never loses to data the library merely collected:
 
 ```python
@@ -86,7 +86,7 @@ client = ai.Client(
 Provenance on the supplied fields is stamped automatically; supplying them is the
 provenance.
 
-## The `auto` sentinel
+## The `auto` Sentinel
 
 Some providers pick the model at request time (GitHub Copilot's `"auto"`). The only safe
 capability claim is then the conjunction across every model the provider might choose:
@@ -98,14 +98,14 @@ caps.context_window  # the smaller of the two
 caps.features  # only features both support
 ```
 
-If any candidate's bound is unknown, the conjunction is unknown — you cannot promise a
-minimum without knowing every value.
+If any candidate's bound is unknown, the conjunction is unknown; a minimum cannot be
+promised without knowing every value.
 
-## Three states, not two
+## Three States, Not Two
 
 A capability is natively supported, emulated by the core (a schema prompt-injected for a
 provider with no structured-output mode, say), or explicitly unavailable. The fourth
-state — a parameter accepted, discarded, and reported as success — is the one AnyInfer
+state (a parameter accepted, discarded, and reported as success) is the one AnyInfer
 refuses to have: `temperature=0` that had no effect looks exactly like `temperature=0`
 that worked. Known drops are declared on the descriptor and reported as
 [`ParameterDropped` telemetry](telemetry.md) instead of sent.
@@ -116,21 +116,21 @@ effort; it does not know which of that provider's models have one. A request car
 field and reports it.
 
 Both only happen on a *known* absence. A `default`-provenance feature set is a guess, and
-the library does not drop a caller's parameter on a guess — the same rule as the
-[pre-dispatch gate](budgeting.md#the-pre-dispatch-gate).
+the library does not drop a caller's parameter on a guess (the same rule as the
+[pre-dispatch gate](budgeting.md#the-pre-dispatch-gate)).
 
-## Proving a target works
+## Proving a Target Works
 
 Three mechanisms answer "will this target actually serve my request?", from cheapest to
 most thorough.
 
 **`resolve()` proves the spelling.** It maps a target string or alias to a concrete
-provider and model, or raises with a hint — see
+provider and model, or raises with a hint; see
 [targets and aliases](targets.md#resolution-is-total). No network traffic.
 
 **`verify()` proves one round trip.** Resolution says nothing about whether the
 credential can generate, the model id exists at that endpoint, or the deployment has
-capacity — and a health probe does not either, since everything a health probe touches
+capacity; a health probe does not either, since everything a health probe touches
 can be fine while inference still fails. `verify()` spends one tiny request and reports
 rather than raises:
 
@@ -169,20 +169,20 @@ report.summary
 
 Findings record at `probed` provenance, so the next request stops guessing. Pass
 `record=False` to look without committing. Outcomes are three-state: `supported`,
-`unsupported`, and `inconclusive` — the provider accepted the request and answered
-something else. Inconclusive results are not recorded, because one reply cannot separate
+`unsupported`, and `inconclusive` (the provider accepted the request and answered
+something else). Inconclusive results are not recorded, because one reply cannot separate
 a weak model from an ignored parameter.
 
 !!! warning "Probing costs requests"
     Four round trips for the default feature set, billed like any other. Run it once when
     an application first configures an endpoint, not on every start.
 
-## Runtime diagnostics
+## Runtime Diagnostics
 
 A capability says what a model *can* do, not what state the engine is in right now. The
 worst local-inference surprise lives in that gap: the request succeeded, the answer is
 correct, and it took ninety seconds because the model no longer fits in VRAM and half of
-it ran on the CPU. No health probe catches that — the server is perfectly reachable.
+it ran on the CPU. No health probe catches that; the server is perfectly reachable.
 
 Providers that can inspect their own runtime report it:
 
@@ -205,7 +205,7 @@ that is [Ollama](../providers/ollama.md) (VRAM spill) and
 [llama.cpp](../providers/llama-cpp.md) (a GPU machine serving on the CPU). Diagnostics
 are advisory: they never fail a request and never gate routing.
 
-## Inspecting capabilities
+## Inspecting Capabilities
 
 ```python
 for model in client.models("openrouter"):
@@ -214,19 +214,19 @@ for model in client.models("openrouter"):
         print(model.id, caps.context_window.value, f"({caps.context_window.provenance})")
 ```
 
-!!! tip "Key takeaways"
-    - Every capability value carries provenance — `default`, `catalog`, `discovered`,
-      `probed`, or `override` — and assembly never lets a weaker source displace a
+!!! tip "Key Takeaways"
+    - Every capability value carries provenance (`default`, `catalog`, `discovered`,
+      `probed`, or `override`), and assembly never lets a weaker source displace a
       stronger one.
     - Unknown stays `None`. Nothing is upgraded from "assumed" to "known" without a
-      listing, a probe, or your override.
+      listing, a probe, or an override.
     - `resolve()` checks spelling for free, `verify()` spends one request to prove a
-      round trip, and `probe()` spends about four to measure features on compatibility
+      round trip, and `probe()` spends ~4 to measure features on compatibility
       endpoints.
     - Parameters are only withheld on a known absence, and every withholding is reported
       as `ParameterDropped`.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

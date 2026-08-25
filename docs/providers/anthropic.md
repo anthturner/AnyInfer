@@ -52,17 +52,17 @@ maps to a budget:
 | `high` | 16384 tokens |
 
 Thinking arrives as `ReasoningDelta` events on the
-[event stream](../concepts/events.md). Thinking starts the first-token clock — the model
-is working and the user sees activity — but its text is excluded from the answer.
+[event stream](../concepts/events.md). Thinking starts the first-token clock (the model
+is working and the user sees activity), but its text is excluded from the answer.
 
-## Structured output
+## Structured Output
 
 Anthropic has no `response_format` field, so a schema becomes a single forced tool call,
-which the API does constrain. You still get a normal validated `result.structured`; the
+which the API does constrain. The caller still gets a normal validated `result.structured`; the
 emulation is invisible except in `structured_mechanism`. See
 [structured output](../concepts/structured-output.md) for how mechanisms are chosen.
 
-## Pointing this adapter elsewhere
+## Pointing This Adapter Elsewhere
 
 Several other services expose an Anthropic-Messages-shaped endpoint. This adapter serves
 any of them through a `base_url` override; nothing else changes:
@@ -77,10 +77,10 @@ ai.ProviderSettings.of(
 
 [DeepSeek](deepseek.md), [xAI](xai.md), and several of the
 [presets](presets.md#anthropic-compatible-endpoints) document such endpoints. Prefer the
-provider's own adapter or preset unless you specifically need Messages-dialect behavior,
+provider's own adapter or preset unless Messages-dialect behavior is specifically needed,
 since provider-specific features are wired only there.
 
-## Multimodal inputs
+## Multimodal Inputs
 
 Images and PDF documents accept inline bytes or provider-fetchable URLs. The adapter emits
 native image/document content blocks. Audio input is not part of this Messages projection
@@ -90,12 +90,12 @@ normalized input model.
 ## Notes
 
 - System messages become the top-level `system` field.
-- `max_tokens` is required by the API; AnyInfer sends 4096 when you set none rather than
+- `max_tokens` is required by the API; AnyInfer sends 4096 when none is set rather than
   letting the request fail with a 400.
 - Tool results ride on a *user* turn in this dialect, not a `tool` role.
 - Model listing is cursor-paginated, and pagination is followed automatically.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/anthropic.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/anthropic.md).

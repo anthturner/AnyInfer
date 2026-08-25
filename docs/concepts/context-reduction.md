@@ -1,4 +1,4 @@
-# Context reduction
+# Context Reduction
 
 You have more material than the model's window holds. `anyinfer.context` decides what to
 send and tells you exactly what it dropped. Together with
@@ -17,12 +17,12 @@ flowchart LR
 ```
 </div>
 
-## You collect, the library reduces
+## You Collect, the Library Reduces
 
 Your application collects: walking the filesystem, applying ignore rules, excluding
 secrets, asking the user what to share. That stays yours, because it is where the
 security policy lives and where every application differs. The library ranks, selects,
-and represents what you hand it — this subpackage never opens a file, never touches the
+and represents what you hand it; this subpackage never opens a file, never touches the
 network, and adds no dependencies.
 
 ```python
@@ -50,7 +50,7 @@ same material across ten messages sends exactly as many tokens as one. What work
 either less fidelity in one request (`ranked`, `tiered`, `packed`) or more requests
 (`distill`).
 
-## The five strategies
+## The Five Strategies
 
 | Strategy | Sends | Use when |
 |---|---|---|
@@ -71,7 +71,7 @@ documents, and verbatim files for whatever budget remains. A model that knows
 
 `packed` splits documents at paragraph boundaries, ranks every chunk, and packs the
 best. Adjacent chunks are coalesced when rendered, so a contiguous run appears as one
-block. Pinned documents are never chunked — pinning means "the user chose this file",
+block. Pinned documents are never chunked: pinning means "the user chose this file",
 and sending a piece of it answers a question they did not ask.
 
 `distill` is the only strategy that issues generation calls, so it is a separate
@@ -92,7 +92,7 @@ It maps each chunk to notes, then reduces the notes to an answer, going hierarch
 when the notes exceed the window. A deterministic `reducer=` replaces the reduce call
 entirely. See [the distill example](../examples/distill-a-corpus.md).
 
-## Losing less than you drop
+## Losing Less Than You Drop
 
 Real corpora repeat themselves. Byte-identical documents collapse by default: one copy
 is rendered, the rest become `<duplicate>` pointers, and nothing is lost. Near-identical
@@ -103,11 +103,11 @@ thousands of documents cost a linear pass and group identically on every run.
 
 A file that just misses the budget can be shortened instead of dropped:
 `compact_fallback` retries it with comments, docstrings, license headers, and blank runs
-removed — a 25–40% saving on real source. Only lines that are entirely a comment are
+removed (a 25–40% saving on real source). Only lines that are entirely a comment are
 removed, because stripping a trailing `//` correctly would need a parser this subpackage
 does not have.
 
-## Plan before you commit
+## Plan Before You Commit
 
 `plan()` runs every deterministic strategy, measures what each would render, and throws
 the text away. It spends no inference and touches no network, so the numbers are exact:
@@ -119,11 +119,11 @@ print(outcome.summary())
 # distill would spend 141+ call(s)
 ```
 
-`outcome.best()` is a recommendation — most of the corpus at the highest fidelity — not
+`outcome.best()` is a recommendation (most of the corpus at the highest fidelity), not
 a decision. An app that would rather have twelve whole files than four hundred
 summarized ones should read `options` and pick for itself.
 
-## Turn two: send the same thing
+## Turn Two: Send the Same Thing
 
 Handing back the previous reduction's state keeps the selection stable, so the prompt
 prefix doesn't churn when the corpus barely moved:
@@ -140,10 +140,10 @@ turns that select the same documents produce byte-identical text and
 [provider prompt caches](caching.md) keep hitting. Pass `render_order="rank"` if you
 would rather have relevance ordering than cache stability.
 
-## Ranking is lexical
+## Ranking Is Lexical
 
-The built-in ranker is BM25-style — term frequency, saturated and length-normalized,
-weighted by inverse document frequency — plus two code-corpus signals: a query term in
+The built-in ranker is BM25-style (term frequency, saturated and length-normalized,
+weighted by inverse document frequency), plus two code-corpus signals: a query term in
 the path outweighs the same term in the body, and anchor files (`README`,
 `pyproject.toml`) get a small bonus. It has no embeddings, which keeps the default path
 free of a model dependency and an index to invalidate.
@@ -156,14 +156,14 @@ is query-independent and so still orders a corpus when the query is weak or abse
 
 For semantic retrieval, `anyinfer.semantic_ranker()` wraps your own
 [`embed()`/`rerank()`](embeddings.md) or any embedding index into the same `Ranker`
-protocol `select()` expects — see
+protocol `select()` expects; see
 [the API reference](../reference/api/context.md#ranking).
 
 ## Tuning
 
 Every algorithmic choice is a field on `ContextTuning`. Pass it to `select()`, put it in
 the `context` block of the [configuration file](../reference/configuration.md), or set
-it with a `--context-*` flag on `anyinfer context` — the three name the same things.
+it with a `--context-*` flag on `anyinfer context`; the three name the same things.
 Every setting that changes what gets sent is off by default, so a reduction never
 changes shape between releases; the single exception is exact-duplicate collapse, which
 is lossless. `ContextTuning.recommended()` is the set worth having for a source-code
@@ -171,7 +171,7 @@ corpus. The full field table, with the reasoning behind `density` ordering and t
 `diversity` penalty, is in
 [the API reference](../reference/api/context.md#advanced-settings).
 
-## Conversations are context too
+## Conversations Are Context Too
 
 `select()` reduces material you collected. `compact_history()` reduces material you
 *produced*, which in an agentic loop is where the window actually goes:
@@ -196,15 +196,15 @@ To apply the same rules automatically on the request path, hand the client a pol
 client = ai.Client(providers, history=ai.HistoryPolicy())
 ```
 
-`last_resort`, the default mode, compacts only after every target — including
-[`Route.context_window_targets`](routing.md) — is exhausted, preferring a larger-window
+`last_resort`, the default mode, compacts only after every target (including
+[`Route.context_window_targets`](routing.md)) is exhausted, preferring a larger-window
 model to losing history. `proactive` compacts before dispatch instead. The policy is off
 unless you configure it, never compacts against an unknown window, and every compaction
 emits a `ContextReduced` event, so a shortened conversation is never a silent one.
 Because the policy lives on the client, the Python API, the CLI, the tool loop, and the
 [sidecar](../serve/README.md) all inherit it identically.
 
-## Every reduction announces itself
+## Every Reduction Announces Itself
 
 Reduction emulates a larger context window, and a truncated corpus produces answers
 that look just like a complete one's. So the result records everything:
@@ -226,13 +226,13 @@ sensitive.
 
 Budgets follow the same rule as [capabilities](capabilities.md): when the target's
 window is unknown, `budget.remaining_tokens` is `None` and the library will not invent
-one — you choose the fallback in the open. Byte and document ceilings apply
+one; you choose the fallback in the open. Byte and document ceilings apply
 independently of tokens (`max_bytes` defaults to 4 MiB, `max_documents` to 200).
 
-## The envelope format
+## The Envelope Format
 
-Reduced output is a mechanical data envelope — neutral tags, HTML-escaped attributes, no
-prose:
+Reduced output is a mechanical data envelope (neutral tags, HTML-escaped attributes, no
+prose):
 
 ```xml
 <context format="1">
@@ -249,7 +249,7 @@ transcripts, so changing it is a documented breaking change: `format` is bumped 
 existing element's meaning changes, not when one is added. The render functions are in
 [the API reference](../reference/api/context.md#rendering).
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Your application collects and approves material; the library only ranks, selects,
       and renders it, with no file or network access of its own.
     - Five strategies cover the fidelity ladder, and `plan()` prices all the
@@ -262,7 +262,7 @@ existing element's meaning changes, not when one is added. The render functions 
     - Path-ordered rendering keeps consecutive turns byte-identical, which is what keeps
       prompt caches hitting.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

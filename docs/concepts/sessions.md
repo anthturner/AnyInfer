@@ -12,20 +12,20 @@ with client.session("copilot:auto") as chat:
     client.generate("Now list the risks.", session=chat)
 ```
 
-## What each provider actually saves
+## What Each Provider Actually Saves
 
 The providers that can carry state between turns save completely different things, which is
 why the handle is opaque rather than a conversation object:
 
 | Provider | What an open session keeps | What that saves |
 |---|---|---|
-| [GitHub Copilot](../providers/copilot.md) | The conversation, server-side | Prior turns are not re-sent at all — fewer tokens billed, and no duplicated history |
+| [GitHub Copilot](../providers/copilot.md) | The conversation, server-side | Prior turns are not re-sent at all: fewer tokens billed, and no duplicated history |
 | [llama.cpp](../providers/llama-cpp.md) | The supervised server, pinned | No model load between turns, and the KV cache the next turn reuses survives |
 | [Ollama](../providers/ollama.md) | The model, resident (`keep_alive`) | No reload of several gigabytes of weights mid-conversation |
 
 Everything else treats a session as inert.
 
-## A session never changes an answer
+## A Session Never Changes an Answer
 
 It is a performance and cost optimization, and holding that line is what makes it safe to
 pass one everywhere. Opening a session against a provider that cannot keep state is allowed
@@ -37,21 +37,21 @@ session.supported  # False
 session.reuse  # 'unsupported', and every request behaves exactly as it would have
 ```
 
-## Reuse is reported, not assumed
+## Reuse Is Reported, Not Assumed
 
 `reuse` says what happened on the **last turn**, not what was hoped for:
 
 | Value | Meaning |
 |---|---|
-| `fresh` | The provider started new state — the first turn, or one it had already expired. |
+| `fresh` | The provider started new state: the first turn, or one it had already expired. |
 | `resumed` | The provider continued state it already held. |
 | `unsupported` | Nothing was reused: this provider cannot, or that turn went somewhere else. |
 
-## State is bound to one target
+## State Is Bound to One Target
 
 Provider state is not portable, so a session names the target it belongs to and applies
 only there. If a route falls back to a different provider, or a different model on the
-same one — that turn simply runs without it and reports `unsupported`:
+same one, that turn simply runs without it and reports `unsupported`:
 
 ```python
 result = client.generate(
@@ -62,24 +62,24 @@ result = client.generate(
 chat.reuse  # 'unsupported' if the fallback answered
 ```
 
-Because a session already names a target, you can leave the target off entirely and it
-stands in — it never overrides an explicit `target` or `route`.
+Because a session already names a target, a caller can leave the target off entirely and
+it stands in; it never overrides an explicit `target` or `route`.
 
-## Closing is local
+## Closing Is Local
 
 `close()` stops the handle being used; it does not reach out to the provider.
 Server-side state expires on the provider's own schedule (Ollama's `keep_alive` timer,
 Copilot's service-side session lifetime). Closing the client itself *does* release what
 an adapter holds open locally, such as a Copilot SDK session.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - A session is an opaque handle, not a conversation: the library never interprets what
       a provider stores in it.
     - It never changes an answer, so passing one to a stateless provider is safe and inert.
     - `reuse` reports what the provider actually did, including when a fallback meant the
       session did not apply.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

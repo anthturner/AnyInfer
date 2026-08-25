@@ -3,9 +3,9 @@
 This section is the compatibility inventory: dedicated adapters for protocols that require
 real translation, plus declarative presets for OpenAI-compatible services and engines.
 Breadth is useful, but it is not AnyInfer's product boundary; start with
-[why and when to use AnyInfer](../why-anyinfer.md) if you are choosing an integration layer.
+[why and when to use AnyInfer](../why-anyinfer.md) when choosing an integration layer.
 
-The generated [complete inventory](all.md) is the full accessible rendering — all 106
+The generated [complete inventory](all.md) is the full accessible rendering: all 106
 providers (20 dedicated adapters, 86 presets), each with its target prefixes, key
 variable or default endpoint, and notes.
 
@@ -100,7 +100,7 @@ variable or default endpoint, and notes.
 See the [conformance matrix](../reference/conformance-matrix.md) for exactly which
 behaviors each one supports, generated from test results rather than asserted.
 
-## What is the same everywhere
+## What Is the Same Everywhere
 
 Since the core owns orchestration, [routing and retries](../concepts/routing.md),
 [structured-output validation](../concepts/structured-output.md),
@@ -108,7 +108,7 @@ Since the core owns orchestration, [routing and retries](../concepts/routing.md)
 and the [event stream](../concepts/events.md) behave identically no matter which
 provider served a request. The [concepts section](../concepts/README.md) documents each.
 
-## What differs, and how you find out
+## What Differs, and How You Find Out
 
 Real differences are surfaced, never hidden:
 
@@ -118,7 +118,7 @@ Real differences are surfaced, never hidden:
 - **`ParameterDropped` events** fire when a provider accepts a parameter and discards it.
 - **Provider pages** document the rest.
 
-## Reaching provider-specific parameters
+## Reaching Provider-Specific Parameters
 
 Anything a provider supports that AnyInfer does not model is reachable verbatim:
 
@@ -130,11 +130,11 @@ client.generate(
 )
 ```
 
-Options are namespaced by provider id and passed straight through to the matching adapter —
-the core never inspects them. You should never have to fork the library to reach a
+Options are namespaced by provider id and passed straight through to the matching adapter;
+the core never inspects them. A developer should never have to fork the library to reach a
 provider-specific feature.
 
-## Adding your own
+## Adding Your Own
 
 Third-party adapters register through the `anyinfer.providers` entry-point group and prove
 themselves with the same conformance suite the built-ins run. See

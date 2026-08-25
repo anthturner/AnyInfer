@@ -1,7 +1,7 @@
-# Structured output
+# Structured Output
 
-A schema is a **contract**, not a hint. Pass one and you get back a value that satisfies it,
-or an error explaining why not; never a "mostly right" string you have to re-parse.
+A schema is a **contract**, not a hint. Passing one returns a value that satisfies it,
+or an error explaining why not; never a "mostly right" string to re-parse.
 
 <div class="anyinfer-hero-diagram" markdown>
 ```mermaid
@@ -31,13 +31,13 @@ result = client.generate(prompt, target="medium", schema=PERSON)
 result.structured  # {"name": "Ada", "age": 36} — already validated
 ```
 
-Pydantic models work too, via duck typing — AnyInfer takes no pydantic dependency:
+Pydantic models work too, via duck typing (AnyInfer takes no pydantic dependency):
 
 ```python
 result = client.generate(prompt, target="medium", schema=MyPydanticModel)
 ```
 
-## How it works
+## How It Works
 
 Three steps, and the third is the one that matters.
 
@@ -54,7 +54,7 @@ grammar  >  json_schema  >  json_mode  >  prompt
 | `json_mode` | Provider guarantees *some* valid JSON | Several |
 | `prompt` | The schema is described in the system prompt | Everywhere |
 
-Unknown capabilities fall to `prompt`, which works everywhere — an unrecognized model
+Unknown capabilities fall to `prompt`, which works everywhere; an unrecognized model
 degrades to something that still produces a validated result rather than failing outright.
 
 The chosen mechanism is recorded on the result:
@@ -68,11 +68,11 @@ result.structured_mechanism  # "grammar"
 Grammar-based engines choke on constructs that are cheap for a validator but expensive for
 a grammar: `minLength`/`maxLength` on strings, and `minItems`/`maxItems` of 2000 or more,
 are stripped *for the wire only*. If a local model keeps failing a length constraint, that
-is why — the constraint never reached the engine, and clearer prompt wording will help
+is why: the constraint never reached the engine, and clearer prompt wording will help
 more than a tighter bound. Two things improve results under every mechanism: prefer `enum`
 over free-form strings, and keep nesting shallow.
 
-**3. Validate the response against your original schema.**
+**3. Validate the response against the original schema.**
 
 Always. Regardless of mechanism, regardless of what the provider claimed. This is
 non-negotiable for a specific reason: backends have shipped bugs where structured-output
@@ -80,23 +80,23 @@ enforcement is *silently disabled* under certain conditions (thinking modes, in 
 producing unconstrained output with no error. A provider's claim that it constrained the
 output is not evidence that it did.
 
-Stripping a constraint in step 2 therefore never weakens what you get — the original schema
-is what decides.
+Stripping a constraint in step 2 therefore never weakens what comes back: the original
+schema is what decides.
 
-## Grammar mode still describes the schema in the prompt
+## Grammar Mode Still Describes the Schema in the Prompt
 
 A GBNF grammar guarantees *well-formed* JSON, not *meaningful* JSON. A model that was never
 shown the schema will happily emit schema-shaped nonsense that satisfies the grammar and
-fails you.
+fails the caller.
 
-So for engines whose grammar mode does not condition the model — llama.cpp and Ollama —
+So for engines whose grammar mode does not condition the model (llama.cpp and Ollama),
 AnyInfer injects the schema into the prompt **as well as** compiling the grammar. This is a
 descriptor property, not a blanket rule: providers whose `json_schema` mode already
 conditions the model do not need it.
 
 ## Repair
 
-Opt in to letting the model correct itself — see
+Opt in to letting the model correct itself; see
 [repair](../reference/glossary.md#repair) in the glossary:
 
 ```python
@@ -128,33 +128,33 @@ except ai.SchemaViolationError as error:
     print(error.raw_text)  # what the model actually said
 ```
 
-You get the validation errors, bounded raw output, and—when a truncated top-level JSON
-object contains delimiter-confirmed complete members—`error.partial` plus
+The error carries the validation errors, bounded raw output, and (when a truncated
+top-level JSON object contains delimiter-confirmed complete members) `error.partial` plus
 `error.missing_fields`. Partial members are evidence, not a valid result: AnyInfer never
 guesses a cut-off scalar, asks another provider to continue it, or treats recovered fields
 as schema-validated.
 
-The budget is the caller's to set for almost every provider. A few declare a ceiling —
-[Microsoft 365 Copilot](../providers/m365-copilot.md) allows one repair attempt, because
-each is a full Graph round trip — and the clamp is never silent: asking for more emits a
+The budget is the caller's to set for almost every provider. A few declare a ceiling
+([Microsoft 365 Copilot](../providers/m365-copilot.md) allows one repair attempt, because
+each is a full Graph round trip), and the clamp is never silent: asking for more emits a
 [`ParameterDropped`](telemetry.md) event naming `repair.max_attempts`.
 
-## Extraction is forgiving; validation is not
+## Extraction Is Forgiving; Validation Is Not
 
-Models wrap JSON in code fences and prose even when told not to. Extraction handles that —
+Models wrap JSON in code fences and prose even when told not to. Extraction handles that:
 it tries the whole string, then scans for the first balanced `{...}` or `[...]`, respecting
 string literals so a brace inside a string does not end the scan.
 
 Validation, once a value is extracted, is strict.
 
-!!! tip "Key takeaways"
-    - A schema is a contract: you always get a client-side-validated value, regardless of
-      which mechanism produced it.
+!!! tip "Key Takeaways"
+    - A schema is a contract: the caller always gets a client-side-validated value,
+      regardless of which mechanism produced it.
     - The strongest native mechanism is chosen automatically: grammar beats json_schema
       beats json_mode beats prompt, and the choice is recorded on the result.
     - Repair is opt-in, bounded, and re-prompts the same model; it never triggers fallback.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

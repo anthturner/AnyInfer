@@ -2,7 +2,7 @@
 icon: material/format-list-bulleted
 ---
 
-# Every provider
+# Every Provider
 
 This is AnyInfer's compatibility inventory, not its primary value proposition:
 **106 providers** comprising 20 dedicated adapters with provider-specific
@@ -26,7 +26,7 @@ result = client.generate(prompt, target="groq:llama-3.3-70b-versatile")
 New to these? Start with [choosing a provider](README.md); the per-provider quirks for
 the preset table are in [hosted & local presets](presets.md).
 
-## Dedicated adapters
+## Dedicated Adapters
 
 These need more than declarative endpoint and auth settings: a native request shape,
 special auth flow, richer discovery, or provider-specific stream handling. Each has its
@@ -61,7 +61,7 @@ These speak the OpenAI chat-completions dialect closely enough that one shared a
 covers them; what differs is declarative — endpoint, auth spelling, token-field name,
 model listing, reasoning translation. See [presets](presets.md) for the quirk notes.
 
-### Hosted services
+### Hosted Services
 
 | Provider | Target | Key (conventional env var) | Notes |
 |---|---|---|---|
@@ -129,7 +129,7 @@ model listing, reasoning translation. See [presets](presets.md) for the quirk no
 | IBM watsonx.ai (model gateway) | `watsonx:` / `ibm-watsonx:` | `WATSONX_API_KEY` | The OpenAI-compatible model gateway (beta, IBM Cloud only), which sidesteps the native API's request-body project scoping and version pinning — providers are registered per project ahead of time instead |
 | Z.ai (Zhipu GLM) | `z-ai:` / `zai:` / `glm:` | `ZAI_API_KEY` | GLM model family; temperature range is 0-1, thinking controls via provider_options ({'thinking': {'type': …}}) |
 
-### Local engines & self-hosted servers
+### Local Engines & Self-Hosted Servers
 
 Local engines need no API key and default to loopback. Where the address is yours — a
 cluster host, a dynamically assigned port — the preset requires a base URL instead.
@@ -160,7 +160,7 @@ cluster host, a dynamically assigned port — the preset requires a base URL ins
 | vLLM | `vllm:` | `http://127.0.0.1:8000/v1` | Serves one model per process; engine extras (guided decoding, top_k) via provider_options |
 | Xinference | `xinference:` / `xorbits:` | `http://127.0.0.1:9997/v1` | Serves many models at once; ids are the model UIDs you launched |
 
-## Not yet covered
+## Not Yet Covered
 
 - **Replicate** — its predictions API is asynchronous and per-model, with no
   chat-completions route to normalize; `api.replicate.com/openapi.json` declares 26

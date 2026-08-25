@@ -1,4 +1,4 @@
-# Conformance matrix
+# Conformance Matrix
 
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
@@ -44,9 +44,9 @@ Last generated: 2026-08-24.
 | voyage | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | xai | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 
-Every dedicated adapter now has a shared-harness row. The `groq`, `moonshot`, `reka` and `venice` rows exercise the shared adapter's quirk axes — bearer auth, the renamed output-token field, `x-api-key` auth, and the `max_completion_tokens` dialect. Every entry in the [preset registry](../providers/presets.md) is separately instantiated and checked for registry invariants; these rows do not claim a live upstream verification.
+Every dedicated adapter now has a shared-harness row. The `groq`, `moonshot`, `reka` and `venice` rows exercise the shared adapter's quirk axes: bearer auth, the renamed output-token field, `x-api-key` auth, and the `max_completion_tokens` dialect. Every entry in the [preset registry](../providers/presets.md) is separately instantiated and checked for registry invariants; these rows do not claim a live upstream verification.
 
-## What the cases check
+## What the Cases Check
 
 | Case | Verifies |
 |---|---|
@@ -81,13 +81,14 @@ Every dedicated adapter now has a shared-harness row. The `groq`, `moonshot`, `r
 
 ## Modes
 
-- **fake-server** — in-process transports asserting we handle each protocol *shape*. Runs on
-  every commit.
-- **cassette** — recorded real traffic, asserting we handle what providers *actually send*.
-- **live** — opt-in, requires credentials. `m365-copilot` is exempt: its authentication is
+- **fake-server**: in-process transports asserting the library handles each protocol
+  *shape*. Runs on every commit.
+- **cassette**: recorded real traffic, asserting the library handles what providers
+  *actually send*.
+- **live**: opt-in, requires credentials. `m365-copilot` is exempt: its authentication is
   interactive-only and cannot run headless.
 
-## See also
+## See Also
 
 - [Provider pages](../providers/README.md) for the human-readable version.
 - [Contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md) for the wire details each adapter depends on.

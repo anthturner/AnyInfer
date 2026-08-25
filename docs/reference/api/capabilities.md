@@ -64,7 +64,7 @@ budget calculator are explained in
 
 </div>
 
-## Spend accounting
+## Spend Accounting
 
 An in-process rollup of what a client spent, and an optional ceiling checked before
 dispatch. Concepts: [cost and spending](../../concepts/cost.md).
@@ -81,7 +81,7 @@ dispatch. Concepts: [cost and spending](../../concepts/cost.md).
 
 </div>
 
-## Rate governance
+## Rate Governance
 
 Client-side pacing for one provider instance, and the header dialect a provider reports its
 window in. Both are inert until configured. Concepts:

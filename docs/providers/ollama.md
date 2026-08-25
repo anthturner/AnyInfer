@@ -45,17 +45,17 @@ model `qwen3:8b`, because [targets](../concepts/targets.md) split on the first c
 | Phase timings | Model load, prefill, decode |
 | Sessions | `keep_alive` |
 
-## Structured output
+## Structured Output
 
-Ollama compiles your schema to a decoding grammar. Two consequences AnyInfer handles:
+Ollama compiles the schema to a decoding grammar. Two consequences AnyInfer handles:
 
 - Grammar-hostile keywords (`minLength`, `maxLength`, huge `minItems`/`maxItems`) are
-  stripped for the wire only; your original schema still
+  stripped for the wire only; the original schema still
   [validates the response](../concepts/structured-output.md).
 - The schema is *also* injected into the prompt. A grammar guarantees well-formed JSON, not
-  meaningful JSON — a model never shown the schema emits schema-shaped nonsense.
+  meaningful JSON; a model never shown the schema emits schema-shaped nonsense.
 
-## Phase timings
+## Phase Timings
 
 ```python
 result.timing.phases
@@ -65,11 +65,11 @@ result.timing.phases
 
 A large `model_load_ms` on a first request is the model being read from disk.
 
-## GPU spill diagnostics
+## GPU Spill Diagnostics
 
 The slowest failure Ollama has is not a failure. A model that no longer fits in VRAM
 alongside whatever else the GPU is holding is loaded anyway, with the overflow served from
-system memory — the request succeeds, the answer is correct, and it takes an order of
+system memory; the request succeeds, the answer is correct, and it takes an order of
 magnitude longer than the same model took yesterday. The wire says nothing about it.
 
 `/api/ps` reports how much of each resident model is actually in VRAM, so the adapter reads
@@ -84,10 +84,10 @@ for note in client.diagnostics("ollama"):
 ```
 
 The same text lands on `result.warnings` for any request that hit it, and as a
-`ProviderDiagnostic` event — see
+`ProviderDiagnostic` event; see
 [runtime diagnostics](../concepts/capabilities.md#runtime-diagnostics). Costs nothing:
 `/api/ps` is a local read, never a generation. A model within 5% of full residency is not
-reported — Ollama's own sizes wobble by a few megabytes, and a warning on every healthy
+reported; Ollama's own sizes wobble by a few megabytes, and a warning on every healthy
 load is one nobody reads.
 
 ## Embeddings
@@ -101,12 +101,12 @@ result = client.embed(["Why is the sky blue?", "Why is the grass green?"], targe
 print(result.space.dimensions, len(result.vectors))
 ```
 
-Batch input is native — every text in one call is sent as one array, not simulated with
+Batch input is native: every text in one call is sent as one array, not simulated with
 repeated requests. Requested `dimensions` are forwarded when the model supports native
 dimensionality reduction. Ollama documents no native rerank endpoint, so
 [reranking](../concepts/embeddings.md) is unsupported for this provider.
 
-## Multimodal inputs
+## Multimodal Inputs
 
 Vision-capable models receive inline images through the native message `images` field.
 Remote image URLs, documents, and audio are refused rather than silently dropped.
@@ -119,7 +119,7 @@ Remote image URLs, documents, and audio are refused rather than silently dropped
 - Native extras pass through provider options:
   `provider_options = {"ollama": {"keep_alive": "10m", "num_ctx": 8192, "num_gpu": 99}}`.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/ollama.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/ollama.md).

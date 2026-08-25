@@ -1,7 +1,7 @@
-# Embeddings and reranking
+# Embeddings and Reranking
 
 Embedding and reranking are stateless inference operations, typed and
-[routed](routing.md) the same way generation is — but they are not generation.
+[routed](routing.md) the same way generation is, but they are not generation.
 `EmbeddingRequest` and `RerankRequest` are their own types; nothing here is ever added as
 a field on `GenerationRequest`.
 
@@ -32,13 +32,13 @@ Both accept a single [target](targets.md), a fallback chain, or a route the same
 
 AnyInfer produces vectors and relevance rankings; it does not persist them, build a
 search index, or crawl a corpus. An application brings its own store and feeds it with
-these results — or uses the small optional
+these results, or uses the small optional
 [`anyinfer-store` add-on](../guides/vector-store.md), which draws the boundary in detail.
 
-## The embedding-space safety rule
+## The Embedding-Space Safety Rule
 
 Two embedding vectors are only meaningfully comparable when they came from the same
-model, the same revision, and — for models that distinguish it — the same input-intent
+model, the same revision, and (for models that distinguish it) the same input-intent
 handling. A query re-embedded by a fallback model produces numbers that look exactly as
 plausible as the primary model's, and will fail to match anything in an index built
 against the primary. Nothing in the response says it happened, which makes this failure
@@ -50,15 +50,15 @@ AnyInfer's answer is `EmbeddingSpace`, carried on every `EmbeddingResult`:
 print(result.space.provider_id, result.space.model, result.space.dimensions)
 ```
 
-By default, embedding routes retry on the same resolved target only — no cross-provider
+By default, embedding routes retry on the same resolved target only: no cross-provider
 or cross-model fallback. A chain that reaches a different `provider:model` is refused
 *before* any request is sent, with an actionable
 [`ConfigError`](../reference/errors.md), because AnyInfer never guesses that two spaces
-are equivalent. If you genuinely want vectors that may not be comparable, pass
+are equivalent. A caller that genuinely wants vectors that may not be comparable passes
 `allow_incompatible_fallback=True`; the result then always carries a warning naming both
 targets.
 
-You can also assert the space you expect up front:
+A caller can also assert the expected space up front:
 
 ```python
 result = client.embed(
@@ -71,7 +71,7 @@ result = client.embed(
 A successful response from a target that does not match `expected_space` is rejected
 rather than returned.
 
-## Input intent
+## Input Intent
 
 Some embedding models produce measurably better retrieval when a query and the documents
 it will be compared against are embedded with different instructions:
@@ -85,9 +85,9 @@ A provider that does not distinguish input intent ignores the field. A model tha
 requires it but received none degrades per its own documented default, and that
 degradation is recorded as a warning.
 
-## Reranking and document identity
+## Reranking and Document Identity
 
-`RerankDocument` ids are caller-owned and opaque — AnyInfer never generates or
+`RerankDocument` ids are caller-owned and opaque; AnyInfer never generates or
 interprets them. Every `RankedItem` carries back the original index and the document id
 it was given, so a caller can always map a ranked result back to its source, and a
 malformed provider response (an out-of-range or duplicate index) is rejected rather than
@@ -105,7 +105,7 @@ and it only happens against a verified limit:
 
 - An oversized embedding request against a target with a verified batch limit is split
   into ordered chunks, dispatched concurrently, and re-assembled in input order. A batch
-  failure is all-or-error; you never get back an `EmbeddingResult` silently missing
+  failure is all-or-error; a caller never gets back an `EmbeddingResult` silently missing
   vectors.
 - When no verified limit exists, a request up to a bounded default goes out as a single
   call, and anything larger is refused with an actionable error rather than a guessed
@@ -115,7 +115,7 @@ and it only happens against a verified limit:
 
 The `batch=` parameter takes an `anyinfer.BatchPolicy`: `max_concurrency` bounds
 parallel chunks, `allow_split=False` refuses splitting outright, `max_items_override`
-supplies a limit you have verified yourself, and `rerank_cross_batch=True` is the
+supplies a limit the caller has verified, and `rerank_cross_batch=True` is the
 explicit opt-in for chunk-local rerank rankings, with a warning that the scores are not
 one global ordering.
 
@@ -127,18 +127,18 @@ established OpenAI-shaped rerank dialect to emulate). The [CLI](../guides/cli.md
 exposes `anyinfer embed` and `anyinfer rerank`. All three surfaces are projections over
 the same `AsyncClient` calls.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Embedding and rerank requests are their own typed operations with their own
-      routing rule: same resolved target only, unless you explicitly allow incompatible
-      fallback.
+      routing rule: same resolved target only, unless incompatible fallback is
+      explicitly allowed.
     - Every result carries its `EmbeddingSpace`, and `expected_space=` turns a stored
       index's assumptions into an enforced precondition.
     - Batch splitting happens only against verified limits and is all-or-error; rerank
       scores are never merged across batches.
     - Storage and search stay outside the core; `anyinfer-store` is the optional add-on
-      when you want them without a database.
+      for having them without a database.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

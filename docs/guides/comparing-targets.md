@@ -1,4 +1,4 @@
-# Compare targets without spending
+# Compare Targets Without Spending
 
 `compare()` resolves a concrete request (the exact messages, schema, tools, sampling
 controls, and cache policy) against every target you name and reports what it would
@@ -8,7 +8,7 @@ order is preserved, and nothing is ranked. If an application wants a cost-first 
 local-first policy, make that selection visibly in application code and pass the
 resulting order to [`Route`](../concepts/routing.md).
 
-## A deterministic, offline example
+## A Deterministic, Offline Example
 
 This complete shape uses a scripted provider with two different capability profiles, so
 it is deterministic, offline, and shows a degradation rather than two identical records:
@@ -69,8 +69,8 @@ Unknowns stay unknown: an unknown or untrusted context window produces a `None` 
 an unpriced target produces `cost=None`, never a plausible number. A target that does
 not exist or is not configured comes back as a `resolvable=False` record explaining why,
 rather than an exception, so one bad candidate does not erase the comparison.
-`refresh=True` may contact providers to refresh their model listings — the one exception
-to the no-contact rule — but still generates no text. Since `compare()` cannot predict
+`refresh=True` may contact providers to refresh their model listings (the one exception
+to the no-contact rule), but still generates no text. Since `compare()` cannot predict
 undocumented provider refusals, use
 [`verify()`](../concepts/capabilities.md#proving-a-target-works) when you need one
 bounded real request as proof.
@@ -84,7 +84,7 @@ anyinfer compare "Summarize this" --target medium --target ollama:qwen3:8b --jso
 The sidecar exposes the same records at `POST /v1/anyinfer/compare`, with an
 OpenAI-shaped request plus a `targets` array.
 
-## From one comparison to a diff
+## From One Comparison to a Diff
 
 `compare()` answers "what does this request become on this target, right now." The
 portability diff tool (`anyinfer.compare_diff`) answers two follow-on questions: did
@@ -92,8 +92,8 @@ that answer just change (regression detection), and what exactly changes in a mo
 A to B (a portability report). It reuses `compare()`'s no-dispatch guarantee: no
 provider is called, and no target is ranked or recommended.
 
-For regression detection, define a fixture set — the requests you care about staying
-stable — as a small JSON file:
+For regression detection, define a fixture set (the requests you care about staying
+stable) as a small JSON file:
 
 ```json
 {
@@ -147,14 +147,14 @@ The fixture format is public and versioned (`compare_diff.FIXTURE_SCHEMA_VERSION
 Define fixtures against your own request shapes, since your regression risk is your own
 requests; the [API reference](../reference/api/compare-diff.md) has every signature.
 
-## When resolution is not the question
+## When Resolution Is Not the Question
 
 When the question is answer quality rather than request resolution, and you are willing
 to spend real generations, run an [arena](../concepts/arena.md). A
 [golden manifest](../examples/golden-manifest.md) answers "did this run's behavior
 change", while `compare_diff` answers "did this request's resolution change".
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - `compare()` resolves a request against every named target without dispatching,
       ranking, or choosing; order is preserved and unknowns stay `None`.
     - Read the fit verdict from `item.budget.fits`; an unresolvable target is a
@@ -164,7 +164,7 @@ change", while `compare_diff` answers "did this request's resolution change".
       provider call.
     - Spending real generations to judge answers is an arena's job, not `compare()`'s.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

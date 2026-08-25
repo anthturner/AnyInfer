@@ -1,7 +1,7 @@
-# The event stream
+# The Event Stream
 
-A generation **is** an ordered stream of typed events. Everything else — the non-streaming
-`generate()`, the OpenAI chunk format, your progress bar — is a projection of that one
+A generation **is** an ordered stream of typed events. Everything else (the non-streaming
+`generate()`, the OpenAI chunk format, a progress bar) is a projection of that one
 primitive. This page covers the request-scoped stream a caller consumes;
 [telemetry](telemetry.md) is the separate observer-facing channel for what happened
 around the request.
@@ -20,7 +20,7 @@ flowchart LR
 ```
 </div>
 
-## The events
+## The Events
 
 | Event | Meaning |
 |---|---|
@@ -32,7 +32,7 @@ flowchart LR
 | `AttemptFailed(record)` | A target attempt failed; a retry or fallback may follow. |
 | `StreamEnded(result)` | Terminal. Carries the assembled `Generation`. |
 
-## The ordering guarantees
+## The Ordering Guarantees
 
 These are a binding contract, verified by
 [the conformance suite](../contributing/conformance.md) for every adapter:
@@ -46,15 +46,16 @@ These are a binding contract, verified by
 4. Within one attempt, concatenating every `TextDelta.text` equals
    `StreamEnded.result.text`.
 
-Guarantee 4 is what lets you render deltas as they arrive and still trust the final result.
+Guarantee 4 is what allows a consumer to render deltas as they arrive and still trust the
+final result.
 
 Guarantees 2 and 4 are scoped **per attempt**: when a schema violation triggers the
 opt-in [repair loop](structured-output.md#repair), the repair re-runs the target inside
 the same stream, announced by a
-fresh `TimingMark("attempt_start")`. Treat each `attempt_start` as "clear and start over"
-— after it, the delta sequence restarts and `result.text` reflects the final attempt only.
+fresh `TimingMark("attempt_start")`. Treat each `attempt_start` as "clear and start
+over": after it, the delta sequence restarts and `result.text` reflects the final attempt only.
 
-## Consuming it
+## Consuming It
 
 Print deltas as they arrive:
 
@@ -75,31 +76,31 @@ async with client.stream(messages, target=target) as stream:
     record(stream.result.usage, stream.result.timing)
 ```
 
-Plain `generate()` is the same machinery with the stream drained internally — ignoring
+Plain `generate()` is the same machinery with the stream drained internally; ignoring
 events costs nothing and changes nothing.
 
-## Non-streaming providers still stream
+## Non-Streaming Providers Still Stream
 
 An adapter for a provider with no streaming API emits one `TextDelta` and a final event.
-Your consumer code does not change, which is the point. The contract is the library's, not
+Consumer code does not change, which is the point. The contract is the library's, not
 the provider's.
 
-## Usage is a late-arriving, optional event
+## Usage Is a Late-Arriving, Optional Event
 
 Usage often arrives *after* the finish reason, in a trailing chunk. Two consequences:
 
 - The parser drains to the protocol's terminal sentinel, never stopping at
-  `finish_reason` — stopping early undercounts tokens.
+  `finish_reason`; stopping early undercounts tokens.
 - Providers that report usage only on their terminal object
   ([Ollama](../providers/ollama.md)) still produce a `UsageUpdate` event, because the
   core synthesizes one. Consumers see one behavior.
 
-## Finish reasons are an open enum
+## Finish Reasons Are an Open Enum
 
 `FinishReason` is `"stop" | "length" | "tool_calls" | "content_filter" | "other"`. A value a
 provider invents tomorrow normalizes to `"other"` rather than crashing the reassembler.
 
-## Timing is measured by the core
+## Timing Is Measured by the Core
 
 `first_token_ms`, `total_ms`, and `output_tokens_per_s` are measured centrally against
 `time.monotonic()`, so they mean the same thing across every provider and are comparable.
@@ -112,7 +113,7 @@ Provider-reported sub-timings, when available, land in `timing.phases`:
 result.timing.phases  # {"model_load_ms": 300.0, "prefill_ms": 200.0, "decode_ms": 1000.0}
 ```
 
-## Early exit cancels
+## Early Exit Cancels
 
 Leaving a stream's context manager before draining it cancels the underlying request:
 
@@ -123,14 +124,14 @@ with client.stream(prompt, target=target) as stream:
             break  # the provider request is cancelled here
 ```
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - A generation is one ordered stream of typed events; `generate()` is just the drained
       stream, not a separate code path.
-    - Four ordering guarantees are enforced for every adapter by the conformance suite —
+    - Four ordering guarantees are enforced for every adapter by the conformance suite:
       concatenated `TextDelta`s always equal the final text.
     - Usage and timing are measured centrally, so they mean the same thing across providers.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

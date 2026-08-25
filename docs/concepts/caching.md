@@ -1,47 +1,47 @@
-# Prompt caching
+# Prompt Caching
 
-Most providers can hold on to a prefix of your prompt and charge less the next time they
+Most providers can hold on to a prefix of the prompt and charge less the next time they
 see it. What "hold on to it" means differs: some want to be told exactly where the
-reusable part ends, others work it out themselves and want you not to disturb it.
+reusable part ends, others work it out themselves and want the prefix left undisturbed.
 AnyInfer treats that difference the way it treats [structured output](structured-output.md):
-you state an intent — cache what is worth caching — and the core picks the strongest
+the caller states an intent (cache what is worth caching) and the core picks the strongest
 mechanism the target offers, reporting when a weaker one is all that is available.
 
 !!! warning "This is not a response cache"
 
-    Prompt caching caches the prompt you send, on the provider's side, for the
+    Prompt caching caches the prompt a request sends, on the provider's side, for the
     provider's retention window. It never skips a call, never reuses an answer, and
     never makes a repeated question free. AnyInfer stores nothing.
 
-## It is off unless you ask
+## It Is Off Unless You Ask
 
 ```python
 result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")  # no caching
 result = client.generate(prompt, target="...", cache=ai.CachePolicy())  # caching
 ```
 
-Caching changes what a provider bills you and how long it keeps a copy of your prompt,
-and neither is a decision the library makes on your behalf. Set the policy once on the
+Caching changes what a provider bills and how long it keeps a copy of the prompt, and
+neither is a decision the library makes on the developer's behalf. Set the policy once on the
 client (`ai.Client(providers, cache=ai.CachePolicy())`) or in the
 [shared configuration file](../reference/configuration.md), where the CLI and sidecar
 pick it up too.
 
-## The two mechanisms
+## The Two Mechanisms
 
-**Explicit** — the provider accepts per-segment marks. AnyInfer decides which segments
+**Explicit**: the provider accepts per-segment marks. AnyInfer decides which segments
 are worth marking, largest first, bounded by the provider's own ceiling; the adapter
 spells each mark in that provider's wire format.
 [Anthropic](../providers/anthropic.md) works this way.
 
-**Implicit** — the provider caches a stable prefix on its own. There is nothing to send,
-so AnyInfer's job is to leave your prefix undisturbed and to tell you when your own
-request is defeating it. [OpenAI](../providers/openai.md) and
+**Implicit**: the provider caches a stable prefix on its own. There is nothing to send,
+so AnyInfer's job is to leave the prefix undisturbed and to report when the request
+itself is defeating it. [OpenAI](../providers/openai.md) and
 [DeepSeek](../providers/deepseek.md) work this way.
 
 When a target offers neither, the policy is reported as dropped via a
 [`ParameterDropped` event](telemetry.md) rather than silently ignored.
 
-## What gets marked
+## What Gets Marked
 
 Three kinds of segment, in the order they sit on the wire:
 
@@ -52,13 +52,14 @@ Three kinds of segment, in the order they sit on the wire:
 | The conversation prefix | Everything before the current turn; grows as the chat does |
 
 Segments smaller than the provider's floor are skipped: below the floor a mark is billed
-as a cache *write* that no later read ever pays back. You can narrow what is eligible:
+as a cache *write* that no later read ever pays back. The policy allows a developer to
+narrow what is eligible:
 
 ```python
 ai.CachePolicy(include_tools=True, include_system=False, min_segment_tokens=2048, max_marks=2)
 ```
 
-## Seeing what happened
+## Seeing What Happened
 
 The result reports which mechanism was engaged:
 
@@ -69,28 +70,28 @@ result.usage.cache_write_tokens  # what it says it stored
 ```
 
 `cache_mechanism` is what was asked for; the usage figures are what the provider
-reported. [Cost](cost.md) is computed only from the reported numbers — an intention is
-never billed as an outcome — and when a provider does not report cache accounting, the
+reported. [Cost](cost.md) is computed only from the reported numbers (an intention is
+never billed as an outcome), and when a provider does not report cache accounting, the
 figures stay `None` rather than becoming zero.
 
 Subscribers see a `CachePlanned` [telemetry event](telemetry.md) carrying the mechanism,
 the mark count, and the estimated cacheable size. Both events are content-free:
 positions and counts, never text.
 
-## Making caching actually work
+## Making Caching Actually Work
 
-An implicit-caching provider only helps if your prefix is byte-identical between turns.
+An implicit-caching provider only helps if the prefix is byte-identical between turns.
 The usual mistakes:
 
 - a timestamp or request id in the system prompt
 - tools serialized in a different order each time
 - context blocks assembled from a set rather than a list
 
-If your `cache_read_tokens` stays at zero while you expect hits, that is where to look.
+If `cache_read_tokens` stays at zero while hits are expected, that is where to look.
 [Context reduction](context-reduction.md) renders in path order by default for exactly
 this reason.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Caching is opt-in, and a policy on a target that supports neither mechanism is
       reported as dropped, never silently ignored.
     - Intent and outcome are separate fields: `cache_mechanism` says what was planned,
@@ -100,7 +101,7 @@ this reason.
     - Implicit caching lives or dies on a byte-identical prefix; look for timestamps and
       unstable serialization order when hits stay at zero.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -1,9 +1,9 @@
-# Branching and releases
+# Branching and Releases
 
 How changes travel from a feature branch to a published release, and what is mechanical
 versus what a maintainer decides.
 
-## The branch model
+## The Branch Model
 
 ```mermaid
 flowchart LR
@@ -25,7 +25,7 @@ when every lint, type, contract, conformance, docs, and bracketed test-matrix jo
 Requiring one stable check name means adding a CI job (or a matrix row) can never silently
 escape the protection rules.
 
-`main` requires three additional checks — `tests (ubuntu-latest, py3.12)`,
+`main` requires three additional checks: `tests (ubuntu-latest, py3.12)`,
 `tests (ubuntu-latest, py3.13)`, and `tests (macos-latest, py3.14)`. Those are the
 names GitHub *reports*, which is what a required context matches on: a job's `name:`, not
 its id. Naming the id (`test-macos`) registers a context no job ever reports, and a
@@ -54,7 +54,7 @@ bills a second time for a result CI already produced.
 - Bumping the version is an ordinary change: edit both files on a feature branch and let
   it ride to `main` through `develop`.
 
-## What a release is
+## What a Release Is
 
 The [release workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/release.yml)
 runs on every merge to `main`:
@@ -80,7 +80,7 @@ runs on every merge to `main`:
 3. **Only when the version is new** does it tag `v<version>` and create the GitHub
    Release, with notes generated from the merged pull requests, every package attached,
    and a `SHA256SUMS` file covering every artifact. An unchanged version (docs-only merges,
-   CI tweaks) leaves what it built as workflow artifacts and cuts nothing — releases stay
+   CI tweaks) leaves what it built as workflow artifacts and cuts nothing; releases stay
    1:1 with versions.
 
 Publishing a release therefore takes exactly one deliberate act: merging a version bump
@@ -104,12 +104,12 @@ for a workflow run whose repository, workflow file, and environment match the pr
 publisher configuration. No API token exists in this repo's secrets, so there is none to
 leak or rotate.
 
-Because publishing is irreversible — a version number on PyPI can be yanked but never
-reused — the job runs in the `pypi` environment, which is where a required-reviewer gate
+Because publishing is irreversible (a version number on PyPI can be yanked but never
+reused), the job runs in the `pypi` environment, which is where a required-reviewer gate
 belongs if you want a human to approve each upload. The version bump is still the single
 deliberate act; the environment just adds a pause before the copy leaves the building.
 
-## Checklist for cutting a release
+## Checklist for Cutting a Release
 
 1. `develop` is green and contains everything the release should.
 2. On a feature branch: bump `project.version` and `anyinfer.__version__`, note anything
@@ -126,7 +126,7 @@ therefore require an explicit local approval. Signing and notarization require e
 certificates and are a release-infrastructure follow-up; the wheel, source distribution,
 checksums, and reproducible workflow remain the authoritative 0.1 release path.
 
-## When a release goes wrong
+## When a Release Goes Wrong
 
 Publishing is the only irreversible step in this repository: a version number on PyPI can
 be yanked but never reused, not even after deleting the file. Recovery by failure mode:

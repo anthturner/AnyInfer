@@ -1,11 +1,11 @@
-# Observe requests, and bridge to OpenTelemetry
+# Observe Requests, and Bridge to OpenTelemetry
 
 Every request emits typed [telemetry events](../concepts/telemetry.md) as it runs. This
 page shows how to consume them in-process and how to export them to OpenTelemetry; the
 [event stream](../concepts/events.md) page covers the per-request events a stream consumer
 sees.
 
-## In-process observers
+## In-Process Observers
 
 ```python
 import anyinfer as ai
@@ -27,11 +27,11 @@ class Metrics:
 client = ai.Client(providers, observers=[Metrics()])
 ```
 
-Keep `on_event` fast — it runs inline on the request path, so queue anything slow. An
+Keep `on_event` fast: it runs inline on the request path, so queue anything slow. An
 observer that raises is isolated and warned about once: a broken telemetry sink must never
 fail a generation.
 
-## Catch silent degradation
+## Catch Silent Degradation
 
 Two events exist specifically to make otherwise-invisible problems visible:
 
@@ -45,7 +45,7 @@ class DegradationWatch:
                 log.info("usage.%s was estimated via %s", field, how)
 ```
 
-`ParameterDropped` fires when a provider accepts a parameter and discards it — the failure
+`ParameterDropped` fires when a provider accepts a parameter and discards it: the failure
 mode where `temperature=0` silently does nothing and looks exactly like success.
 
 `RateLimitWaited` belongs to the same family. A request held back by
@@ -53,7 +53,7 @@ mode where `temperature=0` silently does nothing and looks exactly like success.
 from a slow provider unless something says so, which is why the wait also lands in
 `result.timing.phases["queued_ms"]`.
 
-## Payload privacy
+## Payload Privacy
 
 Prompt and response text are `None` unless an observer opts in, and stripping happens per
 observer:
@@ -66,7 +66,7 @@ client.subscribe(audit_trail, payloads=True)  # sees prompt and response
 Everything still passes redaction first, so a resolved credential cannot appear even in a
 payload-carrying event.
 
-## A JSONL trail
+## A JSONL Trail
 
 An audit trail needs no special support: consume the events directly and have your
 observer serialize each one to a JSONL file.
@@ -88,8 +88,8 @@ You get one span per request with attempts as span events, plus
 standard tooling reads them.
 
 Every event in the contract crosses the bridge. Events carrying a `request_id` become span
-events on that request's span, while the three that belong to no single request —
-`ContextReduced`, `ServerLifecycle`, `DownloadProgress` — become standalone spans, since
+events on that request's span, while the three that belong to no single request
+(`ContextReduced`, `ServerLifecycle`, `DownloadProgress`) become standalone spans, since
 attaching them to an arbitrary in-flight request would misattribute the work. The full
 mapping is in [the OpenTelemetry bridge](../concepts/telemetry.md#the-opentelemetry-bridge);
 the bridge is a consumer of the event contract, so consuming events directly and exporting
@@ -108,7 +108,7 @@ else:
 silent financial error. See
 [cost is tri-state](../concepts/cost.md#cost-is-tri-state).
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Observers run inline on the request path: keep them fast, and know that one which
       raises is isolated rather than allowed to fail a generation.
     - `ParameterDropped`, `UsageEstimated`, and `RateLimitWaited` make degradation visible
@@ -119,7 +119,7 @@ silent financial error. See
     - Never record an unknown cost as zero; `cost_usd` is `None` when the price is not
       trusted.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

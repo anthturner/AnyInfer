@@ -5,7 +5,7 @@ Look things up.
 - **[SDK reference](api/README.md)**: the generated API reference: every public class,
   function, and event, from the docstrings.
 - **[Error catalog](errors.md)**: every exception, when it is raised, whether it retries,
-  and the `hint` your user will see.
+  and the `hint` the user will see.
 - **[Conformance matrix](conformance-matrix.md)**: what each provider actually supports,
   from test results rather than assertion.
 - **[Shared configuration](configuration.md)**: provider settings, environment variables,
@@ -14,18 +14,18 @@ Look things up.
   compatibility, and its executable JSON Schema.
 - **[Glossary](glossary.md)**: the vocabulary this project uses precisely.
 
-## API stability
+## API Stability
 
 The public API is fully typed (the package ships a `py.typed` marker) and documented in
 its docstrings. The stability commitments cover the top-level `anyinfer` namespace plus
 the subpackage surfaces the guides teach: `anyinfer.config`, `anyinfer.local`,
 `anyinfer.serve`, `anyinfer.testing`, and `anyinfer.otel`. Anything under
 `anyinfer._client` is private, and within every module only the names in `__all__` are
-public — everything else is an implementation detail that may change without notice.
+public; everything else is an implementation detail that may change without notice.
 `help(ai.AsyncClient.generate)` in a REPL always matches the published
 [SDK reference](api/README.md), because both come from the same docstrings.
 
-## Module map
+## Module Map
 
 | Module | Responsibility |
 |---|---|

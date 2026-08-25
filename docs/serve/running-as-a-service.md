@@ -1,8 +1,8 @@
-# Running the sidecar as a service
+# Running the Sidecar as a Service
 
 An application pointing at `http://127.0.0.1:8080/v1` needs that endpoint to exist at boot,
 not just while somebody keeps a terminal window open. `anyinfer serve install` writes the
-systemd unit, launchd agent, or scheduled task that arranges it, and shows you the file
+systemd unit, launchd agent, or scheduled task that arranges it, and shows the file
 first. The service runs from the same
 [shared configuration file](../reference/configuration.md) as the CLI and SDK.
 
@@ -17,13 +17,13 @@ The standalone download works the same way: `anyinfer-serve install`. Its archiv
 ships an `INSTALL.txt` rendered from the same templates, so the download and the command
 cannot describe different definitions.
 
-## What it will and will not do
+## What It Will and Will Not Do
 
 - **It prints before it writes.** Every path shows the exact file and the exact commands,
-  and asks for confirmation unless you pass `--yes`.
+  and asks for confirmation unless `--yes` is passed.
 - **User scope by default.** `systemctl --user`, a LaunchAgent, and a per-user scheduled
   task all install without privileges. `--system` generates the system-wide definition and
-  *prints* the commands to run as root; it will not elevate for you.
+  *prints* the commands to run as root; it will not elevate on its own.
 - **It never overwrites silently.** An existing definition stops the command; `--force`
   replaces it.
 - **`uninstall` removes what `install` wrote**: the definition and, where one exists, the
@@ -34,12 +34,12 @@ cannot describe different definitions.
   supervisor AnyInfer is not.
 
 After a successful install the command runs
-[`anyinfer verify`](../guides/cli.md) against the configured route, unless you pass
-`--no-verify`. A service that starts cleanly and then fails every request at 3am because a
+[`anyinfer verify`](../guides/cli.md) against the configured route, unless `--no-verify`
+is passed. A service that starts cleanly and then fails every request at 3am because a
 credential reference is wrong is the failure this catches. A failure is reported; nothing
 is uninstalled.
 
-## What gets generated
+## What Gets Generated
 
 === "Linux (systemd)"
 
@@ -61,8 +61,8 @@ is uninstalled.
 
     The hardening directives are on rather than offered. This process reads a
     configuration file and speaks HTTP; it has no business writing to the filesystem,
-    gaining privileges, or opening anything but IP sockets, and a default you have to
-    turn on is a default nobody has. Logs go to the journal:
+    gaining privileges, or opening anything but IP sockets, and a default that must be
+    turned on is a default nobody has. Logs go to the journal:
     `journalctl --user -u anyinfer-serve.service`.
 
 === "macOS (launchd)"
@@ -82,23 +82,23 @@ is uninstalled.
 
     A logon task, not a Windows Service: the sidecar is a console executable, and a
     service shim would be a second supervisor. For boot-time start, use a third-party
-    service wrapper; that wrapper is then yours to maintain.
+    service wrapper; that wrapper is then the operator's to maintain.
 
-## Tokens and exposure
+## Tokens and Exposure
 
-A loopback service needs no token. Everything below applies only when you expose one.
+A loopback service needs no token. Everything below applies only when one is exposed.
 
 - **The token never enters the definition.** On Linux and macOS it goes to a mode-0600
   environment file beside the unit, read as `ANYINFER_SERVE_TOKEN`. The file is created at
   that mode rather than tightened afterwards.
 - **On Windows no token file is written at all.** A POSIX file mode means little there, so
-  the command tells you to set the variable where the OS already guards it:
+  the command says to set the variable where the OS already guards it:
   `setx ANYINFER_SERVE_TOKEN <token>`. The task inherits it at logon.
 - **A non-loopback definition cannot be generated without both** `--allow-remote-exposure`
   and a token. The running server enforces that already; generation enforces it too, so a
   unit that would survive reboots as an unauthenticated gateway cannot be produced at all.
   See the [security guidance](README.md#security) for what exposure means.
-- Printed output passes through redaction, so a token cannot reach your terminal or your
+- Printed output passes through redaction, so a token cannot reach the terminal or its
   scrollback.
 
 ## Logs
@@ -108,16 +108,16 @@ duplicating them into a file helps nobody. The Windows task has no sink, so `--l
 writes one, and AnyInfer does not rotate it. The generated definition states that, and so
 does this page, so the file's growth never comes as a surprise.
 
-## When the executable moves
+## When the Executable Moves
 
-The generated definition names an absolute path — the console script, or the standalone
+The generated definition names an absolute path: the console script, or the standalone
 executable under a frozen build. If the path lies inside a temporary or extraction
 directory the command refuses and explains: once that directory is cleaned up, the service
 fails at the next boot. Unpack the download somewhere permanent and rerun.
 
 After upgrading or relocating, regenerate: `anyinfer serve install --force`.
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - `anyinfer serve install` shows the exact definition before writing it, installs at
       user scope by default, and runs `anyinfer verify` against the configured route
       afterwards.

@@ -8,8 +8,8 @@ meaning here, the specific one is what the code implements.
 <div class="anyinfer-card" markdown>
 #### Adapter { #adapter }
 The per-provider module that translates a `WireRequest` into a provider's wire format and
-its responses back into events. Adapters only translate — the boundary
-[writing a provider adapter](../contributing/writing-an-adapter.md) explains.
+its responses back into events. Adapters only translate; the boundary is explained in
+[writing a provider adapter](../contributing/writing-an-adapter.md).
 </div>
 
 <div class="anyinfer-card" markdown>
@@ -45,7 +45,7 @@ hash-verified downloads; see [the model catalog](../concepts/catalog.md).
 </div>
 
 <div class="anyinfer-card" markdown>
-#### Conformance suite { #conformance-suite }
+#### Conformance Suite { #conformance-suite }
 The shared test suite every adapter must pass before its matrix row is published; see
 [the conformance suite](../contributing/conformance.md).
 </div>
@@ -58,14 +58,14 @@ needs, how it spells reasoning effort, what it supports. See
 </div>
 
 <div class="anyinfer-card" markdown>
-#### Drift check { #drift-check }
+#### Drift Check { #drift-check }
 The semi-automated audit comparing contract snapshots against providers' current public
 documentation, following
 [`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md).
 </div>
 
 <div class="anyinfer-card" markdown>
-#### Event stream { #event-stream }
+#### Event Stream { #event-stream }
 The generation primitive. A generation *is* an ordered stream of typed events, described
 in [the event stream](../concepts/events.md); the non-streaming API drains it.
 </div>
@@ -77,7 +77,7 @@ fails.
 </div>
 
 <div class="anyinfer-card" markdown>
-#### Health gate { #health-gate }
+#### Health Gate { #health-gate }
 Skipping a target that recently failed, for a short TTL, so one dead endpoint does not cost
 every request its full timeout; see
 [health gating](../concepts/routing.md#health-gating).
@@ -105,7 +105,7 @@ cannot handle efficiently). Never changes what
 <div class="anyinfer-card" markdown>
 #### Provenance { #provenance }
 Where a capability value came from: `default`, `catalog`, `discovered`, `probed`, or
-`override`, [weakest to strongest](../concepts/capabilities.md#the-five-provenances) — an
+`override`, [weakest to strongest](../concepts/capabilities.md#the-five-provenances); an
 application's `override` outranks everything the library collected.
 </div>
 
@@ -122,7 +122,7 @@ failure-class-specific chains. See [routing and rate limits](../concepts/routing
 </div>
 
 <div class="anyinfer-card" markdown>
-#### Sentinel model { #sentinel-model }
+#### Sentinel Model { #sentinel-model }
 A model id meaning "the provider chooses" (Copilot's `auto`). Capabilities for one are
 [the conjunction](../concepts/capabilities.md#the-auto-sentinel) across every candidate.
 </div>
@@ -146,7 +146,7 @@ content event, identically for every provider.
 </div>
 
 <div class="anyinfer-card" markdown>
-#### Wire request { #wire-request }
+#### Wire Request { #wire-request }
 A fully-resolved request handed to an adapter: concrete model, chosen mechanism, projected
 schema, translated reasoning effort, merged options. See
 [the adapter contract](../contributing/writing-an-adapter.md#the-contract).

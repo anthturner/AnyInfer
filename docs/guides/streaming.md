@@ -1,4 +1,4 @@
-# Stream to a terminal
+# Stream to a Terminal
 
 A stream yields typed [events](../concepts/events.md) while the request runs: text deltas,
 reasoning, timing marks, and attempt failures. This page shows the patterns a terminal
@@ -41,7 +41,7 @@ frontend needs; the full event vocabulary is in the [API reference](../reference
             )
     ```
 
-## Use the context manager
+## Use the Context Manager
 
 Leaving the block early cancels the in-flight request. Without it, an abandoned stream keeps
 generating — and, on a hosted provider, keeps billing:
@@ -55,7 +55,7 @@ with client.stream(prompt, target=target) as stream:
                 break  # the request is cancelled on the way out
 ```
 
-## Show thinking separately
+## Show Thinking Separately
 
 Reasoning models emit a separate channel, excluded from the answer text:
 
@@ -68,7 +68,7 @@ for event in stream:
             print(t, end="", flush=True)
 ```
 
-## Measure time to first token
+## Measure Time to First Token
 
 ```python
 for event in stream:
@@ -80,10 +80,10 @@ TTFT is measured by the core against `time.monotonic()`, identically for every p
 numbers from different backends are directly comparable. To export timings to a metrics
 system rather than print them, see [observability](observability.md).
 
-## Show fallback as it happens
+## Show Fallback as It Happens
 
-When a [fallback chain](fallback.md) is in play, `AttemptFailed` events let you show the
-switch as it happens rather than leaving the user staring at a stalled cursor:
+When a [fallback chain](fallback.md) is in play, `AttemptFailed` events allow you to show
+the switch as it happens rather than leaving the user staring at a stalled cursor:
 
 ```python
 for event in stream:
@@ -94,7 +94,7 @@ for event in stream:
             print(t, end="", flush=True)
 ```
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - Use the context-manager form; leaving the block early cancels the in-flight request
       instead of letting a hosted provider keep generating and billing.
     - Reasoning text arrives as `ReasoningDelta`, a channel separate from the answer, so
@@ -103,7 +103,7 @@ for event in stream:
       are directly comparable.
     - `AttemptFailed` events surface retries and fallback while they happen, not after.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

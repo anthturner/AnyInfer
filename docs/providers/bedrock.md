@@ -5,7 +5,7 @@ icon: material/aws
 
 # AWS Bedrock
 
-The Converse API — Bedrock's unified interface, where one request shape serves Claude,
+The Converse API: Bedrock's unified interface, where one request shape serves Claude,
 Nova, Llama, Mistral, and DeepSeek alike. Generation never uses `InvokeModel` and its
 per-model request bodies; only embeddings do, because Converse has no embeddings surface.
 
@@ -44,14 +44,14 @@ ai.ProviderSettings.of("bedrock", options={"region": "us-west-2"})
 ```
 
 With no explicit key, credentials are resolved in order: explicit `aws_access_key_id` /
-`aws_secret_access_key` options, then `boto3`'s chain if you have it installed (it knows
+`aws_secret_access_key` options, then `boto3`'s chain if it is installed (it knows
 about SSO caches, instance metadata, and profiles), then `AWS_ACCESS_KEY_ID` and friends
-from the environment. Neither `boto3` nor any other SDK is a dependency — signing is
+from the environment. Neither `boto3` nor any other SDK is a dependency; signing is
 implemented against the standard library.
 
 `aws-bedrock:` and `amazon-bedrock:` are accepted aliases.
 
-## Model ids
+## Model Ids
 
 Bedrock accepts base model ids, inference-profile ids, and full ARNs. Cross-region
 inference profiles carry a region prefix:
@@ -64,11 +64,11 @@ client.generate(prompt, target="bedrock:amazon.nova-pro-v1:0")
 Ids containing colons work because [targets](../concepts/targets.md) split on the first
 colon only.
 
-## Binary streaming
+## Binary Streaming
 
 `ConverseStream` answers with AWS's `vnd.amazon.eventstream` framing and offers no SSE or
-JSON alternative. AnyInfer decodes it, including verifying both frame checksums — so
-from your side it is an ordinary stream:
+JSON alternative. AnyInfer decodes it, including verifying both frame checksums; from
+the application's side it is an ordinary stream:
 
 ```python
 with client.stream(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5") as stream:
@@ -84,11 +84,11 @@ with client.stream(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5") as s
     `messageStop`. A client that stopped at the stop reason would report zero tokens for
     every request; AnyInfer reads through to the metadata frame.
 
-## Structured output
+## Structured Output
 
 Converse has no response-format field, so a schema is emulated as a single forced tool
-call — the same approach the [Anthropic adapter](anthropic.md) takes, because the API
-genuinely constrains tool input:
+call (the same approach the [Anthropic adapter](anthropic.md) takes, because the API
+genuinely constrains tool input):
 
 ```python
 result = client.generate(article, target="bedrock:amazon.nova-pro-v1:0", schema=SUMMARY)
@@ -111,17 +111,17 @@ result = client.generate(prompt, target="bedrock:us.anthropic.claude-sonnet-4-5"
 Thinking text arrives as `ReasoningDelta` events and stays out of `result.text`. Models
 without extended thinking ignore the field.
 
-## Provider-specific parameters
+## Provider-Specific Parameters
 
-Anything Converse does not model — Claude's `top_k`, guardrail configuration, a service
-tier — passes through `provider_options`, under keys such as
+Anything Converse does not model (Claude's `top_k`, guardrail configuration, a service
+tier) passes through `provider_options`, under keys such as
 `additionalModelRequestFields` and `guardrailConfig`. See
 [the escape hatch](README.md#reaching-provider-specific-parameters).
 
-## Discovery and health
+## Discovery and Health
 
 Discovery reads the Bedrock **control plane**, a different host than the runtime. An
-account without `bedrock:ListFoundationModels` gets an empty list rather than an error — a
+account without `bedrock:ListFoundationModels` gets an empty list rather than an error; a
 permission gap should not make the provider look broken.
 
 Health makes no network call at all: every runtime endpoint costs a generation, and the
@@ -132,12 +132,12 @@ whether credentials are present.
 
 Bedrock prices per model and per region; the bundled table carries the common `us-east-1`
 on-demand rates for the Nova family and Claude, and `capability_overrides` covers rates
-that differ — see [cost and spending](../concepts/cost.md).
+that differ; see [cost and spending](../concepts/cost.md).
 
 ## Embeddings
 
 Since Converse has no embeddings surface, embeddings go through the older `InvokeModel`
-action — a separate code path from generation, sharing only auth and addressing:
+action (a separate code path from generation, sharing only auth and addressing):
 
 ```python
 result = client.embed(
@@ -168,7 +168,7 @@ never a guessed value.
 
 ## Reranking
 
-Rerank is a third action entirely — `bedrock-agent-runtime`'s `POST /rerank`, a different
+Rerank is a third action entirely: `bedrock-agent-runtime`'s `POST /rerank`, a different
 host than `InvokeModel`/`Converse` (though SigV4-signed under the same `bedrock` service
 name). It is model-agnostic at the wire level: the same request/response shape serves
 both `amazon.rerank-v1:0` and `cohere.rerank-v3-5:0`, selected only by the `modelArn` the
@@ -183,18 +183,18 @@ result = client.rerank(
 )
 ```
 
-## Multimodal inputs
+## Multimodal Inputs
 
 Converse image, document, and audio blocks are used directly. Inline inputs are base64;
 remote image/document references must be S3 URIs. The selected model still decides which
 block types it accepts.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/bedrock.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/bedrock.md).
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

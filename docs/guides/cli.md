@@ -1,4 +1,4 @@
-# Run a prompt from the shell
+# Run a Prompt from the Shell
 
 `anyinfer run` sends one prompt through the same path the library uses
 ([routing](../concepts/routing.md), [fallback](fallback.md),
@@ -12,7 +12,7 @@ anyinfer run "Explain TCP slow start." --config anyinfer.json --target ollama:qw
 
 The reply streams to stdout as it arrives.
 
-## Getting a config file in the first place
+## Getting a Config File in the First Place
 
 `anyinfer init` writes one from what this machine can already do, so the first five
 minutes end in a working call rather than in the configuration reference:
@@ -53,14 +53,14 @@ safe to commit, which `init` says once and then leaves your `.gitignore` alone.
 `anyinfer doctor` reports the same hardware without writing anything, and points here
 when no configuration exists yet.
 
-## Instructions for a coding agent
+## Instructions for a Coding Agent
 
 `anyinfer agents-md` prints a fragment describing how the installed version of this
 library is called, ready to append to a repository's `AGENTS.md` or `CLAUDE.md`. The
 command, its flags, and what the fragment contains are covered in
 [coding agents](coding-agents.md).
 
-## Pointing it at providers
+## Pointing It at Providers
 
 `run` reads the same [shared config file](../reference/configuration.md#file-format)
 the Python SDK and sidecar use, so one file drives all three:
@@ -83,7 +83,7 @@ anyinfer run "Summarize the CAP theorem." --config anyinfer.json
 
 `anyinfer providers` lists every registered provider and the fields each one needs.
 
-## Where the prompt comes from
+## Where the Prompt Comes From
 
 The prompt can be an argument, piped on stdin, or both; stdin is appended, which makes
 the usual Unix shapes work:
@@ -101,7 +101,7 @@ JSON file of `{"role", "content"}` objects:
 anyinfer run "And in one sentence?" --messages history.json --config anyinfer.json
 ```
 
-## Output modes
+## Output Modes
 
 By default the text streams to stdout and nothing else does, so `run` composes:
 
@@ -117,7 +117,7 @@ anyinfer run "Name three primes." --config anyinfer.json > primes.txt
 | `--stats` | Prints timing, token, and cost figures to stderr, leaving stdout clean. |
 | `--show-reasoning` | Prints reasoning deltas to stderr, on models that emit them. |
 
-## Enforcing a JSON schema
+## Enforcing a JSON Schema
 
 Point `--schema` at a JSON Schema file and the reply is validated before you see it,
 using the strongest [mechanism](../concepts/structured-output.md) the provider offers.
@@ -138,7 +138,7 @@ anyinfer run "..." --config anyinfer.json --schema city.json --repair 2
 Schema mode implies `--no-stream`: a JSON document cannot be validated until it is
 complete.
 
-### Attach images, documents, and audio
+### Attach Images, Documents, and Audio
 
 `run` collects attachment files at the CLI boundary and sends typed multimodal parts
 through the same client path as the SDK and sidecar:
@@ -152,7 +152,7 @@ payload ceilings are checked before dispatch, and an adapter that cannot represe
 part fails explicitly instead of dropping it; see
 [multimodal inputs](../concepts/multimodal-inputs.md) for provider coverage.
 
-### Compare fixed targets with an arena
+### Compare Fixed Targets with an Arena
 
 ```console
 anyinfer run "Classify this" --schema schema.json \
@@ -164,7 +164,7 @@ anyinfer run "Classify this" --schema schema.json \
 provider calls. Named policies from the shared configuration use `--arena-name`. See
 [arena runs](../concepts/arena.md) for selection and tool-loop semantics.
 
-## Declaring tools
+## Declaring Tools
 
 `--tool` takes a JSON file declaring one tool, and is repeatable:
 
@@ -190,7 +190,7 @@ anyinfer run "What is the weather in Boston?" \
 call-and-respond cycle, use the [tool loop](tool-loop.md) in a script. `--tool-choice`
 requires or forbids tool use (`auto`, `none`, `required`).
 
-## Routing and fallback
+## Routing and Fallback
 
 `--route` names an ordered fallback chain and is repeatable. The first target that
 succeeds wins, so a local-first setup with a hosted backstop is one line:
@@ -203,7 +203,7 @@ anyinfer run "Draft a commit message." --config anyinfer.json \
 `--route` overrides `--target`, since naming an ordered list is the more specific
 instruction.
 
-## Sampling and limits
+## Sampling and Limits
 
 ```bash
 anyinfer run "Write a haiku about latency." --config anyinfer.json \
@@ -215,7 +215,7 @@ expose it. Parameters a provider or model does not support are dropped rather th
 rejected, since a parameter that does nothing is the failure mode that looks exactly
 like success. Every drop is reported as a warning.
 
-## Costing a request before you send it
+## Costing a Request Before You Send It
 
 `--dry-run` reports what a request would spend and whether it fits, using the same
 [budget calculator](../concepts/budgeting.md) the client holds the real request to:
@@ -241,7 +241,7 @@ estimated cost    0.0138-0.0697 USD
 Nothing is sent, and an unknown figure prints `unknown`, never a plausible default.
 `--json` emits the same information for scripts.
 
-## Embedding and reranking
+## Embedding and Reranking
 
 `anyinfer embed` and `anyinfer rerank` are the operation counterparts of `run`:
 
@@ -251,8 +251,8 @@ $ anyinfer embed --file corpus.txt --target ollama:nomic-embed-text --out vector
 $ anyinfer rerank "which doc covers backoff" --file docs.txt --top-n 3 --target cohere:rerank-v3.5
 ```
 
-Plain output prints a one-line summary to stderr — vector counts, never thousands of
-floats; the full vectors only appear with `--json` or `--out`. Inputs come from a
+Plain output prints a one-line summary to stderr (vector counts, never thousands of
+floats); the full vectors only appear with `--json` or `--out`. Inputs come from a
 positional argument, `--file` (newline-delimited), `--jsonl`, or stdin. Both commands
 accept `--trace` / `--trace-json` for the
 [run manifest](../concepts/run-manifests.md):
@@ -267,9 +267,9 @@ the core. A configured `operation_routes` block supplies the default target when
 `--target` is omitted (see the
 [configuration reference](../reference/configuration.md)).
 
-## Checking a target actually works
+## Checking a Target Actually Works
 
-`anyinfer verify` sends one tiny real request and reports what came back — the thing a
+`anyinfer verify` sends one tiny real request and reports what came back: the thing a
 health check cannot tell you, since a credential can be valid for a model listing and
 useless for inference. It is the CLI face of
 [`verify()`](../concepts/capabilities.md#proving-a-target-works).
@@ -311,7 +311,7 @@ A target known to reason gets a larger probe budget than the ordinary 64 tokens:
 thinking model spends a small budget on reasoning before it says anything, and the
 truncated result would read as an empty answer — a connection failure you do not have.
 
-## Fitting a directory into a prompt
+## Fitting a Directory into a Prompt
 
 `anyinfer context` collects files, reduces them to a budget, and prints the envelope.
 Walking a filesystem and deciding what is safe to send is an application's job; the
@@ -360,7 +360,7 @@ Precedence is config file, then `--preset`, then individual flags; boolean setti
 a `--no-` form to turn off what the file or preset turned on. `--json` prints the
 machine-readable record instead of the envelope, for both modes.
 
-## Exit codes
+## Exit Codes
 
 | Code | Meaning |
 |---|---|
@@ -369,7 +369,7 @@ machine-readable record instead of the envelope, for both modes.
 | `2` | The command was used incorrectly; no prompt, no providers, bad flags. |
 | `130` | Interrupted with `Ctrl-C`. |
 
-!!! tip "Key takeaways"
+!!! tip "Key Takeaways"
     - `anyinfer init` writes a configuration from discovered evidence, with keys as
       `env://` references, so the generated file is safe to commit.
     - `run` composes: reply text on stdout, `--stats` on stderr, `--json` for scripts,
@@ -379,7 +379,7 @@ machine-readable record instead of the envelope, for both modes.
     - `run` reports tool calls but never executes them; automated cycles belong to the
       tool loop in a script.
 
-## See also
+## See Also
 
 <div class="anyinfer-see-also" markdown>
 

@@ -67,7 +67,7 @@ Requested `dimensions` are forwarded (text-embedding-3 and later). OpenAI's requ
 schema has no input-intent concept, so passing `input_type` adds a warning to the result
 rather than silently doing nothing. There is no reranking endpoint on this API.
 
-## Multimodal inputs
+## Multimodal Inputs
 
 Images and files are projected to Responses API `input_image` and `input_file` content
 items. Inline bytes become data URLs; remote URLs stay remote. Audio input is model-specific,
@@ -83,7 +83,7 @@ OpenAI model accepts it.
   [escape hatch](README.md#reaching-provider-specific-parameters):
   `provider_options = {"openai": {"store": False, "service_tier": "flex"}}`.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openai.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai.md).

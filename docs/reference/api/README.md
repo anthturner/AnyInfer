@@ -1,6 +1,6 @@
-# SDK reference
+# SDK Reference
 
-Generated from the docstrings of every public symbol in `anyinfer` — coverage is a CI
+Generated from the docstrings of every public symbol in `anyinfer`; coverage is a CI
 gate, so nothing here is an empty page. The core surface is importable from the
 top-level package; the local, serve, and testing subsystems from their subpackages:
 
@@ -27,5 +27,5 @@ import anyinfer as ai
 | [Vector store add-on](vector-store.md) | `anyinfer_store`: the small-scale embedded vector store, a separate distribution |
 | [Errors](errors.md) | The exception hierarchy and its structured fields |
 
-If you are looking for *how to use* these rather than their signatures, start with the
+For *how to use* these rather than their signatures, start with the
 [concepts](../../concepts/README.md) and [guides](../../guides/README.md).

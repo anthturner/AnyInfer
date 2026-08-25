@@ -51,7 +51,7 @@ send requests the upstream provider silently drops.
 - Upstream routing means the served model may differ from the one requested; the response
   echoes what actually served it.
 
-## Wire contract
+## Wire Contract
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openrouter.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openrouter.md).
