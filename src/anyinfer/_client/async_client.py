@@ -2779,16 +2779,52 @@ class AsyncClient:
         An open session names a target of its own, and a caller who has one rarely wants to
         repeat it on every turn, so it stands in when nothing more specific was given. It
         never *overrides* anything: a session is about reuse, not routing.
+
+        **Naming a target changes where the request goes, not how it is governed.** A
+        caller who configured the client with ``route=Route(..., retry=Retry(
+        max_attempts=5))`` and then passes ``target="openai:gpt-x"`` for one call is
+        redirecting that call, not silently opting out of their own retry policy — so a
+        target-shaped override inherits the default route's policy knobs (`Retry`, the
+        health gate and its TTL) and replaces only the targets. The same applies to the
+        target-shaped spellings of ``route`` (a string, or a sequence of them) and to a
+        session's target.
+
+        A fully constructed `Route`, by contrast, is a complete statement of policy and is
+        honoured exactly as written — that is the spelling to reach for when the intent
+        really is to depart from the client's defaults.
+
+        The specialized chains are deliberately *not* inherited. ``context_window_targets``
+        and ``content_policy_targets`` name other targets, and quietly redirecting to a
+        target this caller did not name would be the same surprise in a different place.
         """
+        if isinstance(route, Route):
+            return route
         if route is not None:
-            return Route.coerce(route)
+            coerced = Route.coerce(route)
+            return self._governed(coerced.targets)
         if target is not None:
-            return Route(targets=(target,))
+            return self._governed((target,))
         if session is not None:
-            return Route(targets=(str(session.target),))
+            return self._governed((str(session.target),))
         if self._default_route is not None:
             return self._default_route
         raise _missing_target_error(self._pool.configured_ids)
+
+    def _governed(self, targets: tuple[Target, ...]) -> Route:
+        """Route to ``targets`` under the default route's policy, if there is one.
+
+        See `_resolve_route` for why a target-shaped override inherits policy but not the
+        specialized fallback chains.
+        """
+        base = self._default_route
+        if base is None:
+            return Route(targets=targets)
+        return Route(
+            targets=targets,
+            retry=base.retry,
+            health_gate=base.health_gate,
+            health_ttl_s=base.health_ttl_s,
+        )
 
     # ---- the routed loop -------------------------------------------------------------
 
