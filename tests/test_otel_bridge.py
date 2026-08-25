@@ -140,6 +140,8 @@ ALL_EVENTS: tuple[TelemetryEvent, ...] = (
     ai.ServerLifecycle("llama-1", "ready"),
     ai.DownloadProgress("artifact-1", 1024, 1024, done=True),
     ai.CredentialRotated("openai", "auth-failure"),
+    ai.BatchSubmitted("msgbatch_1", TARGET, 500),
+    ai.BatchCompleted("msgbatch_1", TARGET, "completed", 498, 2),
 )
 
 

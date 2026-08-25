@@ -24,6 +24,8 @@ __all__ = [
     "ArenaCompleted",
     "AttemptCompleted",
     "AttemptStarted",
+    "BatchCompleted",
+    "BatchSubmitted",
     "CachePlanned",
     "ContextReduced",
     "CredentialRotated",
@@ -469,6 +471,47 @@ class DownloadProgress:
 
 
 @dataclass(frozen=True, slots=True)
+class BatchSubmitted:
+    """A deferred batch was accepted by a provider.
+
+    Payload-free: the line count is a number, and the batch id is the provider's own
+    handle rather than anything derived from the requests. Nothing about what was asked is
+    carried, which is the same rule every other event here follows.
+
+    Attributes:
+        batch_id: The provider's id for the job.
+        target: Where it was submitted.
+        line_count: How many requests went in.
+    """
+
+    batch_id: str
+    target: ResolvedTarget
+    line_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class BatchCompleted:
+    """A finished batch was collected.
+
+    Emitted on *collection*, not completion — nothing here polls, and a batch that
+    finished overnight becomes observable the moment a caller asks for it.
+
+    Attributes:
+        batch_id: The provider's id for the job.
+        target: Where it ran.
+        status: The batch's terminal status.
+        completed: Lines that produced a result.
+        failed: Lines that did not.
+    """
+
+    batch_id: str
+    target: ResolvedTarget
+    status: str
+    completed: int
+    failed: int
+
+
+@dataclass(frozen=True, slots=True)
 class CredentialRotated:
     """A provider instance's credential changed and its adapter was rebuilt.
 
@@ -513,6 +556,8 @@ TelemetryEvent = (
     | RateLimitWaited
     | RateLimitObserved
     | CredentialRotated
+    | BatchSubmitted
+    | BatchCompleted
 )
 """Any event an observer may receive."""
 

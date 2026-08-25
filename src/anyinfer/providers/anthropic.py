@@ -15,6 +15,8 @@ model has started working and the user sees activity) but is excluded from the a
 
 from __future__ import annotations
 
+import json
+import time
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import aclosing
 from typing import Any
@@ -49,16 +51,39 @@ from ..types.messages import (
     ToolResult,
     VideoPart,
 )
+from ..types.operations import (
+    BatchHandle,
+    BatchLine,
+    BatchReport,
+    BatchResult,
+    BatchStatus,
+)
 from ..types.requests import (
     ReasoningEffort,
+    ResolvedTarget,
     Sampling,
     ServerToolKind,
     ServerToolSpec,
     ToolSpec,
 )
-from ..types.results import Citation, FinishReason, ServerToolUse, Usage
+from ..types.results import (
+    DETAIL_MAX_CHARS,
+    Citation,
+    ErrorInfo,
+    FinishReason,
+    Generation,
+    ServerToolUse,
+    Timing,
+    Usage,
+)
 from ._multimodal import base64_data, unsupported
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    BatchWireRequest,
+    ProviderConfig,
+    WireRequest,
+)
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .sse import iter_sse
 
@@ -512,6 +537,173 @@ class AnthropicAdapter:
                 message or "anthropic reported a stream error", provider=self.provider_id
             )
 
+    # ---- batches ---------------------------------------------------------------------
+    #
+    # Anthropic's Message Batches API takes the whole job as JSON — no file upload, no
+    # separate download endpoint for the manifest — so this is the shape the protocol was
+    # designed against. Each line's `params` is exactly the body a live request would have
+    # sent, built by the same `build_payload`, minus the streaming flag a batch cannot use.
+
+    async def submit_batch(self, req: BatchWireRequest) -> BatchHandle:
+        """Submit to ``POST /v1/messages/batches``.
+
+        Raises:
+            anyinfer.errors.ProviderError: The provider refused the submission.
+        """
+        payload = {
+            "requests": [
+                {"custom_id": custom_id, "params": self._batch_params(line)}
+                for custom_id, line in req.lines
+            ]
+        }
+        body = await self._batch_call("POST", "/v1/messages/batches", json=payload)
+        return BatchHandle(
+            batch_id=str(body.get("id", "")),
+            provider_id=self.provider_id,
+            model=req.model,
+            line_count=len(req.lines),
+            submitted_at=time.time(),
+        )
+
+    def _batch_params(self, line: WireRequest) -> dict[str, Any]:
+        """One line's request body: the live shape, with streaming removed.
+
+        A batch is answered whole, so `stream` is meaningless there and Anthropic rejects
+        it. Everything else — tools, system, sampling, cache marks — is identical, which is
+        the point of reusing `build_payload` rather than writing a second translator.
+        """
+        params = self.build_payload(line)
+        params.pop("stream", None)
+        return params
+
+    async def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Report state from ``GET /v1/messages/batches/{id}``."""
+        body = await self._batch_call("GET", f"/v1/messages/batches/{handle.batch_id}")
+        return self._report(handle, body)
+
+    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Ask the provider to cancel, via ``POST .../cancel``."""
+        body = await self._batch_call(
+            "POST", f"/v1/messages/batches/{handle.batch_id}/cancel"
+        )
+        return self._report(handle, body)
+
+    def _report(self, handle: BatchHandle, body: Mapping[str, Any]) -> BatchReport:
+        """Normalize one batch object into a report."""
+        counts = body.get("request_counts")
+        counts = counts if isinstance(counts, Mapping) else {}
+        status = _BATCH_STATUSES.get(str(body.get("processing_status", "")), "in_progress")
+        if status == "completed" and body.get("cancel_initiated_at"):
+            status = "cancelled"
+        return BatchReport(
+            handle=handle,
+            status=status,
+            completed=int(counts.get("succeeded", 0) or 0),
+            failed=int(counts.get("errored", 0) or 0) + int(counts.get("expired", 0) or 0),
+        )
+
+    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+        """Download finished lines from the batch's ``results_url``.
+
+        Raises:
+            anyinfer.errors.ProviderError: The batch has not finished, or the download
+                failed. Refused rather than returning an empty result, which a caller
+                would read as "every line failed".
+        """
+        body = await self._batch_call("GET", f"/v1/messages/batches/{handle.batch_id}")
+        report = self._report(handle, body)
+        if not report.finished:
+            raise ProviderError(
+                f"batch {handle.batch_id} is {report.status}, not finished",
+                provider=self.provider_id,
+                retryable=True,
+                hint="poll batch_status until it reports finished",
+            )
+        results_url = body.get("results_url")
+        if not isinstance(results_url, str) or not results_url:
+            return BatchResult(handle=handle, status=report.status)
+
+        try:
+            response = await self._client.get(results_url)
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                headers=response.headers,
+            )
+        return BatchResult(
+            handle=handle,
+            status=report.status,
+            lines=tuple(self._parse_lines(response.text)),
+        )
+
+    def _parse_lines(self, jsonl: str) -> Iterable[BatchLine]:
+        """Parse the JSONL manifest, one line per submitted request."""
+        for raw in jsonl.splitlines():
+            if not raw.strip():
+                continue
+            try:
+                entry = json.loads(raw)
+            except ValueError:
+                continue
+            if not isinstance(entry, Mapping):
+                continue
+            yield self._parse_line(entry)
+
+    def _parse_line(self, entry: Mapping[str, Any]) -> BatchLine:
+        """Turn one manifest entry into a line, replaying it through the event path.
+
+        A succeeded line's `message` is byte-identical to a non-streaming response, so it
+        is fed through the same chunk translator a live call uses — which is what makes a
+        batched answer carry the same tool calls, usage, and finish reason a live one
+        would, rather than a reduced copy assembled here.
+        """
+        custom_id = str(entry.get("custom_id", ""))
+        result = entry.get("result")
+        if not isinstance(result, Mapping):
+            return BatchLine(custom_id=custom_id, error=_batch_error("malformed result entry"))
+        kind = str(result.get("type", ""))
+        if kind != "succeeded":
+            detail = result.get("error")
+            reason = ""
+            if isinstance(detail, Mapping):
+                reason = str(detail.get("message", "") or detail.get("type", ""))
+            return BatchLine(custom_id=custom_id, error=_batch_error(reason or kind))
+
+        body = result.get("message")
+        if not isinstance(body, Mapping):
+            return BatchLine(custom_id=custom_id, error=_batch_error("result carried no message"))
+        return BatchLine(custom_id=custom_id, result=_generation_from_message(body))
+
+    async def _batch_call(
+        self, method: str, path: str, *, json: Any = None
+    ) -> Mapping[str, Any]:
+        """Issue one batch-control request, classifying failures the usual way.
+
+        Raises:
+            anyinfer.errors.ProviderError: The call failed or returned a non-object body.
+        """
+        try:
+            response = await self._client.request(method, path, json=json)
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                headers=response.headers,
+            )
+        body = response.json()
+        if not isinstance(body, Mapping):
+            raise StreamProtocolError(
+                "anthropic returned a non-object batch body", provider=self.provider_id
+            )
+        return body
+
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
         await self._client.aclose()
@@ -577,6 +769,146 @@ def _option_str(options: Mapping[str, Any], key: str) -> str:
     """Read one option as a stripped string, treating anything else as absent."""
     value = options.get(key)
     return value.strip() if isinstance(value, str) else ""
+
+
+_BATCH_STATUSES: Mapping[str, BatchStatus] = {
+    # Anthropic reports two processing states and nothing else; per-line outcomes live in
+    # the manifest rather than in the batch's own status, which is why `ended` maps to
+    # `completed` even when every line errored.
+    "in_progress": "in_progress",
+    "canceling": "in_progress",
+    "ended": "completed",
+}
+
+
+def _batch_error(detail: str) -> ErrorInfo:
+    """Record one line's failure without inventing a status code for it.
+
+    A batch line's failure is reported in the manifest, not as an HTTP response, so there
+    is no status to carry — and stamping a plausible one would be a fact this library made
+    up about somebody else's system.
+    """
+    return ErrorInfo(
+        type_name="ProviderError",
+        provider="anthropic",
+        phase="generate",
+        retryable=False,
+        http_status=None,
+        detail=detail[:DETAIL_MAX_CHARS],
+    )
+
+
+def _generation_from_message(message: Mapping[str, Any]) -> Generation:
+    """Assemble a `Generation` from one batched message body.
+
+    Reuses this module's own block reader, so a batched answer carries the tool calls,
+    usage, and finish reason a live one would rather than a second, drifting parser.
+
+    Assembled here rather than through the router's attempt buffer, deliberately: an
+    adapter must not import from `anyinfer.routing` — the "adapters never orchestrate"
+    contract enforces exactly that — and a manifest line has nothing to orchestrate anyway.
+    The routing fields a live result carries are genuinely absent: nothing routed, and no
+    clock of ours ran on this side.
+    """
+    state = _StreamState()
+    text: list[str] = []
+    calls: list[ToolCall] = []
+    citations: list[Citation] = []
+    usage = Usage()
+
+    for event in _events_from_message(message, state):
+        if isinstance(event, TextDelta):
+            text.append(event.text)
+        elif isinstance(event, UsageUpdate):
+            usage = usage.merge(event.usage)
+        elif isinstance(event, CitationDelta):
+            citations.append(event.citation)
+        elif isinstance(event, ToolCallDelta):
+            calls.append(
+                ToolCall(
+                    id=event.call_id or f"call_{event.index}",
+                    name=event.name or "",
+                    arguments=_batch_arguments(event.arguments_fragment),
+                )
+            )
+
+    final = state.finalize()
+    if final.usage is not None:
+        usage = usage.merge(final.usage)
+    finish_reason = final.finish_reason
+    if calls and finish_reason == "stop":
+        finish_reason = "tool_calls"
+    return Generation(
+        text="".join(text),
+        structured=None,
+        tool_calls=tuple(calls),
+        target=ResolvedTarget(provider_id="anthropic", model=str(message.get("model", ""))),
+        finish_reason=finish_reason,
+        usage=usage.normalized(),
+        timing=Timing(started_at=0.0, total_ms=0.0),
+        citations=tuple(citations),
+        server_tool_uses=final.server_tool_uses,
+    )
+
+
+def _batch_arguments(fragment: str) -> Mapping[str, Any]:
+    """Parse one batched tool call's arguments, tolerating an unparseable payload.
+
+    A live call's arguments arrive as streamed fragments the router reassembles; here the
+    whole object arrives at once. Either way an argument payload that is not a JSON object
+    yields an empty one rather than failing the line — the rest of the answer is still
+    worth returning.
+    """
+    try:
+        parsed = json.loads(fragment or "{}")
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
+
+
+def _events_from_message(
+    message: Mapping[str, Any], state: _StreamState
+) -> Iterable[TextDelta | ReasoningDelta | ToolCallDelta | CitationDelta | UsageUpdate]:
+    """Translate a buffered message body into the events a stream would have produced."""
+    usage = _parse_usage(message.get("usage"))
+    if usage is not None:
+        state.usage = state.usage.merge(usage)
+        yield UsageUpdate(usage)
+    reason = message.get("stop_reason")
+    if isinstance(reason, str):
+        state.finish_reason = _STOP_REASONS.get(reason, "other")
+
+    content = message.get("content")
+    if not isinstance(content, list):
+        return
+    for index, block in enumerate(content):
+        if not isinstance(block, Mapping):
+            continue
+        kind = block.get("type")
+        if kind == "text":
+            text = block.get("text")
+            if isinstance(text, str) and text:
+                state.answer_length += len(text)
+                yield TextDelta(text)
+            for raw in block.get("citations") or ():
+                citation = _parse_citation(raw, state)
+                if citation is not None:
+                    yield CitationDelta(citation)
+        elif kind == "thinking":
+            thinking = block.get("thinking")
+            if isinstance(thinking, str) and thinking:
+                yield ReasoningDelta(thinking)
+        elif kind == "tool_use":
+            yield ToolCallDelta(
+                index=state.tool_slot(index),
+                call_id=str(block.get("id", "")) or None,
+                name=str(block.get("name", "")) or None,
+                arguments_fragment=json.dumps(block.get("input") or {}),
+            )
+        elif kind == "server_tool_use":
+            tool_kind = _SERVER_TOOL_KINDS.get(str(block.get("name", "")))
+            if tool_kind is not None:
+                state.server_tools[tool_kind] = state.server_tools.get(tool_kind, 0) + 1
 
 
 _SERVER_TOOL_KINDS: Mapping[str, ServerToolKind] = {
@@ -772,6 +1104,7 @@ descriptor = ProviderDescriptor(
     ),
     reasoning_translator=_translate_reasoning,
     ignored_parameters=("seed", "presence_penalty", "frequency_penalty", "logprobs"),
+    operations=frozenset({"generation", "batch"}),
     server_tools=frozenset({"web_search", "code_execution"}),
     default_capabilities=ModelCapabilities(features=Sourced(_ANTHROPIC_FEATURES, "default")),
     # Per-segment `cache_control` marks, up to four breakpoints, with a documented

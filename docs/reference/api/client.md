@@ -41,3 +41,21 @@ surface; the sync client is a facade over the async core (see the
 ::: anyinfer.Tool
 
 </div>
+
+## Deferred Batches
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.BatchGenerationRequest
+
+::: anyinfer.BatchHandle
+
+::: anyinfer.BatchReport
+
+::: anyinfer.BatchResult
+
+::: anyinfer.BatchLine
+
+::: anyinfer.BatchStatus
+
+</div>

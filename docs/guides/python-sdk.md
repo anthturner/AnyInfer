@@ -176,6 +176,51 @@ question a result must answer here is how many invocations you just paid for. St
 callers get a `ServerToolDelta` when one starts and finishes, which is what distinguishes
 a pause for a slow search from a stalled connection.
 
+## Run a Batch at Half Price
+
+Providers sell a deferred tier at roughly half the per-token price, answered within a
+window rather than immediately. That is the shape of an eval, a backfill, or an offline
+enrichment run:
+
+```python
+batch = ai.BatchGenerationRequest(
+    requests=tuple(
+        ai.GenerationRequest(messages=(ai.user(question),), schema=Answer)
+        for question in questions
+    ),
+    custom_ids=tuple(row_ids),
+)
+handle = client.submit_batch(batch, target="anthropic:claude-sonnet-4-5")
+save_somewhere(handle)          # AnyInfer stores nothing
+```
+
+Each line is the same `GenerationRequest` a live call takes, translated through the same
+wire builder — so a batched request carries the schema, tools, cache marks, and reasoning
+effort its live twin would. That is the whole argument for batching *through* this library
+rather than around it: the typed request model and cost accounting are more valuable on
+your highest-volume traffic, not less.
+
+The handle is yours to persist. Run retention is a stated non-goal, and a job answered
+hours later in another process is exactly where it would be most tempting to break it —
+so there is no registry here to look it up in later.
+
+```python
+report = client.batch_status(handle)
+if report.finished:
+    result = client.fetch_batch(handle)
+    for line in result.lines:
+        ...
+```
+
+Polling and fetching are separate calls because their costs are: a provider charges
+nothing to ask about a job and real bandwidth to download one, and a caller waiting on a
+24-hour window asks many times and fetches once.
+
+Lines come back in **submission** order even though providers return them in completion
+order, so you can zip results against your own inputs without sorting. A batch is not
+all-or-nothing: `result.succeeded` and `result.failed` split the lines, because providers
+run and bill what worked even when one request was malformed.
+
 ## Handle Failures
 
 All public failures derive from `AnyInferError` and carry structured fields. Branch on

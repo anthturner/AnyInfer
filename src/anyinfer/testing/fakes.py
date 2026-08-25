@@ -1037,6 +1037,13 @@ class FakeAnthropicServer(_FakeServerBase):
             exhausted, so a single-element list serves every request.
         models: Model ids reported by ``GET /v1/models``.
         chunk_size: Characters per streamed text delta.
+        batch_polls_before_done: How many status polls a submitted batch reports
+            ``in_progress`` for before it ends. At least one, so a caller must always poll
+            at least once — a fake that ended immediately could never exercise the
+            poll-then-fetch shape that is the whole point of a deferred API.
+        batch_failures: How many of a batch's lines come back as per-line errors. A batch
+            is not all-or-nothing, and a result type that could not carry a partial failure
+            would force the whole job to be discarded over one bad request.
         page_size: Model ids per listing page. The listing is cursor-paginated, and an
             adapter that ignores ``has_more`` silently reports only the first page --
             which looks like a working discovery call.
@@ -1052,11 +1059,18 @@ class FakeAnthropicServer(_FakeServerBase):
         models: Sequence[str] = ("claude-sonnet-4-5", "claude-opus-4-1"),
         chunk_size: int = 4,
         page_size: int = 1,
+        batch_polls_before_done: int = 1,
+        batch_failures: int = 0,
     ) -> None:
         super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
         self._page_size = max(1, page_size)
+        self.batch_polls_before_done = max(1, batch_polls_before_done)
+        self.batch_failures = batch_failures
+        self._batch_lines: list[str] = []
+        self._batch_polls = 0
+        self._batch_cancelled = False
 
     def next_response(self) -> FakeResponse:
         """The response for the next generation call."""
@@ -1069,9 +1083,98 @@ class FakeAnthropicServer(_FakeServerBase):
             return self._handle_models(request)
         if path.endswith("/v1/messages"):
             return self._handle_messages(request)
+        if "/v1/messages/batches" in path or path.endswith("/batch-results"):
+            return self._handle_batch(request)
         return httpx2.Response(
             404, json={"type": "error", "error": {"type": "not_found", "message": path}}
         )
+
+    # ---- batches ---------------------------------------------------------------------
+    #
+    # A whole deferred job in one in-process fake: submit, poll, cancel, and download. The
+    # state machine is deliberately real — a batch reports `in_progress` until it is polled
+    # `batch_polls_before_done` times — because the property worth testing is that a caller
+    # polls to a terminal status and only then fetches, which a fake that answered
+    # `ended` immediately could never exercise.
+
+    def _handle_batch(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/batch-results"):
+            return httpx2.Response(200, text=self._batch_manifest())
+        if request.method == "POST" and path.endswith("/v1/messages/batches"):
+            body = json.loads(request.content or b"{}")
+            self.requests.append(body)
+            self._batch_lines = [str(entry.get("custom_id", "")) for entry in body["requests"]]
+            self._batch_polls = 0
+            self._batch_cancelled = False
+            return httpx2.Response(200, json=self._batch_object())
+        if path.endswith("/cancel"):
+            self._batch_cancelled = True
+            return httpx2.Response(200, json=self._batch_object())
+        self._batch_polls += 1
+        return httpx2.Response(200, json=self._batch_object())
+
+    def _batch_object(self) -> dict[str, Any]:
+        """The batch as the API reports it right now."""
+        done = self._batch_cancelled or self._batch_polls >= self.batch_polls_before_done
+        failures = min(self.batch_failures, len(self._batch_lines))
+        body: dict[str, Any] = {
+            "id": "msgbatch_fake",
+            "type": "message_batch",
+            "processing_status": "ended" if done else "in_progress",
+            "request_counts": {
+                "succeeded": len(self._batch_lines) - failures if done else 0,
+                "errored": failures if done else 0,
+                "expired": 0,
+                "processing": 0 if done else len(self._batch_lines),
+            },
+        }
+        if self._batch_cancelled:
+            body["cancel_initiated_at"] = "2026-08-25T00:00:00Z"
+        if done:
+            body["results_url"] = "https://fake.invalid/batch-results"
+        return body
+
+    def _batch_manifest(self) -> str:
+        """The JSONL manifest, in *completion* order — which is not submission order.
+
+        Reversed on purpose. Providers return whatever finished first, and a caller zipping
+        results against their own inputs must not have to sort; that ordering is the core's
+        job and this is what proves it does it.
+        """
+        response = self.next_response()
+        failures = min(self.batch_failures, len(self._batch_lines))
+        entries: list[dict[str, Any]] = []
+        for position, custom_id in enumerate(self._batch_lines):
+            if position < failures:
+                entries.append(
+                    {
+                        "custom_id": custom_id,
+                        "result": {
+                            "type": "errored",
+                            "error": {"type": "invalid_request", "message": "line rejected"},
+                        },
+                    }
+                )
+                continue
+            entries.append(
+                {
+                    "custom_id": custom_id,
+                    "result": {
+                        "type": "succeeded",
+                        "message": {
+                            "id": f"msg_{custom_id}",
+                            "type": "message",
+                            "role": "assistant",
+                            "model": "fake-claude",
+                            "content": [{"type": "text", "text": f"{response.text} #{custom_id}"}],
+                            "stop_reason": "end_turn",
+                            "usage": {"input_tokens": 11, "output_tokens": 7},
+                        },
+                    },
+                }
+            )
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
 
     def _handle_models(self, request: httpx2.Request) -> httpx2.Response:
         after = request.url.params.get("after_id")

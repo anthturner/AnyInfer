@@ -83,6 +83,10 @@ OpenTelemetry bridge below instead.
 
 ::: anyinfer.CredentialRotated
 
+::: anyinfer.BatchSubmitted
+
+::: anyinfer.BatchCompleted
+
 </div>
 
 ## Redaction

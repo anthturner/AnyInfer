@@ -116,6 +116,25 @@ Verified 2026-08-09 against https://platform.claude.com/docs/en/api/rate-limits 
   reporting `start_char_index` as an answer offset would be a different claim entirely.
 - Fields read: `cited_text`, `document_index`, `document_title`.
 
+### Message Batches (added 2026-08-25)
+
+- `POST /v1/messages/batches` takes `{requests: [{custom_id, params}]}` where `params` is
+  exactly a Messages body **minus `stream`**, which a batch cannot use and the API rejects.
+  No file upload and no separate manifest endpoint, unlike OpenAI's Batch API.
+- `GET /v1/messages/batches/{id}` reports `processing_status` — only `in_progress`,
+  `canceling`, and `ended` — plus `request_counts` with `succeeded`/`errored`/`expired`/
+  `processing`. Per-line outcomes are **not** in the batch status, which is why `ended`
+  normalizes to `completed` even when every line errored.
+- A cancelled batch is `ended` with `cancel_initiated_at` set; that pairing is what
+  distinguishes it from a natural completion.
+- `POST /v1/messages/batches/{id}/cancel` requests cancellation.
+- Results are a JSONL manifest at the batch's own `results_url`, one entry per line:
+  `{custom_id, result: {type: "succeeded"|"errored"|"expired"|"canceled", message?, error?}}`.
+  A succeeded entry's `message` is byte-identical to a non-streaming response, so the
+  adapter replays it through the same event translator a live call uses rather than
+  parsing it a second way.
+- **Manifest order is completion order, not submission order.** The core re-sorts.
+
 ## Watchlist
 - Rate-limit header names and the RFC 3339 reset format; whether the `tokens` pair keeps
   its "most restrictive limit in effect" meaning

@@ -20,6 +20,8 @@ from .events.telemetry import (
     ArenaCompleted,
     AttemptCompleted,
     AttemptStarted,
+    BatchCompleted,
+    BatchSubmitted,
     CachePlanned,
     ContextReduced,
     CredentialRotated,
@@ -315,6 +317,29 @@ class OTelObserver:
         if event.resets_in_s is not None:
             attributes[f"{GEN_AI}.anyinfer.resets_in_s"] = event.resets_in_s
         self._standalone("rate_limit.observed", attributes).end()
+
+    def _on_BatchSubmitted(self, event: BatchSubmitted) -> None:  # noqa: N802
+        self._standalone(
+            "batch.submitted",
+            {
+                f"{GEN_AI}.system": event.target.provider_id,
+                f"{GEN_AI}.request.model": event.target.model,
+                f"{GEN_AI}.anyinfer.batch_id": event.batch_id,
+                f"{GEN_AI}.anyinfer.line_count": event.line_count,
+            },
+        ).end()
+
+    def _on_BatchCompleted(self, event: BatchCompleted) -> None:  # noqa: N802
+        self._standalone(
+            "batch.completed",
+            {
+                f"{GEN_AI}.system": event.target.provider_id,
+                f"{GEN_AI}.anyinfer.batch_id": event.batch_id,
+                f"{GEN_AI}.anyinfer.batch_status": event.status,
+                f"{GEN_AI}.anyinfer.completed_lines": event.completed,
+                f"{GEN_AI}.anyinfer.failed_lines": event.failed,
+            },
+        ).end()
 
     def _on_CredentialRotated(self, event: CredentialRotated) -> None:  # noqa: N802
         # A provider-lifecycle fact, not a request one: the rotation happened underneath

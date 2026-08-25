@@ -28,12 +28,13 @@ never rewritten.
 - `anyinfer models prune` proposes least-recently-used deletions to fit a disk budget.
 - The sidecar serves `POST /v1/responses`, OpenAI's current-generation dialect, with
   its semantic streaming events — so a Responses-first SDK no longer 404s.
-- Provider-run tools: `server_tools=` asks a target to search the web or execute code
-  inside one request, with the invocation counts reported back.
+- Provider-run tools: `server_tools=` asks a target to search the web or run code inside
+  one request, reporting the invocation counts back.
+- Deferred batch inference at a provider's discounted batch tier, via `submit_batch()`,
+  `batch_status()`, and `fetch_batch()`. Anthropic is the first binding.
 - Telemetry sinks, plugin groups, proxy and TLS settings, and a decision log.
-- The confidential Relay paces and bounds its own traffic: pooled provider pacing
-  that survives a per-call client, per-tenant admission limits, and 429 responses
-  carrying `Retry-After` and standard `RateLimit-*` headers.
+- The confidential Relay paces and bounds its own traffic: pooled provider pacing,
+  per-tenant admission limits, and 429s carrying `Retry-After` and `RateLimit-*` headers.
 
 ### Fixed
 - The demo app no longer persists literal API keys, and writes its configuration with

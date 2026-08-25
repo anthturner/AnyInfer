@@ -54,7 +54,11 @@ from ..session import Session
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
 from ..types.operations import (
+    BatchGenerationRequest,
+    BatchHandle,
     BatchPolicy,
+    BatchReport,
+    BatchResult,
     EmbeddingInputIntent,
     EmbeddingResult,
     EmbeddingSpace,
@@ -757,6 +761,26 @@ class Client:
                 manifest=manifest,
             )
         )
+
+    def submit_batch(self, batch: BatchGenerationRequest, *, target: Target) -> BatchHandle:
+        """Submit a batch. See `AsyncClient.submit_batch()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.submit_batch(batch, target=target))
+
+    def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Ask where a batch is. See `AsyncClient.batch_status()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.batch_status(handle))
+
+    def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+        """Download a finished batch. See `AsyncClient.fetch_batch()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.fetch_batch(handle))
+
+    def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Cancel a batch. See `AsyncClient.cancel_batch()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.cancel_batch(handle))
 
     def embed(
         self,

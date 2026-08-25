@@ -80,7 +80,7 @@ batch.
 
 | Status | ID | Was | Item | Sev | Pri | Score | Effort |
 |---|---|---|---|---|---|---|---|
-| `[ ]` | E.1 | E.1 | Async batch inference APIs (OpenAI Batch, Anthropic Message Batches) | 5 | 3 | 15 | XL |
+| ✅ | E.1 | E.1 | Async batch inference APIs (OpenAI Batch, Anthropic Message Batches) | 5 | 3 | 15 | XL |
 | `[ ]` | F.1 | F.1 | Tier 3 attestation is detection, not attestation (→ plan §G) | 5 | 3 | 15 | XL (→ §G) |
 | `[ ]` | G.3 | G.4 | CPU attestation-quote verification behind the `attest` extra | 5 | 3 | 15 | L |
 | ✅ | E.2 | E.2 | Typed `seed` / `logprobs` / penalty sampling controls | 4 | 3 | 12 | L |
@@ -595,9 +595,17 @@ Two scope decisions are recorded rather than left implicit:
   quietly loosened for one modality no longer means what its name says, and the
   hosted-URI path providers actually expect carries no bytes to count.
 
-**E.5 and E.3 closed later in the same wave**: the Responses route with its semantic
-streaming events, and provider-run server tools across the Anthropic, Responses, and Gemini
-dialects. **E.1 alone remains open.**
+**E.5, E.3, and E.1 closed later in the same wave**, so **section E is now empty**: the
+Responses route with its semantic streaming events, provider-run server tools across three
+dialects, and deferred batch inference.
+
+E.1's scope, stated so its limits are not mistaken for oversights. The types, the
+`SubmitsBatches` protocol, the client surface, and the lifecycle events are complete and
+provider-agnostic; **Anthropic is the only adapter bound so far.** Its Message Batches API
+takes the whole job as JSON, which is the shape the protocol was designed against. OpenAI's
+Batch API needs a JSONL upload to `/v1/files` and a separate download of an output file —
+the same protocol, two more round trips and a file lifecycle — and Bedrock's needs S3 on
+both ends. Both are additive work behind an interface that already exists, not redesigns.
 
 E.3 introduced one thing worth knowing about: `ProviderDescriptor.server_tools` is checked
 *unconditionally*, unlike a capability flag. Ninety-five registered adapters never read the
@@ -614,33 +622,6 @@ non-goals list remains honored and re-verified: response/semantic caching, image
 templating, cross-provider continuation, run retention, non-Python SDKs — none of these are
 misses; do not "fix" them. Everything below was re-verified absent on 2026-08-25 (v2) by
 grep against current source.
-
-## E.1 — Async batch inference APIs (OpenAI Batch, Anthropic Message Batches)
-
-**Severity:** High · **Confidence:** High · **Was:** E.1
-
-**Expected because:** every major provider sells a ~50%-discounted deferred batch tier, and
-AnyInfer's identity is cost-aware dispatch (pricing tables, `SpendPolicy`, `SpendLedger`,
-per-request cost estimation). Evals, backfills, and offline enrichment are this audience's
-staple workloads. **Evidence of absence (re-verified):**
-`grep -rniE "message_batch|/batches|batch_id" src/anyinfer` → zero hits; every "batch" in
-the codebase is synchronous embedding-input splitting or llama-server tuning. Not a stated
-non-goal.
-
-**Long:** The typed request model, capability provenance, and pricing tables are *more*
-valuable in batch mode, yet the library cannot express "submit these 10k requests at half
-price" — users drop to raw provider SDKs and lose structured-output enforcement, telemetry,
-and cost accounting on their highest-volume traffic.
-
-**Remediation sketch:**
-- [ ] **E.1.1** New operation type per the embeddings pattern: `BatchGenerationRequest →
-  BatchHandle → BatchResult`, an opt-in `SubmitsBatches` protocol adapters implement
-  individually (OpenAI, Anthropic, Bedrock, Vertex, Groq all ship batch endpoints),
-  descriptor-declared.
-- [ ] **E.1.2** Reuse `GenerationRequest` as the line-item type and existing codecs for
-  serialization; typed submitted/completed lifecycle events.
-- [ ] **E.1.3** The run-retention non-goal holds: AnyInfer never persists the job registry —
-  the handle is the caller's to store.
 
 # F. Security posture
 

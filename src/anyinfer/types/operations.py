@@ -18,16 +18,23 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from .requests import DEFAULT_TIMEOUT_S, ResolvedTarget
-from .results import AttemptRecord, Timing, Usage
+from .requests import DEFAULT_TIMEOUT_S, GenerationRequest, ResolvedTarget
+from .results import AttemptRecord, ErrorInfo, Generation, Timing, Usage
 
 __all__ = [
     "DEFAULT_MAX_DOCUMENTS",
     "DEFAULT_MAX_EMBEDDING_INPUTS",
     "DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES",
     "DEFAULT_MAX_RERANK_RESPONSE_BYTES",
+    "TERMINAL_BATCH_STATUSES",
     "BatchFailure",
+    "BatchGenerationRequest",
+    "BatchHandle",
+    "BatchLine",
     "BatchPolicy",
+    "BatchReport",
+    "BatchResult",
+    "BatchStatus",
     "EmbeddingCapabilities",
     "EmbeddingInputIntent",
     "EmbeddingRequest",
@@ -44,7 +51,7 @@ __all__ = [
     "rerank_conjunction",
 ]
 
-InferenceOperation = Literal["generation", "embedding", "rerank"]
+InferenceOperation = Literal["generation", "embedding", "rerank", "batch"]
 """The inference operations AnyInfer models as first-class primitives."""
 
 EmbeddingInputIntent = Literal["query", "document", "classification", "clustering"]
@@ -381,6 +388,180 @@ class BatchFailure:
     item_count: int
     succeeded: bool
     error: str | None = None
+
+
+BatchStatus = Literal["queued", "in_progress", "completed", "failed", "expired", "cancelled"]
+"""Where a deferred batch is in its life, normalized across providers.
+
+Terminal states are ``completed``, ``failed``, ``expired``, and ``cancelled``: a provider
+that reports something else has moved, and the mapping is the adapter's to update rather
+than the caller's to guess at.
+"""
+
+TERMINAL_BATCH_STATUSES: frozenset[BatchStatus] = frozenset(
+    {"completed", "failed", "expired", "cancelled"}
+)
+"""Statuses from which a batch will never move again, so polling can stop."""
+
+
+@dataclass(frozen=True, slots=True)
+class BatchGenerationRequest:
+    """A set of generation requests submitted together for deferred, discounted execution.
+
+    Every major provider sells a batch tier at roughly half price on a delayed completion
+    window, which is exactly the shape of the workloads this library's audience runs —
+    evals, backfills, offline enrichment. Without this they drop to a raw provider SDK for
+    their highest-volume traffic and lose structured-output enforcement, capability
+    provenance, and cost accounting on precisely the requests where those matter most.
+
+    The line-item type is `GenerationRequest` itself, not a
+    reduced copy of it. A batched request is the same request with a later answer, and a
+    parallel type would drift from the one every adapter already knows how to translate.
+
+    Attributes:
+        requests: The generation requests to run, in order. Their positions are what
+            ``custom_ids`` defaults to, and what a result's lines are ordered by.
+        custom_ids: Caller-chosen ids correlating each line to its result. Defaults to the
+            request's index as a string. Supply your own when the results will be joined
+            against something else — a row id, a document key — because a provider returns
+            them in *completion* order, not submission order.
+        completion_window: How long the provider may take, in its own vocabulary
+            (``"24h"``). ``None`` sends nothing and takes the provider's default.
+        metadata: Opaque labels carried to the provider where it accepts them, and echoed
+            in telemetry.
+    """
+
+    requests: tuple[GenerationRequest, ...]
+    custom_ids: tuple[str, ...] = ()
+    completion_window: str | None = "24h"
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Reject a batch no provider could run, or whose lines cannot be correlated.
+
+        Raises:
+            ValueError: The batch is empty, the id count disagrees with the request count,
+                or an id repeats. A duplicate id is refused rather than tolerated because
+                results come back keyed by it: two lines sharing one id are two answers
+                the caller cannot tell apart.
+        """
+        if not self.requests:
+            raise ValueError("a batch must carry at least one request")
+        if self.custom_ids and len(self.custom_ids) != len(self.requests):
+            raise ValueError("custom_ids must have one entry per request when supplied")
+        if len(set(self.custom_ids)) != len(self.custom_ids):
+            raise ValueError("custom_ids must be unique; results are correlated by them")
+
+    @property
+    def line_ids(self) -> tuple[str, ...]:
+        """The id for each line, defaulting to its index."""
+        return self.custom_ids or tuple(str(index) for index in range(len(self.requests)))
+
+
+@dataclass(frozen=True, slots=True)
+class BatchHandle:
+    """What a caller keeps in order to reclaim a batch later.
+
+    **AnyInfer stores no job registry.** Run retention is a stated non-goal, and a deferred
+    batch is exactly where it would be most tempting to break it — the answer arrives hours
+    later, in another process. So the handle is a plain value the caller persists wherever
+    they already persist their own work, and every batch call takes one back. Losing it
+    means asking the provider, not asking us.
+
+    Attributes:
+        batch_id: The provider's own id for the job.
+        provider_id: Which configured provider instance it was submitted to. Needed to
+            reclaim it: the id is meaningless anywhere else.
+        model: The model every line was submitted against.
+        line_count: How many requests went in, so a partial result is recognizable as one.
+        submitted_at: Unix timestamp of submission, for a caller's own bookkeeping.
+    """
+
+    batch_id: str
+    provider_id: str
+    model: str
+    line_count: int
+    submitted_at: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class BatchReport:
+    """A batch's current state, without its results.
+
+    Separate from `BatchResult` because polling should be cheap: providers charge nothing
+    to ask about a job and meaningful bandwidth to download one, and a caller waiting on a
+    24-hour window will ask many times and fetch once.
+
+    Attributes:
+        handle: The batch this describes.
+        status: Where it is now.
+        completed: Lines finished successfully, when the provider reports counts.
+        failed: Lines that failed, when the provider reports counts.
+        detail: A provider-supplied explanation for a terminal failure; empty otherwise.
+    """
+
+    handle: BatchHandle
+    status: BatchStatus
+    completed: int = 0
+    failed: int = 0
+    detail: str = ""
+
+    @property
+    def finished(self) -> bool:
+        """Whether this batch will never change state again."""
+        return self.status in TERMINAL_BATCH_STATUSES
+
+
+@dataclass(frozen=True, slots=True)
+class BatchLine:
+    """One line's outcome within a finished batch.
+
+    Exactly one of ``result`` and ``error`` is set. A batch is not all-or-nothing —
+    providers run and bill the lines that succeeded even when others failed — so a line
+    type that could not carry a per-line failure would force the whole batch to be
+    discarded over one bad request.
+
+    Attributes:
+        custom_id: The id this line was submitted under.
+        result: The generation, when this line succeeded.
+        error: What went wrong, when it did.
+    """
+
+    custom_id: str
+    result: Generation | None = None
+    error: ErrorInfo | None = None
+
+    @property
+    def ok(self) -> bool:
+        """Whether this line produced a result."""
+        return self.result is not None
+
+
+@dataclass(frozen=True, slots=True)
+class BatchResult:
+    """A finished batch's lines, correlated back to what was submitted.
+
+    Attributes:
+        handle: The batch these lines belong to.
+        status: The batch's terminal status.
+        lines: One entry per line the provider returned, in *submission* order rather than
+            the completion order providers return them in — a caller zipping results
+            against their own inputs should not have to sort first.
+    """
+
+    handle: BatchHandle
+    status: BatchStatus
+    lines: tuple[BatchLine, ...] = ()
+
+    @property
+    def succeeded(self) -> tuple[BatchLine, ...]:
+        """Only the lines that produced a result."""
+        return tuple(line for line in self.lines if line.ok)
+
+    @property
+    def failed(self) -> tuple[BatchLine, ...]:
+        """Only the lines that failed."""
+        return tuple(line for line in self.lines if not line.ok)
 
 
 @dataclass(frozen=True, slots=True)

@@ -26,7 +26,12 @@ from ..types.events import (
     UsageUpdate,
 )
 from ..types.messages import Message
-from ..types.operations import EmbeddingInputIntent
+from ..types.operations import (
+    BatchHandle,
+    BatchReport,
+    BatchResult,
+    EmbeddingInputIntent,
+)
 from ..types.requests import Sampling, ServerToolSpec, ToolSpec
 from ..types.results import (
     Diagnostic,
@@ -43,6 +48,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AdapterEvent",
     "AdapterFinal",
+    "BatchWireRequest",
     "EmbeddingWireRequest",
     "EmbeddingWireResult",
     "EmbedsText",
@@ -54,6 +60,7 @@ __all__ = [
     "RerankWireRequest",
     "RerankWireResult",
     "ReranksText",
+    "SubmitsBatches",
     "SupportsDiagnostics",
     "WireRankedItem",
     "WireRequest",
@@ -461,6 +468,71 @@ class ReranksText(Protocol):
             anyinfer.errors.ProviderError: With ``retryable``/``retry_after_s`` set.
         """
         ...
+
+
+@runtime_checkable
+class SubmitsBatches(Protocol):
+    """Deferred, discounted execution of many generations at once.
+
+    Opt-in and separate from `GeneratesText` because the two are genuinely different
+    protocols, not one with a flag: a batch endpoint takes a whole job, returns an id, and
+    answers hours later, where generation takes one request and streams. An adapter
+    implements this only if its provider sells a batch tier, and its descriptor declares
+    ``"batch"`` in ``operations``.
+
+    Every method takes or returns a `BatchHandle` rather than
+    consulting anything the adapter remembers. That is what keeps the run-retention
+    non-goal intact through a feature whose whole shape invites breaking it: the answer
+    arrives in another process hours later, and the caller is the only one who stored
+    anything.
+    """
+
+    async def submit_batch(self, req: BatchWireRequest) -> BatchHandle:
+        """Submit a batch and return the handle that reclaims it.
+
+        Raises:
+            anyinfer.errors.ProviderError: The provider refused the submission.
+        """
+        ...
+
+    async def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Report a batch's current state without downloading its results."""
+        ...
+
+    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+        """Download a finished batch's lines.
+
+        Raises:
+            anyinfer.errors.ProviderError: The batch is not finished, or the download
+                failed.
+        """
+        ...
+
+    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Ask the provider to stop a batch, returning its state after the request."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class BatchWireRequest:
+    """A batch resolved for one provider: its lines, already translated.
+
+    Each line is a `WireRequest` — the same fully-resolved shape a live generation would
+    send, so an adapter's batch path serializes exactly what its streaming path would have
+    sent, through the same `build_payload`.
+
+    Attributes:
+        model: The model every line runs against.
+        lines: ``(custom_id, wire request)`` pairs, in submission order.
+        completion_window: The provider's own vocabulary for how long it may take, or
+            ``None`` for its default.
+        metadata: Opaque labels, passed to providers that accept them.
+    """
+
+    model: str
+    lines: tuple[tuple[str, WireRequest], ...]
+    completion_window: str | None = "24h"
+    metadata: Mapping[str, str] = field(default_factory=dict)
 
 
 @runtime_checkable

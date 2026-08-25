@@ -28,6 +28,7 @@ from ..providers.base import (
     ProviderConfig,
     ProviderLifecycle,
     ReranksText,
+    SubmitsBatches,
 )
 from ..registry import ProviderDescriptor, ProviderRegistry, normalize_provider_id
 from ..routing.limits import GoverningTransport, RateLimiter
@@ -488,6 +489,7 @@ class AdapterPool:
             "generation": GeneratesText,
             "embedding": EmbedsText,
             "rerank": ReranksText,
+            "batch": SubmitsBatches,
         }
         for operation in descriptor.operations:
             protocol = checks.get(operation)

@@ -70,6 +70,8 @@ from ..errors import (
 from ..evaluate.compare import EmbeddingTargetComparison, TargetComparison
 from ..events.observers import EventDispatcher, Observer
 from ..events.telemetry import (
+    BatchCompleted,
+    BatchSubmitted,
     DownloadProgress,
     ProviderDiagnostic,
     TelemetryEvent,
@@ -84,8 +86,10 @@ from ..local.variants import VariantPrefs
 from ..manifest import DroppedParameter, ManifestBuilder
 from ..providers.base import (
     AdapterFinal,
+    BatchWireRequest,
     GeneratesText,
     ProviderAdapter,
+    SubmitsBatches,
 )
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.health import HealthCache
@@ -119,7 +123,12 @@ from ..types.messages import (
 from ..types.operations import (
     DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES,
     DEFAULT_MAX_RERANK_RESPONSE_BYTES,
+    BatchGenerationRequest,
+    BatchHandle,
+    BatchLine,
     BatchPolicy,
+    BatchReport,
+    BatchResult,
     EmbeddingCapabilities,
     EmbeddingInputIntent,
     EmbeddingRequest,
@@ -1418,6 +1427,141 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             request, resolved_route, session=session, manifest=manifest
         )
 
+    async def submit_batch(
+        self,
+        batch: BatchGenerationRequest,
+        *,
+        target: Target,
+    ) -> BatchHandle:
+        """Submit a batch for deferred, discounted execution.
+
+        Every major provider sells this tier at roughly half price on a delayed window,
+        which is the shape of an eval, a backfill, or an offline enrichment run. Each line
+        is translated through the same wire builder a live call uses, so a batched request
+        carries the schema, tools, cache marks, and reasoning effort its live twin would.
+
+        **Nothing is stored here.** The returned handle is the caller's to persist,
+        wherever they already persist their own work. Run retention is a stated non-goal,
+        and a job answered hours later in another process is exactly where it would be
+        most tempting to break it.
+
+        Args:
+            batch: The requests to run together.
+            target: Where to run them. One target for the whole batch: a provider's batch
+                endpoint takes one model, and splitting across targets would be routing,
+                which a deferred job cannot do — there is no failure to fall back from
+                until hours later.
+
+        Returns:
+            The handle that reclaims this batch.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+            anyinfer.errors.ProviderError: The provider refused the submission.
+        """
+        resolved = self.resolve(target)
+        adapter = await self._batch_adapter(resolved)
+        descriptor = self._pool.descriptor_for(resolved.provider_id)
+        capabilities = self._capabilities_for(descriptor, resolved)
+
+        lines = tuple(
+            (
+                custom_id,
+                build_wire_request(
+                    request,
+                    resolved,
+                    descriptor,
+                    capabilities=capabilities,
+                    # A batch is answered whole; there is no stream to consume.
+                    stream=False,
+                ),
+            )
+            for custom_id, request in zip(batch.line_ids, batch.requests, strict=True)
+        )
+        handle = await adapter.submit_batch(
+            BatchWireRequest(
+                model=resolved.model,
+                lines=lines,
+                completion_window=batch.completion_window,
+                metadata=dict(batch.metadata),
+            )
+        )
+        self._emit(
+            BatchSubmitted(
+                batch_id=handle.batch_id,
+                target=resolved,
+                line_count=handle.line_count,
+            )
+        )
+        return handle
+
+    async def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Ask where a batch is, without downloading its results.
+
+        Polling is cheap and fetching is not — providers charge nothing to ask about a job
+        and real bandwidth to download one — so a caller waiting on a 24-hour window asks
+        many times and fetches once.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+        """
+        adapter = await self._batch_adapter(self._batch_target(handle))
+        return await adapter.batch_status(handle)
+
+    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+        """Download a finished batch's lines, in submission order.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+            anyinfer.errors.ProviderError: The batch has not finished.
+        """
+        adapter = await self._batch_adapter(self._batch_target(handle))
+        result = await adapter.fetch_batch(handle)
+        ordered = _ordered_lines(result)
+        self._emit(
+            BatchCompleted(
+                batch_id=handle.batch_id,
+                target=self._batch_target(handle),
+                status=result.status,
+                completed=len(result.succeeded),
+                failed=len(result.failed),
+            )
+        )
+        return ordered
+
+    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Ask the provider to stop a batch, returning its state afterwards.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+        """
+        adapter = await self._batch_adapter(self._batch_target(handle))
+        return await adapter.cancel_batch(handle)
+
+    def _batch_target(self, handle: BatchHandle) -> ResolvedTarget:
+        """The target a handle names, reconstructed without re-resolving an alias.
+
+        A handle records the *instance* it was submitted to, not the alias the caller may
+        have typed, because an alias can be repointed between submission and collection —
+        and a batch reclaimed from the wrong account is somebody else's job.
+        """
+        return ResolvedTarget(provider_id=handle.provider_id, model=handle.model)
+
+    async def _batch_adapter(self, resolved: ResolvedTarget) -> SubmitsBatches:
+        """Fetch a provider's adapter and narrow it to the batch protocol.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+        """
+        adapter = await self._pool.get(resolved.provider_id)
+        if not isinstance(adapter, SubmitsBatches):
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} does not support batch submission",
+                provider=resolved.provider_id,
+                hint="choose a provider whose descriptor declares the 'batch' operation",
+            )
+        return adapter
+
     async def embed(
         self,
         inputs: str | Sequence[str],
@@ -2663,6 +2807,25 @@ def _overlay_catalog_windows(
         if candidate.outranks(capabilities.max_output_tokens):
             capabilities = replace(capabilities, max_output_tokens=candidate)
     return capabilities
+
+
+def _ordered_lines(result: BatchResult) -> BatchResult:
+    """Return a result whose lines are in submission order.
+
+    Providers return finished lines in *completion* order, which is whatever finished
+    first. A caller zipping results against their own inputs should not have to sort by a
+    custom id they only supplied so the correlation would work — so the sort happens once,
+    here, keyed by the numeric default when that is what the ids are and lexically
+    otherwise.
+    """
+
+    def key(line: BatchLine) -> tuple[int, object]:
+        try:
+            return (0, int(line.custom_id))
+        except ValueError:
+            return (1, line.custom_id)
+
+    return replace(result, lines=tuple(sorted(result.lines, key=key)))
 
 
 def _parse_overrides(
