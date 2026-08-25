@@ -29,9 +29,16 @@ repository.
 
 A template is authored as plaintext, sealed at build time with AES-256-GCM, and shipped
 as an opaque asset. At runtime, `TemplateVault` decrypts a template into memory only
-immediately before rendering and best-effort-zeroes the buffer afterward. Decryption is
-gated on a signed, time-boxed license blob, so an install without a valid license cannot
-render a single prompt (which doubles as a licensing mechanism).
+immediately before rendering and best-effort-zeroes the buffer afterward. `TemplateVault.render()` is
+gated on a signed, time-boxed license blob, so an install without a valid license gets no
+rendered prompt from the vault — which doubles as a licensing mechanism.
+
+That gate lives in the vault's code path, not in the ciphertext. The vault holds both the
+key and the sealed asset, so a bundle holder can decrypt directly and bypass the check;
+expiry is a signed field checked against local wall-clock, so a clock rollback defeats it.
+This is inherent to client-side sealing — the adversary owns the machine, which is the same
+ceiling Tier 1's confidentiality claim states. The gate makes unlicensed use unambiguous
+and detectable, not impossible. Cite it that way.
 
 ```bash
 # Ships as a separate package. Until a first PyPI release, install from a repository
@@ -71,8 +78,15 @@ decrypting once dropped from the ring.
 
 Entitlement is offline by default: the license blob validates entirely locally, so an
 air-gapped deployment works. Online revocation is opt-in (`revocation_checker`), failing
-open by default since offline operation is the baseline; set
-`revocation_fail_closed=True` when guaranteed revocation matters more than availability.
+open by default since offline operation is the baseline.
+
+**Set `revocation_fail_closed=True` for high-assurance deployments** — anywhere a revoked
+license must stop working even at the cost of availability. Two things to know before you
+do. First, fail-open means an unreachable service degrades to the last cached good answer,
+and a checker that has *never* completed a successful check has no cached answer to fall
+back to, so it degrades to "not revoked". Second, fail-closed makes your revocation
+endpoint a hard dependency of every render: if it is down, nothing renders. That is the
+trade, and it is a real one in both directions.
 
 The `anyinfer-confidential` CLI mirrors the library one-for-one (`keygen`, `seal`,
 `issue-license`) for build pipelines that are not Python.
@@ -262,8 +276,10 @@ read that section before the follow-up question arrives.
     - Tiers 1–2 raise the cost of extracting prompt IP; only Tier 3 (TEE-attested local
       execution) carries a cryptographic guarantee, and Tier 4 is meaningful only
       inside it.
-    - Everything fails closed: no valid license, no rendered prompt; no attestation, no
-      generation; no matching hash, `model_verified=False`.
+    - Everything fails closed *in AnyInfer's own code paths*: no valid license, no
+      rendered prompt from the vault; no attestation, no generation; no matching hash,
+      `model_verified=False`. Tiers 1–2 gate code paths on a machine the adversary owns;
+      only Tier 3's hardware boundary is not bypassable by whoever holds the bundle.
     - Tier 3 today detects TEE presence rather than verifying a signed hardware quote;
       cite it accordingly.
     - The SOC 2 mapping restates the same typed facts in auditor vocabulary; it does not

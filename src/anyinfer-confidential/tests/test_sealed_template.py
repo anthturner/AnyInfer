@@ -165,3 +165,34 @@ def test_encrypted_template_json_round_trip() -> None:
     template = seal_template("hi {x}", key=key, template_id="t", key_id="k1")
     restored = type(template).from_json(template.to_json())
     assert restored == template
+
+
+def test_the_license_gate_is_a_code_path_not_a_lock_on_the_ciphertext() -> None:
+    """Pins Tier 1's stated ceiling in executable form.
+
+    The docs used to say an install without a valid license "cannot produce a single
+    rendered prompt". It cannot produce one *through the vault* — but the bundle carries
+    both the key and the ciphertext, so a holder can decrypt directly and never reach the
+    check. That is inherent to client-side sealing, and it is now stated plainly rather
+    than papered over.
+
+    This test exists so the stronger claim cannot quietly come back: if someone ever makes
+    license validity enter key derivation, this fails and the docs get revisited with it.
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    key = generate_key()
+    private_key, public_key = generate_signing_keypair()
+    template = seal_template("Hello {name}", key=key, template_id="greet", key_id="k1")
+
+    # Through the vault, an expired license is refused.
+    expired = issue_license("acme", private_key=private_key, valid_days=-1)
+    vault = TemplateVault(
+        key_ring=KeyRing({"k1": key}), license_public_key=public_key, license_blob=expired
+    )
+    with pytest.raises(LicenseError):
+        vault.render(template, name="world")
+
+    # Holding the same bundle, decryption succeeds without any license at all.
+    plaintext = AESGCM(key).decrypt(template.nonce, template.ciphertext, None)
+    assert plaintext.decode("utf-8") == "Hello {name}"

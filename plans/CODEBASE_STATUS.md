@@ -59,7 +59,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | C.1 | No API reference for the confidential add-on packages | 3 | 3 | 9 |
 | `[ ]` | E.5 | OpenAI Responses API endpoint on the sidecar | 3 | 3 | 9 |
 | `[ ]` | E.6 | Ship accurate token estimators behind the existing protocol | 3 | 3 | 9 |
-| `[ ]` | F.5 | Sealed-template license gating: tripwire vs lock (fix or re-scope claim) | 3 | 3 | 9 |
+| `[x]` | F.5 | Sealed-template license gating: tripwire vs lock (fix or re-scope claim) | 3 | 3 | 9 |
 | `[ ]` | G.5 | Claims and docs update once quote verification lands | 3 | 3 | 9 |
 | `[ ]` | E.3 | Provider-native server-side tools (web search, code execution) | 4 | 2 | 8 |
 | `[ ]` | E.4 | Typed citations / grounded-generation output | 3 | 2 | 6 |
@@ -1199,11 +1199,15 @@ claim and isn't caveated the same way. Secondary realism notes: expiry uses loca
 should be steered to `True` explicitly in docs).
 
 **Remediation:**
-- [ ] **F.5.1** Either derive the template-decryption key from license-blob material (wrap the AES
-  key per-deployment under a key delivered inside the signed license) so an invalid license
-  genuinely cannot decrypt, **or** amend `sealed_template.py:16-19` and
-  confidentiality-tiers.md to state the enforcement lives in the vault code path only.
-- [ ] **F.5.2** Docs: recommend `revocation_fail_closed=True` for high-assurance deployments and
+- [x] **F.5.1** Took the second option, deliberately *(2026-08-25)*. Key-wrapping under
+  license-carried material does **not** make an invalid license unable to decrypt: expiry is
+  a signed *field*, not a cryptographic property, and the wrapping material would ship in
+  the same bundle without itself expiring. It would add a format-breaking change for
+  near-zero gain and risk a fresh overclaim. Instead `sealed_template.py` and
+  confidentiality-tiers.md now state that enforcement lives in the vault code path, that the
+  bundle holder can decrypt directly, and that clock rollback defeats expiry. A test pins the
+  ceiling so the stronger claim cannot quietly return.
+- [x] **F.5.2** Docs: recommend `revocation_fail_closed=True` for high-assurance deployments and
   spell out the "never checked yet" fail-open.
 
 ## F.6 Sidecar has no request-body size limit
