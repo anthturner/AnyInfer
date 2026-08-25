@@ -214,6 +214,20 @@ verification step is scoped (an `attest`-extra addition) but not built. Do not r
 `end_to_end=True` today as "a cryptographic quote was checked"; this section will change
 when that lands.
 
+**State the ceiling when you cite this.** Two limits are separate and both hold:
+
+- **CPU.** SEV-SNP and TDX are *detected* through their guest device nodes. Quote
+  generation and chain verification against AMD's or Intel's roots is planned, not
+  shipped.
+- **GPU.** Even once CPU quotes are verified, NVIDIA confidential computing will remain
+  **detected but not quote-verified**: GPU attestation goes through the SPDM path in
+  NVIDIA's own tooling, which is substantially harder than the CPU path and needs
+  sustained access to CC-capable hardware. The accurate phrasing at that point is
+  "CPU-attested; GPU CC detected but not quote-verified" — not "attested end to end".
+
+Neither is a reason to avoid Tier 3: the fail-closed refusal is real, and the detection is
+accurate about what it detects. They are a reason to say precisely what you have.
+
 ### Deployment Scope, Today
 
 - CPU-only (SEV-SNP or TDX): broadly available as GA lift-and-shift confidential VMs on

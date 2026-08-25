@@ -976,6 +976,7 @@ def _serve_run(args: argparse.Namespace) -> int:
         return 1
 
     from . import AsyncClient
+    from .config import build_observers
     from .serve.app import DEFAULT_MAX_REQUEST_BYTES, create_app
 
     config = _config(args.config)
@@ -989,6 +990,7 @@ def _serve_run(args: argparse.Namespace) -> int:
         history=config.history,
         cache=config.cache,
         repair=config.repair,
+        observers=list(build_observers(config.observers)),
         arena=config.arena,
         arenas=config.arenas,
     )

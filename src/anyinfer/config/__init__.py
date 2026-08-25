@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -27,10 +27,13 @@ from ..types.requests import (
 )
 
 __all__ = [
+    "BUILTIN_OBSERVERS",
     "COMMENT_KEY",
     "CONFIG_FORMAT_VERSION",
     "MAX_CONFIG_BYTES",
     "AnyInferConfig",
+    "ObserverSpec",
+    "build_observers",
     "dump_config",
     "dumps_config",
     "load_config",
@@ -63,6 +66,7 @@ _ROOT_KEYS = frozenset(
         "history",
         "cache",
         "repair",
+        "observers",
         "arena",
         "arenas",
         "mcp",
@@ -86,6 +90,9 @@ _SETTING_KEYS = frozenset(
         "timeout_s",
         "values",
         "limits",
+        "proxy",
+        "verify",
+        "client_cert",
     }
 )
 _DIRECT_SETTING_KEYS = frozenset({"base_url", "api_key", "api_version"})
@@ -115,6 +122,12 @@ class AnyInferConfig:
         mcp: Model Context Protocol servers described by the optional ``mcp`` block. These
             are inert descriptions: loading a file never spawns a process or opens a
             socket. Pass them to `anyinfer.mcp.MCPToolset.connect` when tools are wanted.
+        observers: Telemetry sinks *described* by the optional ``observers`` block, as
+            `ObserverSpec`s. Inert: loading a file never opens a log. Call
+            `build_observers` to construct them, then pass the result to `Client` or
+            `AsyncClient` as ``observers=``. This is how a sidecar deployment gets an
+            access log at all — it has no constructor for a caller to reach, so a sink it
+            cannot name is a sink it cannot have.
         repair: Bounded schema-repair budget from the optional ``repair`` block, or
             ``None`` when the file does not ask for one. Pass to `Client` or
             `AsyncClient` as ``repair=``. Without it, structured output validates and
@@ -134,6 +147,7 @@ class AnyInferConfig:
     history: HistoryPolicy | None = None
     cache: CachePolicy | None = None
     repair: Repair | None = None
+    observers: tuple[ObserverSpec, ...] = ()
     arena: ArenaPolicy | None = None
     arenas: Mapping[str, ArenaPolicy] = field(default_factory=dict)
     mcp: tuple[MCPServer, ...] = ()
@@ -243,6 +257,7 @@ def loads_config(
     history = _parse_history(data.get("history"), source)
     cache = _parse_cache(data.get("cache"), source)
     repair = _parse_repair(data.get("repair"), source)
+    observers = _parse_observers(data.get("observers"), source)
     arena = _parse_arena(data.get("arena"), source, "'arena'")
     arenas = _parse_arenas(data.get("arenas"), source)
     mcp = _parse_mcp(data.get("mcp"), source)
@@ -254,6 +269,7 @@ def loads_config(
         history=history,
         cache=cache,
         repair=repair,
+        observers=observers,
         arena=arena,
         arenas=arenas,
         mcp=mcp,
@@ -318,6 +334,11 @@ def dumps_config(config: AnyInferConfig, *, comments: bool = False) -> str:
         document["cache"] = _changed_fields(config.cache, CachePolicy())
     if config.repair is not None:
         document["repair"] = _changed_fields(config.repair, Repair())
+    if config.observers:
+        document["observers"] = [
+            spec.name if not spec.options else {"name": spec.name, "options": dict(spec.options)}
+            for spec in config.observers
+        ]
     if config.arena is not None:
         document["arena"] = _arena_json(config.arena)
     if config.arenas:
@@ -388,6 +409,16 @@ def _provider_json(settings: ProviderSettings) -> dict[str, Any]:
         entry["timeout_s"] = settings.timeout_s
     if settings.limits is not None:
         entry["limits"] = _changed_fields(settings.limits, RateLimits())
+    if settings.proxy:
+        entry["proxy"] = settings.proxy
+    if settings.verify is not None:
+        entry["verify"] = settings.verify
+    if settings.client_cert is not None:
+        entry["client_cert"] = (
+            list(settings.client_cert)
+            if isinstance(settings.client_cert, tuple)
+            else settings.client_cert
+        )
     return entry
 
 
@@ -534,6 +565,45 @@ def _parse_provider(
     if isinstance(timeout, bool) or not isinstance(timeout, int | float) or timeout <= 0:
         raise _error(source, f"{location}.timeout_s must be a positive number")
 
+    connection: dict[str, Any] = {}
+    proxy = raw.get("proxy")
+    if proxy is not None:
+        if not isinstance(proxy, str) or not proxy.strip():
+            raise _error(source, f"{location}.proxy must be a non-empty URL string")
+        connection["proxy"] = proxy.strip()
+    if "verify" in raw:
+        verify = raw["verify"]
+        if isinstance(verify, bool):
+            if verify:
+                # `true` is the default; storing it would only make the file noisier.
+                pass
+            else:
+                connection["verify"] = False
+        elif isinstance(verify, str) and verify.strip():
+            connection["verify"] = verify.strip()
+        else:
+            raise _error(
+                source,
+                f"{location}.verify must be false or a path to a CA bundle",
+                hint="true is the default; omit the key instead",
+            )
+    client_cert = raw.get("client_cert")
+    if client_cert is not None:
+        if isinstance(client_cert, str) and client_cert.strip():
+            connection["client_cert"] = client_cert.strip()
+        elif (
+            isinstance(client_cert, list)
+            and len(client_cert) in (2, 3)
+            and all(isinstance(part, str) and part for part in client_cert)
+        ):
+            connection["client_cert"] = tuple(client_cert)
+        else:
+            raise _error(
+                source,
+                f"{location}.client_cert must be a path, or [cert, key], or "
+                "[cert, key, password]",
+            )
+
     return ProviderSettings.of(
         engine_id,
         alias=instance_id if instance_id != engine_id else None,
@@ -541,6 +611,7 @@ def _parse_provider(
         options=merged_options,
         timeout_s=float(timeout),
         limits=_parse_limits(raw.get("limits"), source, location),
+        **connection,
         **direct,
     )
 
@@ -818,6 +889,127 @@ def _parse_cache(value: Any, source: str) -> CachePolicy | None:
         return CachePolicy(**fields)
     except ValueError as exc:
         raise _error(source, f"'cache' is invalid: {exc}") from exc
+
+
+BUILTIN_OBSERVERS = ("logging", "jsonl")
+"""Sink names that need no plugin installed."""
+
+
+@dataclass(frozen=True, slots=True)
+class ObserverSpec:
+    """A telemetry sink named in configuration, not yet built.
+
+    Inert by design, exactly as `MCPServer` is: reading a configuration file must not
+    open a log file any more than it should spawn a subprocess. `build_observers` turns
+    these into live sinks when a frontend actually wants them.
+
+    Attributes:
+        name: ``"logging"``, ``"jsonl"``, or a name published under the
+            ``anyinfer.observers`` entry-point group.
+        options: Keyword arguments for the sink's constructor.
+    """
+
+    name: str
+    options: Mapping[str, Any] = field(default_factory=dict)
+
+
+def _parse_observers(value: Any, source: str) -> tuple[ObserverSpec, ...]:
+    """Validate the optional telemetry-sink block into inert specs.
+
+    Each entry is ``{"name": ..., "options": {...}}``, or a bare string when a sink needs
+    no options. Names are checked against the built-ins and the entry-point group here,
+    so a typo fails at load rather than at the first event.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise _error(source, "'observers' must be an array")
+
+    discovered: dict[str, Any] | None = None
+    specs: list[ObserverSpec] = []
+    for index, entry in enumerate(value):
+        if isinstance(entry, str):
+            name, options = entry.strip(), {}
+        elif isinstance(entry, dict):
+            unknown = set(entry) - {"name", "options"}
+            if unknown:
+                raise _unknown_keys(source, f"'observers[{index}]'", unknown)
+            raw_name = entry.get("name")
+            if not isinstance(raw_name, str) or not raw_name.strip():
+                raise _error(source, f"'observers[{index}]' needs a non-empty 'name'")
+            raw_options = entry.get("options", {})
+            if not isinstance(raw_options, dict):
+                raise _error(source, f"'observers[{index}].options' must be an object")
+            name, options = raw_name.strip(), dict(raw_options)
+        else:
+            raise _error(
+                source, f"'observers[{index}]' must be a string or an object with 'name'"
+            )
+
+        if name not in BUILTIN_OBSERVERS:
+            if discovered is None:
+                from ..plugins import load_observers
+
+                discovered, _issues = load_observers()
+            if name not in discovered:
+                known = ", ".join([*BUILTIN_OBSERVERS, *sorted(discovered)])
+                raise _error(
+                    source,
+                    f"unknown observer {name!r}",
+                    hint=f"install a package providing it, or use one of: {known}",
+                )
+        specs.append(ObserverSpec(name=name, options=options))
+    return tuple(specs)
+
+
+def build_observers(specs: Sequence[ObserverSpec]) -> tuple[Any, ...]:
+    """Construct live telemetry sinks from configured specs.
+
+    Separate from loading so that reading a file has no side effects — a `jsonl` sink
+    opens and holds a file, and that should happen when a frontend decides to observe,
+    not when a config file is parsed.
+
+    Args:
+        specs: Usually `AnyInferConfig.observers`.
+
+    Returns:
+        The constructed sinks, ready to pass as ``observers=``.
+
+    Raises:
+        anyinfer.errors.ConfigError: A sink rejected its options, could not open its
+            file, or its plugin failed to build.
+    """
+    from ..events.sinks import JsonlObserver, LoggingObserver
+
+    discovered: dict[str, Any] | None = None
+    built: list[Any] = []
+    for spec in specs:
+        options = dict(spec.options)
+        try:
+            if spec.name == "jsonl":
+                built.append(JsonlObserver(**options))
+            elif spec.name == "logging":
+                built.append(LoggingObserver(**options))
+            else:
+                if discovered is None:
+                    from ..plugins import load_observers
+
+                    discovered, _issues = load_observers()
+                factory = discovered.get(spec.name)
+                if factory is None:
+                    raise ConfigError(
+                        f"observer {spec.name!r} is no longer installed",
+                        hint="install the package that provides it, or remove it",
+                    )
+                built.append(factory(**options) if callable(factory) else factory)
+        except ConfigError:
+            raise
+        except (TypeError, OSError, ValueError) as exc:
+            raise ConfigError(
+                f"observer {spec.name!r} could not be built: {exc}",
+                hint="check its 'options' against the sink's constructor",
+            ) from exc
+    return tuple(built)
 
 
 def _parse_repair(value: Any, source: str) -> Repair | None:

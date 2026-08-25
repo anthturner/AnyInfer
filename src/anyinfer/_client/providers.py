@@ -72,6 +72,9 @@ class ProviderSettings:
     options: Mapping[str, Any] = field(default_factory=dict)
     timeout_s: float = 120.0
     transport: Any | None = None
+    proxy: str | None = None
+    verify: str | bool | None = None
+    client_cert: str | tuple[str, str] | tuple[str, str, str] | None = None
     alias: str | None = None
     limits: RateLimits | None = None
 
@@ -307,6 +310,9 @@ class AdapterPool:
             options=options,
             timeout_s=settings.timeout_s,
             transport=self._govern(provider_id, descriptor, settings),
+            proxy=settings.proxy,
+            verify=settings.verify,
+            client_cert=settings.client_cert,
             events=self._events,
         )
         adapter = descriptor.factory(config)

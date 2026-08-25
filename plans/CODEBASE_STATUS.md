@@ -63,7 +63,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | G.5 | Claims and docs update once quote verification lands | 3 | 3 | 9 |
 | `[ ]` | E.3 | Provider-native server-side tools (web search, code execution) | 4 | 2 | 8 |
 | `[ ]` | E.4 | Typed citations / grounded-generation output | 3 | 2 | 6 |
-| `[ ]` | E.9 | Explicit proxy / custom CA / mTLS configuration | 2 | 3 | 6 |
+| `[x]` | E.9 | Explicit proxy / custom CA / mTLS configuration | 2 | 3 | 6 |
 | `[x]` | A.6 | Fix the "tests mirror the package" AGENTS.md claim | 1 | 5 | 5 |
 | `[x]` | F.9 | `catalog-refresh` workflow write scope on its read-only job | 1 | 5 | 5 |
 | `[x]` | F.13 | Loose `COHERE.key` credential file in the working tree | 1 | 5 | 5 |
@@ -80,7 +80,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[x]` | D.4 | Sidecar silently swallows `n>1`, never projects logprobs back | 1 | 3 | 3 |
 | `[x]` | D.5 | `ConfidentialityReport` has no producer anywhere | 1 | 3 | 3 |
 | `[x]` | D.7 | DESIGN.md's open-decisions ledger drift (both directions) | 1 | 3 | 3 |
-| `[ ]` | E.12 | Shipped logging/JSONL sink for the telemetry stream | 1 | 3 | 3 |
+| `[x]` | E.12 | Shipped logging/JSONL sink for the telemetry stream | 1 | 3 | 3 |
 | `[x]` | F.6 | Sidecar has no request-body size limit | 1 | 3 | 3 |
 | `[x]` | F.7 | Config-controlled URLs (SSRF / `file://`) trust assumption undocumented | 1 | 3 | 3 |
 | `[x]` | F.12 | SECURITY.md canonical org/domain diverges across the repo | 1 | 3 | 3 |
@@ -92,12 +92,12 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[x]` | C.8 | Glossary omits load-bearing terms | 1 | 2 | 2 |
 | `[x]` | C.9 | No changelog or upgrade-notes surface | 1 | 2 | 2 |
 | `[x]` | D.6 | Demo app never touches arena, compare, or run manifests | 1 | 2 | 2 |
-| `[ ]` | E.10 | Entry-point extensibility beyond provider adapters | 1 | 2 | 2 |
+| `[x]` | E.10 | Entry-point extensibility beyond provider adapters | 1 | 2 | 2 |
 | `[ ]` | E.11 | Local model store disk budget / guided eviction | 1 | 2 | 2 |
 | `[x]` | F.10 | Redaction is exact-substring only | 1 | 2 | 2 |
 | `[x]` | F.11 | Model-weight verification load-time TOCTOU window | 1 | 2 | 2 |
 | `[x]` | A.7 | Demo `MainWindow` is an 88-method single class | 1 | 1 | 1 |
-| `[ ]` | E.13 | Non-goals worth a deliberate revisit (decision log, not a defect) | — | — | — |
+| `[x]` | E.13 | Non-goals worth a deliberate revisit (decision log, not a defect) | — | — | — |
 
 ---
 
@@ -986,7 +986,7 @@ behavior that cannot differ per provider instance; mTLS to an internal gateway h
 short of abusing the test-seam `transport`.
 
 **Remediation:**
-- [ ] **E.9.1** Add `proxy`, `ca_bundle`/`verify`, `client_cert` to `ProviderSettings`, threaded
+- [x] **E.9.1** Add `proxy`, `ca_bundle`/`verify`, `client_cert` to `ProviderSettings`, threaded
   into `httpx2.AsyncClient` (no new dependency); mirror in the config schema and
   `docs/reference/configuration.md`; document the env-var fallback either way.
 
@@ -1000,7 +1000,7 @@ estimators, and reducers are constructor-injection only — unavailable to the s
 sidecar binary, which can only discover what entry points hand it.
 
 **Remediation:**
-- [ ] **E.10.1** Add narrow groups where the config/sidecar path needs them most:
+- [x] **E.10.1** Add narrow groups where the config/sidecar path needs them most:
   `anyinfer.credential_stores` (resolver schemes) and `anyinfer.observers` (config-nameable
   telemetry sinks), with ADR-008's validation discipline. Reducers/estimators can stay
   injection-only.
@@ -1030,7 +1030,7 @@ stdlib `logging` or JSONL to a file — must be hand-written by every consumer;
 `events/observers.py` ships only the protocol, `Subscription`, and the dispatcher.
 
 **Remediation:**
-- [ ] **E.12.1** Add `LoggingObserver`/`JsonlObserver` (~50 lines each) reusing the per-event
+- [x] **E.12.1** Add `LoggingObserver`/`JsonlObserver` (~50 lines each) reusing the per-event
   attribute extraction pattern from `otel.py` — content-free by default, `payloads=True`
   opt-in, honoring redaction; expose as a config option so the sidecar binary gets an
   access-log story.
@@ -1039,13 +1039,13 @@ stdlib `logging` or JSONL to a file — must be hand-written by every consumer;
 
 **Severity:** — · **Confidence:** High that each is currently fenced
 
-- [ ] **E.13.1** *MCP server exposure.* `docs/guides/tool-loop.md:158` routes non-Python clients
+- [x] **E.13.1** *MCP server exposure.* `docs/guides/tool-loop.md:158` routes non-Python clients
   to the OpenAI sidecar, but MCP-only hosts (Claude Desktop, IDE agents) cannot consume an
   OpenAI endpoint. An MCP projection would fit ADR-009's wire-codec discipline.
-- [ ] **E.13.2** *Exact-match response replay.* ADR-012's "permanently out of scope" reasoning
+- [x] **E.13.2** *Exact-match response replay.* ADR-012's "permanently out of scope" reasoning
   targets semantic caching's risks more than exact replay's; exact-match is table stakes in
   every gateway in this category.
-- [ ] **E.13.3** *Same-provider key pooling.* The load-balancing fence prohibits choosing a
+- [x] **E.13.3** *Same-provider key pooling.* The load-balancing fence prohibits choosing a
   different *target*; rotating among several keys for the *same* target is arguably not target
   selection and is expected at scale.
 
@@ -1469,7 +1469,7 @@ honoring the slim-core rule).
 **Sev 3 · Pri 1** — H100 CC attestation via the OpenRM SPDM path (nvtrust tooling) is
 substantially harder than the CPU path and needs sustained GPU-CC hardware access.
 
-- [ ] **G.6.1** Until implemented, state the ceiling in every surface G.5 touches, per the
+- [x] **G.6.1** Until implemented, state the ceiling in every surface G.5 touches, per the
   project's own "every tier states its ceiling" doctrine: "CPU-attested; GPU CC detected but
   not quote-verified."
 - [ ] **G.6.2** Re-evaluate when a design partner needs GPU offload inside the attested

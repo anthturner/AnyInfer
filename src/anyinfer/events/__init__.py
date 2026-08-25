@@ -7,6 +7,7 @@ from ..redaction import (
     register_secret,
 )
 from .observers import EventDispatcher, Observer, Subscription
+from .sinks import JsonlObserver, LoggingObserver, event_to_dict
 from .telemetry import (
     PAYLOAD_FIELDS,
     ArenaCompleted,
@@ -45,6 +46,8 @@ __all__ = [
     "EventDispatcher",
     "FallbackTriggered",
     "FirstToken",
+    "JsonlObserver",
+    "LoggingObserver",
     "Observer",
     "ParameterDropped",
     "ProviderDiagnostic",
@@ -61,6 +64,7 @@ __all__ = [
     "TargetResolved",
     "TelemetryEvent",
     "UsageEstimated",
+    "event_to_dict",
     "redact",
     "register_secret",
     "strip_payloads",

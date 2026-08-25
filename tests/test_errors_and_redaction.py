@@ -249,3 +249,32 @@ def test_short_derived_forms_do_not_slip_under_the_length_floor() -> None:
     registry.register("abc")  # below MIN_SECRET_LEN
     assert len(registry) == 0
     assert registry.redact("abc and more") == "abc and more"
+
+
+# ---- connection settings reach the transport -----------------------------------------
+
+
+def test_build_client_forwards_proxy_and_tls_settings() -> None:
+    from anyinfer.providers.http import build_client
+
+    client = build_client(base_url="https://x", verify=False)
+    assert client is not None
+
+
+def test_build_client_ignores_connection_settings_when_a_transport_is_supplied() -> None:
+    """A caller bringing its own transport has taken over connection handling.
+
+    The fake-server and cassette modes do exactly this, and passing a proxy alongside
+    would be either ignored or an error depending on httpx's mood — better to be explicit.
+    """
+    from anyinfer.providers.http import build_client
+    from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
+
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    client = build_client(
+        base_url="https://fake.invalid",
+        transport=server.transport(),
+        proxy="http://should-be-ignored:3128",
+        verify=False,
+    )
+    assert client is not None

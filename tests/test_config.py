@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
 import anyinfer as ai
+from anyinfer.config import build_observers
 
 
 def test_loads_config_builds_provider_instances_and_route() -> None:
@@ -475,3 +477,160 @@ def test_a_misspelled_repair_key_fails_loudly() -> None:
                 {"format_version": 1, "providers": [], "repair": {"max_attemps": 3}}
             )
         )
+
+
+# ---- observers -----------------------------------------------------------------------
+
+
+def test_observer_block_parses_into_inert_specs(tmp_path: Path) -> None:
+    """Reading a config file must not open a log file, the same rule `mcp` follows."""
+    target = tmp_path / "telemetry.jsonl"
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "format_version": 1,
+                "providers": [],
+                "observers": ["logging", {"name": "jsonl", "options": {"path": str(target)}}],
+            }
+        )
+    )
+
+    assert [spec.name for spec in config.observers] == ["logging", "jsonl"]
+    assert not target.exists(), "parsing must not construct the sink"
+
+
+def test_build_observers_constructs_them(tmp_path: Path) -> None:
+    target = tmp_path / "telemetry.jsonl"
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "format_version": 1,
+                "providers": [],
+                "observers": [{"name": "jsonl", "options": {"path": str(target)}}],
+            }
+        )
+    )
+
+    built = build_observers(config.observers)
+    try:
+        assert [type(o).__name__ for o in built] == ["JsonlObserver"]
+        assert target.exists()
+    finally:
+        built[0].close()
+
+
+def test_observer_block_round_trips(tmp_path: Path) -> None:
+    spec = {
+        "format_version": 1,
+        "providers": [],
+        "observers": ["logging", {"name": "jsonl", "options": {"path": str(tmp_path / "t")}}],
+    }
+    config = ai.loads_config(json.dumps(spec))
+    assert json.loads(ai.dumps_config(config))["observers"] == spec["observers"]
+
+
+def test_an_unknown_observer_name_fails_at_load_not_at_the_first_event() -> None:
+    with pytest.raises(ai.ConfigError, match="unknown observer"):
+        ai.loads_config(
+            json.dumps({"format_version": 1, "providers": [], "observers": ["nope"]})
+        )
+
+
+def test_a_misspelled_observer_key_fails_loudly(tmp_path: Path) -> None:
+    with pytest.raises(ai.ConfigError, match="observers"):
+        ai.loads_config(
+            json.dumps(
+                {
+                    "format_version": 1,
+                    "providers": [],
+                    "observers": [{"nmae": "logging"}],
+                }
+            )
+        )
+
+
+def test_build_observers_reports_bad_options_as_config_errors(tmp_path: Path) -> None:
+    config = ai.loads_config(
+        json.dumps(
+            {
+                "format_version": 1,
+                "providers": [],
+                "observers": [{"name": "jsonl", "options": {"not_a_parameter": 1}}],
+            }
+        )
+    )
+    with pytest.raises(ai.ConfigError, match="could not be built"):
+        build_observers(config.observers)
+
+
+def test_no_observer_block_means_no_sinks() -> None:
+    config = ai.loads_config(json.dumps({"format_version": 1, "providers": []}))
+    assert config.observers == ()
+    assert build_observers(config.observers) == ()
+
+
+# ---- proxy, CA bundle, mTLS ----------------------------------------------------------
+
+
+def test_connection_settings_parse_and_round_trip() -> None:
+    """Per-instance, so one provider can trust a corporate CA while another does not."""
+    spec = {
+        "format_version": 1,
+        "providers": [
+            {
+                "id": "openai",
+                "api_key": "env://K",
+                "proxy": "http://corp-proxy:3128",
+                "verify": "/etc/ssl/corp-ca.pem",
+                "client_cert": ["/etc/ssl/client.pem", "/etc/ssl/client.key"],
+            }
+        ],
+    }
+    config = ai.loads_config(json.dumps(spec))
+    settings = config.providers[0]
+
+    assert settings.proxy == "http://corp-proxy:3128"
+    assert settings.verify == "/etc/ssl/corp-ca.pem"
+    assert settings.client_cert == ("/etc/ssl/client.pem", "/etc/ssl/client.key")
+    assert json.loads(ai.dumps_config(config))["providers"][0] == spec["providers"][0]
+
+
+def test_verify_false_disables_tls_verification() -> None:
+    config = ai.loads_config(
+        json.dumps(
+            {"format_version": 1, "providers": [{"id": "openai", "verify": False}]}
+        )
+    )
+    assert config.providers[0].verify is False
+
+
+def test_verify_true_is_the_default_and_is_not_stored() -> None:
+    """`true` means "as shipped"; keeping it would only make the file noisier."""
+    config = ai.loads_config(
+        json.dumps({"format_version": 1, "providers": [{"id": "openai", "verify": True}]})
+    )
+    assert config.providers[0].verify is None
+    assert "verify" not in json.loads(ai.dumps_config(config))["providers"][0]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"proxy": ""},
+        {"verify": 3},
+        {"client_cert": ["only-one"]},
+        {"client_cert": 7},
+    ],
+)
+def test_malformed_connection_settings_are_refused(bad: dict[str, object]) -> None:
+    with pytest.raises(ai.ConfigError):
+        ai.loads_config(
+            json.dumps({"format_version": 1, "providers": [{"id": "openai", **bad}]})
+        )
+
+
+def test_connection_settings_default_to_unset() -> None:
+    """The ordinary case must leave httpx's own environment handling alone."""
+    config = ai.loads_config(json.dumps({"format_version": 1, "providers": [{"id": "openai"}]}))
+    settings = config.providers[0]
+    assert (settings.proxy, settings.verify, settings.client_cert) == (None, None, None)

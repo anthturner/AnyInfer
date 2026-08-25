@@ -815,8 +815,9 @@ src/anyinfer/
   registry.py
   routing/               # policy.py health.py attempts.py limits.py
   schema/                # mechanism.py project.py validate.py repair.py partial.py
-  events/                # observers.py telemetry.py
+  events/                # observers.py telemetry.py sinks.py
   redaction.py           # event-stream redaction (root module, not under events/)
+  plugins.py             # entry-point discovery beyond provider adapters
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
   session.py             # the session handle
@@ -942,6 +943,34 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    Ollama-adapter warnings?~~ *Resolved:* adapter-reported runtime
    diagnostics, declared on the descriptor and surfaced on `Generation.warnings` plus a
    `ProviderDiagnostic` event.
+
+## 20a. Fenced non-goals worth a deliberate revisit
+
+These are **decisions, not defects**, and each is currently held by a fence stated
+elsewhere in this document. They are recorded here because a fence nobody revisits stops
+being a decision and becomes an accident. Dated so the next reader knows how old the
+reasoning is. *(Recorded 2026-08-25.)*
+
+1. **MCP server exposure.** AnyInfer *consumes* MCP tool sources; it does not project
+   itself as an MCP server. The tool-loop guide routes non-Python clients to the OpenAI
+   sidecar, which MCP-only hosts — Claude Desktop, IDE agents — cannot consume. An MCP
+   projection would sit inside the existing wire-codec discipline rather than against it,
+   which is what makes this worth revisiting rather than merely possible.
+   **Revisit when** a concrete MCP-only integration is asked for.
+
+2. **Exact-match response replay.** ADR-012 puts response caching permanently out of
+   scope, but its reasoning is aimed at *semantic* caching — similarity thresholds,
+   stale-answer risk, correctness that degrades invisibly. Exact-match replay keyed on the
+   full normalized request has none of those properties and is table stakes in comparable
+   gateways. The fence may be broader than the argument behind it.
+   **Revisit when** the cost case is made concretely; the ADR would need amending, not
+   ignoring.
+
+3. **Same-provider key pooling.** The load-balancing fence prohibits choosing a *different
+   target* because one is busy. Rotating among several credentials for the *same* target
+   is arguably not target selection at all, and is ordinary at scale. Whether it falls
+   inside the fence is genuinely unclear, which is the point of recording it.
+   **Revisit when** a deployment hits per-key limits it cannot raise.
 
 ## 21. Risks and complexity traps
 

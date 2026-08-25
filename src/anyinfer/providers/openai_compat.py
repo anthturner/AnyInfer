@@ -71,6 +71,9 @@ class OpenAICompatAdapter:
             headers=self._build_headers(config),
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     def _build_headers(self, config: ProviderConfig) -> dict[str, str]:

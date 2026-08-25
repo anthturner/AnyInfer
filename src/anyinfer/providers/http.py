@@ -63,6 +63,9 @@ def build_client(
     headers: Mapping[str, str] | None = None,
     timeout_s: float = 120.0,
     transport: httpx2.AsyncBaseTransport | None = None,
+    proxy: str | None = None,
+    verify: str | bool | None = None,
+    client_cert: str | tuple[str, str] | tuple[str, str, str] | None = None,
 ) -> httpx2.AsyncClient:
     """Create an ``httpx2.AsyncClient`` configured for provider traffic.
 
@@ -74,13 +77,36 @@ def build_client(
         headers: Default headers applied to every request.
         timeout_s: Default timeout; per-request values override it.
         transport: Optional transport override, used by the fake and cassette test modes.
+        proxy: Proxy URL for this client's traffic. ``None`` leaves httpx's own
+            ``HTTPS_PROXY``/``NO_PROXY`` handling in place, which is the default.
+        verify: CA-bundle path, or ``False`` to disable TLS verification, or ``None`` for
+            the default trust store. A path is what an environment with a private or
+            TLS-intercepting CA needs, and it is per instance, so one provider can trust a
+            corporate CA while another keeps the public roots.
+        client_cert: Client certificate for mTLS.
+
+    Note:
+        These are ignored when ``transport`` is supplied — a caller that brings its own
+        transport has taken over connection handling entirely, which is exactly what the
+        fake-server and cassette test modes do.
     """
+    tls: dict[str, Any] = {}
+    if transport is None:
+        # Passed only when set: httpx distinguishes "not supplied" from an explicit
+        # `None`/`False`, and forwarding a default would override its env-var behaviour.
+        if proxy is not None:
+            tls["proxy"] = proxy
+        if verify is not None:
+            tls["verify"] = verify
+        if client_cert is not None:
+            tls["cert"] = client_cert
     return httpx2.AsyncClient(
         base_url=base_url or "",
         headers=dict(headers or {}),
         timeout=httpx2.Timeout(timeout_s),
         follow_redirects=True,
         transport=transport,
+        **tls,
     )
 
 

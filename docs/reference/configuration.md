@@ -45,6 +45,37 @@ ai.ProviderSettings.of(
 The order providers are listed in is the preference order for
 [alias resolution](../concepts/targets.md#aliases).
 
+### Proxies, Private CAs, and mTLS
+
+Three optional per-instance keys cover TLS-intercepting proxies and private certificate
+authorities — the environments that most often break an otherwise working install:
+
+```json
+{
+  "id": "openai",
+  "api_key": "env://OPENAI_API_KEY",
+  "proxy": "http://corp-proxy:3128",
+  "verify": "/etc/ssl/corp-ca.pem",
+  "client_cert": ["/etc/ssl/client.pem", "/etc/ssl/client.key"]
+}
+```
+
+- **`proxy`** routes this instance's traffic through a proxy. Omit it to keep the standard
+  `HTTPS_PROXY`/`NO_PROXY` environment behavior, which is the default.
+- **`verify`** takes a CA-bundle path for a private or intercepting CA, or `false` to
+  disable verification entirely. `true` is the default and is not stored.
+- **`client_cert`** is a combined PEM path, or `[cert, key]`, or `[cert, key, password]`.
+
+They are **per provider instance** on purpose: one provider can trust a corporate CA while
+another keeps the public roots, which a process-wide environment variable cannot express.
+
+!!! warning "`verify: false` disables certificate checking"
+    It makes the connection interceptable by anything on the path. Point `verify` at the
+    CA bundle instead — that is what it is for, and it keeps verification on.
+
+These are ignored when a `transport` is supplied in code, since a caller bringing its own
+transport has taken over connection handling; that is what the offline test modes do.
+
 ### URLs in Configuration Are Trusted Input
 
 AnyInfer fetches `base_url`, [MCP server](#the-mcp-block) endpoints, and model-source URLs
@@ -446,6 +477,31 @@ takes `repair=` per call and the CLI has `run --repair`, but `anyinfer serve` bu
 client from this file — without the block, structured output through the sidecar validates
 and 422s where the Python path would have recovered. See
 [structured output](../concepts/structured-output.md#repair).
+
+### The `observers` Block
+
+Telemetry sinks the file can name. This is the only way a **sidecar deployment** gets an
+access log: `anyinfer serve` has no constructor for a caller to reach, so a sink it cannot
+name is a sink it cannot have.
+
+```json
+{
+  "observers": [
+    "logging",
+    {"name": "jsonl", "options": {"path": "/var/log/anyinfer/telemetry.jsonl"}}
+  ]
+}
+```
+
+`logging` and `jsonl` ship with the library. Any other name is resolved through the
+`anyinfer.observers` entry-point group, so a package can publish its own sink and have it
+named here — an unknown name is a `ConfigError` at load, not a surprise at the first event.
+
+Sinks are **described, not built**, exactly as [`mcp`](#the-mcp-block) servers are: loading
+a configuration file never opens a log file. `anyinfer.config.build_observers` constructs
+them when a frontend decides to observe. Both built-ins are content-free unless the
+subscription opts into payloads, and every string they emit is redacted — see
+[telemetry](api/telemetry.md#ready-made-sinks).
 
 ### The `operation_routes` Block
 

@@ -94,13 +94,22 @@ def _scheme_of(reference: str) -> str:
 
 
 def default_resolver() -> ResolverChain:
-    """Build the standard resolver chain: keyring, env, then literal.
+    """Build the standard resolver chain: plugins, keyring, env, then literal.
 
     Literal is last because it accepts anything; the scheme-specific resolvers must get first
     refusal.
+
+    Resolvers published under the ``anyinfer.credential_stores`` entry-point group are
+    placed *ahead* of the built-ins, so an organization's own vault scheme can be used
+    from a plain config file — the sidecar has no other way to reach one. A plugin that
+    fails to load is skipped rather than raising: an unavailable vault must not stop a
+    process whose other credentials resolve fine. See `anyinfer.plugins`.
     """
+    from ..plugins import load_credential_stores
     from .env import EnvResolver
     from .keyring_store import KeyringResolver
     from .literal import LiteralResolver
 
-    return ResolverChain([KeyringResolver(), EnvResolver(), LiteralResolver()])
+    discovered, _issues = load_credential_stores()
+    plugins = [discovered[name] for name in sorted(discovered)]
+    return ResolverChain([*plugins, KeyringResolver(), EnvResolver(), LiteralResolver()])

@@ -118,6 +118,18 @@ class ProviderConfig:
     """Optional ``httpx2`` transport override. Used by the fake-server and cassette test
     modes to intercept traffic without touching the adapter's wire logic."""
 
+    proxy: str | None = None
+    """Proxy URL for this instance's traffic, e.g. ``http://corp-proxy:3128``. ``None``
+    leaves httpx's environment-variable behaviour untouched."""
+
+    verify: str | bool | None = None
+    """TLS verification: a CA-bundle path for a private or intercepting CA, ``False`` to
+    disable verification, or ``None`` for the default trust store."""
+
+    client_cert: str | tuple[str, str] | tuple[str, str, str] | None = None
+    """Client certificate for mTLS: a combined PEM path, or ``(cert, key)`` /
+    ``(cert, key, password)``. ``None`` when the endpoint needs no client certificate."""
+
     events: Callable[[TelemetryEvent], None] | None = None
     """Sink for adapter-side lifecycle telemetry (`ServerLifecycle`, `DownloadProgress`).
 
