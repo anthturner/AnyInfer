@@ -185,3 +185,67 @@ async def test_no_secret_reaches_an_error_from_a_real_request() -> None:
     for attempt in error.attempts:
         if attempt.error is not None:
             assert secret not in attempt.error.detail
+
+
+# ---- encoded forms -------------------------------------------------------------------
+
+
+def test_a_secret_is_redacted_from_its_json_escaped_form() -> None:
+    """A credential inside a serialized request body is not the raw string.
+
+    Redaction is exact-substring matching, so without registering the encoded forms a
+    secret survives any serialization that escapes it.
+    """
+    import json
+
+    registry = RedactionRegistry()
+    secret = 'sk-live-with"quote-and\\backslash'
+    registry.register(secret)
+
+    body = json.dumps({"api_key": secret})
+    assert secret not in registry.redact(body)
+    assert REDACTED in registry.redact(body)
+
+
+def test_a_secret_is_redacted_from_a_percent_encoded_url() -> None:
+    import urllib.parse
+
+    registry = RedactionRegistry()
+    secret = "sk-live-abc+def/123"
+    registry.register(secret)
+
+    url = "https://api.example/v1?key=" + urllib.parse.quote(secret, safe="")
+    assert secret not in registry.redact(url)
+    assert REDACTED in registry.redact(url)
+
+
+def test_a_secret_is_redacted_from_an_http_basic_header() -> None:
+    import base64
+
+    registry = RedactionRegistry()
+    secret = "sk-live-abcdef123456"
+    registry.register(secret)
+
+    header = "Basic " + base64.b64encode(secret.encode()).decode()
+    assert REDACTED in registry.redact(header)
+
+    # The `user:pass` shape Basic auth actually uses is covered too.
+    pair = "Basic " + base64.b64encode(b":" + secret.encode()).decode()
+    assert REDACTED in registry.redact(pair)
+
+
+def test_the_raw_secret_still_redacts_after_encoding_forms_were_added() -> None:
+    registry = RedactionRegistry()
+    registry.register("sk-live-abcdef123456")
+    assert registry.redact("token=sk-live-abcdef123456") == f"token={REDACTED}"
+
+
+def test_short_derived_forms_do_not_slip_under_the_length_floor() -> None:
+    """The length floor applies to every derived form, not only the original.
+
+    It exists so redaction cannot corrupt ordinary text.
+    """
+    registry = RedactionRegistry()
+    registry.register("abc")  # below MIN_SECRET_LEN
+    assert len(registry) == 0
+    assert registry.redact("abc and more") == "abc and more"

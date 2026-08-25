@@ -118,3 +118,12 @@ mode when the shape matters more than the M365 grounding does.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/m365-copilot.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/m365-copilot.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Capabilities and provenance](../concepts/capabilities.md): the fixed capability surface and why it is not probed.
+- [Credentials](../concepts/credentials.md): the interactive-only auth path.
+
+</div>

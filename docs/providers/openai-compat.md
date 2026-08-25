@@ -72,3 +72,12 @@ code is unaffected.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openai-compat.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai-compat.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Preset providers](presets.md): the eighty-six providers configured on this adapter.
+- [Add a provider](../guides/custom-providers.md): when a preset is not enough.
+
+</div>

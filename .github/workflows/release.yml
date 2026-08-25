@@ -109,7 +109,7 @@ jobs:
           ./smoke/bin/python -c "import anyinfer; print('anyinfer', anyinfer.__version__)"
           ./smoke/bin/python -c "import anyinfer; c = anyinfer.loads_config('{\"providers\": []}'); assert c.format_version == 1"
           ./smoke/bin/anyinfer --version
-          ./smoke/bin/python -c "import demo_app"
+          ./smoke/bin/python -c "import anyinfer_demo"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

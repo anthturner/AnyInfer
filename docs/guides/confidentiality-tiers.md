@@ -289,6 +289,8 @@ read that section before the follow-up question arrives.
 
 <div class="anyinfer-see-also" markdown>
 
+- [Confidentiality add-ons API reference](../reference/api/confidential.md): every
+  signature on this page, generated from the source.
 - [The local subsystem](../concepts/local.md) and its
   [API reference](../reference/api/local.md): Tiers 3–4's machinery.
 - [Credentials and redaction](../concepts/credentials.md): the Tier 0 posture.

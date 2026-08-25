@@ -55,3 +55,12 @@ send requests the upstream provider silently drops.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openrouter.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openrouter.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Routing and rate limits](../concepts/routing.md): AnyInfer's routing above OpenRouter's own.
+- [Capabilities and provenance](../concepts/capabilities.md): where model facts come from here.
+
+</div>

@@ -3,7 +3,7 @@
 The chip is the demo's teaching device: a small ``</>`` button that sits next to a
 surface and opens the `HelpTopic` explaining which public AnyInfer calls implement what
 that surface shows, with a copyable plain-Python snippet doing the same thing. The prose
-lives in `demo_app.sdk_help`, not here — this module only renders it.
+lives in `anyinfer_demo.sdk_help`, not here — this module only renders it.
 
 The library map answers the wider question: of everything ``anyinfer`` exports, which
 parts does this demo actually exercise, and which does it not? The uncovered list is

@@ -104,3 +104,12 @@ json_schema modes.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/copilot.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/copilot.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Capabilities and provenance](../concepts/capabilities.md): why an SDK-backed provider reports a fixed surface.
+- [Credentials](../concepts/credentials.md): interactive auth and what it means for headless runs.
+
+</div>

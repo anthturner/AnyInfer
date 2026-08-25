@@ -144,6 +144,21 @@ def verify_model_manifest(
 
     Raises:
         anyinfer.errors.ConfigError: The `attest` extra is not installed.
+
+    Note:
+        **This proves what was on disk when it was read, not what gets loaded.** The
+        bytes are hashed here; `llama-server` opens `weights_path` itself, by path, some
+        time later. Anything able to write that path in between — replace the file,
+        rename another over it — is loaded unverified, and no amount of care inside this
+        function fixes that: the loading process opens the path independently, so there
+        is no descriptor to hand it and no way to make the checked bytes and the loaded
+        bytes provably the same object.
+
+        It matters only where an attacker already has local write access to the model
+        directory, which is the deployment Tier 3 is meant to exclude. Close it at the
+        filesystem instead: keep weights on a read-only mount, or in a directory only
+        root can write, so there is no window to exploit. Verifying inside an attested
+        boundary is what makes that assumption checkable rather than assumed.
     """
     try:
         from cryptography.exceptions import InvalidSignature

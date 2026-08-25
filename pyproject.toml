@@ -45,7 +45,7 @@ attest = ["cryptography>=42"]
 # SDKs. The extra exists so importing anyinfer never pulls in subprocess-spawning code.
 mcp = []
 serve = ["starlette>=0.37", "uvicorn>=0.30"]
-# The pack-in PySide6 reference application (`src/demo_app`). Kept in an extra so ADR-007's
+# The pack-in PySide6 reference application (`src/anyinfer_demo`). Kept in an extra so ADR-007's
 # slim core holds: nothing in `anyinfer` imports Qt, and a library install never pulls it in.
 demo = ["PySide6>=6.6", "markdown>=3.6"]
 all = [
@@ -81,7 +81,7 @@ dev = [
 
 [project.scripts]
 anyinfer = "anyinfer.cli:main"
-anyinfer-demo = "demo_app:main"
+anyinfer-demo = "anyinfer_demo:main"
 
 # The application-facing test kit. Registering here means `pip install anyinfer` is enough
 # to get the fixtures; the plugin module itself imports nothing from `anyinfer` until a
@@ -99,14 +99,14 @@ Issues = "https://github.com/anthturner/AnyInfer/issues"
 # installs a generic top-level `workspace` module would collide with unrelated
 # distributions claiming the same name. It stays a repo-root tool (`python workspace.py`).
 [tool.hatch.build.targets.wheel]
-packages = ["src/anyinfer", "src/demo_app"]
+packages = ["src/anyinfer", "src/anyinfer_demo"]
 
 [tool.hatch.build.targets.sdist]
 # The sdist is a working source tree: it can rebuild the wheel, run the test suite, and
 # build the docs (which is why mkdocs.yml, overrides/, and scripts/ ship alongside docs/).
 include = [
   "src/anyinfer",
-  "src/demo_app",
+  "src/anyinfer_demo",
   "tests",
   "docs",
   "overrides",
@@ -158,15 +158,15 @@ convention = "google"
 "src/anyinfer/testing/scaffold.py" = ["RUF001", "RUF002"]
 "workspace.py" = ["RUF001", "RUF002"]
 # Raw SVG path data — splitting it across lines would fragment the "d" attribute string.
-"src/demo_app/widgets/icons.py" = ["E501"]
+"src/anyinfer_demo/widgets/icons.py" = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["anyinfer", "demo_app"]
+known-first-party = ["anyinfer", "anyinfer_demo"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src/anyinfer", "src/demo_app", "workspace.py"]
+files = ["src/anyinfer", "src/anyinfer_demo", "workspace.py"]
 warn_unreachable = true
 disallow_any_generics = true
 no_implicit_reexport = false

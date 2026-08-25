@@ -14,8 +14,11 @@ pip install -e src/anyinfer-confidential
 pip install -e "src/anyinfer-confidential[relay]"   # only if you're running the Relay service
 ```
 
-See DESIGN.md §30 and the published Confidentiality Tiers doc for the
-full design and the honest ceiling on what each tier guarantees.
+Every public signature is generated onto the
+[confidentiality add-ons API reference](https://anyinfer.dev/reference/api/confidential/);
+the [Confidentiality Tiers guide](https://anyinfer.dev/guides/confidentiality-tiers/)
+covers what each tier guarantees and the honest ceiling on it. (DESIGN.md §30 is the
+internal design record behind both — read the published pages first.)
 
 ## Running the Relay service
 

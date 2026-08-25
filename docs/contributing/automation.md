@@ -1,4 +1,4 @@
-# Coding-Agent Instructions
+# Coding Agents and Workstreams
 
 AnyInfer supports Codex, Claude Code, and GitHub Copilot with one authoritative instruction
 set. [`AGENTS.md`](https://github.com/anthturner/AnyInfer/blob/main/AGENTS.md) is the source
@@ -59,7 +59,7 @@ Start in the narrowest workstream that owns the behavior:
 | Shared configuration | `src/anyinfer/config/` | The versioned JSON contract used by every integration path |
 | Command-line tool | `src/anyinfer/cli.py` | Human and shell interface for `run`, `doctor`, `providers`, and sidecar startup |
 | OpenAI-compatible sidecar | [`src/anyinfer/serve/`](../serve/README.md) | OpenAI wire codec and ASGI application; never a second routing core |
-| Demo application | [`src/demo_app/`](../guides/demo-app.md) | Offline reference UI and integration example; not part of core behavior |
+| Demo application | [`src/anyinfer_demo/`](../guides/demo-app.md) | Offline reference UI and integration example; not part of core behavior |
 
 Tests mirror those boundaries under `tests/`. Shared behavior belongs in the engine or
 configuration package, not copied into the CLI, sidecar, or demo. A change that crosses a

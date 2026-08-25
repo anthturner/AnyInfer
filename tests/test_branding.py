@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DOC_ASSETS = ROOT / "docs" / "assets"
-DEMO_ASSETS = ROOT / "src" / "demo_app" / "assets"
+DEMO_ASSETS = ROOT / "src" / "anyinfer_demo" / "assets"
 
 RUNTIME_ASSETS = (
     "anyinfer-icon-512.svg",
@@ -33,7 +33,7 @@ def test_demo_brand_assets_are_exact_canonical_mirrors() -> None:
 
 def test_brand_constants_match_the_canonical_palette() -> None:
     palette = (DOC_ASSETS / "anyinfer-palette.css").read_text(encoding="utf-8")
-    theme = (ROOT / "src" / "demo_app" / "theme.py").read_text(encoding="utf-8")
+    theme = (ROOT / "src" / "anyinfer_demo" / "theme.py").read_text(encoding="utf-8")
     expected = {
         "_TEAL": "#2C7A6F",
         "_TEAL_DEEP": "#0B3B3C",

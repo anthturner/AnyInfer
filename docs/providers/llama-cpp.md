@@ -153,3 +153,12 @@ nothing and never triggers hardware detection on its own.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/llama-cpp.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/llama-cpp.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Run a model locally](../guides/local-inference.md): acquiring weights and picking a runtime.
+- [The local subsystem](../concepts/local.md): supervision, hardware fit, and tuning.
+
+</div>

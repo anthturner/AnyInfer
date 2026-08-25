@@ -339,3 +339,27 @@ async def test_many_concurrent_independent_streams() -> None:
         results = await asyncio.gather(*(one() for _ in range(16)))
 
     assert results == ["concurrent answer"] * 16
+
+
+def test_multiple_choices_are_refused_rather_than_silently_reduced() -> None:
+    """`n` was reserved but never read, so n=3 returned one choice and said nothing."""
+    with pytest.raises(ValueError, match="anyinfer_arena"):
+        request_from_openai({**FULL_REQUEST, "n": 3})
+
+    # n=1 is what every client sends by default and must stay accepted.
+    _, _, _ = request_from_openai({**FULL_REQUEST, "n": 1})
+
+
+@pytest.mark.parametrize("field", ["logprobs", "top_logprobs"])
+def test_logprob_requests_are_refused_rather_than_billed_for_nothing(field: str) -> None:
+    """Unreserved, these forwarded upstream with no response path to carry results back.
+
+    The client pays for the computation and receives none of it, which is worse than a
+    plain refusal.
+    """
+    with pytest.raises(ValueError, match=field):
+        request_from_openai({**FULL_REQUEST, field: True if field == "logprobs" else 5})
+
+
+def test_logprobs_false_is_not_a_request_for_logprobs() -> None:
+    _, _, _ = request_from_openai({**FULL_REQUEST, "logprobs": False})

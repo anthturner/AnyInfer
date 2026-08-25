@@ -1,4 +1,4 @@
-# Stream to a Terminal
+# Stream Typed Events
 
 A stream yields typed [events](../concepts/events.md) while the request runs: text deltas,
 reasoning, timing marks, and attempt failures. This page shows the patterns a terminal

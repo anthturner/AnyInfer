@@ -102,3 +102,12 @@ is deployment-specific and cannot be defaulted.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/azure-foundry.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/azure-foundry.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Credentials](../concepts/credentials.md): Entra tokens versus a plain API key.
+- [Targets and aliases](../concepts/targets.md): addressing one deployment among several.
+
+</div>

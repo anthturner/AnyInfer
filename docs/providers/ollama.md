@@ -123,3 +123,12 @@ Remote image URLs, documents, and audio are refused rather than silently dropped
 
 For the exact request/response fields this adapter depends on, see
 [contracts/ollama.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/ollama.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Run a model locally](../guides/local-inference.md): the local story end to end.
+- [The local subsystem](../concepts/local.md): what AnyInfer supervises and what Ollama owns.
+
+</div>

@@ -865,6 +865,16 @@ contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§2
 docs/                    # provider guides, published site sources (§25)
 ```
 
+**`cli.py` stays one module — a decision, not an accident.** It is ~3,800 lines across
+sixteen command families, the second-largest module in the repository. It stays single
+because argparse subcommand wiring is the kind of code that reads worse spread across
+sixteen files than gathered in one, and because the lazy per-command import style is what
+keeps `anyinfer --help` cheap: nothing a command needs is imported until that command
+runs. The boundary that matters is enforced separately — the CLI imports only public core
+surfaces and never reaches into `_client`. **Revisit if it keeps growing:** the exit is a
+`cli/` package whose `__init__.py` still exports `main`, so
+`[project.scripts] anyinfer = "anyinfer.cli:main"` is untouched.
+
 **Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]`
 github-copilot-sdk · `[azure]` azure-identity · `[vertex]` cryptography · `[keyring]`
 keyring · `[otel]` opentelemetry-api · `[serve]` ASGI server deps · `[demo]` PySide6 and

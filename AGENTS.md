@@ -57,7 +57,7 @@ Keep these product surfaces distinct:
 | Workstream | Owned paths | Boundary |
 |---|---|---|
 | Core SDK / inference engine | `src/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
-| Demo application | `src/demo_app/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
+| Demo application | `src/anyinfer_demo/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
 | One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `init`, `agents-md`, `run`, `embed`, `rerank`, `compare`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, `context`, `conform`, `mcp`, and `serve`. `serve`'s parser lives here, but its semantics belong to the sidecar workstream. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`, and endpoint/credential discovery for `init` belongs in `anyinfer.local.discovery`. |
 | OpenAI-compatible sidecar | `src/anyinfer/serve/`, sidecar tests | Owns the OpenAI wire codec and ASGI lifecycle, plus the operator-tooling renderer `service.py` (systemd/launchd/Windows units) that ships beside them — it emits text and imports nothing but `errors`, so it lives with the thing it starts rather than in the CLI. It stays a projection over `AsyncClient`; no provider, routing, validation, or config policy belongs here. The import-linter contract covers the whole package, so a new `serve/` module is inside the boundary the moment it exists. |
 | Shared configuration | `src/anyinfer/config/`, configuration docs and tests | One versioned format feeds Python SDK callers, the CLI, the sidecar, and compatible demo settings. Frontends may add flags, but they must not fork file semantics. |
@@ -103,7 +103,7 @@ changes require the generated reference and runnable examples.
 - Secrets: anything credential-shaped goes through `anyinfer.credentials` and is registered
   for redaction. Never log, print, or embed secrets in errors, events, or fixtures.
 - Local servers bind `127.0.0.1` only unless `allow_remote_exposure=True`.
-- Layout: `src/anyinfer/` per DESIGN.md §18. Tests are flat `tests/test_<area>.py` modules — an area is often a group of related adapters, so bedrock's tests live in `test_bedrock_vertex.py` — plus mirrored subpackages for `context/`, `demo_app/`, `mcp/`, and `testing/`. Grep for the symbol rather than guessing a path from the module name.
+- Layout: `src/anyinfer/` per DESIGN.md §18. Tests are flat `tests/test_<area>.py` modules — an area is often a group of related adapters, so bedrock's tests live in `test_bedrock_vertex.py` — plus mirrored subpackages for `context/`, `anyinfer_demo/`, `mcp/`, and `testing/`. Grep for the symbol rather than guessing a path from the module name.
 
 ## Testing and documentation obligations
 

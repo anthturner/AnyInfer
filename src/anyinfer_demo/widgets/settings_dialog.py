@@ -403,7 +403,7 @@ class _ProviderPanel(QWidget):
         if setup_field.default_value:
             return setup_field.default_value
         if setup_field.kind == "secret":
-            # A literal is accepted but never written to disk (see demo_app.config), so
+            # A literal is accepted but never written to disk (see anyinfer_demo.config), so
             # the placeholder says which of the two survives a restart rather than
             # presenting them as equivalent.
             return "env://VARIABLE_NAME — a literal key works but is session-only"

@@ -127,6 +127,8 @@ _RESERVED_FIELDS = frozenset(
         "reasoning_effort",
         "metadata",
         "n",
+        "logprobs",
+        "top_logprobs",
         "user",
         HISTORY_FIELD,
         CACHE_FIELD,
@@ -317,6 +319,25 @@ def request_from_openai(
         what makes federation free.
     """
     target = str(body.get("model", "")).strip()
+
+    # Refused, not ignored. The codec's rule elsewhere is that telling the client beats
+    # silently applying the gateway's default; these were the two places it did not hold.
+    # `n` was reserved but never read, so n=3 returned one choice with no error, and
+    # logprobs forwarded upstream — possibly billed — with no response path to carry
+    # results back.
+    requested_choices = body.get("n")
+    if requested_choices is not None and requested_choices != 1:
+        raise ValueError(
+            f"n={requested_choices!r} is not supported: AnyInfer returns one choice per "
+            "request. Use the anyinfer_arena extension to fan out across targets."
+        )
+    for field in ("logprobs", "top_logprobs"):
+        if body.get(field) not in (None, False):
+            raise ValueError(
+                f"{field!r} is not supported: AnyInfer's normalized result has no field "
+                "to carry log probabilities back, so the request would be billed for "
+                "data the response could not return."
+            )
 
     sampling = Sampling(
         temperature=_opt_float(body.get("temperature")),

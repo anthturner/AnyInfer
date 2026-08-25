@@ -87,3 +87,12 @@ OpenAI model accepts it.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openai.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Structured output](../concepts/structured-output.md): native `json_schema` and when it is used.
+- [Prompt caching](../concepts/caching.md): automatic caching and what it reports.
+
+</div>

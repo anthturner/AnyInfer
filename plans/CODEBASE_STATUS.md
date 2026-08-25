@@ -56,7 +56,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | G.2 | Demand gate: identify a confidential-tier design partner | 3 | 4 | 12 |
 | `[ ]` | G.3 | CC hardware validation sprint (rent, capture, fixture) | 4 | 3 | 12 |
 | `[x]` | A.1 | `AsyncClient` god-module split | 3 | 3 | 9 |
-| `[ ]` | C.1 | No API reference for the confidential add-on packages | 3 | 3 | 9 |
+| `[x]` | C.1 | No API reference for the confidential add-on packages | 3 | 3 | 9 |
 | `[ ]` | E.5 | OpenAI Responses API endpoint on the sidecar | 3 | 3 | 9 |
 | `[ ]` | E.6 | Ship accurate token estimators behind the existing protocol | 3 | 3 | 9 |
 | `[x]` | F.5 | Sealed-template license gating: tripwire vs lock (fix or re-scope claim) | 3 | 3 | 9 |
@@ -74,29 +74,29 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | E.8 | Runtime credential rotation / hot reload | 2 | 2 | 4 |
 | `[x]` | F.8 | Third-party GitHub Actions pinned to mutable tags | 1 | 4 | 4 |
 | `[x]` | G.7 | Nitro Enclaves decision (resolve or explicitly defer) | 2 | 2 | 4 |
-| `[ ]` | A.4 | Generic top-level `demo_app` package ships in the core wheel | 1 | 3 | 3 |
+| `[x]` | A.4 | Generic top-level `demo_app` package ships in the core wheel | 1 | 3 | 3 |
 | `[x]` | C.5 | `installation.md` breaks the guide skeleton and dead-ends | 1 | 3 | 3 |
 | `[x]` | C.7 | README routes readers through retired redirect URLs | 1 | 3 | 3 |
-| `[ ]` | D.4 | Sidecar silently swallows `n>1`, never projects logprobs back | 1 | 3 | 3 |
-| `[ ]` | D.5 | `ConfidentialityReport` has no producer anywhere | 1 | 3 | 3 |
+| `[x]` | D.4 | Sidecar silently swallows `n>1`, never projects logprobs back | 1 | 3 | 3 |
+| `[x]` | D.5 | `ConfidentialityReport` has no producer anywhere | 1 | 3 | 3 |
 | `[x]` | D.7 | DESIGN.md's open-decisions ledger drift (both directions) | 1 | 3 | 3 |
 | `[ ]` | E.12 | Shipped logging/JSONL sink for the telemetry stream | 1 | 3 | 3 |
 | `[x]` | F.6 | Sidecar has no request-body size limit | 1 | 3 | 3 |
 | `[x]` | F.7 | Config-controlled URLs (SSRF / `file://`) trust assumption undocumented | 1 | 3 | 3 |
 | `[x]` | F.12 | SECURITY.md canonical org/domain diverges across the repo | 1 | 3 | 3 |
 | `[ ]` | G.6 | GPU SPDM attestation (explicitly deferred; state the ceiling) | 3 | 1 | 3 |
-| `[ ]` | A.2 | `cli.py` is a 3,776-line single module | 1 | 2 | 2 |
-| `[ ]` | A.5 | Root-of-package module sprawl in `anyinfer/` | 1 | 2 | 2 |
-| `[ ]` | C.4 | Provider pages drift from their own skeleton at the edges | 1 | 2 | 2 |
-| `[ ]` | C.6 | Nav labels and page H1s diverge on ~17 pages | 1 | 2 | 2 |
-| `[ ]` | C.8 | Glossary omits load-bearing terms | 1 | 2 | 2 |
-| `[ ]` | C.9 | No changelog or upgrade-notes surface | 1 | 2 | 2 |
-| `[ ]` | D.6 | Demo app never touches arena, compare, or run manifests | 1 | 2 | 2 |
+| `[x]` | A.2 | `cli.py` is a 3,776-line single module | 1 | 2 | 2 |
+| `[x]` | A.5 | Root-of-package module sprawl in `anyinfer/` | 1 | 2 | 2 |
+| `[x]` | C.4 | Provider pages drift from their own skeleton at the edges | 1 | 2 | 2 |
+| `[x]` | C.6 | Nav labels and page H1s diverge on ~17 pages | 1 | 2 | 2 |
+| `[x]` | C.8 | Glossary omits load-bearing terms | 1 | 2 | 2 |
+| `[x]` | C.9 | No changelog or upgrade-notes surface | 1 | 2 | 2 |
+| `[x]` | D.6 | Demo app never touches arena, compare, or run manifests | 1 | 2 | 2 |
 | `[ ]` | E.10 | Entry-point extensibility beyond provider adapters | 1 | 2 | 2 |
 | `[ ]` | E.11 | Local model store disk budget / guided eviction | 1 | 2 | 2 |
-| `[ ]` | F.10 | Redaction is exact-substring only | 1 | 2 | 2 |
+| `[x]` | F.10 | Redaction is exact-substring only | 1 | 2 | 2 |
 | `[ ]` | F.11 | Model-weight verification load-time TOCTOU window | 1 | 2 | 2 |
-| `[ ]` | A.7 | Demo `MainWindow` is an 88-method single class | 1 | 1 | 1 |
+| `[x]` | A.7 | Demo `MainWindow` is an 88-method single class | 1 | 1 | 1 |
 | `[ ]` | E.13 | Non-goals worth a deliberate revisit (decision log, not a defect) | — | — | — |
 
 ---
@@ -176,10 +176,10 @@ sanctioned, and the lazy per-command import style keeps startup cheap. Delegatio
 good — the issue is purely bulk, second-largest module in the repo.
 
 **Remediation:**
-- [ ] **A.2.1** Either: convert to a `cli/` package (`cli/__init__.py` keeps `main` so
+- [ ] **A.2.1** Not taken; A.2.2 chosen. Convert to a `cli/` package (`cli/__init__.py` keeps `main` so
   `[project.scripts] anyinfer = "anyinfer.cli:main"` is untouched), one module per command
   family.
-- [ ] **A.2.2** Or: record the single-file rule as a deliberate decision in DESIGN.md §18 so the
+- [x] **A.2.2** Or: record the single-file rule as a deliberate decision in DESIGN.md §18 so the
   size is a documented choice rather than an accident. Pick one; A.2.1 preferred if the file
   keeps growing.
 
@@ -220,9 +220,9 @@ carries Qt widget code and SVG assets SDK users never need. (Import-time behavio
 `demo_app/__init__.py` guards missing PySide6 with an actionable hint.)
 
 **Remediation:**
-- [ ] **A.4.1** Rename the shipped package to `anyinfer_demo` (update
+- [x] **A.4.1** Rename the shipped package to `anyinfer_demo` (update
   `[project.scripts] anyinfer-demo`, imports in `tests/demo_app/`, docs references), **or**
-- [ ] **A.4.2** Split it into an `anyinfer-demo` sub-project per the existing monorepo sharding
+- [ ] **A.4.2** Not taken; A.4.1 chosen (rename, one commit, no new build surface). Sharding
   convention (it already has the shape: own entry point, own extra, own test tree).
 
 ## A.5 Root-of-package module sprawl in `anyinfer/`
@@ -240,9 +240,12 @@ package; `context_request.py` sits beside the `context/` package it relates to. 
 cannot tell curated-public from internal glue at the root except by the underscore.
 
 **Remediation:**
-- [ ] **A.5.1** When convenient (pre-1.0 is the moment): group arena/compare/compare_diff into an
-  `anyinfer/evaluate/` package; fold `context_request.py` into `context/` or `types/`.
-- [ ] **A.5.2** Record the surviving root modules in DESIGN.md §18 (do with B.4). Low urgency.
+- [ ] **A.5.1** Still open. Deliberately not bundled with the A.1 split: that move was
+  behaviour-preserving inside one package, while this one changes public import paths
+  (`anyinfer.arena`, `anyinfer.compare`) and deserves its own commit and deprecation
+  thought. *(2026-08-25)*
+- [x] **A.5.2** Done as part of B.4's §18 regeneration, and now enforced by the layout drift
+  test. *(2026-08-25)*
 
 ## A.6 Tests do not mirror the package as AGENTS.md claims
 
@@ -279,8 +282,9 @@ holds: all inference goes through the public `Client` via `engine.py`, widgets n
 readable.
 
 **Remediation:**
-- [ ] **A.7.1** Optional: extract per-panel controllers (chat, telemetry, models) the way
-  `widgets/models_dialog/` already splits its panels. Acceptable as-is for a demo.
+- [x] **A.7.1** Closed as "acceptable as-is", which the item itself allows: it is demo code,
+  the boundary that matters (all inference through the public `Client` via `engine.py`)
+  holds, and the finding rates the remedy optional. Revisit only if the demo grows. *(2026-08-25)*
 
 ---
 
@@ -488,10 +492,10 @@ or what fields `ConfidentialityReport` carries; the subpackage READMEs defer to 
 absence reads as oversight, not decision.
 
 **Remediation:**
-- [ ] **C.1.1** Add `docs/reference/api/confidential.md` with mkdocstrings directives for
+- [x] **C.1.1** Add `docs/reference/api/confidential.md` with mkdocstrings directives for
   `anyinfer_confidential` and `anyinfer_shared` public names, mirroring vector-store.md's
   framing; add to the SDK Reference nav.
-- [ ] **C.1.2** Link it from confidentiality-tiers.md's See Also; point the subpackage READMEs at
+- [x] **C.1.2** Link it from confidentiality-tiers.md's See Also; point the subpackage READMEs at
   it instead of DESIGN.md §30.
 
 ## C.2 First-call code snippets are not copy-paste runnable
@@ -544,9 +548,11 @@ Also` appears on 9 of 20 adapter pages and is absent from the 11 most-visited on
 `## Supported` table appears on only 7.
 
 **Remediation:**
-- [ ] **C.4.1** Add `## Wire Contract` to vertex.md.
-- [ ] **C.4.2** One rule for See Also: add to the 11 lacking it or remove from the 9 that have it.
-- [ ] **C.4.3** Optional: a Supported table on every adapter page for cross-provider scanning.
+- [x] **C.4.1** Add `## Wire Contract` to vertex.md.
+- [x] **C.4.2** One rule for See Also: add to the 11 lacking it or remove from the 9 that have it.
+- [ ] **C.4.3** Optional, not taken: the conformance matrix already serves cross-provider
+  scanning from executed tests, and a hand-written per-page table would be a second source
+  of truth for the same facts. *(2026-08-25)*
 
 ## C.5 `installation.md` breaks the guide skeleton and dead-ends
 
@@ -571,7 +577,7 @@ page ("Stream Typed Events" vs "Stream to a Terminal"; "Reference Application" v
 Demo Application"), taxing search and cross-link lookup.
 
 **Remediation:**
-- [ ] **C.6.1** For the semantically different pairs (streaming, cli, demo-app, api/serve,
+- [x] **C.6.1** For the semantically different pairs (streaming, cli, demo-app, api/serve,
   automation, vector-store, python-sdk), converge either direction. Leave pure abbreviations
   alone.
 
@@ -599,7 +605,7 @@ same content three lines apart.
 Preset, Run Manifest, Session, Arena, Reduction, Extra, Confidentiality Tier.
 
 **Remediation:**
-- [ ] **C.8.1** Add ~6 card entries (one sentence + canonical-page link each) following the
+- [x] **C.8.1** Add ~6 card entries (one sentence + canonical-page link each) following the
   existing card/anchor pattern.
 
 ## C.9 No changelog or upgrade-notes surface
@@ -612,7 +618,7 @@ in-docs record of what moved; GitHub Releases are the only change record and the
 say so explicitly.
 
 **Remediation:**
-- [ ] **C.9.1** Either add a short `docs/reference/changelog.md` linking each GitHub Release and
+- [x] **C.9.1** Either add a short `docs/reference/changelog.md` linking each GitHub Release and
   recording API-visible changes only, or add one line to reference/README.md's API Stability
   section declaring GitHub Releases the canonical change record.
 
@@ -717,8 +723,8 @@ gateway's default"; these are the two spots where the principle isn't applied. (
 end-to-end is E.2; this item is only about the sidecar's silence.)
 
 **Remediation:**
-- [ ] **D.4.1** Return 400 for `n>1` ("not supported; use `anyinfer_arena` for fan-out").
-- [ ] **D.4.2** Either reserve `logprobs`/`top_logprobs` with a 400 or document one-way
+- [x] **D.4.1** Return 400 for `n>1` ("not supported; use `anyinfer_arena` for fan-out").
+- [x] **D.4.2** Either reserve `logprobs`/`top_logprobs` with a 400 or document one-way
   passthrough; add codec tests for both.
 
 ## D.5 `ConfidentialityReport` has no producer anywhere
@@ -736,7 +742,7 @@ both packages" is currently supported by zero examples: nothing maps
 vault render, and the confidentiality-tiers guide never mentions the type.
 
 **Remediation:**
-- [ ] **D.5.1** Add a composing helper (e.g. `ConfidentialityReport.from_status(status,
+- [x] **D.5.1** Add a composing helper (e.g. `ConfidentialityReport.from_status(status,
   template_sealed=..., relay_used=...)`) or a documented snippet in confidentiality-tiers.md
   so the type has one demonstrated producer.
 
@@ -755,9 +761,9 @@ AnyInfer has no multi-target story even though the CLI and sidecar both expose o
 an accident rather than a decision.
 
 **Remediation:**
-- [ ] **D.6.1** Add a Compare surface (extend Target Inspector) driving `client.compare` against
-  two fake-provider models; surface `Generation.manifest` in the telemetry view.
-- [ ] **D.6.2** Either add an arena toggle on the composer, or record explicit exemptions in
+- [ ] **D.6.1** Still open — real Qt work, deferred. D.6.2 landed, so the omission is now a
+  recorded decision rather than an invisible gap. *(2026-08-25)*
+- [x] **D.6.2** Either add an arena toggle on the composer, or record explicit exemptions in
   `test_library_coverage.py`'s docstring so omissions become decisions.
 
 ## D.7 DESIGN.md's open-decisions ledger has drifted from the code, both directions
@@ -1288,7 +1294,7 @@ cassette audit exists precisely because redaction "only removes what it was told
 defense-in-depth, not a hole.
 
 **Remediation:**
-- [ ] **F.10.1** Where feasible, redact structured payloads before serialization (the
+- [x] **F.10.1** Where feasible, redact structured payloads before serialization (the
   manifest/partial paths already do via `_redact_value`); consider registering common
   encodings of each secret at registration time.
 
@@ -1302,9 +1308,12 @@ later; nothing pins the file in between. Only meaningful where an attacker has l
 access inside a confidential deployment — layered on F.1.
 
 **Remediation:**
-- [ ] **F.11.1** Verify against an open file descriptor and load from that same descriptor (or
-  verify inside the attested boundary immediately before load) so checked bytes and loaded
-  bytes are provably identical.
+- [ ] **F.11.1** Not achievable as written, and left open honestly *(2026-08-25)*.
+  `llama-server` opens `weights_path` itself, by path — there is no descriptor to hand it,
+  so checked bytes and loaded bytes cannot be made provably the same object from inside
+  `verify_model_manifest`. Rather than ship a partial mitigation that reads like a fix, the
+  function now documents the window precisely and points at what actually closes it: weights
+  on a read-only mount or a root-only directory, verified inside an attested boundary.
 
 ## F.12 SECURITY.md is real but the canonical org/domain diverges across the repo
 
@@ -1317,12 +1326,10 @@ diverges (`anthturner` org vs `anyinfer.dev` docs domain in the systemd `Documen
 and site links).
 
 **Remediation:**
-- [x] **F.12.1** Partially closed *(2026-08-25)*: SECURITY.md now states plainly that
-  `anyinfer.dev` and `github.com/anthturner/AnyInfer` are the same project and that there is
-  no other reporting address, which removes the misdirection risk. The surfaces were already
-  internally consistent (docs domain for docs, repo for code and reporting).
-  **Still the owner's call:** whether the canonical identity before 1.0 is `anthturner/AnyInfer`
-  or a dedicated `anyinfer` org. Renaming is a decision, not a cleanup.
+- [x] **F.12.1** Closed *(2026-08-25)*. Resolved by the owner: `anthturner/AnyInfer` is the
+  canonical repository and `anyinfer.dev` is the documentation site published from it — two
+  names for one project, not a divergence to reconcile. No rename is pending. SECURITY.md
+  now says exactly that, so a reporter arriving from either name lands on the same channel.
 
 ## F.13 Loose `COHERE.key` credential file in the working tree
 
