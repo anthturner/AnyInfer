@@ -111,6 +111,10 @@ class ConfidentialExecutionStatus:
             claim** — a hash-and-signature check on an unattested host is a real but
             weaker guarantee; only `model_verified is True and end_to_end is True`
             together is the full Tier 4 claim (see `provenance.py`'s module docstring).
+            It is also **point-in-time**: it describes the weights when this status was
+            computed, not the weights a server later loads. To bind verification to the
+            load itself, pass a `WeightsProvenance` to `LocalServerSupervisor.acquire`,
+            which verifies inside the start path.
     """
 
     cpu_tee: CpuTeeKind | None

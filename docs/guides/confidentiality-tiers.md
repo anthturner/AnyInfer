@@ -242,10 +242,39 @@ ok = verify_model_manifest(manifest, weights_path=model_path, vendor_public_key=
 ```
 
 `confidential_execution_status()` accepts `manifest=`/`vendor_public_key=` and populates
-`model_verified` on the status. Verification is never cached, so a swapped file is
-caught on the next call. Treat `model_verified is True` as meaningful only when
+`model_verified` on the status. Treat `model_verified is True` as meaningful only when
 `end_to_end is True` too; a hash-and-signature check on an unattested host is a weaker,
 different guarantee.
+
+### Verify at the Point of Load
+
+`model_verified` is a point-in-time answer: it describes the weights when the status was
+computed, not the weights a server later opens. If the check runs at startup and the model
+loads an hour later, the gap between them is an hour.
+
+To bind verification to the load, hand the provenance to whatever starts the server:
+
+```python
+from anyinfer.local import WeightsProvenance
+
+provenance = WeightsProvenance(manifest=manifest, vendor_public_key=public_key)
+managed = await supervisor.acquire(key, model_path, plan, provenance=provenance)
+```
+
+The weights are hashed through open file descriptors *inside* the start path, and their
+identity is re-confirmed in the instant before the process is spawned. A file renamed over,
+replaced, truncated, or deleted after verification is refused with a
+[`ConfidentialExecutionError`](../reference/errors.md#confidentialexecutionerror) and no
+server starts — including when the replacement is byte-identical, because a replacement is
+a different file whatever it contains.
+
+Two residual windows remain, and neither closes from inside a library. `llama-server` opens
+the path itself, so the microseconds between the last check and that open are not covered;
+and because llama.cpp maps weights lazily, a writer with access to the *same* file can
+still alter pages that have not been read yet. Both need the bytes to be immutable while
+they load — a read-only mount, or a directory only root can write. That is a property of
+how you deploy, and Tier 3's attested boundary is what makes it checkable rather than
+assumed.
 
 ## Appendix: SOC 2 Control Mapping
 

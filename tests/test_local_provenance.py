@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -12,8 +13,14 @@ from cryptography.hazmat.primitives.serialization import (
     PublicFormat,
 )
 
-from anyinfer.errors import ConfigError
-from anyinfer.local.provenance import ModelManifest, hash_model_weights, verify_model_manifest
+from anyinfer.errors import ConfidentialExecutionError, ConfigError
+from anyinfer.local.provenance import (
+    ModelManifest,
+    WeightsProvenance,
+    hash_model_weights,
+    open_verified_weights,
+    verify_model_manifest,
+)
 
 
 def _keypair() -> tuple[bytes, bytes]:
@@ -133,3 +140,115 @@ def test_manifest_json_round_trip() -> None:
 def test_from_dict_rejects_a_malformed_manifest() -> None:
     with pytest.raises(ConfigError):
         ModelManifest.from_dict({"model_id": "x"})
+
+
+# ---- verification bound to the bytes that get loaded ---------------------------------
+
+
+def _provenance(weights: Path) -> tuple[WeightsProvenance, bytes]:
+    private_key, public_key = _keypair()
+    manifest = _manifest("m", hash_model_weights(weights), private_key)
+    return WeightsProvenance(manifest=manifest, vendor_public_key=public_key), public_key
+
+
+def test_open_verified_weights_agrees_with_the_path_based_digest(tmp_path: Path) -> None:
+    """Manifests signed before descriptor-based verification existed must still verify."""
+    weights = tmp_path / "model.gguf"
+    weights.write_bytes(b"weights" * 1000)
+    provenance, _ = _provenance(weights)
+
+    with open_verified_weights(provenance, weights) as verified:
+        assert verified.digest == hash_model_weights(weights)
+
+
+def test_open_verified_weights_agrees_on_a_directory_snapshot(tmp_path: Path) -> None:
+    weights = tmp_path / "snapshot"
+    (weights / "nested").mkdir(parents=True)
+    (weights / "a.safetensors").write_bytes(b"aaa" * 500)
+    (weights / "nested" / "b.json").write_text('{"k": 1}')
+    provenance, _ = _provenance(weights)
+
+    with open_verified_weights(provenance, weights) as verified:
+        assert verified.digest == hash_model_weights(weights)
+
+
+def test_a_file_replaced_after_verification_is_caught(tmp_path: Path) -> None:
+    """The whole point: a rename over the path is a different inode, and is refused.
+
+    This is the swap the old path-based check could not see — it hashed, returned True,
+    and whatever happened to the path afterwards was invisible.
+    """
+    weights = tmp_path / "model.gguf"
+    weights.write_bytes(b"genuine" * 1000)
+    provenance, _ = _provenance(weights)
+
+    with open_verified_weights(provenance, weights) as verified:
+        verified.assert_unchanged()  # still the same file
+
+        impostor = tmp_path / "impostor.gguf"
+        impostor.write_bytes(b"genuine" * 1000)  # identical bytes, different inode
+        impostor.replace(weights)
+
+        with pytest.raises(ConfidentialExecutionError, match="replaced after verification"):
+            verified.assert_unchanged()
+
+
+def test_a_file_truncated_after_verification_is_caught(tmp_path: Path) -> None:
+    weights = tmp_path / "model.gguf"
+    weights.write_bytes(b"genuine" * 1000)
+    provenance, _ = _provenance(weights)
+
+    with open_verified_weights(provenance, weights) as verified:
+        with weights.open("r+b") as handle:
+            handle.truncate(10)
+        with pytest.raises(ConfidentialExecutionError, match="changed size"):
+            verified.assert_unchanged()
+
+
+def test_a_file_deleted_after_verification_is_caught(tmp_path: Path) -> None:
+    weights = tmp_path / "model.gguf"
+    weights.write_bytes(b"genuine" * 1000)
+    provenance, _ = _provenance(weights)
+
+    with open_verified_weights(provenance, weights) as verified:
+        weights.unlink()
+        with pytest.raises(ConfidentialExecutionError, match="no longer readable"):
+            verified.assert_unchanged()
+
+
+def test_tampered_weights_never_open_at_all(tmp_path: Path) -> None:
+    weights = tmp_path / "model.gguf"
+    weights.write_bytes(b"genuine" * 1000)
+    provenance, _ = _provenance(weights)
+    weights.write_bytes(b"tampered" * 1000)
+
+    with pytest.raises(ConfidentialExecutionError, match="do not match the signed manifest"):
+        with open_verified_weights(provenance, weights):
+            pytest.fail("must not yield for weights that do not match")
+
+
+def test_a_manifest_signed_by_another_key_never_opens(tmp_path: Path) -> None:
+    weights = tmp_path / "model.gguf"
+    weights.write_bytes(b"genuine" * 1000)
+    provenance, _ = _provenance(weights)
+    other_private, _ = _keypair()
+    forged = WeightsProvenance(
+        manifest=_manifest("m", hash_model_weights(weights), other_private),
+        vendor_public_key=provenance.vendor_public_key,
+    )
+
+    with pytest.raises(ConfidentialExecutionError, match="not signed by the expected"):
+        with open_verified_weights(forged, weights):
+            pytest.fail("must not yield for a forged manifest")
+
+
+def test_descriptors_are_released_when_the_block_exits(tmp_path: Path) -> None:
+    weights = tmp_path / "model.gguf"
+    weights.write_bytes(b"genuine" * 1000)
+    provenance, _ = _provenance(weights)
+
+    with open_verified_weights(provenance, weights) as verified:
+        held = verified._fds
+    for fd in held:
+        with pytest.raises(OSError):
+            os.fstat(fd)

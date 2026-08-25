@@ -95,7 +95,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[ ]` | E.10 | Entry-point extensibility beyond provider adapters | 1 | 2 | 2 |
 | `[ ]` | E.11 | Local model store disk budget / guided eviction | 1 | 2 | 2 |
 | `[x]` | F.10 | Redaction is exact-substring only | 1 | 2 | 2 |
-| `[ ]` | F.11 | Model-weight verification load-time TOCTOU window | 1 | 2 | 2 |
+| `[x]` | F.11 | Model-weight verification load-time TOCTOU window | 1 | 2 | 2 |
 | `[x]` | A.7 | Demo `MainWindow` is an 88-method single class | 1 | 1 | 1 |
 | `[ ]` | E.13 | Non-goals worth a deliberate revisit (decision log, not a defect) | — | — | — |
 
@@ -1308,12 +1308,27 @@ later; nothing pins the file in between. Only meaningful where an attacker has l
 access inside a confidential deployment — layered on F.1.
 
 **Remediation:**
-- [ ] **F.11.1** Not achievable as written, and left open honestly *(2026-08-25)*.
-  `llama-server` opens `weights_path` itself, by path — there is no descriptor to hand it,
-  so checked bytes and loaded bytes cannot be made provably the same object from inside
-  `verify_model_manifest`. Rather than ship a partial mitigation that reads like a fix, the
-  function now documents the window precisely and points at what actually closes it: weights
-  on a read-only mount or a root-only directory, verified inside an attested boundary.
+- [x] **F.11.1** Fixed, with the residual stated *(2026-08-25)*. Investigation changed the
+  diagnosis: the primary defect was not a micro-race but a **missing link** —
+  `verify_model_manifest` was only ever called from `confidential_execution_status()`, and
+  `LocalServerSupervisor` had no knowledge of manifests at all, so the verify→load gap was
+  unbounded rather than microseconds.
+  - `WeightsProvenance` carries the manifest and key to the point of load;
+    `LocalServerSupervisor.acquire(..., provenance=...)` verifies **inside** the start
+    path, so verification and load are one operation.
+  - `open_verified_weights` hashes through **open descriptors** rather than the path, and
+    holds them for the block — inode numbers get recycled, so recording `(dev, ino)` alone
+    would let a delete-and-recreate pass.
+  - `VerifiedWeights.assert_unchanged()` runs in the instant before `Popen`; rename-over,
+    replace, truncate, and delete are all refused, including a **byte-identical**
+    replacement, because it is a different inode.
+  - The proposed "verify against an fd and load from that same fd" was checked and rejected
+    as unworkable: weights may be a *directory* snapshot, and llama.cpp derives split-shard
+    paths from filenames, so a `/proc/self/fd/N` substitution breaks both cases.
+  - **Residual, documented at every surface:** llama-server opens the path itself
+    (microseconds uncovered), and llama.cpp maps lazily, so a writer with access to the same
+    inode can still alter unfaulted pages. Both need immutable bytes during load — read-only
+    mount or root-only directory — which is a deployment property, not a library one.
 
 ## F.12 SECURITY.md is real but the canonical org/domain diverges across the repo
 
