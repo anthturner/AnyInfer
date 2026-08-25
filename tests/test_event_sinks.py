@@ -100,6 +100,24 @@ def test_the_jsonl_file_is_not_readable_by_other_local_users(tmp_path: Path) -> 
     assert path.stat().st_mode & 0o777 == 0o600
 
 
+def test_the_jsonl_file_is_owner_restricted_where_the_platform_allows_it(
+    tmp_path: Path,
+) -> None:
+    """Pins what actually happens on each platform rather than skipping one of them."""
+    from anyinfer._private_files import OWNER_ONLY_IS_ENFORCED
+
+    path = tmp_path / "telemetry.jsonl"
+    with ai.JsonlObserver(path):
+        pass
+
+    if OWNER_ONLY_IS_ENFORCED:
+        assert path.stat().st_mode & 0o777 == 0o600
+    else:
+        # Windows reports a mode the call did not really set; the sink documents that it
+        # cannot restrict there, and this asserts the file is at least created.
+        assert path.exists()
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
 def test_jsonl_observer_tightens_an_existing_wider_mode_file(tmp_path: Path) -> None:
     """`os.open`'s mode argument applies only on creation; an existing file keeps its own."""

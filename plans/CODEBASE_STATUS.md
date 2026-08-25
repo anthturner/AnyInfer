@@ -127,6 +127,7 @@ batch.
 | ✅ | H.3 | new | Dead `filterwarnings` exemption silently covers future starlette drift | 1 | 4 | 4 | XS |
 | ✅ | I.1 | new | CI installs 1 of 3 shards; 64 shard tests gated nowhere | 4 | 5 | 20 | S |
 | ✅ | I.2 | new | `os.pread` is POSIX-only; every Windows lane fails | 4 | 5 | 20 | XS |
+| ✅ | I.3 | new | `chmod(0o600)` is a no-op on Windows; four writers claimed protection | 3 | 5 | 15 | S |
 | 🚧 | C.4 | C.3.2 | Delete add-on install caveats when the first PyPI release ships | 1 | 1 | 1 | XS |
 
 ---
@@ -1241,3 +1242,47 @@ tests across `test_local_provenance.py` and `test_local_server.py` failed with
 - [x] **I.2.2** A test hides `os.pread` exactly as Windows lacks it, asserting an identical
   digest and an untouched file position — so the Linux lanes now cover the branch only
   Windows would otherwise reach, which is how the POSIX-only call shipped unnoticed.
+
+## I.3 — `chmod(0o600)` does not restrict anything on Windows
+
+**Severity:** Medium · **Confidence:** High (CI reported `key.bin is mode 666`) · **Was:** new
+**Paths:** `src/anyinfer/_private_files.py` (new),
+`src/anyinfer-confidential/src/anyinfer_confidential/cli.py`,
+`src/anyinfer/events/sinks.py`, `src/anyinfer_demo/config.py`
+
+**Brief:** `Path.chmod(0o600)` on Windows toggles a read-only attribute and leaves the
+file's ACL untouched, so a file "protected" that way stays readable by every other local
+account — and `stat()` afterwards reports `0o666`. Three writers called it and described
+the result as owner-only: the confidential CLI (**key material**), the JSONL telemetry
+sink, and the demo config.
+
+**Long:** Found by questioning the `skipif` guards added for I.2 rather than by CI, which
+was green. Those guards were correct about the *test* — a POSIX mode assertion is
+meaningless on Windows — but skipping was the wrong remedy, because the assertion was the
+only thing checking a security property that genuinely matters on both platforms. The
+skip converted a visible failure into an unchecked claim, which is worse.
+
+The project had already reached the right answer once: `serve/service.py` declines to
+write a bearer-token file on Windows at all, reasoning that *"a weakly-protected secret
+file that looks protected is worse than telling the operator to put the value where the
+OS already guards it."* The other three writers had not been held to it.
+
+**Remediation:**
+- [x] **I.3.1** `anyinfer/_private_files.py` provides `restrict_to_owner`, which applies
+  the mode where the platform can express it and **returns whether the restriction is
+  real**, plus `OWNER_ONLY_IS_ENFORCED` and a shared warning string. No Windows ACL
+  manipulation is attempted: doing it properly means `icacls` or the Win32 security APIs,
+  and shipping security-critical code no maintainer can exercise would trade a known gap
+  for an unverified one — the same rule §G applies to attestation.
+- [x] **I.3.2** All three writers use it. The confidential CLI still writes the key (a
+  keygen that refused to run on Windows would be worse) but warns on stderr, and its three
+  success messages now say what was actually applied instead of a hard-coded "mode 0600".
+- [x] **I.3.3** The two skipped tests were replaced with tests that assert the real
+  behaviour on *both* platforms, so neither is unchecked. Verified down the Windows branch
+  by forcing `OWNER_ONLY_IS_ENFORCED` off.
+- [x] **I.3.4** `docs/guides/observability.md` no longer claims mode 0600 unconditionally.
+
+**Still open, deliberately:** on Windows these files are not owner-restricted at all. The
+honest posture now ships; the protection does not. Closing that needs ACL work validated
+on a real Windows host — the same hardware-gated shape as §G, and worth its own item in a
+future rebuild.

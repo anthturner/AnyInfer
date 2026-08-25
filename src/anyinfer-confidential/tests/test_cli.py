@@ -80,6 +80,28 @@ def test_seal_and_issue_license_end_to_end(tmp_path: Path) -> None:
     assert verified.deployment_id == "dep-1"
 
 
+def test_secret_outputs_are_owner_restricted_or_say_they_are_not(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Owner-only where the platform can express it; a warning where it cannot.
+
+    Skipping this on Windows is what let the gap hide: `chmod(0o600)` there toggles a
+    read-only attribute and leaves the ACL untouched, so the key stays readable by every
+    other local account while the mode argument implies otherwise. Both branches are
+    asserted so neither platform is simply unchecked.
+    """
+    from anyinfer._private_files import OWNER_ONLY_IS_ENFORCED
+
+    key_path = tmp_path / "key.bin"
+    assert main(["keygen", "--out", str(key_path)]) == 0
+    assert key_path.exists()
+
+    if OWNER_ONLY_IS_ENFORCED:
+        assert key_path.stat().st_mode & 0o777 == 0o600
+    else:
+        assert "without owner-only permissions" in capsys.readouterr().err
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
 def test_secret_outputs_are_written_mode_0600(tmp_path: Path) -> None:
     """Secret outputs are not readable by other local users.

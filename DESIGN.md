@@ -817,6 +817,7 @@ src/anyinfer/
   schema/                # mechanism.py project.py validate.py repair.py partial.py
   events/                # observers.py telemetry.py sinks.py
   redaction.py           # event-stream redaction (root module, not under events/)
+  _private_files.py      # owner-only file permissions, and where they cannot be applied
   plugins.py             # entry-point discovery beyond provider adapters
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py

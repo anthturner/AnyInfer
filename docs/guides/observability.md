@@ -78,8 +78,9 @@ with ai.JsonlObserver("telemetry.jsonl") as trail:
     client.subscribe(trail)
 ```
 
-The file is created at mode `0600`, since even payload-free telemetry names targets,
-models, and spend. `LoggingObserver` is the same idea aimed at a `logging.Logger`: the
+On POSIX the file is created at mode `0600`, since even payload-free telemetry names
+targets, models, and spend. Windows has no equivalent through `chmod` — the file is not
+owner-restricted there, so put it somewhere whose ACL already excludes other accounts. `LoggingObserver` is the same idea aimed at a `logging.Logger`: the
 event name is the message and the full mapping rides as an `anyinfer_event` record
 attribute, so a JSON formatter renders it while a plain one still prints something
 readable.

@@ -26,6 +26,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from .._private_files import restrict_to_owner
 from ..redaction import redact
 from .telemetry import TelemetryEvent
 
@@ -168,8 +169,10 @@ class JsonlObserver:
     from its background loop thread while the caller's own thread may be subscribing.
 
     Args:
-        path: File to append to. Parent directories are created. Created at mode 0600 —
-            even payload-free telemetry names targets, models, and spend.
+        path: File to append to. Parent directories are created. Created at mode 0600 on
+            POSIX — even payload-free telemetry names targets, models, and spend. Windows
+            has no equivalent through `chmod`, so the file is *not* owner-restricted
+            there; put it somewhere whose ACL already excludes other accounts.
         flush: Flush after every line. The default (`True`) costs a syscall per event and
             is what makes the file useful for `tail -f` and for a crash post-mortem, which
             is most of why this exists. Set `False` for high-volume runs where the file is
@@ -192,7 +195,8 @@ class JsonlObserver:
         # The mode argument above applies only when `open` creates the file. Appending to
         # a file that already exists at 0644 would inherit that mode silently, so it is
         # re-applied unconditionally -- the same follow-up the demo config writer does.
-        self._path.chmod(0o600)
+        # On Windows this is a no-op and reports so; see `_private_files`.
+        restrict_to_owner(self._path)
 
     def on_event(self, event: TelemetryEvent) -> None:
         """Append one event. Never raises for a serialization problem."""

@@ -21,6 +21,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from anyinfer._private_files import restrict_to_owner
 from anyinfer.config import CONFIG_FORMAT_VERSION
 
 __all__ = ["CONFIG_PATH", "DemoConfig", "ProviderConfig", "default_config"]
@@ -322,11 +323,13 @@ class DemoConfig:
         destination.parent.mkdir(parents=True, exist_ok=True)
         # Created at 0600 before the first byte: even with literal secrets stripped, the
         # file names endpoints, tenants, and which environment variables hold keys, and
-        # a default umask leaves that readable by every other local user.
+        # a default umask leaves that readable by every other local user. Windows cannot
+        # express this through `chmod`; `restrict_to_owner` reports that rather than
+        # pretending otherwise.
         descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(json.dumps(self.to_json(), indent=2))
-        destination.chmod(0o600)
+        restrict_to_owner(destination)
 
     @classmethod
     def load(cls, path: Path | None = None) -> DemoConfig:
