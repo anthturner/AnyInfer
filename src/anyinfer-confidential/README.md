@@ -16,3 +16,12 @@ pip install -e "src/anyinfer-confidential[relay]"   # only if you're running the
 
 See DESIGN.md §30 and the published Confidentiality Tiers doc for the
 full design and the honest ceiling on what each tier guarantees.
+
+## Running the Relay service
+
+`app.build_app` requires a `tokens` mapping (bearer token → `tenant_id`) and refuses to
+build without one. The endpoint returns the decrypted, assembled prompt, so the tenant is
+derived from the presented token and never from the request body; a body `tenant_id` that
+disagrees with the token is rejected. Terminate TLS in front of it, and provision routes
+with `relay.load_registry` rather than a hand-rolled registration script. The full
+checklist is in [the confidentiality tiers guide](../../docs/guides/confidentiality-tiers.md).

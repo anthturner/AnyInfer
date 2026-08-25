@@ -108,9 +108,41 @@ result = await relay.handle(
 print(result.assembled_prompt)
 ```
 
-`anyinfer_confidential.app.build_app(relay)` serves it over ASGI with the `relay`
-extra. Self-hosted and hosted deployments run the identical `Relay` class; AnyInfer does
-not currently operate a hosted instance.
+`anyinfer_confidential.app.build_app(relay, tokens=...)` serves it over ASGI with the
+`relay` extra. Self-hosted and hosted deployments run the identical `Relay` class;
+AnyInfer does not currently operate a hosted instance.
+
+### Deploying the Relay
+
+The endpoint's response body is the decrypted, assembled prompt, so authentication is
+not optional and `build_app` has no unauthenticated mode. `tokens` maps a bearer token to
+the tenant it authenticates, and the tenant is taken from the token — a `tenant_id` in the
+request body is never trusted, and one that disagrees with the token is rejected.
+
+```python
+import secrets
+
+from anyinfer_confidential.app import build_app
+from anyinfer_confidential.relay import load_registry
+
+registry = load_registry("relay-routes.json")   # sealed templates: ciphertext, not secret
+app = build_app(relay, tokens={secrets.token_urlsafe(32): "customer-42"})
+```
+
+A self-hosting checklist:
+
+- **Terminate TLS in front of the app.** A bearer token on a plaintext connection is
+  readable by anything on the path.
+- **Issue one long random token per tenant** and record which tenant each belongs to.
+  Rotate by replacing the mapping and rebuilding the app.
+- **Provision routes from a file** with `load_registry`, so the tenant-to-route binding
+  is under configuration management rather than in a bespoke script. The file holds
+  sealed templates, so it is ciphertext and can live in a config repository; decryption
+  still needs the deployment's vault, key ring, and a valid license.
+- **Do not expose `mode="forward"` expectations to HTTP clients.** The endpoint assembles
+  only, and answers a forward-mode request with 400. Forwarding needs short-lived
+  provider credentials that the wire format deliberately does not accept; call
+  `Relay.handle` in-process for that mode.
 
 ## Tier 3 (Attested Local Execution)
 

@@ -454,7 +454,8 @@ def cmd_setup(args: argparse.Namespace) -> int:
     # sharding convention) aren't in the root package's dependency graph, but their
     # mkdocstrings reference pages need them importable for `workspace build docs` /
     # `workspace check --only=docs-build` to succeed locally, same as in CI.
-    python("-m", "pip", "install", "-e", "src/anyinfer-store")
+    for shard in ("src/anyinfer-store", "src/anyinfer-shared", "src/anyinfer-confidential"):
+        python("-m", "pip", "install", "-e", shard)
     print()
     print(green("Environment ready.") + " Try `workspace check` or `workspace demo`.")
     return 0

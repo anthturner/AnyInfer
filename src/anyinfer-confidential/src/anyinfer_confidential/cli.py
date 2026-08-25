@@ -7,6 +7,7 @@ offline file transform, matching Tier 1's "no daemon" posture.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -14,18 +15,35 @@ from .license import generate_signing_keypair, issue_license
 from .sealed_template import generate_key, seal_template
 
 
+def _write_private_bytes(path: str, payload: bytes) -> None:
+    """Write secret material at mode 0600, created restricted before the first byte.
+
+    Writing first and tightening afterwards leaves a window in which the key is
+    world-readable, which is exactly what this guards against on a shared build machine
+    or a CI runner. Mirrors ``anyinfer.serve.service.write_service``'s token handling.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(payload)
+    target.chmod(0o600)
+
+
 def _cmd_keygen(args: argparse.Namespace) -> int:
     key = generate_key()
-    Path(args.out).write_bytes(key)
-    print(f"wrote AES-256-GCM key to {args.out}")
+    _write_private_bytes(args.out, key)
+    print(f"wrote AES-256-GCM key to {args.out} (mode 0600 — this key decrypts every")
+    print("template sealed under its key id; keep it out of source control)")
     return 0
 
 
 def _cmd_keygen_license(args: argparse.Namespace) -> int:
     private_key, public_key = generate_signing_keypair()
-    Path(args.out_private).write_bytes(private_key)
+    _write_private_bytes(args.out_private, private_key)
     Path(args.out_public).write_bytes(public_key)
-    print(f"wrote license signing keypair to {args.out_private} (private, keep secret)")
+    print(f"wrote license signing keypair to {args.out_private} (private, mode 0600,")
+    print("                              keep secret — it mints licenses)")
     print(f"                              and {args.out_public} (public, ship with clients)")
     return 0
 
@@ -44,8 +62,11 @@ def _cmd_seal(args: argparse.Namespace) -> int:
 def _cmd_issue_license(args: argparse.Namespace) -> int:
     private_key = Path(args.private_key).read_bytes()
     blob = issue_license(args.deployment_id, private_key=private_key, valid_days=args.days)
-    Path(args.out).write_bytes(blob)
-    print(f"issued a {args.days}-day license for {args.deployment_id!r} -> {args.out!r}")
+    _write_private_bytes(args.out, blob)
+    print(
+        f"issued a {args.days}-day license for {args.deployment_id!r} -> {args.out!r} "
+        "(mode 0600)"
+    )
     return 0
 
 

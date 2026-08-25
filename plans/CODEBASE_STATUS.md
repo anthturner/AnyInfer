@@ -36,13 +36,13 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | Status | ID | Item | Sev | Pri | Score |
 |---|---|---|---|---|---|
 | `[x]` | B.1 | Sidecar docs deny endpoints the sidecar actually serves | 5 | 5 | 25 |
-| `[ ]` | F.2 | Relay ASGI app serves decrypted prompt IP with no authentication | 5 | 5 | 25 |
+| `[x]` | F.2 | Relay ASGI app serves decrypted prompt IP with no authentication | 5 | 5 | 25 |
 | `[ ]` | G.1 | Attestation honest-claims pass (reword oversell, pin GPU parse) | 5 | 5 | 25 |
 | `[x]` | B.6 | Error docs `missing_fields` → real attribute `missing_required` | 3 | 5 | 15 |
 | `[ ]` | E.1 | Async batch inference APIs (OpenAI Batch, Anthropic Message Batches) | 5 | 3 | 15 |
 | `[ ]` | F.1 | Tier 3 "attested execution" is detection, not attestation (→ plan §G) | 5 | 3 | 15 |
 | `[ ]` | F.3 | Demo app persists literal API keys despite "memory only" guarantee | 3 | 5 | 15 |
-| `[ ]` | F.4 | Confidential CLI writes private keys with default file permissions | 3 | 5 | 15 |
+| `[x]` | F.4 | Confidential CLI writes private keys with default file permissions | 3 | 5 | 15 |
 | `[ ]` | G.4 | CPU attestation-quote verification behind the `attest` extra | 5 | 3 | 15 |
 | `[ ]` | B.2 | Conformance matrix mislabels implemented embeddings (3 providers) | 3 | 4 | 12 |
 | `[x]` | B.3 | CLI subcommand enumerations stale in AGENTS.md and DESIGN.md | 3 | 4 | 12 |
@@ -1119,14 +1119,14 @@ only with no provisioning surface, and there is no hosted deployment story (docs
 "hosted Relay ops" gap.
 
 **Remediation:**
-- [ ] **F.2.1** Add authentication to `build_app` (bearer token or mTLS); derive `tenant_id` from
+- [x] **F.2.1** Add authentication to `build_app` (bearer token or mTLS); derive `tenant_id` from
   the authenticated principal, never the body; reject a body `tenant_id` that disagrees.
-- [ ] **F.2.2** Handle `mode:"forward"` explicitly at the HTTP layer: either decode short-lived
+- [x] **F.2.2** Handle `mode:"forward"` explicitly at the HTTP layer: either decode short-lived
   provider settings or return 400 "assemble only" — never the current misleading 404.
-- [ ] **F.2.3** Add a registry-provisioning helper (JSON/file-based) and a self-host deployment
+- [x] **F.2.3** Add a registry-provisioning helper (JSON/file-based) and a self-host deployment
   checklist (TLS, token issuance, tenant binding) to the package README /
   confidentiality-tiers.md.
-- [ ] **F.2.4** Until F.2.1 lands, document loudly that `build_app` is unauthenticated and must be
+- [x] **F.2.4** Until F.2.1 lands, document loudly that `build_app` is unauthenticated and must be
   wrapped.
 
 ## F.3 Demo app persists literal API keys despite a documented "memory only" guarantee
@@ -1169,7 +1169,7 @@ licenses gating all template decryption; the AES key decrypts every template sea
 id. On a shared build machine or CI runner, another local user or a later job can read them.
 
 **Remediation:**
-- [ ] **F.4.1** Write all three outputs via `os.open(path, O_WRONLY|O_CREAT|O_TRUNC, 0o600)` +
+- [x] **F.4.1** Write all three outputs via `os.open(path, O_WRONLY|O_CREAT|O_TRUNC, 0o600)` +
   `fdopen`, mirroring `serve/service.py:write_service`; print a note that the file is
   mode-restricted.
 
