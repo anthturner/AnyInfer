@@ -98,7 +98,9 @@ def normalize_provider_id(value: str) -> str:
     return value.strip().lower().replace("_", "-")
 
 
-PluginLoadReason = Literal["import-failed", "not-a-descriptor", "id-taken", "alias-taken"]
+PluginLoadReason = Literal[
+    "import-failed", "not-a-descriptor", "id-taken", "alias-taken", "scheme-reserved"
+]
 """Why a third-party entry point did not become a usable provider."""
 
 
@@ -397,6 +399,18 @@ class ProviderDescriptor:
 
     requires_base_url: bool = False
     """Whether the adapter cannot be built without a configured base URL."""
+
+    honors_connection_settings: bool = True
+    """Whether the adapter applies the instance's ``proxy``/``verify``/``client_cert``.
+
+    True for every adapter that opens its own HTTP client through
+    `anyinfer.providers.http.build_client`, which is nearly all of them. False for an
+    adapter that delegates transport to a vendor SDK it does not configure — the parser
+    reads this to refuse the keys at load rather than accept them and silently ignore
+    them, which is the same "reject noise" rule that already turns ``verify: true`` into
+    an error. Declared rather than hardcoded so a new delegating adapter inherits the
+    behavior by saying so.
+    """
 
     setup: ProviderSetupSpec = ProviderSetupSpec()
     """Declarative description of the configuration this provider needs, which is what a

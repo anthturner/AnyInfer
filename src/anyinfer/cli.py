@@ -61,6 +61,18 @@ def _add_serve_flags(parser: argparse.ArgumentParser) -> None:
         metavar="TARGET",
         help="advertise a concrete provider:model target from /v1/models (repeatable)",
     )
+    # Default resolved in `cmd_serve`, not here: the constant lives in `serve.app`, which
+    # is imported lazily so building this parser never costs the serve import.
+    parser.add_argument(
+        "--max-request-bytes",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "reject request bodies larger than N bytes with 413 "
+            "(default: 10 MiB; 0 disables the check)"
+        ),
+    )
 
 
 def _copy_parser_actions(
@@ -310,7 +322,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--reasoning",
         default=None,
-        choices=["minimal", "low", "medium", "high"],
+        choices=["none", "minimal", "low", "medium", "high"],
         help="reasoning effort, on models that expose it",
     )
     run.add_argument(
@@ -964,7 +976,8 @@ def _serve_run(args: argparse.Namespace) -> int:
         return 1
 
     from . import AsyncClient
-    from .serve.app import create_app
+    from .config import build_observers
+    from .serve.app import DEFAULT_MAX_REQUEST_BYTES, create_app
 
     config = _config(args.config)
     settings, route = list(config.providers), config.route
@@ -976,10 +989,22 @@ def _serve_run(args: argparse.Namespace) -> int:
         operation_routes=config.operation_routes,
         history=config.history,
         cache=config.cache,
+        repair=config.repair,
+        observers=list(build_observers(config.observers)),
         arena=config.arena,
         arenas=config.arenas,
     )
-    app = create_app(client, auth_token=token, expose_targets=tuple(args.expose))
+    app = create_app(
+        client,
+        auth_token=token,
+        expose_targets=tuple(args.expose),
+        max_request_bytes=(
+            DEFAULT_MAX_REQUEST_BYTES
+            if args.max_request_bytes is None
+            else args.max_request_bytes
+        ),
+        context_tuning=config.context,
+    )
 
     print(f"anyinfer {__version__} serving on http://{args.host}:{args.port}")
     print(f"  authentication: {'bearer token' if token else 'disabled (loopback only)'}")
@@ -1302,7 +1327,7 @@ def _confirm(question: str, args: argparse.Namespace) -> bool:
 def _compare(args: argparse.Namespace) -> int:
     """Compare a request across targets without dispatching it.
 
-    Dispatches to the portability diff tool (`anyinfer.compare_diff`) first when
+    Dispatches to the portability diff tool (`anyinfer.evaluate.compare_diff`) first when
     ``--snapshot``, ``--diff``, or ``--diff-request`` was given; otherwise runs the
     original single ad hoc comparison.
     """
@@ -1401,7 +1426,7 @@ def _compare(args: argparse.Namespace) -> int:
 def _compare_snapshot(args: argparse.Namespace) -> int:
     """`anyinfer compare --snapshot`: write a compare_diff snapshot to --out."""
     from . import Client
-    from . import compare_diff as cd
+    from .evaluate import compare_diff as cd
 
     if args.fixtures is None or args.out is None:
         print("--snapshot needs --fixtures and --out", file=sys.stderr)
@@ -1426,7 +1451,7 @@ def _compare_snapshot(args: argparse.Namespace) -> int:
 
 def _compare_diff_files(args: argparse.Namespace) -> int:
     """`anyinfer compare --diff BASELINE CURRENT`: structural diff, no client needed."""
-    from . import compare_diff as cd
+    from .evaluate import compare_diff as cd
 
     baseline_path, current_path = args.diff
     try:
@@ -1469,7 +1494,7 @@ def _compare_diff_request(args: argparse.Namespace) -> int:
     The ad hoc, no-baseline-file "should I move from A to B" report for one fixture.
     """
     from . import Client
-    from . import compare_diff as cd
+    from .evaluate import compare_diff as cd
 
     if args.fixtures is None or args.diff_target_a is None or args.diff_target_b is None:
         print(
@@ -2113,7 +2138,7 @@ def _result_payload(generation: Any) -> dict[str, Any]:
         "warnings": list(generation.warnings),
     }
     if generation.arena is not None:
-        from .arena import arena_to_dict
+        from .evaluate.arena import arena_to_dict
 
         payload["arena"] = arena_to_dict(generation.arena)
     return payload

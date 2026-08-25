@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from anyinfer import Client, ProviderSettings, compare_diff
+from anyinfer import Client, ProviderSettings
+from anyinfer.evaluate import compare_diff
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "compare-diff"
 

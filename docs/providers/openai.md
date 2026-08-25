@@ -47,7 +47,7 @@ result = client.generate(prompt, target="openai:gpt-5", reasoning="high")
 result.usage.reasoning_tokens
 ```
 
-Effort levels pass straight through: `minimal`, `low`, `medium`, `high`.
+Effort levels pass straight through: `none`, `minimal`, `low`, `medium`, `high`.
 
 ## Embeddings
 
@@ -87,3 +87,12 @@ OpenAI model accepts it.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/openai.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/openai.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Structured output](../concepts/structured-output.md): native `json_schema` and when it is used.
+- [Prompt caching](../concepts/caching.md): automatic caching and what it reports.
+
+</div>

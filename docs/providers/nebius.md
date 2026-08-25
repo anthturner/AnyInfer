@@ -61,3 +61,12 @@ outside AnyInfer's normalized four-level scale; send those explicitly through
 
 For the exact fields this adapter sends and reads, see
 [contracts/nebius.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/nebius.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Preset providers](presets.md): the shared adapter this rides on.
+- [Targets and aliases](../concepts/targets.md): naming a model on a preset provider.
+
+</div>

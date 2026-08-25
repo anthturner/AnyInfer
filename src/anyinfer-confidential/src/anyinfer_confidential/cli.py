@@ -7,25 +7,68 @@ offline file transform, matching Tier 1's "no daemon" posture.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
+
+from anyinfer._private_files import (
+    OWNER_ONLY_IS_ENFORCED,
+    owner_only_warning,
+    restrict_to_owner,
+)
 
 from .license import generate_signing_keypair, issue_license
 from .sealed_template import generate_key, seal_template
 
 
+def _write_private_bytes(path: str, payload: bytes) -> None:
+    """Write secret material owner-restricted, created that way before the first byte.
+
+    Writing first and tightening afterwards leaves a window in which the key is
+    world-readable, which is exactly what this guards against on a shared build machine
+    or a CI runner. Mirrors ``anyinfer.serve.service.write_service``'s token handling.
+
+    **On Windows the restriction cannot be applied.** `chmod` there toggles a read-only
+    attribute and leaves the ACL alone, so the file stays readable by every other local
+    account while `stat` reports 0o666. This writes the key anyway — a keygen that
+    refused to run on Windows would be worse — but says so on stderr rather than letting
+    the mode argument imply a protection that is not there. The sidecar's service writer
+    takes the stronger line for its bearer token and declines to write a file at all;
+    that option is not open here, because the key *is* the artifact being produced.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # `O_BINARY` because `payload` is key material: on Windows `os.open` defaults to text
+    # mode, which would rewrite any 0x0A byte in a key as CRLF and corrupt it on write.
+    # The flag does not exist on POSIX, where there is no translation to disable.
+    descriptor = os.open(
+        target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0), 0o600
+    )
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(payload)
+    if not restrict_to_owner(target):
+        print(owner_only_warning(target, what="key material"), file=sys.stderr)
+
+
+def _mode_note() -> str:
+    """How to describe the permissions actually applied, per platform."""
+    return "mode 0600" if OWNER_ONLY_IS_ENFORCED else "NOT owner-restricted on Windows"
+
+
 def _cmd_keygen(args: argparse.Namespace) -> int:
     key = generate_key()
-    Path(args.out).write_bytes(key)
-    print(f"wrote AES-256-GCM key to {args.out}")
+    _write_private_bytes(args.out, key)
+    print(f"wrote AES-256-GCM key to {args.out} ({_mode_note()} — this key decrypts every")
+    print("template sealed under its key id; keep it out of source control)")
     return 0
 
 
 def _cmd_keygen_license(args: argparse.Namespace) -> int:
     private_key, public_key = generate_signing_keypair()
-    Path(args.out_private).write_bytes(private_key)
+    _write_private_bytes(args.out_private, private_key)
     Path(args.out_public).write_bytes(public_key)
-    print(f"wrote license signing keypair to {args.out_private} (private, keep secret)")
+    print(f"wrote license signing keypair to {args.out_private} (private, {_mode_note()},")
+    print("                              keep secret — it mints licenses)")
     print(f"                              and {args.out_public} (public, ship with clients)")
     return 0
 
@@ -44,8 +87,11 @@ def _cmd_seal(args: argparse.Namespace) -> int:
 def _cmd_issue_license(args: argparse.Namespace) -> int:
     private_key = Path(args.private_key).read_bytes()
     blob = issue_license(args.deployment_id, private_key=private_key, valid_days=args.days)
-    Path(args.out).write_bytes(blob)
-    print(f"issued a {args.days}-day license for {args.deployment_id!r} -> {args.out!r}")
+    _write_private_bytes(args.out, blob)
+    print(
+        f"issued a {args.days}-day license for {args.deployment_id!r} -> {args.out!r} "
+        f"({_mode_note()})"
+    )
     return 0
 
 

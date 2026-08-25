@@ -31,7 +31,6 @@ from ._client import (
     semantic_ranker,
     tool,
 )
-from .arena import ArenaResult, Candidate
 from .benchmark import (
     BENCHMARK_OUTPUT_TOKENS,
     BENCHMARK_PROMPT_TOKENS,
@@ -72,7 +71,6 @@ from .catalog import (
     OllamaChannel,
     load_default_catalog,
 )
-from .compare import EmbeddingTargetComparison, TargetComparison
 from .config import (
     CONFIG_FORMAT_VERSION,
     MAX_CONFIG_BYTES,
@@ -105,6 +103,8 @@ from .errors import (
     TransportError,
     UnsupportedInputError,
 )
+from .evaluate.arena import ArenaResult, Candidate
+from .evaluate.compare import EmbeddingTargetComparison, TargetComparison
 from .events import (
     ArenaCompleted,
     AttemptCompleted,
@@ -114,6 +114,8 @@ from .events import (
     DownloadProgress,
     FallbackTriggered,
     FirstToken,
+    JsonlObserver,
+    LoggingObserver,
     Observer,
     ParameterDropped,
     ProviderDiagnostic,
@@ -316,8 +318,10 @@ __all__ = [
     "HostShorthand",
     "ImagePart",
     "InferenceOperation",
+    "JsonlObserver",
     "LocalModelInfo",
     "LocalRuntimeError",
+    "LoggingObserver",
     "Measurement",
     "MeasurementIdentity",
     "MeasurementStore",

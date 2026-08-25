@@ -20,7 +20,7 @@ import os
 from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any, ClassVar
 
-from ..errors import AuthError, ConfigError, ProviderError, RateLimitError
+from ..errors import AnyInferError, AuthError, ConfigError, ProviderError, RateLimitError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import (
     DiscoveredModel,
@@ -90,19 +90,45 @@ class CopilotAdapter:
         copilot = self._import_sdk()
         options: dict[str, Any] = dict(self._config.options)
         cli_path = options.pop("cli_path", None) or os.environ.get(_CLI_PATH_ENV)
+        if cli_path:
+            # The SDK takes a runtime *connection*, not a flat path: `cli_path=` was an
+            # earlier spelling and today's `CopilotClient` is keyword-only with no
+            # `**kwargs`, so passing it raises `TypeError` rather than being ignored.
+            # `StdioRuntimeConnection` is the variant that spawns the named binary and
+            # talks to it over stdin/stdout, which is what pointing at a CLI means.
+            options["connection"] = copilot.StdioRuntimeConnection(path=str(cli_path))
         try:
-            self._client = copilot.CopilotClient(
-                **({"cli_path": cli_path} if cli_path else {}), **options
-            )
+            self._client = copilot.CopilotClient(**options)
         except Exception as exc:
             raise self._map_error(exc) from exc
         return self._client
 
-    def _map_error(self, exc: Exception) -> ProviderError:
-        """Map an SDK or CLI failure to a typed, actionable error."""
+    def _map_error(self, exc: Exception) -> AnyInferError:
+        """Map an SDK or CLI failure to a typed, actionable error.
+
+        Returns `AnyInferError` rather than `ProviderError` because not every failure
+        reaching here is the provider's: an options key the installed SDK does not accept
+        is a configuration mistake, and `ConfigError` sits on the configure-phase branch
+        of the hierarchy rather than under `ProviderError`.
+        """
         text = f"{type(exc).__name__}: {exc}"
         lowered = text.lower()
 
+        if isinstance(exc, TypeError) and "keyword argument" in lowered:
+            # The whole `options` block is forwarded to a vendor constructor that is
+            # keyword-only with no `**kwargs`, so an option this SDK version does not
+            # know is a `TypeError` rather than something it ignores. Named explicitly
+            # because the generic branch below turns it into a bare repr, which is how
+            # a rename in the SDK reads as an unexplained provider failure.
+            return ConfigError(
+                text,
+                provider=self.provider_id,
+                hint=(
+                    "an 'options' key is not accepted by the installed "
+                    "github-copilot-sdk; remove it, or upgrade/downgrade the SDK to a "
+                    "version that takes it"
+                ),
+            )
         if "not found" in lowered and ("cli" in lowered or "copilot" in lowered):
             return ProviderError(
                 text,
@@ -234,21 +260,46 @@ class CopilotAdapter:
         self._session_counter += 1
         return f"copilot-session-{self._session_counter}"
 
+    #: Shutdown method names, most current first. The SDK spells this `stop`; `close` and
+    #: `aclose` are kept as fallbacks so an older or newer pin still shuts down rather
+    #: than silently doing nothing. Probing for names that do not exist is what let a
+    #: rename leak the CLI subprocess on every close, so `_SHUTDOWN_METHODS` is asserted
+    #: against the installed SDK in `tests/test_copilot.py` instead of merely hoped for.
+    _SHUTDOWN_METHODS = ("stop", "close", "aclose")
+
     async def aclose(self) -> None:
-        """Shut down held sessions, the SDK client, and its CLI runtime."""
+        """Shut down held sessions, the SDK client, and its CLI runtime.
+
+        The client owns a spawned CLI process, so failing to reach a real shutdown method
+        leaks it — silently, because there is nothing to raise. `CopilotClient.stop`
+        closes active sessions as part of its own cleanup; sessions are still swept first
+        so a session-level failure cannot skip the client shutdown that matters most.
+        """
         for session in self._sessions.values():
-            close = getattr(session, "close", None) or getattr(session, "aclose", None)
-            if close is not None:
-                with contextlib.suppress(Exception):
-                    await _maybe_await(close())
+            await self._shutdown(session)
         self._sessions.clear()
         if self._client is None:
             return
-        close = getattr(self._client, "close", None) or getattr(self._client, "aclose", None)
-        if close is not None:
-            with contextlib.suppress(Exception):
-                await _maybe_await(close())
+        await self._shutdown(self._client)
         self._client = None
+
+    @staticmethod
+    async def _shutdown(target: Any) -> None:
+        """Call the first shutdown method `target` actually has, sync or async."""
+        for name in CopilotAdapter._SHUTDOWN_METHODS:
+            method = getattr(target, name, None)
+            if method is None:
+                continue
+            with contextlib.suppress(Exception):
+                await _maybe_await(method())
+            return
+        # Falling through means every known spelling is gone: the SDK renamed its
+        # shutdown API again. Async context-manager exit is the one contract the SDK has
+        # kept across those renames, so it is the last resort rather than giving up.
+        exit_ = getattr(target, "__aexit__", None)
+        if exit_ is not None:
+            with contextlib.suppress(Exception):
+                await exit_(None, None, None)
 
 
 # ---- helpers -------------------------------------------------------------------------
@@ -430,6 +481,9 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=None,
     requires_base_url=False,
+    # The SDK owns its own HTTP stack; this adapter never builds an httpx client, so a
+    # proxy or CA bundle set here would be accepted and then quietly do nothing.
+    honors_connection_settings=False,
     setup=ProviderSetupSpec(
         fields=(
             SetupField(

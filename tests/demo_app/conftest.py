@@ -71,7 +71,7 @@ def isolated_config_path(tmp_path, monkeypatch):
     write into the developer's real per-user configuration.
     """
     try:
-        import demo_app.config as demo_config
+        import anyinfer_demo.config as demo_config
     except ImportError:
         yield
         return

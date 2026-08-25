@@ -99,3 +99,12 @@ normalized input model.
 
 For the exact request/response fields this adapter depends on, see
 [contracts/anthropic.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/anthropic.md).
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Structured output](../concepts/structured-output.md): why a schema request here becomes a single forced tool call.
+- [Prompt caching](../concepts/caching.md): Anthropic's explicit cache breakpoints and what they bill.
+
+</div>

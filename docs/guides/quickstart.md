@@ -25,8 +25,10 @@ read.
 
 === "Sync"
 
-    ```python hl_lines="8"
+    ```python hl_lines="10"
     import anyinfer as ai
+
+    text = "The 0.1 release adds embeddings, reranking, and an OpenAI-compatible sidecar."
 
     client = ai.Client(
         [
@@ -45,8 +47,10 @@ read.
 
 === "Async"
 
-    ```python hl_lines="9"
+    ```python hl_lines="11"
     import anyinfer as ai
+
+    text = "The 0.1 release adds embeddings, reranking, and an OpenAI-compatible sidecar."
 
     async with ai.AsyncClient(
         [

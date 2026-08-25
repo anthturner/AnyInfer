@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 
-from demo_app.config import default_config
-from demo_app.engine import Engine
+from anyinfer_demo.config import default_config
+from anyinfer_demo.engine import Engine
 
 
 def _drain_task(engine: Engine, key: str, timeout_ms: int = 15_000) -> object:
@@ -48,7 +48,7 @@ def engine(qapp: object) -> Engine:
 
 
 def test_embed_button_disabled_until_target_set(engine: Engine, qapp: object) -> None:
-    from demo_app.widgets.embeddings_panel import EmbeddingsPanel
+    from anyinfer_demo.widgets.embeddings_panel import EmbeddingsPanel
 
     panel = EmbeddingsPanel(engine)
     assert panel._embed_button.isEnabled() is False
@@ -61,7 +61,7 @@ def test_embed_button_disabled_until_target_set(engine: Engine, qapp: object) ->
 
 def test_embed_runs_against_the_offline_fake(engine: Engine, qapp: object) -> None:
     from anyinfer import EmbeddingResult
-    from demo_app.widgets.embeddings_panel import EMBED_KEY, EmbeddingsPanel
+    from anyinfer_demo.widgets.embeddings_panel import EMBED_KEY, EmbeddingsPanel
 
     panel = EmbeddingsPanel(engine)
     panel.set_target("ignored")
@@ -79,7 +79,7 @@ def test_embed_runs_against_the_offline_fake(engine: Engine, qapp: object) -> No
 
 def test_rerank_runs_against_the_offline_fake(engine: Engine, qapp: object) -> None:
     from anyinfer import RerankResult
-    from demo_app.widgets.embeddings_panel import RERANK_KEY, EmbeddingsPanel
+    from anyinfer_demo.widgets.embeddings_panel import RERANK_KEY, EmbeddingsPanel
 
     panel = EmbeddingsPanel(engine)
     panel.set_target("ignored")
@@ -95,7 +95,7 @@ def test_rerank_runs_against_the_offline_fake(engine: Engine, qapp: object) -> N
 
 
 def test_embed_with_no_text_does_nothing(engine: Engine, qapp: object) -> None:
-    from demo_app.widgets.embeddings_panel import EmbeddingsPanel
+    from anyinfer_demo.widgets.embeddings_panel import EmbeddingsPanel
 
     panel = EmbeddingsPanel(engine)
     panel.set_target("ignored")

@@ -167,9 +167,15 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
 
     ``minimal`` clamps to ``low`` rather than ``none``: only some Grok models accept
     ``none``, and silently disabling reasoning on a reasoning model would change the
-    answer more than the caller asked for.
+    answer more than the caller asked for. An explicit ``none`` is passed straight
+    through — the caller asked for exactly that, so a model that rejects it should say so
+    rather than have the request quietly rewritten into more reasoning than was wanted.
     """
-    return {} if effort is None else {"reasoning_effort": _XAI_EFFORTS[effort]}
+    if effort is None:
+        return {}
+    if effort == "none":
+        return {"reasoning_effort": "none"}
+    return {"reasoning_effort": _XAI_EFFORTS[effort]}
 
 
 _XAI_FEATURES = (

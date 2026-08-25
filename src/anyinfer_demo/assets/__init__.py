@@ -12,7 +12,7 @@ from pathlib import Path
 
 __all__ = ["asset_path", "read_svg"]
 
-_PACKAGE = "demo_app.assets"
+_PACKAGE = "anyinfer_demo.assets"
 
 
 def asset_path(name: str) -> Path:

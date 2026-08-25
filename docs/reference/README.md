@@ -25,6 +25,13 @@ public; everything else is an implementation detail that may change without noti
 `help(ai.AsyncClient.generate)` in a REPL always matches the published
 [SDK reference](api/README.md), because both come from the same docstrings.
 
+**Where changes are recorded.**
+[GitHub Releases](https://github.com/anthturner/AnyInfer/releases) is the canonical change
+record: every release carries generated notes covering what changed in it, and the project
+publishes no separate changelog that could drift from them. AnyInfer is pre-1.0, so a minor
+version may change a public signature — read the release notes for the version you are
+moving to before upgrading.
+
 ## Module Map
 
 | Module | Responsibility |

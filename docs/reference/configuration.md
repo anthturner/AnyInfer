@@ -45,6 +45,80 @@ ai.ProviderSettings.of(
 The order providers are listed in is the preference order for
 [alias resolution](../concepts/targets.md#aliases).
 
+### Proxies, Private CAs, and mTLS
+
+Three optional per-instance keys cover TLS-intercepting proxies and private certificate
+authorities — the environments that most often break an otherwise working install:
+
+```json
+{
+  "id": "openai",
+  "api_key": "env://OPENAI_API_KEY",
+  "proxy": "http://corp-proxy:3128",
+  "verify": "/etc/ssl/corp-ca.pem",
+  "client_cert": ["/etc/ssl/client.pem", "/etc/ssl/client.key"]
+}
+```
+
+- **`proxy`** routes this instance's traffic through a proxy. Omit it to keep the standard
+  `HTTPS_PROXY`/`NO_PROXY` environment behavior, which is the default.
+- **`verify`** takes a CA-bundle path for a private or intercepting CA, or `false` to
+  disable verification entirely. `true` is the default and is not stored.
+- **`client_cert`** is a combined PEM path, or `[cert, key]`, or `[cert, key, password]`.
+
+They are **per provider instance** on purpose: one provider can trust a corporate CA while
+another keeps the public roots, which a process-wide environment variable cannot express.
+All three combine: the example above is one instance behind an intercepting proxy,
+trusting a private CA, presenting a client certificate. A path that cannot be read or
+parsed is a `ConfigError` naming the setting, not a bare filesystem error.
+
+!!! warning "`verify: false` disables certificate checking"
+    It makes the connection interceptable by anything on the path. Point `verify` at the
+    CA bundle instead — that is what it is for, and it keeps verification on.
+
+These are ignored when a `transport` is supplied in code, since a caller bringing its own
+transport has taken over connection handling; that is what the offline test modes do.
+
+#### What They Cover, and What They Do Not
+
+The keys govern the connections AnyInfer opens *for this provider instance*: its
+generation, embedding, and reranking calls, plus — for Vertex — the Google OAuth token
+exchange that authenticates them, since one instance having two different trust decisions
+is not something a user could infer.
+
+Four things stay outside that boundary and follow the process environment
+(`HTTPS_PROXY`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`) instead:
+
+- **Auth token endpoints other than Google's.** Microsoft Entra token acquisition rides
+  the `azure-identity` SDK's own HTTP stack, which AnyInfer does not configure.
+- **[MCP](#the-mcp-block) servers.** A tool server is a separate endpoint with its own
+  trust story, not part of a provider instance.
+- **Model and runtime downloads.** Weight fetching lives in `anyinfer.local`, not in an
+  adapter, and is governed per download rather than per provider.
+- **The `copilot` provider entirely.** Its adapter delegates transport to
+  `github-copilot-sdk`, which owns its own connection handling. The parser rejects these
+  keys on a copilot instance rather than accepting them and doing nothing.
+
+### URLs in Configuration Are Trusted Input
+
+AnyInfer fetches `base_url`, [MCP server](#the-mcp-block) endpoints, and model-source URLs
+as given. It does not filter them by host: a URL pointing at `localhost`, at a private
+range, or at a cloud metadata endpoint such as `169.254.169.254` is fetched like any
+other, and a `file://` model source reads the local path it names. This is deliberate —
+pointing AnyInfer at a service on your own network is the normal case for Ollama, LM
+Studio, vLLM, and a self-hosted gateway, and a blocklist would break it.
+
+The assumption is that **configuration is trusted**: written by the operator, not by a
+user of the application. It holds for a config file under your control, and for the
+sidecar, whose `model` strings resolve only to already-configured providers and so cannot
+introduce a new URL.
+
+It stops holding the moment lower-trust input reaches any of these values — a multi-tenant
+application letting a customer supply a `base_url`, an MCP endpoint, or a model source. If
+you build that, validate the URL against your own allowlist before it reaches
+`ProviderSettings`; treat it as you would any other user-supplied URL your server will
+fetch.
+
 ### Configuring One Engine More Than Once
 
 `alias` gives an entry its own identity, so the same engine can be configured several
@@ -112,6 +186,13 @@ ai.ProviderSettings.of(
 
 Fields a provider declares as anything *other* than `secret` are passed through verbatim,
 since resolving them would corrupt any literal value that merely looked like a reference.
+
+Beyond `env://` and `credential://`, an organization can add its own scheme by publishing
+a resolver under the `anyinfer.credential_stores` entry-point group — the only way to
+reach one from a plain config file, and so the only way the sidecar can use it. A
+scheme-shaped `api_key` that no installed resolver handles is a `ConfigError` at load
+rather than a value quietly sent as the credential. See
+[custom schemes the sidecar can reach](../concepts/credentials.md#custom-schemes-the-sidecar-can-reach).
 
 To discover what a provider accepts without hardcoding it, read its setup spec; the
 `any_of` groups are the ones where one of several fields will do:
@@ -184,7 +265,7 @@ client.generate(
     tools=(),
     tool_choice="auto",  # "auto" | "none" | "required" | a tool name
     sampling=ai.Sampling(...),
-    reasoning=None,  # "minimal" | "low" | "medium" | "high"
+    reasoning=None,  # "none" | "minimal" | "low" | "medium" | "high"
     timeout_s=None,  # per attempt; defaults to 120
     repair=None,
     provider_options={},  # namespaced escape hatch
@@ -357,6 +438,9 @@ A misspelled setting is a `ConfigError`, not a silent no-op; a tuning key that s
 does nothing is worse than one that fails loudly. The sidecar reads the same file so one
 config serves every frontend, but it does not reduce context itself: it is a wire codec
 over a normal client, and reduction is the application's call about its own material.
+What the sidecar *does* supply is this block as the default tuning for a wire context
+request that omits its own `tuning`, so a gateway caller inherits the operator's settings
+instead of silently falling back to the library defaults.
 
 The full field list is on [`ContextTuning`](api/context.md#advanced-settings).
 
@@ -402,6 +486,63 @@ Prompt-cache placement is opt-in because it changes provider billing and retenti
 Omitting the block disables placement. An empty object enables the default `CachePolicy`;
 `auto` chooses the strongest mechanism the resolved target offers. See
 [prompt caching](../concepts/caching.md) for the mechanism and billing semantics.
+
+### The `repair` Block
+
+Bounded schema repair, opt-in because a repair round-trip costs another provider call:
+
+```json
+{
+  "repair": {
+    "max_attempts": 1
+  }
+}
+```
+
+Omitting the block means no repair: a response that violates the schema is surfaced as a
+`SchemaViolationError` rather than retried. An empty object enables the default `Repair`.
+
+This block is how a **sidecar deployment** reaches the repair loop at all. The Python API
+takes `repair=` per call and the CLI has `run --repair`, but `anyinfer serve` builds its
+client from this file — without the block, structured output through the sidecar validates
+and 422s where the Python path would have recovered. See
+[structured output](../concepts/structured-output.md#repair).
+
+### The `observers` Block
+
+Telemetry sinks the file can name. This is the only way a **sidecar deployment** gets an
+access log: `anyinfer serve` has no constructor for a caller to reach, so a sink it cannot
+name is a sink it cannot have.
+
+```json
+{
+  "observers": [
+    "logging",
+    {"name": "jsonl", "options": {"path": "/var/log/anyinfer/telemetry.jsonl"}}
+  ]
+}
+```
+
+`logging` and `jsonl` ship with the library. Any other name is resolved through the
+`anyinfer.observers` entry-point group, so a package can publish its own sink and have it
+named here — an unknown name is a `ConfigError` at load, not a surprise at the first event.
+
+Sinks are **described, not built**, exactly as [`mcp`](#the-mcp-block) servers are: loading
+a configuration file never opens a log file. `anyinfer.config.build_observers` constructs
+them when a frontend decides to observe. Every string they emit is redacted — see
+[telemetry](api/telemetry.md#ready-made-sinks).
+
+A sink named here is **always payload-free**, with no opt-in. Payload capture is a
+`client.subscribe(sink, payloads=True)` decision in code, deliberately: a configuration
+file is edited by whoever can reach it, often committed, and often shared between
+environments, so a key in it that turns on prompt-and-response capture would be the wrong
+default in every direction. A deployment that wants an audit trail carrying payloads
+builds the sink in code and subscribes it there.
+
+Validating a name that is *not* a built-in imports the package providing it, because
+entry-point metadata alone cannot confirm the name resolves to something real. That is
+the accepted cost of failing at load instead of at the first event; a file naming only
+built-ins imports nothing.
 
 ### The `operation_routes` Block
 

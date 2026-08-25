@@ -145,6 +145,9 @@ class GeminiAdapter:
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     def _model_path(self, model: str, method: str) -> str:
@@ -744,6 +747,11 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
+    if effort == "none":
+        # `thinkingLevel` has no off value; the budget field does, and zero is Gemini's
+        # documented way to disable thinking. Models that cannot disable it clamp upward
+        # server-side, the same as for any other level.
+        return {"thinkingConfig": {"thinkingBudget": 0}}
     return {"thinkingConfig": {"thinkingLevel": _THINKING_LEVELS[effort]}}
 
 

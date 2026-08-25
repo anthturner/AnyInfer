@@ -13,10 +13,27 @@ immediately before rendering it, and best-effort-zeroes the decrypted buffer aft
 "best effort" because CPython strings are immutable and the interpreter may retain copies
 the caller has no handle to; this module never claims stronger than that.
 
-Decryption is gated on a vendor-issued, signed, time-boxed `LicenseBlob`. This is a
-second, independent motivation beyond confidentiality: an install without a valid,
-unexpired, correctly-signed license cannot produce a single rendered prompt. See
-`license.py` for issuance and verification.
+`TemplateVault.render()` is gated on a vendor-issued, signed, time-boxed `LicenseBlob`:
+without a valid, unexpired, correctly-signed license, `render()` raises and returns no
+prompt. See `license.py` for issuance and verification.
+
+**What that gate is, precisely.** It is enforcement in *this code path*, not a
+cryptographic lock on the ciphertext. License validity never enters key derivation: a
+`TemplateVault` holds the AES key (via its `KeyRing`) and the ciphertext, so someone
+holding the bundle can call `AESGCM(key).decrypt(...)` themselves and skip the check
+entirely. Two further limits worth stating plainly:
+
+- **Expiry is a signed field, not a cryptographic property.** It is compared against local
+  wall-clock time, so rolling the clock back defeats it. Key-wrapping the template under
+  material carried in the license would not fix this — that material ships in the same
+  bundle and does not itself expire.
+- **Revocation defaults to fail-open** (`revocation_fail_closed=False`), so an unreachable
+  revocation service degrades to the offline answer rather than refusing to render.
+
+This is inherent to client-side sealing, and it is the same ceiling Tier 1's
+*confidentiality* claim already states: the adversary owns the machine. The licensing gate
+raises the cost and makes unlicensed use unambiguous and detectable — it does not make it
+impossible, and nothing here should be sold as if it did.
 """
 
 from __future__ import annotations

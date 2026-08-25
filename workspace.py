@@ -451,10 +451,14 @@ def cmd_setup(args: argparse.Namespace) -> int:
     python("-m", "pip", "install", "--upgrade", "pip")
     python("-m", "pip", "install", "-e", f".[{args.extras}]")
     # Sharded add-ons (src/anyinfer-*, each its own pyproject.toml per the monorepo
-    # sharding convention) aren't in the root package's dependency graph, but their
-    # mkdocstrings reference pages need them importable for `workspace build docs` /
-    # `workspace check --only=docs-build` to succeed locally, same as in CI.
-    python("-m", "pip", "install", "-e", "src/anyinfer-store")
+    # sharding convention) aren't in the root package's dependency graph. They are
+    # installed editable for two reasons: their mkdocstrings reference pages need them
+    # importable for `workspace build docs` / `workspace check --only=docs-build`, and
+    # their own test suites must exercise the working tree. A non-editable install here
+    # means a shard's tests silently run against a stale copy in site-packages, which is
+    # exactly what hid two security fixes from their own tests once already.
+    for shard in SHARDS:
+        python("-m", "pip", "install", "-e", shard)
     print()
     print(green("Environment ready.") + " Try `workspace check` or `workspace demo`.")
     return 0
@@ -537,9 +541,21 @@ _DOCSTRING_INHERITED_EXEMPT = frozenset(
 )
 """Members every exported class inherits; requiring docstrings for these is noise."""
 
+SHARDS = ("src/anyinfer-store", "src/anyinfer-shared", "src/anyinfer-confidential")
+"""The sharded add-ons, each its own pyproject.toml per the monorepo sharding convention.
+
+Named once because two places must agree: `cmd_setup`, which builds a contributor's
+environment, and `.github/workflows/ci.yml`, which builds CI's. When they disagreed, CI
+installed one of the three — so the docs build failed on an unimportable shard, and 64
+shard tests never ran anywhere. `tests/test_workspace.py` asserts the workflow installs
+exactly this list, so adding a shard cannot silently skip either environment again.
+"""
+
+
 _PUBLIC_SURFACES = (
     "anyinfer",
-    "anyinfer.compare_diff",
+    "anyinfer.evaluate",
+    "anyinfer.evaluate.compare_diff",
     "anyinfer.context",
     "anyinfer.local",
     "anyinfer.serve",
@@ -991,21 +1007,36 @@ def cmd_check(args: argparse.Namespace) -> int:
 _CONTRACTS_URL = "https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md"
 """Absolute because the matrix page cannot link outside the mkdocs docs/ tree."""
 
-_MATRIX_HEADER = """# Conformance Matrix
+_NON_HTTP_ROWS = frozenset({"copilot", "llama-cpp"})
+"""Matrix rows whose conformance boundary is not an in-process HTTP transport.
+
+Named here so the header's "N that speak HTTP" is derived from the rows actually
+rendered instead of re-counted by hand — the drift that left the number stale before.
+"""
+
+
+def _matrix_header(providers: Sequence[str]) -> str:
+    """Render the matrix preamble, deriving the HTTP-boundary count from the rows."""
+    http_rows = sum(1 for name in providers if name not in _NON_HTTP_ROWS)
+    return f"""# Conformance Matrix
 
 **Generated from a real conformance run — do not edit by hand.**
 Regenerate with `python workspace.py matrix`.
 
-Legend: ✅ verified · ➖ declared unsupported · ❌ failing
+Legend: ✅ verified · 🔗 implemented, verified by that adapter's dedicated tests ·
+➖ declared unsupported · ❌ failing
 
 Each cell is one parametrized test case executed against that adapter in fake-server mode,
 at whatever boundary that adapter has: an in-process HTTP transport for the
-twenty that speak HTTP, and a fake SDK module for `copilot`, whose boundary is
+{http_rows} that speak HTTP, and a fake SDK module for `copilot`, whose boundary is
 the ``github-copilot-sdk`` session API rather than a wire protocol. `llama-cpp` speaks
 HTTP to a server it supervises, so its row substitutes a stub supervisor and starts no
 process, downloads nothing, and binds no port.
-A ➖ is a declared limitation, not a pass. How a case is defined and how to record a
-cassette are covered in [the conformance suite](../contributing/conformance.md).
+A ➖ is a declared limitation, not a pass. A 🔗 is neither: the adapter implements the
+operation and a dedicated test in its own module proves it, but exercising it through this
+shared harness would need a second fake with a different shape. How a case is defined and
+how to record a cassette are covered in
+[the conformance suite](../contributing/conformance.md).
 
 """
 
@@ -1141,7 +1172,7 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
 
     case_names = [case.name for case in CONFORMANCE_CASES]
 
-    lines = [_MATRIX_HEADER]
+    lines = [_matrix_header(sorted(results))]
     lines.append(f"Last generated: {date.today().isoformat()}.\n")
     lines.append("| Provider | " + " | ".join(case_names) + " |")
     lines.append("|---" * (len(case_names) + 1) + "|")
@@ -1345,7 +1376,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
         raise StepError(
             'PySide6 is not installed — run `workspace setup`, or `pip install -e ".[demo]"`'
         )
-    return python("-m", "demo_app", *args.rest)
+    return python("-m", "anyinfer_demo", *args.rest)
 
 
 @verb(
@@ -1451,13 +1482,13 @@ def _build_wheel() -> int:
 _DEMO_ENTRY_STUB = """\
 '''PyInstaller entry point for the demo app.
 
-Generated by `workspace build demo`. The real ``demo_app.__main__`` cannot be the entry
+Generated by `workspace build demo`. The real ``anyinfer_demo.__main__`` cannot be the entry
 script directly: PyInstaller executes the entry file as a top-level script, where
-``demo_app``'s relative imports have no parent package.
+``anyinfer_demo``'s relative imports have no parent package.
 '''
 import sys
 
-from demo_app.app import main
+from anyinfer_demo.app import main
 
 sys.exit(main())
 """
@@ -1674,7 +1705,7 @@ def _build_demo_bundle() -> int:
             "--copy-metadata",
             "markdown",
             "--add-data",
-            f"{ROOT / 'src' / 'demo_app' / 'assets'}{os.pathsep}demo_app/assets",
+            f"{ROOT / 'src' / 'anyinfer_demo' / 'assets'}{os.pathsep}anyinfer_demo/assets",
         ),
     )
     _write_bundle_info(

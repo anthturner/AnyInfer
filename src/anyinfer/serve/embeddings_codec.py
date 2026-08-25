@@ -9,8 +9,10 @@ the sidecar app wires them to `AsyncClient.embed`/`AsyncClient.rerank`.
 
 from __future__ import annotations
 
+import base64
+import struct
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..types.operations import EmbeddingResult, RerankResult
@@ -26,19 +28,23 @@ __all__ = [
 
 def embedding_request_from_openai(
     body: Mapping[str, Any],
-) -> tuple[str, list[str], dict[str, Any]]:
+) -> tuple[str, list[str], dict[str, Any], str]:
     """Decode an OpenAI-compatible ``POST /v1/embeddings`` request body.
 
     Args:
         body: The parsed request JSON.
 
     Returns:
-        A ``(target, inputs, kwargs)`` triple. ``target`` is the ``model`` field verbatim,
-        the same target-in-model-string convention chat completions uses. ``kwargs`` holds
-        the optional fields ready to splice into `AsyncClient.embed`.
+        A ``(target, inputs, kwargs, encoding_format)`` tuple. ``target`` is the ``model``
+        field verbatim, the same target-in-model-string convention chat completions uses.
+        ``kwargs`` holds the optional fields ready to splice into `AsyncClient.embed`.
+        ``encoding_format`` is ``"float"`` or ``"base64"``, for `embeddings_response` to
+        apply on the way out — it is a wire-encoding choice, so it never reaches the
+        client call.
 
     Raises:
-        ValueError: ``model`` is missing, or ``input`` is not a string or array of strings.
+        ValueError: ``model`` is missing, ``input`` is not a string or array of strings,
+            or ``encoding_format`` is neither ``"float"`` nor ``"base64"``.
     """
     target = str(body.get("model", "")).strip()
     if not target:
@@ -59,18 +65,30 @@ def embedding_request_from_openai(
     if isinstance(dimensions, int):
         kwargs["dimensions"] = dimensions
 
+    # base64 is the official `openai` Python client's default, so refusing it broke the
+    # most common stock client against an endpoint whose reason to exist is stock-client
+    # compatibility. EmbeddingResult still carries plain floats — re-encoding at the wire
+    # is exactly this codec's job, so it happens here and never reaches the client call.
     encoding_format = body.get("encoding_format")
-    if encoding_format not in (None, "float"):
-        # base64 output is a response-encoding choice AnyInfer does not project; the
-        # normalized EmbeddingResult always carries plain floats, and re-encoding them as
-        # base64 on the way out is a codec detail, not something the client call needs.
-        raise ValueError("only encoding_format='float' is supported")
+    if encoding_format is None:
+        encoding_format = "float"
+    if encoding_format not in ("float", "base64"):
+        raise ValueError("encoding_format must be 'float' or 'base64'")
 
-    return target, inputs, kwargs
+    return target, inputs, kwargs, str(encoding_format)
+
+
+def _pack_base64(values: Sequence[float]) -> str:
+    """Pack a vector as OpenAI does: little-endian float32, base64-encoded."""
+    return base64.b64encode(struct.pack(f"<{len(values)}f", *values)).decode("ascii")
 
 
 def embeddings_response(
-    result: EmbeddingResult, *, model: str, include_manifest: bool = False
+    result: EmbeddingResult,
+    *,
+    model: str,
+    include_manifest: bool = False,
+    encoding_format: str = "float",
 ) -> dict[str, Any]:
     """Render an `EmbeddingResult` as an OpenAI-compatible ``list`` object.
 
@@ -79,11 +97,21 @@ def embeddings_response(
         model: The ``model`` string to echo back.
         include_manifest: Attach the run manifest under `MANIFEST_FIELD` — opt-in, so a
             stock OpenAI client's response shape never changes (see `wants_manifest`).
+        encoding_format: ``"float"`` for a JSON array, or ``"base64"`` for OpenAI's
+            packed little-endian float32 string. Comes from the request via
+            `embedding_request_from_openai`.
     """
+    as_base64 = encoding_format == "base64"
     body: dict[str, Any] = {
         "object": "list",
         "data": [
-            {"object": "embedding", "index": i, "embedding": list(vector.values)}
+            {
+                "object": "embedding",
+                "index": i,
+                "embedding": (
+                    _pack_base64(vector.values) if as_base64 else list(vector.values)
+                ),
+            }
             for i, vector in enumerate(result.vectors)
         ],
         "model": model,

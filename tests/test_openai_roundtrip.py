@@ -14,6 +14,7 @@ import pytest
 
 import anyinfer as ai
 from anyinfer.serve.openai_codec import (
+    CACHE_FIELD,
     chunk_from_event,
     completion_from_generation,
     final_chunk,
@@ -60,6 +61,7 @@ FULL_REQUEST = {
         }
     ],
     "tool_choice": "auto",
+    "reasoning_effort": "high",
     "response_format": {
         "type": "json_schema",
         "json_schema": {
@@ -89,9 +91,81 @@ def test_full_request_round_trips_losslessly() -> None:
     assert rebuilt["max_tokens"] == FULL_REQUEST["max_tokens"]
     assert rebuilt["stop"] == FULL_REQUEST["stop"]
     assert rebuilt["tool_choice"] == FULL_REQUEST["tool_choice"]
+    assert rebuilt["reasoning_effort"] == FULL_REQUEST["reasoning_effort"]
     assert rebuilt["metadata"] == FULL_REQUEST["metadata"]
     assert rebuilt["tools"] == FULL_REQUEST["tools"]
     assert rebuilt["response_format"] == FULL_REQUEST["response_format"]
+
+
+def test_the_cache_extension_round_trips() -> None:
+    """DESIGN §22 invariant 1 calls a one-way codec field a design bug, not a shortcut.
+
+    `anyinfer_cache` decoded into a typed `CachePolicy` but was never re-encoded, and the
+    round-trip test passed only because no case generated the field. A gateway chaining a
+    request onward silently dropped the caller's caching decision — one with a cost
+    attached, which is the whole reason the extension exists.
+    """
+    body = {
+        **FULL_REQUEST,
+        CACHE_FIELD: {"mode": "off", "min_segment_tokens": 2048, "include_tools": False},
+    }
+    target, request, stream = request_from_openai(body)
+
+    assert request.cache is not None
+    assert request.cache.mode == "off"
+
+    rebuilt = request_to_openai(target, request, stream=stream)
+    _, second, _ = request_from_openai(rebuilt)
+
+    assert second.cache == request.cache
+    assert rebuilt[CACHE_FIELD]["min_segment_tokens"] == 2048
+    assert rebuilt[CACHE_FIELD]["include_tools"] is False
+
+
+def test_an_absent_cache_extension_stays_absent() -> None:
+    """A stock OpenAI client must get a byte-identical body back."""
+    target, request, _ = request_from_openai(FULL_REQUEST)
+    assert CACHE_FIELD not in request_to_openai(target, request)
+
+
+def test_reasoning_effort_decodes_to_the_typed_field_not_passthrough() -> None:
+    """The one first-class generation parameter the codec used to lose.
+
+    Unreserved, it fell into verbatim provider_options, so the core's cross-provider
+    reasoning translation never engaged: an Anthropic or Gemini backend saw an OpenAI
+    field name it does not speak, and a sidecar caller got no reasoning at all.
+    """
+    _, request, _ = request_from_openai(FULL_REQUEST)
+
+    assert request.reasoning == "high"
+    assert "reasoning_effort" not in request.provider_options.get("*", {})
+
+
+def test_absent_reasoning_effort_stays_absent() -> None:
+    body = {k: v for k, v in FULL_REQUEST.items() if k != "reasoning_effort"}
+    target, request, _ = request_from_openai(body)
+
+    assert request.reasoning is None
+    assert "reasoning_effort" not in request_to_openai(target, request)
+
+
+@pytest.mark.parametrize("effort", ["none", "minimal", "low", "medium", "high"])
+def test_every_reasoning_effort_level_round_trips(effort: str) -> None:
+    """`none` included: OpenAI accepts it, so a stock client sending it must not get a 400.
+
+    Refusing it made the gateway narrower than the dialect it claims to project — a
+    client that worked here by passthrough started failing once the field became typed.
+    """
+    target, request, _ = request_from_openai({**FULL_REQUEST, "reasoning_effort": effort})
+
+    assert request.reasoning == effort
+    assert request_to_openai(target, request)["reasoning_effort"] == effort
+
+
+def test_an_unrecognized_reasoning_effort_is_refused() -> None:
+    """Dropped silently, it would change what the model was asked to do in secret."""
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        request_from_openai({**FULL_REQUEST, "reasoning_effort": "extreme"})
 
 
 def test_messages_round_trip_including_tool_turns() -> None:
@@ -310,3 +384,27 @@ async def test_many_concurrent_independent_streams() -> None:
         results = await asyncio.gather(*(one() for _ in range(16)))
 
     assert results == ["concurrent answer"] * 16
+
+
+def test_multiple_choices_are_refused_rather_than_silently_reduced() -> None:
+    """`n` was reserved but never read, so n=3 returned one choice and said nothing."""
+    with pytest.raises(ValueError, match="anyinfer_arena"):
+        request_from_openai({**FULL_REQUEST, "n": 3})
+
+    # n=1 is what every client sends by default and must stay accepted.
+    _, _, _ = request_from_openai({**FULL_REQUEST, "n": 1})
+
+
+@pytest.mark.parametrize("field", ["logprobs", "top_logprobs"])
+def test_logprob_requests_are_refused_rather_than_billed_for_nothing(field: str) -> None:
+    """Unreserved, these forwarded upstream with no response path to carry results back.
+
+    The client pays for the computation and receives none of it, which is worse than a
+    plain refusal.
+    """
+    with pytest.raises(ValueError, match=field):
+        request_from_openai({**FULL_REQUEST, field: True if field == "logprobs" else 5})
+
+
+def test_logprobs_false_is_not_a_request_for_logprobs() -> None:
+    _, _, _ = request_from_openai({**FULL_REQUEST, "logprobs": False})

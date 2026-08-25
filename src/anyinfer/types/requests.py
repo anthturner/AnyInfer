@@ -105,8 +105,20 @@ class Sampling:
     stop: tuple[str, ...] = ()
 
 
-ReasoningEffort = Literal["minimal", "low", "medium", "high"]
-"""Normalized reasoning effort; each descriptor translates it to its provider's wire form."""
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high"]
+"""Normalized reasoning effort; each descriptor translates it to its provider's wire form.
+
+``none`` asks for reasoning to be *disabled*, and is distinct from both ``minimal`` and
+from leaving the field unset. ``minimal`` means "think as little as you can", ``none``
+means "do not think", and `None` means "whatever this model does by default" — three
+different requests that produce three different wire forms. The level exists because
+OpenAI's own vocabulary accepts it on current models, and a sidecar caller sending it
+against an OpenAI backend must not be refused for using the dialect the gateway claims.
+
+Not every provider can express it. Where a provider publishes a reasoning enum with no
+off value, the descriptor omits the field rather than substituting a level the caller did
+not ask for; each `ReasoningTranslator` documents its own choice.
+"""
 
 
 @runtime_checkable

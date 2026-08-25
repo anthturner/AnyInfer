@@ -210,7 +210,7 @@ anyinfer run "Write a haiku about latency." --config anyinfer.json \
   --temperature 0.9 --max-tokens 60 --stop "---" --timeout 30
 ```
 
-`--reasoning` (`minimal`, `low`, `medium`, `high`) sets reasoning effort on models that
+`--reasoning` (`none`, `minimal`, `low`, `medium`, `high`) sets reasoning effort on models that
 expose it. Parameters a provider or model does not support are dropped rather than
 rejected, since a parameter that does nothing is the failure mode that looks exactly
 like success. Every drop is reported as a warning.

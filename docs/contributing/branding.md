@@ -14,13 +14,13 @@ wordmark, or add generated approximations. The icon art is background-independen
 wordmark text changes between light and dark variants.
 
 The demo needs package-local copies under
-[`src/demo_app/assets/`](https://github.com/anthturner/AnyInfer/tree/main/src/demo_app/assets)
+[`src/anyinfer_demo/assets/`](https://github.com/anthturner/AnyInfer/tree/main/src/anyinfer_demo/assets)
 because those files ship in the wheel and standalone application. They are
 content-identical mirrors, not a second source of truth; SVG line endings may follow the
 checkout platform.
 [`tests/test_branding.py`](https://github.com/anthturner/AnyInfer/blob/main/tests/test_branding.py)
 fails if they drift from `docs/assets/`.
-[`src/demo_app/theme.py`](https://github.com/anthturner/AnyInfer/blob/main/src/demo_app/theme.py)
+[`src/anyinfer_demo/theme.py`](https://github.com/anthturner/AnyInfer/blob/main/src/anyinfer_demo/theme.py)
 translates the canonical palette into Qt tokens, and the same tests pin its brand
 constants.
 
@@ -48,7 +48,7 @@ GitHub's own repository preview image is a repository setting, not a file: uploa
 When changing the brand kit:
 
 1. Edit the canonical files in `docs/assets/`.
-2. Copy the four runtime assets exactly into `src/demo_app/assets/`.
+2. Copy the four runtime assets exactly into `src/anyinfer_demo/assets/`.
 3. Update the Qt tokens only if `anyinfer-palette.css` changed.
 4. Run `python scripts/render_social_card.py` if a wordmark or the surface color changed.
 5. Run `python workspace.py check` and `python workspace.py build docs`.

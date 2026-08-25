@@ -62,11 +62,19 @@ the frontend stays a codec.
 | Endpoint | Behavior |
 |---|---|
 | `POST /v1/chat/completions` | Streaming and non-streaming. `model` is parsed as a target. |
+| `POST /v1/embeddings` | Vectors for a string or batch. `model` is parsed as a target. |
+| `POST /v1/anyinfer/rerank` | Scores documents against a query. Not an OpenAI route. |
+| `POST /v1/anyinfer/compare` | Runs one prompt across several targets. Not an OpenAI route. |
 | `GET /v1/models` | Catalog aliases plus any explicitly exposed targets. |
 | `GET /health` | Liveness. Requires no authentication. |
 | Anything else under `/v1` | 404 with a clear explanation. |
 
-Embeddings and generated image/audio outputs are out of scope. Typed image, document, and
+The two `/v1/anyinfer/` routes are deliberate extensions: reranking and comparison have no
+OpenAI equivalent, so they sit under a namespaced prefix rather than pretending to be stock
+endpoints. See [embeddings](../concepts/embeddings.md) for what the embeddings route
+projects and [comparing targets](../guides/comparing-targets.md) for the compare route.
+
+Generated image and audio *outputs* are out of scope. Typed image, document, and
 audio *inputs* are accepted in OpenAI content arrays and capability-gated before dispatch;
 see [multimodal inputs](../concepts/multimodal-inputs.md).
 
@@ -87,9 +95,18 @@ field cannot.
 ## What Survives the Wire, and What Does Not
 
 **Survives:** text and multimodal message parts, tools, `tool_choice`,
-`response_format.json_schema`, temperature, top-p, max tokens, stop sequences, the stream
-flag, usage, and finish reasons. Unrecognized extra-body fields reach `provider_options`,
-so the escape hatch survives too.
+`response_format.json_schema`, temperature, top-p, max tokens, stop sequences,
+`reasoning_effort`, the stream flag, usage, and finish reasons. `reasoning_effort` is
+decoded into the typed, cross-provider effort level rather than passed through, so it
+reaches an Anthropic thinking budget or a Gemini thinking config instead of silently doing
+nothing outside the OpenAI dialect. Unrecognized extra-body fields reach
+`provider_options`, so the escape hatch survives too.
+
+**Refused with a 400, deliberately:** `n` above 1, and `logprobs`/`top_logprobs`. A
+generation is a single-completion primitive here, so `n` has nothing to map onto; logprobs
+have no normalized result surface to come back in, and returning nothing while the request
+still bills would be the silent-wrong-answer case this project exists to remove. Both are
+refusals rather than silent drops.
 
 **Does not in the stock shape:** timing marks and attempt records. They have no
 `chat.completion.chunk` representation. An AnyInfer-aware caller can request the complete
@@ -116,6 +133,11 @@ absence of both response forms. See [run manifests](../concepts/run-manifests.md
 - Standard redaction applies to logs; payload retention is off by default.
 - There are no configuration or execution endpoints of any kind, so a captured token can
   spend inference, but it cannot rewrite routing or run code.
+- Request bodies are capped at **10 MiB** by default; a larger one gets a `413`.
+  `--max-request-bytes N` changes the cap and `--max-request-bytes 0` disables it. The cap
+  is enforced *while reading*, not from `content-length` — that header is absent on a
+  chunked request and can simply lie on any other, so checking it alone would be advisory.
+  A client debugging an unexpected `413` is hitting this, not the provider.
 
 === "Bash"
 
@@ -177,6 +199,25 @@ superset of OpenAI chat completions, and this is what that superset is for:
 shortened conversation; `true` accepts the defaults. A malformed value is a `400` rather
 than a silent fallback to the gateway's setting.
 
+## Choosing a Prompt-Cache Policy Per Request
+
+`anyinfer_cache` works the same way, for a decision with a cost attached — whether the
+prompt is held on the provider's side:
+
+```json
+{
+  "model": "anthropic:claude-sonnet-4-5",
+  "messages": [...],
+  "anyinfer_cache": {"mode": "off"}
+}
+```
+
+`false` is shorthand for `{"mode": "off"}` and `true` for the defaults. The field decodes
+into the same [`CachePolicy`](../concepts/caching.md) an SDK caller passes, so a caller
+who must not have their prompt retained can say so per request without the deployment
+changing, and a caller who wants caching the gateway does not ask for by default can turn
+it on. A malformed policy is a `400`.
+
 ## Reducing an Explicit Corpus
 
 An application can also send an explicit, caller-approved corpus with a request:
@@ -230,9 +271,9 @@ The sidecar, CLI, and Python SDK use the same
       system.
     - Any target spelling works as the `model` field, so hosted, hub, and local routes are
       all reachable from a stock OpenAI client.
-    - The AnyInfer extensions (`anyinfer_manifest`, `anyinfer_history`, `anyinfer_context`,
-      `anyinfer_arena`) are additive: a client that does not send them receives a plain
-      OpenAI completion.
+    - The AnyInfer extensions (`anyinfer_manifest`, `anyinfer_history`, `anyinfer_cache`,
+      `anyinfer_context`, `anyinfer_arena`) are additive: a client that does not send them
+      receives a plain OpenAI completion.
     - A non-loopback bind requires both `--allow-remote-exposure` and a bearer token, and
       backend credentials never transit the frontend.
 

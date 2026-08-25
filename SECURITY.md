@@ -12,6 +12,12 @@ Do not open a public issue. Use
 If that form is unavailable, email `github@anthturner.com` with the subject
 `AnyInfer security report`.
 
+`github.com/anthturner/AnyInfer` is the canonical repository, and
+[anyinfer.dev](https://anyinfer.dev/) is the documentation site published from it. Two
+names, one project — the repository is where code, releases, and this reporting channel
+live. There is no other official reporting address; if you found one elsewhere, it is not
+ours.
+
 Include the affected version, integration path, reproduction steps or a proof of concept,
 and the impact you expect. Remove API keys, tokens, prompts, model output, and other private
 payloads before sending logs or configuration files.

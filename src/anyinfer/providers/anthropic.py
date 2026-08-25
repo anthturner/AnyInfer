@@ -123,6 +123,9 @@ class AnthropicAdapter:
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     # ---- discovery -------------------------------------------------------------------
@@ -537,7 +540,10 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
-    if effort == "minimal":
+    if effort in ("none", "minimal"):
+        # Anthropic has no "think as little as possible" setting, so `minimal` and `none`
+        # reach the same wire form by different routes: `minimal` because disabled is the
+        # closest available level, `none` because disabled is exactly what was asked for.
         return {"thinking": {"type": "disabled"}}
     budgets = {"low": 1024, "medium": 4096, "high": 16384}
     return {"thinking": {"type": "enabled", "budget_tokens": budgets[effort]}}

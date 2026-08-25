@@ -161,6 +161,9 @@ class BedrockAdapter:
             headers={"content-type": "application/json"},
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     # ---- auth ------------------------------------------------------------------------
@@ -1024,7 +1027,7 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
-    if effort == "minimal":
+    if effort in ("none", "minimal"):
         return {"additionalModelRequestFields": {"thinking": {"type": "disabled"}}}
     budgets = {"low": 1024, "medium": 4096, "high": 16384}
     return {

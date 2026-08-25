@@ -21,10 +21,10 @@ import binascii
 import json
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from .._context_wire import decode_context_request, encode_context_request
-from ..arena import arena_to_dict
+from ..evaluate.arena import arena_to_dict
 from ..types.events import StreamEvent, TextDelta, ToolCallDelta
 from ..types.messages import (
     AudioPart,
@@ -41,6 +41,7 @@ from ..types.requests import (
     CachePolicy,
     GenerationRequest,
     HistoryPolicy,
+    ReasoningEffort,
     Sampling,
     SchemaSpec,
     ToolSpec,
@@ -123,8 +124,11 @@ _RESERVED_FIELDS = frozenset(
         "tools",
         "tool_choice",
         "response_format",
+        "reasoning_effort",
         "metadata",
         "n",
+        "logprobs",
+        "top_logprobs",
         "user",
         HISTORY_FIELD,
         CACHE_FIELD,
@@ -295,11 +299,19 @@ def _parse_arguments(raw: Any) -> Mapping[str, Any]:
     return {}
 
 
-def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest, bool]:
+def request_from_openai(
+    body: Mapping[str, Any], *, context_tuning: Any = None
+) -> tuple[str, GenerationRequest, bool]:
     """Decode an OpenAI chat-completions request body.
 
     Args:
         body: The parsed request JSON.
+        context_tuning: Default ``ContextTuning`` for a request whose context extension
+            omits its own ``tuning``. The gateway supplies the deployment's configured
+            tuning, so wire callers inherit it rather than always falling back to the
+            library defaults. Typed opaquely on purpose: the sidecar is a codec and does
+            not import the context implementation, so it forwards the object onward
+            without inspecting it.
 
     Returns:
         A ``(target, request, stream)`` triple. ``target`` is the ``model`` field taken
@@ -307,6 +319,25 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
         what makes federation free.
     """
     target = str(body.get("model", "")).strip()
+
+    # Refused, not ignored. The codec's rule elsewhere is that telling the client beats
+    # silently applying the gateway's default; these were the two places it did not hold.
+    # `n` was reserved but never read, so n=3 returned one choice with no error, and
+    # logprobs forwarded upstream — possibly billed — with no response path to carry
+    # results back.
+    requested_choices = body.get("n")
+    if requested_choices is not None and requested_choices != 1:
+        raise ValueError(
+            f"n={requested_choices!r} is not supported: AnyInfer returns one choice per "
+            "request. Use the anyinfer_arena extension to fan out across targets."
+        )
+    for field in ("logprobs", "top_logprobs"):
+        if body.get(field) not in (None, False):
+            raise ValueError(
+                f"{field!r} is not supported: AnyInfer's normalized result has no field "
+                "to carry log probabilities back, so the request would be billed for "
+                "data the response could not return."
+            )
 
     sampling = Sampling(
         temperature=_opt_float(body.get("temperature")),
@@ -333,14 +364,43 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
         tools=tools,
         tool_choice=_decode_tool_choice(body.get("tool_choice")),
         sampling=sampling,
+        reasoning=_decode_reasoning_effort(body.get("reasoning_effort")),
         history=_decode_history(body.get(HISTORY_FIELD)),
         cache=_decode_cache(body.get(CACHE_FIELD)),
         arena=_decode_arena(body.get(ARENA_FIELD)),
-        context=_decode_context(body.get(CONTEXT_FIELD)),
+        context=_decode_context(body.get(CONTEXT_FIELD), context_tuning),
         provider_options=_decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
     )
     return target, request, bool(body.get("stream"))
+
+
+def _decode_reasoning_effort(raw: Any) -> ReasoningEffort | None:
+    """Decode OpenAI's ``reasoning_effort`` into the normalized effort level.
+
+    Typed rather than passed through, so the core's cross-provider translation engages
+    for sidecar callers too — an Anthropic thinking budget, a Gemini thinking config.
+    Passing it through verbatim silently did nothing for every non-OpenAI dialect.
+
+    ``none`` is accepted alongside the four effort levels because OpenAI's own vocabulary
+    accepts it on current models: a stock client that worked against this gateway by
+    passthrough must not start getting a 400 for speaking the dialect the gateway claims
+    to project. It decodes to a request for reasoning *off*, which each descriptor spells
+    in its provider's own terms.
+
+    Raises:
+        ValueError: The value is not one of the normalized levels. Refused rather than
+            dropped: now that the field is reserved, silently ignoring an unrecognized
+            value would tell the caller nothing while quietly changing what the model was
+            asked to do.
+    """
+    if raw is None:
+        return None
+    if raw in ("none", "minimal", "low", "medium", "high"):
+        return cast("ReasoningEffort", raw)
+    raise ValueError(
+        f"reasoning_effort must be one of none, minimal, low, medium, high (got {raw!r})"
+    )
 
 
 def _decode_cache(raw: Any) -> CachePolicy | None:
@@ -408,9 +468,9 @@ def _decode_arena(raw: Any) -> ArenaPolicy | None:
         raise ValueError(f"{ARENA_FIELD} is invalid: {exc}") from exc
 
 
-def _decode_context(raw: Any) -> Any:
+def _decode_context(raw: Any, default_tuning: Any = None) -> Any:
     """Decode the context extension; reduction remains in the core client."""
-    return decode_context_request(raw)
+    return decode_context_request(raw, default_tuning=default_tuning)
 
 
 def _decode_history(raw: Any) -> HistoryPolicy | None:
@@ -613,6 +673,9 @@ def request_to_openai(
     if sampling.stop:
         body["stop"] = list(sampling.stop)
 
+    if request.reasoning is not None:
+        body["reasoning_effort"] = request.reasoning
+
     if request.tools:
         body["tools"] = [
             {
@@ -637,6 +700,14 @@ def request_to_openai(
             "mode": request.history.mode,
             "keep_recent": request.history.keep_recent,
             "keep_system": request.history.keep_system,
+        }
+    if request.cache is not None:
+        body[CACHE_FIELD] = {
+            "mode": request.cache.mode,
+            "min_segment_tokens": request.cache.min_segment_tokens,
+            "max_marks": request.cache.max_marks,
+            "include_tools": request.cache.include_tools,
+            "include_system": request.cache.include_system,
         }
     if request.arena is not None:
         body[ARENA_FIELD] = {

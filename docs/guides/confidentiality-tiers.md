@@ -9,8 +9,9 @@ It does not protect your own prompt IP (templates, orchestration, few-shot curat
 from a customer running your client software on infrastructure they own. No purely
 client-side technique can: the customer owns the machine, the OS, and the network stack.
 This page is a ladder from "raises the cost of extraction" (Tiers 1–2) up to the one
-point where a real cryptographic guarantee becomes possible (Tier 3, hardware-attested
-local execution), plus a verification layer on top of it (Tier 4). Each tier's
+point where a real cryptographic guarantee becomes *possible* (Tier 3, hardware-attested
+local execution — today detection, with quote verification planned), plus a verification
+layer on top of it (Tier 4). Each tier's
 guarantee, cost, and limits are stated once, in the table:
 
 | Tier | What it guarantees | What it costs | Ships in |
@@ -28,12 +29,21 @@ repository.
 
 A template is authored as plaintext, sealed at build time with AES-256-GCM, and shipped
 as an opaque asset. At runtime, `TemplateVault` decrypts a template into memory only
-immediately before rendering and best-effort-zeroes the buffer afterward. Decryption is
-gated on a signed, time-boxed license blob, so an install without a valid license cannot
-render a single prompt (which doubles as a licensing mechanism).
+immediately before rendering and best-effort-zeroes the buffer afterward. `TemplateVault.render()` is
+gated on a signed, time-boxed license blob, so an install without a valid license gets no
+rendered prompt from the vault — which doubles as a licensing mechanism.
+
+That gate lives in the vault's code path, not in the ciphertext. The vault holds both the
+key and the sealed asset, so a bundle holder can decrypt directly and bypass the check;
+expiry is a signed field checked against local wall-clock, so a clock rollback defeats it.
+This is inherent to client-side sealing — the adversary owns the machine, which is the same
+ceiling Tier 1's confidentiality claim states. The gate makes unlicensed use unambiguous
+and detectable, not impossible. Cite it that way.
 
 ```bash
-pip install "anyinfer-confidential[relay]"   # relay is optional; Tier 1 alone needs no extra
+# Ships as a separate package. Until a first PyPI release, install from a repository
+# checkout — see [installation](installation.md#optional-add-on-packages).
+pip install -e "src/anyinfer-confidential[relay]"   # relay is optional; Tier 1 needs no extra
 ```
 
 ```python
@@ -68,8 +78,15 @@ decrypting once dropped from the ring.
 
 Entitlement is offline by default: the license blob validates entirely locally, so an
 air-gapped deployment works. Online revocation is opt-in (`revocation_checker`), failing
-open by default since offline operation is the baseline; set
-`revocation_fail_closed=True` when guaranteed revocation matters more than availability.
+open by default since offline operation is the baseline.
+
+**Set `revocation_fail_closed=True` for high-assurance deployments** — anywhere a revoked
+license must stop working even at the cost of availability. Two things to know before you
+do. First, fail-open means an unreachable service degrades to the last cached good answer,
+and a checker that has *never* completed a successful check has no cached answer to fall
+back to, so it degrades to "not revoked". Second, fail-closed makes your revocation
+endpoint a hard dependency of every render: if it is down, nothing renders. That is the
+trade, and it is a real one in both directions.
 
 The `anyinfer-confidential` CLI mirrors the library one-for-one (`keygen`, `seal`,
 `issue-license`) for build pipelines that are not Python.
@@ -108,14 +125,49 @@ result = await relay.handle(
 print(result.assembled_prompt)
 ```
 
-`anyinfer_confidential.app.build_app(relay)` serves it over ASGI with the `relay`
-extra. Self-hosted and hosted deployments run the identical `Relay` class; AnyInfer does
-not currently operate a hosted instance.
+`anyinfer_confidential.app.build_app(relay, tokens=...)` serves it over ASGI with the
+`relay` extra. Self-hosted and hosted deployments run the identical `Relay` class;
+AnyInfer does not currently operate a hosted instance.
+
+### Deploying the Relay
+
+The endpoint's response body is the decrypted, assembled prompt, so authentication is
+not optional and `build_app` has no unauthenticated mode. `tokens` maps a bearer token to
+the tenant it authenticates, and the tenant is taken from the token — a `tenant_id` in the
+request body is never trusted, and one that disagrees with the token is rejected.
+
+```python
+import secrets
+
+from anyinfer_confidential.app import build_app
+from anyinfer_confidential.relay import load_registry
+
+registry = load_registry("relay-routes.json")   # sealed templates: ciphertext, not secret
+app = build_app(relay, tokens={secrets.token_urlsafe(32): "customer-42"})
+```
+
+A self-hosting checklist:
+
+- **Terminate TLS in front of the app.** A bearer token on a plaintext connection is
+  readable by anything on the path.
+- **Issue one long random token per tenant** and record which tenant each belongs to.
+  Rotate by replacing the mapping and rebuilding the app.
+- **Provision routes from a file** with `load_registry`, so the tenant-to-route binding
+  is under configuration management rather than in a bespoke script. The file holds
+  sealed templates, so it is ciphertext and can live in a config repository; decryption
+  still needs the deployment's vault, key ring, and a valid license.
+- **Do not expose `mode="forward"` expectations to HTTP clients.** The endpoint assembles
+  only, and answers a forward-mode request with 400. Forwarding needs short-lived
+  provider credentials that the wire format deliberately does not accept; call
+  `Relay.handle` in-process for that mode.
 
 ## Tier 3 (Attested Local Execution)
 
-The one tier with a real cryptographic guarantee, because it targets AnyInfer's own
-[local adapters](../concepts/local.md) instead of a cloud call. When the host supports a
+The one tier designed for a real cryptographic guarantee, because it targets AnyInfer's
+own [local adapters](../concepts/local.md) instead of a cloud call. What ships today is
+detection rather than attestation — see
+[detection versus cryptographic attestation](#detection-versus-cryptographic-attestation)
+below, and read `end_to_end` as an advisory local signal until then. When the host supports a
 trusted execution environment (AMD SEV-SNP or Intel TDX today), the local runtime can
 run inside it, and `confidential_execution_status()` reports whether the guarantee holds
 right now, on this box:
@@ -162,6 +214,20 @@ verification step is scoped (an `attest`-extra addition) but not built. Do not r
 `end_to_end=True` today as "a cryptographic quote was checked"; this section will change
 when that lands.
 
+**State the ceiling when you cite this.** Two limits are separate and both hold:
+
+- **CPU.** SEV-SNP and TDX are *detected* through their guest device nodes. Quote
+  generation and chain verification against AMD's or Intel's roots is planned, not
+  shipped.
+- **GPU.** Even once CPU quotes are verified, NVIDIA confidential computing will remain
+  **detected but not quote-verified**: GPU attestation goes through the SPDM path in
+  NVIDIA's own tooling, which is substantially harder than the CPU path and needs
+  sustained access to CC-capable hardware. The accurate phrasing at that point is
+  "CPU-attested; GPU CC detected but not quote-verified" — not "attested end to end".
+
+Neither is a reason to avoid Tier 3: the fail-closed refusal is real, and the detection is
+accurate about what it detects. They are a reason to say precisely what you have.
+
 ### Deployment Scope, Today
 
 - CPU-only (SEV-SNP or TDX): broadly available as GA lift-and-shift confidential VMs on
@@ -190,10 +256,39 @@ ok = verify_model_manifest(manifest, weights_path=model_path, vendor_public_key=
 ```
 
 `confidential_execution_status()` accepts `manifest=`/`vendor_public_key=` and populates
-`model_verified` on the status. Verification is never cached, so a swapped file is
-caught on the next call. Treat `model_verified is True` as meaningful only when
+`model_verified` on the status. Treat `model_verified is True` as meaningful only when
 `end_to_end is True` too; a hash-and-signature check on an unattested host is a weaker,
 different guarantee.
+
+### Verify at the Point of Load
+
+`model_verified` is a point-in-time answer: it describes the weights when the status was
+computed, not the weights a server later opens. If the check runs at startup and the model
+loads an hour later, the gap between them is an hour.
+
+To bind verification to the load, hand the provenance to whatever starts the server:
+
+```python
+from anyinfer.local import WeightsProvenance
+
+provenance = WeightsProvenance(manifest=manifest, vendor_public_key=public_key)
+managed = await supervisor.acquire(key, model_path, plan, provenance=provenance)
+```
+
+The weights are hashed through open file descriptors *inside* the start path, and their
+identity is re-confirmed in the instant before the process is spawned. A file renamed over,
+replaced, truncated, or deleted after verification is refused with a
+[`ConfidentialExecutionError`](../reference/errors.md#confidentialexecutionerror) and no
+server starts — including when the replacement is byte-identical, because a replacement is
+a different file whatever it contains.
+
+Two residual windows remain, and neither closes from inside a library. `llama-server` opens
+the path itself, so the microseconds between the last check and that open are not covered;
+and because llama.cpp maps weights lazily, a writer with access to the *same* file can
+still alter pages that have not been read yet. Both need the bytes to be immutable while
+they load — a read-only mount, or a directory only root can write. That is a property of
+how you deploy, and Tier 3's attested boundary is what makes it checkable rather than
+assumed.
 
 ## Appendix: SOC 2 Control Mapping
 
@@ -224,8 +319,10 @@ read that section before the follow-up question arrives.
     - Tiers 1–2 raise the cost of extracting prompt IP; only Tier 3 (TEE-attested local
       execution) carries a cryptographic guarantee, and Tier 4 is meaningful only
       inside it.
-    - Everything fails closed: no valid license, no rendered prompt; no attestation, no
-      generation; no matching hash, `model_verified=False`.
+    - Everything fails closed *in AnyInfer's own code paths*: no valid license, no
+      rendered prompt from the vault; no attestation, no generation; no matching hash,
+      `model_verified=False`. Tiers 1–2 gate code paths on a machine the adversary owns;
+      only Tier 3's hardware boundary is not bypassable by whoever holds the bundle.
     - Tier 3 today detects TEE presence rather than verifying a signed hardware quote;
       cite it accordingly.
     - The SOC 2 mapping restates the same typed facts in auditor vocabulary; it does not
@@ -235,6 +332,8 @@ read that section before the follow-up question arrives.
 
 <div class="anyinfer-see-also" markdown>
 
+- [Confidentiality add-ons API reference](../reference/api/confidential.md): every
+  signature on this page, generated from the source.
 - [The local subsystem](../concepts/local.md) and its
   [API reference](../reference/api/local.md): Tiers 3–4's machinery.
 - [Credentials and redaction](../concepts/credentials.md): the Tier 0 posture.

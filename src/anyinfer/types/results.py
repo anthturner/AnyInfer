@@ -11,8 +11,8 @@ from .messages import ToolCall
 from .requests import CacheMechanism, ResolvedTarget
 
 if TYPE_CHECKING:  # pragma: no cover — imported for the annotation only
-    from ..arena import ArenaResult
     from ..context_request import ContextSummary
+    from ..evaluate.arena import ArenaResult
     from ..manifest import RunManifest
 
 __all__ = [

@@ -48,6 +48,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job here only reads the repository: the suite, the gates, and the docs build.
+# Nothing publishes, comments, or pushes, so the workflow token needs no write scope --
+# stated explicitly rather than inherited from the repository default, matching the
+# other five workflows. A job that ever needs more elevates itself.
+permissions:
+  contents: read
+
 env:
   PYTHONUNBUFFERED: "1"
   # Detection probes must never touch a CI runner's cache directory: a cached profile
@@ -113,11 +120,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -126,7 +133,10 @@ jobs:
       # mkdocstrings imports every documented package to render its reference pages, so
       # sharded add-ons (src/anyinfer-*, each its own pyproject.toml and never folded into
       # the root package) need their own editable install for the docs gates below.
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
 
       # Every gate goes through `workspace check` so the phases a contributor runs
       # locally and the commands CI runs cannot drift apart. Each phase echoes the
@@ -191,11 +201,11 @@ jobs:
           - os: windows-latest
             python-version: "3.14"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -204,7 +214,10 @@ jobs:
       # `workspace build all` (exercised by test_workspace.py) builds the docs site as
       # part of "all", and mkdocstrings imports every sharded add-on (src/anyinfer-*) to
       # render its reference pages — same reason the gates job installs it above.
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
 
       # The PySide6 wheel ships Qt's own libraries but still links against the system's
       # EGL/GL/xkbcommon/D-Bus stack, which the Linux runner image does not carry. Missing
@@ -240,16 +253,19 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
       - run: uv pip install -e ".[all,dev]"
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
       - name: install Qt's system libraries
         run: |
           sudo apt-get update -qq
@@ -274,16 +290,19 @@ jobs:
     needs: [changes]
     if: github.base_ref == 'main' && needs.changes.outputs.docs_only != 'true'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.14"
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
       - run: uv pip install -e ".[all,dev]"
-      - run: uv pip install -e src/anyinfer-store
+      # All three shards, matching `workspace.SHARDS` — a test asserts this list
+      # stays in step with it. Listed on one line rather than looped because the
+      # test matrix includes Windows, where the default shell is not bash.
+      - run: uv pip install -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
       - name: pytest
         run: python workspace.py check --only=test
 

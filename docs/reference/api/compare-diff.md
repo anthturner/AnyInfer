@@ -1,6 +1,6 @@
 # Portability Diff Tool
 
-`anyinfer.compare_diff`: snapshot [`compare()`](client.md) output for a fixture set, and
+`anyinfer.evaluate.compare_diff`: snapshot [`compare()`](client.md) output for a fixture set, and
 diff two snapshots structurally. No ranking, scoring, or live provider calls; every
 function here either calls `compare()` (itself no-dispatch) or works on plain JSON. See the
 [portability guide](../../guides/comparing-targets.md) for the full walkthrough and the
@@ -12,22 +12,22 @@ from anyinfer import compare_diff
 
 <div class="anyinfer-api-block" markdown>
 
-::: anyinfer.compare_diff.load_fixtures
+::: anyinfer.evaluate.compare_diff.load_fixtures
 
-::: anyinfer.compare_diff.snapshot
+::: anyinfer.evaluate.compare_diff.snapshot
 
-::: anyinfer.compare_diff.diff
+::: anyinfer.evaluate.compare_diff.diff
 
-::: anyinfer.compare_diff.diff_targets
+::: anyinfer.evaluate.compare_diff.diff_targets
 
-::: anyinfer.compare_diff.render_text
+::: anyinfer.evaluate.compare_diff.render_text
 
-::: anyinfer.compare_diff.Fixture
+::: anyinfer.evaluate.compare_diff.Fixture
 
-::: anyinfer.compare_diff.DiffReport
+::: anyinfer.evaluate.compare_diff.DiffReport
 
-::: anyinfer.compare_diff.DiffEntry
+::: anyinfer.evaluate.compare_diff.DiffEntry
 
-::: anyinfer.compare_diff.FIXTURE_SCHEMA_VERSION
+::: anyinfer.evaluate.compare_diff.FIXTURE_SCHEMA_VERSION
 
 </div>

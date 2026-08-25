@@ -8,7 +8,7 @@ cannot drift apart silently. A test resolves every ``api`` entry against the rea
 package, which turns "the help is stale" from a review comment into a red test.
 
 This module is deliberately import-light: pure data plus a resolver, no Qt. The dialog
-that renders topics lives in `demo_app.widgets.sdk_help`.
+that renders topics lives in `anyinfer_demo.widgets.sdk_help`.
 """
 
 from __future__ import annotations
@@ -104,7 +104,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "        elif isinstance(event, ai.StreamEnded):\n"
                 "            result = event.result  # the finished Generation"
             ),
-            demo_source="src/demo_app/engine.py",
+            demo_source="src/anyinfer_demo/engine.py",
         ),
         HelpTopic(
             key="routing",
@@ -129,7 +129,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "for attempt in result.attempts:\n"
                 "    print(attempt.target, attempt.outcome)"
             ),
-            demo_source="src/demo_app/main_window.py",
+            demo_source="src/anyinfer_demo/main_window.py",
         ),
         HelpTopic(
             key="sampling",
@@ -148,7 +148,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "# top_p stays None -> the field never appears on the wire\n"
                 'result = client.generate("hello", target=target, sampling=sampling)'
             ),
-            demo_source="src/demo_app/main_window.py",
+            demo_source="src/anyinfer_demo/main_window.py",
         ),
         HelpTopic(
             key="reasoning",
@@ -171,7 +171,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "# while streaming, thoughts arrive as ReasoningDelta events, apart\n"
                 "# from the answer text"
             ),
-            demo_source="src/demo_app/main_window.py",
+            demo_source="src/anyinfer_demo/main_window.py",
         ),
         HelpTopic(
             key="structured",
@@ -202,7 +202,7 @@ TOPICS: dict[str, HelpTopic] = {
                 ")\n"
                 "print(result.structured, result.structured_mechanism, result.repair_attempts)"
             ),
-            demo_source="src/demo_app/widgets/schema_panel.py",
+            demo_source="src/anyinfer_demo/widgets/schema_panel.py",
         ),
         HelpTopic(
             key="telemetry",
@@ -237,7 +237,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "# opt in to text payloads only if you really want them:\n"
                 "# client.subscribe(observer, payloads=True)"
             ),
-            demo_source="src/demo_app/widgets/telemetry_view.py",
+            demo_source="src/anyinfer_demo/widgets/telemetry_view.py",
         ),
         HelpTopic(
             key="providers",
@@ -265,7 +265,7 @@ TOPICS: dict[str, HelpTopic] = {
                 'health = client.health("ollama")\n'
                 "print(health.ok, health.detail)"
             ),
-            demo_source="src/demo_app/main_window.py",
+            demo_source="src/anyinfer_demo/main_window.py",
         ),
         HelpTopic(
             key="setup-spec",
@@ -294,7 +294,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "    print(descriptor.id, [f.key for f in descriptor.setup.fields])\n"
                 "# the demo renders exactly these SetupField declarations, kind by kind"
             ),
-            demo_source="src/demo_app/widgets/settings_dialog.py",
+            demo_source="src/anyinfer_demo/widgets/settings_dialog.py",
         ),
         HelpTopic(
             key="budget",
@@ -321,7 +321,7 @@ TOPICS: dict[str, HelpTopic] = {
                 'print("fits:", budget.fits)  # True / False / None; never a guess\n'
                 'print("cost:", budget.estimated_cost)  # None without pricing on file'
             ),
-            demo_source="src/demo_app/widgets/composer.py",
+            demo_source="src/anyinfer_demo/widgets/composer.py",
         ),
         HelpTopic(
             key="sessions",
@@ -341,7 +341,7 @@ TOPICS: dict[str, HelpTopic] = {
                 'client.generate("and again", target=session.target, session=session)\n'
                 "print(session.reuse)  # 'resumed' | 'fresh' | 'unsupported'"
             ),
-            demo_source="src/demo_app/engine.py",
+            demo_source="src/anyinfer_demo/engine.py",
         ),
         HelpTopic(
             key="local-system",
@@ -371,7 +371,7 @@ TOPICS: dict[str, HelpTopic] = {
                 'warm = client.benchmark("ollama:qwen3:8b")\n'
                 "print(first.ttft_ms, warm.ttft_ms, warm.decode_tokens_per_s)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog/benchmark_panel.py",
+            demo_source="src/anyinfer_demo/widgets/models_dialog/benchmark_panel.py",
         ),
         HelpTopic(
             key="catalog",
@@ -396,7 +396,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "for entry in view.runnable:\n"
                 "    print(entry.name, entry.fit.level, entry.fit.reasons)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog/catalog_panel.py",
+            demo_source="src/anyinfer_demo/widgets/models_dialog/catalog_panel.py",
         ),
         HelpTopic(
             key="acquisition",
@@ -429,7 +429,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "for entry in client.installed_models():\n"
                 "    print(entry.model_id, entry.directory)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog/catalog_panel.py",
+            demo_source="src/anyinfer_demo/widgets/models_dialog/catalog_panel.py",
         ),
         HelpTopic(
             key="runtimes",
@@ -456,7 +456,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "report = install_runtime(None)  # None -> best for this machine\n"
                 "print(report.backend, report.executable)"
             ),
-            demo_source="src/demo_app/widgets/models_dialog/runtime_panel.py",
+            demo_source="src/anyinfer_demo/widgets/models_dialog/runtime_panel.py",
         ),
         HelpTopic(
             key="target-inspection",
@@ -496,7 +496,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "timing = client.benchmark(target)  # one deterministic request, timed\n"
                 "print(timing.ttft_ms, timing.decode_tokens_per_s)"
             ),
-            demo_source="src/demo_app/widgets/target_inspector.py",
+            demo_source="src/anyinfer_demo/widgets/target_inspector.py",
         ),
         HelpTopic(
             key="tools",
@@ -530,7 +530,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "    tools=[word_count], target=target, max_rounds=4,\n"
                 ")"
             ),
-            demo_source="src/demo_app/widgets/tools_panel.py",
+            demo_source="src/anyinfer_demo/widgets/tools_panel.py",
         ),
         HelpTopic(
             key="embeddings",
@@ -566,7 +566,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "    target=target,\n"
                 ")"
             ),
-            demo_source="src/demo_app/widgets/embeddings_panel.py",
+            demo_source="src/anyinfer_demo/widgets/embeddings_panel.py",
         ),
         HelpTopic(
             key="errors",
@@ -596,7 +596,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "    print(error.detail)  # bounded, redacted\n"
                 "    print(error.hint)    # the actionable next step"
             ),
-            demo_source="src/demo_app/main_window.py",
+            demo_source="src/anyinfer_demo/main_window.py",
         ),
         HelpTopic(
             key="offline-fake",
@@ -625,7 +625,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "provider.register(registry)\n"
                 "client = ai.Client([provider.settings()], registry=registry)"
             ),
-            demo_source="src/demo_app/fake_provider.py",
+            demo_source="src/anyinfer_demo/fake_provider.py",
         ),
         HelpTopic(
             key="history",
@@ -648,7 +648,7 @@ TOPICS: dict[str, HelpTopic] = {
                 ")\n"
                 "# watch for ContextReduced in telemetry — compaction is never silent"
             ),
-            demo_source="src/demo_app/main_window.py",
+            demo_source="src/anyinfer_demo/main_window.py",
         ),
         HelpTopic(
             key="prompt-cache",
@@ -672,7 +672,7 @@ TOPICS: dict[str, HelpTopic] = {
                 ")\n"
                 "# the CachePlanned event reports the mechanism and mark placement"
             ),
-            demo_source="src/demo_app/main_window.py",
+            demo_source="src/anyinfer_demo/main_window.py",
         ),
         HelpTopic(
             key="messages",
@@ -693,7 +693,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "result = client.generate(messages, target=target)\n"
                 "messages.append(ai.assistant(result.text))  # carry history forward"
             ),
-            demo_source="src/demo_app/conversation.py",
+            demo_source="src/anyinfer_demo/conversation.py",
         ),
         HelpTopic(
             key="metrics",
@@ -712,7 +712,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "print(result.usage.output_tokens)     # Usage — reported by the provider\n"
                 "print(result.usage.cost_usd)          # None without pricing; not 0.0"
             ),
-            demo_source="src/demo_app/widgets/metrics.py",
+            demo_source="src/anyinfer_demo/widgets/metrics.py",
         ),
         HelpTopic(
             key="config",
@@ -730,7 +730,7 @@ TOPICS: dict[str, HelpTopic] = {
                 "print(config.default_route)\n"
                 "# anyinfer serve --config <the same file>"
             ),
-            demo_source="src/demo_app/config.py",
+            demo_source="src/anyinfer_demo/config.py",
         ),
     )
 }

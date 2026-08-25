@@ -36,8 +36,10 @@ Last verified: 2026-08-07 — against the live xAI API documentation (sources be
   `max_tokens`.
 - `reasoning_effort` from normalized effort: `minimal` clamps to `low` (only some models
   accept `none`, and silently disabling reasoning would change the answer more than the
-  caller asked). `grok-4.20` ships as separate `-reasoning`/`-non-reasoning` variants
-  instead of taking the parameter.
+  caller asked). Normalized `none` is passed through as `none` rather than clamped — a
+  model that rejects it should say so, not be sent more reasoning than was requested.
+  `grok-4.20` ships as separate `-reasoning`/`-non-reasoning` variants instead of taking
+  the parameter.
 
 ### Response fields read
 - openai-compat shapes, plus **`usage.cost_in_usd_ticks`** (1 USD = 10^10 ticks): the

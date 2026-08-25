@@ -90,18 +90,20 @@ _NON_CC_CAPABLE_OUTPUT = """\
 docstring for the pin and what remains unverified (the positive-capability case)."""
 
 
-def test_gpu_cc_capable_and_enabled_parses_nvidia_smi_output(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("reported", ["CC", "cc", "APM", "APM, CC"])
+def test_gpu_cc_allowlisted_capability_values_parse_as_capable(
+    monkeypatch: pytest.MonkeyPatch, reported: str
 ) -> None:
     monkeypatch.setattr(
         attest,
         "_run",
         lambda command: "    CC State                   : ON\n"
-        "    GPU CC Capabilities        : HOPPER_CC\n",
+        f"    GPU CC Capabilities        : {reported}\n",
     )
-    capable, enabled = attest._detect_gpu_cc()
+    capable, enabled, unrecognized = attest._detect_gpu_cc()
     assert capable is True
     assert enabled is True
+    assert unrecognized is None
 
 
 def test_gpu_cc_capable_but_not_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -109,28 +111,61 @@ def test_gpu_cc_capable_but_not_enabled(monkeypatch: pytest.MonkeyPatch) -> None
         attest,
         "_run",
         lambda command: "    CC State                   : OFF\n"
-        "    GPU CC Capabilities        : HOPPER_CC\n",
+        "    GPU CC Capabilities        : CC\n",
     )
-    capable, enabled = attest._detect_gpu_cc()
+    capable, enabled, unrecognized = attest._detect_gpu_cc()
     assert capable is True
     assert enabled is False
+    assert unrecognized is None
 
 
 def test_gpu_cc_capabilities_none_means_not_capable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(attest, "_run", lambda command: _NON_CC_CAPABLE_OUTPUT)
-    assert attest._detect_gpu_cc() == (False, False)
+    assert attest._detect_gpu_cc() == (False, False, None)
 
 
 def test_no_nvidia_smi_means_not_capable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(attest, "_run", lambda command: None)
-    assert attest._detect_gpu_cc() == (False, False)
+    assert attest._detect_gpu_cc() == (False, False, None)
 
 
 def test_unparseable_nvidia_smi_output_means_not_detected_not_guessed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(attest, "_run", lambda command: "some future format we don't know")
-    assert attest._detect_gpu_cc() == (False, False)
+    assert attest._detect_gpu_cc() == (False, False, None)
+
+
+@pytest.mark.parametrize("reported", ["N/A", "Unknown", "BLACKWELL_CC", "ERR!"])
+def test_an_unrecognized_capability_value_fails_closed_and_is_reported(
+    monkeypatch: pytest.MonkeyPatch, reported: str
+) -> None:
+    """The old rule was "anything that is not None is capable", which failed *open*.
+
+    A driver that answers ``N/A``, an error string, or a capability tier nobody has
+    seen yet would all have read as capable — on the single field the end-to-end
+    claim rests on. Unknown now means not capable, and the value is handed back so the
+    operator sees what was not understood instead of a silent downgrade.
+    """
+    monkeypatch.setattr(
+        attest,
+        "_run",
+        lambda command: "    CC State                   : ON\n"
+        f"    GPU CC Capabilities        : {reported}\n",
+    )
+    capable, enabled, unrecognized = attest._detect_gpu_cc()
+    assert capable is False
+    assert enabled is True
+    assert unrecognized == reported
+
+
+def test_garbled_output_without_a_capability_line_is_not_capable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        attest, "_run", lambda command: "    CC State                   : ON\n"
+    )
+    assert attest._detect_gpu_cc() == (False, True, None)
 
 
 # ---- end_to_end combination matrix -------------------------------------------------------
@@ -152,7 +187,7 @@ def _status(
 
     def fake_run(command: list[str]) -> str | None:
         if gpu_cc_capable or gpu_cc_enabled:
-            cap = "HOPPER_CC" if gpu_cc_capable else "None"
+            cap = "CC" if gpu_cc_capable else "None"
             state = "ON" if gpu_cc_enabled else "OFF"
             return f"    CC State                   : {state}\n    GPU CC Capabilities        : {cap}\n"
         return None

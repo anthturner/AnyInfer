@@ -17,6 +17,8 @@ hide:
     ```python
     import anyinfer as ai
 
+    prompt = "Summarize the Apollo program in one sentence."
+
     client = ai.Client([ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")])
     result = client.generate(prompt, target="anthropic:claude-sonnet-4-5")
     print(result.text)
@@ -26,6 +28,8 @@ hide:
 
     ```python
     import anyinfer as ai
+
+    prompt = "Summarize the Apollo program in one sentence."
 
     async with ai.AsyncClient(
         [ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY")]

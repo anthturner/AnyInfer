@@ -13,10 +13,22 @@ import sys
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+    PublicFormat,
+)
 
-from anyinfer.errors import LocalRuntimeError
+from anyinfer.errors import ConfidentialExecutionError, LocalRuntimeError
 from anyinfer.events.telemetry import ServerLifecycle
 from anyinfer.local.hardware import Accelerator, HardwareProfile
+from anyinfer.local.provenance import (
+    ModelManifest,
+    WeightsProvenance,
+    hash_model_weights,
+)
 from anyinfer.local.server import LOOPBACK_HOST, ServerSupervisor, allocate_port
 from anyinfer.local.tuning import ServerPlan
 
@@ -337,5 +349,75 @@ async def test_managed_server_tracks_active_streams(fake_binary: Path, tmp_path:
             assert not handle.is_idle
             assert handle.idle_seconds() == 0.0
         assert handle.is_idle
+    finally:
+        await supervisor.aclose()
+
+
+# ---- Tier 4: verification happens at the point of load --------------------------------
+
+
+def _signed_provenance(weights: Path) -> WeightsProvenance:
+    """A manifest genuinely signed over the current contents of `weights`."""
+    private_key = Ed25519PrivateKey.generate()
+    private_bytes = private_key.private_bytes(
+        Encoding.Raw, PrivateFormat.Raw, encryption_algorithm=NoEncryption()
+    )
+    public_bytes = private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    unsigned = ModelManifest(
+        model_id="m",
+        weight_hash=hash_model_weights(weights),
+        vendor_key_id="k1",
+        signed_at="2026-08-25T00:00:00Z",
+        signature=b"",
+    )
+    signed = ModelManifest(
+        model_id=unsigned.model_id,
+        weight_hash=unsigned.weight_hash,
+        vendor_key_id=unsigned.vendor_key_id,
+        signed_at=unsigned.signed_at,
+        signature=Ed25519PrivateKey.from_private_bytes(private_bytes).sign(unsigned._payload()),
+    )
+    return WeightsProvenance(manifest=signed, vendor_public_key=public_bytes)
+
+
+async def test_verified_weights_start_normally(fake_binary: Path, tmp_path: Path) -> None:
+    model = _model(tmp_path)
+    supervisor = ServerSupervisor(binary=fake_binary)
+    try:
+        managed = await supervisor.acquire(
+            "m", model, _plan(), provenance=_signed_provenance(model)
+        )
+        assert managed.base_url.startswith(f"http://{LOOPBACK_HOST}:")
+    finally:
+        await supervisor.aclose()
+
+
+async def test_weights_that_do_not_match_the_manifest_never_spawn(
+    fake_binary: Path, tmp_path: Path
+) -> None:
+    """Verification is inside the load path now, so a mismatch stops the process.
+
+    Previously nothing connected the two: a caller could verify somewhere else, or not
+    at all, and the supervisor would spawn either way.
+    """
+    model = _model(tmp_path)
+    provenance = _signed_provenance(model)
+    model.write_bytes(b"different weights entirely")
+
+    supervisor = ServerSupervisor(binary=fake_binary)
+    try:
+        with pytest.raises(ConfidentialExecutionError, match="do not match the signed manifest"):
+            await supervisor.acquire("m", model, _plan(), provenance=provenance)
+        assert supervisor.resident_models == (), "nothing may be left running"
+    finally:
+        await supervisor.aclose()
+
+
+async def test_no_provenance_means_no_verification(fake_binary: Path, tmp_path: Path) -> None:
+    """The ordinary local path is unchanged and pays nothing for this."""
+    supervisor = ServerSupervisor(binary=fake_binary)
+    try:
+        managed = await supervisor.acquire("m", _model(tmp_path), _plan())
+        assert managed.base_url
     finally:
         await supervisor.aclose()

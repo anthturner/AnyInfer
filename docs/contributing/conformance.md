@@ -36,6 +36,20 @@ supports = Capabilities(reasoning=False, tools=False)
 An unsupported case is reported `skipped` and renders as ➖, a declared limitation rather
 than a pass, so the matrix cannot overstate a provider.
 
+When an adapter *does* implement an operation but proving it needs a differently-shaped
+fake than the shared harness serves, name the capability in `covered_elsewhere` alongside
+the `False` flag:
+
+```python
+supports = Capabilities(reasoning=False)
+covered_elsewhere = frozenset({"embedding"})
+```
+
+That renders as 🔗 instead of ➖. The distinction matters: three adapters shipped working
+embeddings while the matrix told readers they could not embed, because both truths were
+collapsed onto one symbol. The annotation cannot overstate coverage either — it only
+changes how an already-skipped case is drawn, and the dedicated test still has to exist.
+
 ## Contributing a Cassette
 
 Cassette coverage is the one thing here that does not scale with maintainer effort: it

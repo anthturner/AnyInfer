@@ -10,14 +10,14 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 
-from demo_app.config import default_config
-from demo_app.conversation import gist_title
-from demo_app.fake_provider import DEMO_PROVIDER_ID
+from anyinfer_demo.config import default_config
+from anyinfer_demo.conversation import gist_title
+from anyinfer_demo.fake_provider import DEMO_PROVIDER_ID
 
 
 @pytest.fixture
 def window(qapp: object, wait_for_models):
-    from demo_app.main_window import MainWindow
+    from anyinfer_demo.main_window import MainWindow
 
     built = MainWindow(default_config())
     if not built._engine_bar.target():
@@ -134,7 +134,7 @@ class TestTabs:
         window._on_tab_close(window._tabs.indexOf(page))
 
         monkeypatch.setattr(
-            "demo_app.main_window.QFileDialog.getOpenFileName",
+            "anyinfer_demo.main_window.QFileDialog.getOpenFileName",
             lambda *_args, **_kwargs: (str(saved_path), "JSON"),
         )
         window._on_open_saved()
@@ -144,7 +144,7 @@ class TestTabs:
 
 class TestTabMenu:
     def test_open_saved_is_available_even_without_a_tab_under_the_pointer(self, qapp: object):
-        from demo_app.widgets.chat_tabs import ConversationTabs
+        from anyinfer_demo.widgets.chat_tabs import ConversationTabs
 
         tabs = ConversationTabs()
         menu, actions = tabs._make_context_menu(-1)
@@ -156,8 +156,8 @@ class TestTabMenu:
 
 class TestSharedTabBorders:
     def test_conversations_use_the_shared_bordered_tab_widget(self, qapp: object):
-        from demo_app.widgets.chat_tabs import ConversationTabs
-        from demo_app.widgets.tab_widget import BorderedTabWidget
+        from anyinfer_demo.widgets.chat_tabs import ConversationTabs
+        from anyinfer_demo.widgets.tab_widget import BorderedTabWidget
 
         tabs = ConversationTabs()
         assert isinstance(tabs, BorderedTabWidget)
@@ -165,7 +165,7 @@ class TestSharedTabBorders:
         assert tabs.tabPosition() == tabs.TabPosition.North
 
     def test_outline_refresh_is_deferred_until_tab_geometry_settles(self, qapp: object):
-        from demo_app.widgets.tab_widget import BorderedTabWidget
+        from anyinfer_demo.widgets.tab_widget import BorderedTabWidget
 
         tabs = BorderedTabWidget()
         tabs.update_tab_outline()
@@ -196,7 +196,7 @@ class TestBubblePolish:
     def test_transcript_and_message_bodies_never_scroll_horizontally(self, qapp: object):
         from PySide6.QtCore import Qt
 
-        from demo_app.widgets.chat_view import MessageBubble, MessageList
+        from anyinfer_demo.widgets.chat_view import MessageBubble, MessageList
 
         transcript = MessageList()
         bubble = MessageBubble("assistant", "demo-fake:reliable")
@@ -204,7 +204,7 @@ class TestBubblePolish:
         assert bubble._body.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
 
     def test_assistant_header_reveals_target_on_hover(self, qapp: object):
-        from demo_app.widgets.chat_view import MessageBubble
+        from anyinfer_demo.widgets.chat_view import MessageBubble
 
         bubble = MessageBubble("assistant", "ollama:gpt-oss:20b")
         assert "ollama" not in bubble._header_label.text()
@@ -214,7 +214,7 @@ class TestBubblePolish:
         assert "ollama" not in bubble._header_label.text()
 
     def test_welcome_cards_share_a_minimum_height(self, qapp: object):
-        from demo_app.widgets.chat_view import _WelcomeCard
+        from anyinfer_demo.widgets.chat_view import _WelcomeCard
 
         short = _WelcomeCard("Short", "One line")
         long = _WelcomeCard("Longer title that wraps", "A much longer description " * 4)
@@ -323,7 +323,7 @@ class TestRequestOptionsGrid:
 
 class TestRenderingFixes:
     def test_window_and_collapsed_inspector_sections_keep_usable_minima(self, window):
-        from demo_app.widgets.collapsible_section import HEADER_HEIGHT
+        from anyinfer_demo.widgets.collapsible_section import HEADER_HEIGHT
 
         assert window.minimumWidth() == 960
         assert window.minimumHeight() == 640
@@ -334,8 +334,8 @@ class TestRenderingFixes:
         from PySide6.QtCore import QSize
         from PySide6.QtWidgets import QLabel
 
-        from demo_app import theme
-        from demo_app.widgets.collapsible_section import CollapsibleSection
+        from anyinfer_demo import theme
+        from anyinfer_demo.widgets.collapsible_section import CollapsibleSection
 
         section = CollapsibleSection("Telemetry", QLabel("body"))
         section.setStyleSheet(theme.stylesheet(theme.resolve_theme(qapp, "light")))
@@ -348,7 +348,7 @@ class TestRenderingFixes:
         assert abs(toggle.geometry().center().y() - toggle.parentWidget().rect().center().y()) <= 1
 
     def test_collapsed_inspector_headers_are_anchored_to_the_top(self, window, qapp: object):
-        from demo_app.widgets.collapsible_section import HEADER_HEIGHT
+        from anyinfer_demo.widgets.collapsible_section import HEADER_HEIGHT
 
         window.resize(1200, 800)
         window.show()
@@ -374,8 +374,8 @@ class TestRenderingFixes:
         from PySide6.QtCore import QSize
         from PySide6.QtWidgets import QTabBar, QToolButton
 
-        from demo_app.conversation import Conversation
-        from demo_app.widgets.chat_tabs import ChatPage, ConversationTabs
+        from anyinfer_demo.conversation import Conversation
+        from anyinfer_demo.widgets.chat_tabs import ChatPage, ConversationTabs
 
         tabs = ConversationTabs()
         index = tabs.add_page(ChatPage(Conversation.new()), "Chat")
@@ -396,29 +396,29 @@ class TestRenderingFixes:
         assert combo.itemData(0, Qt.ItemDataRole.ToolTipRole) == combo.itemText(0)
 
     def test_hint_and_notice_styles_use_secondary_surfaces(self, qapp: object):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         stylesheet = theme.stylesheet(theme.resolve_theme(qapp, "light"))
         assert "QLabel#HintText" in stylesheet
         assert "border-left: 3px solid" in stylesheet
 
     def test_hardware_marks_choose_contrast_from_their_background(self, qapp: object):
-        from demo_app.widgets.models_dialog import _contrasting_text_color
+        from anyinfer_demo.widgets.models_dialog import _contrasting_text_color
 
         assert _contrasting_text_color("#ffffff") == "#000000"
         assert _contrasting_text_color("#000000") == "#ffffff"
 
     def test_required_mark_uses_the_active_danger_token(self, qapp: object):
         from anyinfer.registry import SetupField
-        from demo_app import theme
-        from demo_app.widgets.settings_dialog import _field_label
+        from anyinfer_demo import theme
+        from anyinfer_demo.widgets.settings_dialog import _field_label
 
         label = _field_label(SetupField("api_key", "API key", "secret", required=True))
         assert theme.color("danger") in label.text()
         assert "#d13438" not in label.text()
 
     def test_telemetry_events_use_separate_badge_and_detail_columns(self, qapp: object):
-        from demo_app.widgets.telemetry_view import _RequestCard
+        from anyinfer_demo.widgets.telemetry_view import _RequestCard
 
         card = _RequestCard("request-id", ("demo-fake:reliable",))
         card.add_event(object())
@@ -431,8 +431,8 @@ class TestHelpDialogPolish:
     def test_code_view_copy_excludes_line_numbers(self, qapp: object):
         from PySide6.QtWidgets import QApplication
 
-        from demo_app.sdk_help import TOPICS
-        from demo_app.widgets.sdk_help import SdkHelpDialog
+        from anyinfer_demo.sdk_help import TOPICS
+        from anyinfer_demo.widgets.sdk_help import SdkHelpDialog
 
         dialog = SdkHelpDialog(TOPICS["streaming"])
         try:
@@ -445,7 +445,7 @@ class TestHelpDialogPolish:
             dialog.close()
 
     def test_licenses_dialog_lists_the_shipped_components(self, qapp: object):
-        from demo_app.widgets.help_dialogs import THIRD_PARTY_COMPONENTS, LicensesDialog
+        from anyinfer_demo.widgets.help_dialogs import THIRD_PARTY_COMPONENTS, LicensesDialog
 
         names = [c.name for c in THIRD_PARTY_COMPONENTS]
         assert any("Tabler" in n for n in names)
@@ -460,7 +460,7 @@ class TestHelpDialogPolish:
 
     def test_about_dialog_reports_the_sdk_version(self, qapp: object):
         import anyinfer
-        from demo_app.widgets.help_dialogs import AboutDialog
+        from anyinfer_demo.widgets.help_dialogs import AboutDialog
 
         dialog = AboutDialog()
         try:
@@ -483,7 +483,7 @@ class TestConcurrentFakeShapes:
     def test_structured_and_plain_tabs_do_not_reshape_each_other(self, window):
         import json
 
-        from demo_app.widgets.schema_panel import EXAMPLE_SCHEMA
+        from anyinfer_demo.widgets.schema_panel import EXAMPLE_SCHEMA
 
         # Tab 1: structured. Enable the schema before sending.
         window._schema.set_enabled(True)

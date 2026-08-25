@@ -23,8 +23,10 @@ deployment serving several vendors' traffic relies on this scoping directly.
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from .sealed_template import EncryptedTemplate, TemplateVault
@@ -38,6 +40,7 @@ __all__ = [
     "RelayRegistry",
     "RelayResult",
     "RelayRoute",
+    "load_registry",
 ]
 
 
@@ -103,6 +106,65 @@ class RelayRegistry:
         if route is None:
             raise RelayError(f"no route {routing_key!r} provisioned for this tenant")
         return route
+
+
+def load_registry(path: str | Path) -> RelayRegistry:
+    """Build a `RelayRegistry` from a JSON provisioning file.
+
+    The registry is in-memory and has no persistence of its own, which left every
+    deployment hand-writing the same registration loop. This is that loop, so a
+    self-hosted relay can be provisioned from a file under configuration management
+    rather than from a bespoke script.
+
+    The file holds *sealed* templates — ciphertext — so it is not itself secret material
+    and can live in a config repository. Decryption still requires the deployment's
+    `TemplateVault`, its key ring, and a valid license.
+
+    Expected shape::
+
+        {
+          "tenants": {
+            "acme": [
+              {
+                "routing_key": "summarize",
+                "target": "anthropic:claude-sonnet-4-5",
+                "template": { ... EncryptedTemplate.to_json() payload ... }
+              }
+            ]
+          }
+        }
+
+    Args:
+        path: The JSON provisioning file.
+
+    Returns:
+        A registry with every listed route provisioned under its tenant.
+
+    Raises:
+        RelayError: The file is malformed, or a route entry is missing a required field.
+    """
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+        tenants = document["tenants"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise RelayError(f"cannot load relay registry from {path}: {exc}") from exc
+
+    registry = RelayRegistry()
+    for tenant_id, routes in tenants.items():
+        for entry in routes:
+            try:
+                template = EncryptedTemplate.from_json(json.dumps(entry["template"]))
+                route = RelayRoute(
+                    routing_key=str(entry["routing_key"]),
+                    template=template,
+                    target=str(entry["target"]),
+                )
+            except (KeyError, ValueError, TypeError) as exc:
+                raise RelayError(
+                    f"malformed route for tenant {tenant_id!r} in {path}: {exc}"
+                ) from exc
+            registry.register(str(tenant_id), route)
+    return registry
 
 
 class Relay:

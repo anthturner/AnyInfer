@@ -45,7 +45,7 @@ attest = ["cryptography>=42"]
 # SDKs. The extra exists so importing anyinfer never pulls in subprocess-spawning code.
 mcp = []
 serve = ["starlette>=0.37", "uvicorn>=0.30"]
-# The pack-in PySide6 reference application (`src/demo_app`). Kept in an extra so ADR-007's
+# The pack-in PySide6 reference application (`src/anyinfer_demo`). Kept in an extra so ADR-007's
 # slim core holds: nothing in `anyinfer` imports Qt, and a library install never pulls it in.
 demo = ["PySide6>=6.6", "markdown>=3.6"]
 all = [
@@ -81,7 +81,7 @@ dev = [
 
 [project.scripts]
 anyinfer = "anyinfer.cli:main"
-anyinfer-demo = "demo_app:main"
+anyinfer-demo = "anyinfer_demo:main"
 
 # The application-facing test kit. Registering here means `pip install anyinfer` is enough
 # to get the fixtures; the plugin module itself imports nothing from `anyinfer` until a
@@ -99,14 +99,14 @@ Issues = "https://github.com/anthturner/AnyInfer/issues"
 # installs a generic top-level `workspace` module would collide with unrelated
 # distributions claiming the same name. It stays a repo-root tool (`python workspace.py`).
 [tool.hatch.build.targets.wheel]
-packages = ["src/anyinfer", "src/demo_app"]
+packages = ["src/anyinfer", "src/anyinfer_demo"]
 
 [tool.hatch.build.targets.sdist]
 # The sdist is a working source tree: it can rebuild the wheel, run the test suite, and
 # build the docs (which is why mkdocs.yml, overrides/, and scripts/ ship alongside docs/).
 include = [
   "src/anyinfer",
-  "src/demo_app",
+  "src/anyinfer_demo",
   "tests",
   "docs",
   "overrides",
@@ -158,15 +158,15 @@ convention = "google"
 "src/anyinfer/testing/scaffold.py" = ["RUF001", "RUF002"]
 "workspace.py" = ["RUF001", "RUF002"]
 # Raw SVG path data — splitting it across lines would fragment the "d" attribute string.
-"src/demo_app/widgets/icons.py" = ["E501"]
+"src/anyinfer_demo/widgets/icons.py" = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["anyinfer", "demo_app"]
+known-first-party = ["anyinfer", "anyinfer_demo"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src/anyinfer", "src/demo_app", "workspace.py"]
+files = ["src/anyinfer", "src/anyinfer_demo", "workspace.py"]
 warn_unreachable = true
 disallow_any_generics = true
 no_implicit_reexport = false
@@ -199,19 +199,27 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+# The shards' own suites are included, not just `tests/`. They were excluded, so 64 tests
+# — including the Relay's authentication and body-cap tests — never ran in CI or in
+# `workspace check`, on a branch whose whole point was closing security findings. A shard
+# ships as its own distribution but is developed in this tree, so it is gated here.
+testpaths = [
+    "tests",
+    "src/anyinfer-store/tests",
+    "src/anyinfer-shared/tests",
+    "src/anyinfer-confidential/tests",
+]
 markers = [
     # Two tracks, so the inner loop is seconds and the gate is still exhaustive.
     # `workspace test` runs the fast track; `workspace test --all` and CI run everything.
     "exhaustive: sweeps the entire preset or provider matrix. Needed when the shared OpenAI-compatible dialect, a descriptor invariant, or the conformance suite itself changes -- not when iterating on one adapter, which its own test module covers.",
     "slow: takes seconds for reasons unrelated to the code under iteration (packaging, subprocess builds). Always run before a commit; skipped while iterating.",
 ]
-filterwarnings = [
-    "error",
-    # Import-time warning from starlette's own test client about its httpx backend —
-    # third-party drift we cannot act on from here, not a defect in our code.
-    "ignore::DeprecationWarning:starlette.testclient",
-]
+# `error` with no exemptions. The starlette.testclient ignore that used to sit here was
+# removed once starlette 1.6 stopped emitting the warning it named: a filter that matches
+# nothing is not free, because it silently swallows the *next* deprecation from that module
+# too. Re-add an exemption only with the specific message and a reason, never a bare module.
+filterwarnings = ["error"]
 # `--durations` costs nothing and makes every run, including a CI log, self-profiling.
 # That is how the macOS lane's cost gets diagnosed: it runs this suite roughly four times
 # slower than Linux does, which no core-count difference explains, and the answer is not
@@ -245,12 +253,13 @@ forbidden_modules = [
 
 [[tool.importlinter.contracts]]
 # ADR-009: the sidecar is a wire codec around a normal client, never a second core. The
-# contract covers the codec and ASGI app. `serve.__main__` is only a module-runner shim into
-# the separate CLI process boundary, so it is not request-path code.
+# whole package is the source, not a named pair of modules: naming modules meant
+# `embeddings_codec` and `service` sat outside the contract, so nothing would have caught
+# either importing `anyinfer.providers`. A module added tomorrow is covered on arrival.
 name = "Sidecar is a codec around the client, never a second core"
 type = "forbidden"
 allow_indirect_imports = true
-source_modules = ["anyinfer.serve.openai_codec", "anyinfer.serve.app"]
+source_modules = ["anyinfer.serve"]
 forbidden_modules = [
   "anyinfer.providers",
   "anyinfer.routing",

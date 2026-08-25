@@ -69,7 +69,14 @@ from .hardware import (
     probe_signature,
 )
 from .metrics import ResourceSample, StorageProfile, SystemSampler, storage_profile
-from .provenance import ModelManifest, hash_model_weights, verify_model_manifest
+from .provenance import (
+    ModelManifest,
+    VerifiedWeights,
+    WeightsProvenance,
+    hash_model_weights,
+    open_verified_weights,
+    verify_model_manifest,
+)
 from .recommend import Recommendation, Tier, TierSource, recommend_alias
 from .runtimes import (
     InstallReport,
@@ -164,6 +171,8 @@ __all__ = [
     "TuningInputs",
     "VariantChoice",
     "VariantPrefs",
+    "VerifiedWeights",
+    "WeightsProvenance",
     "acquire",
     "acquire_sync",
     "allocate_port",
@@ -191,6 +200,7 @@ __all__ = [
     "license_allowed",
     "load_runtime_table",
     "memory_budget",
+    "open_verified_weights",
     "plan_acquisition",
     "plan_server",
     "probe_signature",

@@ -190,6 +190,8 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
+    if effort == "none":
+        return {"reasoning": "off"}
     return {"reasoning": "low" if effort == "minimal" else effort}
 
 

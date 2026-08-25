@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from demo_app.sdk_help import TOPICS, covered_symbols, resolve_api, uncovered_symbols
+from anyinfer_demo.sdk_help import TOPICS, covered_symbols, resolve_api, uncovered_symbols
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -71,13 +71,13 @@ def test_snippets_reference_the_apis_they_document():
 
 class TestHelpWidgets:
     def test_help_button_rejects_an_unknown_topic(self, qapp: object):
-        from demo_app.widgets.sdk_help import SdkHelpButton
+        from anyinfer_demo.widgets.sdk_help import SdkHelpButton
 
         with pytest.raises(KeyError):
             SdkHelpButton("no-such-topic")
 
     def test_every_topic_renders_in_the_dialog(self, qapp: object):
-        from demo_app.widgets.sdk_help import SdkHelpDialog
+        from anyinfer_demo.widgets.sdk_help import SdkHelpDialog
 
         for topic in TOPICS.values():
             dialog = SdkHelpDialog(topic)
@@ -87,7 +87,7 @@ class TestHelpWidgets:
             dialog.close()
 
     def test_library_map_shows_every_topic_and_the_gap_count(self, qapp: object):
-        from demo_app.widgets.sdk_help import LibraryMapDialog
+        from anyinfer_demo.widgets.sdk_help import LibraryMapDialog
 
         dialog = LibraryMapDialog()
         try:
@@ -102,8 +102,8 @@ class TestHelpWidgets:
             dialog.close()
 
     def test_inspector_sections_carry_help_chips(self, qapp: object):
-        from demo_app.config import default_config
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.config import default_config
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:

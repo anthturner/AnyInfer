@@ -130,6 +130,49 @@ client = ai.Client(providers, resolver=chain)
 The *chain* registers resolved secrets for redaction, not the individual resolvers, so a
 third-party resolver cannot forget to.
 
+## Custom Schemes the Sidecar Can Reach
+
+`chain.add()` needs a constructor call, which an application always has and the
+[sidecar](../serve/README.md) never does. `anyinfer serve` can only use what a
+configuration file can *name*, so a resolver reaches it through an entry-point group
+instead:
+
+```toml
+# pyproject.toml of the package providing the scheme
+[project.entry-points."anyinfer.credential_stores"]
+vault = "my_company.anyinfer_vault:VaultResolver"
+```
+
+The entry point resolves to a `CredentialResolver` — the same two-method protocol as
+above — or to a class or zero-argument callable returning one. Install the package
+alongside AnyInfer and `"api_key": "vault://prod/openai"` works in any config file, from
+any frontend, with no code change.
+
+Four rules govern the group, and they are worth knowing before you publish one:
+
+- **Discovered resolvers go first.** They are placed ahead of the built-ins in the
+  default chain, which is what lets a custom scheme get first refusal.
+- **But they may not claim a built-in scheme.** A resolver whose `handles()` answers
+  `True` for `env://` or `credential://` is dropped before it reaches the chain, recorded
+  as a `scheme-reserved` issue. Being first in line is for *adding* a scheme, never for
+  redefining one — the same collision refusal the `anyinfer.providers` group enforces on
+  ids and aliases. A resolver whose `handles()` raises on the probe is dropped too.
+- **A failed plugin is skipped, not fatal.** An unreachable vault package must not stop a
+  process whose other credentials resolve fine. Each skip warns once and stays readable
+  on `chain.plugin_issues()`, and the eventual `CredentialError` names it.
+- **An unresolvable scheme fails loudly.** Anything shaped like `scheme://` that no
+  resolver handles is refused — at config load where possible, naming the file location.
+  It is never accepted as a literal secret, which would put an internal vault path on the
+  wire as a bearer token.
+
+!!! warning "This is a trust decision"
+    A package published under this group is imported, instantiated, and consulted for
+    credential references in your process. That is not a new code-execution primitive —
+    any installed distribution can already run code at interpreter startup — but it is a
+    designed interposition point on the credential path specifically, reachable through a
+    transitive dependency. The built-in schemes are fenced off for exactly that reason.
+    Depend on a credential-store plugin the way you would depend on an auth library.
+
 ## Backend Credentials Never Transit the Sidecar
 
 When the [sidecar](../serve/README.md) is running, it authenticates *clients to itself*
@@ -143,6 +186,8 @@ pointed at the frontend never sees, sends, or needs them.
       including to code that never saw the client that resolved it.
     - Backend credentials never transit the sidecar; it authenticates clients to
       itself with its own bearer token.
+    - A custom scheme reaches the sidecar through the `anyinfer.credential_stores`
+      entry-point group; it may add a scheme but never redefine a built-in one.
 
 ## See Also
 
