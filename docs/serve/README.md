@@ -62,11 +62,19 @@ the frontend stays a codec.
 | Endpoint | Behavior |
 |---|---|
 | `POST /v1/chat/completions` | Streaming and non-streaming. `model` is parsed as a target. |
+| `POST /v1/embeddings` | Vectors for a string or batch. `model` is parsed as a target. |
+| `POST /v1/anyinfer/rerank` | Scores documents against a query. Not an OpenAI route. |
+| `POST /v1/anyinfer/compare` | Runs one prompt across several targets. Not an OpenAI route. |
 | `GET /v1/models` | Catalog aliases plus any explicitly exposed targets. |
 | `GET /health` | Liveness. Requires no authentication. |
 | Anything else under `/v1` | 404 with a clear explanation. |
 
-Embeddings and generated image/audio outputs are out of scope. Typed image, document, and
+The two `/v1/anyinfer/` routes are deliberate extensions: reranking and comparison have no
+OpenAI equivalent, so they sit under a namespaced prefix rather than pretending to be stock
+endpoints. See [embeddings](../concepts/embeddings.md) for what the embeddings route
+projects and [comparing targets](../guides/comparing-targets.md) for the compare route.
+
+Generated image and audio *outputs* are out of scope. Typed image, document, and
 audio *inputs* are accepted in OpenAI content arrays and capability-gated before dispatch;
 see [multimodal inputs](../concepts/multimodal-inputs.md).
 

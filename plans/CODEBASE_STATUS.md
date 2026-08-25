@@ -35,7 +35,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 
 | Status | ID | Item | Sev | Pri | Score |
 |---|---|---|---|---|---|
-| `[ ]` | B.1 | Sidecar docs deny endpoints the sidecar actually serves | 5 | 5 | 25 |
+| `[x]` | B.1 | Sidecar docs deny endpoints the sidecar actually serves | 5 | 5 | 25 |
 | `[ ]` | F.2 | Relay ASGI app serves decrypted prompt IP with no authentication | 5 | 5 | 25 |
 | `[ ]` | G.1 | Attestation honest-claims pass (reword oversell, pin GPU parse) | 5 | 5 | 25 |
 | `[x]` | B.6 | Error docs `missing_fields` → real attribute `missing_required` | 3 | 5 | 15 |
@@ -48,7 +48,7 @@ F.4 + F.9 + F.13 are one quick hygiene batch; A.1 is best done pre-1.0.
 | `[x]` | B.3 | CLI subcommand enumerations stale in AGENTS.md and DESIGN.md | 3 | 4 | 12 |
 | `[x]` | B.4 | DESIGN.md §18 package layout has drifted from the tree | 3 | 4 | 12 |
 | `[x]` | B.5 | Stale counts: matrix header, adapter list, "other twenty", "about ten" | 3 | 4 | 12 |
-| `[ ]` | C.2 | First-call code snippets are not copy-paste runnable | 3 | 4 | 12 |
+| `[x]` | C.2 | First-call code snippets are not copy-paste runnable | 3 | 4 | 12 |
 | `[ ]` | D.1 | Sidecar `/v1/embeddings` rejects the OpenAI SDK's default encoding | 3 | 4 | 12 |
 | `[ ]` | D.2 | `reasoning_effort` is unreachable through the sidecar | 3 | 4 | 12 |
 | `[ ]` | D.3 | No repair config for serve; config `context` block ignored | 3 | 4 | 12 |
@@ -314,9 +314,9 @@ A reader of `docs/serve/README.md` will conclude embedding traffic must go elsew
 the comparing-targets guide already document the true behavior.
 
 **Remediation:**
-- [ ] **B.1.1** Add rows to `docs/serve/README.md`'s "What It Serves" table for
+- [x] **B.1.1** Add rows to `docs/serve/README.md`'s "What It Serves" table for
   `POST /v1/embeddings`, `POST /v1/anyinfer/rerank`, `POST /v1/anyinfer/compare`.
-- [ ] **B.1.2** Rewrite the exclusion sentence to scope it to generated image/audio *outputs*
+- [x] **B.1.2** Rewrite the exclusion sentence to scope it to generated image/audio *outputs*
   only, linking `concepts/embeddings.md`.
 
 ## B.2 Conformance matrix labels implemented embeddings "declared unsupported" (3 providers)
@@ -503,7 +503,7 @@ paste. Every downstream example page gets this right by being a complete program
 entry-path fragments have the gap.
 
 **Remediation:**
-- [ ] **C.2.1** In README.md, docs/index.md, and quickstart's "Your First Call" only, define the
+- [x] **C.2.1** In README.md, docs/index.md, and quickstart's "Your First Call" only, define the
   input inline (one-line literal or `open("release-notes.txt").read()`). Later quickstart
   sections may keep free variables once the pattern is established.
 

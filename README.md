@@ -21,6 +21,8 @@ telemetry, and shared configuration.
 ```python
 import anyinfer as ai
 
+text = "AnyInfer 0.1 adds embeddings, reranking, and an OpenAI-compatible sidecar."
+
 client = ai.Client(
     [
         ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
@@ -38,7 +40,9 @@ print(result.usage.output_tokens, "tokens in", result.timing.total_ms, "ms")
 Point the same call at a local model by changing one string:
 
 ```python
-result = client.generate(prompt, target="ollama:qwen3:8b")  # "medium" is a catalog alias
+result = client.generate(
+    "Summarize this release note:\n" + text, target="ollama:qwen3:8b"
+)  # "medium" is a catalog alias
 ```
 
 Embeddings and reranking are the same client, the same routing, and the same batching —
