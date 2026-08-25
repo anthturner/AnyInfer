@@ -26,6 +26,7 @@ __all__ = [
     "AttemptStarted",
     "CachePlanned",
     "ContextReduced",
+    "CredentialRotated",
     "DownloadProgress",
     "FallbackTriggered",
     "FirstToken",
@@ -467,6 +468,29 @@ class DownloadProgress:
     session_bytes: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class CredentialRotated:
+    """A provider instance's credential changed and its adapter was rebuilt.
+
+    Emitted only when the resolved value actually moved — a TTL expiring and the
+    credential re-resolving to the same secret is not an event, because nothing happened.
+    Rotation discards a connection pool mid-flight, so an operator watching latency
+    deserves to know which second it was.
+
+    Payload-free by construction: the credential is never carried here, and neither is
+    the change-detection digest.
+
+    Attributes:
+        provider: The provider instance whose adapter was rebuilt.
+        trigger: What prompted the re-resolution — ``"ttl"`` for the periodic re-check,
+            ``"auth-failure"`` for the one triggered by a provider rejecting a credential
+            that had been working.
+    """
+
+    provider: str
+    trigger: Literal["ttl", "auth-failure"] = "ttl"
+
+
 TelemetryEvent = (
     RequestStarted
     | ArenaCompleted
@@ -488,6 +512,7 @@ TelemetryEvent = (
     | CachePlanned
     | RateLimitWaited
     | RateLimitObserved
+    | CredentialRotated
 )
 """Any event an observer may receive."""
 

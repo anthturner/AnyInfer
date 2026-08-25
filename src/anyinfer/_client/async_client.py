@@ -257,6 +257,16 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             always be fixed locally.
         model_dir: Where acquired model weights are stored. Defaults to the per-OS data
             directory, overridable with ``ANYINFER_MODEL_DIR``.
+        credential_ttl_s: How often to re-check whether a provider's credential reference
+            still resolves to the same secret. ``None`` — the default — resolves once at
+            adapter build and never again, which is what a client holding literal keys
+            wants. Set it when credentials come from a source that rotates underneath a
+            long-running process (a keychain, a mounted secret, an env file a deployment
+            rewrites): on expiry the reference is re-resolved, and the adapter is rebuilt
+            **only if the value actually changed**, so a rotation costs one connection
+            pool and a stable credential costs nothing. A provider that rejects a
+            credential which had been working triggers the same re-resolution immediately,
+            whatever the TTL says.
     """
 
     def __init__(
@@ -285,6 +295,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         manifest_payloads: bool = False,
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
+        credential_ttl_s: float | None = None,
     ) -> None:
         self._registry = registry or default_registry
         self._events = EventDispatcher(list(observers or []))
@@ -299,6 +310,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             # Lifecycle telemetry from adapters (server start/stop, download progress)
             # flows through the same dispatcher as request-path events.
             events=self._emit,
+            credential_ttl_s=credential_ttl_s,
         )
         self._default_route = route
         self._operation_routes: dict[str, Route] = dict(operation_routes or {})

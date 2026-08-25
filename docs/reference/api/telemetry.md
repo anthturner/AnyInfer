@@ -81,6 +81,8 @@ OpenTelemetry bridge below instead.
 
 ::: anyinfer.ServerLifecycle
 
+::: anyinfer.CredentialRotated
+
 </div>
 
 ## Redaction

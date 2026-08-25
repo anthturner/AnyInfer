@@ -22,6 +22,7 @@ from .events.telemetry import (
     AttemptStarted,
     CachePlanned,
     ContextReduced,
+    CredentialRotated,
     DownloadProgress,
     FallbackTriggered,
     FirstToken,
@@ -314,6 +315,17 @@ class OTelObserver:
         if event.resets_in_s is not None:
             attributes[f"{GEN_AI}.anyinfer.resets_in_s"] = event.resets_in_s
         self._standalone("rate_limit.observed", attributes).end()
+
+    def _on_CredentialRotated(self, event: CredentialRotated) -> None:  # noqa: N802
+        # A provider-lifecycle fact, not a request one: the rotation happened underneath
+        # whichever request first noticed, and belongs to neither.
+        self._standalone(
+            "credential.rotated",
+            {
+                f"{GEN_AI}.system": event.provider,
+                f"{GEN_AI}.anyinfer.rotation_trigger": event.trigger,
+            },
+        ).end()
 
     def _on_UsageEstimated(self, event: UsageEstimated) -> None:  # noqa: N802
         span = self._spans.get(event.request_id)

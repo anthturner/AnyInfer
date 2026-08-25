@@ -38,6 +38,7 @@ from ..context.select import select as select_context
 from ..context_request import ContextSummary
 from ..errors import (
     AllTargetsFailedError,
+    AuthError,
     ConfigError,
     ContextLengthError,
     ProviderError,
@@ -67,7 +68,6 @@ from ..events.telemetry import (
 from ..manifest import ManifestBuilder
 from ..providers.base import (
     AdapterFinal,
-    GeneratesText,
     ProviderAdapter,
     ProviderLifecycle,
     aclosing_if_supported,
@@ -115,6 +115,23 @@ from ..types.results import (
 )
 from .providers import AdapterPool
 from .wire import build_wire_request, dropped_parameters
+
+
+def _as_generator(adapter: ProviderLifecycle, resolved: ResolvedTarget) -> ProviderAdapter:
+    """Narrow a pooled adapter to the generation protocol, or say which one it is not.
+
+    Raises:
+        ConfigError: If the provider's adapter cannot generate. A descriptor claiming an
+            operation its adapter lacks is an authoring bug, so this names the provider
+            rather than surfacing an `AttributeError` from inside the router.
+    """
+    if not isinstance(adapter, ProviderAdapter):
+        raise ConfigError(
+            f"provider {resolved.provider_id!r} does not support generation",
+            provider=resolved.provider_id,
+            hint="choose a target whose provider declares the 'generation' operation",
+        )
+    return adapter
 
 
 def _last_user_text(request: GenerationRequest) -> str:
@@ -378,13 +395,7 @@ class GenerationExecutionMixin:
                 attempts.append(AttemptRecord(resolved, "skipped_unhealthy"))
                 continue
 
-            adapter = await self._pool.get(resolved.provider_id)
-            if not isinstance(adapter, GeneratesText):
-                raise ConfigError(
-                    f"provider {resolved.provider_id!r} does not support generation",
-                    provider=resolved.provider_id,
-                    hint="choose a target whose provider declares the 'generation' operation",
-                )
+            adapter = _as_generator(await self._pool.get(resolved.provider_id), resolved)
             descriptor = self._pool.descriptor_for(resolved.provider_id)
             capabilities = self._capabilities_for(descriptor, resolved)
             if builder is not None:
@@ -452,6 +463,17 @@ class GenerationExecutionMixin:
                 except ProviderError as error:
                     last_error = error
                     retryable = route.retry.should_retry(error)
+                    if not retryable and isinstance(error, AuthError):
+                        # An auth failure is deterministic — unless the credential rotated
+                        # underneath a long-running process, in which case the same request
+                        # succeeds with a freshly resolved one. The pool re-resolves and
+                        # answers whether anything actually moved, so a genuinely wrong key
+                        # still fails on the first attempt rather than being sent twice.
+                        retryable = await self._pool.refresh_credential(resolved.provider_id)
+                        if retryable:
+                            adapter = _as_generator(
+                                await self._pool.get(resolved.provider_id), resolved
+                            )
                     budget_left = attempt_number < route.retry.max_attempts
 
                     if isinstance(error, StreamProtocolError) and emitted_content:
