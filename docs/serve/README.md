@@ -373,8 +373,9 @@ The sidecar, CLI, and Python SDK use the same
       all reachable from a stock OpenAI client.
     - The AnyInfer extensions (`anyinfer_manifest`, `anyinfer_history`, `anyinfer_cache`,
       `anyinfer_context`, `anyinfer_arena`, `anyinfer_cite_documents`/
-      `anyinfer_citations`, `anyinfer_server_tools`, and the `anyinfer_video` content item) are additive: a client
-      that does not send them receives a plain OpenAI completion.
+      `anyinfer_citations`, `anyinfer_server_tools`, and the `anyinfer_video` content
+      item) are additive: a client that does not send them receives a plain OpenAI
+      completion.
     - A non-loopback bind requires both `--allow-remote-exposure` and a bearer token, and
       backend credentials never transit the frontend.
 

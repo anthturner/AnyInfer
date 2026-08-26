@@ -27,4 +27,5 @@ build without one. The endpoint returns the decrypted, assembled prompt, so the 
 derived from the presented token and never from the request body; a body `tenant_id` that
 disagrees with the token is rejected. Terminate TLS in front of it, and provision routes
 with `relay.load_registry` rather than a hand-rolled registration script. The full
-checklist is in [the confidentiality tiers guide](../../docs/guides/confidentiality-tiers.md).
+checklist is in the
+[Confidentiality Tiers guide](https://anyinfer.dev/guides/confidentiality-tiers/).

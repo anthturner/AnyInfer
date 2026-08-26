@@ -29,20 +29,20 @@ repository.
 
 A template is authored as plaintext, sealed at build time with AES-256-GCM, and shipped
 as an opaque asset. At runtime, `TemplateVault` decrypts a template into memory only
-immediately before rendering and best-effort-zeroes the buffer afterward. `TemplateVault.render()` is
-gated on a signed, time-boxed license blob, so an install without a valid license gets no
-rendered prompt from the vault — which doubles as a licensing mechanism.
+immediately before rendering and best-effort-zeroes the buffer afterward.
+`TemplateVault.render()` is gated on a signed, time-boxed license blob, so an install
+without a valid license gets no rendered prompt from the vault — which doubles as a
+licensing mechanism.
 
 That gate lives in the vault's code path, not in the ciphertext. The vault holds both the
 key and the sealed asset, so a bundle holder can decrypt directly and bypass the check;
 expiry is a signed field checked against local wall-clock, so a clock rollback defeats it.
-This is inherent to client-side sealing — the adversary owns the machine, which is the same
-ceiling Tier 1's confidentiality claim states. The gate makes unlicensed use unambiguous
-and detectable, not impossible. Cite it that way.
+This is inherent to client-side sealing — the adversary owns the machine, which is the same ceiling Tier 1's confidentiality claim states. What Tier 1 gives you is unlicensed use made unambiguous and detectable, not use made impossible.
+
+It ships as a separate package. Until its first PyPI release, install it from a
+repository checkout — see [the add-on packages](installation.md#optional-add-on-packages):
 
 ```bash
-# Ships as a separate package. Until a first PyPI release, install from a repository
-# checkout — see [installation](installation.md#optional-add-on-packages).
 pip install -e "src/anyinfer-confidential[relay]"   # relay is optional; Tier 1 needs no extra
 ```
 
@@ -387,8 +387,7 @@ read that section before the follow-up question arrives.
       rendered prompt from the vault; no attestation, no generation; no matching hash,
       `model_verified=False`. Tiers 1–2 gate code paths on a machine the adversary owns;
       only Tier 3's hardware boundary is not bypassable by whoever holds the bundle.
-    - Tier 3 today detects TEE presence rather than verifying a signed hardware quote;
-      cite it accordingly.
+    - Tier 3 today detects TEE presence rather than verifying a signed hardware quote.
     - The SOC 2 mapping restates the same typed facts in auditor vocabulary; it does not
       add guarantees.
 
