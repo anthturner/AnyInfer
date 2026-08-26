@@ -157,7 +157,7 @@ def test_vertex_claims_them_because_it_is_the_gemini_adapter_pointed_elsewhere()
 
 
 def test_xai_spells_search_beside_the_messages_rather_than_as_a_tool() -> None:
-    """xAI's Live Search is a request-level block, and is counted from usage."""
+    """Live Search on xAI is a request-level block, and is counted from usage."""
     payload = _payload("xai", server_tools=(ServerToolSpec(kind="web_search", max_uses=5),))
     assert payload["search_parameters"] == {"mode": "on", "max_search_results": 5}
     assert "tools" not in payload

@@ -628,7 +628,7 @@ def test_the_named_providers_declare_the_operation() -> None:
         for pid in default_registry.known_ids()
         if "batch" in default_registry.get(pid).operations
     }
-    assert declaring == {"anthropic", "openai", "groq"}
+    assert declaring == {"anthropic", "openai", "groq", "bedrock", "vertex"}
 
 
 # ---- the same lifecycle on the chat dialect --------------------------------------------------
@@ -683,3 +683,335 @@ def test_a_preset_without_a_verified_batch_tier_does_not_claim_one() -> None:
     assert "batch" in default_registry.get("groq").operations
     assert "batch" not in default_registry.get("cerebras").operations
     assert "batch" not in default_registry.get("together").operations
+
+
+# ---- storage-staged batches ------------------------------------------------------------------
+#
+# Bedrock and Vertex do not carry a batch over the API at all: the lines are an object in
+# the caller's own bucket, and the job references it by URI. That is a third lifecycle
+# shape beside Anthropic's one-step and OpenAI's file dance, and it is the one that makes
+# the handle carry state — the output location is not derivable from the job id, and an
+# adapter that remembered it would be the job registry this design exists to avoid.
+
+from anyinfer.testing.fakes import FakeBedrockServer  # noqa: E402
+
+BEDROCK_TARGET = "bedrock:anthropic.claude-sonnet-4-5-v1:0"
+_BEDROCK_OPTIONS = {
+    "aws_access_key_id": "AKIAFAKE",
+    "aws_secret_access_key": "secret",
+    "region": "us-east-1",
+    "batch_s3_uri": "s3://my-bucket/anyinfer",
+    "batch_role_arn": "arn:aws:iam::1234:role/AnyInferBatch",
+}
+
+
+def _bedrock_client(server: FakeBedrockServer, **options: object) -> ai.AsyncClient:
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "bedrock",
+                options={**_BEDROCK_OPTIONS, **options},
+                transport=server.transport(),
+            )
+        ],
+        use_default_catalog=False,
+    )
+
+
+async def test_the_lines_are_staged_in_the_callers_bucket_before_the_job_is_created() -> None:
+    server = FakeBedrockServer(FakeResponse(text="answer"))
+    client = _bedrock_client(server)
+    try:
+        handle = await client.submit_batch(_batch(3), target=BEDROCK_TARGET)
+    finally:
+        await client.aclose()
+
+    assert len(server.objects) == 1
+    url, content = next(iter(server.objects.items()))
+    assert url.startswith("https://my-bucket.s3.us-east-1.amazonaws.com/anyinfer/anyinfer-")
+
+    staged = [json.loads(line) for line in content.decode().splitlines()]
+    assert [entry["recordId"] for entry in staged] == ["0", "1", "2"]
+    # The live Converse body, not a reduced copy of it.
+    assert "messages" in staged[0]["modelInput"]
+    assert "stream" not in staged[0]["modelInput"]
+
+    job = server.requests[0]
+    assert job["modelId"] == "anthropic.claude-sonnet-4-5-v1:0"
+    assert job["roleArn"] == "arn:aws:iam::1234:role/AnyInferBatch"
+    assert job["inputDataConfig"]["s3InputDataConfig"]["s3InputFormat"] == "JSONL"
+    assert handle.batch_id.startswith("arn:aws:bedrock:")
+
+
+async def test_the_handle_records_where_the_answers_will_land() -> None:
+    """Nothing else can: the job object reports the prefix, not the file."""
+    server = FakeBedrockServer(FakeResponse(text="answer"))
+    client = _bedrock_client(server)
+    try:
+        handle = await client.submit_batch(_batch(1), target=BEDROCK_TARGET)
+    finally:
+        await client.aclose()
+
+    assert handle.provider_state["output_uri"].startswith("s3://my-bucket/anyinfer/anyinfer-")
+    assert handle.provider_state["output_uri"].endswith(".jsonl.out")
+
+
+async def test_a_storage_staged_batch_polls_then_reads_its_answers_back() -> None:
+    server = FakeBedrockServer(FakeResponse(text="answer"), batch_polls_before_done=2)
+    client = _bedrock_client(server)
+    try:
+        handle = await client.submit_batch(_batch(2), target=BEDROCK_TARGET)
+        assert (await client.batch_status(handle)).status == "in_progress"
+        assert (await client.batch_status(handle)).finished
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    # The fake answers in reverse, as a provider would; submission order is restored.
+    assert [line.custom_id for line in result.lines] == ["0", "1"]
+    assert [line.result.text for line in result.lines] == ["answer #0", "answer #1"]
+    assert result.lines[0].result.usage.input_tokens == 11
+    assert result.lines[0].result.finish_reason == "stop"
+
+
+async def test_a_rejected_record_fails_alone_though_it_shares_a_file_with_the_answers() -> None:
+    """Bedrock puts failures beside successes rather than in a second file."""
+    server = FakeBedrockServer(FakeResponse(text="answer"), batch_failures=1)
+    client = _bedrock_client(server)
+    try:
+        handle = await client.submit_batch(_batch(3), target=BEDROCK_TARGET)
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert len(result.lines) == 3
+    failed = [line for line in result.lines if line.error is not None]
+    assert len(failed) == 1
+    assert "record rejected" in failed[0].error.detail
+    assert all(line.result is not None for line in result.lines if line.error is None)
+
+
+async def test_stopping_a_job_reports_where_it_landed() -> None:
+    server = FakeBedrockServer(FakeResponse(text="answer"), batch_polls_before_done=99)
+    client = _bedrock_client(server)
+    try:
+        handle = await client.submit_batch(_batch(1), target=BEDROCK_TARGET)
+        report = await client.cancel_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert report.status == "cancelled"
+    assert report.finished
+
+
+async def test_an_unconfigured_bucket_refuses_before_anything_is_written() -> None:
+    """The bucket is the caller's; AnyInfer neither creates nor guesses one."""
+    server = FakeBedrockServer(FakeResponse(text="answer"))
+    client = _bedrock_client(server, batch_s3_uri="", batch_role_arn="")
+    try:
+        with pytest.raises(ai.ConfigError, match="S3 prefix and an execution role"):
+            await client.submit_batch(_batch(1), target=BEDROCK_TARGET)
+    finally:
+        await client.aclose()
+    assert server.objects == {}
+
+
+async def test_a_non_s3_uri_is_refused_rather_than_signed_for_the_wrong_host() -> None:
+    server = FakeBedrockServer(FakeResponse(text="answer"))
+    client = _bedrock_client(server, batch_s3_uri="https://my-bucket/anyinfer")
+    try:
+        with pytest.raises(ai.ConfigError, match="must be an s3:// URI"):
+            await client.submit_batch(_batch(1), target=BEDROCK_TARGET)
+    finally:
+        await client.aclose()
+
+
+async def test_a_bedrock_api_key_alone_cannot_stage_a_batch() -> None:
+    """It authenticates the runtime; S3 will not accept it, and saying so beats a 403."""
+    server = FakeBedrockServer(FakeResponse(text="answer"))
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "bedrock",
+                api_key="bedrock-api-key",
+                options={
+                    "region": "us-east-1",
+                    "batch_s3_uri": "s3://my-bucket/anyinfer",
+                    "batch_role_arn": "arn:aws:iam::1234:role/AnyInferBatch",
+                },
+                transport=server.transport(),
+            )
+        ],
+        use_default_catalog=False,
+    )
+    try:
+        with pytest.raises(ai.ConfigError, match="AWS credentials, not a Bedrock API key"):
+            await client.submit_batch(_batch(1), target=BEDROCK_TARGET)
+    finally:
+        await client.aclose()
+
+
+def test_partially_completed_is_a_finish_not_a_failure() -> None:
+    """The manifest is readable; the lines that failed are reported as failed lines.
+
+    A whole-batch `failed` would discard every answer that did arrive.
+    """
+    from anyinfer.providers.bedrock import _BEDROCK_BATCH_STATUSES
+
+    assert _BEDROCK_BATCH_STATUSES["PartiallyCompleted"] == "completed"
+    assert _BEDROCK_BATCH_STATUSES["Stopped"] == "cancelled"
+
+
+# ---- the same storage-staged shape on Vertex --------------------------------------------------
+
+from anyinfer.testing.fakes import FakeGeminiServer  # noqa: E402
+
+VERTEX_TARGET = "vertex:gemini-2.5-flash"
+
+
+def _vertex_client(server: FakeGeminiServer, **options: object) -> ai.AsyncClient:
+    return ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "vertex",
+                api_key="ya29.fake-access-token",
+                options={
+                    "project": "my-project",
+                    "location": "us-central1",
+                    "batch_gcs_uri": "gs://my-bucket/anyinfer",
+                    **options,
+                },
+                transport=server.transport(),
+            )
+        ],
+        use_default_catalog=False,
+    )
+
+
+async def test_vertex_stages_generate_content_bodies_in_the_callers_bucket() -> None:
+    server = FakeGeminiServer(FakeResponse(text="answer"))
+    client = _vertex_client(server)
+    try:
+        handle = await client.submit_batch(_batch(2), target=VERTEX_TARGET)
+    finally:
+        await client.aclose()
+
+    assert len(server.objects) == 1
+    key, content = next(iter(server.objects.items()))
+    assert key.startswith("anyinfer/anyinfer-")
+
+    staged = [json.loads(line) for line in content.decode().splitlines()]
+    # The live generateContent shape, because this adapter *is* the Gemini adapter.
+    assert "contents" in staged[0]["request"]
+
+    job = server.requests[0]
+    assert job["model"] == "publishers/google/models/gemini-2.5-flash"
+    assert job["inputConfig"]["instancesFormat"] == "jsonl"
+    assert job["outputConfig"]["predictionsFormat"] == "jsonl"
+    assert handle.provider_state["output_prefix"].startswith("gs://my-bucket/anyinfer/")
+
+
+async def test_a_vertex_line_id_rides_in_the_body_because_the_api_has_no_field_for_it() -> None:
+    """The predictions file echoes the request back; that echo is the only pairing channel."""
+    server = FakeGeminiServer(FakeResponse(text="answer"))
+    client = _vertex_client(server)
+    try:
+        await client.submit_batch(_batch(2, custom_ids=("row-a", "row-b")), target=VERTEX_TARGET)
+    finally:
+        await client.aclose()
+
+    staged = [
+        json.loads(line)
+        for line in next(iter(server.objects.values())).decode().splitlines()
+    ]
+    assert [entry["request"]["labels"]["anyinfer_line_id"] for entry in staged] == [
+        "row-a",
+        "row-b",
+    ]
+
+
+async def test_vertex_polls_then_reads_predictions_from_the_directory_the_job_names() -> None:
+    """The output directory is timestamped by the API, so it cannot be predicted."""
+    server = FakeGeminiServer(FakeResponse(text="answer"), batch_polls_before_done=2)
+    client = _vertex_client(server)
+    try:
+        handle = await client.submit_batch(
+            _batch(2, custom_ids=("row-a", "row-b")), target=VERTEX_TARGET
+        )
+        assert (await client.batch_status(handle)).status == "in_progress"
+        finished = await client.batch_status(handle)
+        assert finished.finished
+        assert finished.completed == 2
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert [line.custom_id for line in result.lines] == ["row-a", "row-b"]
+    assert [line.result.text for line in result.lines] == ["answer #row-a", "answer #row-b"]
+    assert result.lines[0].result.usage.input_tokens == 11
+
+
+async def test_a_rejected_vertex_line_fails_alone() -> None:
+    server = FakeGeminiServer(FakeResponse(text="answer"), batch_failures=1)
+    client = _vertex_client(server)
+    try:
+        handle = await client.submit_batch(_batch(3), target=VERTEX_TARGET)
+        result = await client.fetch_batch(handle)
+    finally:
+        await client.aclose()
+
+    failed = [line for line in result.lines if line.error is not None]
+    assert len(failed) == 1
+    assert "line rejected" in failed[0].error.detail
+
+
+async def test_cancelling_a_vertex_job_reports_where_it_landed() -> None:
+    server = FakeGeminiServer(FakeResponse(text="answer"), batch_polls_before_done=99)
+    client = _vertex_client(server)
+    try:
+        handle = await client.submit_batch(_batch(1), target=VERTEX_TARGET)
+        report = await client.cancel_batch(handle)
+    finally:
+        await client.aclose()
+
+    assert report.status == "cancelled"
+
+
+async def test_an_unconfigured_vertex_bucket_refuses_before_anything_is_written() -> None:
+    server = FakeGeminiServer(FakeResponse(text="answer"))
+    client = _vertex_client(server, batch_gcs_uri="")
+    try:
+        with pytest.raises(ai.ConfigError, match="caller-owned GCS prefix"):
+            await client.submit_batch(_batch(1), target=VERTEX_TARGET)
+    finally:
+        await client.aclose()
+    assert server.objects == {}
+
+
+async def test_a_non_gcs_vertex_uri_is_refused() -> None:
+    server = FakeGeminiServer(FakeResponse(text="answer"))
+    client = _vertex_client(server, batch_gcs_uri="https://my-bucket/anyinfer")
+    try:
+        with pytest.raises(ai.ConfigError, match="must be a gs:// URI"):
+            await client.submit_batch(_batch(1), target=VERTEX_TARGET)
+    finally:
+        await client.aclose()
+
+
+def test_partially_succeeded_is_a_finish_not_a_failure_on_vertex_too() -> None:
+    from anyinfer.providers.vertex import _VERTEX_BATCH_STATUSES
+
+    assert _VERTEX_BATCH_STATUSES["JOB_STATE_PARTIALLY_SUCCEEDED"] == "completed"
+    assert _VERTEX_BATCH_STATUSES["JOB_STATE_CANCELLED"] == "cancelled"
+
+
+def test_all_five_named_providers_are_bound() -> None:
+    """E.1.1 named OpenAI, Anthropic, Bedrock, Vertex, and Groq. This is the whole set."""
+    from anyinfer.registry import default_registry
+
+    declaring = {
+        pid
+        for pid in default_registry.known_ids()
+        if "batch" in default_registry.get(pid).operations
+    }
+    assert {"openai", "anthropic", "bedrock", "vertex", "groq"} <= declaring

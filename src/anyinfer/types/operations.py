@@ -481,6 +481,12 @@ class BatchHandle:
             row keys and then zipped the results against their inputs would otherwise get
             silently mispaired answers — every line correct, attached to the wrong row.
         submitted_at: Unix timestamp of submission, for a caller's own bookkeeping.
+        provider_state: Opaque provider-specific facts the *adapter* needs to reclaim this
+            job, carried here because there is nowhere else to put them. Where a provider
+            answers into storage the caller owns — Bedrock writes to S3, Vertex to GCS —
+            the output location is not derivable from the job id, and an adapter that
+            remembered it would be the job registry this type exists to avoid. Opaque to
+            the caller: read it for diagnostics, never construct it.
     """
 
     batch_id: str
@@ -489,6 +495,7 @@ class BatchHandle:
     line_count: int
     line_ids: tuple[str, ...] = ()
     submitted_at: float = 0.0
+    provider_state: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

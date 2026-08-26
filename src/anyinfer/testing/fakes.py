@@ -15,6 +15,7 @@ import struct
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
+from urllib.parse import unquote
 
 import httpx2
 
@@ -949,9 +950,17 @@ class FakeBedrockServer(_FakeServerBase):
         models: Model ids reported by the control plane's ``/foundation-models``.
         chunk_size: Characters per streamed text delta.
         dimensions: Width of the vectors ``/invoke`` returns.
+        batch_polls_before_done: Status polls a submitted job reports in progress for
+            before it finishes. At least one, so a caller must always poll.
+        batch_failures: How many records come back carrying an ``error`` rather than a
+            ``modelOutput``. Bedrock puts both in the same object, unlike OpenAI's two
+            files, and an adapter that assumed one or the other would drop them.
 
     Attributes:
         requests: Every request body received, for assertions.
+        objects: Every S3 object written, keyed by URL — a batch is staged in the
+            caller's own bucket rather than uploaded over the API, so the fake has to
+            stand in for S3 as well as for Bedrock.
     """
 
     def __init__(
@@ -964,11 +973,19 @@ class FakeBedrockServer(_FakeServerBase):
         ),
         chunk_size: int = 4,
         dimensions: int = 8,
+        batch_polls_before_done: int = 1,
+        batch_failures: int = 0,
     ) -> None:
         super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
         self._dimensions = dimensions
+        self.objects: dict[str, bytes] = {}
+        self.batch_polls_before_done = max(1, batch_polls_before_done)
+        self.batch_failures = batch_failures
+        self._batch_polls = 0
+        self._batch_stopped = False
+        self._batch_records: list[str] = []
 
     def next_response(self) -> FakeResponse:
         """The response for the next call."""
@@ -977,6 +994,10 @@ class FakeBedrockServer(_FakeServerBase):
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
+        if ".s3." in request.url.host:
+            return self._handle_s3(request)
+        if "/model-invocation-job" in path:
+            return self._handle_batch(request)
         if path.endswith("/foundation-models"):
             return httpx2.Response(
                 200,
@@ -995,6 +1016,90 @@ class FakeBedrockServer(_FakeServerBase):
         if path.endswith("/rerank"):
             return self._rerank(request)
         return httpx2.Response(404, json={"message": f"no such path: {path}"})
+
+    # ---- deferred batches, and the bucket they are staged in ---------------------------
+
+    def _handle_s3(self, request: httpx2.Request) -> httpx2.Response:
+        """Stand in for the caller's own S3 bucket.
+
+        Bedrock's batch tier never carries the job over the API: the input is an object
+        the client writes and the output is an object it reads. Modeling that here rather
+        than pretending the API takes the lines is the point — an adapter that skipped the
+        staging step would pass a fake that skipped it too.
+        """
+        key = str(request.url)
+        if request.method == "PUT":
+            self.objects[key] = request.content
+            self._batch_records = [
+                json.loads(line)["recordId"]
+                for line in request.content.decode("utf-8").splitlines()
+                if line.strip()
+            ]
+            return httpx2.Response(200)
+        if key in self.objects:
+            return httpx2.Response(200, content=self.objects[key])
+        if key.endswith(".jsonl.out"):
+            return httpx2.Response(200, text=self._batch_manifest())
+        return httpx2.Response(404, text="<Error><Code>NoSuchKey</Code></Error>")
+
+    def _handle_batch(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if request.method == "POST" and path.endswith("/model-invocation-job"):
+            self.requests.append(json.loads(request.content or b"{}"))
+            self._batch_polls = 0
+            self._batch_stopped = False
+            return httpx2.Response(
+                200,
+                json={"jobArn": "arn:aws:bedrock:us-east-1:1234:model-invocation-job/fake"},
+            )
+        if path.endswith("/stop"):
+            self._batch_stopped = True
+            return httpx2.Response(200, json={})
+        self._batch_polls += 1
+        return httpx2.Response(200, json={"status": self._batch_status()})
+
+    def _batch_status(self) -> str:
+        if self._batch_stopped:
+            return "Stopped"
+        return (
+            "Completed"
+            if self._batch_polls >= self.batch_polls_before_done
+            else "InProgress"
+        )
+
+    def _batch_manifest(self) -> str:
+        """Answered records, in completion order — which is not submission order."""
+        response = self.next_response()
+        failures = min(self.batch_failures, len(self._batch_records))
+        entries: list[dict[str, Any]] = []
+        for index, record_id in enumerate(self._batch_records):
+            if index < failures:
+                entries.append(
+                    {
+                        "recordId": record_id,
+                        "error": {
+                            "errorCode": "ValidationException",
+                            "errorMessage": "record rejected",
+                        },
+                    }
+                )
+                continue
+            entries.append(
+                {
+                    "recordId": record_id,
+                    "modelOutput": {
+                        "output": {
+                            "message": {
+                                "role": "assistant",
+                                "content": [{"text": f"{response.text} #{record_id}"}],
+                            }
+                        },
+                        "stopReason": "end_turn",
+                        "usage": {"inputTokens": 11, "outputTokens": 7, "totalTokens": 18},
+                    },
+                }
+            )
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
 
     def _consume(self, request: httpx2.Request) -> tuple[dict[str, Any], FakeResponse]:
         body = json.loads(request.content or b"{}")
@@ -1497,13 +1602,25 @@ class FakeGeminiServer(_FakeServerBase):
         *,
         models: Sequence[str] = ("gemini-2.5-flash", "gemini-2.5-pro"),
         chunk_size: int = 4,
+        batch_polls_before_done: int = 1,
+        batch_failures: int = 0,
     ) -> None:
         super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
+        self.objects: dict[str, bytes] = {}
+        self.batch_polls_before_done = max(1, batch_polls_before_done)
+        self.batch_failures = batch_failures
+        self._batch_polls = 0
+        self._batch_cancelled = False
+        self._batch_lines: list[dict[str, Any]] = []
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
+        if request.url.host == "storage.googleapis.com":
+            return self._handle_gcs(request)
+        if "batchPredictionJobs" in path:
+            return self._handle_batch(request)
         if path.endswith("/models"):
             return httpx2.Response(
                 200,
@@ -1532,6 +1649,109 @@ class FakeGeminiServer(_FakeServerBase):
         return httpx2.Response(
             404, json={"error": {"code": 404, "message": f"no such path: {path}"}}
         )
+
+    # ---- deferred batches, and the bucket they are staged in ---------------------------
+
+    def _handle_gcs(self, request: httpx2.Request) -> httpx2.Response:
+        """Stand in for the caller's own GCS bucket.
+
+        Vertex's batch tier never carries the job over the API: the input is an object
+        the client writes and the predictions are an object it reads. Modeling the
+        staging step rather than pretending the API takes the lines is the point.
+        """
+        if request.method == "POST":
+            name = request.url.params.get("name", "")
+            self.objects[name] = request.content
+            self._batch_lines = [
+                json.loads(line)
+                for line in request.content.decode("utf-8").splitlines()
+                if line.strip()
+            ]
+            return httpx2.Response(200, json={"name": name})
+        key = unquote(request.url.path.rsplit("/o/", 1)[-1])
+        if key.endswith("predictions.jsonl"):
+            return httpx2.Response(200, text=self._predictions())
+        if key in self.objects:
+            return httpx2.Response(200, content=self.objects[key])
+        return httpx2.Response(404, json={"error": {"message": f"no such object: {key}"}})
+
+    def _handle_batch(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith(":cancel"):
+            self._batch_cancelled = True
+            return httpx2.Response(200, json={})
+        if request.method == "POST":
+            self.requests.append(json.loads(request.content or b"{}"))
+            self._batch_polls = 0
+            self._batch_cancelled = False
+            return httpx2.Response(
+                200,
+                json={
+                    "name": "projects/p/locations/us-central1/batchPredictionJobs/9",
+                    "state": "JOB_STATE_PENDING",
+                },
+            )
+        self._batch_polls += 1
+        return httpx2.Response(200, json=self._job_object())
+
+    def _job_object(self) -> dict[str, Any]:
+        if self._batch_cancelled:
+            return {"state": "JOB_STATE_CANCELLED"}
+        if self._batch_polls < self.batch_polls_before_done:
+            return {"state": "JOB_STATE_RUNNING"}
+        failures = min(self.batch_failures, len(self._batch_lines))
+        return {
+            "state": "JOB_STATE_SUCCEEDED",
+            "completionStats": {
+                "successfulCount": len(self._batch_lines) - failures,
+                "failedCount": failures,
+            },
+            # A timestamped directory of the API's own naming, under the requested
+            # prefix — the reason the output path cannot simply be predicted.
+            "outputInfo": {
+                "gcsOutputDirectory": f"{self._batch_prefix()}/prediction-2026-08-25T00:00:00Z"
+            },
+        }
+
+    def _batch_prefix(self) -> str:
+        submitted = self.requests[-1] if self.requests else {}
+        output = submitted.get("outputConfig", {}) if isinstance(submitted, dict) else {}
+        destination = output.get("gcsDestination", {}) if isinstance(output, dict) else {}
+        return str(destination.get("outputUriPrefix", "gs://fake/out"))
+
+    def _predictions(self) -> str:
+        """Answered predictions, in an order the API does not promise."""
+        response = self._responses[min(self._call_index, len(self._responses) - 1)]
+        failures = min(self.batch_failures, len(self._batch_lines))
+        entries: list[dict[str, Any]] = []
+        for index, line in enumerate(self._batch_lines):
+            request_body = line.get("request", {})
+            line_id = request_body.get("labels", {}).get("anyinfer_line_id", "")
+            if index < failures:
+                entries.append({"request": request_body, "status": "line rejected"})
+                continue
+            entries.append(
+                {
+                    "request": request_body,
+                    "response": {
+                        "candidates": [
+                            {
+                                "content": {
+                                    "role": "model",
+                                    "parts": [{"text": f"{response.text} #{line_id}"}],
+                                },
+                                "finishReason": "STOP",
+                            }
+                        ],
+                        "usageMetadata": {
+                            "promptTokenCount": 11,
+                            "candidatesTokenCount": 7,
+                            "totalTokenCount": 18,
+                        },
+                    },
+                }
+            )
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
 
     def _handle_predict(self, request: httpx2.Request) -> httpx2.Response:
         """Serve ``:predict``, sharing the scenario script with generation.
