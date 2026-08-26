@@ -54,7 +54,8 @@ standalone builds on the [downloads page](downloads.md).
   and the
   [drift check](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md).
 - [Testing](contributing/testing.md): fakes, cassettes, and what to test where.
-- [Branching and releases](contributing/releasing.md).
+- [Branching and releases](contributing/releasing.md) and
+  [the changelog](contributing/changelog.md).
 
 ## Design Documents
 

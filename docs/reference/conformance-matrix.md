@@ -92,7 +92,7 @@ Every dedicated adapter now has a shared-harness row. The `groq`, `moonshot`, `r
 - **live**: opt-in, requires credentials. `m365-copilot` is exempt: its authentication is
   interactive-only and cannot run headless.
 
-## See also
+## See Also
 
 - [Provider pages](../providers/README.md) for the human-readable version.
 - [Contract snapshots](https://github.com/anthturner/AnyInfer/blob/main/contracts/README.md) for the wire details each adapter depends on.

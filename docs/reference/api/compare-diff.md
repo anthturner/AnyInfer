@@ -1,13 +1,13 @@
 # Portability Diff Tool
 
-`anyinfer.evaluate.compare_diff`: snapshot [`compare()`](client.md) output for a fixture set, and
-diff two snapshots structurally. No ranking, scoring, or live provider calls; every
+`anyinfer.evaluate.compare_diff`: snapshot [`compare()`](client.md) output for a fixture
+set, and diff two snapshots structurally. No ranking, scoring, or live provider calls; every
 function here either calls `compare()` (itself no-dispatch) or works on plain JSON. See the
 [portability guide](../../guides/comparing-targets.md) for the full walkthrough and the
 fixture schema.
 
 ```python
-from anyinfer import compare_diff
+from anyinfer.evaluate import compare_diff
 ```
 
 <div class="anyinfer-api-block" markdown>

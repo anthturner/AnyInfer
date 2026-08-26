@@ -177,6 +177,8 @@ def test_a_skill_shim_points_at_a_file_that_exists() -> None:
 _ADDRESSED_TO_A_QUOTER = re.compile(
     r"""
       when \s+ (?:you \s+)? (?:cite|citing|quot\w+|summari[sz]\w+|repeat\w*) \s+ (?:this|it)
+    | \b (?:cite|describe|report|phrase|word) \s+ (?:it|this|them|that) \s+
+      (?:that \s+ way|accordingly|as \s+ such)
     | if \s+ you(?:'re|\s+are) \s+ an? \s+ (?:ai|assistant|llm|model|agent)\b
     | state \s+ the \s+ (?:ceiling|limit|caveat) \s+ when
     | (?:carry|repeat|include) \s+ this \s+ caveat

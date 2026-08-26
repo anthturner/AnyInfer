@@ -26,11 +26,13 @@ public; everything else is an implementation detail that may change without noti
 [SDK reference](api/README.md), because both come from the same docstrings.
 
 **Where changes are recorded.**
-[GitHub Releases](https://github.com/anthturner/AnyInfer/releases) is the canonical change
-record: every release carries generated notes covering what changed in it, and the project
-publishes no separate changelog that could drift from them. AnyInfer is pre-1.0, so a minor
-version may change a public signature — read the release notes for the version you are
-moving to before upgrading.
+[`CHANGELOG.md`](https://github.com/anthturner/AnyInfer/blob/main/CHANGELOG.md) is the
+canonical change record, curated to what a caller would act on. Each
+[GitHub Release](https://github.com/anthturner/AnyInfer/releases) carries that version's
+section verbatim as its notes, so the two cannot drift. AnyInfer is pre-1.0, so a minor
+version may change a public signature — read the entries for the version you are moving to
+before upgrading. What earns an entry is in
+[the changelog rules](../contributing/changelog.md).
 
 ## Module Map
 
