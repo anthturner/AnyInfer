@@ -40,10 +40,29 @@ lanes; their verdict was already produced on the promotion PR). Pushes to `devel
 not trigger it: `develop` only takes merges through a pull request that already had to
 be green.
 
-Promotions from `develop` to `main` use a merge commit, never a squash or rebase merge:
-those mint new commit ids on `main` and permanently diverge the two branches. After the
-promotion merges, fast-forward `develop` onto `main` so both branches point at the same
-commit.
+## How Each Merge Happens
+
+The two hops merge differently, and a repository ruleset enforces each so the choice is
+not a thing to remember:
+
+- **`feature/*` into `develop` squashes.** A branch arrives as one commit whatever it took
+  to get there. Its intermediate history — a fix, a fix to the fix, a base refresh — is
+  scaffolding for the branch, not for the reader of `develop`.
+- **`develop` into `main` uses a merge commit**, never a squash or rebase: those mint new
+  commit ids on `main` and permanently diverge the two branches. After the promotion
+  merges, fast-forward `develop` onto `main` so both point at the same commit.
+
+The asymmetry is the point. Squashing the promotion would rewrite what `develop` already
+contains; merging a feature branch preserves history nobody needs. Rebase merging is
+disabled outright, and the head branch is deleted on merge.
+
+What this avoids is a braid. Before it, every one-commit fix cost two merge commits — one
+into `develop`, one into `main` — and the fast-forward wove the two lines together, so
+four small fixes read as eight merges around four real changes. Now they read as four
+commits and one promotion.
+
+When several small fixes are in flight, put them on one branch. A branch per fix is a
+merge per fix, and each pull request spends the CI matrix again.
 
 ## Versioning
 
