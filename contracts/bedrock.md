@@ -55,6 +55,27 @@ guardrails, and cache points live. `InvokeModel` is not used.
 - `POST {base}/model/{modelId}/converse-stream` — streaming
 - `GET https://bedrock.{region}.amazonaws.com/foundation-models` — discovery, on the
   **control plane** (a different host than the runtime, signed separately)
+- `POST https://bedrock.{region}.amazonaws.com/model-invocation-job` — create a deferred
+  batch, control plane
+- `GET https://bedrock.{region}.amazonaws.com/model-invocation-job/{jobArn}` — poll one
+- `POST .../model-invocation-job/{jobArn}/stop` — stop one
+- `PUT|GET https://{bucket}.s3.{region}.amazonaws.com/{key}` — stage the batch input and
+  read its output, **signed for service `s3`, not `bedrock`**
+
+The job ARN is percent-encoded whole into the path, for the same reason a model id is.
+
+### Deferred batches
+`CreateModelInvocationJob` does not carry the job: input and output are JSONL objects in
+the caller's own bucket, configured as `batch_s3_uri` and `batch_role_arn` beside
+`region`. Input lines are `{"recordId", "modelInput"}` where `modelInput` is the live
+Converse body; output records are `{"recordId", "modelOutput"}` or `{"recordId", "error"}`
+in **one** file — successes and failures share it, unlike OpenAI's two.
+
+A Bedrock API key cannot stage a batch. It authenticates the runtime only, and S3 rejects
+it, so the adapter refuses locally rather than letting a 403 arrive an hour later.
+
+Job states map to the normalized vocabulary; `PartiallyCompleted` is `completed`, because
+the manifest is readable and the failures are reported as failed lines.
 
 Default base is `https://bedrock-runtime.{region}.amazonaws.com`, region default
 `us-east-1`. `modelId` may be a base model id, an inference-profile id, or an ARN, and is
@@ -275,3 +296,7 @@ so pagination has never been reachable; revisit if that assumption changes.
   both is a model-level rejection this adapter does not pre-empt.
 - Long read timeouts (60 minutes or more) are recommended for Claude models on Bedrock.
 - `cacheDetails[]` per-TTL cache accounting — read only in aggregate today.
+- **Batch minimum record counts and the output directory layout are not verified
+  live.** Bedrock documents a per-model minimum record count per job, which the
+  adapter does not pre-check, and the output object path is derived from the job name
+  the adapter chose rather than read back from the job. Noted 2026-08-25.

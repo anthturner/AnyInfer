@@ -39,9 +39,15 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
   optional `max_uses`. The date is part of the wire type, so a version bump upstream is a
   contract change here rather than a silent behaviour change. Results stream as
   `server_tool_use` blocks (invocation) and `web_search_tool_result` /
-  `code_execution_tool_result` blocks (outcome); a failure is a nested
-  `web_search_tool_result_error`. Only invocation *counts* are surfaced — the queries and
-  results are caller-adjacent content.
+  `code_execution_tool_result` blocks (outcome); a failure is a nested `content` object
+  whose own type ends in `_error`, carrying an `error_code`.
+  Result payloads are surfaced as of 2026-08-25: a search's `content[]` is a list of
+  `{url, title}` entries, and a code execution's `content` is one object with `stdout`,
+  `stderr`, and `return_code`. The tool is named in the block *type* rather than in a
+  field, which is why the result types are mapped separately from the invocation names.
+- Deferred batches (added 2026-08-25): `POST /v1/messages/batches` takes the whole job as
+  one JSON request — one step where OpenAI's is three — and results are fetched from the
+  batch's `results_url` as JSONL.
 - Citations (added 2026-08-25) are a **per-document request-side opt-in**:
   `content[].citations: {"enabled": true}` on a `document` block. Without it the model
   answers without attributions, and Anthropic bills a cited answer differently, so it is

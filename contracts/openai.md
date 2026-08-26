@@ -112,6 +112,13 @@ Verified 2026-08-09 against https://developers.openai.com/api/docs/guides/rate-l
   `completion_window`.
 - Each JSONL record is `{custom_id, method, url, body}` where `body` is a Responses body
   **minus `stream`**, which a batch cannot use.
+- `url` and `endpoint` are **absolute, version-prefixed paths** — `/v1/responses`, not the
+  `/responses` a live request posts to against a base URL that already carries the
+  version. The API validates this field against a fixed list of full paths, so borrowing
+  the live path fails validation at submit rather than at run. Corrected 2026-08-25.
+- The lifecycle above is byte-identical on every provider that copied the Batch API onto
+  chat completions (Groq), where the only difference is `endpoint: /v1/chat/completions`
+  and the line bodies. It is implemented once, in `providers/_openai_batch.py`.
 - `GET /batches/{id}` reports a richer status set than Anthropic's — `validating`,
   `in_progress`, `finalizing`, `completed`, `failed`, `expired`, `cancelling`, `cancelled`
   — normalized so a caller polls one vocabulary whichever provider ran the job. Counts are

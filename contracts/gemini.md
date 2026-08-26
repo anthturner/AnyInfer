@@ -70,9 +70,15 @@ native protocol is used instead.
   `server_tools.max_uses` is declared in `ignored_parameters`. `toolConfig` applies only to
   function declarations and is omitted when there are none.
 - Search reports back as `candidates[].groundingMetadata.webSearchQueries` — on the
-  candidate, not as a part — so invocations are counted from that list's length. Code
-  execution arrives as parts: `executableCode` (invocation) and `codeExecutionResult` with
-  an `outcome` (`OUTCOME_OK` or otherwise).
+  candidate, not as a part — so invocations are counted from that list's length. The
+  sources are a *separate* member of the same object: `groundingChunks[]`, each a one-key
+  object naming its retrieval kind, of which only `web` (`{uri, title}`) is a search
+  result. The others describe a caller's own retrieval corpus and are not surfaced as
+  search sources. Read as of 2026-08-25.
+- Code execution arrives as parts: `executableCode` (invocation) and `codeExecutionResult`
+  with an `outcome` (`OUTCOME_OK` or otherwise) and an `output`. That single `output`
+  field carries both the printed output and the failure message, so it is surfaced as the
+  event's `output` on success and as its `detail` on failure.
 - `tools[0].functionDeclarations[]`: `{name, description, parameters}` with parameters
   projected to the accepted schema subset.
 - `toolConfig.functionCallingConfig`: `{mode: "NONE"|"ANY", allowedFunctionNames?}`.
