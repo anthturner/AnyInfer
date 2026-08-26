@@ -174,6 +174,50 @@ def test_a_skill_shim_points_at_a_file_that_exists() -> None:
             )
 
 
+_ADDRESSED_TO_A_QUOTER = re.compile(
+    r"""
+      when \s+ (?:you \s+)? (?:cite|citing|quot\w+|summari[sz]\w+|repeat\w*) \s+ (?:this|it)
+    | if \s+ you(?:'re|\s+are) \s+ an? \s+ (?:ai|assistant|llm|model|agent)\b
+    | state \s+ the \s+ (?:ceiling|limit|caveat) \s+ when
+    | (?:carry|repeat|include) \s+ this \s+ caveat
+    | for \s+ anyone \s+ (?:quoting|citing|summari[sz]ing)
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+"""Phrases that address the person *quoting* a page rather than the one reading it.
+
+Not a general style check — it catches the one specific slip AGENTS.md forbids, where
+documentation starts instructing a citer, a summarizer, or a model about how to repeat
+what it says. A reader deciding whether a feature fits their problem is not helped by
+guidance on how to talk about the page.
+"""
+
+
+def test_no_rendered_text_instructs_the_reader_on_how_to_quote_it() -> None:
+    """Documentation addresses the person using AnyInfer, and nobody else.
+
+    "State the ceiling when you cite this" shipped on the confidentiality-tiers page,
+    where someone weighing Tier 3 against their threat model found instructions for a
+    citer instead of the fact they came for. The rule was stated nowhere and enforced by
+    nobody; this covers every surface that renders, docstrings included, because
+    mkdocstrings publishes those onto the site as well.
+    """
+    offenders: list[str] = []
+    for path in sorted((ROOT / "docs").rglob("*.md")):
+        for match in _ADDRESSED_TO_A_QUOTER.finditer(path.read_text(encoding="utf-8")):
+            offenders.append(f"{path.relative_to(ROOT)}: {match.group(0)!r}")
+    for path in sorted((ROOT / "src").rglob("*.py")):
+        for match in _ADDRESSED_TO_A_QUOTER.finditer(path.read_text(encoding="utf-8")):
+            offenders.append(f"{path.relative_to(ROOT)}: {match.group(0)!r}")
+    for match in _ADDRESSED_TO_A_QUOTER.finditer(_read("README.md")):
+        offenders.append(f"README.md: {match.group(0)!r}")
+
+    assert offenders == [], (
+        "say what is true and let the reader carry it; documentation is not a caption "
+        f"for someone else's slide: {offenders}"
+    )
+
+
 def test_no_user_facing_text_carries_an_adr_identifier() -> None:
     """`ADR-NNN` is internal shorthand; outside this repo it explains nothing.
 
