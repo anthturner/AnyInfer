@@ -16,7 +16,7 @@ import pytest
 
 import anyinfer as ai
 from anyinfer.errors import UnsupportedInputError
-from anyinfer.providers.base import ProviderConfig, WireRequest
+from anyinfer.providers.base import WireRequest
 from anyinfer.registry import default_registry
 from anyinfer.serve.openai_codec import VIDEO_CONTENT_TYPE, decode_messages, encode_messages
 from anyinfer.types.capabilities import Feature
@@ -71,32 +71,33 @@ def test_a_hosted_video_uri_carries_no_bytes_to_count() -> None:
 # ---- the one projection -----------------------------------------------------------------
 
 
-def _gemini_parts(part: VideoPart) -> list[dict[str, object]]:
-    adapter = default_registry.get("gemini").factory(
-        ProviderConfig(provider_id="gemini", base_url="https://fake.invalid/v1beta")
-    )
-    message = Message(role="user", content=(Text("hi"), part))
-    payload = adapter.build_payload(WireRequest(model="m", messages=(message,)))  # type: ignore[attr-defined]
-    return list(payload["contents"][0]["parts"])
+async def _gemini_parts(built_adapter, part: VideoPart) -> list[dict[str, object]]:
+    async with built_adapter("gemini", base_url="https://fake.invalid/v1beta") as adapter:
+        message = Message(role="user", content=(Text("hi"), part))
+        payload = adapter.build_payload(  # type: ignore[union-attr]
+            WireRequest(model="m", messages=(message,))
+        )
+        return list(payload["contents"][0]["parts"])
 
 
-def test_gemini_sends_a_hosted_uri_as_file_data_with_clip_metadata() -> None:
-    parts = _gemini_parts(VideoPart(url="https://x/y.mp4", start_offset_s=1.5, end_offset_s=9, fps=2))
+async def test_gemini_sends_a_hosted_uri_as_file_data_with_clip_metadata(built_adapter) -> None:
+    parts = await _gemini_parts(built_adapter, VideoPart(url="https://x/y.mp4", start_offset_s=1.5, end_offset_s=9, fps=2))
     video = parts[1]
     assert video["fileData"] == {"mimeType": "video/mp4", "fileUri": "https://x/y.mp4"}
     # Protobuf durations, not plain numbers — the one place the dialect departs from JSON.
     assert video["videoMetadata"] == {"startOffset": "1.5s", "endOffset": "9s", "fps": 2}
 
 
-def test_gemini_sends_inline_bytes_as_inline_data() -> None:
-    video = _gemini_parts(VideoPart(data=b"\x00\x01\x02"))[1]
+async def test_gemini_sends_inline_bytes_as_inline_data(built_adapter) -> None:
+    video = (await _gemini_parts(built_adapter, VideoPart(data=b"\x00\x01\x02")))[1]
     assert video["inlineData"]["mimeType"] == "video/mp4"  # type: ignore[index]
     assert "videoMetadata" not in video
 
 
-def test_gemini_omits_metadata_the_caller_never_set() -> None:
+async def test_gemini_omits_metadata_the_caller_never_set(built_adapter) -> None:
     """A provider default restated as a caller choice is a lie about what was asked."""
-    assert "videoMetadata" not in _gemini_parts(VideoPart(url="https://x/y.mp4"))[1]
+    parts = await _gemini_parts(built_adapter, VideoPart(url="https://x/y.mp4"))
+    assert "videoMetadata" not in parts[1]
 
 
 def test_gemini_declares_the_capability_it_actually_projects() -> None:
@@ -108,7 +109,9 @@ def test_gemini_declares_the_capability_it_actually_projects() -> None:
 # ---- refusal everywhere else ------------------------------------------------------------
 
 
-def test_no_adapter_silently_drops_a_video_part() -> None:
+
+
+async def test_no_adapter_silently_drops_a_video_part(built_adapter) -> None:
     """The whole point of the type: every adapter either sends video or refuses it.
 
     A skipped ``isinstance`` branch is invisible — the request succeeds and the model
@@ -122,34 +125,33 @@ def test_no_adapter_silently_drops_a_video_part() -> None:
         if descriptor.id in seen or "generation" not in descriptor.operations:
             continue
         seen.add(descriptor.id)
-        try:
-            adapter = descriptor.factory(
-                ProviderConfig(provider_id=descriptor.id, base_url="https://fake.invalid/v1")
-            )
-        except Exception:
-            continue
-        build = getattr(adapter, "build_payload", None)
-        if build is None:
-            continue
-        try:
-            body = repr(build(WireRequest(model="m", messages=(VIDEO_MESSAGE,))))
-        except UnsupportedInputError:
-            continue  # refused: the other honest outcome
-        except Exception:
-            continue
-        if "video" not in body and "AAEC" not in body:
-            dropped.append(descriptor.id)
+        async with built_adapter(descriptor.id) as adapter:
+            if adapter is None:
+                continue
+            build = getattr(adapter, "build_payload", None)
+            if build is None:
+                continue
+            try:
+                body = repr(build(WireRequest(model="m", messages=(VIDEO_MESSAGE,))))
+            except UnsupportedInputError:
+                continue  # refused: the other honest outcome
+            except Exception:
+                continue
+            if "video" not in body and "AAEC" not in body:
+                dropped.append(descriptor.id)
 
     assert not dropped, "these adapters silently discard a video part: " + ", ".join(dropped)
 
 
 @pytest.mark.parametrize("provider_id", ["anthropic", "openai", "openai-compat", "ollama"])
-def test_the_refusal_names_the_modality_and_the_provider(provider_id: str) -> None:
-    adapter = default_registry.get(provider_id).factory(
-        ProviderConfig(provider_id=provider_id, base_url="https://fake.invalid/v1")
-    )
-    with pytest.raises(UnsupportedInputError, match="video"):
-        adapter.build_payload(WireRequest(model="m", messages=(VIDEO_MESSAGE,)))  # type: ignore[attr-defined]
+async def test_the_refusal_names_the_modality_and_the_provider(
+    built_adapter, provider_id: str
+) -> None:
+    async with built_adapter(provider_id) as adapter:
+        with pytest.raises(UnsupportedInputError, match="video"):
+            adapter.build_payload(  # type: ignore[union-attr]
+                WireRequest(model="m", messages=(VIDEO_MESSAGE,))
+            )
 
 
 # ---- the sidecar extension ---------------------------------------------------------------

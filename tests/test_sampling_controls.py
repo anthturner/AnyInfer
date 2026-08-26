@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 
+import httpx2
 import pytest
 
 import anyinfer as ai
@@ -85,7 +86,13 @@ def _adapter(provider_id: str) -> object:
 
     descriptor = default_registry.get(provider_id)
     return descriptor.factory(
-        ProviderConfig(provider_id=provider_id, base_url="https://fake.invalid/v1")
+        ProviderConfig(
+            provider_id=provider_id,
+            base_url="https://fake.invalid/v1",
+            # A mock transport, though nothing here makes a call: a real client builds a
+            # real SSL context, which opens trust-store CA files nothing closes.
+            transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
+        )
     )
 
 

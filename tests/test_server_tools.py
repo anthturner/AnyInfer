@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import httpx2
 import pytest
 
 import anyinfer as ai
@@ -54,9 +55,28 @@ def test_the_kinds_are_deliberately_two() -> None:
 # ---- each dialect's spelling --------------------------------------------------------------
 
 
+def _adapter(provider_id: str) -> Any:
+    """Build one adapter with a mock transport, for tests that only inspect it."""
+    return default_registry.get(provider_id).factory(
+        ProviderConfig(
+            provider_id=provider_id,
+            base_url="https://fake.invalid/v1",
+            api_key="k",
+            transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
+        )
+    )
+
+
 def _payload(provider_id: str, **overrides: Any) -> dict[str, Any]:
     adapter = default_registry.get(provider_id).factory(
-        ProviderConfig(provider_id=provider_id, base_url="https://fake.invalid/v1", api_key="k")
+        ProviderConfig(
+            provider_id=provider_id,
+            base_url="https://fake.invalid/v1",
+            api_key="k",
+            # A mock transport, though nothing here makes a call: a real client builds a
+            # real SSL context, which opens trust-store CA files nothing closes.
+            transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
+        )
     )
     request = WireRequest(model="m", messages=(ai.user("hi"),), **overrides)
     return adapter.build_payload(request)  # type: ignore[attr-defined]
@@ -162,9 +182,7 @@ def test_xai_spells_search_beside_the_messages_rather_than_as_a_tool() -> None:
     assert payload["search_parameters"] == {"mode": "on", "max_search_results": 5}
     assert "tools" not in payload
 
-    adapter = default_registry.get("xai").factory(
-        ProviderConfig(provider_id="xai", base_url="https://fake.invalid/v1", api_key="k")
-    )
+    adapter = _adapter("xai")
     counted = adapter._parse_usage(
         {"prompt_tokens": 10, "completion_tokens": 5, "num_sources_used": 3}
     )
@@ -221,7 +239,14 @@ def _events(provider_id: str, chunks: list[Any]) -> list[Any]:
     import importlib
 
     adapter = default_registry.get(provider_id).factory(
-        ProviderConfig(provider_id=provider_id, base_url="https://fake.invalid/v1", api_key="k")
+        ProviderConfig(
+            provider_id=provider_id,
+            base_url="https://fake.invalid/v1",
+            api_key="k",
+            # A mock transport, though nothing here makes a call: a real client builds a
+            # real SSL context, which opens trust-store CA files nothing closes.
+            transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
+        )
     )
     state = importlib.import_module(type(adapter).__module__)._StreamState()
     produced: list[Any] = []

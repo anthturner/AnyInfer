@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx2
 import pytest
 
 import anyinfer as ai
@@ -60,7 +61,13 @@ def test_span_of_clamps_a_providers_off_by_one_rather_than_raising() -> None:
 
 def _adapter(provider_id: str) -> Any:
     return default_registry.get(provider_id).factory(
-        ProviderConfig(provider_id=provider_id, base_url="https://fake.invalid/v1")
+        ProviderConfig(
+            provider_id=provider_id,
+            base_url="https://fake.invalid/v1",
+            # A mock transport, though nothing here makes a call: a real client builds a
+            # real SSL context, which opens trust-store CA files nothing closes.
+            transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
+        )
     )
 
 
