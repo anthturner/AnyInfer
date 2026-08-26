@@ -20,8 +20,12 @@ same ceilings OpenAI itself documents.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import asyncio
+import time
+from collections.abc import AsyncGenerator, Mapping
 from typing import Any, ClassVar
+
+import httpx2
 
 from ..errors import ConfigError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
@@ -52,6 +56,11 @@ class AzureFoundryAdapter(OpenAICompatEmbeddingsMixin, OpenAICompatAdapter):
             )
         self._api_version = config.api_version
         super().__init__(config)
+        # Attached rather than baked into the headers, so the first token is fetched when
+        # a request needs one and every later request gets a fresh one.
+        auth = self._entra_auth(config)
+        if auth is not None:
+            self._client.auth = auth
         if self._api_version:
             # Older deployments still require the query parameter; newer ``/openai/v1``
             # endpoints ignore it.
@@ -60,50 +69,104 @@ class AzureFoundryAdapter(OpenAICompatEmbeddingsMixin, OpenAICompatAdapter):
             self.embeddings_path = f"{self.embeddings_path}?api-version={self._api_version}"
 
     def _build_headers(self, config: ProviderConfig) -> dict[str, str]:
-        """Use an ``api-key`` header, or acquire an Entra token when no key is set."""
-        headers = {"content-type": "application/json"}
+        """Use an ``api-key`` header, and leave Entra auth to `_EntraAuth`.
 
+        No token is acquired here. `_build_headers` runs during construction, and
+        `DefaultAzureCredential` walks a chain that shells out to `az`, `pwsh`, and `azd`
+        and probes the IMDS endpoint over HTTP — so building a client used to spawn
+        processes and block on network timeouts before the caller had made a single
+        request. It also pinned one token for the process's lifetime, which an Entra token
+        outlives by about an hour.
+        """
+        headers = {"content-type": "application/json"}
         if config.api_key:
             headers["api-key"] = config.api_key
-        else:
-            token = self._acquire_entra_token(config)
-            if token:
-                headers["authorization"] = f"Bearer {token}"
-
         headers.update({k.lower(): v for k, v in config.headers.items()})
         return headers
 
-    def _acquire_entra_token(self, config: ProviderConfig) -> str | None:
-        """Obtain a bearer token through ``azure-identity``.
+    def _entra_auth(self, config: ProviderConfig) -> _EntraAuth | None:
+        """The per-request token source, or ``None`` when a key authenticates instead."""
+        if config.api_key or not config.options.get("use_entra", True):
+            return None
+        return _EntraAuth(
+            provider_id=self.provider_id,
+            scope=str(config.options.get("scope") or FOUNDRY_SCOPE),
+        )
+
+
+class _EntraAuth(httpx2.Auth):
+    """Acquires an Entra bearer token on first use and refreshes it before it expires.
+
+    `DefaultAzureCredential` is expensive in a way that matters where it is called from:
+    it walks a chain that spawns `az`, `pwsh`, and `azd`, and probes the IMDS endpoint
+    over HTTP. Doing that at construction meant every `Client` holding an Azure provider
+    paid it at startup, whether or not it ever sent a request — and the spawned probes
+    outlived the call often enough to surface as unraisable `ResourceWarning`s in
+    unrelated code.
+
+    It is also blocking, so the acquisition runs in a worker thread: the credential chain
+    can take seconds, and the event loop is shared with every other in-flight request.
+
+    Attributes:
+        _margin_s: How long before expiry a token is replaced. Azure reports absolute
+            expiry, and a token that expires mid-flight fails a request that was already
+            paid for.
+    """
+
+    _margin_s: ClassVar[float] = 300.0
+
+    def __init__(self, *, provider_id: str, scope: str) -> None:
+        self._provider_id = provider_id
+        self._scope = scope
+        self._token: str = ""
+        self._expires_at: float = 0.0
+        self._lock = asyncio.Lock()
+
+    async def async_auth_flow(
+        self, request: httpx2.Request
+    ) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
+        """Attach a live token to one request."""
+        request.headers["authorization"] = f"Bearer {await self._bearer()}"
+        yield request
+
+    async def _bearer(self) -> str:
+        """The cached token, acquiring or refreshing it when it will not outlast the call.
 
         Raises:
-            ConfigError: If the ``[azure]`` extra is missing, or the credential chain
-                cannot produce a token.
+            anyinfer.errors.ConfigError: The extra is missing, or the chain produced none.
         """
-        options = config.options
-        if not options.get("use_entra", True):
-            return None
+        async with self._lock:
+            if self._token and time.time() < self._expires_at - self._margin_s:
+                return self._token
+            token, expires_at = await asyncio.to_thread(self._acquire)
+            self._token, self._expires_at = token, expires_at
+            return self._token
 
+    def _acquire(self) -> tuple[str, float]:
+        """Walk the credential chain. Blocking, and called only in a worker thread.
+
+        Raises:
+            anyinfer.errors.ConfigError: The extra is missing, or the chain produced none.
+        """
         try:
             from azure.identity import DefaultAzureCredential
         except ImportError as exc:
             raise ConfigError(
                 "azure-foundry needs either an API key or the azure extra for Entra auth",
-                provider=self.provider_id,
+                provider=self._provider_id,
                 hint="pip install 'anyinfer[azure]', or set api_key",
             ) from exc
 
-        scope = str(options.get("scope") or FOUNDRY_SCOPE)
         try:
             credential = DefaultAzureCredential()
-            token = credential.get_token(scope)
+            token = credential.get_token(self._scope)
         except Exception as exc:
             raise ConfigError(
-                f"could not acquire an Entra token for {scope}: {exc}",
-                provider=self.provider_id,
+                f"could not acquire an Entra token for {self._scope}: {exc}",
+                provider=self._provider_id,
                 hint="run 'az login', or configure a service principal in the environment",
             ) from exc
-        return str(token.token)
+        return str(token.token), float(getattr(token, "expires_on", 0.0) or 0.0)
 
 
 def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:

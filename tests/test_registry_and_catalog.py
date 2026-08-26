@@ -640,6 +640,49 @@ class TestEveryProviderIsWellFormed:
     to satisfy them without anyone remembering to add a test.
     """
 
+    async def test_building_a_provider_spawns_no_subprocess(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Constructing an adapter must not shell out. Nothing has been asked for yet.
+
+        The Azure adapter used to acquire an Entra token in `_build_headers`, which runs
+        during construction. `DefaultAzureCredential` walks a chain that spawns `az`,
+        `pwsh`, and `azd` and probes the IMDS endpoint over HTTP — so merely building a
+        `Client` that listed Azure paid for all of it, and the abandoned probes surfaced
+        later as unraisable ResourceWarnings blamed on whichever test the garbage
+        collector happened to interrupt. That failure took three wrong fixes to find
+        because it never named the code that caused it.
+        """
+        import subprocess
+
+        from anyinfer.errors import ConfigError
+        from anyinfer.providers.base import ProviderConfig
+
+        spawned: list[object] = []
+        original = subprocess.Popen.__init__
+
+        def record(self, *args: object, **kwargs: object) -> None:
+            spawned.append(args[0] if args else kwargs.get("args"))
+            original(self, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(subprocess.Popen, "__init__", record)
+
+        for descriptor in ProviderRegistry(load_builtins=True, load_entry_points=False):
+            try:
+                adapter = descriptor.factory(
+                    ProviderConfig(
+                        provider_id=descriptor.id,
+                        base_url=descriptor.default_base_url or "https://fake.invalid/v1",
+                    )
+                )
+            except (ConfigError, Exception):
+                continue
+            closer = getattr(adapter, "aclose", None)
+            if closer is not None:
+                await closer()
+
+        assert not spawned, f"building providers spawned: {spawned}"
+
     async def test_every_provider_is_instantiable(self) -> None:
         """A descriptor whose factory raises is a provider that exists only in a list.
 

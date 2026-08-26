@@ -55,6 +55,16 @@ section fetched live from learn.microsoft.com.
   tenant-chosen deployment name, not a fixed catalog id, so these limits cannot be keyed
   reliably per model the way OpenAI's fixed model ids allow.
 
+### When the token is acquired (corrected 2026-08-26)
+
+Per request, on first use, cached until five minutes before its reported expiry — not at
+construction. `DefaultAzureCredential` walks a chain that spawns `az`, `pwsh`, and `azd`
+and probes the IMDS endpoint over HTTP, so acquiring at construction made building a
+client shell out and block on network timeouts before the caller had asked for anything,
+and pinned a single token for the life of the process — which an Entra token outlives by
+about an hour. The chain is blocking, so it runs in a worker thread rather than on the
+event loop shared with in-flight requests.
+
 ## Watchlist
 - `api-version` lifecycle/retirements; the newer version-less `/openai/v1` surface
 - Scope strings and credential-chain behavior in `azure-identity` major versions
@@ -62,3 +72,6 @@ section fetched live from learn.microsoft.com.
   in responses)
 - Whether Azure ever exposes a listing endpoint that tags which deployments are
   embedding-capable (would let discovery stamp `operations` per-model, as LM Studio does)
+- **The refresh margin is not verified against a live tenant.** Expiry is read from
+  `AccessToken.expires_on`, and a credential that reports none refreshes on every
+  request rather than caching a token it cannot date. Noted 2026-08-26.
