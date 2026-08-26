@@ -173,6 +173,36 @@ Four rules govern the group, and they are worth knowing before you publish one:
     transitive dependency. The built-in schemes are fenced off for exactly that reason.
     Depend on a credential-store plugin the way you would depend on an auth library.
 
+## Rotation Without a Restart
+
+A reference is resolved once, when the provider's adapter is first built, and by default
+never again. That is right for a literal key or an env var fixed at launch, and wrong for
+a long-running process whose secret source rotates underneath it — a keychain entry, a
+mounted secret file, an env file a deployment rewrites.
+
+`credential_ttl_s` re-checks:
+
+```python
+client = ai.AsyncClient(config.providers, credential_ttl_s=300)
+```
+
+On expiry the reference is resolved again, and the adapter is rebuilt **only if the value
+actually changed**. The distinction matters: an adapter owns a connection pool, and for
+the supervised local engine a running process, so rebuilding on a timer rather than on a
+rotation would trade a restart-free rotation for a periodic connection storm. A stable
+credential costs one resolver call; a rotated one costs one connection pool, and emits a
+[`CredentialRotated`](telemetry.md) event so the second it happened is visible.
+
+A provider rejecting a credential that had been working triggers the same re-resolution
+immediately, whatever the TTL says — that is the strongest available signal that a key
+moved. The request is retried only when re-resolution produced something different; a
+genuinely wrong key still fails on the first attempt rather than being sent twice.
+
+A source that has become unreadable — a locked keychain, an unmounted secret — does not
+tear down a working adapter. The live credential may still be perfectly valid, and if it
+is not, the provider says so and the ordinary auth path reports it. That is a better
+failure than a client that stops working because a vault went briefly unreachable.
+
 ## Backend Credentials Never Transit the Sidecar
 
 When the [sidecar](../serve/README.md) is running, it authenticates *clients to itself*
@@ -188,6 +218,9 @@ pointed at the frontend never sees, sends, or needs them.
       itself with its own bearer token.
     - A custom scheme reaches the sidecar through the `anyinfer.credential_stores`
       entry-point group; it may add a scheme but never redefine a built-in one.
+    - `credential_ttl_s` re-resolves references on a schedule and rebuilds an adapter only
+      when the secret actually changed; a 401 on a previously-working credential triggers
+      the same re-resolution at once.
 
 ## See Also
 

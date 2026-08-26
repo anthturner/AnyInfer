@@ -14,6 +14,12 @@ stream yields on the way there. Ordering guarantees are documented in
 
 ::: anyinfer.Timing
 
+::: anyinfer.TokenLogprob
+
+::: anyinfer.Citation
+
+::: anyinfer.ServerToolUse
+
 ::: anyinfer.AttemptRecord
 
 ::: anyinfer.Outcome
@@ -97,6 +103,12 @@ stream yields on the way there. Ordering guarantees are documented in
 ::: anyinfer.ToolCall
 
 ::: anyinfer.ToolCallDelta
+
+::: anyinfer.CitationDelta
+
+::: anyinfer.ServerToolDelta
+
+::: anyinfer.ServerToolSource
 
 ::: anyinfer.UsageUpdate
 

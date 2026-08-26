@@ -49,6 +49,12 @@ upstream. The contract drift check audits provider contract snapshots against cu
 public API documentation, following
 [`contracts/DRIFT-CHECK.md`](https://github.com/anthturner/AnyInfer/blob/main/contracts/DRIFT-CHECK.md).
 
+One further workflow follows the same two-stage shape but is not on a schedule. The
+changelog workflow writes a branch's [changelog](changelog.md) entries into the
+`Unreleased` section when its pull request opens, and pins that section to a version when
+a push declares one. Both modes push onto the feature branch, so the prose is reviewed with the
+work it describes.
+
 ## Workstream Boundaries
 
 Start in the narrowest workstream that owns the behavior:

@@ -54,6 +54,12 @@ commit.
   bumps PATCH. From 1.0.0 on, plain [SemVer](https://semver.org/).
 - Bumping the version is an ordinary change: edit both files on a feature branch and let
   it ride to `main` through `develop`.
+- Pushing that bump also starts the
+  [changelog workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/changelog.yml),
+  which pins the accrued `## Unreleased` [changelog](changelog.md) entries to the new
+  version and opens a fresh empty `## Unreleased` above them. The entries themselves were
+  written as each branch merged, so a bump publishes prose that has already been
+  reviewed.
 
 ## What a Release Is
 
@@ -79,10 +85,18 @@ runs on every merge to `main`:
     all. Platform-specific freeze breakage therefore surfaces at the version bump rather
     than at the merge before it; no release can be cut without all five going green.
 3. **Only when the version is new** does it tag `v<version>` and create the GitHub
-   Release, with notes generated from the merged pull requests, every package attached,
-   and a `SHA256SUMS` file covering every artifact. An unchanged version (docs-only merges,
-   CI tweaks) leaves what it built as workflow artifacts and cuts nothing; releases stay
-   1:1 with versions.
+   Release, with every package attached and a `SHA256SUMS` file covering every artifact.
+   An unchanged version (docs-only merges, CI tweaks) leaves what it built as workflow
+   artifacts and cuts nothing; releases stay 1:1 with versions.
+
+    The release notes are that version's section of
+    [`CHANGELOG.md`](https://github.com/anthturner/AnyInfer/blob/main/CHANGELOG.md),
+    sliced out verbatim, plus a compare link. They are not generated from merged pull
+    request titles: those record how the work was organized rather than what changed, and
+    a partner reading "Develop by @anthturner in #3" learns nothing. Because the notes and
+    the changelog are the same bytes, they cannot drift apart, and because the section was
+    reviewed on the branch that bumped the version, nothing unreviewed reaches the release
+    page.
 
 Publishing a release therefore takes exactly one deliberate act: merging a version bump
 to `main`. There is no separate tagging step to forget or get wrong, and a release's tag
@@ -113,12 +127,15 @@ deliberate act; the environment just adds a pause before the copy leaves the bui
 ## Checklist for Cutting a Release
 
 1. `develop` is green and contains everything the release should.
-2. On a feature branch: bump `project.version` and `anyinfer.__version__`, note anything
-   user-facing in the PR description (it becomes the generated release notes).
-3. PR into `develop`; merge when green. PR `develop` into `main`; merge when green.
-4. Watch the release workflow attach `v<version>` and publish the wheel to PyPI.
-5. Verify the [downloads page](../downloads.md), checksum file, and PyPI project page.
-6. Confirm the artifact-signing posture is what you intend to ship, and that it matches
+2. Read `## Unreleased` in
+   [`CHANGELOG.md`](https://github.com/anthturner/AnyInfer/blob/main/CHANGELOG.md): it is
+   what the release will say. Fix anything wrong there first.
+3. On a feature branch: bump `project.version` and `anyinfer.__version__`. Push, and the
+   changelog workflow pins those entries to the new version.
+4. PR into `develop`; merge when green. PR `develop` into `main`; merge when green.
+5. Watch the release workflow attach `v<version>` and publish the wheel to PyPI.
+6. Verify the [downloads page](../downloads.md), checksum file, and PyPI project page.
+7. Confirm the artifact-signing posture is what you intend to ship, and that it matches
    what the downloads page tells users. Today that means: the wheel and sdist go to PyPI
    through Trusted Publishing (OIDC, no long-lived token), `SHA256SUMS` is attached to the
    Release, and native bundles are **not** code-signed. Signing and notarization are a

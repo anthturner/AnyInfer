@@ -315,6 +315,10 @@ descriptor = ProviderDescriptor(
         "stop",
         "tools",
         "reasoning",
+        "seed",
+        "presence_penalty",
+        "frequency_penalty",
+        "logprobs",
     ),
 )
 """Descriptor for the Microsoft 365 Copilot provider."""

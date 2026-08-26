@@ -504,6 +504,16 @@ descriptor = ProviderDescriptor(
     default_capabilities=ModelCapabilities(features=Sourced(_COPILOT_FEATURES, "default")),
     token_calibration=_COPILOT_CALIBRATION,
     supports_sessions=True,
-    ignored_parameters=("temperature", "top_p", "max_output_tokens", "stop", "tools"),
+    ignored_parameters=(
+        "temperature",
+        "top_p",
+        "max_output_tokens",
+        "stop",
+        "tools",
+        "seed",
+        "presence_penalty",
+        "frequency_penalty",
+        "logprobs",
+    ),
 )
 """Descriptor for the GitHub Copilot provider."""

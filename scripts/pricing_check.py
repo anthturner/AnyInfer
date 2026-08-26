@@ -3,6 +3,21 @@
 This module deliberately contains no networking imports. Live retrieval is isolated in
 ``pricing_fetch.py`` so every normalization and money comparison is deterministic and
 offline-testable.
+
+**Scope: per-token rates only.** The table also carries per-invocation rates for
+provider-run tools (``server_tools``), and nothing here watches them. Every admitted feed
+is a *model* catalog publishing prompt and completion prices; a search fee is a separate
+line item those catalogs do not carry in a comparable form. So a server-tool rate is
+verified when a human reads the provider's own pricing page and is not re-checked
+afterwards. Those rates move — every one currently recorded was read on 2026-08-25 — so
+the staleness risk here is real rather than theoretical.
+
+That is a real gap rather than a decision to be comfortable with, and it is recorded here
+because the alternative is a report that looks exhaustive while silently covering less
+than it appears to. `validate_pricing.py` still holds those rates to the same date and
+source discipline as a token rate, so what is missing is the *drift tripwire*, not the
+provenance requirement. Revisit if an admitted feed begins publishing per-invocation fees
+in a comparable form.
 """
 
 from __future__ import annotations

@@ -19,6 +19,7 @@ on this surface; their fees are already reflected in the reported cost.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from typing import Any, ClassVar
 
@@ -34,6 +35,7 @@ from ..types.capabilities import (
 )
 from ..types.requests import ReasoningEffort
 from ..types.results import Usage
+from .base import WireRequest
 from .http import map_transport_error, read_error_detail
 from .openai_compat import OpenAICompatAdapter
 
@@ -83,6 +85,25 @@ class XaiAdapter(OpenAICompatAdapter):
             return await super().list_models()
         return [_parse_language_model(e) for e in entries if isinstance(e, Mapping)]
 
+    def build_payload(self, req: WireRequest) -> dict[str, Any]:
+        """Add xAI's Live Search, which is a request-level block rather than a tool.
+
+        Every other provider spells server-run search as an entry in the `tools` array.
+        xAI spells it as `search_parameters` beside the messages, and reports what it used
+        in `usage.num_sources_used` rather than as a content block — so the count comes
+        from usage on the way back, not from a stream event.
+        """
+        payload = super().build_payload(req)
+        if any(spec.kind == "web_search" for spec in req.server_tools):
+            search: dict[str, Any] = {"mode": "on"}
+            max_uses = next(
+                (s.max_uses for s in req.server_tools if s.kind == "web_search"), None
+            )
+            if max_uses is not None:
+                search["max_search_results"] = max_uses
+            payload["search_parameters"] = search
+        return payload
+
     def _parse_usage(self, usage: Mapping[str, Any]) -> Usage:
         """Read the standard block, then adopt xAI's exact billed cost.
 
@@ -90,18 +111,13 @@ class XaiAdapter(OpenAICompatAdapter):
         tiered pricing, cached-token rates, and server-side tool fees.
         """
         parsed = super()._parse_usage(usage)
+        sources = usage.get("num_sources_used")
+        if isinstance(sources, int) and not isinstance(sources, bool) and sources > 0:
+            parsed = replace(parsed, server_tool_uses={"web_search": sources})
         cost = _cost_from_ticks(usage.get("cost_in_usd_ticks"))
         if cost is None:
             return parsed
-        return Usage(
-            input_tokens=parsed.input_tokens,
-            output_tokens=parsed.output_tokens,
-            total_tokens=parsed.total_tokens,
-            cache_read_tokens=parsed.cache_read_tokens,
-            cache_write_tokens=parsed.cache_write_tokens,
-            reasoning_tokens=parsed.reasoning_tokens,
-            cost_usd=cost,
-        )
+        return replace(parsed, cost_usd=cost)
 
 
 def _cost_from_ticks(value: Any) -> Decimal | None:
@@ -179,7 +195,8 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
 
 
 _XAI_FEATURES = (
-    Feature.STREAMING
+    Feature.WEB_SEARCH
+    | Feature.STREAMING
     | Feature.JSON_SCHEMA
     | Feature.JSON_MODE
     | Feature.TOOLS
@@ -221,6 +238,7 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
+    server_tools=frozenset({"web_search"}),
     default_capabilities=ModelCapabilities(features=Sourced(_XAI_FEATURES, "default")),
 )
 """Descriptor for the xAI provider."""

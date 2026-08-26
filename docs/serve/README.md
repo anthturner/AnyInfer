@@ -62,12 +62,37 @@ the frontend stays a codec.
 | Endpoint | Behavior |
 |---|---|
 | `POST /v1/chat/completions` | Streaming and non-streaming. `model` is parsed as a target. |
+| `POST /v1/responses` | OpenAI's current-generation dialect, streaming and non-streaming. Same targets, same extensions. |
 | `POST /v1/embeddings` | Vectors for a string or batch. `model` is parsed as a target. |
 | `POST /v1/anyinfer/rerank` | Scores documents against a query. Not an OpenAI route. |
 | `POST /v1/anyinfer/compare` | Runs one prompt across several targets. Not an OpenAI route. |
 | `GET /v1/models` | Catalog aliases plus any explicitly exposed targets. |
 | `GET /health` | Liveness. Requires no authentication. |
 | Anything else under `/v1` | 404 with a clear explanation. |
+
+## Two OpenAI Dialects, One Core
+
+`/v1/chat/completions` and `/v1/responses` are separate codecs over the same client. A
+Responses-first SDK 404s against a chat-completions-only gateway, and this project already
+treats Responses as the real dialect — its own OpenAI adapter speaks `POST /responses`
+upstream — so serving only the older shape meant projecting one this library does not
+itself prefer.
+
+They differ in kind, not just in spelling. Responses streams a narrated lifecycle — an
+item was added, a content part opened, text arrived, the part closed — where chat
+completions repeats one chunk shape and leaves reassembly to the client. Each record names
+its type on the SSE `event:` line, which is what those clients dispatch on. Reasoning gets
+its own output item rather than being folded into the answer or dropped, and a grounded
+answer's citations land on the content part's native `annotations` rather than needing an
+extension.
+
+**What is refused rather than emulated.** Responses is a *stateful* API.
+`previous_response_id` continues a conversation the server remembers and `store` asks it
+to remember one; this gateway remembers nothing, so both are 400s with an explanation.
+Silently dropping `previous_response_id` would return an answer assembled without the
+conversation the caller referenced — which reads as a bad model rather than a missing
+feature. A response states `"store": false` so a client learns the posture without having
+to be refused first.
 
 The two `/v1/anyinfer/` routes are deliberate extensions: reranking and comparison have no
 OpenAI equivalent, so they sit under a namespaced prefix rather than pretending to be stock
@@ -95,18 +120,24 @@ field cannot.
 ## What Survives the Wire, and What Does Not
 
 **Survives:** text and multimodal message parts, tools, `tool_choice`,
-`response_format.json_schema`, temperature, top-p, max tokens, stop sequences,
-`reasoning_effort`, the stream flag, usage, and finish reasons. `reasoning_effort` is
-decoded into the typed, cross-provider effort level rather than passed through, so it
-reaches an Anthropic thinking budget or a Gemini thinking config instead of silently doing
-nothing outside the OpenAI dialect. Unrecognized extra-body fields reach
-`provider_options`, so the escape hatch survives too.
+`response_format.json_schema`, temperature, top-p, max tokens, stop sequences, `seed`,
+`presence_penalty`, `frequency_penalty`, `logprobs`/`top_logprobs`, `reasoning_effort`, the
+stream flag, usage, and finish reasons. `reasoning_effort` is decoded into the typed,
+cross-provider effort level rather than passed through, so it reaches an Anthropic thinking
+budget or a Gemini thinking config instead of silently doing nothing outside the OpenAI
+dialect. Unrecognized extra-body fields reach `provider_options`, so the escape hatch
+survives too.
 
-**Refused with a 400, deliberately:** `n` above 1, and `logprobs`/`top_logprobs`. A
-generation is a single-completion primitive here, so `n` has nothing to map onto; logprobs
-have no normalized result surface to come back in, and returning nothing while the request
-still bills would be the silent-wrong-answer case this project exists to remove. Both are
-refusals rather than silent drops.
+`logprobs` and `top_logprobs` decode together into one normalized count, and the answers
+come back on `choices[0].logprobs` in the dialect's own shape. A target that cannot report
+them says so through the normal dropped-parameter path rather than answering with an empty
+object.
+
+**Refused with a 400, deliberately:** `n` above 1. A generation is a single-completion
+primitive here, so `n` has nothing to map onto — a refusal rather than a silent drop.
+`top_logprobs` without `logprobs: true` is refused for the same reason: it is an error
+upstream, and guessing which half of the pair was meant is how a request gets billed for
+data nobody asked for.
 
 **Does not in the stock shape:** timing marks and attempt records. They have no
 `chat.completion.chunk` representation. An AnyInfer-aware caller can request the complete
@@ -252,6 +283,75 @@ running beside the files. [Context reduction](../concepts/context-reduction.md) 
 the strategies; [fit a corpus to a context budget](../guides/fitting-context.md) covers
 choosing one.
 
+## Provider-Run Tools
+
+`anyinfer_server_tools` asks the provider to search the web or execute code inside the
+request. Chat completions has no surface for these — its `tools` array is client-executed
+functions, and putting a provider-run capability there would make a stock client try to
+execute something that already ran:
+
+```json
+{"anyinfer_server_tools": [{"kind": "web_search", "max_uses": 3}]}
+```
+
+The response carries the counts back under the same name, `[{"kind": "web_search", "uses":
+2}]` — counts only, since what the provider searched for is caller content.
+
+On `/v1/responses` these have a native home: a `tools` entry whose `type` names the
+capability, beside the function declarations. A stock Responses client asking for
+`{"type": "web_search"}` is understood as written, and the extension is needed only for the
+use ceiling that dialect cannot express.
+
+A target that cannot run a requested tool is refused rather than answering without it. That
+is the opposite of how an unhonored sampling knob is handled, deliberately: an answer built
+without the search that was asked for is a different answer, not a degraded one.
+
+## Attributions
+
+`anyinfer_cite_documents: true` asks the target to attribute its answer to the documents
+the request supplied. Attributions come back on the choice as `anyinfer_citations`, and in
+a stream as their own frames carrying the same objects:
+
+```json
+{"anyinfer_citations": [
+  {"start_index": 0, "end_index": 20, "quoted_text": "Rayleigh scattering",
+   "document_index": 1, "title": "Optics"}
+]}
+```
+
+Chat completions has no citation surface, so without this extension a grounded answer
+arrived with its attributions stranded in the provider's raw payload — visible in Python,
+invisible through the gateway. A field the provider did not state is **absent**, never
+null or zero: an offset of zero and "the provider located this only in the source" are
+different claims, and a wire shape that cannot tell them apart pushes a fabricated
+highlight onto whoever renders it.
+
+## Sending Video
+
+Chat completions has no content type for video, so a video message part travels as an
+`anyinfer_video` **content item** — an extension inside the message rather than a
+top-level request key, matching how the dialect itself grew `input_audio` and `file`:
+
+```json
+{
+  "model": "gemini:gemini-2.5-flash",
+  "messages": [{"role": "user", "content": [
+    {"type": "text", "text": "What happens at the end?"},
+    {"type": "anyinfer_video", "anyinfer_video": {
+      "url": "https://generativelanguage.googleapis.com/v1beta/files/abc123",
+      "media_type": "video/mp4",
+      "start_offset_s": 30, "fps": 1
+    }}
+  ]}]
+}
+```
+
+`url` takes a provider-hosted URI, a public video URL, or a `data:` URL; `data` takes raw
+base64 instead. The clip window and frame rate are optional and omitted when unset — they
+change both the answer and the bill, so a value is only ever sent because a caller chose
+it. A target without video support refuses the request rather than answering about footage
+it never received.
+
 ## Fixed-Target Arena Requests
 
 An AnyInfer-aware caller can add `anyinfer_arena` with the complete `ArenaPolicy` field set,
@@ -272,8 +372,9 @@ The sidecar, CLI, and Python SDK use the same
     - Any target spelling works as the `model` field, so hosted, hub, and local routes are
       all reachable from a stock OpenAI client.
     - The AnyInfer extensions (`anyinfer_manifest`, `anyinfer_history`, `anyinfer_cache`,
-      `anyinfer_context`, `anyinfer_arena`) are additive: a client that does not send them
-      receives a plain OpenAI completion.
+      `anyinfer_context`, `anyinfer_arena`, `anyinfer_cite_documents`/
+      `anyinfer_citations`, `anyinfer_server_tools`, and the `anyinfer_video` content item) are additive: a client
+      that does not send them receives a plain OpenAI completion.
     - A non-loopback bind requires both `--allow-remote-exposure` and a bearer token, and
       backend credentials never transit the frontend.
 

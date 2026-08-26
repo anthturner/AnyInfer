@@ -836,14 +836,16 @@ src/anyinfer/
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py pricing_table.py estimate.py
-                         # budget.py gating.py cache.py ledger.py pricing.json
+                         # tokenizers.py remote_tokenizers.py budget.py gating.py
+                         # cache.py ledger.py pricing.json
   local/                 # hardware.py metrics.py backends.py runtimes.py runtimes.json tuning.py
                          # services.py discovery.py fit.py variants.py artifacts.py downloads.py
                          # acquire.py store.py server.py recommend.py
                          # sources/ direct_url.py huggingface.py local_path.py
                          # attestation.py provenance.py
   providers/             # base.py sse.py eventstream.py http.py cloud_auth.py
-                         # _multimodal.py openai_compat.py openai_compat_embeddings.py
+                         # _logprobs.py _multimodal.py _openai_batch.py
+                         # openai_compat.py openai_compat_embeddings.py
                          # openai_shaped_retrieval.py openai.py anthropic.py
                          # ollama.py openrouter.py azure_foundry.py copilot.py
                          # m365_copilot.py llama_cpp.py gemini.py deepseek.py xai.py
@@ -859,8 +861,8 @@ src/anyinfer/
   cli.py                 # init, agents-md, run, embed, rerank, compare, verify,
                          # benchmark, doctor, providers, models, runtime, context,
                          # mcp, conform, serve
-  serve/                 # openai_codec.py embeddings_codec.py app.py service.py
-                         # __main__.py — see §22, ADR-009
+  serve/                 # openai_codec.py responses_codec.py embeddings_codec.py
+                         # app.py service.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
 contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§24)
@@ -1862,6 +1864,31 @@ structured slot-fill inputs; the relay assembles the request server-side.
 directly against the BYOK posture in §30.0. That tension is documented rather than hidden:
 what the relay sees (the assembled request, transiently) and what it persists (nothing, by
 design and by audit) are both stated, with logs carrying metadata only.
+
+**Pacing and admission control** *(2026-08-25)*. Two bounds, both inert until configured,
+both holding timing metadata only — so the zero-retention claim above is unchanged and
+still structural.
+
+A pooled `RateLimiter` fixes an inertness that was structural, not accidental:
+`Relay._forward` builds a client per call because a BYOK credential must die with the
+request that carried it, and the token bucket and header-observed windows lived inside that
+client. Pooling the limiter — never the client — keeps the pacing while the credential
+lifetime is untouched, keyed by a per-process salted digest rather than by the key.
+
+Per-tenant admission caps make one tenant unable to consume the process. Isolation is
+structural rather than scheduled: each tenant has its own counter, cap, and queue, so there
+is no shared queue for one tenant's burst to delay another's request in. What waits is a
+caller, never a stored request — a durable queue would have to persist slot-fills and
+assembled prompts, which is a different product with a weaker guarantee than this section
+states.
+
+Every number returned to a caller — `Retry-After`, `RateLimit-Remaining` — derives only
+from that caller's own tenant state. A figure computed from process-wide load would reopen
+the enumeration hole `RelayRegistry.resolve`'s uniform error message closes on purpose.
+
+**The ceiling, stated honestly:** this bounds one process. It is not cross-process quota
+enforcement, and a multi-process Relay gets one set of bounds per process. A global quota
+belongs in a fronting gateway, which is the same call `routing/limits.py` makes for core.
 
 ### 30.4 Tier 3 — attested local execution
 

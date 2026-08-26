@@ -9,6 +9,7 @@ bearer token, never from the request body.
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
 import pytest
@@ -55,7 +56,13 @@ def _relay() -> Relay:
 
 def _client() -> TestClient:
     tokens = {ACME_TOKEN: "acme", OTHER_TOKEN: "other"}
-    return TestClient(build_app(_relay(), tokens=tokens))
+    # These tests are about authentication, not capacity. `build_app` warns when a
+    # multi-tenant relay has no admission limits — deliberately, since that is the
+    # noisy-neighbour gap — and `filterwarnings = ["error"]` would turn it into a failure
+    # here. The warning has its own coverage in test_app_throttling.py.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return TestClient(build_app(_relay(), tokens=tokens))
 
 
 def test_building_an_app_without_tokens_is_refused() -> None:
@@ -160,7 +167,9 @@ def test_forward_mode_is_refused_with_an_explanation_not_a_404() -> None:
 def test_an_oversized_body_is_refused_with_413() -> None:
     """Post-auth exposure only, but one tenant must not exhaust the process for the rest."""
     tokens = {ACME_TOKEN: "acme", OTHER_TOKEN: "other"}
-    client = TestClient(build_app(_relay(), tokens=tokens, max_request_bytes=1024))
+    with warnings.catch_warnings():  # see _client(): the admission warning is not
+        warnings.simplefilter("ignore")  # what this test is about
+        client = TestClient(build_app(_relay(), tokens=tokens, max_request_bytes=1024))
 
     response = client.post(
         "/v1/relay/assemble",
@@ -172,7 +181,9 @@ def test_an_oversized_body_is_refused_with_413() -> None:
 
 def test_the_body_cap_can_be_disabled() -> None:
     tokens = {ACME_TOKEN: "acme", OTHER_TOKEN: "other"}
-    client = TestClient(build_app(_relay(), tokens=tokens, max_request_bytes=0))
+    with warnings.catch_warnings():  # see _client(): the admission warning is not
+        warnings.simplefilter("ignore")  # what this test is about
+        client = TestClient(build_app(_relay(), tokens=tokens, max_request_bytes=0))
 
     response = client.post(
         "/v1/relay/assemble",

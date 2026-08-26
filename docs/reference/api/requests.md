@@ -21,6 +21,8 @@ The request side of the one primitive: everything a `GenerationRequest` can carr
 
 ::: anyinfer.AudioPart
 
+::: anyinfer.VideoPart
+
 ::: anyinfer.system
 
 ::: anyinfer.user
@@ -42,6 +44,10 @@ The request side of the one primitive: everything a `GenerationRequest` can carr
 ::: anyinfer.ContextRequest
 
 ::: anyinfer.ToolSpec
+
+::: anyinfer.ServerToolSpec
+
+::: anyinfer.ServerToolKind
 
 ::: anyinfer.ToolChoice
 

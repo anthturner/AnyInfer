@@ -25,7 +25,7 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
 from ..errors import AnyInferError, SchemaViolationError
-from ..types.events import StreamEnded
+from ..types.events import ReasoningDelta, StreamEnded, TextDelta, ToolCallDelta
 from ..types.operations import RerankDocument
 from .embeddings_codec import (
     embedding_request_from_openai,
@@ -40,6 +40,12 @@ from .openai_codec import (
     manifest_chunk,
     request_from_openai,
     wants_manifest,
+)
+from .responses_codec import (
+    _ResponseStream,
+    encode_response,
+    request_from_responses,
+    response_stream_events,
 )
 
 __all__ = ["DEFAULT_MAX_REQUEST_BYTES", "create_app"]
@@ -148,6 +154,65 @@ def create_app(
                 result,
                 model=target,
                 completion_id=completion_id,
+                created=created,
+                include_manifest=include_manifest,
+            )
+        )
+
+    async def responses(request: Any) -> Any:
+        """Serve ``POST /v1/responses``, OpenAI's current-generation dialect.
+
+        A second codec over the same client, never a second core: it decodes into the
+        identical `GenerationRequest` the chat route
+        builds, and everything after that is shared.
+        """
+        guard = _check_auth(request, auth_token, starlette)
+        if guard is not None:
+            return guard
+
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 — any malformed body is one error to the client
+            return _error(starlette, 400, "request body must be valid JSON")
+        if not isinstance(body, Mapping):
+            return _error(starlette, 400, "request body must be a JSON object")
+
+        try:
+            target, generation_request, wants_stream = request_from_responses(
+                body, context_tuning=context_tuning
+            )
+            include_manifest = wants_manifest(body)
+        except ValueError as exc:
+            return _error(starlette, 400, str(exc))
+        if not target:
+            return _error(starlette, 400, "the 'model' field is required")
+
+        response_id = f"resp_{uuid.uuid4().hex[:24]}"
+        created = int(time.time())
+
+        if wants_stream:
+            return starlette.StreamingResponse(
+                _stream_response_events(
+                    client,
+                    target,
+                    generation_request,
+                    response_id=response_id,
+                    created=created,
+                    include_manifest=_wants_manifest_quietly(body),
+                ),
+                headers=_SSE_HEADERS,
+            )
+
+        try:
+            result = await _generate(client, target, generation_request)
+        except AnyInferError as exc:
+            return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
+
+        return starlette.JSONResponse(
+            encode_response(
+                result,
+                model=target,
+                response_id=response_id,
                 created=created,
                 include_manifest=include_manifest,
             )
@@ -309,6 +374,7 @@ def create_app(
     routes = [
         starlette.Route("/health", health, methods=["GET"]),
         starlette.Route("/v1/chat/completions", chat_completions, methods=["POST"]),
+        starlette.Route("/v1/responses", responses, methods=["POST"]),
         starlette.Route("/v1/embeddings", embeddings, methods=["POST"]),
         starlette.Route("/v1/anyinfer/rerank", rerank, methods=["POST"]),
         starlette.Route("/v1/models", models, methods=["GET"]),
@@ -331,6 +397,8 @@ async def _generate(client: Any, target: str, request: Any) -> Any:
         tool_choice=request.tool_choice,
         sampling=request.sampling,
         reasoning=request.reasoning,
+        logprobs=request.logprobs,
+        cite_documents=request.cite_documents,
         history=request.history,
         cache=request.cache,
         arena=request.arena,
@@ -338,6 +406,83 @@ async def _generate(client: Any, target: str, request: Any) -> Any:
         provider_options=request.provider_options,
         metadata=request.metadata,
     )
+
+
+async def _stream_response_events(
+    client: Any,
+    target: str,
+    request: Any,
+    *,
+    response_id: str,
+    created: int,
+    include_manifest: bool,
+) -> AsyncIterator[bytes]:
+    """Project the event stream onto the Responses API's semantic SSE events.
+
+    Unlike the chat projection, every record here carries an ``event:`` line as well as
+    ``data:`` — this dialect's clients dispatch on the event name rather than inspecting
+    the payload — and the sequence is a narrated lifecycle rather than repeated chunks,
+    which the codec's state machine owns.
+    """
+    stream = client.stream(
+        request.messages,
+        target=target,
+        schema=request.schema,
+        tools=request.tools,
+        tool_choice=request.tool_choice,
+        sampling=request.sampling,
+        reasoning=request.reasoning,
+        logprobs=request.logprobs,
+        cite_documents=request.cite_documents,
+        history=request.history,
+        cache=request.cache,
+        arena=request.arena,
+        context=request.context,
+        provider_options=request.provider_options,
+        metadata=request.metadata,
+    )
+    events = response_stream_events(model=target, response_id=response_id, created=created)
+
+    try:
+        try:
+            for opening in events.created():
+                yield _sse_event(opening)
+            async for event in stream:
+                for record in _response_records(events, event):
+                    yield _sse_event(record)
+                if isinstance(event, StreamEnded):
+                    for terminal in events.completed(
+                        event.result, include_manifest=include_manifest
+                    ):
+                        yield _sse_event(terminal)
+        except AnyInferError as exc:
+            yield _sse_event(events.failed(str(exc), type(exc).__name__))
+    finally:
+        # Same reasoning as the chat stream's: ASGI closes this generator the moment a
+        # client disconnects, and without this the provider connection would be released
+        # by garbage collection rather than deterministically.
+        await stream.aclose()
+
+
+def _response_records(events: _ResponseStream, event: Any) -> list[dict[str, Any]]:
+    """Translate one AnyInfer stream event into zero or more Responses records."""
+    if isinstance(event, TextDelta):
+        return events.text_delta(event.text)
+    if isinstance(event, ReasoningDelta):
+        return events.reasoning_delta(event.text)
+    if isinstance(event, ToolCallDelta):
+        return events.tool_delta(
+            event.index, event.call_id, event.name, event.arguments_fragment
+        )
+    # Timing marks and attempt records have no Responses equivalent, exactly as they have
+    # no chat-completions one: they are AnyInfer-native observability.
+    return []
+
+
+def _sse_event(record: Mapping[str, Any]) -> bytes:
+    """Frame one record as an SSE event, naming its type on the ``event:`` line."""
+    kind = str(record.get("type", "message"))
+    return f"event: {kind}\ndata: {json.dumps(record)}\n\n".encode()
 
 
 async def _stream_chunks(
@@ -363,6 +508,8 @@ async def _stream_chunks(
         tool_choice=request.tool_choice,
         sampling=request.sampling,
         reasoning=request.reasoning,
+        logprobs=request.logprobs,
+        cite_documents=request.cite_documents,
         history=request.history,
         cache=request.cache,
         arena=request.arena,

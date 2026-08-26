@@ -38,6 +38,7 @@ from ..capabilities.pricing import (
     TRUSTED_PROVENANCE,
     CostEstimate,
     compute_operation_cost,
+    with_cost,
 )
 from ..capabilities.pricing_table import PricingTable
 from ..capabilities.probes import (
@@ -70,6 +71,8 @@ from ..errors import (
 from ..evaluate.compare import EmbeddingTargetComparison, TargetComparison
 from ..events.observers import EventDispatcher, Observer
 from ..events.telemetry import (
+    BatchCompleted,
+    BatchSubmitted,
     DownloadProgress,
     ProviderDiagnostic,
     TelemetryEvent,
@@ -84,11 +87,14 @@ from ..local.variants import VariantPrefs
 from ..manifest import DroppedParameter, ManifestBuilder
 from ..providers.base import (
     AdapterFinal,
+    BatchWireRequest,
     GeneratesText,
     ProviderAdapter,
+    SubmitsBatches,
 )
 from ..registry import ProviderDescriptor, ProviderRegistry, default_registry
 from ..routing.health import HealthCache
+from ..routing.limits import RateLimiter
 from ..routing.policy import Retry, Route
 from ..schema.mechanism import MechanismRung, choose_mechanism
 from ..schema.validate import extract_json, validate
@@ -112,12 +118,18 @@ from ..types.messages import (
     DocumentPart,
     ImagePart,
     Message,
+    VideoPart,
     user,
 )
 from ..types.operations import (
     DEFAULT_MAX_EMBEDDING_RESPONSE_BYTES,
     DEFAULT_MAX_RERANK_RESPONSE_BYTES,
+    BatchGenerationRequest,
+    BatchHandle,
+    BatchLine,
     BatchPolicy,
+    BatchReport,
+    BatchResult,
     EmbeddingCapabilities,
     EmbeddingInputIntent,
     EmbeddingRequest,
@@ -140,6 +152,7 @@ from ..types.requests import (
     ResolvedTarget,
     Sampling,
     SchemaSpec,
+    ServerToolSpec,
     SpendPolicy,
     SupportsJSONSchema,
     Target,
@@ -147,7 +160,9 @@ from ..types.requests import (
     ToolSpec,
 )
 from ..types.results import (
+    DETAIL_MAX_CHARS,
     Diagnostic,
+    ErrorInfo,
     Generation,
     Usage,
 )
@@ -256,6 +271,25 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             always be fixed locally.
         model_dir: Where acquired model weights are stored. Defaults to the per-OS data
             directory, overridable with ``ANYINFER_MODEL_DIR``.
+        credential_ttl_s: How often to re-check whether a provider's credential reference
+            still resolves to the same secret. ``None`` — the default — resolves once at
+            adapter build and never again, which is what a client holding literal keys
+            wants. Set it when credentials come from a source that rotates underneath a
+            long-running process (a keychain, a mounted secret, an env file a deployment
+            rewrites): on expiry the reference is re-resolved, and the adapter is rebuilt
+            **only if the value actually changed**, so a rotation costs one connection
+            pool and a stable credential costs nothing. A provider that rejects a
+            credential which had been working triggers the same re-resolution immediately,
+            whatever the TTL says.
+        limiters: Pre-built `RateLimiter` instances keyed by provider instance id, used
+            instead of constructing one from that instance's ``limits``. For the one
+            situation the constructed path cannot serve: a caller that builds a
+            short-lived client per request around a long-lived credential, where a
+            per-client limiter paces every call against an empty bucket and discards the
+            windows the provider just reported. Limiter identity is the unit of pacing —
+            one account at one provider — so handing in the limiter that identity owns is
+            what carries the state across clients. Injection is deliberately not a
+            cross-process quota mechanism: these are in-memory objects in one loop.
     """
 
     def __init__(
@@ -284,6 +318,8 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         manifest_payloads: bool = False,
         capability_overrides: Mapping[str, ModelCapabilities] | None = None,
         model_dir: Path | None = None,
+        credential_ttl_s: float | None = None,
+        limiters: Mapping[str, RateLimiter] | None = None,
     ) -> None:
         self._registry = registry or default_registry
         self._events = EventDispatcher(list(observers or []))
@@ -298,6 +334,8 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             # Lifecycle telemetry from adapters (server start/stop, download progress)
             # flows through the same dispatcher as request-path events.
             events=self._emit,
+            credential_ttl_s=credential_ttl_s,
+            limiters=limiters,
         )
         self._default_route = route
         self._operation_routes: dict[str, Route] = dict(operation_routes or {})
@@ -1320,6 +1358,9 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         cache: CachePolicy | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
+        cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1332,6 +1373,25 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
 
         ``manifest`` overrides the client's manifest setting for this one call; ``None``
         inherits it.
+
+        ``logprobs`` asks the target to report per-token log-probabilities: ``0`` for the
+        chosen token's own, a positive count for that many alternatives beside it, and
+        ``None`` — the default — for none at all. A target that cannot report them emits a
+        `ParameterDropped` event rather than answering with an empty
+        `Generation.logprobs`.
+
+        ``cite_documents`` asks the target to attribute its answer to the documents this
+        request supplied, landing them on `Generation.citations`
+        and on `CitationDelta` events as they arrive.
+        Off by default and never inferred from the presence of a document, since every
+        dialect treats it as a request-side opt-in and several bill a cited answer
+        differently.
+
+        ``server_tools`` asks the *provider* to run capabilities of its own during the
+        generation — web search, code execution. Off by default and never inferred: each is
+        billed per invocation. A target that cannot run one refuses before dispatch rather
+        than answering as though it had, since an answer built without the search that was
+        asked for is a different answer, not a degraded one.
 
         Returns:
             The assembled `Generation`.
@@ -1353,6 +1413,9 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             cache=cache,
             arena=arena,
             context=context,
+            logprobs=logprobs,
+            cite_documents=cite_documents,
+            server_tools=server_tools,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1366,6 +1429,203 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         return await self._generate_request(
             request, resolved_route, session=session, manifest=manifest
         )
+
+    async def submit_batch(
+        self,
+        batch: BatchGenerationRequest,
+        *,
+        target: Target,
+    ) -> BatchHandle:
+        """Submit a batch for deferred, discounted execution.
+
+        Every major provider sells this tier at roughly half price on a delayed window,
+        which is the shape of an eval, a backfill, or an offline enrichment run. Each line
+        is translated through the same wire builder a live call uses, so a batched request
+        carries the schema, tools, cache marks, and reasoning effort its live twin would.
+
+        **Nothing is stored here.** The returned handle is the caller's to persist,
+        wherever they already persist their own work. Run retention is a stated non-goal,
+        and a job answered hours later in another process is exactly where it would be
+        most tempting to break it.
+
+        Args:
+            batch: The requests to run together.
+            target: Where to run them. One target for the whole batch: a provider's batch
+                endpoint takes one model, and splitting across targets would be routing,
+                which a deferred job cannot do — there is no failure to fall back from
+                until hours later.
+
+        Returns:
+            The handle that reclaims this batch.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+            anyinfer.errors.ProviderError: The provider refused the submission.
+        """
+        resolved = self.resolve(target)
+        adapter = await self._batch_adapter(resolved)
+        descriptor = self._pool.descriptor_for(resolved.provider_id)
+        capabilities = self._capabilities_for(descriptor, resolved)
+
+        lines = tuple(
+            (
+                custom_id,
+                build_wire_request(
+                    request,
+                    resolved,
+                    descriptor,
+                    capabilities=capabilities,
+                    # A batch is answered whole; there is no stream to consume.
+                    stream=False,
+                ),
+            )
+            for custom_id, request in zip(batch.line_ids, batch.requests, strict=True)
+        )
+        handle = await adapter.submit_batch(
+            BatchWireRequest(
+                model=resolved.model,
+                lines=lines,
+                completion_window=batch.completion_window,
+                metadata=dict(batch.metadata),
+            )
+        )
+        # Stamped here rather than in the adapter: the submission order is the *caller's*
+        # fact, and an adapter that had to remember it would be holding job state.
+        handle = replace(handle, line_ids=batch.line_ids)
+        self._emit(
+            BatchSubmitted(
+                batch_id=handle.batch_id,
+                target=resolved,
+                line_count=handle.line_count,
+            )
+        )
+        return handle
+
+    async def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Ask where a batch is, without downloading its results.
+
+        Polling is cheap and fetching is not — providers charge nothing to ask about a job
+        and real bandwidth to download one — so a caller waiting on a 24-hour window asks
+        many times and fetches once.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+        """
+        adapter = await self._batch_adapter(self._batch_target(handle))
+        return await adapter.batch_status(handle)
+
+    async def fetch_batch(
+        self,
+        handle: BatchHandle,
+        *,
+        schema: SchemaSpec | SupportsJSONSchema | Mapping[str, Any] | None = None,
+    ) -> BatchResult:
+        """Download a finished batch's lines, in submission order.
+
+        Args:
+            handle: The batch to collect.
+            schema: The structured-output contract every line was submitted under, applied
+                to each answer here. Supplying it is what keeps a batch from being the one
+                place this library stops enforcing schemas — the reason to batch *through*
+                AnyInfer rather than around it is that the typed request model still holds,
+                and a result that skipped validation would quietly give that up on a
+                caller's highest-volume traffic.
+
+                Taken as an argument rather than remembered: collection happens hours later
+                in another process, and a client that stored the batch's schemas would be
+                the job registry this design does not keep. One schema for the whole batch,
+                because a batch runs one shape — a line that violates it is reported on
+                *that line*, never by failing the batch.
+
+        Returns:
+            The finished batch, lines in submission order, each validated and priced.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+            anyinfer.errors.ProviderError: The batch has not finished.
+        """
+        resolved = self._batch_target(handle)
+        adapter = await self._batch_adapter(resolved)
+        result = await adapter.fetch_batch(handle)
+        spec = SchemaSpec.coerce(schema) if schema is not None else None
+        capabilities = self._batch_capabilities(resolved)
+        ordered = _ordered_lines(
+            replace(
+                result,
+                lines=tuple(
+                    _finish_line(line, spec, capabilities) for line in result.lines
+                ),
+            )
+        )
+        self._emit(
+            BatchCompleted(
+                batch_id=handle.batch_id,
+                target=self._batch_target(handle),
+                status=result.status,
+                completed=len(result.succeeded),
+                failed=len(result.failed),
+            )
+        )
+        return ordered
+
+    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Ask the provider to stop a batch, returning its state afterwards.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+        """
+        adapter = await self._batch_adapter(self._batch_target(handle))
+        return await adapter.cancel_batch(handle)
+
+    def _batch_capabilities(self, resolved: ResolvedTarget) -> ModelCapabilities | None:
+        """Assembled capabilities for a batch's target, or ``None`` when unknown.
+
+        Unknown is a real answer here: a batch is collected long after submission, possibly
+        against a client configured differently, and an unpriceable line reports no cost
+        rather than a guessed one.
+        """
+        try:
+            descriptor = self._pool.descriptor_for(resolved.provider_id)
+        except (AnyInferError, ValueError):
+            return None
+        return self._capabilities_for(descriptor, resolved)
+
+    def _batch_target(self, handle: BatchHandle) -> ResolvedTarget:
+        """The target a handle names, reconstructed without re-resolving an alias.
+
+        A handle records the *instance* it was submitted to, not the alias the caller may
+        have typed, because an alias can be repointed between submission and collection —
+        and a batch reclaimed from the wrong account is somebody else's job.
+        """
+        return ResolvedTarget(provider_id=handle.provider_id, model=handle.model)
+
+    async def _batch_adapter(self, resolved: ResolvedTarget) -> SubmitsBatches:
+        """Fetch a provider's adapter and narrow it to the batch protocol.
+
+        The descriptor decides, not the adapter object. Several providers share one
+        adapter class — every OpenAI-compatible preset does — so whether the *class* has
+        the methods says nothing about whether this provider sells the tier. A structural
+        check alone would let a preset with no batch endpoint submit a job and fail at the
+        upload, hours of confusion later than it should.
+
+        Raises:
+            anyinfer.errors.ConfigError: The provider does not implement batching.
+        """
+        if "batch" not in self._pool.descriptor_for(resolved.provider_id).operations:
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} does not support batch submission",
+                provider=resolved.provider_id,
+                hint="choose a provider whose descriptor declares the 'batch' operation",
+            )
+        adapter = await self._pool.get(resolved.provider_id)
+        if not isinstance(adapter, SubmitsBatches):
+            raise ConfigError(
+                f"provider {resolved.provider_id!r} declares batch submission but its "
+                "adapter does not implement it",
+                provider=resolved.provider_id,
+                hint="fix the descriptor's operations set or the adapter's factory",
+            )
+        return adapter
 
     async def embed(
         self,
@@ -1605,6 +1865,9 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         cache: CachePolicy | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
+        cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -1617,6 +1880,25 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
 
         ``manifest`` overrides the client's manifest setting for this one call; ``None``
         inherits it.
+
+        ``logprobs`` asks the target to report per-token log-probabilities: ``0`` for the
+        chosen token's own, a positive count for that many alternatives beside it, and
+        ``None`` — the default — for none at all. A target that cannot report them emits a
+        `ParameterDropped` event rather than answering with an empty
+        `Generation.logprobs`.
+
+        ``cite_documents`` asks the target to attribute its answer to the documents this
+        request supplied, landing them on `Generation.citations`
+        and on `CitationDelta` events as they arrive.
+        Off by default and never inferred from the presence of a document, since every
+        dialect treats it as a request-side opt-in and several bill a cited answer
+        differently.
+
+        ``server_tools`` asks the *provider* to run capabilities of its own during the
+        generation — web search, code execution. Off by default and never inferred: each is
+        billed per invocation. A target that cannot run one refuses before dispatch rather
+        than answering as though it had, since an answer built without the search that was
+        asked for is a different answer, not a degraded one.
 
         Returns:
             An `AsyncStream`: an async iterator of
@@ -1636,6 +1918,9 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             cache=cache,
             arena=arena,
             context=context,
+            logprobs=logprobs,
+            cite_documents=cite_documents,
+            server_tools=server_tools,
             provider_options=provider_options,
             metadata=metadata,
             max_response_bytes=max_response_bytes,
@@ -1773,6 +2058,9 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         max_input_bytes: int | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
+        cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
     ) -> GenerationRequest:
         spec = SchemaSpec.coerce(schema) if schema is not None else None
         request = GenerationRequest(
@@ -1788,6 +2076,9 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
             cache=cache,
             arena=arena,
             context=context,
+            logprobs=logprobs,
+            cite_documents=cite_documents,
+            server_tools=tuple(server_tools),
             provider_options=dict(provider_options or {}),
             metadata=dict(metadata or {}),
             max_input_part_bytes=(
@@ -2004,6 +2295,7 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
                 try:
                     target_request, _ = self._apply_context_request(
                         request,
+                        resolved=resolved,
                         capabilities=capabilities,
                         calibration=descriptor.token_calibration,
                         builder=None,
@@ -2301,6 +2593,8 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
                     required.add(Feature.DOCUMENT)
                 elif isinstance(part, AudioPart):
                     required.add(Feature.AUDIO_IN)
+                elif isinstance(part, VideoPart):
+                    required.add(Feature.VIDEO_IN)
         if not required or capabilities.features.provenance not in TRUSTED_PROVENANCE:
             return
         missing = [feature for feature in required if feature not in capabilities.features.value]
@@ -2310,6 +2604,65 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
                 f"{resolved} does not support attached {labels} input",
                 provider=resolved.provider_id,
                 hint="choose a model whose capabilities include the required input modality",
+            )
+
+    def _check_server_tools(
+        self,
+        request: GenerationRequest,
+        resolved: ResolvedTarget,
+        capabilities: ModelCapabilities,
+    ) -> None:
+        """Refuse a server tool this target cannot run, from either of two facts.
+
+        A refusal rather than a dropped parameter, which is the opposite of how an
+        unhonored sampling knob is handled — and the difference is what the caller gets
+        back. A dropped ``temperature`` still produces the answer they asked for, slightly
+        differently sampled. An answer produced *without* the web search they asked for is
+        a different answer built from stale training data, and it arrives looking exactly
+        like a good one.
+
+        Two checks, because two different things can be missing and only one of them is
+        ever in doubt:
+
+        - **The adapter has no way to ask.** `ProviderDescriptor.server_tools` is a fact
+          about this repository's own code, so it is checked unconditionally. Ninety-five
+          of the registered adapters never read the field, and without this every one of
+          them would answer as though the tool had run.
+        - **The model cannot run it.** That is a capability, so it follows the same
+          trusted-absence rule as everything else: a ``default``-provenance feature set is
+          a guess, and refusing on a guess would break targets that would have worked.
+
+        Raises:
+            anyinfer.errors.UnsupportedInputError: The target cannot run a requested tool.
+        """
+        if not request.server_tools:
+            return
+        requested = {spec.kind for spec in request.server_tools}
+
+        descriptor_tools = self._pool.descriptor_for(resolved.provider_id).server_tools
+        unspeakable = sorted(requested - set(descriptor_tools))
+        if unspeakable:
+            raise UnsupportedInputError(
+                f"{resolved.provider_id} has no wire form for the requested server-side "
+                f"tool(s): {', '.join(unspeakable)}",
+                provider=resolved.provider_id,
+                hint="choose a provider that runs these itself, or drop server_tools",
+            )
+
+        if capabilities.features.provenance not in TRUSTED_PROVENANCE:
+            return
+        required = {
+            "web_search": Feature.WEB_SEARCH,
+            "code_execution": Feature.CODE_EXECUTION,
+        }
+        available = capabilities.features.value
+        missing = sorted(kind for kind in requested if required[kind] not in available)
+        if missing:
+            raise UnsupportedInputError(
+                f"{resolved} cannot run the requested server-side tool(s): "
+                + ", ".join(missing),
+                provider=resolved.provider_id,
+                hint="choose a model whose capabilities include them, or drop server_tools",
             )
 
     def _operation_capabilities(self, resolved: ResolvedTarget) -> ModelCapabilities | None:
@@ -2519,6 +2872,76 @@ def _overlay_catalog_windows(
         if candidate.outranks(capabilities.max_output_tokens):
             capabilities = replace(capabilities, max_output_tokens=candidate)
     return capabilities
+
+
+def _finish_line(
+    line: BatchLine, schema: SchemaSpec | None, capabilities: ModelCapabilities | None
+) -> BatchLine:
+    """Apply the two things a batched line was missing: validation and cost.
+
+    Both are core concerns an adapter must not perform — one needs the caller's schema and
+    the other the assembled capabilities, and neither is available to a translator. Doing
+    them here is what makes a batched result the same kind of object a live one is.
+
+    A schema violation lands on the line as an error rather than raising, because a batch
+    is not all-or-nothing: one malformed answer must not discard the ninety-nine that
+    validated, and the provider billed for all hundred either way. There is deliberately
+    no repair — a repair round trip is a second request, and a deferred job has already
+    ended by the time anyone looks.
+    """
+    if line.result is None:
+        return line
+
+    result = line.result
+    usage = with_cost(result.usage, capabilities)
+    if usage is not result.usage:
+        result = replace(result, usage=usage)
+
+    if schema is not None:
+        candidate, parse_error = extract_json(result.text)
+        errors = (
+            (parse_error,)
+            if parse_error is not None
+            else validate(candidate, schema.json_schema)
+        )
+        if errors:
+            return BatchLine(
+                custom_id=line.custom_id,
+                error=ErrorInfo(
+                    type_name="SchemaViolationError",
+                    provider=result.target.provider_id,
+                    phase="validate",
+                    retryable=False,
+                    http_status=None,
+                    detail="; ".join(errors)[:DETAIL_MAX_CHARS],
+                ),
+            )
+        result = replace(result, structured=candidate, structured_mechanism="json_schema")
+
+    return replace(line, result=result)
+
+
+def _ordered_lines(result: BatchResult) -> BatchResult:
+    """Return a result whose lines are in submission order.
+
+    Providers return finished lines in *completion* order — whatever finished first — and
+    a caller zipping results against their own inputs should not have to reorder them.
+
+    Restored by looking each line up in the handle's recorded ``line_ids`` rather than by
+    sorting. Sorting only recovers submission order when the ids are the positional
+    defaults; for caller-supplied row keys it produces *lexical* order, which pairs every
+    answer with the wrong input while looking perfectly well-formed. Lines the handle does
+    not name are appended rather than dropped: an unexpected id is a provider surprise
+    worth surfacing, not evidence the answer should be thrown away.
+    """
+    order = {custom_id: index for index, custom_id in enumerate(result.handle.line_ids)}
+    if not order:
+        return result
+    unknown = len(order)
+    return replace(
+        result,
+        lines=tuple(sorted(result.lines, key=lambda line: order.get(line.custom_id, unknown))),
+    )
 
 
 def _parse_overrides(

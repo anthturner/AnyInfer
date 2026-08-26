@@ -27,17 +27,20 @@ from typing import TYPE_CHECKING, Any
 
 from ..capabilities.budget import build_context_budget
 from ..capabilities.cache import CachePlan, plan_cache
-from ..capabilities.estimate import TokenEstimator
+from ..capabilities.estimate import TokenEstimator, _message_text
 from ..capabilities.gating import check_context_fit
 from ..capabilities.ledger import SpendLedger
 from ..capabilities.pricing import (
     TRUSTED_PROVENANCE,
     with_cost,
 )
+from ..capabilities.remote_tokenizers import PrewarmsCounts, prewarm
+from ..capabilities.tokenizers import estimator_for
 from ..context.select import select as select_context
 from ..context_request import ContextSummary
 from ..errors import (
     AllTargetsFailedError,
+    AuthError,
     ConfigError,
     ContextLengthError,
     ProviderError,
@@ -67,7 +70,6 @@ from ..events.telemetry import (
 from ..manifest import ManifestBuilder
 from ..providers.base import (
     AdapterFinal,
-    GeneratesText,
     ProviderAdapter,
     ProviderLifecycle,
     aclosing_if_supported,
@@ -115,6 +117,23 @@ from ..types.results import (
 )
 from .providers import AdapterPool
 from .wire import build_wire_request, dropped_parameters
+
+
+def _as_generator(adapter: ProviderLifecycle, resolved: ResolvedTarget) -> ProviderAdapter:
+    """Narrow a pooled adapter to the generation protocol, or say which one it is not.
+
+    Raises:
+        ConfigError: If the provider's adapter cannot generate. A descriptor claiming an
+            operation its adapter lacks is an authoring bug, so this names the provider
+            rather than surfacing an `AttributeError` from inside the router.
+    """
+    if not isinstance(adapter, ProviderAdapter):
+        raise ConfigError(
+            f"provider {resolved.provider_id!r} does not support generation",
+            provider=resolved.provider_id,
+            hint="choose a target whose provider declares the 'generation' operation",
+        )
+    return adapter
 
 
 def _last_user_text(request: GenerationRequest) -> str:
@@ -268,6 +287,13 @@ class GenerationExecutionMixin:
             capabilities: ModelCapabilities,
         ) -> None: ...
 
+        def _check_server_tools(
+            self,
+            request: GenerationRequest,
+            resolved: ResolvedTarget,
+            capabilities: ModelCapabilities,
+        ) -> None: ...
+
         def _check_spend(
             self,
             request: GenerationRequest,
@@ -378,20 +404,16 @@ class GenerationExecutionMixin:
                 attempts.append(AttemptRecord(resolved, "skipped_unhealthy"))
                 continue
 
-            adapter = await self._pool.get(resolved.provider_id)
-            if not isinstance(adapter, GeneratesText):
-                raise ConfigError(
-                    f"provider {resolved.provider_id!r} does not support generation",
-                    provider=resolved.provider_id,
-                    hint="choose a target whose provider declares the 'generation' operation",
-                )
+            adapter = _as_generator(await self._pool.get(resolved.provider_id), resolved)
             descriptor = self._pool.descriptor_for(resolved.provider_id)
             capabilities = self._capabilities_for(descriptor, resolved)
             if builder is not None:
                 builder.note_capabilities(resolved, capabilities)
+            await self._prewarm_estimator(active, resolved)
             try:
                 target_request, context_summary = self._apply_context_request(
                     active,
+                    resolved=resolved,
                     capabilities=capabilities,
                     calibration=descriptor.token_calibration,
                     builder=builder,
@@ -452,6 +474,17 @@ class GenerationExecutionMixin:
                 except ProviderError as error:
                     last_error = error
                     retryable = route.retry.should_retry(error)
+                    if not retryable and isinstance(error, AuthError):
+                        # An auth failure is deterministic — unless the credential rotated
+                        # underneath a long-running process, in which case the same request
+                        # succeeds with a freshly resolved one. The pool re-resolves and
+                        # answers whether anything actually moved, so a genuinely wrong key
+                        # still fails on the first attempt rather than being sent twice.
+                        retryable = await self._pool.refresh_credential(resolved.provider_id)
+                        if retryable:
+                            adapter = _as_generator(
+                                await self._pool.get(resolved.provider_id), resolved
+                            )
                     budget_left = attempt_number < route.retry.max_attempts
 
                     if isinstance(error, StreamProtocolError) and emitted_content:
@@ -550,8 +583,10 @@ class GenerationExecutionMixin:
         resolved = self.resolve(route.targets[0])
         await self._pool.get(resolved.provider_id)
         descriptor = self._pool.descriptor_for(resolved.provider_id)
+        await self._prewarm_estimator(request, resolved)
         return self._compact_to_fit(
             request,
+            resolved=resolved,
             capabilities=self._capabilities_for(descriptor, resolved),
             calibration=descriptor.token_calibration,
             policy=policy,
@@ -567,6 +602,7 @@ class GenerationExecutionMixin:
         self,
         request: GenerationRequest,
         *,
+        resolved: ResolvedTarget,
         capabilities: ModelCapabilities,
         calibration: TokenCalibration | None,
         policy: HistoryPolicy,
@@ -584,8 +620,9 @@ class GenerationExecutionMixin:
         envelope component is treated as fixed even though it shrinks with the content,
         which compacts marginally harder than strictly necessary — the safe direction.
         """
+        estimator = self._estimator_for(resolved)
         budget = build_context_budget(
-            request, capabilities, estimator=self._estimator, calibration=calibration
+            request, capabilities, estimator=estimator, calibration=calibration
         )
         allowance = budget.input_allowance_tokens
         if allowance is None or budget.fits is not False:
@@ -603,7 +640,7 @@ class GenerationExecutionMixin:
         compaction = compact_history(
             request.messages,
             max_tokens=target_tokens,
-            estimator=self._estimator,
+            estimator=estimator,
             keep_recent=policy.keep_recent,
             keep_system=policy.keep_system,
         )
@@ -613,6 +650,39 @@ class GenerationExecutionMixin:
         # explicitly rather than found by correlation.
         self._emit(compaction.event(), builder=builder)
         return request.with_messages(compaction.messages)
+
+    def _estimator_for(self, resolved: ResolvedTarget) -> TokenEstimator:
+        """The estimator to count this target's tokens with.
+
+        A tokenizer is a *model's* fact, but `TokenEstimator.estimate`
+        sees only text — so an estimator that knows how to specialize is asked to, once
+        per target, and one that does not is returned unchanged. The shipped byte
+        heuristic is in the second group, which is why it needed no change.
+
+        The provider's declared calibration names which exact-counting strategy applies
+        here, so an estimator counting a different one is not asked to specialize into a
+        precision it does not have for this target.
+        """
+        calibration = self._pool.descriptor_for(resolved.provider_id).token_calibration
+        return estimator_for(
+            self._estimator, resolved.provider_id, resolved.model, calibration=calibration
+        )
+
+    async def _prewarm_estimator(
+        self, request: GenerationRequest, resolved: ResolvedTarget
+    ) -> None:
+        """Fetch exact counts for this request's text, when the estimator counts remotely.
+
+        Awaited before sizing rather than inside it: `TokenEstimator.estimate` is
+        synchronous, and a blocking HTTP call under it would stall the event loop for
+        every other request in flight. An estimator that counts locally is untouched, and
+        one whose service is unreachable degrades to its base estimator rather than
+        failing a request that could have been sized approximately.
+        """
+        estimator = self._estimator_for(resolved)
+        if not isinstance(estimator, PrewarmsCounts):
+            return
+        await prewarm(estimator, [_message_text(message) for message in request.messages])
 
     def _client_side_pacing(
         self, limiter: RateLimiter | None, descriptor: ProviderDescriptor
@@ -632,6 +702,7 @@ class GenerationExecutionMixin:
         self,
         request: GenerationRequest,
         *,
+        resolved: ResolvedTarget,
         capabilities: ModelCapabilities,
         calibration: TokenCalibration,
         builder: ManifestBuilder | None,
@@ -641,12 +712,13 @@ class GenerationExecutionMixin:
         policy = request.context
         if policy is None:
             return request, None
+        estimator = self._estimator_for(resolved)
         max_tokens = policy.max_tokens
         if max_tokens is None:
             budget = build_context_budget(
                 request,
                 capabilities,
-                estimator=self._estimator,
+                estimator=estimator,
                 calibration=calibration,
             )
             if (
@@ -668,7 +740,7 @@ class GenerationExecutionMixin:
             strategy=policy.strategy,
             max_documents=policy.max_request_documents,
             max_bytes=policy.max_request_bytes,
-            estimator=self._estimator,
+            estimator=estimator,
             tuning=policy.tuning,
         )
         if emit:
@@ -720,6 +792,7 @@ class GenerationExecutionMixin:
             # never be reached, because there is no longer an overflow to redirect.
             fitted = self._compact_to_fit(
                 request,
+                resolved=resolved,
                 capabilities=capabilities,
                 calibration=descriptor.token_calibration,
                 policy=policy,
@@ -731,6 +804,7 @@ class GenerationExecutionMixin:
         # Money is checked in the same place as size, and for the same reason: a refusal
         # that costs a round trip is a refusal that already spent something.
         self._check_multimodal(request, resolved, capabilities)
+        self._check_server_tools(request, resolved, capabilities)
         self._check_spend(request, resolved, capabilities, request_id=request_id)
 
         if self._context_gate:
@@ -740,7 +814,7 @@ class GenerationExecutionMixin:
             check_context_fit(
                 request,
                 capabilities,
-                estimator=self._estimator,
+                estimator=self._estimator_for(resolved),
                 calibration=descriptor.token_calibration,
                 provider=resolved.provider_id,
                 model=resolved.model,
@@ -862,6 +936,17 @@ class GenerationExecutionMixin:
                         # still see it, so the core normalizes the difference away.
                         yield UsageUpdate(final.usage)
                 active_buffer.phases.update(final.phases)
+                active_buffer.logprobs = final.logprobs
+                active_buffer.server_tool_uses = final.server_tool_uses
+                if final.server_tool_uses:
+                    # Onto usage as well as the result: cost is computed from usage alone,
+                    # and a search is a billed line item like any token.
+                    active_buffer.usage = replace(
+                        active_buffer.usage,
+                        server_tool_uses={
+                            use.kind: use.uses for use in final.server_tool_uses
+                        },
+                    )
                 if self._retain_raw:
                     active_buffer.raw = final.raw
 
@@ -1013,6 +1098,9 @@ class GenerationExecutionMixin:
             warnings=tuple(buffer.warnings),
             raw=buffer.raw,
             context_reduction=context_summary,
+            logprobs=buffer.logprobs,
+            citations=tuple(buffer.citations),
+            server_tool_uses=buffer.server_tool_uses,
         )
 
     def _plan_cache(
@@ -1041,7 +1129,7 @@ class GenerationExecutionMixin:
             policy,
             capabilities or ModelCapabilities(),
             descriptor,
-            self._estimator,
+            self._estimator_for(resolved),
         )
 
         if plan.mechanism == "implicit":

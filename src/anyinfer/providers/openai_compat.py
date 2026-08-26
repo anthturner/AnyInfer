@@ -29,10 +29,13 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.requests import Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
-from ._multimodal import base64_data, data_url, media_subtype
+from ..types.results import FinishReason, Generation, ResolvedTarget, Timing, TokenLogprob, Usage
+from ._logprobs import parse_openai_logprobs
+from ._multimodal import base64_data, data_url, media_subtype, unsupported
+from ._openai_batch import OpenAIBatchMixin
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .sse import iter_sse
@@ -48,7 +51,7 @@ _FINISH_REASONS: Mapping[str, FinishReason] = {
 }
 
 
-class OpenAICompatAdapter:
+class OpenAICompatAdapter(OpenAIBatchMixin):
     """Adapter for OpenAI-compatible chat-completions endpoints."""
 
     output_tokens_field: ClassVar[str] = "max_tokens"
@@ -167,6 +170,14 @@ class OpenAICompatAdapter:
         if response_format is not None:
             payload["response_format"] = response_format
 
+        if req.logprobs is not None:
+            # Two fields, not one: the dialect's `logprobs` is the boolean that turns the
+            # feature on, and `top_logprobs` is how many alternatives to include. Sending
+            # `top_logprobs: 0` without the boolean returns nothing at all.
+            payload["logprobs"] = True
+            if req.logprobs > 0:
+                payload["top_logprobs"] = req.logprobs
+
         payload.update(req.reasoning_wire)
         payload.update(req.extra_options)
         return payload
@@ -181,6 +192,12 @@ class OpenAICompatAdapter:
             payload[self.output_tokens_field] = sampling.max_output_tokens
         if sampling.stop:
             payload["stop"] = list(sampling.stop)
+        if sampling.seed is not None:
+            payload["seed"] = sampling.seed
+        if sampling.presence_penalty is not None:
+            payload["presence_penalty"] = sampling.presence_penalty
+        if sampling.frequency_penalty is not None:
+            payload["frequency_penalty"] = sampling.frequency_penalty
 
     def _encode_response_format(self, req: WireRequest) -> dict[str, Any] | None:
         """Encode the structured-output mechanism, when it has a wire form.
@@ -213,7 +230,10 @@ class OpenAICompatAdapter:
             }
 
         text = "".join(p.text for p in message.content if isinstance(p, Text))
-        modal = any(isinstance(p, ImagePart | DocumentPart | AudioPart) for p in message.content)
+        modal = any(
+            isinstance(p, ImagePart | DocumentPart | AudioPart | VideoPart)
+            for p in message.content
+        )
         content: str | list[dict[str, Any]] | None = text
         if modal:
             content = []
@@ -246,6 +266,12 @@ class OpenAICompatAdapter:
                             },
                         }
                     )
+                elif isinstance(part, VideoPart):
+                    # The chat-completions dialect defines no video content item. Refused
+                    # rather than skipped: a dropped part leaves the model answering a
+                    # question about a video it was never shown, which reads as a bad
+                    # answer rather than as a missing input.
+                    raise unsupported(self.provider_id, "video")
         encoded: dict[str, Any] = {"role": message.role, "content": content}
         calls = [p for p in message.content if isinstance(p, ToolCall)]
         if calls:
@@ -338,6 +364,10 @@ class OpenAICompatAdapter:
         if isinstance(finish, str):
             state.finish_reason = _FINISH_REASONS.get(finish, "other")
 
+        # Streamed log-probabilities arrive per chunk, covering only that chunk's tokens,
+        # so they accumulate rather than replace.
+        state.logprobs.extend(parse_openai_logprobs(choice.get("logprobs")))
+
         delta = choice.get("delta")
         if not isinstance(delta, Mapping):
             return
@@ -427,6 +457,7 @@ class OpenAICompatAdapter:
         choices = payload.get("choices")
         message: Mapping[str, Any] = {}
         finish_reason: FinishReason = "stop"
+        logprobs: tuple[TokenLogprob, ...] = ()
         if isinstance(choices, list) and choices and isinstance(choices[0], Mapping):
             choice = choices[0]
             raw_message = choice.get("message")
@@ -435,6 +466,7 @@ class OpenAICompatAdapter:
             raw_finish = choice.get("finish_reason")
             if isinstance(raw_finish, str):
                 finish_reason = _FINISH_REASONS.get(raw_finish, "other")
+            logprobs = parse_openai_logprobs(choice.get("logprobs"))
 
         content = message.get("content")
         if isinstance(content, str) and content:
@@ -446,7 +478,57 @@ class OpenAICompatAdapter:
         usage = self._parse_usage(usage_payload) if isinstance(usage_payload, Mapping) else None
         if usage is not None:
             yield UsageUpdate(usage)
-        yield AdapterFinal(finish_reason=finish_reason, usage=usage, raw=payload)
+        yield AdapterFinal(
+            finish_reason=finish_reason, usage=usage, raw=payload, logprobs=logprobs
+        )
+
+    # ---- batches -----------------------------------------------------------------------
+
+    def generation_from_batch_body(self, body: Mapping[str, Any]) -> Generation:
+        """Assemble a `Generation` from one batched chat-completion body.
+
+        Read through `_events_from_completion`, the same reader the buffered live path
+        uses, so a batched answer carries the text, tool calls, usage, and finish reason a
+        live one would rather than through a second parser that can drift from it.
+
+        Assembled here rather than through the router's attempt buffer: an adapter must not
+        import from `anyinfer.routing` — the "adapters never orchestrate" contract enforces
+        exactly that — and a manifest line has nothing to orchestrate. The routing fields a
+        live result carries are genuinely absent; nothing routed, and no clock of ours ran.
+        """
+        text: list[str] = []
+        calls: dict[int, list[ToolCallDelta]] = {}
+        final: AdapterFinal | None = None
+        for event in self._events_from_completion(body, _BATCH_LINE_REQUEST):
+            if isinstance(event, TextDelta):
+                text.append(event.text)
+            elif isinstance(event, ToolCallDelta):
+                calls.setdefault(event.index, []).append(event)
+            elif isinstance(event, AdapterFinal):
+                final = event
+
+        usage = (final.usage if final is not None else None) or Usage()
+        return Generation(
+            text="".join(text),
+            structured=None,
+            tool_calls=tuple(
+                ToolCall(
+                    id="".join(d.call_id or "" for d in deltas),
+                    name="".join(d.name or "" for d in deltas),
+                    arguments=_batch_tool_arguments(
+                        "".join(d.arguments_fragment for d in deltas)
+                    ),
+                )
+                for _, deltas in sorted(calls.items())
+            ),
+            target=ResolvedTarget(
+                provider_id=self.provider_id, model=str(body.get("model", ""))
+            ),
+            finish_reason=final.finish_reason if final is not None else "stop",
+            usage=usage.normalized(),
+            timing=Timing(started_at=0.0, total_ms=0.0),
+            logprobs=final.logprobs if final is not None else (),
+        )
 
     def _parse_usage(self, usage: Mapping[str, Any]) -> Usage:
         """Read the dialect's usage block."""
@@ -474,14 +556,19 @@ class OpenAICompatAdapter:
 class _StreamState:
     """Accumulates cross-chunk streaming state so the final event is complete."""
 
-    __slots__ = ("finish_reason", "usage")
+    __slots__ = ("finish_reason", "logprobs", "usage")
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage: Usage | None = None
+        self.logprobs: list[TokenLogprob] = []
 
     def finalize(self) -> AdapterFinal:
-        return AdapterFinal(finish_reason=self.finish_reason, usage=self.usage)
+        return AdapterFinal(
+            finish_reason=self.finish_reason,
+            usage=self.usage,
+            logprobs=tuple(self.logprobs),
+        )
 
 
 descriptor = ProviderDescriptor(
@@ -518,3 +605,19 @@ descriptor = ProviderDescriptor(
     ),
 )
 """Descriptor for the generic OpenAI-compatible provider."""
+
+
+_BATCH_LINE_REQUEST = WireRequest(model="", messages=())
+"""A placeholder for the reader, which consults the request only for fields a manifest
+line does not have. Built once rather than per line."""
+
+
+def _batch_tool_arguments(raw: str) -> Mapping[str, Any]:
+    """Parse one batched tool call's arguments, tolerating a provider that sent none."""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}

@@ -28,6 +28,7 @@ concurrency:
 
 jobs:
   build:
+    name: build and upload the site
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # upload-artifact can leave duplicate records when its finalize request succeeds
@@ -106,6 +107,7 @@ jobs:
           done
 
   deploy:
+    name: publish to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -454,6 +454,10 @@ def test_descriptor_declares_the_parameters_it_ignores() -> None:
         "max_output_tokens",
         "stop",
         "tools",
+        "seed",
+        "presence_penalty",
+        "frequency_penalty",
+        "logprobs",
     )
 
 

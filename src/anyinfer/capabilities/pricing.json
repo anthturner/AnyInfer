@@ -5,9 +5,18 @@
     "so they parse losslessly as Decimals. Every entry records the real date and provider",
     "source used to verify it. The top-level generated date is only when this document was",
     "emitted; it does not imply that every entry was re-verified.",
-    "Standard on-demand tier only: batch discounts, cache-hit rates, long-context tiers",
-    "(Gemini and Claude price >200k-token prompts higher), and per-request search fees",
-    "(Perplexity) are not modelled — use capability_overrides where they matter.",
+    "Standard on-demand tier only: batch discounts, cache-hit rates, and long-context",
+    "tiers (Gemini and Claude price >200k-token prompts higher) are not modelled — use",
+    "capability_overrides where they matter.",
+    "Per-invocation fees for provider-run tools live in the top-level 'server_tools'",
+    "block, keyed by provider then tool kind, each entry carrying last_verified and",
+    "source under the same rules as a token rate, plus exactly one of: per_use (a flat",
+    "fee), per_use_by_model (where the provider charges by model class), or",
+    "billed_as: tokens (a tool folded into the token bill, a known zero rather than a",
+    "missing rate). A kind with no entry, or a model no per_use_by_model key matches,",
+    "is *unpriced*: the generation reports cost as unknown rather than understating the",
+    "bill. Note that pricing_check.py does not drift-check these; no admitted feed",
+    "publishes them comparably, so they are human-verified only.",
     "The weekly checker is a read-only drift tripwire. Direct machine-readable catalogs",
     "and secondary signals can trigger review, but only provider-owned current pricing",
     "documentation plus human review authorizes a rate or last_verified change. Exhaustive",
@@ -15,6 +24,64 @@
     "by scripts/validate_pricing.py; unchecked or unrepresentable pricing is never guessed."
   ],
   "generated": "2026-08-10",
+  "server_tools": {
+    "_comment": [
+      "Per-invocation prices for provider-run tools, read from each provider's own pricing",
+      "page on the last_verified date. Provider-level because a tool fee is set per tool,",
+      "not per model — except where a provider says otherwise, which is why per_use_by_model",
+      "exists. An unmatched model, or an absent kind, is *unpriced*: the generation's cost",
+      "reports as unknown rather than understating the bill.",
+      "Not recorded here, deliberately: tools billed by container time or memory (Anthropic",
+      "and OpenAI code execution). AnyInfer counts invocations, not container-hours, so no",
+      "correct per-invocation number exists and their absence is the honest answer."
+    ],
+    "anthropic": {
+      "web_search": {
+        "per_use": "0.01",
+        "last_verified": "2026-08-25",
+        "source": "https://platform.claude.com/docs/en/docs/about-claude/pricing",
+        "note": "$10 per 1,000 searches. An errored search is not billed."
+      }
+    },
+    "openai": {
+      "web_search": {
+        "per_use_by_model": {
+          "gpt-5": "0.01",
+          "o1": "0.01",
+          "o3": "0.01",
+          "o4": "0.01"
+        },
+        "last_verified": "2026-08-25",
+        "source": "https://developers.openai.com/api/docs/pricing",
+        "note": "$10/1k calls on reasoning models; $25/1k on non-reasoning, which are unlisted."
+      }
+    },
+    "gemini": {
+      "web_search": {
+        "per_use_by_model": {
+          "gemini-3": "0.014",
+          "gemini-2.5": "0.035"
+        },
+        "last_verified": "2026-08-25",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing",
+        "note": "$14/1k on 3.x, $35/1k on 2.5. Free tiers are not modelled."
+      },
+      "code_execution": {
+        "billed_as": "tokens",
+        "last_verified": "2026-08-25",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing",
+        "note": "Billed at standard token rates; no separate charge, and no session runtime fee."
+      }
+    },
+    "xai": {
+      "web_search": {
+        "per_use": "0.005",
+        "last_verified": "2026-08-25",
+        "source": "https://docs.x.ai/developers/pricing",
+        "note": "$5 per 1,000 calls, flat across models."
+      }
+    }
+  },
   "providers": {
     "openai": [
       {

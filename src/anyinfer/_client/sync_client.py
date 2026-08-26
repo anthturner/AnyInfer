@@ -54,7 +54,11 @@ from ..session import Session
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities
 from ..types.events import StreamEnded, StreamEvent
 from ..types.operations import (
+    BatchGenerationRequest,
+    BatchHandle,
     BatchPolicy,
+    BatchReport,
+    BatchResult,
     EmbeddingInputIntent,
     EmbeddingResult,
     EmbeddingSpace,
@@ -72,6 +76,7 @@ from ..types.requests import (
     ResolvedTarget,
     Sampling,
     SchemaSpec,
+    ServerToolSpec,
     SpendPolicy,
     SupportsJSONSchema,
     Target,
@@ -715,6 +720,9 @@ class Client:
         cache: CachePolicy | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
+        cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -741,6 +749,9 @@ class Client:
                 cache=cache,
                 arena=arena,
                 context=context,
+                logprobs=logprobs,
+                cite_documents=cite_documents,
+                server_tools=server_tools,
                 provider_options=provider_options,
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,
@@ -750,6 +761,28 @@ class Client:
                 manifest=manifest,
             )
         )
+
+    def submit_batch(self, batch: BatchGenerationRequest, *, target: Target) -> BatchHandle:
+        """Submit a batch. See `AsyncClient.submit_batch()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.submit_batch(batch, target=target))
+
+    def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Ask where a batch is. See `AsyncClient.batch_status()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.batch_status(handle))
+
+    def fetch_batch(
+        self, handle: BatchHandle, *, schema: SchemaSpec | None = None
+    ) -> BatchResult:
+        """Download a finished batch. See `AsyncClient.fetch_batch()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.fetch_batch(handle, schema=schema))
+
+    def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Cancel a batch. See `AsyncClient.cancel_batch()`."""
+        self._ensure_open()
+        return self._loop.run(self._async.cancel_batch(handle))
 
     def embed(
         self,
@@ -870,6 +903,9 @@ class Client:
         cache: CachePolicy | None = None,
         arena: ArenaPolicy | None = None,
         context: ContextRequest | None = None,
+        logprobs: int | None = None,
+        cite_documents: bool = False,
+        server_tools: Sequence[ServerToolSpec] = (),
         provider_options: Mapping[str, Mapping[str, Any]] | None = None,
         metadata: Mapping[str, str] | None = None,
         max_response_bytes: int | None = None,
@@ -901,6 +937,9 @@ class Client:
                 cache=cache,
                 arena=arena,
                 context=context,
+                logprobs=logprobs,
+                cite_documents=cite_documents,
+                server_tools=server_tools,
                 provider_options=provider_options,
                 metadata=metadata,
                 max_response_bytes=max_response_bytes,

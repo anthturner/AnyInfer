@@ -52,6 +52,7 @@ jobs:
     outputs:
       version: ${{ steps.read.outputs.version }}
       is_new: ${{ steps.read.outputs.is_new }}
+      previous: ${{ steps.read.outputs.previous }}
       bundle_matrix: ${{ steps.read.outputs.bundle_matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -64,6 +65,11 @@ jobs:
         run: |
           version="$(python -c 'import tomllib, pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Read before the new tag exists, so this is the release being superseded --
+          # the left-hand side of the release notes' compare link. Empty for the first
+          # release ever, which is the one release with nothing to compare against.
+          previous="$(git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/##' | sort -V | tail -n 1)"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
           # The bundle matrix is chosen here rather than with an `if:` on each row,
           # because a row skipped by `if:` still reports a skipped check while a row that
           # was never in the matrix costs and says nothing. See the header for why an
@@ -173,10 +179,32 @@ jobs:
         working-directory: artifacts
         run: find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+
+      # The notes are the version's own CHANGELOG.md section, not `--generate-notes`
+      # output. Generated notes list merged pull request titles, which is a record of how
+      # the work was organized rather than of what changed -- "Develop by @anthturner in
+      # #3" was a real line in the 0.1.2 release. The section was drafted and reviewed on
+      # the branch that bumped the version, so it is already human-approved prose by the
+      # time it gets here, and the release page and the changelog cannot drift apart
+      # because they are the same bytes. Rules: docs/contributing/changelog.md.
+      - name: build the release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          PREVIOUS: ${{ needs.version.outputs.previous }}
+        run: |
+          python scripts/validate_changelog.py --emit-section "$VERSION" > notes.md
+          if [ -n "$PREVIOUS" ]; then
+            printf '\n**Full Changelog**: https://github.com/%s/compare/%s...v%s\n' \
+              "$GITHUB_REPOSITORY" "$PREVIOUS" "$VERSION" >> notes.md
+          fi
+          cat notes.md
+
       # The tag is created by the release itself, so a release and its tag can never
-      # disagree. `--generate-notes` builds the changelog from merged PR titles; the
-      # downloads page on the docs site links to these assets by their stable
-      # (version-free) bundle names via /releases/latest/download/.
+      # disagree. The downloads page on the docs site links to these assets by their
+      # stable (version-free) bundle names via /releases/latest/download/.
       - name: create release v${{ needs.version.outputs.version }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -184,7 +212,7 @@ jobs:
           gh release create "v${{ needs.version.outputs.version }}" \
             --title "AnyInfer ${{ needs.version.outputs.version }}" \
             --target "$GITHUB_SHA" \
-            --generate-notes \
+            --notes-file notes.md \
             artifacts/*
 
   # ------------------------------------------------------------------------------

@@ -20,9 +20,22 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 - None (Responses API is unversioned-by-header at snapshot time)
 ### Request fields
 - `model`, `input` (message list), `instructions` (system), `stream`,
-  `max_output_tokens`, `temperature`, `top_p`,
+  `max_output_tokens`, `temperature`, `top_p`, `top_logprobs`,
   `reasoning: {"effort": <none|minimal|low|medium|high>}` (normalized effort translated here),
   `text.format` for structured output (json_schema), `tools`
+- **Server-side tools** (added 2026-08-25) are bare marker objects in `tools[]`:
+  `{"type": "web_search"}` and `{"type": "code_interpreter", "container": {"type": "auto"}}`.
+  Neither takes a per-tool use ceiling, so `server_tools.max_uses` is declared in
+  `ignored_parameters`. Lifecycle arrives as typed stream events —
+  `response.web_search_call.in_progress`/`.completed` and the `code_interpreter_call`
+  pair. The intermediate `.searching`/`.interpreting` events are deliberately not mapped:
+  they say the same thing with more granularity than a normalized status carries, and
+  counting them would inflate the invocation count.
+- **Absent from this dialect** (verified 2026-08-25): `seed`, `presence_penalty`, and
+  `frequency_penalty` exist on chat-completions but not on Responses, so the adapter never
+  sends them and the descriptor declares all three in `ignored_parameters`.
+- `top_logprobs` is a bare count here — there is no companion boolean, and `0` is a valid
+  value meaning "the chosen token's own probability, no alternatives".
 
 ### Multimodal inputs
 Verified 2026-08-10 against the provider-owned image and file-input guides above.
@@ -90,6 +103,35 @@ Verified 2026-08-09 against https://developers.openai.com/api/docs/guides/rate-l
   than carrying a remembered number. Embedding pricing appears on the model pages
   ($0.02/1M for 3-small, $0.13/1M for 3-large, 2026-08-12) but enters `pricing.json`
   only through the pricing pipeline, never by hand.
+
+### Batch API (added 2026-08-25)
+
+- Three steps, unlike Anthropic's one. `POST /files` with `purpose=batch` takes the job as
+  a **multipart upload** of JSONL and returns a file id; `POST /batches` references it via
+  `input_file_id` alongside `endpoint` (the generation path the lines target) and
+  `completion_window`.
+- Each JSONL record is `{custom_id, method, url, body}` where `body` is a Responses body
+  **minus `stream`**, which a batch cannot use.
+- `url` and `endpoint` are **absolute, version-prefixed paths** — `/v1/responses`, not the
+  `/responses` a live request posts to against a base URL that already carries the
+  version. The API validates this field against a fixed list of full paths, so borrowing
+  the live path fails validation at submit rather than at run. Corrected 2026-08-25.
+- The lifecycle above is byte-identical on every provider that copied the Batch API onto
+  chat completions (Groq), where the only difference is `endpoint: /v1/chat/completions`
+  and the line bodies. It is implemented once, in `providers/_openai_batch.py`.
+- `GET /batches/{id}` reports a richer status set than Anthropic's — `validating`,
+  `in_progress`, `finalizing`, `completed`, `failed`, `expired`, `cancelling`, `cancelled`
+  — normalized so a caller polls one vocabulary whichever provider ran the job. Counts are
+  under `request_counts` (`total`/`completed`/`failed`).
+- **Results arrive in two files, not one:** `output_file_id` holds succeeded lines and
+  `error_file_id` holds rejected ones. Reading only the first silently drops every failure
+  and returns a batch smaller than it was submitted, with nothing to explain the gap.
+- Each file is fetched from `GET /files/{id}/content`. Output entries are
+  `{custom_id, response: {status_code, body}}` where `body` is byte-identical to a
+  non-streaming Responses body, so it is read by the same output-item reader a live call
+  uses. Error entries carry `{custom_id, error: {code, message}}`.
+- `POST /batches/{id}/cancel` requests cancellation.
+- Manifest order is completion order, not submission order. The core re-sorts.
 
 ## Watchlist
 - Rate-limit header names and the duration format of the reset values

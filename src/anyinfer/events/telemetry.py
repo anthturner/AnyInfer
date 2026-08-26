@@ -24,8 +24,11 @@ __all__ = [
     "ArenaCompleted",
     "AttemptCompleted",
     "AttemptStarted",
+    "BatchCompleted",
+    "BatchSubmitted",
     "CachePlanned",
     "ContextReduced",
+    "CredentialRotated",
     "DownloadProgress",
     "FallbackTriggered",
     "FirstToken",
@@ -467,6 +470,70 @@ class DownloadProgress:
     session_bytes: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class BatchSubmitted:
+    """A deferred batch was accepted by a provider.
+
+    Payload-free: the line count is a number, and the batch id is the provider's own
+    handle rather than anything derived from the requests. Nothing about what was asked is
+    carried, which is the same rule every other event here follows.
+
+    Attributes:
+        batch_id: The provider's id for the job.
+        target: Where it was submitted.
+        line_count: How many requests went in.
+    """
+
+    batch_id: str
+    target: ResolvedTarget
+    line_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class BatchCompleted:
+    """A finished batch was collected.
+
+    Emitted on *collection*, not completion — nothing here polls, and a batch that
+    finished overnight becomes observable the moment a caller asks for it.
+
+    Attributes:
+        batch_id: The provider's id for the job.
+        target: Where it ran.
+        status: The batch's terminal status.
+        completed: Lines that produced a result.
+        failed: Lines that did not.
+    """
+
+    batch_id: str
+    target: ResolvedTarget
+    status: str
+    completed: int
+    failed: int
+
+
+@dataclass(frozen=True, slots=True)
+class CredentialRotated:
+    """A provider instance's credential changed and its adapter was rebuilt.
+
+    Emitted only when the resolved value actually moved — a TTL expiring and the
+    credential re-resolving to the same secret is not an event, because nothing happened.
+    Rotation discards a connection pool mid-flight, so an operator watching latency
+    deserves to know which second it was.
+
+    Payload-free by construction: the credential is never carried here, and neither is
+    the change-detection digest.
+
+    Attributes:
+        provider: The provider instance whose adapter was rebuilt.
+        trigger: What prompted the re-resolution — ``"ttl"`` for the periodic re-check,
+            ``"auth-failure"`` for the one triggered by a provider rejecting a credential
+            that had been working.
+    """
+
+    provider: str
+    trigger: Literal["ttl", "auth-failure"] = "ttl"
+
+
 TelemetryEvent = (
     RequestStarted
     | ArenaCompleted
@@ -488,6 +555,9 @@ TelemetryEvent = (
     | CachePlanned
     | RateLimitWaited
     | RateLimitObserved
+    | CredentialRotated
+    | BatchSubmitted
+    | BatchCompleted
 )
 """Any event an observer may receive."""
 

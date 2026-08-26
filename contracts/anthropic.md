@@ -34,6 +34,28 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
   `stop_sequences`, `tools`, `tool_choice`; reasoning-effort wire form recorded in
   `output_config: {"effort": e}` — VERIFY on first drift run (extended
   thinking may instead use `thinking: {"type":"enabled","budget_tokens":N}`)
+- **Server-side tools** (added 2026-08-25) are `tools[]` entries whose `type` carries a
+  **date**: `web_search_20250305` and `code_execution_20250522`, each with a `name` and an
+  optional `max_uses`. The date is part of the wire type, so a version bump upstream is a
+  contract change here rather than a silent behaviour change. Results stream as
+  `server_tool_use` blocks (invocation) and `web_search_tool_result` /
+  `code_execution_tool_result` blocks (outcome); a failure is a nested `content` object
+  whose own type ends in `_error`, carrying an `error_code`.
+  Result payloads are surfaced as of 2026-08-25: a search's `content[]` is a list of
+  `{url, title}` entries, and a code execution's `content` is one object with `stdout`,
+  `stderr`, and `return_code`. The tool is named in the block *type* rather than in a
+  field, which is why the result types are mapped separately from the invocation names.
+- Deferred batches (added 2026-08-25): `POST /v1/messages/batches` takes the whole job as
+  one JSON request — one step where OpenAI's is three — and results are fetched from the
+  batch's `results_url` as JSONL.
+- Citations (added 2026-08-25) are a **per-document request-side opt-in**:
+  `content[].citations: {"enabled": true}` on a `document` block. Without it the model
+  answers without attributions, and Anthropic bills a cited answer differently, so it is
+  sent only when the caller asked.
+- **Absent from this protocol** (re-checked 2026-08-25): `seed`, `presence_penalty`,
+  `frequency_penalty`, and any log-probability field. The Messages API publishes none of
+  them, so the descriptor declares all four in `ignored_parameters` — a caller who sets
+  one is told, rather than getting a successful answer that ignored it.
 
 ### Multimodal inputs
 Verified 2026-08-10 against the provider-owned vision and PDF guides. Images use `image`
@@ -89,6 +111,35 @@ Verified 2026-08-09 against https://platform.claude.com/docs/en/api/rate-limits 
 - Only uncached input tokens count toward the ITPM limit on most models, so a cached prefix
   raises effective throughput without raising the limit. AnyInfer does not model this: it
   paces on what the headers report, which already reflects it.
+
+### Citation response shape
+
+- Streamed as `content_block_delta` with `delta.type: "citations_delta"` and
+  `delta.citation`. Location shapes differ by document kind (`char_location`,
+  `page_location`, `content_block_location`) and all count into the **cited document**,
+  never into the answer — but each delta arrives immediately after the text it supports,
+  so the answer span is recoverable from stream position. The adapter derives it that way;
+  reporting `start_char_index` as an answer offset would be a different claim entirely.
+- Fields read: `cited_text`, `document_index`, `document_title`.
+
+### Message Batches (added 2026-08-25)
+
+- `POST /v1/messages/batches` takes `{requests: [{custom_id, params}]}` where `params` is
+  exactly a Messages body **minus `stream`**, which a batch cannot use and the API rejects.
+  No file upload and no separate manifest endpoint, unlike OpenAI's Batch API.
+- `GET /v1/messages/batches/{id}` reports `processing_status` — only `in_progress`,
+  `canceling`, and `ended` — plus `request_counts` with `succeeded`/`errored`/`expired`/
+  `processing`. Per-line outcomes are **not** in the batch status, which is why `ended`
+  normalizes to `completed` even when every line errored.
+- A cancelled batch is `ended` with `cancel_initiated_at` set; that pairing is what
+  distinguishes it from a natural completion.
+- `POST /v1/messages/batches/{id}/cancel` requests cancellation.
+- Results are a JSONL manifest at the batch's own `results_url`, one entry per line:
+  `{custom_id, result: {type: "succeeded"|"errored"|"expired"|"canceled", message?, error?}}`.
+  A succeeded entry's `message` is byte-identical to a non-streaming response, so the
+  adapter replays it through the same event translator a live call uses rather than
+  parsing it a second way.
+- **Manifest order is completion order, not submission order.** The core re-sorts.
 
 ## Watchlist
 - Rate-limit header names and the RFC 3339 reset format; whether the `tokens` pair keeps

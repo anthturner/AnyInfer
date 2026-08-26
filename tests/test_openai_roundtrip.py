@@ -395,16 +395,21 @@ def test_multiple_choices_are_refused_rather_than_silently_reduced() -> None:
     _, _, _ = request_from_openai({**FULL_REQUEST, "n": 1})
 
 
-@pytest.mark.parametrize("field", ["logprobs", "top_logprobs"])
-def test_logprob_requests_are_refused_rather_than_billed_for_nothing(field: str) -> None:
-    """Unreserved, these forwarded upstream with no response path to carry results back.
+def test_logprobs_decodes_the_dialect_pair_into_one_normalized_count() -> None:
+    """The wire spells the ask across two fields; the normalized request has one."""
+    _, request, _ = request_from_openai({**FULL_REQUEST, "logprobs": True, "top_logprobs": 5})
+    assert request.logprobs == 5
 
-    The client pays for the computation and receives none of it, which is worse than a
-    plain refusal.
-    """
-    with pytest.raises(ValueError, match=field):
-        request_from_openai({**FULL_REQUEST, field: True if field == "logprobs" else 5})
+    _, chosen_only, _ = request_from_openai({**FULL_REQUEST, "logprobs": True})
+    assert chosen_only.logprobs == 0, "the boolean alone asks for the chosen token"
+
+
+def test_top_logprobs_without_the_boolean_is_refused() -> None:
+    """Upstream errors on the half-spelled ask; guessing which half was meant is worse."""
+    with pytest.raises(ValueError, match="top_logprobs requires"):
+        request_from_openai({**FULL_REQUEST, "top_logprobs": 5})
 
 
 def test_logprobs_false_is_not_a_request_for_logprobs() -> None:
-    _, _, _ = request_from_openai({**FULL_REQUEST, "logprobs": False})
+    _, request, _ = request_from_openai({**FULL_REQUEST, "logprobs": False})
+    assert request.logprobs is None

@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from .errors import ConfigError
 from .types.capabilities import ModelCapabilities, RateLimitHeaders, TokenCalibration
 from .types.operations import EmbeddingCapabilities, InferenceOperation, RerankCapabilities
-from .types.requests import CacheMechanism, ReasoningEffort
+from .types.requests import CacheMechanism, ReasoningEffort, ServerToolKind
 
 if TYPE_CHECKING:
     from .providers.base import ProviderConfig, ProviderLifecycle
@@ -570,12 +570,30 @@ class ProviderDescriptor:
     library refuses to perform in silence.
     """
 
-    ignored_parameters: tuple[str, ...] = ()
-    """Request parameters this provider accepts and silently discards.
+    server_tools: frozenset[ServerToolKind] = frozenset()
+    """Provider-run tools this adapter knows how to ask for.
 
-    Distinct from "rejects with an error" and from "supported": a silently-ignored
-    parameter looks like success while doing nothing, so the core reports it as a
-    `ParameterDropped` event instead of letting it pass
+    Empty for almost every provider, and that emptiness is *load-bearing*: a request naming
+    a server tool an adapter cannot spell is refused by the core before dispatch rather
+    than sent without it. This is a stronger claim than a capability flag and is checked
+    differently — a `Feature` is a fact about a model that may be
+    a guess, while this is a fact about our own code and is never in doubt.
+
+    The refusal is deliberate where a dropped sampling knob would not be. An answer
+    produced without the web search the caller asked for is not a degraded answer; it is a
+    different one, built from stale training data, and it arrives looking exactly like a
+    good one.
+    """
+
+    ignored_parameters: tuple[str, ...] = ()
+    """Request parameters this target will not honor, whatever the caller sets.
+
+    Two situations produce the same caller-visible outcome and so share one list: a
+    provider that *accepts* the parameter and silently discards it, and one whose protocol
+    has no field for it at all, so the adapter never sends it. Both are distinct from
+    "rejects with an error" and from "supported" — in either case the request succeeds, the
+    parameter does nothing, and nothing says so unless we say it. The core reports each as
+    a `ParameterDropped` event instead of letting it pass
     unnoticed.
     """
 

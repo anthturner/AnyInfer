@@ -28,8 +28,17 @@ from ..types.capabilities import (
     ModelCapabilities,
     RateLimitHeaders,
     Sourced,
+    TokenCalibration,
 )
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    ReasoningDelta,
+    ServerToolDelta,
+    ServerToolSource,
+    ServerToolStatus,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import (
     AudioPart,
     DocumentPart,
@@ -38,12 +47,35 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
-from ..types.operations import EmbeddingCapabilities
-from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
-from ._multimodal import base64_data, data_url, media_subtype
-from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest
+from ..types.operations import (
+    EmbeddingCapabilities,
+)
+from ..types.requests import (
+    ReasoningEffort,
+    ResolvedTarget,
+    Sampling,
+    ServerToolKind,
+    ToolSpec,
+)
+from ..types.results import (
+    FinishReason,
+    Generation,
+    ServerToolUse,
+    Timing,
+    TokenLogprob,
+    Usage,
+)
+from ._logprobs import parse_logprob_entries
+from ._multimodal import base64_data, data_url, media_subtype, unsupported
+from ._openai_batch import OpenAIBatchMixin
+from .base import (
+    AdapterEvent,
+    AdapterFinal,
+    ProviderConfig,
+    WireRequest,
+)
 from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
 from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 from .sse import iter_sse
@@ -58,7 +90,7 @@ _INCOMPLETE_REASONS: Mapping[str, FinishReason] = {
 }
 
 
-class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
+class OpenAIAdapter(OpenAIBatchMixin, OpenAICompatEmbeddingsMixin):
     """Adapter for the OpenAI Responses API."""
 
     provider_id: ClassVar[str] = "openai"
@@ -144,13 +176,21 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
 
     # ---- generation ------------------------------------------------------------------
 
+    responses_path: ClassVar[str] = "/responses"
+    """Where a live request goes, resolved against a base URL that carries the version."""
+
+    batch_endpoint: ClassVar[str] = "/v1/responses"
+    """Where a *batched* line goes. Absolute, because the Batch API validates this field
+    against a fixed list of full paths rather than resolving it against the base URL."""
+    """The generation endpoint, named once because the batch API references it by URL."""
+
     async def generate(self, req: WireRequest) -> AsyncIterator[AdapterEvent]:
         """Run one generation against ``POST /responses``."""
         payload = self.build_payload(req)
         try:
             async with self._client.stream(
                 "POST",
-                "/responses",
+                self.responses_path,
                 json=payload,
                 timeout=req.timeout_s,
                 headers={"accept": "text/event-stream"},
@@ -198,6 +238,11 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
 
         self._apply_sampling(payload, req.sampling)
 
+        if req.logprobs is not None:
+            # The Responses API takes only the count — there is no companion boolean, and
+            # zero means "the chosen token's own probability, no alternatives".
+            payload["top_logprobs"] = req.logprobs
+
         if req.mechanism == "json_schema" and req.wire_schema is not None:
             payload["text"] = {
                 "format": {
@@ -209,8 +254,13 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
         elif req.mechanism == "json_mode":
             payload["text"] = {"format": {"type": "json_object"}}
 
+        server_tools = [_OPENAI_SERVER_TOOLS[spec.kind] for spec in req.server_tools]
+        if req.tools or server_tools:
+            payload["tools"] = [
+                *(dict(tool) for tool in server_tools),
+                *(self._encode_tool(t) for t in req.tools),
+            ]
         if req.tools:
-            payload["tools"] = [self._encode_tool(t) for t in req.tools]
             payload["tool_choice"] = self._encode_tool_choice(req.tool_choice)
 
         payload.update(req.reasoning_wire)
@@ -247,6 +297,9 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
         kind = str(chunk.get("type", ""))
 
         if kind == "response.output_text.delta":
+            # Log-probabilities ride on the text delta that produced them, covering only
+            # that delta's tokens, so they accumulate across the stream.
+            state.logprobs.extend(parse_logprob_entries(chunk.get("logprobs")))
             delta = chunk.get("delta")
             if isinstance(delta, str) and delta:
                 yield TextDelta(delta)
@@ -256,6 +309,19 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
             delta = chunk.get("delta")
             if isinstance(delta, str) and delta:
                 yield ReasoningDelta(delta)
+            return
+
+        if kind in _SERVER_TOOL_EVENTS:
+            tool_kind, status = _SERVER_TOOL_EVENTS[kind]
+            if status == "started":
+                state.server_tools[tool_kind] = state.server_tools.get(tool_kind, 0) + 1
+            yield ServerToolDelta(kind=tool_kind, status=status)
+            return
+
+        if kind == "response.output_item.done":
+            item = chunk.get("item")
+            if isinstance(item, Mapping) and item.get("type") in _SERVER_TOOL_ITEMS:
+                yield _server_tool_result(item)
             return
 
         if kind == "response.output_item.added":
@@ -307,6 +373,10 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
                 provider=self.provider_id,
             )
 
+    def generation_from_batch_body(self, body: Mapping[str, Any]) -> Generation:
+        """Read one batched Responses body with the live path's own output-item reader."""
+        return _generation_from_response(body)
+
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
         await self._client.aclose()
@@ -315,13 +385,22 @@ class OpenAIAdapter(OpenAICompatEmbeddingsMixin):
 class _StreamState:
     """Tracks finish reason, usage, and output-index to tool-slot mapping."""
 
-    __slots__ = ("finish_reason", "saw_tool_call", "tool_slots", "usage")
+    __slots__ = (
+        "finish_reason",
+        "logprobs",
+        "saw_tool_call",
+        "server_tools",
+        "tool_slots",
+        "usage",
+    )
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots: dict[int, int] = {}
         self.saw_tool_call = False
+        self.logprobs: list[TokenLogprob] = []
+        self.server_tools: dict[ServerToolKind, int] = {}
 
     def tool_slot(self, output_index: int) -> int:
         """Map an output-item index onto a dense tool-call slot."""
@@ -338,7 +417,143 @@ class _StreamState:
         return AdapterFinal(
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
+            logprobs=tuple(self.logprobs),
+            server_tool_uses=tuple(
+                ServerToolUse(kind=kind, uses=count)
+                for kind, count in sorted(self.server_tools.items())
+            ),
         )
+
+
+def _generation_from_response(body: Mapping[str, Any]) -> Generation:
+    """Assemble a `Generation` from one batched Responses body.
+
+    Read by the same output-item reader a live call's terminal event uses, so a batched
+    answer carries the tool calls, usage, and status a live one would rather than a second
+    parser that can drift from it.
+
+    Assembled here rather than through the router's attempt buffer: an adapter must not
+    import from `anyinfer.routing` — the "adapters never orchestrate" contract enforces
+    exactly that — and a manifest line has nothing to orchestrate. The routing fields a
+    live result carries are genuinely absent; nothing routed, and no clock of ours ran.
+    """
+    text: list[str] = []
+    calls: list[ToolCall] = []
+    saw_tool_call = False
+
+    for item in body.get("output") or ():
+        if not isinstance(item, Mapping):
+            continue
+        kind = item.get("type")
+        if kind == "message":
+            for part in item.get("content") or ():
+                if isinstance(part, Mapping) and part.get("type") == "output_text":
+                    value = part.get("text")
+                    if isinstance(value, str):
+                        text.append(value)
+        elif kind == "function_call":
+            saw_tool_call = True
+            calls.append(
+                ToolCall(
+                    id=str(item.get("call_id") or item.get("id") or ""),
+                    name=str(item.get("name", "")),
+                    arguments=_batch_arguments(item.get("arguments")),
+                )
+            )
+
+    usage = _parse_usage(body.get("usage")) or Usage()
+    state = _StreamState()
+    state.saw_tool_call = saw_tool_call
+    return Generation(
+        text="".join(text),
+        structured=None,
+        tool_calls=tuple(calls),
+        target=ResolvedTarget(provider_id="openai", model=str(body.get("model", ""))),
+        finish_reason=_finish_reason(body, state),
+        usage=usage.normalized(),
+        timing=Timing(started_at=0.0, total_ms=0.0),
+    )
+
+
+_SERVER_TOOL_ITEMS: Mapping[str, ServerToolKind] = {
+    "web_search_call": "web_search",
+    "code_interpreter_call": "code_execution",
+}
+"""Output-item types that carry a finished server tool's result."""
+
+
+def _server_tool_result(item: Mapping[str, Any]) -> ServerToolDelta:
+    """Decode a finished server-tool output item into the event carrying its result.
+
+    The `response.*_call.completed` events announce the finish but carry no payload; the
+    output item does. Reading the payload here rather than there is why completion is not
+    in `_SERVER_TOOL_EVENTS`: emitting from both would double-report every invocation.
+    """
+    tool_kind = _SERVER_TOOL_ITEMS[str(item.get("type"))]
+    if str(item.get("status", "")) in ("failed", "incomplete"):
+        error = item.get("error")
+        detail = error.get("message") if isinstance(error, Mapping) else error
+        return ServerToolDelta(
+            kind=tool_kind, status="failed", detail=str(detail or "")
+        )
+    if tool_kind == "web_search":
+        action = item.get("action")
+        entries = action.get("sources") if isinstance(action, Mapping) else None
+        return ServerToolDelta(
+            kind=tool_kind,
+            status="completed",
+            sources=tuple(
+                ServerToolSource(
+                    url=str(entry.get("url", "") or ""),
+                    title=str(entry.get("title", "") or ""),
+                )
+                for entry in (entries or ())
+                if isinstance(entry, Mapping) and entry.get("url")
+            ),
+        )
+    outputs = item.get("outputs")
+    return ServerToolDelta(
+        kind=tool_kind,
+        status="completed",
+        output="".join(
+            str(out.get("logs", "") or "")
+            for out in (outputs or ())
+            if isinstance(out, Mapping)
+        ),
+    )
+
+
+def _batch_arguments(raw: Any) -> Mapping[str, Any]:
+    """Parse one batched tool call's arguments, tolerating an unparseable payload.
+
+    An argument payload that is not a JSON object yields an empty one rather than failing
+    the line — the rest of the answer is still worth returning.
+    """
+    if not isinstance(raw, str):
+        return {}
+    try:
+        parsed = json.loads(raw or "{}")
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
+
+
+_OPENAI_SERVER_TOOLS: Mapping[str, Mapping[str, Any]] = {
+    # Bare marker objects: this dialect names the capability in `type` and takes no
+    # per-tool ceiling, so `max_uses` has nowhere to go here and is reported dropped.
+    "web_search": {"type": "web_search"},
+    "code_execution": {"type": "code_interpreter", "container": {"type": "auto"}},
+}
+
+_SERVER_TOOL_EVENTS: Mapping[str, tuple[ServerToolKind, ServerToolStatus]] = {
+    "response.web_search_call.in_progress": ("web_search", "started"),
+    "response.code_interpreter_call.in_progress": ("code_execution", "started"),
+}
+"""Typed lifecycle events this dialect emits per server-tool invocation.
+
+Only the two ends are mapped. The intermediate `.searching`/`.interpreting` events say
+the same thing as `in_progress` with more granularity than a normalized status carries,
+and counting them would inflate the invocation count this feeds."""
 
 
 def _finish_reason(response: Mapping[str, Any], state: _StreamState) -> FinishReason:
@@ -400,7 +615,11 @@ def _split_instructions(messages: Sequence[Message]) -> tuple[str, list[dict[str
                 )
 
         text = "".join(p.text for p in message.content if isinstance(p, Text))
-        modal = [p for p in message.content if isinstance(p, ImagePart | DocumentPart | AudioPart)]
+        modal = [
+            p
+            for p in message.content
+            if isinstance(p, ImagePart | DocumentPart | AudioPart | VideoPart)
+        ]
         if text or modal:
             content_type = "output_text" if message.role == "assistant" else "input_text"
             content: list[dict[str, Any]] = []
@@ -434,6 +653,11 @@ def _split_instructions(messages: Sequence[Message]) -> tuple[str, list[dict[str
                             },
                         }
                     )
+                elif isinstance(part, VideoPart):
+                    # The Responses dialect defines no video content item. Refused rather
+                    # than skipped: a dropped part leaves the model answering about a
+                    # video it was never shown.
+                    raise unsupported("openai", "video")
             items.append(
                 {
                     "role": message.role,
@@ -482,6 +706,9 @@ _OPENAI_FEATURES = (
     | Feature.REASONING
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
+    | Feature.LOGPROBS
+    | Feature.WEB_SEARCH
+    | Feature.CODE_EXECUTION
 )
 
 
@@ -519,7 +746,7 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=_DEFAULT_BASE_URL,
     requires_base_url=False,
-    operations=frozenset({"generation", "embedding"}),
+    operations=frozenset({"generation", "embedding", "batch"}),
     static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
     setup=ProviderSetupSpec(
         fields=(
@@ -545,6 +772,18 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=(
+        "seed",
+        "presence_penalty",
+        "frequency_penalty",
+        # The dialect names each server tool in `type` and takes no per-tool
+        # ceiling, so a `max_uses` the caller set has nowhere to go.
+        "server_tools.max_uses",
+    ),
+    server_tools=frozenset({"web_search", "code_execution"}),
+    token_calibration=TokenCalibration(
+        tokenizer="tiktoken", tokenizer_provenance="catalog"
+    ),
     default_capabilities=ModelCapabilities(features=Sourced(_OPENAI_FEATURES, "default")),
     # Prompt caching is automatic on a stable prefix — there is nothing to mark, so the
     # core's only duty is to leave the prefix undisturbed. Recorded in contracts/openai.md.

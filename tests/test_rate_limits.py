@@ -23,6 +23,7 @@ from anyinfer.routing.limits import (
     governed_attempt,
     parse_reset_seconds,
 )
+from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
 from anyinfer.types.capabilities import RateLimitHeaders
 
 OPENAI_DIALECT = RateLimitHeaders(
@@ -551,3 +552,164 @@ def test_an_ungoverned_client_takes_no_permit_and_reports_no_wait() -> None:
         for e in collector.events
         if isinstance(e, ai.ParameterDropped) and e.parameter.startswith("limits.")
     ]
+
+
+# ---- the injection seam ------------------------------------------------------------------
+#
+# `AdapterPool._govern` is the single site a `RateLimiter` is constructed, which is what
+# makes injection a seam rather than a refactor. It exists for one situation the
+# constructed path cannot serve: a caller that builds a short-lived client per request
+# around a long-lived credential, where a per-client limiter paces every call against an
+# empty bucket and discards the windows the provider just reported.
+
+
+async def test_an_injected_limiter_survives_the_client_that_used_it() -> None:
+    """The property the seam exists for: pacing state outliving a per-request client.
+
+    Asserted on the token bucket rather than on wall time. Three requests through three
+    separate clients draw the bucket down; without injection each client would build a
+    fresh limiter and the third request would find a full one — which is exactly the
+    inertness this seam exists to fix.
+    """
+    # `FakeClock`, not a frozen one: this module's clock advances when something sleeps
+    # on it, which is what `_dispatch_gate`'s wait loop needs to make progress. A clock
+    # that never moves paired with a sleep that never waits spins that loop forever.
+    clock = FakeClock()
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    shared = RateLimiter(
+        ai.RateLimits(requests_per_minute=60),
+        provider_id="openai-compat",
+        clock=clock,
+        sleep=clock.sleep,
+    )
+
+    for _ in range(3):
+        client = ai.AsyncClient(
+            [
+                ai.ProviderSettings.of(
+                    "openai-compat",
+                    base_url="https://fake.invalid/v1",
+                    transport=server.transport(),
+                )
+            ],
+            limiters={"openai-compat": shared},
+            use_default_catalog=False,
+        )
+        try:
+            await client.generate("hi", target="openai-compat:m")
+        finally:
+            await client.aclose()
+        assert client._pool.limiter_for("openai-compat") is shared
+
+    assert len(server.requests) == 3
+    # A 60/minute bucket holds one request, so calls two and three each had to wait for a
+    # refill: the shared limiter paced across three separate clients. Three per-client
+    # limiters would each have started full and nothing would ever have slept.
+    assert clock.total_slept > 0, "the pooled bucket paced nothing; state did not carry"
+
+
+async def test_an_injected_limiter_wins_over_one_built_from_settings() -> None:
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    shared = RateLimiter(ai.RateLimits(requests_per_minute=600), provider_id="openai-compat")
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "openai-compat",
+                base_url="https://fake.invalid/v1",
+                transport=server.transport(),
+                limits=ai.RateLimits(requests_per_minute=1),
+            )
+        ],
+        limiters={"openai-compat": shared},
+        use_default_catalog=False,
+    )
+    try:
+        await client.generate("hi", target="openai-compat:m")
+        assert client._pool.limiter_for("openai-compat") is shared
+    finally:
+        await client.aclose()
+
+
+async def test_an_inert_injected_limiter_installs_no_governor() -> None:
+    """Inertness is judged from the injected limiter's own configuration, not the settings'.
+
+    The one honestly-inert policy, per `RateLimits.active`: a bare `RateLimits()` still
+    means "pace me by what the provider reports", so opting out is spelled by switching
+    header-following off with no bounds set.
+    """
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    inert = RateLimiter(ai.RateLimits(respect_headers=False), provider_id="openai-compat")
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "openai-compat",
+                base_url="https://fake.invalid/v1",
+                transport=server.transport(),
+            )
+        ],
+        limiters={"openai-compat": inert},
+        use_default_catalog=False,
+    )
+    try:
+        await client.generate("hi", target="openai-compat:m")
+        assert client._pool.limiter_for("openai-compat") is None
+    finally:
+        await client.aclose()
+
+
+async def test_no_injection_changes_nothing() -> None:
+    """The seam is inert by omission, which is what makes it safe to add to core."""
+    server = FakeOpenAIServer(FakeResponse(text="ok"))
+    client = ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "openai-compat",
+                base_url="https://fake.invalid/v1",
+                transport=server.transport(),
+                limits=ai.RateLimits(requests_per_minute=60),
+            )
+        ],
+        use_default_catalog=False,
+    )
+    try:
+        await client.generate("hi", target="openai-compat:m")
+        limiter = client._pool.limiter_for("openai-compat")
+        assert limiter is not None
+        assert limiter.limits.requests_per_minute == 60
+    finally:
+        await client.aclose()
+
+
+# ---- reporting an observed window ----------------------------------------------------------
+
+
+def test_observed_wait_reports_the_providers_own_number_without_spending_anything() -> None:
+    """A fronting layer must be able to *report* the wait, not only sleep through it."""
+    clock = [1000.0]
+    limiter = RateLimiter(
+        ai.RateLimits(requests_per_minute=60, respect_headers=True),
+        dialect=ai.RateLimitHeaders(
+            requests_remaining="x-remaining", requests_reset="x-reset", limit_requests="x-limit"
+        ),
+        provider_id="p",
+        clock=lambda: clock[0],
+    )
+
+    assert limiter.observed_wait_s() == 0.0, "nothing observed yet is not a wait"
+
+    limiter.observe({"x-remaining": "0", "x-reset": "30", "x-limit": "100"})
+    first = limiter.observed_wait_s()
+    assert first == pytest.approx(30.0, abs=1.0)
+
+    # Read-only: asking twice must not consume a token, take the gate, or move the window.
+    assert limiter.observed_wait_s() == pytest.approx(first)
+
+
+def test_observed_wait_is_clear_when_the_window_has_room() -> None:
+    limiter = RateLimiter(
+        ai.RateLimits(requests_per_minute=60, respect_headers=True),
+        dialect=ai.RateLimitHeaders(requests_remaining="x-remaining", requests_reset="x-reset"),
+        provider_id="p",
+    )
+    limiter.observe({"x-remaining": "50", "x-reset": "30"})
+    assert limiter.observed_wait_s() == 0.0

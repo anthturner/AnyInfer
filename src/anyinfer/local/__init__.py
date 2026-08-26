@@ -102,7 +102,14 @@ from .server import (
     is_loopback,
 )
 from .sources import RemoteFile, ResolvedArtifact, SourceRef, SourceResolver
-from .store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
+from .store import (
+    ModelStore,
+    PrunePlan,
+    PruneProposal,
+    RemovalReport,
+    ResolvedModel,
+    StoreEntry,
+)
 from .tuning import (
     CONTEXT_LADDER,
     Posture,
@@ -148,6 +155,8 @@ __all__ = [
     "Posture",
     "ProgressCallback",
     "ProgressSink",
+    "PrunePlan",
+    "PruneProposal",
     "Recommendation",
     "RemoteFile",
     "RemovalReport",

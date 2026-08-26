@@ -19,7 +19,9 @@ request body. There is no unauthenticated mode to fall into by omission.
 
 from __future__ import annotations
 
+import math
 import secrets
+import warnings
 from collections.abc import Mapping
 from typing import Any
 
@@ -28,9 +30,43 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route as StarletteRoute
 
-from .relay import Relay, RelayError
+from .admission import RelayThrottledError
+from .relay import Relay, RelayBadRequestError, RelayError
 
-__all__ = ["build_app"]
+__all__ = ["RELAY_RATE_LIMIT_HEADERS", "build_app"]
+
+_RATE_LIMIT_LIMIT = "ratelimit-limit"
+_RATE_LIMIT_REMAINING = "ratelimit-remaining"
+_RATE_LIMIT_RESET = "ratelimit-reset"
+
+
+def _relay_rate_limit_headers() -> Any:
+    """The header dialect this app emits, as a core `RateLimitHeaders`.
+
+    Built lazily so importing this module does not import core's capability types. The
+    payoff for using the IETF draft names rather than bespoke ``X-Relay-*`` ones: an
+    AnyInfer client pointed at a Relay paces itself against these with no new client code,
+    by passing this constant as its provider dialect.
+
+    A rename in a future revision of that draft is then a deliberate, versioned change to
+    *both* halves at once — and the round-trip test between them is what makes a
+    half-finished rename fail loudly instead of silently reading `None` forever.
+    """
+    from anyinfer.types.capabilities import RateLimitHeaders
+
+    return RateLimitHeaders(
+        requests_remaining=_RATE_LIMIT_REMAINING,
+        requests_reset=_RATE_LIMIT_RESET,
+        limit_requests=_RATE_LIMIT_LIMIT,
+    )
+
+
+RELAY_RATE_LIMIT_HEADERS = _relay_rate_limit_headers
+"""Call to get the `RateLimitHeaders` describing what this app emits.
+
+A callable rather than a value so `import anyinfer_confidential.app` stays free of a core
+import at module scope, matching how the rest of this package defers its core imports.
+"""
 
 _UNAUTHORIZED_HEADERS = {"WWW-Authenticate": 'Bearer realm="anyinfer-relay"'}
 
@@ -64,6 +100,51 @@ def _authenticate(request: Request, tokens: Mapping[str, str]) -> str | None:
 
 DEFAULT_MAX_REQUEST_BYTES = 256 * 1024
 """Cap on a relay request body. Slot-fill requests are tiny; this is generous for them."""
+
+
+def _throttled_response(exc: RelayThrottledError) -> JSONResponse:
+    """Render a refusal as a 429 a client can act on without parsing prose.
+
+    ``Retry-After`` is emitted as **bare integer seconds**, never the HTTP-date spelling
+    the RFC also permits: this project's own `parse_retry_after` deliberately refuses
+    dates, so a date here would be silently dropped by our own client. Rounded up, because
+    rounding a backoff down is how a client retries into the same wall.
+    """
+    info = exc.info
+    headers = {"Retry-After": str(max(1, math.ceil(info.retry_after_s)))}
+    if info.remaining is not None:
+        headers[_RATE_LIMIT_REMAINING] = str(info.remaining)
+        headers[_RATE_LIMIT_RESET] = str(max(1, math.ceil(info.retry_after_s)))
+    return JSONResponse(
+        {"error": str(exc), "reason": info.reason, "retry_after_s": info.retry_after_s},
+        status_code=429,
+        headers=headers,
+    )
+
+
+def _apply_budget_headers(response: JSONResponse, relay: Relay, tenant_id: str) -> None:
+    """Tell a successful caller how much of its own budget is left.
+
+    This is the half that lets a client slow down *before* the wall rather than after it,
+    which is the more useful half — a 429 arrives too late to avoid the round trip it
+    refused.
+
+    Every value derives from the requesting tenant's own state, never the process's. A
+    remaining count computed from global load would let a tenant poll in a loop and read
+    another tenant's traffic volume straight off its own response headers, which is the
+    enumeration the registry's uniform error message exists to prevent.
+
+    Nothing is emitted when the tenant has no configured limits: an empty dialect honestly
+    declared beats a guessed one, which is the same call `RateLimitHeaders` makes.
+    """
+    admission = relay.admission()
+    limits = admission.limits_for(tenant_id)
+    if limits.max_in_flight is None:
+        return
+    response.headers[_RATE_LIMIT_LIMIT] = str(limits.max_in_flight)
+    remaining = admission.remaining(tenant_id)
+    if remaining is not None:
+        response.headers[_RATE_LIMIT_REMAINING] = str(remaining)
 
 
 def build_app(
@@ -157,16 +238,34 @@ def build_app(
             result = await relay.handle(
                 tenant_id=tenant_id, routing_key=routing_key, slots=slots, mode="assemble"
             )
+        except RelayThrottledError as exc:
+            return _throttled_response(exc)
+        except RelayBadRequestError as exc:
+            # Split from the catch-all below: every validation failure used to answer 404,
+            # which sends a caller looking for a provisioning problem that does not exist.
+            return JSONResponse({"error": str(exc)}, status_code=400)
         except RelayError as exc:
+            # Route resolution only. The message stays deliberately uniform across "no such
+            # route" and "another tenant's route" — see `RelayRegistry.resolve`.
             return JSONResponse({"error": str(exc)}, status_code=404)
 
-        return JSONResponse(
+        response = JSONResponse(
             {
                 "assembled_prompt": result.assembled_prompt,
                 "generation_text": result.generation_text,
                 "target": result.target,
                 "latency_ms": result.latency_ms,
             }
+        )
+        _apply_budget_headers(response, relay, tenant_id)
+        return response
+
+    if len({*tokens.values()}) >= 2 and not relay.admission().configured_tenants:
+        warnings.warn(
+            "this relay serves more than one tenant with no admission limits configured: "
+            "one tenant's fan-out can consume the whole process. Set TenantLimits via "
+            "Relay.admission().set_limits(), or provision them in the registry file.",
+            stacklevel=2,
         )
 
     app = Starlette(routes=[StarletteRoute("/v1/relay/assemble", handle, methods=["POST"])])

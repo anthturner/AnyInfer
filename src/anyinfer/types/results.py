@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from .messages import ToolCall
-from .requests import CacheMechanism, ResolvedTarget
+from .requests import CacheMechanism, ResolvedTarget, ServerToolKind
 
 if TYPE_CHECKING:  # pragma: no cover — imported for the annotation only
     from ..context_request import ContextSummary
@@ -18,6 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover — imported for the annotation only
 __all__ = [
     "DETAIL_MAX_CHARS",
     "AttemptRecord",
+    "Citation",
     "Diagnostic",
     "DiagnosticSeverity",
     "ErrorInfo",
@@ -25,12 +27,119 @@ __all__ = [
     "Generation",
     "Mechanism",
     "Outcome",
+    "ServerToolUse",
     "Timing",
+    "TokenLogprob",
     "Usage",
 ]
 
 DETAIL_MAX_CHARS = 512
 """Upper bound on `ErrorInfo.detail`, applied after redaction."""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerToolUse:
+    """How many times the provider ran one of its own tools during a generation.
+
+    A count, not a transcript. What a provider searched for is caller content and the
+    provider's own reasoning about it; carrying either through this library's result type
+    would put prompt-adjacent text somewhere the zero-payload telemetry rules do not
+    reach. The count is what a caller actually needs — these are billed per invocation, so
+    the question the result must answer is "how many did I just pay for?"
+
+    Attributes:
+        kind: Which capability ran.
+        uses: How many invocations the provider reported.
+    """
+
+    kind: ServerToolKind
+    uses: int
+
+
+@dataclass(frozen=True, slots=True)
+class Citation:
+    """A span of the answer, and the source material it came from.
+
+    The dialects disagree about almost everything: Anthropic reports character offsets
+    into a supplied document plus the exact passage quoted, Cohere reports offsets into
+    the *answer* plus a source id, and Gemini reports offsets into the answer plus a URI.
+    The union of what they agree is worth saying is: which part of the answer this
+    supports, and enough about the source to show a person. Everything is optional
+    because no dialect fills all of it, and a zero-valued offset is not the same as an
+    absent one — an absent offset means the provider did not say, and rendering a
+    highlight at position zero because of it would be a fabricated claim about the text.
+
+    Attributes:
+        start_index: Character offset into `Generation.text` where the supported span
+            begins, or ``None`` when the provider located the citation only in the source.
+        end_index: Exclusive character offset where the supported span ends.
+        quoted_text: The passage from the source material, when the provider quotes it.
+            Empty when it reports only a location.
+        document_index: Which of the request's supplied documents this cites, in the order
+            they appeared in the request. ``None`` for a provider-retrieved source that
+            was never part of the request.
+        title: Human-readable source name, when the provider supplies one.
+        uri: Source URL, for providers whose grounding reaches the open web.
+    """
+
+    start_index: int | None = None
+    end_index: int | None = None
+    quoted_text: str = ""
+    document_index: int | None = None
+    title: str = ""
+    uri: str = ""
+
+    def span_of(self, text: str) -> str:
+        """The cited span of an answer, or ``""`` when this citation gives no offsets.
+
+        Args:
+            text: The answer text, normally `Generation.text`.
+
+        Returns:
+            The substring the citation supports, clamped to the text's bounds so a
+            provider's off-by-one offset yields a short span rather than an exception.
+        """
+        if self.start_index is None or self.end_index is None:
+            return ""
+        start = max(0, min(self.start_index, len(text)))
+        end = max(start, min(self.end_index, len(text)))
+        return text[start:end]
+
+
+@dataclass(frozen=True, slots=True)
+class TokenLogprob:
+    """One generated token and how likely the model considered it.
+
+    Providers disagree about almost everything here except the two facts that matter — a
+    token and its log-probability — so those are the only required fields. ``top`` carries
+    the runners-up when the request asked for alternatives and the provider returned them;
+    an empty tuple means "not asked for, or not answered", which are indistinguishable on
+    the wire and equally uninformative to act on.
+
+    Log-probabilities are natural-log values in ``(-inf, 0]``, which is what every
+    provider reports and what a caller comparing two of them expects. AnyInfer does not
+    convert them to probabilities: the exponential is one line at the call site and a lossy
+    default here.
+
+    Attributes:
+        token: The generated token, as the provider spelled it.
+        logprob: Natural log of the token's probability.
+        top: Alternatives the model weighed at this position, most likely first. Empty
+            when none were requested or none were returned.
+        bytes: The token's raw UTF-8 bytes, when the provider reports them. Needed to
+            reassemble text through tokens that split a multi-byte character; ``None``
+            when the provider states only the string.
+    """
+
+    token: str
+    logprob: float
+    top: tuple[TokenLogprob, ...] = ()
+    bytes: tuple[int, ...] | None = None
+
+    @property
+    def probability(self) -> float:
+        """The token's probability in ``[0, 1]``, exponentiating `logprob`."""
+        return math.exp(self.logprob)
 
 DiagnosticSeverity = Literal["info", "warning"]
 """How much a runtime diagnostic should worry the caller. Never an error: a condition that
@@ -84,6 +193,11 @@ class Usage:
         search_units: Provider-native billed search units (reranking). A distinct
             billing dimension with its own field on purpose — a search unit is never a
             token count, and encoding one as the other would fabricate usage.
+        server_tool_uses: Invocations of provider-run tools during this generation, keyed
+            by kind. A third billing dimension for the same reason as the second: a web
+            search is billed per search, so a generation that searched costs more than its
+            token counts say. Carried on usage rather than only on the result so that cost
+            can be computed from usage alone, as every other dimension here is.
     """
 
     input_tokens: int | None = None
@@ -94,6 +208,7 @@ class Usage:
     reasoning_tokens: int | None = None
     cost_usd: Decimal | None = None
     search_units: int | None = None
+    server_tool_uses: Mapping[str, int] = field(default_factory=dict)
 
     def normalized(self) -> Usage:
         """Fill ``total_tokens`` from input + output when both are known."""
@@ -286,6 +401,17 @@ class Generation:
         arena: Every arena candidate and the terminal selection, or ``None`` for an
             ordinary generation.
         context_reduction: Content-free account of per-request corpus reduction.
+        logprobs: Per-token log-probabilities for the answer, in generation order, when
+            the request asked for them and the target returned them. Empty otherwise —
+            including for a target that accepted the request and answered without them,
+            which is reported as a dropped parameter rather than inferred from this field.
+        server_tool_uses: How many times the target ran each of its own tools. Empty when
+            none were requested or none ran. Counts only — see `ServerToolUse` for why the
+            queries and results are deliberately absent.
+        citations: Attributions the target reported for this answer, in the order it
+            reported them. Empty when none were returned, which includes every target that
+            does not produce them — the presence of citations is a provider capability,
+            never something AnyInfer derives from the text.
     """
 
     text: str
@@ -304,3 +430,6 @@ class Generation:
     manifest: RunManifest | None = None
     arena: ArenaResult | None = None
     context_reduction: ContextSummary | None = None
+    logprobs: tuple[TokenLogprob, ...] = ()
+    citations: tuple[Citation, ...] = ()
+    server_tool_uses: tuple[ServerToolUse, ...] = ()

@@ -44,6 +44,11 @@ one.
 ## groq — Groq (GroqCloud)
 
 - Base URL: `https://api.groq.com/openai/v1`
+- **Deferred batches: yes** (declared 2026-08-25). The only preset here that declares the
+  tier. The `/files` + `/batches` lifecycle is OpenAI's, with `endpoint` and each line's
+  `url` set to `/v1/chat/completions` rather than `/v1/responses`, and line bodies in the
+  chat-completion shape. Source: the official groq-python SDK reference lists `batches`
+  and `files` resources (see the session note above); not verified against a live key.
 - Auth: Authorization: Bearer <key>
 - `GET /models`: yes
 - Compatibility notes:

@@ -35,6 +35,7 @@ from ..registry import (
     SetupField,
 )
 from ..types.capabilities import Feature, Health, ModelCapabilities, Sourced
+from ..types.operations import InferenceOperation
 from ..types.requests import ReasoningEffort
 from .base import ProviderConfig, WireRequest
 from .openai_compat import OpenAICompatAdapter
@@ -117,6 +118,12 @@ class CompatPreset:
             `contracts/openai-compat-presets.md`) — **not** inferred from chat
             compatibility. Off by default: an unverified preset is generation-only, the
             correct default per the plan (BH.I.2) rather than an optimistic guess.
+        batches: Whether this preset sells the OpenAI-shaped deferred batch tier
+            (``/files`` + ``/batches``), verified against the provider's own documentation
+            and recorded in the contract snapshot. Off by default under the same rule as
+            `embeddings`: chat compatibility does not imply batch compatibility, and a
+            preset that declares a tier it does not have fails at submit rather than
+            refusing locally.
         note: One-line quirk summary, rendered into the generated provider index.
     """
 
@@ -141,6 +148,7 @@ class CompatPreset:
     default_top_p: float | None = None
     default_port: int | None = None
     embeddings: bool = False
+    batches: bool = False
     note: str = ""
 
 
@@ -285,7 +293,11 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         display_name="Groq",
         base_url="https://api.groq.com/openai/v1",
         key_env="GROQ_API_KEY",
-        note="LPU-served open models; rejects logprobs/logit_bias-style parameters.",
+        batches=True,
+        note=(
+            "LPU-served open models; rejects logprobs/logit_bias-style parameters. "
+            "Sells a discounted deferred batch tier at the OpenAI-shaped endpoints."
+        ),
     ),
     CompatPreset(
         id="cerebras",
@@ -1327,6 +1339,21 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
     )
 
 
+def _operations(preset: CompatPreset) -> frozenset[InferenceOperation]:
+    """Which operations this preset's verified endpoints actually cover.
+
+    Every preset shares one adapter, so the class implementing a protocol says nothing
+    about whether this provider sells that tier — the declaration is the only gate, and
+    it follows the contract snapshot rather than chat compatibility.
+    """
+    operations: set[InferenceOperation] = {"generation"}
+    if preset.embeddings:
+        operations.add("embedding")
+    if preset.batches:
+        operations.add("batch")
+    return frozenset(operations)
+
+
 def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
     """Materialize one preset into a registrable descriptor."""
     adapter_class = PresetEmbeddingAdapter if preset.embeddings else PresetCompatAdapter
@@ -1338,11 +1365,7 @@ def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
         locality=preset.locality,
         default_base_url=preset.base_url,
         requires_base_url=preset.requires_base_url,
-        operations=(
-            frozenset({"generation", "embedding"})
-            if preset.embeddings
-            else frozenset({"generation"})
-        ),
+        operations=_operations(preset),
         setup=_setup_spec(preset),
         default_capabilities=ModelCapabilities(
             features=Sourced(preset.features, "default"),

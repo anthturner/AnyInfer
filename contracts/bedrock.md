@@ -55,6 +55,27 @@ guardrails, and cache points live. `InvokeModel` is not used.
 - `POST {base}/model/{modelId}/converse-stream` — streaming
 - `GET https://bedrock.{region}.amazonaws.com/foundation-models` — discovery, on the
   **control plane** (a different host than the runtime, signed separately)
+- `POST https://bedrock.{region}.amazonaws.com/model-invocation-job` — create a deferred
+  batch, control plane
+- `GET https://bedrock.{region}.amazonaws.com/model-invocation-job/{jobArn}` — poll one
+- `POST .../model-invocation-job/{jobArn}/stop` — stop one
+- `PUT|GET https://{bucket}.s3.{region}.amazonaws.com/{key}` — stage the batch input and
+  read its output, **signed for service `s3`, not `bedrock`**
+
+The job ARN is percent-encoded whole into the path, for the same reason a model id is.
+
+### Deferred batches
+`CreateModelInvocationJob` does not carry the job: input and output are JSONL objects in
+the caller's own bucket, configured as `batch_s3_uri` and `batch_role_arn` beside
+`region`. Input lines are `{"recordId", "modelInput"}` where `modelInput` is the live
+Converse body; output records are `{"recordId", "modelOutput"}` or `{"recordId", "error"}`
+in **one** file — successes and failures share it, unlike OpenAI's two.
+
+A Bedrock API key cannot stage a batch. It authenticates the runtime only, and S3 rejects
+it, so the adapter refuses locally rather than letting a 403 arrive an hour later.
+
+Job states map to the normalized vocabulary; `PartiallyCompleted` is `completed`, because
+the manifest is readable and the failures are reported as failed lines.
 
 Default base is `https://bedrock-runtime.{region}.amazonaws.com`, region default
 `us-east-1`. `modelId` may be a base model id, an inference-profile id, or an ARN, and is
@@ -88,7 +109,11 @@ supported way to use the ambient chain.
   `bytes`; remote sources must be `s3://` and project to `s3Location`. **Tool results ride
   on a `user` turn**, as in the Anthropic dialect.
 - `system[]`: a top-level list of text blocks, not a message.
-- `inferenceConfig`: `maxTokens`, `temperature`, `topP`, `stopSequences`. Unset sampling
+- `inferenceConfig`: `maxTokens`, `temperature`, `topP`, `stopSequences` — and nothing
+  else. Converse defines no `seed`, penalty, or log-probability field (re-checked
+  2026-08-25); model-specific equivalents exist only under
+  `additionalModelRequestFields`, which is per-model rather than protocol-level, so the
+  descriptor declares all four in `ignored_parameters`. Unset sampling
   fields are omitted entirely.
 - `toolConfig`: `tools[].toolSpec` (`name`, `description`, `inputSchema.json`) plus
   `toolChoice`, which is `auto`, `any`, or a named `tool`.
@@ -256,6 +281,12 @@ document set in one `Rerank` call today (bounded by `RerankCapabilities.max_docu
 so pagination has never been reachable; revisit if that assumption changes.
 
 ## Watchlist
+
+- **`video` content blocks are published but not implemented.** Converse documents a
+  `video` block whose shape parallels `document` exactly, so the projection is nearly free
+  — but it carries no clip window or frame rate, and a `VideoPart` that set either would
+  lose it silently. The adapter refuses video explicitly until the block is verified
+  live and that metadata question has an answer. Noted 2026-08-25.
 - **The OpenAI-compat endpoints.** `bedrock-mantle.{region}.api.aws/v1` (recommended,
   API-key auth) and `bedrock-runtime.{region}.amazonaws.com/v1` exist for select models.
   If coverage broadens, a preset entry may become worthwhile alongside this adapter.
@@ -265,3 +296,7 @@ so pagination has never been reachable; revisit if that assumption changes.
   both is a model-level rejection this adapter does not pre-empt.
 - Long read timeouts (60 minutes or more) are recommended for Claude models on Bedrock.
 - `cacheDetails[]` per-TTL cache accounting — read only in aggregate today.
+- **Batch minimum record counts and the output directory layout are not verified
+  live.** Bedrock documents a per-model minimum record count per job, which the
+  adapter does not pre-check, and the output object path is derived from the job name
+  the adapter chose rather than read back from the job. Noted 2026-08-25.

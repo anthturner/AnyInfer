@@ -80,23 +80,23 @@ batch.
 
 | Status | ID | Was | Item | Sev | Pri | Score | Effort |
 |---|---|---|---|---|---|---|---|
-| `[ ]` | E.1 | E.1 | Async batch inference APIs (OpenAI Batch, Anthropic Message Batches) | 5 | 3 | 15 | XL |
+| ✅ | E.1 | E.1 | Async batch inference APIs (OpenAI Batch, Anthropic Message Batches) | 5 | 3 | 15 | XL |
 | `[ ]` | F.1 | F.1 | Tier 3 attestation is detection, not attestation (→ plan §G) | 5 | 3 | 15 | XL (→ §G) |
 | `[ ]` | G.3 | G.4 | CPU attestation-quote verification behind the `attest` extra | 5 | 3 | 15 | L |
-| `[ ]` | E.2 | E.2 | Typed `seed` / `logprobs` / penalty sampling controls | 4 | 3 | 12 | L |
+| ✅ | E.2 | E.2 | Typed `seed` / `logprobs` / penalty sampling controls | 4 | 3 | 12 | L |
 | ✅ | F.2 | new | Unknown credential schemes fall through to LiteralResolver; plugin issues discarded | 3 | 4 | 12 | S |
 | `[ ]` | G.1 | G.2 | Demand gate: identify a confidential-tier design partner | 3 | 4 | 12 | XS |
 | `[ ]` | G.2 | G.3 | CC hardware validation sprint (rent, capture, fixture) | 4 | 3 | 12 | M |
-| `[ ]` | E.5 | E.5 | OpenAI Responses API endpoint on the sidecar | 3 | 3 | 9 | L |
-| `[ ]` | E.6 | E.6 | Ship accurate token estimators behind the existing protocol | 3 | 3 | 9 | M |
+| ✅ | E.5 | E.5 | OpenAI Responses API endpoint on the sidecar | 3 | 3 | 9 | L |
+| ✅ | E.6 | E.6 | Ship accurate token estimators behind the existing protocol | 3 | 3 | 9 | M |
 | `[ ]` | G.4 | G.5 | Claims and docs update once quote verification lands | 3 | 3 | 9 | S |
 | ✅ | B.1 | new | README embeddings enumeration omits Gemini and llama.cpp | 2 | 4 | 8 | XS |
 | ✅ | B.2 | new | Observability guide contradicts the shipped sinks it never mentions | 2 | 4 | 8 | S |
 | ✅ | C.1 | new | `anyinfer.credential_stores` entry-point group undocumented | 2 | 4 | 8 | S |
 | ✅ | D.1 | new | `anyinfer_cache` wire extension: undocumented, one-way, untested | 2 | 4 | 8 | S |
-| `[ ]` | E.3 | E.3 | Provider-native server-side tools (web search, code execution) | 4 | 2 | 8 | XL |
+| ✅ | E.3 | E.3 | Provider-native server-side tools (web search, code execution) | 4 | 2 | 8 | XL |
 | ✅ | D.2 | new | Proxy/TLS settings do not reach auth token exchanges; boundary unstated | 2 | 3 | 6 | S |
-| `[ ]` | E.4 | E.4 | Typed citations / grounded-generation output | 3 | 2 | 6 | L |
+| ✅ | E.4 | E.4 | Typed citations / grounded-generation output | 3 | 2 | 6 | L |
 | ✅ | F.3 | new | Credential-store plugins can shadow built-in schemes | 2 | 3 | 6 | S |
 | ✅ | B.5 | new | AGENTS.md misnames the demo tests subpackage | 1 | 5 | 5 | XS |
 | ✅ | F.4 | new | Relay (and sidecar) auth 500s on a non-ASCII bearer token | 1 | 5 | 5 | XS |
@@ -104,8 +104,8 @@ batch.
 | ✅ | B.3 | new | Serve page's wire-contract prose trails the codec | 1 | 4 | 4 | XS |
 | ✅ | C.2 | new | New config/plugins public API missing from the API reference | 1 | 4 | 4 | S |
 | ✅ | C.3 | new | Request-body cap has a flag but no prose documentation | 1 | 4 | 4 | XS |
-| `[ ]` | E.7 | E.7 | Video input parts | 2 | 2 | 4 | M |
-| `[ ]` | E.8 | E.8 | Runtime credential rotation / hot reload | 2 | 2 | 4 | M |
+| ✅ | E.7 | E.7 | Video input parts | 2 | 2 | 4 | M |
+| ✅ | E.8 | E.8 | Runtime credential rotation / hot reload | 2 | 2 | 4 | M |
 | ✅ | F.5 | new | Relay HTTP surface lacks the request-body cap | 1 | 4 | 4 | S |
 | ✅ | F.6 | new | Telemetry-sink redaction edge gaps (dict keys, `default=str`, chmod) | 1 | 4 | 4 | XS |
 | ✅ | B.4 | new | Proxy/TLS keys documented as universal but no-op on copilot | 1 | 3 | 3 | S |
@@ -120,7 +120,7 @@ batch.
 | ⏭️ | A.2 | new | Mixin `TYPE_CHECKING` signature stubs can drift compatibly | 1 | 2 | 2 | M |
 | ✅ | D.5 | new | Observer-config decisions unrecorded (payload-free-only; import-at-parse) | 1 | 2 | 2 | XS |
 | 🔁 | D.7 | D.7.4 | Contract-snapshot live-verification burn-down | 1 | 2 | 2 | XS |
-| `[ ]` | E.9 | E.11 | Local model store guided eviction (`prune`) | 1 | 2 | 2 | M |
+| ✅ | E.9 | E.11 | Local model store guided eviction (`prune`) | 1 | 2 | 2 | M |
 | ✅ | A.3 | new | `cli.py` stay-single-file decision lacks a growth threshold | 1 | 1 | 1 | XS |
 | ✅ | H.1 | new | Documented `verify` + `client_cert` combination is a `TypeError` in httpx2 | 4 | 5 | 20 | S |
 | ✅ | H.2 | new | Copilot `cli_path` is a `TypeError`; `aclose` leaks the CLI process | 4 | 5 | 20 | S |
@@ -577,6 +577,57 @@ openrouter. Unchanged otherwise — still self-scheduling, still watch-only.
 
 ## E.0 Scope discipline
 
+**Closure note (2026-08-25, branch `feature/core-features-wave`).** Six of the nine items
+in this section landed and have been removed per this document's convention: **E.2**
+(typed `seed`/penalties/`logprobs` with a `TokenLogprob` result surface), **E.4** (typed
+citations across the Anthropic, Cohere, and Gemini dialects), **E.6** (a tiktoken-backed
+exact estimator behind a `tokenizers` extra), **E.7** (`VideoPart`), **E.8** (runtime
+credential rotation), and **E.9** (`models prune`).
+
+Two scope decisions are recorded rather than left implicit:
+
+- **E.6 shipped its local half only.** Its sketch also named a provider's count-tokens
+  endpoint and llama-server's `/tokenize`. Both are network calls and `TokenEstimator` is
+  synchronous, so shipping them means a blocking HTTP call inside an async client stalling
+  the event loop for every concurrent request. That needs an async estimator protocol —
+  reopen this item when there is a reason to make that change deliberately.
+- **E.7 did not add a per-modality byte ceiling**, which its sketch called for. A ceiling
+  quietly loosened for one modality no longer means what its name says, and the
+  hosted-URI path providers actually expect carries no bytes to count.
+
+**E.5, E.3, and E.1 closed later in the same wave**, so **section E is now empty**: the
+Responses route with its semantic streaming events, provider-run server tools across three
+dialects, and deferred batch inference.
+
+**Bindings and remaining scope.** E.1's sketch named five providers. **Anthropic and
+OpenAI are bound**, and they are the two that matter for proving the interface, because
+their APIs have opposite shapes: Anthropic takes the whole job as JSON and returns one
+manifest, while OpenAI uploads it as a file and splits results across two more, one for
+successes and one for rejections. The protocol survives both without either leaking into
+it. **Bedrock, Vertex, and Groq remain unbound** — Bedrock's and Vertex's need S3 and GCS
+on both ends, which is a storage dependency rather than a protocol question; Groq's follows
+OpenAI's shape closely. All three are additive work behind an interface that now exists.
+
+**Also completed on a second pass**, after a review found each spelled out in the plan but
+missing from the first implementation:
+
+- **E.3.2's per-invocation pricing.** `Pricing.per_server_tool_use` and
+  `Usage.server_tool_uses` make a searched generation cost more than its tokens say. An
+  unpriced invocation makes the whole cost unknown rather than free — understating a bill
+  is the one direction a cost-aware caller cannot absorb.
+- **E.5's inverse codec.** `request_to_responses` and the round-trip test that enforces
+  ADR-009's request-superset invariant for that dialect. Writing it found a live bug: the
+  Responses decoder consulted the *chat-completions* reserved-field set, so `input`,
+  `text`, and `reasoning` were treated as unrecognized extra body and forwarded to the
+  provider verbatim. It also surfaced that `provider_options` had been one-way in the chat
+  codec since it shipped — decoded but never re-encoded, so the escape hatch vanished on a
+  gateway's second hop. Both fixed.
+
+E.3 introduced one thing worth knowing about: `ProviderDescriptor.server_tools` is checked
+*unconditionally*, unlike a capability flag. Ninety-five registered adapters never read the
+field, so without a declaration the core could trust, every one of them would have answered
+as though the tool had run.
+
 Four v1 misses closed this window with real implementations: per-instance **proxy/CA/mTLS**
 (v1 E.9), **plugin entry-point groups** for credential stores and observers (v1 E.10),
 **shipped logging/JSONL telemetry sinks** (v1 E.12), and the **fenced-non-goals decision
@@ -587,175 +638,6 @@ non-goals list remains honored and re-verified: response/semantic caching, image
 templating, cross-provider continuation, run retention, non-Python SDKs — none of these are
 misses; do not "fix" them. Everything below was re-verified absent on 2026-08-25 (v2) by
 grep against current source.
-
-## E.1 — Async batch inference APIs (OpenAI Batch, Anthropic Message Batches)
-
-**Severity:** High · **Confidence:** High · **Was:** E.1
-
-**Expected because:** every major provider sells a ~50%-discounted deferred batch tier, and
-AnyInfer's identity is cost-aware dispatch (pricing tables, `SpendPolicy`, `SpendLedger`,
-per-request cost estimation). Evals, backfills, and offline enrichment are this audience's
-staple workloads. **Evidence of absence (re-verified):**
-`grep -rniE "message_batch|/batches|batch_id" src/anyinfer` → zero hits; every "batch" in
-the codebase is synchronous embedding-input splitting or llama-server tuning. Not a stated
-non-goal.
-
-**Long:** The typed request model, capability provenance, and pricing tables are *more*
-valuable in batch mode, yet the library cannot express "submit these 10k requests at half
-price" — users drop to raw provider SDKs and lose structured-output enforcement, telemetry,
-and cost accounting on their highest-volume traffic.
-
-**Remediation sketch:**
-- [ ] **E.1.1** New operation type per the embeddings pattern: `BatchGenerationRequest →
-  BatchHandle → BatchResult`, an opt-in `SubmitsBatches` protocol adapters implement
-  individually (OpenAI, Anthropic, Bedrock, Vertex, Groq all ship batch endpoints),
-  descriptor-declared.
-- [ ] **E.1.2** Reuse `GenerationRequest` as the line-item type and existing codecs for
-  serialization; typed submitted/completed lifecycle events.
-- [ ] **E.1.3** The run-retention non-goal holds: AnyInfer never persists the job registry —
-  the handle is the caller's to store.
-
-## E.2 — Typed `seed` / `logprobs` / penalty sampling controls
-
-**Severity:** Medium-High · **Confidence:** High · **Was:** E.2
-
-**Expected because:** OpenAI-dialect table stakes accepted by ~80 of the presets, and the
-product's core promise is "no per-engine branches in consuming apps." **Evidence of absence
-(re-verified):** `Sampling` in `types/requests.py` still has exactly `temperature`,
-`top_p`, `max_output_tokens`, `stop`; no logprobs surface on `Generation`. Preset notes
-still tell users to hand-spell provider variants (Mistral `random_seed`).
-
-**Long:** The `provider_options` escape hatch defeats the promise — a seeded run requires
-knowing each provider's spelling, and logprobs have nowhere to land in normalized results,
-which hard-stops eval harnesses and classification-with-confidence callers. The sidecar now
-400s `logprobs` explicitly (v1 D.4 fix), which is honest but makes the gap a visible wall
-for OpenAI-client migrations.
-
-**Remediation sketch:**
-- [ ] **E.2.1** Extend `Sampling` additively with `seed`, `presence_penalty`,
-  `frequency_penalty` (defaults `None`; never invent a value).
-- [ ] **E.2.2** Add a `logprobs` request field with a typed `TokenLogprob` result surface on
-  `Generation`; emit the existing `ParameterDropped` event where unsupported.
-- [ ] **E.2.3** Sidecar codec: decode these as typed fields and retire the `logprobs` 400
-  (the `n>1` refusal stays).
-
-## E.3 — Provider-native server-side tools (web search, code execution)
-
-**Severity:** Medium-High · **Confidence:** High · **Was:** E.3
-
-**Expected because:** Anthropic, OpenAI, Gemini, and xAI all ship server-executed tools;
-"grounded answer with fresh web results" is a top application feature. **Evidence of absence
-(re-verified):** `grep -rniE "web_search|server_tool|code_interpreter" src/anyinfer` → zero
-code hits; `ToolSpec` models client-executed tools only. The "not an agent framework"
-non-goal fences planning/memory, not provider-native passthrough — the provider executes the
-tool inside one request/response, squarely translate-only territory.
-
-**Remediation sketch:**
-- [ ] **E.3.1** Add a `ServerToolSpec` union member beside `ToolSpec`, typed per capability
-  (`web_search`, `code_execution`), capability-declared with provenance so unsupported
-  targets refuse before dispatch.
-- [ ] **E.3.2** Map server-tool result blocks to a typed event; add per-invocation pricing
-  line items.
-
-## E.4 — Typed citations / grounded-generation output
-
-**Severity:** Medium · **Confidence:** High · **Was:** E.4
-
-**Expected because:** RAG-with-attribution is a dominant pattern; Anthropic citations,
-Cohere grounded chat, and Gemini grounding metadata all return structures users must render.
-**Evidence of absence (re-verified):** no `Citation` type in `types/`; the gap remains
-self-acknowledged in two adapters (`m365_copilot.py` retains citations on `raw`;
-`cohere.py`'s docstring advertises grounded citations its generate path never requests).
-
-**Remediation sketch:**
-- [ ] **E.4.1** Add `citations` to `Generation` and a citation event to the event union;
-  adapters map each dialect.
-- [ ] **E.4.2** Request-side grounding documents reuse `DocumentPart`/context blocks.
-- [ ] **E.4.3** Sidecar projects citations under an `anyinfer_*` extension field (and, per
-  D.1's lesson, document + round-trip-test the extension in the same change).
-
-## E.5 — OpenAI Responses API endpoint on the sidecar
-
-**Severity:** Medium · **Confidence:** High · **Was:** E.5
-
-**Expected because:** the Responses API is OpenAI's current-generation surface and
-Responses-first SDKs/frameworks 404 against a chat-completions-only gateway — while
-AnyInfer's *own* OpenAI adapter speaks `POST /responses` upstream, so the project already
-treats it as the real dialect. **Evidence of absence (re-verified):** `serve/app.py`'s route
-table has no `/v1/responses`; the catch-all 404s it.
-
-**Remediation sketch:**
-- [ ] **E.5.1** Add `serve/responses_codec.py` beside `openai_codec.py` mapping
-  `POST /v1/responses` (input items → `Message` parts, `text.format` → `SchemaSpec`,
-  semantic streaming events) under the wire-codec invariants; update the serve README route
-  table in the same commit (B.3's lesson).
-- [ ] **E.5.2** Refuse `previous_response_id` explicitly or map it onto `Session` — never
-  silently emulate server-side state.
-
-## E.6 — Ship accurate token estimators behind the existing protocol
-
-**Severity:** Medium · **Confidence:** High · **Was:** E.6
-
-**Expected because:** context budgeting is a headline capability and the category norm
-(tiktoken, Anthropic `count_tokens`, llama-server `/tokenize`) makes real counts assumed.
-**Evidence of absence (re-verified):** `capabilities/estimate.py` still ships only the
-byte-heuristic; tiktoken appears in docstrings only; no `[tokenizers]` extra. The
-`TokenEstimator` protocol is complete; implementations are wholly absent — so the context
-gate, cache-mark placement, and `SpendPolicy.max_request_usd` all run on a heuristic.
-
-**Remediation sketch:**
-- [ ] **E.6.1** Ship optional estimators behind extras: tiktoken-backed (exact for
-  OpenAI-family), Anthropic count-tokens endpoint (opt-in, cached), llama-server
-  `/tokenize` for local targets.
-- [ ] **E.6.2** Wire per-provider selection through `TokenCalibration` with provenance so
-  gating knows when a floor is exact.
-
-## E.7 — Video input parts
-
-**Severity:** Low-Medium · **Confidence:** High · **Was:** E.7
-
-**Brief:** `ContentPart` still models Text/ToolCall/ToolResult/Image/Document/Audio — no
-`VideoPart` (re-verified), so a Gemini video request (a marquee Gemini use case) cannot be
-expressed. The multimodal non-goal covers *outputs*, not video input; this is unaddressed
-rather than fenced.
-
-**Remediation:**
-- [ ] **E.7.1** Add `VideoPart` (data-or-URL, `video/*` media-type check, its own byte
-  ceiling) to `types/messages.py`; project in `providers/_multimodal.py` for Gemini/Vertex;
-  refuse elsewhere via trusted capability absence.
-
-## E.8 — Runtime credential rotation / hot reload
-
-**Severity:** Medium-Low · **Confidence:** Medium · **Was:** E.8
-
-**Brief:** Re-verified untouched by the plugin/TLS work: `api_key` references are still
-resolved once at adapter build (`_client/providers.py:299`; docstring says so), with no
-TTL/lazy re-resolution and no 401-triggered retry — rotating a key still means restarting
-the installed sidecar service, while `cloud_auth.py` proves the refresh pattern exists for
-cloud tokens.
-
-**Remediation:**
-- [ ] **E.8.1** Make credential resolution lazy-per-request or TTL-cached in header
-  construction (the `cloud_auth.py` refresh-margin pattern is the in-tree template).
-- [ ] **E.8.2** Treat a 401-after-success as a trigger to re-resolve once before failing.
-
-## E.9 — Local model store guided eviction (`prune`)
-
-**Severity:** Low · **Confidence:** High · **Was:** E.11 (revised)
-**Paths:** `src/anyinfer/local/store.py`, `src/anyinfer/cli.py`
-
-**Brief:** v1 correction: `last_used_at` already exists and is maintained on store entries
-(`store.py:148,533`), so the recency-data half of the v1 finding was stale. What remains is
-the surface: no `prune` command and no disk budget — cleanup is manual `models rm` with no
-guidance, while the tier-recommendation flow accumulates stale multi-GB variants across
-hardware upgrades.
-
-**Remediation:**
-- [ ] **E.9.1** Add `anyinfer models prune [--keep-bytes N]` proposing least-recently-used
-  deletions from the existing `last_used_at` data, interactive confirm, never touching
-  externally-registered entries. Automatic eviction stays out.
-
----
 
 # F. Security posture
 

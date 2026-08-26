@@ -45,15 +45,40 @@ native protocol is used instead.
   `model`; **tool results ride on a `user` turn**, not a dedicated role.
 - `Part` shapes emitted: `{text}`, `{functionCall: {name, args, id?}}`,
   `{functionResponse: {name, response}}`, `{inlineData: {mimeType, data}}`, and
-  `{fileData: {mimeType, fileUri}}`. The media shapes were verified 2026-08-10 against
+  `{fileData: {mimeType, fileUri}}`.
+- Video (added 2026-08-25) reuses the same two source shapes — `inlineData` for a short
+  inline clip, `fileData` for a Files-API URI or a public video URL — with an optional
+  **sibling** `videoMetadata: {startOffset?, endOffset?, fps?}` on the same Part. Offsets
+  are protobuf durations (a decimal string ending in `s`), which is the one place this
+  dialect departs from plain JSON numbers; `fps` is a plain number. All three are omitted
+  when the caller set none, so provider defaults are never restated as caller choices. The media shapes were verified 2026-08-10 against
   the provider-owned file-input guide. A synthesized `call_N` id is *not* echoed back
   as a `functionCall.id` — it is ours, not a key Gemini issued.
 - `functionResponse.response` must be an object: a non-JSON tool result is wrapped as
   `{"output": ...}`, or `{"error": ...}` when the result is error-flagged.
 - `systemInstruction: {parts: [{text}]}` — system messages are a top-level field.
 - `generationConfig`: `temperature`, `topP`, `maxOutputTokens`, `stopSequences`,
-  `responseMimeType`, `responseSchema`, `thinkingConfig`. Unset sampling fields are
-  omitted entirely.
+  `seed`, `presencePenalty`, `frequencyPenalty`, `responseMimeType`, `responseSchema`,
+  `thinkingConfig`. Unset sampling fields are omitted entirely.
+- `generationConfig.responseLogprobs: true` plus optional `generationConfig.logprobs:
+  <int>` (added 2026-08-25). The count is the number of *alternatives* per position;
+  Gemini rejects `logprobs: 0`, so a request for the chosen token alone sends the boolean
+  without the count.
+- **Server-side tools** (added 2026-08-25) are marker objects that are *siblings* of the
+  declarations rather than entries inside them: `tools: [{googleSearch: {}}, {codeExecution:
+  {}}, {functionDeclarations: [...]}]`. No per-tool ceiling exists, so
+  `server_tools.max_uses` is declared in `ignored_parameters`. `toolConfig` applies only to
+  function declarations and is omitted when there are none.
+- Search reports back as `candidates[].groundingMetadata.webSearchQueries` — on the
+  candidate, not as a part — so invocations are counted from that list's length. The
+  sources are a *separate* member of the same object: `groundingChunks[]`, each a one-key
+  object naming its retrieval kind, of which only `web` (`{uri, title}`) is a search
+  result. The others describe a caller's own retrieval corpus and are not surfaced as
+  search sources. Read as of 2026-08-25.
+- Code execution arrives as parts: `executableCode` (invocation) and `codeExecutionResult`
+  with an `outcome` (`OUTCOME_OK` or otherwise) and an `output`. That single `output`
+  field carries both the printed output and the failure message, so it is surfaced as the
+  event's `output` on success and as its `detail` on failure.
 - `tools[0].functionDeclarations[]`: `{name, description, parameters}` with parameters
   projected to the accepted schema subset.
 - `toolConfig.functionCallingConfig`: `{mode: "NONE"|"ANY", allowedFunctionNames?}`.
@@ -85,6 +110,15 @@ native protocol is used instead.
 
 ### Response fields read
 - `candidates[0].content.parts[]` — `text` (with `thought` flag), `functionCall`.
+- `candidates[0].citationMetadata.citationSources[]` — `{startIndex, endIndex, uri,
+  license?}`, with offsets into the **answer**. The list is **cumulative across streamed
+  chunks**, not incremental, so the adapter tracks how many it has emitted; without that a
+  long grounded answer re-reports its first citation on every chunk.
+- `candidates[0].logprobsResult` — `chosenCandidates[{token, logProbability}]` and
+  `topCandidates[{candidates[{token, logProbability}]}]`. Google splits what other
+  dialects nest: the two arrays are **parallel by position**, so recovering one token with
+  its alternatives means zipping them. `topCandidates` is absent entirely unless the
+  request asked for a positive alternatives count.
 - `candidates[0].finishReason` — `STOP`→stop, `MAX_TOKENS`→length,
   `SAFETY`/`RECITATION`/`BLOCKLIST`/`PROHIBITED_CONTENT`/`SPII`/`IMAGE_SAFETY`/
   `BLOCKED_SAFETY`/`LANGUAGE`→content_filter, `MALFORMED_FUNCTION_CALL`/
