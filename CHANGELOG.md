@@ -16,45 +16,40 @@ never rewritten.
 
 ## Unreleased
 
+## 0.1.3 — 2026-08-26
+
 ### Added
-- `Sampling` gained typed `seed`, `presence_penalty`, and `frequency_penalty`;
-  `GenerationRequest` gained `logprobs`.
-- `VideoPart`, alongside the existing text, image, and audio input parts.
-- Typed citations for grounded generation: `Generation.citations` and a
-  `CitationDelta` stream event, with `cite_documents=True` asking for them.
-- Exact token counting behind the `tokenizers` extra, where estimation was used before.
-- Credentials can be rotated at runtime: a replaced key takes effect without restarting
-  the process.
-- `anyinfer models prune` proposes least-recently-used deletions to fit a disk budget.
-- The sidecar serves `POST /v1/responses`, OpenAI's current-generation dialect, with
-  its semantic streaming events — so a Responses-first SDK no longer 404s.
-- Provider-run tools: `server_tools=` asks a target to search the web or run code inside
-  one request, and `ServerToolDelta` carries back what it found.
-- Search invocations are priced from each provider's own published rate.
 - Deferred batch inference at a provider's discounted tier, via `submit_batch()`,
   `batch_status()`, and `fetch_batch()`.
-- Exact token counts from Anthropic's count-tokens endpoint and llama-server's
-  `/tokenize`, alongside the local tokenizers.
+- Provider-run tools: `server_tools=` asks a target to search or run code in one
+  request; `ServerToolDelta` returns what it found, priced per invocation.
+- The sidecar serves `POST /v1/responses`, OpenAI's current-generation dialect, with
+  its semantic streaming events — so a Responses-first SDK no longer 404s.
+- Typed citations for grounded generation: `Generation.citations` and a
+  `CitationDelta` stream event, with `cite_documents=True` asking for them.
+- `VideoPart`, alongside the existing text, image, and audio input parts.
+- `Sampling` gained typed `seed`, `presence_penalty`, and `frequency_penalty`;
+  `GenerationRequest` gained `logprobs`.
+- Exact token counting where estimation was used before: the `tokenizers` extra,
+  Anthropic's count-tokens endpoint, and llama-server's `/tokenize`.
+- Credentials can be rotated at runtime: a replaced key takes effect without restarting
+  the process.
 - Telemetry sinks, plugin groups, proxy and TLS settings, and a decision log.
-- The confidential Relay paces and bounds its own traffic: pooled provider pacing,
-  per-tenant admission limits, and 429s carrying `Retry-After` and `RateLimit-*` headers.
+- The confidential Relay paces and bounds its own traffic: pooled pacing, per-tenant
+  admission limits, and 429s carrying `Retry-After` and `RateLimit-*` headers.
+- `anyinfer models prune` proposes least-recently-used deletions to fit a disk budget.
 
 ### Fixed
-- Batched OpenAI lines target `/v1/responses`; the unversioned path was rejected at
-  submit.
-- A failed Anthropic web search is no longer counted, and so no longer billed for.
-- `Client.fetch_batch()` forwards `schema=`, matching its async counterpart.
 - The demo app no longer persists literal API keys, and writes its configuration with
   owner-only permissions.
 - The confidential Relay is authenticated, and its key material is written with
   owner-only permissions.
-- Tier 3 attestation fails closed on an unknown GPU confidential-compute state instead of
-  claiming a tier it cannot prove.
-- Local weight verification is bound to the load rather than to a separate call that
-  could be skipped.
+- Tier 3 attestation fails closed on an unknown GPU confidential-compute state, and
+  local weight verification is bound to the load rather than a skippable call.
 - The sidecar accepts base64 embeddings and typed `reasoning_effort`, honors repair and
   context configuration, and caps request bodies.
-- The GitHub Copilot adapter works against github-copilot-sdk 1.0.9.
+
+Curated to the entries a partner would act on. [Everything in 0.1.3](https://github.com/anthturner/AnyInfer/compare/v0.1.2...v0.1.3).
 
 ## 0.1.2 — 2026-08-25
 
