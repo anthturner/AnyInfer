@@ -44,12 +44,38 @@ class _Recorder:
         return httpx2.MockTransport(handle)
 
 
-def _anthropic(tokens: int = 42, *, status: int = 200) -> tuple[_Recorder, AnthropicCountTokensEstimator]:
+_OPEN: list[object] = []
+"""Estimators built by this module's helpers, awaiting close.
+
+An estimator owns an HTTP client, and one that is dropped without closing surfaces later
+as an unraisable exception during whatever test happens to be running when the garbage
+collector reaches it — a failure attributed to innocent code, appearing only on some
+interpreters and some shardings. Closing them centrally is what keeps that from being a
+thing each new test has to remember.
+"""
+
+
+@pytest.fixture(autouse=True)
+async def _close_estimators():
+    """Close every estimator this module's helpers built, however the test ended."""
+    yield
+    while _OPEN:
+        await _OPEN.pop().aclose()  # type: ignore[attr-defined]
+
+
+def _track(estimator):
+    _OPEN.append(estimator)
+    return estimator
+
+
+def _anthropic(
+    tokens: int = 42, *, status: int = 200
+) -> tuple[_Recorder, AnthropicCountTokensEstimator]:
     recorder = _Recorder(
         handler=lambda _: httpx2.Response(status, json={"input_tokens": tokens})
     )
-    return recorder, AnthropicCountTokensEstimator(
-        api_key="sk-test", transport=recorder.transport()
+    return recorder, _track(
+        AnthropicCountTokensEstimator(api_key="sk-test", transport=recorder.transport())
     )
 
 
@@ -57,7 +83,7 @@ def _llama(count: int = 9, *, status: int = 200) -> tuple[_Recorder, LlamaServer
     recorder = _Recorder(
         handler=lambda _: httpx2.Response(status, json={"tokens": list(range(count))})
     )
-    return recorder, LlamaServerTokenizeEstimator(transport=recorder.transport())
+    return recorder, _track(LlamaServerTokenizeEstimator(transport=recorder.transport()))
 
 
 # ---- the counts themselves ------------------------------------------------------------------
@@ -68,7 +94,6 @@ async def test_a_prewarmed_count_is_exact_which_is_the_whole_point() -> None:
     _, estimator = _anthropic(tokens=42)
     await estimator.prewarm(["hello world"])
     assert estimator.estimate("hello world") == TokenEstimate(42, 42)
-    await estimator.aclose()
 
 
 async def test_llama_server_counts_the_ids_it_returns() -> None:
@@ -78,7 +103,6 @@ async def test_llama_server_counts_the_ids_it_returns() -> None:
     assert estimator.estimate("hello world") == TokenEstimate(9, 9)
     assert recorder.requests[0]["path"] == "/tokenize"
     assert recorder.requests[0]["body"] == {"content": "hello world"}
-    await estimator.aclose()
 
 
 async def test_anthropic_counts_through_its_own_endpoint_with_a_model() -> None:
@@ -88,7 +112,6 @@ async def test_anthropic_counts_through_its_own_endpoint_with_a_model() -> None:
     assert recorder.requests[0]["path"] == "/v1/messages/count_tokens"
     assert recorder.requests[0]["body"]["model"] == "claude-sonnet-4-5"
     assert recorder.requests[0]["body"]["messages"] == [{"role": "user", "content": "hi"}]
-    await estimator.aclose()
 
 
 # ---- never blocking, never failing ----------------------------------------------------------
@@ -104,7 +127,6 @@ async def test_an_uncounted_text_falls_back_rather_than_blocking() -> None:
     # One request, for the one text that was prewarmed. Nothing was fetched under the
     # synchronous call.
     assert len(recorder.requests) == 1
-    await estimator.aclose()
 
 
 async def test_a_service_that_refuses_degrades_instead_of_failing_the_request() -> None:
@@ -112,25 +134,24 @@ async def test_a_service_that_refuses_degrades_instead_of_failing_the_request() 
     _, estimator = _anthropic(status=500)
     await estimator.prewarm(["hello"])
     assert estimator.estimate("hello") == HeuristicTokenEstimator().estimate("hello")
-    await estimator.aclose()
 
 
 async def test_a_service_that_is_not_up_degrades_too() -> None:
     def refuse(request: httpx2.Request) -> httpx2.Response:
         raise httpx2.ConnectError("nothing listening", request=request)
 
-    estimator = LlamaServerTokenizeEstimator(transport=httpx2.MockTransport(refuse))
+    estimator = _track(LlamaServerTokenizeEstimator(transport=httpx2.MockTransport(refuse)))
     await estimator.prewarm(["hello"])
     assert estimator.estimate("hello") == HeuristicTokenEstimator().estimate("hello")
-    await estimator.aclose()
 
 
 async def test_a_malformed_answer_is_not_trusted_as_a_count() -> None:
     recorder = _Recorder(handler=lambda _: httpx2.Response(200, json={"input_tokens": "many"}))
-    estimator = AnthropicCountTokensEstimator(api_key="k", transport=recorder.transport())
+    estimator = _track(
+        AnthropicCountTokensEstimator(api_key="k", transport=recorder.transport())
+    )
     await estimator.prewarm(["hello"])
     assert estimator.estimate("hello") == HeuristicTokenEstimator().estimate("hello")
-    await estimator.aclose()
 
 
 # ---- the cache ------------------------------------------------------------------------------
@@ -148,7 +169,6 @@ async def test_a_text_is_counted_once_however_often_it_is_re_estimated() -> None
         "turn two",
         "turn three",
     ]
-    await estimator.aclose()
 
 
 async def test_the_cache_is_bounded_so_a_long_lived_process_does_not_grow_forever() -> None:
@@ -158,7 +178,6 @@ async def test_the_cache_is_bounded_so_a_long_lived_process_does_not_grow_foreve
     # The oldest was evicted, so it re-counts rather than remembering everything ever seen.
     assert estimator.estimate("a") == HeuristicTokenEstimator().estimate("a")
     assert estimator.estimate("c").floor == 42
-    await estimator.aclose()
 
 
 async def test_counting_is_keyed_by_content_not_by_object_identity() -> None:
@@ -167,7 +186,6 @@ async def test_counting_is_keyed_by_content_not_by_object_identity() -> None:
     await estimator.prewarm(["same text"])
     await estimator.prewarm(["".join(["same ", "text"])])
     assert len(recorder.requests) == 1
-    await estimator.aclose()
 
 
 # ---- the seam the client uses ---------------------------------------------------------------
@@ -184,13 +202,12 @@ async def test_prewarm_skips_empty_texts() -> None:
     recorder, estimator = _anthropic()
     await prewarm(estimator, ["", "real", ""])
     assert len(recorder.requests) == 1
-    await estimator.aclose()
 
 
 # ---- exactness is a claim the provenance rules govern (E.6.2) --------------------------------
 
 
-def test_an_exact_floor_requires_the_provider_to_declare_that_tokenizer() -> None:
+async def test_an_exact_floor_requires_the_provider_to_declare_that_tokenizer() -> None:
     """A count is exact only if it counts the tokenizer the provider actually runs."""
     _, estimator = _anthropic()
     anthropic_says = TokenCalibration(
@@ -202,7 +219,7 @@ def test_an_exact_floor_requires_the_provider_to_declare_that_tokenizer() -> Non
     assert not counts_exactly(estimator, openai_says)
 
 
-def test_a_guessed_tokenizer_claim_does_not_make_a_floor_exact() -> None:
+async def test_a_guessed_tokenizer_claim_does_not_make_a_floor_exact() -> None:
     """The gate *refuses* on the floor, so a default-provenance guess may not license one."""
     _, estimator = _anthropic()
     guessed = TokenCalibration(
@@ -211,7 +228,7 @@ def test_a_guessed_tokenizer_claim_does_not_make_a_floor_exact() -> None:
     assert not counts_exactly(estimator, guessed)
 
 
-def test_a_provider_declaring_no_tokenizer_claims_no_exactness() -> None:
+async def test_a_provider_declaring_no_tokenizer_claims_no_exactness() -> None:
     _, estimator = _anthropic()
     assert not counts_exactly(estimator, TokenCalibration())
     assert not counts_exactly(HeuristicTokenEstimator(), TokenCalibration())
@@ -224,7 +241,7 @@ def test_the_heuristic_is_never_exact_even_where_a_tokenizer_is_declared() -> No
     )
 
 
-def test_selection_does_not_specialize_an_estimator_for_the_wrong_provider() -> None:
+async def test_selection_does_not_specialize_an_estimator_for_the_wrong_provider() -> None:
     """Asked to count Claude with a tiktoken estimator, it stays as it is.
 
     Specializing would produce an OpenAI encoding presented as a Claude count; leaving it
