@@ -836,8 +836,8 @@ src/anyinfer/
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
   capabilities/          # assemble.py probes.py pricing.py pricing_table.py estimate.py
-                         # tokenizers.py budget.py gating.py cache.py ledger.py
-                         # pricing.json
+                         # tokenizers.py remote_tokenizers.py budget.py gating.py
+                         # cache.py ledger.py pricing.json
   local/                 # hardware.py metrics.py backends.py runtimes.py runtimes.json tuning.py
                          # services.py discovery.py fit.py variants.py artifacts.py downloads.py
                          # acquire.py store.py server.py recommend.py

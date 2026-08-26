@@ -11,6 +11,7 @@ from .capabilities import (
     RateLimitHeaders,
     Sourced,
     TokenCalibration,
+    TokenizerKind,
     conjunction,
 )
 from .events import (
@@ -195,6 +196,7 @@ __all__ = [
     "TimingMarkName",
     "TokenCalibration",
     "TokenLogprob",
+    "TokenizerKind",
     "ToolCall",
     "ToolCallDelta",
     "ToolChoice",

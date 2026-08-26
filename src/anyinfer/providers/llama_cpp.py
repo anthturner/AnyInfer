@@ -45,6 +45,7 @@ from ..types.capabilities import (
     LocalModelInfo,
     ModelCapabilities,
     Sourced,
+    TokenCalibration,
 )
 from ..types.messages import AudioPart, DocumentPart, ImagePart, VideoPart
 from ..types.results import Diagnostic
@@ -752,6 +753,9 @@ descriptor = ProviderDescriptor(
             ),
         ),
         model_selection="manual-only",
+    ),
+    token_calibration=TokenCalibration(
+        tokenizer="llama_server_tokenize", tokenizer_provenance="catalog"
     ),
     default_capabilities=ModelCapabilities(features=Sourced(_LLAMA_FEATURES, "default")),
     supports_sessions=True,

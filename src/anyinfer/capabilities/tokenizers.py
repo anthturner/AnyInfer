@@ -17,19 +17,21 @@ the floor. So an exact text count remains a true lower bound on what a provider 
 which is the property the gate needs.
 
 **Only local tokenizers live here.** A provider's own count-tokens endpoint and
-llama-server's ``/tokenize`` would both be more exact still, and neither fits: the
-`TokenEstimator` protocol is synchronous, and a synchronous HTTP call inside an async
-client stalls the event loop for every concurrent request. Making them work means an async
-estimator protocol, which is a deliberate future change rather than something to smuggle
-in behind a blocking call.
+llama-server's ``/tokenize`` are more exact still, and they live in `remote_tokenizers`
+because they need a round trip: the `TokenEstimator` protocol is synchronous, and a
+blocking HTTP call inside an async client would stall the event loop for every concurrent
+request. That module resolves it by moving the *fetch* ahead of the counting rather than
+by making every implementation async.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 from ..errors import ConfigError
+from ..types.capabilities import TokenCalibration, TokenizerKind
 from .estimate import TokenEstimate
+from .pricing import TRUSTED_PROVENANCE
 
 if TYPE_CHECKING:  # pragma: no cover — annotation only
     from .estimate import TokenEstimator
@@ -38,6 +40,7 @@ __all__ = [
     "DEFAULT_ENCODING",
     "TargetAwareTokenEstimator",
     "TiktokenEstimator",
+    "counts_exactly",
     "estimator_for",
 ]
 
@@ -67,21 +70,63 @@ class TargetAwareTokenEstimator(Protocol):
         ...
 
 
-def estimator_for(estimator: TokenEstimator, provider_id: str, model: str) -> TokenEstimator:
+def estimator_for(
+    estimator: TokenEstimator,
+    provider_id: str,
+    model: str,
+    *,
+    calibration: TokenCalibration | None = None,
+) -> TokenEstimator:
     """Specialize an estimator for one target, when it knows how to be specialized.
 
     Args:
         estimator: The client's configured estimator.
         provider_id: The resolved provider.
         model: The resolved model id.
+        calibration: The target provider's declared calibration, whose `tokenizer` names
+            which exact-counting strategy applies here. Consulted only to decide whether
+            the configured estimator is the right *kind* for this provider — it never
+            constructs one, because an estimator carries credentials and transports the
+            caller owns.
 
     Returns:
         A target-specific estimator, or ``estimator`` unchanged when it is not
         target-aware.
     """
+    if calibration is not None and not _kind_applies(estimator, calibration):
+        # The configured estimator counts a different tokenizer than this provider uses,
+        # so its numbers are not exact here. Falling back to the heuristic would be worse
+        # than a near-miss encoding, so the estimator is kept — but `counts_exactly`
+        # reports False, and the gate stops treating the floor as certain.
+        return estimator
     if isinstance(estimator, TargetAwareTokenEstimator):
         return estimator.for_model(provider_id, model)
     return estimator
+
+
+def counts_exactly(estimator: TokenEstimator, calibration: TokenCalibration | None) -> bool:
+    """Whether this estimator's floor is the number the provider will charge.
+
+    Two things have to hold, and the second is why the provenance exists. The estimator
+    must be an exact one, and the provider must be declared — *on trusted provenance* —
+    to use the tokenizer that estimator implements. A `default` guess about which
+    tokenizer applies could make a floor wrong in the one direction that matters, since
+    the pre-dispatch gate refuses on the floor.
+    """
+    if calibration is None or calibration.tokenizer is None:
+        return False
+    if calibration.tokenizer_provenance not in TRUSTED_PROVENANCE:
+        return False
+    return _kind_applies(estimator, calibration)
+
+
+def _kind_applies(estimator: TokenEstimator, calibration: TokenCalibration) -> bool:
+    """Whether ``estimator`` implements the strategy this provider is declared to use."""
+    kind = getattr(estimator, "tokenizer_kind", None)
+    if kind is None:
+        # Not an exact estimator at all; nothing to mismatch, and nothing to claim.
+        return calibration.tokenizer is None
+    return kind == calibration.tokenizer
 
 
 class TiktokenEstimator:
@@ -108,6 +153,10 @@ class TiktokenEstimator:
     Raises:
         anyinfer.errors.ConfigError: If ``tiktoken`` is not installed.
     """
+
+    tokenizer_kind: ClassVar[TokenizerKind] = "tiktoken"
+    """Which exact-counting strategy this implements, matched against a provider's
+    declared `TokenCalibration.tokenizer` before its counts are trusted as exact."""
 
     __slots__ = ("_encoder", "_exact", "_pinned")
 

@@ -42,6 +42,8 @@ budget calculator are explained in
 
 ::: anyinfer.TokenCalibration
 
+::: anyinfer.TokenizerKind
+
 ::: anyinfer.build_context_budget
 
 ::: anyinfer.estimate_request

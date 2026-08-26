@@ -32,6 +32,7 @@ from ..types.capabilities import (
     ModelCapabilities,
     RateLimitHeaders,
     Sourced,
+    TokenCalibration,
 )
 from ..types.events import (
     CitationDelta,
@@ -1146,6 +1147,9 @@ descriptor = ProviderDescriptor(
     ignored_parameters=("seed", "presence_penalty", "frequency_penalty", "logprobs"),
     operations=frozenset({"generation", "batch"}),
     server_tools=frozenset({"web_search", "code_execution"}),
+    token_calibration=TokenCalibration(
+        tokenizer="anthropic_count_tokens", tokenizer_provenance="catalog"
+    ),
     default_capabilities=ModelCapabilities(features=Sourced(_ANTHROPIC_FEATURES, "default")),
     # Per-segment `cache_control` marks, up to four breakpoints, with a documented
     # minimum cacheable prefix. Recorded in contracts/anthropic.md.

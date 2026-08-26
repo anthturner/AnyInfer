@@ -28,6 +28,7 @@ from ..types.capabilities import (
     ModelCapabilities,
     RateLimitHeaders,
     Sourced,
+    TokenCalibration,
 )
 from ..types.events import (
     ReasoningDelta,
@@ -780,6 +781,9 @@ descriptor = ProviderDescriptor(
         "server_tools.max_uses",
     ),
     server_tools=frozenset({"web_search", "code_execution"}),
+    token_calibration=TokenCalibration(
+        tokenizer="tiktoken", tokenizer_provenance="catalog"
+    ),
     default_capabilities=ModelCapabilities(features=Sourced(_OPENAI_FEATURES, "default")),
     # Prompt caching is automatic on a stable prefix — there is nothing to mark, so the
     # core's only duty is to leave the prefix undisturbed. Recorded in contracts/openai.md.

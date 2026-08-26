@@ -27,13 +27,14 @@ from typing import TYPE_CHECKING, Any
 
 from ..capabilities.budget import build_context_budget
 from ..capabilities.cache import CachePlan, plan_cache
-from ..capabilities.estimate import TokenEstimator
+from ..capabilities.estimate import TokenEstimator, _message_text
 from ..capabilities.gating import check_context_fit
 from ..capabilities.ledger import SpendLedger
 from ..capabilities.pricing import (
     TRUSTED_PROVENANCE,
     with_cost,
 )
+from ..capabilities.remote_tokenizers import PrewarmsCounts, prewarm
 from ..capabilities.tokenizers import estimator_for
 from ..context.select import select as select_context
 from ..context_request import ContextSummary
@@ -408,6 +409,7 @@ class GenerationExecutionMixin:
             capabilities = self._capabilities_for(descriptor, resolved)
             if builder is not None:
                 builder.note_capabilities(resolved, capabilities)
+            await self._prewarm_estimator(active, resolved)
             try:
                 target_request, context_summary = self._apply_context_request(
                     active,
@@ -581,6 +583,7 @@ class GenerationExecutionMixin:
         resolved = self.resolve(route.targets[0])
         await self._pool.get(resolved.provider_id)
         descriptor = self._pool.descriptor_for(resolved.provider_id)
+        await self._prewarm_estimator(request, resolved)
         return self._compact_to_fit(
             request,
             resolved=resolved,
@@ -655,8 +658,31 @@ class GenerationExecutionMixin:
         sees only text — so an estimator that knows how to specialize is asked to, once
         per target, and one that does not is returned unchanged. The shipped byte
         heuristic is in the second group, which is why it needed no change.
+
+        The provider's declared calibration names which exact-counting strategy applies
+        here, so an estimator counting a different one is not asked to specialize into a
+        precision it does not have for this target.
         """
-        return estimator_for(self._estimator, resolved.provider_id, resolved.model)
+        calibration = self._pool.descriptor_for(resolved.provider_id).token_calibration
+        return estimator_for(
+            self._estimator, resolved.provider_id, resolved.model, calibration=calibration
+        )
+
+    async def _prewarm_estimator(
+        self, request: GenerationRequest, resolved: ResolvedTarget
+    ) -> None:
+        """Fetch exact counts for this request's text, when the estimator counts remotely.
+
+        Awaited before sizing rather than inside it: `TokenEstimator.estimate` is
+        synchronous, and a blocking HTTP call under it would stall the event loop for
+        every other request in flight. An estimator that counts locally is untouched, and
+        one whose service is unreachable degrades to its base estimator rather than
+        failing a request that could have been sized approximately.
+        """
+        estimator = self._estimator_for(resolved)
+        if not isinstance(estimator, PrewarmsCounts):
+            return
+        await prewarm(estimator, [_message_text(message) for message in request.messages])
 
     def _client_side_pacing(
         self, limiter: RateLimiter | None, descriptor: ProviderDescriptor

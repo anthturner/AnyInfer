@@ -31,6 +31,7 @@ __all__ = [
     "RateLimitHeaders",
     "Sourced",
     "TokenCalibration",
+    "TokenizerKind",
     "conjunction",
 ]
 
@@ -63,6 +64,16 @@ class Sourced(Generic[_T]):
         return _PROVENANCE_RANK[self.provenance] >= _PROVENANCE_RANK[other.provenance]
 
 
+TokenizerKind = Literal["tiktoken", "anthropic_count_tokens", "llama_server_tokenize"]
+"""Exact-counting strategies AnyInfer knows how to drive.
+
+Each names a real endpoint or library, not a family of them: `tiktoken` is the published
+OpenAI-family vocabulary, `anthropic_count_tokens` is Anthropic's own counting endpoint,
+and `llama_server_tokenize` is a supervised llama-server's `/tokenize`. A provider whose
+tokenizer is neither published nor exposed declares nothing.
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class TokenCalibration:
     """How much a provider's own envelope inflates the prompt it is sent.
@@ -83,14 +94,29 @@ class TokenCalibration:
     dispatch, and a lower bound may only claim tokens the provider certainly charges —
     envelope overhead is a correction we believe, not one we can prove.
 
+    A provider also declares *how* its tokens can be counted exactly, when they can be.
+    That belongs here rather than in a table beside it because it is the same fact from
+    the same source: what this provider's numbers mean and where an exact one comes from.
+
     Attributes:
         multiplier: Factor applied to the planning estimate of prompt-proportional
             content. ``1.0`` means the provider counts what was sent.
         overhead_tokens: Flat tokens the envelope adds per request, counted once.
+        tokenizer: Which exact-counting strategy this provider's models can use, or
+            ``None`` where none exists and the heuristic is the honest answer. Naming a
+            strategy does not install one — the estimators live behind extras, and a
+            caller who has not configured one still gets the heuristic.
+        tokenizer_provenance: How the `tokenizer` claim was arrived at, under the same
+            trust rules as every other capability. Only `TRUSTED_PROVENANCE` values let
+            the gate treat a resulting floor as exact: a `default` guess about which
+            tokenizer applies could produce a floor that is wrong in the direction that
+            matters, and the gate *refuses* on the floor.
     """
 
     multiplier: float = 1.0
     overhead_tokens: int = 0
+    tokenizer: TokenizerKind | None = None
+    tokenizer_provenance: Provenance = "default"
 
     def __post_init__(self) -> None:
         """Reject calibrations that would corrupt every estimate downstream.
