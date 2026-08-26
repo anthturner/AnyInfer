@@ -40,6 +40,11 @@ async def _build_adapter(
     innocent code, in another file, on some interpreters and some shardings only. One such
     leak cost an afternoon; this exists so the next one cannot.
 
+    Required whenever the provider is one that may own more than an HTTP client — the
+    Copilot adapter spawns a CLI process, and a mock transport does nothing about a child
+    process. A helper that builds only HTTP-dialect adapters against a mock transport
+    holds no OS resources and does not need this.
+
     Yields ``None`` when the provider cannot be constructed from these settings, which
     lets a registry-walking test skip it without a try/except of its own.
     """
