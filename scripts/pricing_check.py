@@ -6,9 +6,11 @@ offline-testable.
 
 **Scope: per-token rates only.** The table also carries per-invocation rates for
 provider-run tools (``server_tools``), and nothing here watches them. Every admitted feed
-is a *model* catalog publishing prompt and completion prices; a search or code-execution
-fee is a provider-level line item those catalogs do not carry in a comparable form. So a
-server-tool rate is verified when a human adds it and is not re-checked afterwards.
+is a *model* catalog publishing prompt and completion prices; a search fee is a separate
+line item those catalogs do not carry in a comparable form. So a server-tool rate is
+verified when a human reads the provider's own pricing page and is not re-checked
+afterwards. Those rates move — every one currently recorded was read on 2026-08-25 — so
+the staleness risk here is real rather than theoretical.
 
 That is a real gap rather than a decision to be comfortable with, and it is recorded here
 because the alternative is a report that looks exhaustive while silently covering less

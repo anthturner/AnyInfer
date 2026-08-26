@@ -30,6 +30,7 @@ never rewritten.
   its semantic streaming events — so a Responses-first SDK no longer 404s.
 - Provider-run tools: `server_tools=` asks a target to search the web or run code inside
   one request, and `ServerToolDelta` carries back what it found.
+- Search invocations are priced from each provider's own published rate.
 - Deferred batch inference at a provider's discounted tier, via `submit_batch()`,
   `batch_status()`, and `fetch_batch()`.
 - Exact token counts from Anthropic's count-tokens endpoint and llama-server's
@@ -41,6 +42,7 @@ never rewritten.
 ### Fixed
 - Batched OpenAI lines target `/v1/responses`; the unversioned path was rejected at
   submit.
+- A failed Anthropic web search is no longer counted, and so no longer billed for.
 - `Client.fetch_batch()` forwards `schema=`, matching its async counterpart.
 - The demo app no longer persists literal API keys, and writes its configuration with
   owner-only permissions.

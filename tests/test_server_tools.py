@@ -808,3 +808,84 @@ def test_a_rate_without_a_date_and_source_is_refused_like_every_other_price() ->
     """Same discipline as a token rate: an unverified figure cannot be added quietly."""
     with pytest.raises(ai.ConfigError, match="missing field"):
         _table({"anthropic": {"web_search": {"per_use": "0.01"}}})
+
+
+def test_a_failed_search_is_not_counted_because_it_is_not_billed() -> None:
+    """An errored search is not billed, so it is not counted.
+
+    Anthropic states it plainly on its pricing page. The count is what cost is computed
+    from, so leaving a failed invocation in it reports
+    a charge that never appears on the bill.
+    """
+    produced = _events(
+        "anthropic",
+        [
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "server_tool_use", "name": "web_search"},
+            },
+            {
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": {
+                    "type": "web_search_tool_result",
+                    "content": {
+                        "type": "web_search_tool_result_error",
+                        "error_code": "max_uses_exceeded",
+                    },
+                },
+            },
+        ],
+    )
+    assert produced[-1].server_tool_uses == ()
+
+
+def test_a_search_that_succeeded_beside_one_that_failed_is_still_counted() -> None:
+    produced = _events(
+        "anthropic",
+        [
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "server_tool_use", "name": "web_search"},
+            },
+            {
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": {
+                    "type": "web_search_tool_result",
+                    "content": [{"url": "https://a.test", "title": "A"}],
+                },
+            },
+            {
+                "type": "content_block_start",
+                "index": 2,
+                "content_block": {"type": "server_tool_use", "name": "web_search"},
+            },
+            {
+                "type": "content_block_start",
+                "index": 3,
+                "content_block": {
+                    "type": "web_search_tool_result",
+                    "content": {"type": "web_search_tool_result_error", "error_code": "x"},
+                },
+            },
+        ],
+    )
+    assert produced[-1].server_tool_uses == (ServerToolUse(kind="web_search", uses=1),)
+
+
+def test_a_stream_that_ends_before_the_result_still_counts_the_invocation() -> None:
+    """The tool genuinely ran; reversal only happens on a reported failure."""
+    produced = _events(
+        "anthropic",
+        [
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "server_tool_use", "name": "web_search"},
+            }
+        ],
+    )
+    assert produced[-1].server_tool_uses == (ServerToolUse(kind="web_search", uses=1),)

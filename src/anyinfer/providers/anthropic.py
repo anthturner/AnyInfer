@@ -465,7 +465,9 @@ class AnthropicAdapter:
                     yield ServerToolDelta(kind=tool_kind, status="started")
                 return
             if isinstance(block, Mapping) and block.get("type") in _SERVER_TOOL_RESULTS:
-                yield _server_tool_result(block)
+                event = _server_tool_result(block)
+                state.discount_if_failed(event)
+                yield event
                 return
             if (
                 isinstance(block, Mapping)
@@ -725,7 +727,11 @@ class _StreamState:
         """How many times each server-side tool started, counted from its own blocks.
 
         Anthropic also reports a `server_tool_use` total in usage, but only for search;
-        counting the blocks covers every kind uniformly and needs no per-kind branch."""
+        counting the blocks covers every kind uniformly and needs no per-kind branch.
+
+        Counted at *invocation* and reversed if the invocation fails, per
+        `discount_if_failed` — the count feeds cost, and Anthropic does not bill a search
+        that errored."""
         self.answer_length = 0
         self.cited_through = 0
         """How far into the answer the citations so far have reached.
@@ -735,6 +741,25 @@ class _StreamState:
         citation supports. So the span in the answer is recoverable — it runs from wherever
         the last citation ended to wherever the text has reached now — and recovering it is
         what lets a caller highlight the sentence rather than only name the source."""
+
+    def discount_if_failed(self, event: ServerToolDelta) -> None:
+        """Un-count an invocation the provider will not bill for.
+
+        Anthropic states it plainly: "If an error occurs during web search, the web search
+        will not be billed." The count is what a caller's cost is computed from, so leaving
+        a failed invocation in it reports a charge that will never appear on the bill —
+        wrong in the direction that erodes trust in every other number here.
+
+        Reversal rather than counting-on-success because the invocation and its result are
+        separate blocks, and a stream that ends between them has genuinely used the tool.
+        """
+        if event.status != "failed":
+            return
+        remaining = self.server_tools.get(event.kind, 0) - 1
+        if remaining > 0:
+            self.server_tools[event.kind] = remaining
+        else:
+            self.server_tools.pop(event.kind, None)
 
     def tool_slot(self, block_index: int) -> int:
         """Map a content-block index onto a dense tool-call slot.
@@ -909,7 +934,9 @@ def _events_from_message(
                 state.server_tools[tool_kind] = state.server_tools.get(tool_kind, 0) + 1
                 yield ServerToolDelta(kind=tool_kind, status="started")
         elif kind in _SERVER_TOOL_RESULTS:
-            yield _server_tool_result(block)
+            event = _server_tool_result(block)
+            state.discount_if_failed(event)
+            yield event
 
 
 _SERVER_TOOL_KINDS: Mapping[str, ServerToolKind] = {
@@ -940,6 +967,7 @@ def _server_tool_result(block: Mapping[str, Any]) -> ServerToolDelta:
             status="failed",
             detail=str(content.get("error_code", "") or ""),
         )
+
     if tool_kind == "web_search":
         entries = content if isinstance(content, Sequence) and not isinstance(content, str) else ()
         return ServerToolDelta(

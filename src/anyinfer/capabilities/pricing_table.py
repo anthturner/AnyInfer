@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from importlib import resources
@@ -134,7 +134,9 @@ class PricingTable:
         for provider_id, raw_entries in providers.items():
             provider_tools = tool_rates.get(str(provider_id), {})
             parsed = tuple(
-                _parse_entry(provider_id, raw, provider_tools)
+                _parse_entry(
+                    provider_id, raw, _rates_for(provider_tools, str(raw.get("model", "")))
+                )
                 for raw in _require_list(provider_id, raw_entries)
             )
             entries[str(provider_id)] = parsed
@@ -147,24 +149,69 @@ def _require_list(provider_id: str, value: Any) -> list[Any]:
     return value
 
 
-def _parse_server_tools(raw: Any) -> dict[str, dict[str, Decimal]]:
+@dataclass(frozen=True, slots=True)
+class _ToolRate:
+    """One server tool's price, before a model is known.
+
+    Attributes:
+        flat: The rate however the tool is used, or ``Decimal(0)`` for a tool the provider
+            folds into the token bill. ``None`` when the rate depends on the model.
+        by_model: Rates keyed by model id or prefix, for a provider that charges by model
+            class. Empty when a flat rate applies.
+    """
+
+    flat: Decimal | None = None
+    by_model: Mapping[str, Decimal] = field(default_factory=dict)
+
+    def resolve(self, model: str) -> Decimal | None:
+        """The rate for one model, or ``None`` when this table cannot price it.
+
+        Longest-prefix wins, matching how a model entry is looked up, so
+        ``gemini-2.5-flash`` finds a ``gemini-2.5`` rate without a ``gemini-2`` rate
+        stealing it. An unmatched model returns ``None`` and stays honestly unpriced.
+        """
+        if self.flat is not None:
+            return self.flat
+        best: str | None = None
+        for candidate in self.by_model:
+            matches = model == candidate or model.startswith(candidate)
+            if matches and (best is None or len(candidate) > len(best)):
+                best = candidate
+        return self.by_model[best] if best is not None else None
+
+
+def _parse_server_tools(raw: Any) -> dict[str, dict[str, _ToolRate]]:
     """Parse the provider-level server-tool rate block.
 
-    Provider-run tools are billed per invocation at a rate the provider sets per *tool*,
-    not per model — one search costs the same whichever model asked for it — so the rates
-    live once per provider rather than repeated on every entry. A provider with no block,
-    or a tool missing from one, stays unpriced, and `compute_cost` then reports the whole
-    generation's cost as unknown rather than counting the invocation as free.
+    Three shapes, because the providers genuinely have three. A tool billed at one flat
+    rate however it is used carries `per_use`. A tool whose rate depends on the model
+    carries `per_use_by_model`, keyed by model id or prefix — OpenAI charges reasoning and
+    non-reasoning models differently for the same search, and Gemini charges by model
+    generation. And a tool that adds no separate line item at all carries
+    `billed_as: "tokens"`, which is a *known* cost of zero rather than a missing one.
+
+    That last distinction is the reason this is not simply a number. An absent rate means
+    unpriced, which makes the whole generation's cost unknown; zero means the provider
+    folds this tool into the token bill and the token figure is already the whole answer.
+    Collapsing them would either invent a charge or hide one.
+
+    A model not matched by any `per_use_by_model` key stays unpriced. That is deliberate:
+    where a provider bills by model class rather than by a name we can match, guessing
+    which class an unlisted model falls into would produce a confident wrong number.
     """
     if raw is None:
         return {}
     if not isinstance(raw, dict):
         raise ConfigError("pricing table's 'server_tools' must be a mapping")
-    parsed: dict[str, dict[str, Decimal]] = {}
+    parsed: dict[str, dict[str, _ToolRate]] = {}
     for provider_id, block in raw.items():
+        # An underscore-prefixed key is prose for whoever edits this file next, at either
+        # level, the same convention the document's top-level `_comment` uses.
+        if provider_id.startswith("_"):
+            continue
         if not isinstance(block, dict):
             raise ConfigError(f"server-tool rates for {provider_id!r} must be an object")
-        rates: dict[str, Decimal] = {}
+        rates: dict[str, _ToolRate] = {}
         for kind, entry in block.items():
             if kind.startswith("_"):
                 continue
@@ -172,19 +219,44 @@ def _parse_server_tools(raw: Any) -> dict[str, dict[str, Decimal]]:
                 raise ConfigError(
                     f"server-tool rate {kind!r} for {provider_id!r} must be an object"
                 )
+            where = f"server-tool rate {kind!r} for {provider_id!r}"
             try:
                 # Same discipline as a token rate: the date and source are mandatory, so
                 # an unverified figure cannot be added without saying it is unverified.
                 str(entry["last_verified"])
                 str(entry["source"])
-                rates[str(kind)] = _parse_rate(entry["per_use"])
             except KeyError as missing:
                 raise ConfigError(
-                    f"server-tool rate {kind!r} for {provider_id!r} is missing "
-                    f"field {missing.args[0]!r}"
+                    f"{where} is missing field {missing.args[0]!r}"
                 ) from None
+            rates[str(kind)] = _parse_tool_rate(entry, where)
         parsed[str(provider_id)] = rates
     return parsed
+
+
+def _parse_tool_rate(entry: Mapping[str, Any], where: str) -> _ToolRate:
+    """Read one tool's rate in whichever of the three shapes it was written."""
+    if entry.get("billed_as") == "tokens":
+        return _ToolRate(flat=Decimal(0))
+    if "per_use" in entry:
+        return _ToolRate(flat=_parse_rate(entry["per_use"]))
+    by_model = entry.get("per_use_by_model")
+    if isinstance(by_model, dict) and by_model:
+        return _ToolRate(
+            by_model={str(model): _parse_rate(rate) for model, rate in by_model.items()}
+        )
+    raise ConfigError(
+        f"{where} needs one of 'per_use', 'per_use_by_model', or 'billed_as'"
+    )
+
+def _rates_for(rates: Mapping[str, _ToolRate], model: str) -> dict[str, Decimal]:
+    """Resolve every tool's rate for one model, dropping the ones it cannot price."""
+    resolved: dict[str, Decimal] = {}
+    for kind, rate in rates.items():
+        value = rate.resolve(model)
+        if value is not None:
+            resolved[kind] = value
+    return resolved
 
 
 def _parse_entry(

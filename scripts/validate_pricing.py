@@ -72,7 +72,7 @@ def _server_tool_problems(data: dict, today: _dt.date) -> list[str]:
     """Apply the token-rate discipline to per-invocation rates.
 
     Read from the raw document rather than through the table, because the loader keeps
-    only the rate itself — the date and source exist to be audited here, and dropping
+    only the resolved rate — the date and source exist to be audited here, and dropping
     them into the loader's return type would put audit metadata on every priced call.
 
     Without this, a search rate could land with a date in the future and a source that is
@@ -87,6 +87,8 @@ def _server_tool_problems(data: dict, today: _dt.date) -> list[str]:
 
     problems: list[str] = []
     for provider, rates in block.items():
+        if provider.startswith("_"):
+            continue
         if not isinstance(rates, dict):
             problems.append(f"server_tools:{provider}: must be an object")
             continue
@@ -97,30 +99,78 @@ def _server_tool_problems(data: dict, today: _dt.date) -> list[str]:
             if not isinstance(entry, dict):
                 problems.append(f"{where}: must be an object")
                 continue
-
-            verified_raw = entry.get("last_verified")
-            try:
-                verified = _dt.date.fromisoformat(str(verified_raw))
-            except ValueError:
-                problems.append(f"{where}: last_verified {verified_raw!r} is not ISO")
-            else:
-                if verified > today:
-                    problems.append(f"{where}: last_verified {verified} is in the future")
-
-            source = entry.get("source")
-            if not isinstance(source, str) or not source.startswith("https://"):
-                problems.append(f"{where}: source must be an https URL")
-
-            # Zero is not a rate a provider charges; it is a rate nobody filled in. An
-            # entry that means "free" should be absent, which prices the call as unknown
-            # rather than asserting a number.
-            raw_rate = entry.get("per_use")
-            try:
-                if Decimal(str(raw_rate)) <= 0:
-                    problems.append(f"{where}: per_use must be positive, not {raw_rate!r}")
-            except (ArithmeticError, InvalidOperation):
-                problems.append(f"{where}: per_use {raw_rate!r} is not a decimal string")
+            problems.extend(_provenance_problems(entry, where, today))
+            problems.extend(_rate_shape_problems(entry, where))
     return problems
+
+
+def _provenance_problems(entry: dict, where: str, today: _dt.date) -> list[str]:
+    """Every rate carries a real date and a page somebody can open."""
+    problems: list[str] = []
+    verified_raw = entry.get("last_verified")
+    try:
+        verified = _dt.date.fromisoformat(str(verified_raw))
+    except ValueError:
+        problems.append(f"{where}: last_verified {verified_raw!r} is not ISO")
+    else:
+        if verified > today:
+            problems.append(f"{where}: last_verified {verified} is in the future")
+
+    source = entry.get("source")
+    if not isinstance(source, str) or not source.startswith("https://"):
+        problems.append(f"{where}: source must be an https URL")
+    return problems
+
+
+def _rate_shape_problems(entry: dict, where: str) -> list[str]:
+    """Exactly one of the three rate shapes, and any figure in it must be usable.
+
+    The shapes are mutually exclusive on purpose. An entry carrying both a flat rate and
+    a per-model table has two answers for one question, and whichever the loader happened
+    to read first would become the bill.
+    """
+    shapes = [
+        name
+        for name in ("per_use", "per_use_by_model", "billed_as")
+        if entry.get(name) is not None
+    ]
+    if len(shapes) != 1:
+        return [
+            f"{where}: needs exactly one of per_use, per_use_by_model, or billed_as "
+            f"(found {shapes or 'none'})"
+        ]
+
+    shape = shapes[0]
+    if shape == "billed_as":
+        if entry["billed_as"] != "tokens":
+            return [f"{where}: billed_as must be \"tokens\", not {entry['billed_as']!r}"]
+        return []
+
+    if shape == "per_use":
+        return _positive_rate(entry["per_use"], where)
+
+    by_model = entry["per_use_by_model"]
+    if not isinstance(by_model, dict) or not by_model:
+        return [f"{where}: per_use_by_model must be a non-empty object"]
+    problems: list[str] = []
+    for model, rate in by_model.items():
+        problems.extend(_positive_rate(rate, f"{where}:{model}"))
+    return problems
+
+
+def _positive_rate(raw: object, where: str) -> list[str]:
+    """A rate is a positive decimal string.
+
+    Zero is refused because free is spelled by `billed_as`, not by a zero: an absent kind
+    reports cost as unknown, a zero here would assert a number nobody verified, and a tool
+    genuinely folded into the token bill says so explicitly.
+    """
+    try:
+        if Decimal(str(raw)) <= 0:
+            return [f"{where}: per_use must be positive, not {raw!r}"]
+    except (ArithmeticError, InvalidOperation):
+        return [f"{where}: per_use {raw!r} is not a decimal string"]
+    return []
 
 
 def main() -> int:
