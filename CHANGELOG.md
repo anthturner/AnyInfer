@@ -16,6 +16,11 @@ never rewritten.
 
 ## Unreleased
 
+### Fixed
+- Building an Azure Foundry provider no longer runs the Entra credential chain, which
+  shelled out to `az`, `pwsh`, and `azd`; the token is now acquired per request and
+  refreshed before it expires.
+
 ## 0.1.3 — 2026-08-26
 
 ### Added
