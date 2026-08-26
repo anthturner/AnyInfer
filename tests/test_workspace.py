@@ -556,22 +556,36 @@ class TestShardParity:
         declared = sorted((workspace.ROOT / shard).as_posix() for shard in workspace.SHARDS)
         assert on_disk == declared
 
-    def test_the_ci_workflow_installs_exactly_the_declared_shards(self):
-        """CI's environment and a contributor's are built from one list, not two."""
-        workflow = (workspace.ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        install_lines = [
-            line for line in workflow.splitlines() if "uv pip install -e src/anyinfer-" in line
-        ]
-        assert install_lines, "no shard install step found in ci.yml"
+    def test_every_workflow_installs_exactly_the_declared_shards(self):
+        """CI's environment and a contributor's are built from one list, not two.
 
-        for line in install_lines:
-            installed = sorted(
-                token for token in line.split() if token.startswith("src/anyinfer-")
-            )
-            assert installed == sorted(workspace.SHARDS), (
-                f"ci.yml installs {installed}, but workspace.SHARDS is "
-                f"{sorted(workspace.SHARDS)} — the two environments would diverge"
-            )
+        Scoped to *every* workflow rather than to `ci.yml`, which is the hole this
+        version closes. The old test read one file, so the site build — which installed
+        one shard of three — satisfied every gate in the repo and still failed the first
+        time it ran, on a reference page for a module it had never installed. A check
+        that covers most of the places a list is repeated leaves the list unguarded.
+        """
+        workflows = sorted((workspace.ROOT / ".github/workflows").glob("*.yml"))
+        assert workflows, "no workflows found"
+
+        checked: list[str] = []
+        for path in workflows:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if "uv pip install" not in line or "src/anyinfer-" not in line:
+                    continue
+                installed = sorted(
+                    token for token in line.split() if token.startswith("src/anyinfer-")
+                )
+                assert installed == sorted(workspace.SHARDS), (
+                    f"{path.name} installs {installed}, but workspace.SHARDS is "
+                    f"{sorted(workspace.SHARDS)} — those environments would diverge"
+                )
+                checked.append(path.name)
+
+        assert "ci.yml" in checked
+        # The site build imports every shard to render its reference pages, so it is the
+        # one most easily forgotten and the one where forgetting is only visible on main.
+        assert "docs-site.yml" in checked
 
     def test_every_shard_suite_is_collected(self):
         """A shard's tests must be gated, not merely present in the tree."""
