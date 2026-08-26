@@ -56,7 +56,10 @@ jobs:
 
       # Sharded add-ons (src/anyinfer-*, own pyproject.toml) that ship a mkdocstrings
       # reference page need their own editable install too — see the CI gates job.
-      - run: uv pip install --system -e src/anyinfer-store
+      # All of them: this listed only `anyinfer-store` while `anyinfer-confidential`
+      # already had a reference page in the nav, so the first run of this workflow died
+      # on a module it had never installed.
+      - run: uv pip install --system -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
 
       - name: build the site
         run: python workspace.py build docs
