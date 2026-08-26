@@ -69,7 +69,14 @@ from .hardware import (
     probe_signature,
 )
 from .metrics import ResourceSample, StorageProfile, SystemSampler, storage_profile
-from .provenance import ModelManifest, hash_model_weights, verify_model_manifest
+from .provenance import (
+    ModelManifest,
+    VerifiedWeights,
+    WeightsProvenance,
+    hash_model_weights,
+    open_verified_weights,
+    verify_model_manifest,
+)
 from .recommend import Recommendation, Tier, TierSource, recommend_alias
 from .runtimes import (
     InstallReport,
@@ -95,7 +102,14 @@ from .server import (
     is_loopback,
 )
 from .sources import RemoteFile, ResolvedArtifact, SourceRef, SourceResolver
-from .store import ModelStore, RemovalReport, ResolvedModel, StoreEntry
+from .store import (
+    ModelStore,
+    PrunePlan,
+    PruneProposal,
+    RemovalReport,
+    ResolvedModel,
+    StoreEntry,
+)
 from .tuning import (
     CONTEXT_LADDER,
     Posture,
@@ -141,6 +155,8 @@ __all__ = [
     "Posture",
     "ProgressCallback",
     "ProgressSink",
+    "PrunePlan",
+    "PruneProposal",
     "Recommendation",
     "RemoteFile",
     "RemovalReport",
@@ -164,6 +180,8 @@ __all__ = [
     "TuningInputs",
     "VariantChoice",
     "VariantPrefs",
+    "VerifiedWeights",
+    "WeightsProvenance",
     "acquire",
     "acquire_sync",
     "allocate_port",
@@ -191,6 +209,7 @@ __all__ = [
     "license_allowed",
     "load_runtime_table",
     "memory_budget",
+    "open_verified_weights",
     "plan_acquisition",
     "plan_server",
     "probe_signature",

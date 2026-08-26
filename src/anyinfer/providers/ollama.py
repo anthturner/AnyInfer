@@ -44,6 +44,7 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
 from ..types.results import Diagnostic, FinishReason, Usage
@@ -113,6 +114,9 @@ class OllamaAdapter:
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     @staticmethod
@@ -367,6 +371,12 @@ class OllamaAdapter:
             options["num_predict"] = sampling.max_output_tokens
         if sampling.stop:
             options["stop"] = list(sampling.stop)
+        if sampling.seed is not None:
+            options["seed"] = sampling.seed
+        if sampling.presence_penalty is not None:
+            options["presence_penalty"] = sampling.presence_penalty
+        if sampling.frequency_penalty is not None:
+            options["frequency_penalty"] = sampling.frequency_penalty
         return options
 
     def _encode_message(self, message: Message) -> dict[str, Any]:
@@ -390,6 +400,8 @@ class OllamaAdapter:
                 raise unsupported(self.provider_id, "document")
             elif isinstance(part, AudioPart):
                 raise unsupported(self.provider_id, "audio")
+            elif isinstance(part, VideoPart):
+                raise unsupported(self.provider_id, "video")
         if images:
             encoded["images"] = images
         calls = [p for p in message.content if isinstance(p, ToolCall)]
@@ -622,7 +634,7 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
-    if effort == "minimal":
+    if effort in ("none", "minimal"):
         return {"think": False}
     return {"think": effort}
 
@@ -671,6 +683,7 @@ descriptor = ProviderDescriptor(
         host_shorthand=HostShorthand(scheme="http", default_port=11434),
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("logprobs",),
     default_capabilities=ModelCapabilities(features=Sourced(_OLLAMA_FEATURES, "default")),
     supports_sessions=True,
     # Ollama keeps its own store and downloader, so acquisition here means asking it to

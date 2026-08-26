@@ -87,6 +87,9 @@ def build_wire_request(
         tools=request.tools,
         tool_choice=request.tool_choice,
         cache_marks=cache_marks,
+        cite_documents=request.cite_documents and _model_cites(request, capabilities),
+        server_tools=request.server_tools,
+        logprobs=request.logprobs if _model_reports_logprobs(request, capabilities) else None,
         stream=stream,
         timeout_s=request.effective_timeout_s,
         max_response_bytes=request.max_response_bytes,
@@ -114,6 +117,41 @@ def _model_takes_reasoning(
     if capabilities is None or capabilities.features.provenance not in TRUSTED_PROVENANCE:
         return True
     return Feature.REASONING in capabilities.features.value
+
+
+def _model_reports_logprobs(
+    request: GenerationRequest, capabilities: ModelCapabilities | None
+) -> bool:
+    """Whether a request for log-probabilities should reach this model.
+
+    The same trusted-absence rule `_model_takes_reasoning` applies, for the same reason:
+    a ``default``-provenance feature set is a descriptor-level guess, and withholding the
+    field on a guess turns a provider that would have answered into one that silently
+    could not. The difference from reasoning is what happens on a *known* absence — a
+    dropped reasoning effort still produces an answer, while a request whose whole point
+    was the probabilities produces a `Generation` with an empty ``logprobs`` a caller
+    would otherwise have to notice for themselves. So `dropped_parameters` reports the
+    withholding explicitly, and this function only decides what goes on the wire.
+    """
+    if request.logprobs is None:
+        return False
+    if capabilities is None or capabilities.features.provenance not in TRUSTED_PROVENANCE:
+        return True
+    return Feature.LOGPROBS in capabilities.features.value
+
+
+def _model_cites(request: GenerationRequest, capabilities: ModelCapabilities | None) -> bool:
+    """Whether a request for citations should reach this model.
+
+    The same trusted-absence rule the other two capability gates use: a
+    ``default``-provenance feature set is a descriptor-level guess, and withholding on a
+    guess turns a provider that would have cited into one that silently could not.
+    """
+    if not request.cite_documents:
+        return False
+    if capabilities is None or capabilities.features.provenance not in TRUSTED_PROVENANCE:
+        return True
+    return Feature.CITATIONS in capabilities.features.value
 
 
 def _projector_for(descriptor: ProviderDescriptor) -> Any:
@@ -149,6 +187,22 @@ def dropped_parameters(
                 "support reasoning effort, so it was not sent",
             )
         )
+    if request.cite_documents and not _model_cites(request, capabilities):
+        dropped.append(
+            (
+                "cite_documents",
+                f"{descriptor.id}'s {'model' if capabilities else 'models'} does not "
+                "attribute answers to supplied documents, so no citations were requested",
+            )
+        )
+    if request.logprobs is not None and not _model_reports_logprobs(request, capabilities):
+        dropped.append(
+            (
+                "logprobs",
+                f"{descriptor.id}'s {'model' if capabilities else 'models'} does not "
+                "report token log-probabilities, so none were requested",
+            )
+        )
     if not descriptor.ignored_parameters:
         return tuple(dropped)
 
@@ -157,6 +211,14 @@ def dropped_parameters(
         "top_p": request.sampling.top_p,
         "max_output_tokens": request.sampling.max_output_tokens,
         "stop": request.sampling.stop or None,
+        "seed": request.sampling.seed,
+        "presence_penalty": request.sampling.presence_penalty,
+        "frequency_penalty": request.sampling.frequency_penalty,
+        "logprobs": request.logprobs,
+        "cite_documents": request.cite_documents or None,
+        "server_tools.max_uses": next(
+            (spec.max_uses for spec in request.server_tools if spec.max_uses is not None), None
+        ),
         "reasoning": request.reasoning,
         "tools": request.tools or None,
     }

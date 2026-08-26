@@ -921,6 +921,7 @@ HARNESS = ConformanceHarness(
     # with --embeddings, which is a *different* resident server for the same model, so
     # they are covered by the dedicated tests above rather than claimed here.
     supports=Capabilities(reasoning=False, cancellation=True),
+    covered_elsewhere=frozenset({"embedding"}),
 )
 
 

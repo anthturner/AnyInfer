@@ -7,6 +7,9 @@ real ASGI app without binding a port or a network call.
 
 from __future__ import annotations
 
+import base64
+import struct
+
 import pytest
 
 import anyinfer as ai
@@ -110,16 +113,62 @@ def test_embeddings_missing_input_is_400() -> None:
     assert response.status_code == 400
 
 
-def test_embeddings_rejects_base64_encoding_format() -> None:
+def test_embeddings_accepts_the_openai_sdk_default_request_shape() -> None:
+    """The stock `openai` Python client sends encoding_format="base64" by default.
+
+    Refusing it broke the most common client against the endpoint whose whole reason to
+    exist is stock-client compatibility, and AnyInfer's own tests never noticed because
+    they all speak float.
+    """
     fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
     http = _client(fake)
 
     response = http.post(
         "/v1/embeddings",
-        json={"model": "fake-embed:small", "input": "hi", "encoding_format": "base64"},
+        json={
+            "model": "fake-embed:small",
+            "input": ["hi"],
+            "encoding_format": "base64",
+        },
+    )
+
+    assert response.status_code == 200
+    packed = response.json()["data"][0]["embedding"]
+    assert isinstance(packed, str), "base64 embeddings are a string, not an array"
+
+    raw = base64.b64decode(packed)
+    assert len(raw) == 4 * 4, "four float32 values"
+    decoded = struct.unpack("<4f", raw)
+
+    # The same request in float encoding must yield the same vector.
+    as_float = http.post(
+        "/v1/embeddings",
+        json={"model": "fake-embed:small", "input": ["hi"], "encoding_format": "float"},
+    ).json()["data"][0]["embedding"]
+    assert decoded == pytest.approx(as_float)
+
+
+def test_embeddings_defaults_to_float_when_encoding_format_is_absent() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    http = _client(fake)
+
+    response = http.post("/v1/embeddings", json={"model": "fake-embed:small", "input": "hi"})
+
+    assert response.status_code == 200
+    assert isinstance(response.json()["data"][0]["embedding"], list)
+
+
+def test_embeddings_rejects_an_unknown_encoding_format() -> None:
+    fake = FakeEmbeddingRerankProvider("fake-embed", embedding_dimensions={"small": 4})
+    http = _client(fake)
+
+    response = http.post(
+        "/v1/embeddings",
+        json={"model": "fake-embed:small", "input": "hi", "encoding_format": "quantized"},
     )
 
     assert response.status_code == 400
+    assert "encoding_format" in response.json()["error"]["message"]
 
 
 def test_embeddings_provider_error_maps_to_http_status() -> None:

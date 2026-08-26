@@ -11,7 +11,7 @@ import httpx2
 import pytest
 
 import anyinfer as ai
-from anyinfer.arena import Candidate, candidate_envelope, select_candidates
+from anyinfer.evaluate.arena import Candidate, candidate_envelope, select_candidates
 from anyinfer.registry import ProviderRegistry
 from anyinfer.serve.openai_codec import request_from_openai, request_to_openai
 from anyinfer.testing import ScriptedFailure, ScriptedModel, ScriptedProvider

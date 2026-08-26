@@ -114,6 +114,10 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
+    if effort == "none":
+        # The deliberate turn-off the docstring above points at `provider_options` for is
+        # now sayable in the normalized vocabulary, so it no longer needs the escape hatch.
+        return {"thinking": {"type": "disabled"}}
     return {
         "thinking": {"type": "enabled"},
         "reasoning_effort": _DEEPSEEK_EFFORTS[effort],

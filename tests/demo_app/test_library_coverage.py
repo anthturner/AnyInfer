@@ -11,6 +11,26 @@ Everything here runs headless and offline against the in-process fake provider, 
 deliberate exception noted at its call site: the catalog is real data read from the shipped
 `catalog/models.json`, because a fake catalog would test the table
 widget rather than the integration.
+
+**What the demo deliberately does not surface.** This list is hand-curated, which means a
+missing feature is invisible here unless it is written down — so it is. Each of these is
+reachable from the CLI and the sidecar, and absent from the demo *by decision*, not by
+oversight:
+
+- **Arena fan-out** (`client.arena`) — running one prompt against several targets at once
+  needs a multi-result transcript view; the demo's transcript is deliberately a single
+  conversation, and a second layout would double the window's complexity for a feature an
+  integrator reads about rather than clicks.
+- **Target comparison** (`client.compare`) — same reason, and `anyinfer compare` already
+  demonstrates it in the surface where its tabular output belongs.
+- **Run manifests** (`Generation.manifest`) — the telemetry view shows live events, which
+  is the thing a GUI adds over reading a manifest after the fact.
+- **MCP tool sources** — the tool loop is covered here with in-process tools; adding a
+  server connection would make the demo spawn subprocesses, which its offline-by-default
+  posture rules out.
+
+Adding a demo surface for any of them is a fine change — delete the bullet in the same
+commit. What is not fine is an omission nobody decided on.
 """
 
 from __future__ import annotations
@@ -20,9 +40,9 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QEventLoop, QTimer
 
-from demo_app.config import ProviderConfig, default_config
-from demo_app.engine import Engine
-from demo_app.fake_provider import DEMO_PROVIDER_ID, TOOL_MODEL
+from anyinfer_demo.config import ProviderConfig, default_config
+from anyinfer_demo.engine import Engine
+from anyinfer_demo.fake_provider import DEMO_PROVIDER_ID, TOOL_MODEL
 
 
 def _drain_task(engine: Engine, key: str, timeout_ms: int = 30_000) -> object:
@@ -93,7 +113,7 @@ class TestSetupFieldRendering:
     def test_a_directory_field_gets_a_picker_and_no_url_hint(self, qapp: object):
         """The bug these kinds exist to prevent: a model directory suggesting a URL."""
         from anyinfer.registry import default_registry
-        from demo_app.widgets.settings_dialog import _PathField, _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _PathField, _ProviderPanel
 
         descriptor = default_registry.get("llama-cpp")
         panel = _ProviderPanel(descriptor, ProviderConfig(provider_id="llama-cpp"))
@@ -106,7 +126,7 @@ class TestSetupFieldRendering:
         from PySide6.QtWidgets import QComboBox
 
         from anyinfer.registry import default_registry
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = default_registry.get("llama-cpp")
         panel = _ProviderPanel(descriptor, ProviderConfig(provider_id="llama-cpp"))
@@ -154,7 +174,7 @@ class TestModelsDialog:
     ):
         from PySide6.QtWidgets import QDialogButtonBox
 
-        from demo_app.widgets.models_dialog import ModelsDialog
+        from anyinfer_demo.widgets.models_dialog import ModelsDialog
 
         dialog = ModelsDialog(engine, default_config())
         try:
@@ -179,7 +199,7 @@ class TestModelsDialog:
         from PySide6.QtCore import Qt
 
         from anyinfer.local.hardware import HardwareProfile
-        from demo_app.widgets.models_dialog import _RuntimePanel, _RuntimeReport
+        from anyinfer_demo.widgets.models_dialog import _RuntimePanel, _RuntimeReport
 
         # default_runtime_kind() deliberately asks the real host, not the HardwareProfile
         # passed in below (it decides what to install on *this* machine) — pin the host so
@@ -229,8 +249,8 @@ class TestModelsDialog:
         self, engine: Engine, qapp: object
     ):
         from anyinfer.local.runtimes import InstallReport
-        from demo_app.engine import RuntimeInstallProgress
-        from demo_app.widgets.models_dialog import _RuntimePanel
+        from anyinfer_demo.engine import RuntimeInstallProgress
+        from anyinfer_demo.widgets.models_dialog import _RuntimePanel
 
         configured = default_config().with_provider(
             ProviderConfig(provider_id="llama-cpp", enabled=True)
@@ -251,7 +271,7 @@ class TestModelsDialog:
     def test_runtime_panel_can_select_an_installed_backend(self, engine: Engine, qapp: object):
         from anyinfer.local.hardware import HardwareProfile
         from anyinfer.local.runtimes import InstallReport, RuntimeManifest
-        from demo_app.widgets.models_dialog import _RuntimePanel, _RuntimeReport
+        from anyinfer_demo.widgets.models_dialog import _RuntimePanel, _RuntimeReport
 
         configured = default_config().with_provider(
             ProviderConfig(provider_id="llama-cpp", enabled=True)
@@ -282,7 +302,7 @@ class TestModelsDialog:
         self, engine: Engine, qapp: object
     ):
         from anyinfer.local.store import StoreEntry
-        from demo_app.widgets.models_dialog import _BenchmarkPanel
+        from anyinfer_demo.widgets.models_dialog import _BenchmarkPanel
 
         configured = default_config().with_provider(
             ProviderConfig(provider_id="llama-cpp", enabled=True)
@@ -309,7 +329,7 @@ class TestModelsDialog:
     ):
         from PySide6.QtWidgets import QApplication
 
-        from demo_app.widgets.models_dialog import _scrollable, _SystemPanel
+        from anyinfer_demo.widgets.models_dialog import _scrollable, _SystemPanel
 
         panel = _SystemPanel(engine)
         scroll = _scrollable(panel)
@@ -328,8 +348,8 @@ class TestModelsDialog:
         from anyinfer._client.models import build_catalog_view
         from anyinfer.local.hardware import HardwareProfile
         from anyinfer.registry import default_registry
-        from demo_app.config import DemoConfig
-        from demo_app.widgets.add_model_dialog import AddModelDialog, _acquisition_engine
+        from anyinfer_demo.config import DemoConfig
+        from anyinfer_demo.widgets.add_model_dialog import AddModelDialog, _acquisition_engine
 
         view = build_catalog_view(
             load_default_catalog(),
@@ -378,9 +398,9 @@ class TestModelsDialog:
         from anyinfer import load_default_catalog
         from anyinfer._client.models import build_catalog_view
         from anyinfer.local.hardware import HardwareProfile
-        from demo_app.config import DemoConfig
-        from demo_app.widgets.add_model_dialog import AddModelChoice
-        from demo_app.widgets.models_dialog import _CatalogPanel
+        from anyinfer_demo.config import DemoConfig
+        from anyinfer_demo.widgets.add_model_dialog import AddModelChoice
+        from anyinfer_demo.widgets.models_dialog import _CatalogPanel
 
         config = DemoConfig(
             providers=(
@@ -448,7 +468,7 @@ class TestModelsDialog:
         )
         from anyinfer._client.models import build_catalog_view
         from anyinfer.local.hardware import HardwareProfile
-        from demo_app.widgets.models_dialog import _CatalogPanel
+        from anyinfer_demo.widgets.models_dialog import _CatalogPanel
 
         panel = _CatalogPanel(
             engine,
@@ -496,7 +516,7 @@ class TestModelsDialog:
     def test_system_is_first_and_renders_hardware_fit_guidance(self, engine: Engine, qapp: object):
         from anyinfer import CatalogView
         from anyinfer.local.hardware import Accelerator, HardwareProfile
-        from demo_app.widgets.models_dialog import _CATALOG_KEY, ModelsDialog
+        from anyinfer_demo.widgets.models_dialog import _CATALOG_KEY, ModelsDialog
 
         dialog = ModelsDialog(engine, default_config())
         try:
@@ -548,7 +568,7 @@ class TestModelsDialog:
         self, engine: Engine, qapp: object
     ):
         from anyinfer import Measurement, MeasurementIdentity
-        from demo_app.widgets.models_dialog import ModelsDialog
+        from anyinfer_demo.widgets.models_dialog import ModelsDialog
 
         dialog = ModelsDialog(engine, default_config())
         identity = MeasurementIdentity(provider_id="ollama", model="qwen3:8b")
@@ -584,7 +604,7 @@ class TestModelsDialog:
         from anyinfer import load_default_catalog
         from anyinfer._client.models import build_catalog_view
         from anyinfer.local.hardware import HardwareProfile
-        from demo_app.widgets.models_dialog import _CatalogPanel
+        from anyinfer_demo.widgets.models_dialog import _CatalogPanel
 
         panel = _CatalogPanel(engine, default_config())
         requested: list[bool] = []
@@ -627,8 +647,8 @@ class TestModelsDialog:
         from anyinfer import load_default_catalog
         from anyinfer._client.models import build_catalog_view
         from anyinfer.local.hardware import HardwareProfile
-        from demo_app.widgets.models_dialog import ModelsDialog
-        from demo_app.widgets.tab_widget import BorderedTabWidget
+        from anyinfer_demo.widgets.models_dialog import ModelsDialog
+        from anyinfer_demo.widgets.tab_widget import BorderedTabWidget
 
         monkeypatch.setattr(engine, "local_catalog", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(engine, "installed_models", lambda *_args, **_kwargs: None)
@@ -672,7 +692,7 @@ class TestModelsDialog:
     def test_catalog_replaces_installed_and_engine_pull_tabs(
         self, engine: Engine, qapp: object, monkeypatch: pytest.MonkeyPatch
     ):
-        from demo_app.widgets.models_dialog import ModelsDialog
+        from anyinfer_demo.widgets.models_dialog import ModelsDialog
 
         monkeypatch.setattr(engine, "local_catalog", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(engine, "installed_models", lambda *_args, **_kwargs: None)
@@ -691,7 +711,7 @@ class TestModelsDialog:
         from anyinfer import load_default_catalog
         from anyinfer._client.models import build_catalog_view
         from anyinfer.local.hardware import HardwareProfile
-        from demo_app.widgets.add_model_dialog import AddModelDialog
+        from anyinfer_demo.widgets.add_model_dialog import AddModelDialog
 
         view = build_catalog_view(
             load_default_catalog(),
@@ -713,7 +733,7 @@ class TestModelsDialog:
             dialog.close()
 
     def test_unknown_download_size_reads_as_unknown_not_free(self):
-        from demo_app.widgets.models_dialog import _bytes
+        from anyinfer_demo.widgets.models_dialog import _bytes
 
         assert _bytes(None) == "—"
         assert _bytes(0) == "0 B"
@@ -723,7 +743,7 @@ class TestTargetInspector:
     def test_resolve_reports_provider_and_model_without_a_request(
         self, engine: Engine, qapp: object
     ):
-        from demo_app.widgets.target_inspector import RESOLVE_KEY, TargetInspector
+        from anyinfer_demo.widgets.target_inspector import RESOLVE_KEY, TargetInspector
 
         inspector = TargetInspector(engine)
         inspector.set_target(f"{DEMO_PROVIDER_ID}:reliable")
@@ -739,7 +759,7 @@ class TestTargetInspector:
         self, engine: Engine, qapp: object
     ):
         """A probe costs one request per feature, and the panel says how many it spent."""
-        from demo_app.widgets.target_inspector import PROBE_KEY, TargetInspector
+        from anyinfer_demo.widgets.target_inspector import PROBE_KEY, TargetInspector
 
         inspector = TargetInspector(engine)
         inspector.set_target(f"{DEMO_PROVIDER_ID}:reliable")
@@ -754,7 +774,7 @@ class TestTargetInspector:
     def test_capabilities_are_rendered_with_their_provenance(self):
         """A measured window and a guessed one must not read the same."""
         from anyinfer import Feature, ModelCapabilities, Sourced
-        from demo_app.widgets.target_inspector import _capabilities_lines
+        from anyinfer_demo.widgets.target_inspector import _capabilities_lines
 
         lines = _capabilities_lines(
             ModelCapabilities(
@@ -766,7 +786,7 @@ class TestTargetInspector:
         assert any("STREAMING" in line and "default" in line for line in lines)
 
     def test_buttons_stay_disabled_without_a_target(self, engine: Engine, qapp: object):
-        from demo_app.widgets.target_inspector import TargetInspector
+        from anyinfer_demo.widgets.target_inspector import TargetInspector
 
         inspector = TargetInspector(engine)
         inspector.set_target("")
@@ -777,8 +797,8 @@ class TestTargetInspector:
 class TestToolLoop:
     def test_the_offline_model_drives_a_real_tool_round_trip(self, engine: Engine, qapp: object):
         """The function actually runs — the answer text alone would not prove it did."""
-        from demo_app.widgets import tools_panel
-        from demo_app.widgets.tools_panel import TOOLS_KEY, ToolsPanel
+        from anyinfer_demo.widgets import tools_panel
+        from anyinfer_demo.widgets.tools_panel import TOOLS_KEY, ToolsPanel
 
         panel = ToolsPanel(engine)
         panel.set_target(f"{DEMO_PROVIDER_ID}:{TOOL_MODEL}")
@@ -792,7 +812,7 @@ class TestToolLoop:
         assert "current_time" in panel._output.toPlainText()
 
     def test_run_needs_a_target(self, engine: Engine, qapp: object):
-        from demo_app.widgets.tools_panel import ToolsPanel
+        from anyinfer_demo.widgets.tools_panel import ToolsPanel
 
         panel = ToolsPanel(engine)
         panel.set_target("")
@@ -802,7 +822,7 @@ class TestToolLoop:
 class TestRequestOptions:
     def test_reasoning_effort_defaults_to_sending_nothing(self, qapp: object):
         """Blank means "omit the field", not "minimal" — each provider decides."""
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -817,7 +837,7 @@ class TestRequestOptions:
 
         The fake provider keeps no session, so the honest answer is ``unsupported``.
         """
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -837,7 +857,7 @@ class TestRequestOptions:
         from decimal import Decimal
 
         from anyinfer import CostEstimate
-        from demo_app.main_window import _cost_hint
+        from anyinfer_demo.main_window import _cost_hint
 
         assert _cost_hint(None) == ""
         estimate = CostEstimate(low=Decimal("0.0012"), high=Decimal("0.0034"), currency="USD")
@@ -847,8 +867,8 @@ class TestRequestOptions:
 class TestHistoryAndCachePolicies:
     def test_default_selections_send_no_policy_at_all(self, qapp: object):
         """Both dropdowns default to 'off': no policy object, not a disabled one."""
-        from demo_app.config import default_config
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.config import default_config
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -859,8 +879,8 @@ class TestHistoryAndCachePolicies:
 
     def test_selections_map_to_the_library_policies(self, qapp: object):
         from anyinfer import CachePolicy, HistoryPolicy
-        from demo_app.config import default_config
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.config import default_config
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -873,8 +893,8 @@ class TestHistoryAndCachePolicies:
 
     def test_policies_travel_on_the_generation_spec(self, qapp: object, wait_for_models):
         """What the dropdowns say is what the engine is handed — nothing in between."""
-        from demo_app.config import default_config
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.config import default_config
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -899,7 +919,7 @@ class TestHistoryAndCachePolicies:
         """
         from anyinfer import CachePolicy, Retry, Route, Sampling, user
         from anyinfer.events.telemetry import CachePlanned, ParameterDropped
-        from demo_app.engine import GenerationSpec
+        from anyinfer_demo.engine import GenerationSpec
 
         events = []
         engine.telemetry.connect(events.append)
@@ -916,7 +936,7 @@ class TestHistoryAndCachePolicies:
 
 class TestBenchmarkPair:
     def test_pair_runs_two_and_reports_the_warmth_protocol(self, engine: Engine, qapp: object):
-        from demo_app.widgets.target_inspector import BENCHMARK_KEY, TargetInspector
+        from anyinfer_demo.widgets.target_inspector import BENCHMARK_KEY, TargetInspector
 
         inspector = TargetInspector(engine)
         inspector.set_target(f"{DEMO_PROVIDER_ID}:reliable")
@@ -935,7 +955,7 @@ class TestBenchmarkPair:
 class TestTelemetryRendering:
     def test_context_reduced_and_cache_planned_render_structurally(self, qapp: object):
         from anyinfer.events.telemetry import CachePlanned, ContextReduced
-        from demo_app.widgets.telemetry_view import _details_of
+        from anyinfer_demo.widgets.telemetry_view import _details_of
 
         reduced = _details_of(
             ContextReduced(

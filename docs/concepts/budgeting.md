@@ -70,19 +70,87 @@ explicit about being an estimate by carrying two figures with opposite biases:
 The two consumers need opposite errors: when packing, overestimating keeps the
 application safe; when refusing, only an underestimate justifies the refusal.
 
-Anything more accurate plugs in through the `TokenEstimator` protocol; tiktoken, a
-provider's count-tokens endpoint, llama-server's `/tokenize`. An exact tokenizer returns
-`floor == tokens`, which gives the gate full force:
+## Counting Exactly
+
+`pip install anyinfer[tokenizers]` ships an exact counter for the OpenAI-family
+encodings:
 
 ```python
-class TiktokenEstimator:
-    def estimate(self, text: str) -> ai.TokenEstimate:
-        count = len(encoding.encode(text))
-        return ai.TokenEstimate(count, count)
-
-
-client = ai.Client(providers, estimator=TiktokenEstimator())
+client = ai.Client(providers, estimator=ai.TiktokenEstimator())
 ```
+
+An exact count returns `floor == tokens`, which is what gives the pre-dispatch gate its
+full force. That is the whole benefit, and it is worth being precise about where it lands:
+the planning figure was already roughly right, while the byte **floor** divides by 8 and
+lands somewhere between a third and three quarters of the true count depending on the
+text — widest on code, which tokenizers pack aggressively and a bytes-per-token constant
+cannot. Every point of that gap is a request the gate lets through and the provider then
+rejects.
+
+Constructing one loads a vocabulary, which `tiktoken` fetches over the network unless its
+cache (`TIKTOKEN_CACHE_DIR`) already holds it. That happens at construction rather than at
+first count on purpose: a server should discover a missing vocabulary while starting up,
+not part-way through a request. Pre-warm the cache in an image build if run-time network
+access is not available.
+
+The estimator selects an encoding per model, so one client instance serves a route that
+spans model families. Anthropic, Gemini, and Cohere publish no tokenizer; for their models
+it substitutes the current OpenAI encoding and reports the result as a *guess* — the count
+becomes the planning figure and the floor is held below it, because a substituted encoding
+can over-count and a floor that over-claims refuses requests that would have fit. Still far
+tighter than counting bytes, which is the point of installing it.
+
+For an open-weight family served through an OpenAI-compatible endpoint, where the model id
+tells the tokenizer nothing, pin the encoding instead — that is your assertion about your
+own deployment, and it is trusted as exact:
+
+```python
+client = ai.Client(providers, estimator=ai.TiktokenEstimator("cl100k_base"))
+```
+
+Anything else plugs in through the `TokenEstimator` protocol, and an estimator that
+implements `for_model()` is specialized per target the same way this one is.
+
+### Counting Against a Tokenizer You Cannot Run
+
+Anthropic's vocabulary is not published, and neither is that of whatever quantized GGUF a
+local server happens to be holding. For those two, the exact count has to come from the
+service that owns the tokenizer:
+
+```python
+client = ai.AsyncClient(
+    providers,
+    estimator=ai.AnthropicCountTokensEstimator(api_key=key, model="claude-sonnet-4-5"),
+)
+```
+
+These need a round trip, and `TokenEstimator.estimate` is synchronous — a blocking HTTP
+call underneath it would stall the event loop for every other request in flight. So the
+*fetch* moves ahead of the counting instead: an async client awaits one warm-up call
+before it starts sizing, and the synchronous counting that follows reads what came back.
+Nothing about that is visible at the call site; you configure the estimator and the client
+does the rest.
+
+Two consequences worth knowing. A text that was not warmed falls back to the byte
+heuristic rather than blocking, so an unusual code path gets a worse number and never a
+stalled loop. And a counting service that is down degrades the same way — a request that
+could have been sized approximately should not fail outright for want of an exact number.
+
+`LlamaServerTokenizeEstimator` does the same against a supervised llama-server's
+`/tokenize`, where the tokenizer is the one loaded with the weights.
+
+### When a Floor Is Actually Exact
+
+Being an exact counter is not enough to make a floor exact — it has to be exact *for the
+target being counted*. A `tiktoken` estimator pointed at Claude produces a confident
+number from the wrong vocabulary.
+
+So each provider declares which counting strategy its models use, on
+`TokenCalibration.tokenizer`, with a provenance like every other capability claim. The
+gate treats a floor as certain only when the estimator implements that strategy **and**
+the declaration carries trusted provenance. A `default`-provenance guess about which
+tokenizer applies is not enough, because the gate *refuses* on the floor — and a floor
+that over-claims turns into a refused request that would have fit.
 
 ## When the Provider Bills for More Than You Sent
 

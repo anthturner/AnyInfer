@@ -14,6 +14,23 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 
 </div>
 
+## Ready-Made Sinks
+
+Two sinks for the common cases, so a structured record does not have to be hand-written.
+Both are content-free unless the subscription opts into payloads, and every string they
+emit is redacted. For spans and metrics a backend can aggregate, use the
+OpenTelemetry bridge below instead.
+
+<div class="anyinfer-api-block" markdown>
+
+::: anyinfer.LoggingObserver
+
+::: anyinfer.JsonlObserver
+
+::: anyinfer.events.sinks.event_to_dict
+
+</div>
+
 ## Request Lifecycle Events
 
 <div class="anyinfer-api-block" markdown>
@@ -63,6 +80,12 @@ secrets out of everything. Concepts: [telemetry](../../concepts/telemetry.md) ·
 ::: anyinfer.DownloadProgress
 
 ::: anyinfer.ServerLifecycle
+
+::: anyinfer.CredentialRotated
+
+::: anyinfer.BatchSubmitted
+
+::: anyinfer.BatchCompleted
 
 </div>
 

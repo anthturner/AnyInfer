@@ -36,8 +36,10 @@ Last verified: 2026-08-07 — against the live xAI API documentation (sources be
   `max_tokens`.
 - `reasoning_effort` from normalized effort: `minimal` clamps to `low` (only some models
   accept `none`, and silently disabling reasoning would change the answer more than the
-  caller asked). `grok-4.20` ships as separate `-reasoning`/`-non-reasoning` variants
-  instead of taking the parameter.
+  caller asked). Normalized `none` is passed through as `none` rather than clamped — a
+  model that rejects it should say so, not be sent more reasoning than was requested.
+  `grok-4.20` ships as separate `-reasoning`/`-non-reasoning` variants instead of taking
+  the parameter.
 
 ### Response fields read
 - openai-compat shapes, plus **`usage.cost_in_usd_ticks`** (1 USD = 10^10 ticks): the
@@ -60,6 +62,16 @@ Last verified: 2026-08-07 — against the live xAI API documentation (sources be
 Because all of these are already reflected in `cost_in_usd_ticks`, the reported cost is
 authoritative and the pricing table's entries are a preflight estimate only.
 
+## Server-side tools
+
+Live Search is a **request-level block**, not an entry in `tools`: `search_parameters:
+{"mode": "on"}` beside the messages, with `max_uses` mapped onto `max_search_results`.
+Usage reports what it consulted as `usage.num_sources_used`, so the invocation count comes
+from usage on the way back rather than from a content block or a stream event — the only
+provider bound here that reports it that way.
+
+Only `web_search` is declared. xAI ships no code-execution tool on this API.
+
 ## Watchlist
 - **The Responses API becoming primary.** Chat completions is explicitly legacy; server-
   side tools (web_search, x_search, code_execution, file_search, MCP) are Responses-only.
@@ -68,3 +80,6 @@ authoritative and the pricing table's entries are a preflight estimate only.
   favor of a server-side tools array.
 - Deferred completions (`GET /v1/chat/deferred-completion/{request_id}`) — unused here.
 - Whether raw reasoning content is ever exposed (no `reasoning_content` documented).
+- **Live Search is not verified live.** The `search_parameters` block and
+  `num_sources_used` are read from xAI's published reference rather than from a run
+  against a real key. Noted 2026-08-25.

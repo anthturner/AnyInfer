@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import binascii
+import contextlib
 import datetime as dt
 import json
 import struct
@@ -17,6 +18,7 @@ from anyinfer.providers.cloud_auth import (
     sigv4_headers,
 )
 from anyinfer.providers.eventstream import iter_event_stream
+from support import self_signed_cert
 
 # ---- SigV4 ---------------------------------------------------------------------------
 
@@ -188,6 +190,103 @@ def test_a_credentials_file_that_is_not_a_service_account_is_actionable(tmp_path
         source.token()
 
     assert "service-account" in str(excinfo.value)
+
+
+def test_the_token_exchange_honors_the_instances_connection_settings(monkeypatch, tmp_path):
+    """One instance must not make two different trust decisions.
+
+    The data plane has honored `proxy`/`verify`/`client_cert` per instance since they
+    shipped, but the token exchange opened a bare client — so a Vertex instance behind an
+    intercepting proxy with a corporate CA had `generateContent` succeed and its own
+    authentication fail TLS verification, with nothing saying why.
+    """
+    import ssl
+
+    import httpx2
+
+    seen: dict[str, object] = {}
+
+    class _StopError(Exception):
+        pass
+
+    def recording_client(*args, **kwargs):
+        # Recorded and stopped rather than constructed: what is under test is which
+        # arguments reach httpx, not what httpx then does with them.
+        seen.update(kwargs)
+        raise _StopError
+
+    monkeypatch.setattr(httpx2, "Client", recording_client)
+
+    cert, key, _ = self_signed_cert(tmp_path)
+    source = GoogleTokenSource(
+        options={},
+        proxy="http://corp-proxy:3128",
+        verify=str(cert),
+        client_cert=(str(cert), str(key)),
+    )
+    with contextlib.suppress(_StopError):
+        source._exchange("not-a-real-assertion")
+
+    assert seen["proxy"] == "http://corp-proxy:3128"
+    # Resolved through the shared `tls_kwargs`, so the token exchange gets one SSL context
+    # built exactly the way the data plane builds one — not a CA path and a certificate on
+    # two deprecated keywords that httpx refuses to accept together.
+    assert isinstance(seen["verify"], ssl.SSLContext)
+    assert seen["verify"].verify_mode == ssl.CERT_REQUIRED
+    assert "cert" not in seen
+
+
+def test_an_unreadable_ca_bundle_on_the_token_path_is_a_config_error():
+    """The same actionable failure the data plane gives, not a bare `FileNotFoundError`."""
+    source = GoogleTokenSource(options={}, verify="/no/such/corp-ca.pem")
+    with pytest.raises(ConfigError, match="cannot load the CA bundle"):
+        source._exchange("not-a-real-assertion")
+
+
+def test_a_supplied_transport_takes_over_from_the_connection_settings(monkeypatch):
+    """Same rule as the data plane: a transport owns connection handling entirely."""
+    import httpx2
+
+    seen: dict[str, object] = {}
+
+    class _StopError(Exception):
+        pass
+
+    def recording_client(*args, **kwargs):
+        seen.update(kwargs)
+        raise _StopError
+
+    monkeypatch.setattr(httpx2, "Client", recording_client)
+
+    source = GoogleTokenSource(
+        options={},
+        transport=httpx2.MockTransport(lambda request: httpx2.Response(500)),
+        proxy="http://corp-proxy:3128",
+        verify=False,
+    )
+    with contextlib.suppress(_StopError):
+        source._exchange("not-a-real-assertion")
+
+    assert "proxy" not in seen
+    assert "verify" not in seen
+
+
+def test_vertex_passes_its_connection_settings_to_both_planes():
+    """The adapter rebuilds a config for its Gemini parent; the settings must survive it."""
+    from anyinfer.providers.base import ProviderConfig
+    from anyinfer.providers.vertex import VertexAdapter
+
+    adapter = VertexAdapter(
+        ProviderConfig(
+            provider_id="vertex",
+            options={"project": "p", "location": "global"},
+            proxy="http://corp-proxy:3128",
+            verify=False,
+        )
+    )
+
+    assert adapter._tokens._proxy == "http://corp-proxy:3128"
+    assert adapter._tokens._verify is False
 
 
 # ---- the binary event stream ---------------------------------------------------------

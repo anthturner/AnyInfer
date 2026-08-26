@@ -21,7 +21,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from ..capabilities.pricing import with_operation_cost
-from ..errors import AllTargetsFailedError, ConfigError, ProviderError
+from ..errors import AllTargetsFailedError, AuthError, ConfigError, ProviderError
 from ..events.telemetry import (
     AttemptCompleted,
     AttemptStarted,
@@ -100,6 +100,7 @@ async def _attempt_with_retry(
     request_id: str,
     emit: EmitFn,
     call: Callable[[], Awaitable[tuple[_WireResultT, Timing]]],
+    on_auth_failure: Callable[[], Awaitable[bool]] | None = None,
 ) -> tuple[_WireResultT, Timing, list[AttemptRecord]]:
     """Run one target's retry loop. Returns the wire result, its timing, and attempt log.
 
@@ -107,6 +108,13 @@ async def _attempt_with_retry(
     policy guarantees at least one attempt (``max_attempts >= 1`` is not itself enforced
     here — a policy with zero attempts is a caller error the loop below turns into an
     immediate `ConfigError` rather than ever silently returning nothing).
+
+    ``on_auth_failure`` is consulted only for an `AuthError`, which the default retry
+    predicate declines as deterministic — and normally is. The one case where it is not is
+    a credential that rotated underneath a long-running process: the same request would
+    now succeed with a freshly resolved key. The hook re-resolves and returns whether
+    anything actually changed, so a genuinely wrong key still fails on the first attempt
+    rather than being sent twice.
     """
     attempts: list[AttemptRecord] = []
     attempt_number = 0
@@ -123,7 +131,10 @@ async def _attempt_with_retry(
             attempts.append(
                 AttemptRecord(target=resolved, outcome="failed", error=error_info, timing=timing)
             )
-            if attempt_number >= route.retry.max_attempts or not route.retry.should_retry(exc):
+            retryable = route.retry.should_retry(exc)
+            if not retryable and isinstance(exc, AuthError) and on_auth_failure is not None:
+                retryable = await on_auth_failure()
+            if attempt_number >= route.retry.max_attempts or not retryable:
                 raise
             delay = backoff_delay(attempt_number, route.retry, retry_after_s=exc.retry_after_s)
             emit(
@@ -415,6 +426,9 @@ async def dispatch_embed(
                     request_id=request_id,
                     emit=emit,
                     call=embed_call,
+                    on_auth_failure=functools.partial(
+                        pool.refresh_credential, resolved.provider_id
+                    ),
                 )
             except ProviderError as exc:
                 health.mark_failed(resolved, exc.detail)
@@ -681,6 +695,9 @@ async def dispatch_rerank(
                     request_id=request_id,
                     emit=emit,
                     call=rerank_call,
+                    on_auth_failure=functools.partial(
+                        pool.refresh_credential, resolved.provider_id
+                    ),
                 )
             except ProviderError as exc:
                 health.mark_failed(resolved, exc.detail)

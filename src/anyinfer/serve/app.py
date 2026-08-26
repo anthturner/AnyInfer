@@ -25,7 +25,7 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any
 
 from ..errors import AnyInferError, SchemaViolationError
-from ..types.events import StreamEnded
+from ..types.events import ReasoningDelta, StreamEnded, TextDelta, ToolCallDelta
 from ..types.operations import RerankDocument
 from .embeddings_codec import (
     embedding_request_from_openai,
@@ -41,8 +41,14 @@ from .openai_codec import (
     request_from_openai,
     wants_manifest,
 )
+from .responses_codec import (
+    _ResponseStream,
+    encode_response,
+    request_from_responses,
+    response_stream_events,
+)
 
-__all__ = ["create_app"]
+__all__ = ["DEFAULT_MAX_REQUEST_BYTES", "create_app"]
 
 _SSE_HEADERS = {
     "content-type": "text/event-stream",
@@ -54,11 +60,23 @@ _SSE_HEADERS = {
 }
 
 
+DEFAULT_MAX_REQUEST_BYTES = 10 * 1024 * 1024
+"""Default cap on a request body, in bytes.
+
+Ten megabytes is far above any real chat-completions or embeddings body — a batch of
+thousands of embedding inputs is still well under it — and far below the point where
+buffering hurts. Raise it deliberately if a deployment genuinely sends larger corpora
+through the context extension.
+"""
+
+
 def create_app(
     client: Any,
     *,
     auth_token: str | None = None,
     expose_targets: Sequence[str] = (),
+    context_tuning: Any = None,
+    max_request_bytes: int = DEFAULT_MAX_REQUEST_BYTES,
 ) -> Any:
     """Build the ASGI application.
 
@@ -68,6 +86,13 @@ def create_app(
             which is only appropriate on loopback.
         expose_targets: Concrete ``provider:model`` targets to advertise from
             ``/v1/models``, in addition to catalog aliases.
+        context_tuning: Default `ContextTuning` for wire context requests that omit
+            their own ``tuning`` block — normally the deployment's configured
+            `AnyInferConfig.context`. ``None`` keeps the library defaults.
+        max_request_bytes: Reject a request body larger than this with 413. Every handler
+            buffers its whole body to parse JSON, so without a cap a single client can
+            force unbounded allocation — which matters most when the gateway is exposed
+            off loopback. ``0`` disables the check.
 
     Returns:
         A Starlette application.
@@ -91,7 +116,9 @@ def create_app(
             return _error(starlette, 400, "request body must be a JSON object")
 
         try:
-            target, generation_request, wants_stream = request_from_openai(body)
+            target, generation_request, wants_stream = request_from_openai(
+                body, context_tuning=context_tuning
+            )
             include_manifest = wants_manifest(body)
         except ValueError as exc:
             # A malformed AnyInfer extension field is the client's mistake, and telling it
@@ -127,6 +154,65 @@ def create_app(
                 result,
                 model=target,
                 completion_id=completion_id,
+                created=created,
+                include_manifest=include_manifest,
+            )
+        )
+
+    async def responses(request: Any) -> Any:
+        """Serve ``POST /v1/responses``, OpenAI's current-generation dialect.
+
+        A second codec over the same client, never a second core: it decodes into the
+        identical `GenerationRequest` the chat route
+        builds, and everything after that is shared.
+        """
+        guard = _check_auth(request, auth_token, starlette)
+        if guard is not None:
+            return guard
+
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 — any malformed body is one error to the client
+            return _error(starlette, 400, "request body must be valid JSON")
+        if not isinstance(body, Mapping):
+            return _error(starlette, 400, "request body must be a JSON object")
+
+        try:
+            target, generation_request, wants_stream = request_from_responses(
+                body, context_tuning=context_tuning
+            )
+            include_manifest = wants_manifest(body)
+        except ValueError as exc:
+            return _error(starlette, 400, str(exc))
+        if not target:
+            return _error(starlette, 400, "the 'model' field is required")
+
+        response_id = f"resp_{uuid.uuid4().hex[:24]}"
+        created = int(time.time())
+
+        if wants_stream:
+            return starlette.StreamingResponse(
+                _stream_response_events(
+                    client,
+                    target,
+                    generation_request,
+                    response_id=response_id,
+                    created=created,
+                    include_manifest=_wants_manifest_quietly(body),
+                ),
+                headers=_SSE_HEADERS,
+            )
+
+        try:
+            result = await _generate(client, target, generation_request)
+        except AnyInferError as exc:
+            return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
+
+        return starlette.JSONResponse(
+            encode_response(
+                result,
+                model=target,
+                response_id=response_id,
                 created=created,
                 include_manifest=include_manifest,
             )
@@ -196,7 +282,9 @@ def create_app(
         shaped.pop("targets", None)
         shaped.setdefault("model", targets[0])
         try:
-            _, generation_request, _ = request_from_openai(shaped)
+            _, generation_request, _ = request_from_openai(
+                shaped, context_tuning=context_tuning
+            )
             comparisons = await client.compare(generation_request, targets=targets)
         except AnyInferError as exc:
             return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
@@ -222,7 +310,7 @@ def create_app(
             return _error(starlette, 400, "request body must be a JSON object")
 
         try:
-            target, inputs, kwargs = embedding_request_from_openai(body)
+            target, inputs, kwargs, encoding_format = embedding_request_from_openai(body)
             include_manifest = wants_manifest(body)
         except ValueError as exc:
             return _error(starlette, 400, str(exc))
@@ -232,7 +320,12 @@ def create_app(
         except AnyInferError as exc:
             return _error(starlette, _status_for(exc), str(exc), type(exc).__name__)
         return starlette.JSONResponse(
-            embeddings_response(result, model=target, include_manifest=include_manifest)
+            embeddings_response(
+                result,
+                model=target,
+                include_manifest=include_manifest,
+                encoding_format=encoding_format,
+            )
         )
 
     async def rerank(request: Any) -> Any:
@@ -281,13 +374,17 @@ def create_app(
     routes = [
         starlette.Route("/health", health, methods=["GET"]),
         starlette.Route("/v1/chat/completions", chat_completions, methods=["POST"]),
+        starlette.Route("/v1/responses", responses, methods=["POST"]),
         starlette.Route("/v1/embeddings", embeddings, methods=["POST"]),
         starlette.Route("/v1/anyinfer/rerank", rerank, methods=["POST"]),
         starlette.Route("/v1/models", models, methods=["GET"]),
         starlette.Route("/v1/anyinfer/compare", compare_targets, methods=["POST"]),
         starlette.Route("/v1/{rest:path}", unsupported, methods=["GET", "POST"]),
     ]
-    return starlette.Starlette(routes=routes)
+    app = starlette.Starlette(routes=routes)
+    if max_request_bytes > 0:
+        return _with_body_limit(app, max_request_bytes)
+    return app
 
 
 async def _generate(client: Any, target: str, request: Any) -> Any:
@@ -299,6 +396,9 @@ async def _generate(client: Any, target: str, request: Any) -> Any:
         tools=request.tools,
         tool_choice=request.tool_choice,
         sampling=request.sampling,
+        reasoning=request.reasoning,
+        logprobs=request.logprobs,
+        cite_documents=request.cite_documents,
         history=request.history,
         cache=request.cache,
         arena=request.arena,
@@ -306,6 +406,83 @@ async def _generate(client: Any, target: str, request: Any) -> Any:
         provider_options=request.provider_options,
         metadata=request.metadata,
     )
+
+
+async def _stream_response_events(
+    client: Any,
+    target: str,
+    request: Any,
+    *,
+    response_id: str,
+    created: int,
+    include_manifest: bool,
+) -> AsyncIterator[bytes]:
+    """Project the event stream onto the Responses API's semantic SSE events.
+
+    Unlike the chat projection, every record here carries an ``event:`` line as well as
+    ``data:`` — this dialect's clients dispatch on the event name rather than inspecting
+    the payload — and the sequence is a narrated lifecycle rather than repeated chunks,
+    which the codec's state machine owns.
+    """
+    stream = client.stream(
+        request.messages,
+        target=target,
+        schema=request.schema,
+        tools=request.tools,
+        tool_choice=request.tool_choice,
+        sampling=request.sampling,
+        reasoning=request.reasoning,
+        logprobs=request.logprobs,
+        cite_documents=request.cite_documents,
+        history=request.history,
+        cache=request.cache,
+        arena=request.arena,
+        context=request.context,
+        provider_options=request.provider_options,
+        metadata=request.metadata,
+    )
+    events = response_stream_events(model=target, response_id=response_id, created=created)
+
+    try:
+        try:
+            for opening in events.created():
+                yield _sse_event(opening)
+            async for event in stream:
+                for record in _response_records(events, event):
+                    yield _sse_event(record)
+                if isinstance(event, StreamEnded):
+                    for terminal in events.completed(
+                        event.result, include_manifest=include_manifest
+                    ):
+                        yield _sse_event(terminal)
+        except AnyInferError as exc:
+            yield _sse_event(events.failed(str(exc), type(exc).__name__))
+    finally:
+        # Same reasoning as the chat stream's: ASGI closes this generator the moment a
+        # client disconnects, and without this the provider connection would be released
+        # by garbage collection rather than deterministically.
+        await stream.aclose()
+
+
+def _response_records(events: _ResponseStream, event: Any) -> list[dict[str, Any]]:
+    """Translate one AnyInfer stream event into zero or more Responses records."""
+    if isinstance(event, TextDelta):
+        return events.text_delta(event.text)
+    if isinstance(event, ReasoningDelta):
+        return events.reasoning_delta(event.text)
+    if isinstance(event, ToolCallDelta):
+        return events.tool_delta(
+            event.index, event.call_id, event.name, event.arguments_fragment
+        )
+    # Timing marks and attempt records have no Responses equivalent, exactly as they have
+    # no chat-completions one: they are AnyInfer-native observability.
+    return []
+
+
+def _sse_event(record: Mapping[str, Any]) -> bytes:
+    """Frame one record as an SSE event, naming its type on the ``event:`` line."""
+    kind = str(record.get("type", "message"))
+    return f"event: {kind}\ndata: {json.dumps(record)}\n\n".encode()
 
 
 async def _stream_chunks(
@@ -330,6 +507,9 @@ async def _stream_chunks(
         tools=request.tools,
         tool_choice=request.tool_choice,
         sampling=request.sampling,
+        reasoning=request.reasoning,
+        logprobs=request.logprobs,
+        cite_documents=request.cite_documents,
         history=request.history,
         cache=request.cache,
         arena=request.arena,
@@ -415,12 +595,22 @@ def _sse(payload: Mapping[str, Any]) -> bytes:
 
 
 def _check_auth(request: Any, auth_token: str | None, starlette: Any) -> Any:
-    """Verify the bearer token, if one is configured."""
+    """Verify the bearer token, if one is configured.
+
+    Both sides are encoded to bytes before comparison: `compare_digest` raises
+    `TypeError` on a str holding any character above U+007F, and Starlette decodes
+    header values as latin-1, so a single byte >= 0x80 in the Authorization value would
+    turn this 401 into an unhandled 500 mintable by any unauthenticated client.
+    Encoding is a bijection on str, so equality is preserved exactly.
+    """
     if auth_token is None:
         return None
     header = request.headers.get("authorization", "")
     presented = header[7:] if header.lower().startswith("bearer ") else ""
-    if not secrets.compare_digest(presented, auth_token):
+    if not secrets.compare_digest(
+        presented.encode("utf-8", "surrogateescape"),
+        auth_token.encode("utf-8", "surrogateescape"),
+    ):
         return _error(starlette, 401, "invalid or missing bearer token", "invalid_api_key")
     return None
 
@@ -433,6 +623,110 @@ def _status_for(exc: AnyInferError) -> int:
     if isinstance(status, int) and 400 <= status < 600:
         return status
     return 502
+
+
+def _with_body_limit(app: Any, limit: int) -> Any:
+    """Wrap an ASGI app so oversized request bodies are refused with 413.
+
+    Enforced *while reading* rather than by trusting ``content-length``: that header is
+    absent on a chunked request and can simply lie on any other, so a check against it
+    alone is advisory. This reads at most ``limit`` bytes plus the first chunk that
+    crosses the line, then replays the buffered body to the wrapped app — bounded
+    allocation either way, and the handlers buffer the whole body to parse JSON anyway,
+    so nothing downstream loses streaming it did not already lose.
+    """
+
+    async def limited(scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await app(scope, receive, send)
+            return
+
+        # A declared length over the limit is refused without reading the body at all;
+        # an honest client gets a fast answer instead of uploading megabytes first.
+        declared = None
+        for key, value in scope.get("headers") or ():
+            if key.lower() == b"content-length":
+                declared = value
+                break
+        if declared is not None:
+            try:
+                if int(declared) > limit:
+                    await _send_too_large(send, limit)
+                    return
+            except ValueError:
+                pass  # unparseable: fall through to the read-side check
+
+        chunks: list[bytes] = []
+        total = 0
+        more = True
+        while more:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                # Forward the disconnect rather than the partial body. Replaying what
+                # arrived so far with ``more_body: False`` would present a truncation as a
+                # complete request: truncated JSON almost always 400s, but a truncation
+                # landing on a JSON boundary would be dispatched for real -- spending
+                # budget and emitting telemetry for a response that goes nowhere.
+                await app(scope, _disconnected(), send)
+                return
+            chunks.append(message.get("body", b""))
+            total += len(chunks[-1])
+            if total > limit:
+                await _send_too_large(send, limit)
+                return
+            more = message.get("more_body", False)
+
+        await app(scope, _replay(chunks), send)
+
+    return limited
+
+
+def _disconnected() -> Any:
+    """A receive channel reporting only that the client went away."""
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.disconnect"}
+
+    return receive
+
+
+def _replay(chunks: list[bytes]) -> Any:
+    """Hand the already-read body to the wrapped app as a fresh receive channel."""
+    body = b"".join(chunks)
+    sent = False
+
+    async def receive() -> dict[str, Any]:
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        return {"type": "http.disconnect"}
+
+    return receive
+
+
+async def _send_too_large(send: Any, limit: int) -> None:
+    """Emit an OpenAI-shaped 413 without needing the Starlette response classes."""
+    payload = json.dumps(
+        {
+            "error": {
+                "message": f"request body exceeds the {limit}-byte limit",
+                "type": "invalid_request_error",
+                "code": None,
+            }
+        }
+    ).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(payload)).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": payload})
 
 
 def _error(starlette: Any, status: int, message: str, kind: str = "invalid_request_error") -> Any:

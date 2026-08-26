@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import httpx2
 import pytest
 
 import anyinfer as ai
@@ -656,6 +657,12 @@ class TestEveryProviderIsWellFormed:
                 provider_id=descriptor.id,
                 base_url=descriptor.default_base_url or "https://fake.invalid/v1",
                 api_key="test-key",
+                # A mock transport, though nothing here makes a call. This walks the whole
+                # registry, and a real client per adapter builds a real SSL context that
+                # opens trust-store CA files — dozens of handles nothing closes, which
+                # resurface as unraisable exceptions in whichever test the collector
+                # happens to interrupt.
+                transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
             )
             try:
                 assert descriptor.factory(config) is not None

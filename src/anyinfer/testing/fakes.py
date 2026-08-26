@@ -14,7 +14,8 @@ import json
 import struct
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+from urllib.parse import unquote
 
 import httpx2
 
@@ -26,6 +27,7 @@ __all__ = [
     "FakeOllamaServer",
     "FakeOpenAIServer",
     "FakeResponse",
+    "FakeResponsesBatchServer",
     "FakeResponsesServer",
     "FakeRetrievalServer",
     "chunk_text",
@@ -72,6 +74,12 @@ class FakeResponse:
         malformed_sse: Emit an unparseable SSE data field, to exercise error handling.
         ignore_stream: Answer a streaming request with a buffered JSON body.
         omit_usage_chunk: Stream without a terminal usage chunk.
+        logprobs: Report these per-token log-probabilities, as ``(token, logprob)``
+            pairs, but **only when the request asked for them**. A fake that answered
+            with log-probabilities nobody requested would let an adapter that never sends
+            the field pass a test for sending it.
+        top_logprobs: Alternatives to attach to each reported token, as ``(token,
+            logprob)`` pairs. Sent only when the request asked for a positive count.
     """
 
     text: str = "Hello from the fake provider."
@@ -91,6 +99,8 @@ class FakeResponse:
     malformed_sse: bool = False
     ignore_stream: bool = False
     omit_usage_chunk: bool = False
+    logprobs: tuple[tuple[str, float], ...] = ()
+    top_logprobs: tuple[tuple[str, float], ...] = ()
 
 
 CONFORMANCE_SCENARIOS: tuple[str, ...] = (
@@ -266,11 +276,15 @@ class FakeOpenAIServer(_FakeServerBase):
                 headers=dict(response.headers),
             )
 
+        asked_for_logprobs = bool(body.get("logprobs"))
+        wants_alternatives = asked_for_logprobs and bool(body.get("top_logprobs"))
         wants_stream = bool(body.get("stream")) and not response.ignore_stream
         if wants_stream:
             return httpx2.Response(
                 200,
-                content=self._stream_body(response),
+                content=self._stream_body(
+                    response, logprobs=asked_for_logprobs, alternatives=wants_alternatives
+                ),
                 headers={
                     "content-type": "text/event-stream",
                     **dict(response.headers),
@@ -278,7 +292,9 @@ class FakeOpenAIServer(_FakeServerBase):
             )
         return httpx2.Response(
             200,
-            json=self._completion_body(response),
+            json=self._completion_body(
+                response, logprobs=asked_for_logprobs, alternatives=wants_alternatives
+            ),
             headers=dict(response.headers),
         )
 
@@ -332,7 +348,35 @@ class FakeOpenAIServer(_FakeServerBase):
         seed = sum(ord(c) for c in text) or 1
         return [round(((seed * (i + 1)) % 97) / 97 + 0.05, 6) for i in range(self._dimensions)]
 
-    def _completion_body(self, response: FakeResponse) -> dict[str, Any]:
+    def _logprobs_block(
+        self, response: FakeResponse, *, alternatives: bool
+    ) -> dict[str, Any] | None:
+        """The dialect's ``logprobs`` object, or ``None`` when the script has none."""
+        if not response.logprobs:
+            return None
+        top = (
+            [
+                {"token": token, "logprob": logprob, "bytes": list(token.encode())}
+                for token, logprob in response.top_logprobs
+            ]
+            if alternatives
+            else []
+        )
+        return {
+            "content": [
+                {
+                    "token": token,
+                    "logprob": logprob,
+                    "bytes": list(token.encode()),
+                    "top_logprobs": top,
+                }
+                for token, logprob in response.logprobs
+            ]
+        }
+
+    def _completion_body(
+        self, response: FakeResponse, *, logprobs: bool = False, alternatives: bool = False
+    ) -> dict[str, Any]:
         message: dict[str, Any] = {"role": "assistant", "content": response.text or None}
         if response.reasoning and self._reasoning_field:
             message[self._reasoning_field] = response.reasoning
@@ -351,11 +395,17 @@ class FakeOpenAIServer(_FakeServerBase):
             "model": "fake-model-small",
             "choices": [{"index": 0, "message": message, "finish_reason": response.finish_reason}],
         }
+        if logprobs:
+            block = self._logprobs_block(response, alternatives=alternatives)
+            if block is not None:
+                body["choices"][0]["logprobs"] = block
         if response.usage is not None:
             body["usage"] = dict(response.usage)
         return body
 
-    def _stream_body(self, response: FakeResponse) -> bytes:
+    def _stream_body(
+        self, response: FakeResponse, *, logprobs: bool = False, alternatives: bool = False
+    ) -> bytes:
         if response.malformed_sse:
             return b"data: {not json at all\n\n"
 
@@ -394,6 +444,13 @@ class FakeOpenAIServer(_FakeServerBase):
 
         final = self._delta_chunk({})
         final["choices"][0]["finish_reason"] = response.finish_reason
+        if logprobs:
+            block = self._logprobs_block(response, alternatives=alternatives)
+            if block is not None:
+                # One chunk carrying every token, which is the shape a provider produces
+                # when its last delta closes the message. The adapter accumulates across
+                # chunks, so a single-chunk script still exercises the accumulation path.
+                final["choices"][0]["logprobs"] = block
         chunks.append(final)
 
         if response.usage is not None and not response.omit_usage_chunk:
@@ -415,6 +472,181 @@ class FakeOpenAIServer(_FakeServerBase):
             "model": "fake-model-small",
             "choices": [{"index": 0, "delta": dict(delta), "finish_reason": None}],
         }
+
+
+class FakeResponsesBatchServer(_FakeServerBase):
+    """The OpenAI Batch API's three-step lifecycle, in process.
+
+    Deliberately models all three steps rather than collapsing them: a JSONL file is
+    uploaded to ``/files``, the batch references it by id, and results come back as *two*
+    more files — successes in ``output_file_id`` and rejections in ``error_file_id``. An
+    adapter that read only the first would silently drop every failure and return a batch
+    that looks smaller than it was, which is a fake's job to catch.
+
+    Args:
+        responses: Scenario script. Only ``text`` and ``status`` apply here.
+        polls_before_done: Status polls the batch reports in progress for before it ends.
+            At least one, so a caller must always poll — a fake that finished immediately
+            could not exercise the poll-then-fetch shape a deferred API exists for.
+        failures: How many lines land in the error file rather than the output file.
+        dialect: Which body shape answered lines carry. ``responses`` is OpenAI's own;
+            ``chat`` is what every provider that copied the Batch API onto chat
+            completions returns (Groq). The lifecycle is byte-identical between them —
+            only the line bodies differ — which is exactly why one fake covers both.
+
+    Attributes:
+        requests: Every request body received, for assertions.
+        uploaded: The JSONL text of each uploaded input file, in order.
+    """
+
+    def __init__(
+        self,
+        responses: Sequence[FakeResponse] | FakeResponse | None = None,
+        *,
+        polls_before_done: int = 1,
+        failures: int = 0,
+        dialect: Literal["responses", "chat"] = "responses",
+    ) -> None:
+        super().__init__(responses)
+        self.polls_before_done = max(1, polls_before_done)
+        self.failures = failures
+        self.dialect = dialect
+        self.uploaded: list[str] = []
+        self._lines: list[str] = []
+        self._polls = 0
+        self._cancelled = False
+
+    def next_response(self) -> FakeResponse:
+        """The response every line's body is built from."""
+        return self._responses[min(self._call_index, len(self._responses) - 1)]
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/files") and request.method == "POST":
+            return self._handle_upload(request)
+        if "/files/" in path and path.endswith("/content"):
+            return self._handle_download(path)
+        if path.endswith("/batches") and request.method == "POST":
+            return self._handle_submit(request)
+        if path.endswith("/cancel"):
+            self._cancelled = True
+            return httpx2.Response(200, json=self._batch_object())
+        if "/batches/" in path:
+            self._polls += 1
+            return httpx2.Response(200, json=self._batch_object())
+        return httpx2.Response(404, json={"error": {"message": f"no such path: {path}"}})
+
+    def _handle_upload(self, request: httpx2.Request) -> httpx2.Response:
+        """Accept the multipart upload and remember its JSONL, for assertions."""
+        body = request.content.decode("utf-8", "replace")
+        # Pull the file part out of the multipart envelope without a parser: every line
+        # that looks like one of our own JSONL records is one.
+        self.uploaded.append(
+            "\n".join(line for line in body.splitlines() if line.startswith('{"custom_id"'))
+        )
+        self._lines = [
+            json.loads(line)["custom_id"]
+            for line in self.uploaded[-1].splitlines()
+            if line.strip()
+        ]
+        return httpx2.Response(200, json={"id": "file-input", "object": "file"})
+
+    def _handle_submit(self, request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content or b"{}")
+        self.requests.append(body)
+        self._polls = 0
+        self._cancelled = False
+        return httpx2.Response(200, json=self._batch_object())
+
+    def _batch_object(self) -> dict[str, Any]:
+        done = self._cancelled or self._polls >= self.polls_before_done
+        failures = min(self.failures, len(self._lines))
+        status = "cancelled" if self._cancelled else ("completed" if done else "in_progress")
+        body: dict[str, Any] = {
+            "id": "batch_fake",
+            "object": "batch",
+            "status": status,
+            "request_counts": {
+                "total": len(self._lines),
+                "completed": len(self._lines) - failures if done else 0,
+                "failed": failures if done else 0,
+            },
+        }
+        if done:
+            body["output_file_id"] = "file-output"
+            if failures:
+                body["error_file_id"] = "file-errors"
+        return body
+
+    def _handle_download(self, path: str) -> httpx2.Response:
+        failures = min(self.failures, len(self._lines))
+        succeeded = self._lines[failures:]
+        rejected = self._lines[:failures]
+        if path.endswith("file-errors/content"):
+            return httpx2.Response(200, text=self._error_manifest(rejected))
+        return httpx2.Response(200, text=self._output_manifest(succeeded))
+
+    def _output_manifest(self, custom_ids: Sequence[str]) -> str:
+        """Successful lines, in *completion* order — which is not submission order."""
+        response = self.next_response()
+        entries = [
+            {
+                "id": f"batch_req_{custom_id}",
+                "custom_id": custom_id,
+                "response": {
+                    "status_code": 200,
+                    "body": self._line_body(custom_id, f"{response.text} #{custom_id}"),
+                },
+                "error": None,
+            }
+            for custom_id in custom_ids
+        ]
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
+
+    def _line_body(self, custom_id: str, text: str) -> dict[str, Any]:
+        """One answered line's body, in whichever dialect this fake serves."""
+        if self.dialect == "chat":
+            return {
+                "id": f"chatcmpl_{custom_id}",
+                "object": "chat.completion",
+                "model": "fake-chat",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": text},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18},
+            }
+        return {
+            "id": f"resp_{custom_id}",
+            "object": "response",
+            "status": "completed",
+            "model": "fake-gpt",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": text}],
+                }
+            ],
+            "usage": {"input_tokens": 11, "output_tokens": 7, "total_tokens": 18},
+        }
+
+    def _error_manifest(self, custom_ids: Sequence[str]) -> str:
+        """Rejected lines, which live in their own file rather than beside the successes."""
+        return "\n".join(
+            json.dumps(
+                {
+                    "id": f"batch_req_{custom_id}",
+                    "custom_id": custom_id,
+                    "response": None,
+                    "error": {"code": "invalid_request", "message": "line rejected"},
+                }
+            )
+            for custom_id in custom_ids
+        )
 
 
 class FakeRetrievalServer(_FakeServerBase):
@@ -718,9 +950,17 @@ class FakeBedrockServer(_FakeServerBase):
         models: Model ids reported by the control plane's ``/foundation-models``.
         chunk_size: Characters per streamed text delta.
         dimensions: Width of the vectors ``/invoke`` returns.
+        batch_polls_before_done: Status polls a submitted job reports in progress for
+            before it finishes. At least one, so a caller must always poll.
+        batch_failures: How many records come back carrying an ``error`` rather than a
+            ``modelOutput``. Bedrock puts both in the same object, unlike OpenAI's two
+            files, and an adapter that assumed one or the other would drop them.
 
     Attributes:
         requests: Every request body received, for assertions.
+        objects: Every S3 object written, keyed by URL — a batch is staged in the
+            caller's own bucket rather than uploaded over the API, so the fake has to
+            stand in for S3 as well as for Bedrock.
     """
 
     def __init__(
@@ -733,11 +973,19 @@ class FakeBedrockServer(_FakeServerBase):
         ),
         chunk_size: int = 4,
         dimensions: int = 8,
+        batch_polls_before_done: int = 1,
+        batch_failures: int = 0,
     ) -> None:
         super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
         self._dimensions = dimensions
+        self.objects: dict[str, bytes] = {}
+        self.batch_polls_before_done = max(1, batch_polls_before_done)
+        self.batch_failures = batch_failures
+        self._batch_polls = 0
+        self._batch_stopped = False
+        self._batch_records: list[str] = []
 
     def next_response(self) -> FakeResponse:
         """The response for the next call."""
@@ -746,6 +994,10 @@ class FakeBedrockServer(_FakeServerBase):
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
+        if ".s3." in request.url.host:
+            return self._handle_s3(request)
+        if "/model-invocation-job" in path:
+            return self._handle_batch(request)
         if path.endswith("/foundation-models"):
             return httpx2.Response(
                 200,
@@ -764,6 +1016,90 @@ class FakeBedrockServer(_FakeServerBase):
         if path.endswith("/rerank"):
             return self._rerank(request)
         return httpx2.Response(404, json={"message": f"no such path: {path}"})
+
+    # ---- deferred batches, and the bucket they are staged in ---------------------------
+
+    def _handle_s3(self, request: httpx2.Request) -> httpx2.Response:
+        """Stand in for the caller's own S3 bucket.
+
+        Bedrock's batch tier never carries the job over the API: the input is an object
+        the client writes and the output is an object it reads. Modeling that here rather
+        than pretending the API takes the lines is the point — an adapter that skipped the
+        staging step would pass a fake that skipped it too.
+        """
+        key = str(request.url)
+        if request.method == "PUT":
+            self.objects[key] = request.content
+            self._batch_records = [
+                json.loads(line)["recordId"]
+                for line in request.content.decode("utf-8").splitlines()
+                if line.strip()
+            ]
+            return httpx2.Response(200)
+        if key in self.objects:
+            return httpx2.Response(200, content=self.objects[key])
+        if key.endswith(".jsonl.out"):
+            return httpx2.Response(200, text=self._batch_manifest())
+        return httpx2.Response(404, text="<Error><Code>NoSuchKey</Code></Error>")
+
+    def _handle_batch(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if request.method == "POST" and path.endswith("/model-invocation-job"):
+            self.requests.append(json.loads(request.content or b"{}"))
+            self._batch_polls = 0
+            self._batch_stopped = False
+            return httpx2.Response(
+                200,
+                json={"jobArn": "arn:aws:bedrock:us-east-1:1234:model-invocation-job/fake"},
+            )
+        if path.endswith("/stop"):
+            self._batch_stopped = True
+            return httpx2.Response(200, json={})
+        self._batch_polls += 1
+        return httpx2.Response(200, json={"status": self._batch_status()})
+
+    def _batch_status(self) -> str:
+        if self._batch_stopped:
+            return "Stopped"
+        return (
+            "Completed"
+            if self._batch_polls >= self.batch_polls_before_done
+            else "InProgress"
+        )
+
+    def _batch_manifest(self) -> str:
+        """Answered records, in completion order — which is not submission order."""
+        response = self.next_response()
+        failures = min(self.batch_failures, len(self._batch_records))
+        entries: list[dict[str, Any]] = []
+        for index, record_id in enumerate(self._batch_records):
+            if index < failures:
+                entries.append(
+                    {
+                        "recordId": record_id,
+                        "error": {
+                            "errorCode": "ValidationException",
+                            "errorMessage": "record rejected",
+                        },
+                    }
+                )
+                continue
+            entries.append(
+                {
+                    "recordId": record_id,
+                    "modelOutput": {
+                        "output": {
+                            "message": {
+                                "role": "assistant",
+                                "content": [{"text": f"{response.text} #{record_id}"}],
+                            }
+                        },
+                        "stopReason": "end_turn",
+                        "usage": {"inputTokens": 11, "outputTokens": 7, "totalTokens": 18},
+                    },
+                }
+            )
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
 
     def _consume(self, request: httpx2.Request) -> tuple[dict[str, Any], FakeResponse]:
         body = json.loads(request.content or b"{}")
@@ -982,6 +1318,13 @@ class FakeAnthropicServer(_FakeServerBase):
             exhausted, so a single-element list serves every request.
         models: Model ids reported by ``GET /v1/models``.
         chunk_size: Characters per streamed text delta.
+        batch_polls_before_done: How many status polls a submitted batch reports
+            ``in_progress`` for before it ends. At least one, so a caller must always poll
+            at least once — a fake that ended immediately could never exercise the
+            poll-then-fetch shape that is the whole point of a deferred API.
+        batch_failures: How many of a batch's lines come back as per-line errors. A batch
+            is not all-or-nothing, and a result type that could not carry a partial failure
+            would force the whole job to be discarded over one bad request.
         page_size: Model ids per listing page. The listing is cursor-paginated, and an
             adapter that ignores ``has_more`` silently reports only the first page --
             which looks like a working discovery call.
@@ -997,11 +1340,18 @@ class FakeAnthropicServer(_FakeServerBase):
         models: Sequence[str] = ("claude-sonnet-4-5", "claude-opus-4-1"),
         chunk_size: int = 4,
         page_size: int = 1,
+        batch_polls_before_done: int = 1,
+        batch_failures: int = 0,
     ) -> None:
         super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
         self._page_size = max(1, page_size)
+        self.batch_polls_before_done = max(1, batch_polls_before_done)
+        self.batch_failures = batch_failures
+        self._batch_lines: list[str] = []
+        self._batch_polls = 0
+        self._batch_cancelled = False
 
     def next_response(self) -> FakeResponse:
         """The response for the next generation call."""
@@ -1014,9 +1364,98 @@ class FakeAnthropicServer(_FakeServerBase):
             return self._handle_models(request)
         if path.endswith("/v1/messages"):
             return self._handle_messages(request)
+        if "/v1/messages/batches" in path or path.endswith("/batch-results"):
+            return self._handle_batch(request)
         return httpx2.Response(
             404, json={"type": "error", "error": {"type": "not_found", "message": path}}
         )
+
+    # ---- batches ---------------------------------------------------------------------
+    #
+    # A whole deferred job in one in-process fake: submit, poll, cancel, and download. The
+    # state machine is deliberately real — a batch reports `in_progress` until it is polled
+    # `batch_polls_before_done` times — because the property worth testing is that a caller
+    # polls to a terminal status and only then fetches, which a fake that answered
+    # `ended` immediately could never exercise.
+
+    def _handle_batch(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith("/batch-results"):
+            return httpx2.Response(200, text=self._batch_manifest())
+        if request.method == "POST" and path.endswith("/v1/messages/batches"):
+            body = json.loads(request.content or b"{}")
+            self.requests.append(body)
+            self._batch_lines = [str(entry.get("custom_id", "")) for entry in body["requests"]]
+            self._batch_polls = 0
+            self._batch_cancelled = False
+            return httpx2.Response(200, json=self._batch_object())
+        if path.endswith("/cancel"):
+            self._batch_cancelled = True
+            return httpx2.Response(200, json=self._batch_object())
+        self._batch_polls += 1
+        return httpx2.Response(200, json=self._batch_object())
+
+    def _batch_object(self) -> dict[str, Any]:
+        """The batch as the API reports it right now."""
+        done = self._batch_cancelled or self._batch_polls >= self.batch_polls_before_done
+        failures = min(self.batch_failures, len(self._batch_lines))
+        body: dict[str, Any] = {
+            "id": "msgbatch_fake",
+            "type": "message_batch",
+            "processing_status": "ended" if done else "in_progress",
+            "request_counts": {
+                "succeeded": len(self._batch_lines) - failures if done else 0,
+                "errored": failures if done else 0,
+                "expired": 0,
+                "processing": 0 if done else len(self._batch_lines),
+            },
+        }
+        if self._batch_cancelled:
+            body["cancel_initiated_at"] = "2026-08-25T00:00:00Z"
+        if done:
+            body["results_url"] = "https://fake.invalid/batch-results"
+        return body
+
+    def _batch_manifest(self) -> str:
+        """The JSONL manifest, in *completion* order — which is not submission order.
+
+        Reversed on purpose. Providers return whatever finished first, and a caller zipping
+        results against their own inputs must not have to sort; that ordering is the core's
+        job and this is what proves it does it.
+        """
+        response = self.next_response()
+        failures = min(self.batch_failures, len(self._batch_lines))
+        entries: list[dict[str, Any]] = []
+        for position, custom_id in enumerate(self._batch_lines):
+            if position < failures:
+                entries.append(
+                    {
+                        "custom_id": custom_id,
+                        "result": {
+                            "type": "errored",
+                            "error": {"type": "invalid_request", "message": "line rejected"},
+                        },
+                    }
+                )
+                continue
+            entries.append(
+                {
+                    "custom_id": custom_id,
+                    "result": {
+                        "type": "succeeded",
+                        "message": {
+                            "id": f"msg_{custom_id}",
+                            "type": "message",
+                            "role": "assistant",
+                            "model": "fake-claude",
+                            "content": [{"type": "text", "text": f"{response.text} #{custom_id}"}],
+                            "stop_reason": "end_turn",
+                            "usage": {"input_tokens": 11, "output_tokens": 7},
+                        },
+                    },
+                }
+            )
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
 
     def _handle_models(self, request: httpx2.Request) -> httpx2.Response:
         after = request.url.params.get("after_id")
@@ -1163,13 +1602,25 @@ class FakeGeminiServer(_FakeServerBase):
         *,
         models: Sequence[str] = ("gemini-2.5-flash", "gemini-2.5-pro"),
         chunk_size: int = 4,
+        batch_polls_before_done: int = 1,
+        batch_failures: int = 0,
     ) -> None:
         super().__init__(responses)
         self._models = list(models)
         self._chunk_size = chunk_size
+        self.objects: dict[str, bytes] = {}
+        self.batch_polls_before_done = max(1, batch_polls_before_done)
+        self.batch_failures = batch_failures
+        self._batch_polls = 0
+        self._batch_cancelled = False
+        self._batch_lines: list[dict[str, Any]] = []
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
+        if request.url.host == "storage.googleapis.com":
+            return self._handle_gcs(request)
+        if "batchPredictionJobs" in path:
+            return self._handle_batch(request)
         if path.endswith("/models"):
             return httpx2.Response(
                 200,
@@ -1198,6 +1649,109 @@ class FakeGeminiServer(_FakeServerBase):
         return httpx2.Response(
             404, json={"error": {"code": 404, "message": f"no such path: {path}"}}
         )
+
+    # ---- deferred batches, and the bucket they are staged in ---------------------------
+
+    def _handle_gcs(self, request: httpx2.Request) -> httpx2.Response:
+        """Stand in for the caller's own GCS bucket.
+
+        Vertex's batch tier never carries the job over the API: the input is an object
+        the client writes and the predictions are an object it reads. Modeling the
+        staging step rather than pretending the API takes the lines is the point.
+        """
+        if request.method == "POST":
+            name = request.url.params.get("name", "")
+            self.objects[name] = request.content
+            self._batch_lines = [
+                json.loads(line)
+                for line in request.content.decode("utf-8").splitlines()
+                if line.strip()
+            ]
+            return httpx2.Response(200, json={"name": name})
+        key = unquote(request.url.path.rsplit("/o/", 1)[-1])
+        if key.endswith("predictions.jsonl"):
+            return httpx2.Response(200, text=self._predictions())
+        if key in self.objects:
+            return httpx2.Response(200, content=self.objects[key])
+        return httpx2.Response(404, json={"error": {"message": f"no such object: {key}"}})
+
+    def _handle_batch(self, request: httpx2.Request) -> httpx2.Response:
+        path = request.url.path
+        if path.endswith(":cancel"):
+            self._batch_cancelled = True
+            return httpx2.Response(200, json={})
+        if request.method == "POST":
+            self.requests.append(json.loads(request.content or b"{}"))
+            self._batch_polls = 0
+            self._batch_cancelled = False
+            return httpx2.Response(
+                200,
+                json={
+                    "name": "projects/p/locations/us-central1/batchPredictionJobs/9",
+                    "state": "JOB_STATE_PENDING",
+                },
+            )
+        self._batch_polls += 1
+        return httpx2.Response(200, json=self._job_object())
+
+    def _job_object(self) -> dict[str, Any]:
+        if self._batch_cancelled:
+            return {"state": "JOB_STATE_CANCELLED"}
+        if self._batch_polls < self.batch_polls_before_done:
+            return {"state": "JOB_STATE_RUNNING"}
+        failures = min(self.batch_failures, len(self._batch_lines))
+        return {
+            "state": "JOB_STATE_SUCCEEDED",
+            "completionStats": {
+                "successfulCount": len(self._batch_lines) - failures,
+                "failedCount": failures,
+            },
+            # A timestamped directory of the API's own naming, under the requested
+            # prefix — the reason the output path cannot simply be predicted.
+            "outputInfo": {
+                "gcsOutputDirectory": f"{self._batch_prefix()}/prediction-2026-08-25T00:00:00Z"
+            },
+        }
+
+    def _batch_prefix(self) -> str:
+        submitted = self.requests[-1] if self.requests else {}
+        output = submitted.get("outputConfig", {}) if isinstance(submitted, dict) else {}
+        destination = output.get("gcsDestination", {}) if isinstance(output, dict) else {}
+        return str(destination.get("outputUriPrefix", "gs://fake/out"))
+
+    def _predictions(self) -> str:
+        """Answered predictions, in an order the API does not promise."""
+        response = self._responses[min(self._call_index, len(self._responses) - 1)]
+        failures = min(self.batch_failures, len(self._batch_lines))
+        entries: list[dict[str, Any]] = []
+        for index, line in enumerate(self._batch_lines):
+            request_body = line.get("request", {})
+            line_id = request_body.get("labels", {}).get("anyinfer_line_id", "")
+            if index < failures:
+                entries.append({"request": request_body, "status": "line rejected"})
+                continue
+            entries.append(
+                {
+                    "request": request_body,
+                    "response": {
+                        "candidates": [
+                            {
+                                "content": {
+                                    "role": "model",
+                                    "parts": [{"text": f"{response.text} #{line_id}"}],
+                                },
+                                "finishReason": "STOP",
+                            }
+                        ],
+                        "usageMetadata": {
+                            "promptTokenCount": 11,
+                            "candidatesTokenCount": 7,
+                            "totalTokenCount": 18,
+                        },
+                    },
+                }
+            )
+        return "\n".join(json.dumps(entry) for entry in reversed(entries))
 
     def _handle_predict(self, request: httpx2.Request) -> httpx2.Response:
         """Serve ``:predict``, sharing the scenario script with generation.

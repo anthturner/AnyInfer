@@ -42,9 +42,12 @@ body dialect the way `embed()` needs. See `contracts/bedrock.md` for the citatio
 from __future__ import annotations
 
 import json
+import time
+import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import aclosing
 from typing import Any
+from urllib.parse import quote
 
 import httpx2
 
@@ -60,14 +63,33 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
-from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent, RerankCapabilities
+from ..types.operations import (
+    BatchHandle,
+    BatchLine,
+    BatchReport,
+    BatchResult,
+    BatchStatus,
+    EmbeddingCapabilities,
+    EmbeddingInputIntent,
+    RerankCapabilities,
+)
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
+from ..types.results import (
+    DETAIL_MAX_CHARS,
+    FinishReason,
+    Generation,
+    ResolvedTarget,
+    Timing,
+    Usage,
+)
 from ._multimodal import base64_data, media_subtype, neutral_filename, unsupported
+from ._openai_batch import batch_error
 from .base import (
     AdapterEvent,
     AdapterFinal,
+    BatchWireRequest,
     EmbeddingWireRequest,
     EmbeddingWireResult,
     ProviderConfig,
@@ -161,6 +183,9 @@ class BedrockAdapter:
             headers={"content-type": "application/json"},
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     # ---- auth ------------------------------------------------------------------------
@@ -643,6 +668,13 @@ class BedrockAdapter:
                         }
                     }
                 )
+            elif isinstance(part, VideoPart):
+                # Converse publishes a `video` block whose shape parallels `document`
+                # exactly, so this is one line away from working — but it carries no clip
+                # window or frame rate, and a `VideoPart` that set either would lose it
+                # silently. Refused until the block is verified against the live protocol
+                # and the metadata question has an answer (see contracts/bedrock.md).
+                raise unsupported(self.provider_id, "video")
 
         # Tool results ride on a user turn here, as in the Anthropic dialect.
         role = "user" if message.role in ("user", "tool") else "assistant"
@@ -869,9 +901,391 @@ class BedrockAdapter:
             phase="stream",
         )
 
+    # ---- batches ---------------------------------------------------------------------
+    #
+    # Bedrock's deferred tier is `CreateModelInvocationJob`, and it does not take the job
+    # over the wire: input and output are JSONL objects in the *caller's own* S3 bucket,
+    # and the job references them by URI. That is the whole shape difference from the
+    # OpenAI-style file dance — the bucket, the IAM role, and the region are the caller's
+    # account infrastructure, so they are configured beside `region` rather than passed on
+    # every request. AnyInfer writes the input object, submits the job, and reads the
+    # output object back; it never creates or manages the bucket.
+
+    async def submit_batch(self, req: BatchWireRequest) -> BatchHandle:
+        """Stage the lines in S3, then create a model-invocation job over them.
+
+        Raises:
+            anyinfer.errors.ConfigError: The batch storage options are not configured.
+            anyinfer.errors.ProviderError: The upload or the submission was refused.
+        """
+        bucket_uri, role_arn = self._batch_storage()
+        job_name = f"anyinfer-{uuid.uuid4().hex[:24]}"
+        input_uri = f"{bucket_uri}/{job_name}/input.jsonl"
+
+        jsonl = "\n".join(
+            json.dumps({"recordId": custom_id, "modelInput": self._batch_body(line)})
+            for custom_id, line in req.lines
+        )
+        await self._put_object(input_uri, jsonl.encode("utf-8"))
+
+        payload: dict[str, Any] = {
+            "jobName": job_name,
+            "roleArn": role_arn,
+            "modelId": req.model,
+            "inputDataConfig": {
+                "s3InputDataConfig": {"s3Uri": input_uri, "s3InputFormat": "JSONL"}
+            },
+            "outputDataConfig": {
+                "s3OutputDataConfig": {"s3Uri": f"{bucket_uri}/{job_name}/out/"}
+            },
+        }
+        if req.metadata:
+            payload["tags"] = [
+                {"key": key, "value": value} for key, value in sorted(req.metadata.items())
+            ]
+        body = await self._control_call("POST", "/model-invocation-job", payload)
+        return BatchHandle(
+            batch_id=str(body.get("jobArn", "")),
+            provider_id=self.provider_id,
+            model=req.model,
+            line_count=len(req.lines),
+            submitted_at=time.time(),
+            line_ids=tuple(custom_id for custom_id, _ in req.lines),
+            # Where the answers will land. The job object reports the output *prefix* it
+            # was given rather than the file, and rebuilding the path at fetch time would
+            # mean re-deriving the job name from an ARN — so it is recorded once, here.
+            provider_state={
+                "output_uri": f"{bucket_uri}/{job_name}/out/{job_name}/input.jsonl.out"
+            },
+        )
+
+    def _batch_body(self, line: WireRequest) -> dict[str, Any]:
+        """One line's model input: the live Converse body, with streaming removed."""
+        body = self.build_payload(line)
+        body.pop("stream", None)
+        return body
+
+    def _batch_storage(self) -> tuple[str, str]:
+        """Read the caller's batch bucket prefix and execution role.
+
+        Raises:
+            anyinfer.errors.ConfigError: Either is missing or malformed.
+        """
+        options = dict(self._config.options)
+        bucket = str(options.get("batch_s3_uri") or "").rstrip("/")
+        role = str(options.get("batch_role_arn") or "")
+        if not bucket or not role:
+            raise ConfigError(
+                "bedrock batches need a caller-owned S3 prefix and an execution role",
+                provider=self.provider_id,
+                hint=(
+                    "set options={'batch_s3_uri': 's3://my-bucket/anyinfer', "
+                    "'batch_role_arn': 'arn:aws:iam::...:role/...'} — the bucket is "
+                    "yours, and AnyInfer neither creates nor manages it"
+                ),
+            )
+        if not bucket.startswith("s3://"):
+            raise ConfigError(
+                f"batch_s3_uri must be an s3:// URI, not {bucket!r}",
+                provider=self.provider_id,
+            )
+        return bucket, role
+
+    async def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Report state from ``GetModelInvocationJob``."""
+        return self._report(handle, await self._control_call("GET", self._job_path(handle)))
+
+    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Stop a job, then report where it landed."""
+        await self._control_call("POST", f"{self._job_path(handle)}/stop", {})
+        return self._report(handle, await self._control_call("GET", self._job_path(handle)))
+
+    def _job_path(self, handle: BatchHandle) -> str:
+        """The control-plane path for one job, which is keyed by its full ARN."""
+        return f"/model-invocation-job/{quote(handle.batch_id, safe='')}"
+
+    def _report(self, handle: BatchHandle, body: Mapping[str, Any]) -> BatchReport:
+        """Normalize one job object into a report.
+
+        Bedrock reports no per-line counts while a job runs, so completed and failed stay
+        zero until the manifest is read. Reporting a guess would be worse than reporting
+        nothing: a caller watching progress would see numbers that never move.
+        """
+        return BatchReport(
+            handle=handle,
+            status=_BEDROCK_BATCH_STATUSES.get(str(body.get("status", "")), "in_progress"),
+            detail=str(body.get("message", ""))[:DETAIL_MAX_CHARS],
+        )
+
+    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+        """Read the output object back out of S3 and parse its records.
+
+        Raises:
+            anyinfer.errors.ProviderError: The job has not finished, or the read failed.
+        """
+        report = self._report(handle, await self._control_call("GET", self._job_path(handle)))
+        if not report.finished:
+            raise ProviderError(
+                f"batch {handle.batch_id} is {report.status}, not finished",
+                provider=self.provider_id,
+                retryable=True,
+                hint="poll batch_status until it reports finished",
+            )
+        output_uri = handle.provider_state.get("output_uri", "")
+        if not output_uri:
+            raise ProviderError(
+                "this handle does not record where its output went",
+                provider=self.provider_id,
+                hint="fetch a batch with the handle submit_batch returned",
+            )
+        text = await self._get_object(output_uri)
+        return BatchResult(
+            handle=handle, status=report.status, lines=tuple(self._parse_lines(text))
+        )
+
+    def _parse_lines(self, jsonl: str) -> Iterable[BatchLine]:
+        """Parse the manifest, one record per submitted line.
+
+        One file, not two: Bedrock reports a rejected line in the same object as an
+        accepted one, distinguished by carrying an `error` member rather than by which
+        file it landed in.
+        """
+        for raw in jsonl.splitlines():
+            if not raw.strip():
+                continue
+            try:
+                entry = json.loads(raw)
+            except ValueError:
+                continue
+            if not isinstance(entry, Mapping):
+                continue
+            custom_id = str(entry.get("recordId", ""))
+            error = entry.get("error")
+            output = entry.get("modelOutput")
+            if error or not isinstance(output, Mapping):
+                yield BatchLine(
+                    custom_id=custom_id,
+                    error=batch_error(self.provider_id, _bedrock_line_failure(error)),
+                )
+                continue
+            yield BatchLine(custom_id=custom_id, result=self.generation_from_batch_body(output))
+
+    def generation_from_batch_body(self, body: Mapping[str, Any]) -> Generation:
+        """Assemble a `Generation` from one answered record.
+
+        Read through `_events_from_response`, the same reader the buffered live path uses,
+        so a batched answer carries the text, tool calls, usage, and stop reason a live one
+        would rather than through a second parser that can drift from it.
+
+        Assembled here rather than through the router's attempt buffer: an adapter must not
+        import from `anyinfer.routing` — the "adapters never orchestrate" contract enforces
+        exactly that — and a manifest record has nothing to orchestrate. The routing fields
+        a live result carries are genuinely absent; nothing routed, and no clock of ours ran.
+        """
+        text: list[str] = []
+        calls: list[ToolCall] = []
+        final: AdapterFinal | None = None
+        for event in self._events_from_response(body):
+            if isinstance(event, TextDelta):
+                text.append(event.text)
+            elif isinstance(event, ToolCallDelta):
+                calls.append(
+                    ToolCall(
+                        id=event.call_id or "",
+                        name=event.name or "",
+                        arguments=_bedrock_tool_arguments(event.arguments_fragment),
+                    )
+                )
+            elif isinstance(event, AdapterFinal):
+                final = event
+        usage = (final.usage if final is not None else None) or Usage()
+        return Generation(
+            text="".join(text),
+            structured=None,
+            tool_calls=tuple(calls),
+            target=ResolvedTarget(provider_id=self.provider_id, model=""),
+            finish_reason=final.finish_reason if final is not None else "stop",
+            usage=usage.normalized(),
+            timing=Timing(started_at=0.0, total_ms=0.0),
+        )
+
+    # ---- the two AWS surfaces a batch needs beyond the runtime -------------------------
+
+    async def _control_call(
+        self, method: str, path: str, payload: Mapping[str, Any] | None = None
+    ) -> Mapping[str, Any]:
+        """Issue one `bedrock` control-plane request, signed for that host.
+
+        The control plane is a different host than the runtime this adapter is built
+        against — batches are created there, not on `bedrock-runtime`.
+
+        Raises:
+            anyinfer.errors.ProviderError: The call failed or returned a non-object body.
+        """
+        host = f"https://bedrock.{self._region}.amazonaws.com"
+        body = json.dumps(payload).encode("utf-8") if payload is not None else b""
+        headers = {"content-type": "application/json"}
+        headers.update(
+            self._signed(method=method, url=f"{host}{path}", body=body, headers=headers)
+        )
+        try:
+            response = await self._client.request(
+                method, f"{host}{path}", content=body or None, headers=headers
+            )
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                phase="generate",
+            )
+        parsed = response.json() if response.content else {}
+        if not isinstance(parsed, Mapping):
+            raise StreamProtocolError(
+                "bedrock returned a non-object batch body", provider=self.provider_id
+            )
+        return parsed
+
+    async def _put_object(self, uri: str, body: bytes) -> None:
+        """Write one S3 object, signed for the `s3` service rather than `bedrock`.
+
+        Raises:
+            anyinfer.errors.ProviderError: The write was refused.
+        """
+        url = _s3_url(uri, self._region)
+        headers = {"content-type": "application/jsonl"}
+        headers.update(
+            self._signed(method="PUT", url=url, body=body, headers=headers, service="s3")
+        )
+        try:
+            response = await self._client.put(url, content=body, headers=headers)
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                phase="generate",
+            )
+
+    async def _get_object(self, uri: str) -> str:
+        """Read one S3 object back.
+
+        Raises:
+            anyinfer.errors.ProviderError: The read was refused.
+        """
+        url = _s3_url(uri, self._region)
+        headers = dict(self._signed(method="GET", url=url, body=b"", headers={}, service="s3"))
+        try:
+            response = await self._client.get(url, headers=headers)
+        except httpx2.HTTPError as exc:
+            raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
+        if response.status_code >= 400:
+            raise classify_status(
+                response.status_code,
+                provider=self.provider_id,
+                detail=read_error_detail(response.content),
+                phase="generate",
+            )
+        return response.text
+
+    def _signed(
+        self,
+        *,
+        method: str,
+        url: str,
+        body: bytes,
+        headers: Mapping[str, str],
+        service: str = _SIGNING_SERVICE,
+    ) -> Mapping[str, str]:
+        """Sign one request for a named AWS service.
+
+        A Bedrock API key authenticates the runtime and nothing else — it is not an AWS
+        credential, and S3 will not accept it — so a batch needs real credentials even
+        where a live call does not.
+
+        Raises:
+            anyinfer.errors.ConfigError: No AWS credentials are available.
+        """
+        if self._credentials is None:
+            raise ConfigError(
+                "bedrock batches need AWS credentials, not a Bedrock API key",
+                provider=self.provider_id,
+                hint=(
+                    "a Bedrock API key authenticates the runtime only; staging a batch "
+                    "writes to your own S3 bucket, which requires AWS credentials"
+                ),
+            )
+        return sigv4_headers(
+            credentials=self._credentials,
+            method=method,
+            url=url,
+            region=self._region,
+            service=service,
+            body=body,
+            headers=dict(headers),
+        )
+
     async def aclose(self) -> None:
         """Close the underlying HTTP transport."""
         await self._client.aclose()
+
+
+_BEDROCK_BATCH_STATUSES: Mapping[str, BatchStatus] = {
+    "Submitted": "queued",
+    "Validating": "queued",
+    "Scheduled": "queued",
+    "InProgress": "in_progress",
+    "Stopping": "in_progress",
+    "Completed": "completed",
+    "PartiallyCompleted": "completed",
+    "Failed": "failed",
+    "Stopped": "cancelled",
+    "Expired": "expired",
+}
+"""Bedrock's job states, normalized onto the one vocabulary a caller polls.
+
+`PartiallyCompleted` maps to completed rather than failed on purpose: the job finished
+and its manifest is readable, and the lines that failed are reported as failed lines. A
+whole-batch `failed` would discard the answers that did arrive.
+"""
+
+
+def _s3_url(uri: str, region: str) -> str:
+    """Turn an ``s3://bucket/key`` URI into the virtual-hosted HTTPS URL SigV4 signs.
+
+    The path-style alternative is deprecated for new buckets, and the region has to be in
+    the host rather than left to the global endpoint: a redirect would arrive unsigned for
+    its new host and fail authentication rather than following through.
+    """
+    remainder = uri[len("s3://") :]
+    bucket, _, key = remainder.partition("/")
+    return f"https://{bucket}.s3.{region}.amazonaws.com/{quote(key)}"
+
+
+def _bedrock_line_failure(error: Any) -> str:
+    """Extract one rejected record's message without inventing one."""
+    if isinstance(error, Mapping):
+        message = error.get("errorMessage") or error.get("message") or error.get("errorCode")
+        if message:
+            return str(message)
+    elif isinstance(error, str) and error:
+        return error
+    return "the provider rejected this line without a message"
+
+
+def _bedrock_tool_arguments(raw: str) -> Mapping[str, Any]:
+    """Parse one batched tool call's arguments, tolerating a provider that sent none."""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, Mapping) else {}
 
 
 class _StreamState:
@@ -1024,7 +1438,7 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
-    if effort == "minimal":
+    if effort in ("none", "minimal"):
         return {"additionalModelRequestFields": {"thinking": {"type": "disabled"}}}
     budgets = {"low": 1024, "medium": 4096, "high": 16384}
     return {
@@ -1104,7 +1518,7 @@ descriptor = ProviderDescriptor(
     locality="hosted",
     default_base_url=None,
     requires_base_url=False,
-    operations=frozenset({"generation", "embedding", "rerank"}),
+    operations=frozenset({"generation", "embedding", "rerank", "batch"}),
     static_embedding_capabilities=_STATIC_EMBEDDING_CAPABILITIES,
     static_rerank_capabilities=_STATIC_RERANK_CAPABILITIES,
     setup=ProviderSetupSpec(
@@ -1194,6 +1608,7 @@ descriptor = ProviderDescriptor(
         ),
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("seed", "presence_penalty", "frequency_penalty", "logprobs"),
     default_capabilities=ModelCapabilities(features=Sourced(_BEDROCK_FEATURES, "default")),
 )
 """Descriptor for the AWS Bedrock provider."""

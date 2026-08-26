@@ -7,6 +7,7 @@ offline fake provider, so the demo is verified end to end without credentials or
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 
 import pytest
@@ -24,10 +25,10 @@ from anyinfer import Retry, Route
 from anyinfer.registry import ProviderRegistry
 from anyinfer.types.messages import Message, Text, user
 from anyinfer.types.requests import Repair, Sampling
-from demo_app.config import DemoConfig, ProviderConfig, default_config
-from demo_app.engine import Engine, GenerationSpec
-from demo_app.fake_provider import DEMO_MODELS, DEMO_PROVIDER_ID, DemoFakeBackend
-from demo_app.widgets.schema_panel import EXAMPLE_SCHEMA
+from anyinfer_demo.config import DemoConfig, ProviderConfig, default_config
+from anyinfer_demo.engine import Engine, GenerationSpec
+from anyinfer_demo.fake_provider import DEMO_MODELS, DEMO_PROVIDER_ID, DemoFakeBackend
+from anyinfer_demo.widgets.schema_panel import EXAMPLE_SCHEMA
 
 
 def _drain(engine: Engine, timeout_ms: int = 15_000) -> object:
@@ -77,6 +78,68 @@ class TestConfig:
         assert restored.for_provider("openai").api_key == "env://KEY"
         assert restored.targets == config.targets
 
+    def test_a_literal_secret_never_reaches_the_saved_file(self, tmp_path):
+        """config.py has always promised literal keys stay in memory; now it holds.
+
+        The settings dialog invites a literal into the secret field, so this is the
+        difference between the guarantee and an API key sitting in ~/.config at 0644.
+        """
+        path = tmp_path / "demo.json"
+        config = default_config().with_provider(
+            ProviderConfig(
+                "openai",
+                enabled=True,
+                values={"api_key": "sk-a-real-looking-secret", "base_url": "https://x"},
+            )
+        )
+        config.save(path)
+
+        written = path.read_text(encoding="utf-8")
+        assert "sk-a-real-looking-secret" not in written
+        assert "https://x" in written, "non-secret fields must still persist"
+        # The in-memory config is untouched: the session keeps working.
+        assert config.for_provider("openai").api_key == "sk-a-real-looking-secret"
+
+    def test_an_unregistered_provider_drops_every_literal(self, tmp_path):
+        """When field kinds are unknowable the stripper must fail safe, not fail open.
+
+        A stale entry for a provider plugin that was uninstalled or failed to import has
+        no descriptor, so nothing can say which of its fields are secret. Keeping them all
+        would break the guarantee in exactly the case where nothing else is watching.
+        """
+        path = tmp_path / "demo.json"
+        config = default_config().with_provider(
+            ProviderConfig(
+                "a-provider-that-is-not-installed",
+                enabled=True,
+                values={
+                    "api_key": "sk-a-real-looking-secret",
+                    "token": "another-literal",
+                    "base_url": "env://SOME_URL",
+                },
+            )
+        )
+        config.save(path)
+
+        written = path.read_text(encoding="utf-8")
+        assert "sk-a-real-looking-secret" not in written
+        assert "another-literal" not in written
+        assert "env://SOME_URL" in written, "references stay: they are not key material"
+
+    def test_a_credential_reference_still_persists(self, tmp_path):
+        """References are safe in a file and are the whole point of the scheme."""
+        path = tmp_path / "demo.json"
+        default_config().with_provider(
+            ProviderConfig("openai", enabled=True, values={"api_key": "env://OPENAI_API_KEY"})
+        ).save(path)
+        assert DemoConfig.load(path).for_provider("openai").api_key == "env://OPENAI_API_KEY"
+
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
+    def test_the_saved_file_is_not_readable_by_other_local_users(self, tmp_path):
+        path = tmp_path / "demo.json"
+        default_config().save(path)
+        assert path.stat().st_mode & 0o777 == 0o600
+
     def test_corrupt_config_falls_back_to_defaults(self, tmp_path):
         path = tmp_path / "demo.json"
         path.write_text("{not json", encoding="utf-8")
@@ -113,7 +176,7 @@ class TestConfig:
         assert restored.ignore_runtime_hardware_constraints is False
 
     def test_app_settings_edits_runtime_constraint_override(self, qapp: object):
-        from demo_app.widgets.app_settings_dialog import AppSettingsDialog
+        from anyinfer_demo.widgets.app_settings_dialog import AppSettingsDialog
 
         dialog = AppSettingsDialog(default_config())
         try:
@@ -123,8 +186,8 @@ class TestConfig:
             dialog.close()
 
     def test_app_settings_offers_and_returns_every_theme(self, qapp: object):
-        from demo_app import theme
-        from demo_app.widgets.app_settings_dialog import AppSettingsDialog
+        from anyinfer_demo import theme
+        from anyinfer_demo.widgets.app_settings_dialog import AppSettingsDialog
 
         dialog = AppSettingsDialog(replace(default_config(), theme="forest"))
         try:
@@ -278,7 +341,7 @@ class TestConfig:
 class TestFakeProvider:
     def test_registers_and_resolves(self):
         registry = ProviderRegistry()
-        from demo_app.fake_provider import register_demo_provider
+        from anyinfer_demo.fake_provider import register_demo_provider
 
         register_demo_provider(registry)
         assert registry.resolve_alias("demo") == DEMO_PROVIDER_ID
@@ -503,20 +566,20 @@ class TestConversation:
         )
 
     def test_new_conversation_has_no_messages(self):
-        from demo_app.conversation import Conversation
+        from anyinfer_demo.conversation import Conversation
 
         conversation = Conversation.new()
         assert conversation.messages == ()
         assert conversation.title == "New chat"
 
     def test_title_is_derived_from_the_first_user_message(self):
-        from demo_app.conversation import Conversation
+        from anyinfer_demo.conversation import Conversation
 
         conversation = Conversation.new().with_messages([user("Explain retries in AnyInfer.")])
         assert conversation.title == "Explain retries in AnyInfer."
 
     def test_long_titles_are_truncated(self):
-        from demo_app.conversation import Conversation
+        from anyinfer_demo.conversation import Conversation
 
         long_text = "x" * 100
         conversation = Conversation.new().with_messages([user(long_text)])
@@ -524,7 +587,7 @@ class TestConversation:
         assert conversation.title.endswith("…")
 
     def test_round_trips_through_json(self):
-        from demo_app.conversation import Conversation
+        from anyinfer_demo.conversation import Conversation
 
         conversation = Conversation.new().with_messages([user("Hi"), user("Follow-up")])
         conversation = conversation.with_result(self._result())
@@ -536,7 +599,7 @@ class TestConversation:
         assert restored.results[0].total_ms == 42.0
 
     def test_save_and_load_round_trips(self, tmp_path):
-        from demo_app.conversation import Conversation
+        from anyinfer_demo.conversation import Conversation
 
         conversation = Conversation.new().with_messages([user("Persisted.")])
         conversation.save(tmp_path)
@@ -548,7 +611,7 @@ class TestConversation:
     def test_load_all_sorts_newest_first_and_skips_corrupt_files(self, tmp_path):
         from datetime import datetime, timedelta
 
-        from demo_app.conversation import Conversation
+        from anyinfer_demo.conversation import Conversation
 
         base = Conversation.new().with_messages([user("older")])
         older = replace(base, id="older-id", updated_at=datetime.now(UTC))
@@ -565,14 +628,14 @@ class TestConversation:
         assert [c.id for c in loaded] == [newer.id, older.id]
 
     def test_summary_never_carries_the_raw_generation(self):
-        from demo_app.conversation import GenerationSummary
+        from anyinfer_demo.conversation import GenerationSummary
 
         summary = GenerationSummary.from_result(self._result())
         assert not hasattr(summary, "raw")
         assert not hasattr(summary, "text")
 
     def test_to_markdown_includes_every_message(self):
-        from demo_app.conversation import Conversation
+        from anyinfer_demo.conversation import Conversation
 
         conversation = Conversation.new().with_messages(
             [user("Question?"), Message(role="assistant", content=(Text("Answer."),))]
@@ -589,7 +652,7 @@ class TestSchemaPanel:
         jsonschema.Draft202012Validator.check_schema(EXAMPLE_SCHEMA)
 
     def test_reports_bad_json(self, qapp: object):
-        from demo_app.widgets.schema_panel import SchemaPanel
+        from anyinfer_demo.widgets.schema_panel import SchemaPanel
 
         panel = SchemaPanel()
         assert panel.schema() is None  # disabled by default
@@ -600,7 +663,7 @@ class TestSchemaPanel:
             panel.schema()
 
     def test_returns_parsed_schema_when_enabled(self, qapp: object):
-        from demo_app.widgets.schema_panel import SchemaPanel
+        from anyinfer_demo.widgets.schema_panel import SchemaPanel
 
         panel = SchemaPanel()
         panel.set_enabled(True)
@@ -609,8 +672,8 @@ class TestSchemaPanel:
 
 class TestSettingsDialog:
     def _dialog(self, config=None):
-        from demo_app.fake_provider import register_demo_provider
-        from demo_app.widgets.settings_dialog import ProviderSettingsDialog
+        from anyinfer_demo.fake_provider import register_demo_provider
+        from anyinfer_demo.widgets.settings_dialog import ProviderSettingsDialog
 
         registry = ProviderRegistry()
         register_demo_provider(registry)
@@ -745,7 +808,7 @@ class TestSettingsDialog:
             ProviderSetupSpec,
             SetupField,
         )
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="invented-provider",
@@ -772,7 +835,7 @@ class TestSettingsDialog:
             ProviderSetupSpec,
             SetupField,
         )
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="masked",
@@ -790,8 +853,8 @@ class TestSettingsDialog:
         from PySide6.QtWidgets import QFormLayout
 
         from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
-        from demo_app import theme
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo import theme
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="marked",
@@ -825,7 +888,7 @@ class TestSettingsDialog:
         from PySide6.QtWidgets import QLineEdit
 
         from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="hinted",
@@ -855,7 +918,7 @@ class TestSettingsDialog:
     def test_an_any_of_group_is_satisfied_by_either_field(self, qapp: object):
         """Anthropic takes an API key *or* an OAuth token — neither alone is required."""
         from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="either-or",
@@ -884,7 +947,7 @@ class TestSettingsDialog:
     def test_anthropic_offers_both_credentials_and_an_optional_version(self, qapp: object):
         """The reported UI defects, asserted against the real descriptor."""
         from anyinfer.providers.anthropic import descriptor
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         panel = _ProviderPanel(descriptor, ProviderConfig("anthropic"))
 
@@ -918,7 +981,7 @@ class TestSettingsDialog:
     def test_standard_value_fields_start_folded_away(self, qapp: object):
         """The prompt is what the provider cannot know; the rest waits behind a chevron."""
         from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="folded",
@@ -950,7 +1013,7 @@ class TestSettingsDialog:
         from PySide6.QtWidgets import QLineEdit
 
         from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="defaulted",
@@ -978,7 +1041,7 @@ class TestSettingsDialog:
     def test_a_stored_override_opens_the_disclosure(self, qapp: object):
         """Hiding a setting that is in force is worse than showing one that is not."""
         from anyinfer.registry import ProviderDescriptor, ProviderSetupSpec, SetupField
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = ProviderDescriptor(
             id="overridden",
@@ -1005,7 +1068,7 @@ class TestSettingsDialog:
 
     def test_an_engine_with_only_standard_values_asks_nothing(self, qapp: object):
         """Ollama and every keyless local engine land here — install it and go."""
-        from demo_app.widgets.settings_dialog import _ProviderPanel
+        from anyinfer_demo.widgets.settings_dialog import _ProviderPanel
 
         descriptor = self._dialog()._registry.get("ollama")
         panel = _ProviderPanel(descriptor, ProviderConfig("ollama"))
@@ -1046,7 +1109,7 @@ class TestTelemetryView:
     def test_groups_events_under_their_request(self, qapp: object):
         from anyinfer.events.telemetry import RequestStarted, TargetResolved
         from anyinfer.types.requests import ResolvedTarget
-        from demo_app.widgets.telemetry_view import TelemetryView
+        from anyinfer_demo.widgets.telemetry_view import TelemetryView
 
         view = TelemetryView()
         view.add_event(RequestStarted(request_id="r1", targets=("demo-fake:reliable",)))
@@ -1057,7 +1120,7 @@ class TestTelemetryView:
 
     def test_marks_withheld_payloads(self, qapp: object):
         from anyinfer.events.telemetry import RequestStarted
-        from demo_app.widgets.telemetry_view import _payload_note
+        from anyinfer_demo.widgets.telemetry_view import _payload_note
 
         note = _payload_note(RequestStarted(request_id="r", targets=()))
         assert "withheld" in note
@@ -1065,7 +1128,7 @@ class TestTelemetryView:
 
 class TestChatView:
     def test_turns_do_not_run_together(self, qapp: object):
-        from demo_app.widgets.chat_view import MessageList
+        from anyinfer_demo.widgets.chat_view import MessageList
 
         view = MessageList()
         view.add_user_message("First question?")
@@ -1086,7 +1149,7 @@ class TestChatView:
 
     def test_answer_resumes_on_its_own_line_after_a_notice(self, qapp: object):
         """A retry notice mid-turn must not run into the answer text that follows it."""
-        from demo_app.widgets.chat_view import MessageList
+        from anyinfer_demo.widgets.chat_view import MessageList
 
         view = MessageList()
         view.begin_assistant_message("demo-fake:flaky")
@@ -1099,7 +1162,7 @@ class TestChatView:
         assert text.index("retried") < text.index("The answer.")
 
     def test_empty_assistant_turns_are_dropped(self, qapp: object):
-        from demo_app.widgets.chat_view import MessageList
+        from anyinfer_demo.widgets.chat_view import MessageList
 
         view = MessageList()
         view.begin_assistant_message("demo-fake:reliable")
@@ -1108,7 +1171,7 @@ class TestChatView:
         assert view.transcript_text() == ""
 
     def test_markdown_is_rendered_on_turn_completion(self, qapp: object):
-        from demo_app.widgets.chat_view import MessageBubble
+        from anyinfer_demo.widgets.chat_view import MessageBubble
 
         bubble = MessageBubble("assistant", "demo-fake:reliable")
         bubble.append_delta("**bold**")
@@ -1119,7 +1182,7 @@ class TestChatView:
 
     def test_bubbles_grow_to_fit_their_text_instead_of_scrolling(self, qapp: object):
         """A long answer must be readable in full, not boxed behind scrollbars."""
-        from demo_app.widgets.chat_view import MessageBubble
+        from anyinfer_demo.widgets.chat_view import MessageBubble
 
         bubble = MessageBubble("assistant", "demo-fake:reliable")
         bubble.set_plain_text("A long answer. " * 60)
@@ -1133,7 +1196,7 @@ class TestChatView:
 
     def test_fenced_code_wraps_inside_the_bubble(self, qapp: object):
         """Qt leaves <pre> unwrapped by default, which pushes code off the bubble's edge."""
-        from demo_app.widgets.chat_view import MessageBubble
+        from anyinfer_demo.widgets.chat_view import MessageBubble
 
         bubble = MessageBubble("assistant", "demo-fake:reliable")
         code = " + ".join(f"value_{index}" for index in range(40))
@@ -1146,7 +1209,7 @@ class TestChatView:
         assert body.document().size().width() <= body.viewport().width()
 
     def test_long_turns_use_the_full_bubble_width_and_short_ones_do_not(self, qapp: object):
-        from demo_app.widgets.chat_view import ASSISTANT_BUBBLE_MAX_WIDTH, MessageBubble
+        from anyinfer_demo.widgets.chat_view import ASSISTANT_BUBBLE_MAX_WIDTH, MessageBubble
 
         short = MessageBubble("assistant", "demo-fake:reliable")
         short.set_plain_text("Hi.")
@@ -1159,7 +1222,7 @@ class TestChatView:
     def test_copy_button_copies_the_message_text(self, qapp: object):
         from PySide6.QtWidgets import QApplication
 
-        from demo_app.widgets.chat_view import MessageBubble
+        from anyinfer_demo.widgets.chat_view import MessageBubble
 
         bubble = MessageBubble("assistant", "demo-fake:reliable")
         bubble.append_delta("Copy me.")
@@ -1168,7 +1231,7 @@ class TestChatView:
         assert QApplication.clipboard().text() == "Copy me."
 
     def test_welcome_view_hidden_once_a_message_is_added(self, qapp: object):
-        from demo_app.widgets.chat_view import MessageList, WelcomeView
+        from anyinfer_demo.widgets.chat_view import MessageList, WelcomeView
 
         view = MessageList()
         welcome = WelcomeView()
@@ -1179,8 +1242,8 @@ class TestChatView:
         assert welcome.isHidden()
 
     def test_welcome_view_swaps_the_wordmark_variant_by_theme(self, qapp: object):
-        from demo_app import theme
-        from demo_app.widgets.chat_view import WelcomeView
+        from anyinfer_demo import theme
+        from anyinfer_demo.widgets.chat_view import WelcomeView
 
         theme.apply_theme(qapp, "light")
         welcome = WelcomeView()
@@ -1193,7 +1256,7 @@ class TestChatView:
 
     def test_active_bubble_header_can_be_retitled_to_the_resolved_target(self, qapp: object):
         """After a fallback, the header must name the target that actually answered."""
-        from demo_app.widgets.chat_view import MessageList
+        from anyinfer_demo.widgets.chat_view import MessageList
 
         view = MessageList()
         view.begin_assistant_message("demo-fake:flaky")
@@ -1210,7 +1273,7 @@ class TestMainWindow:
         self, qapp: object, monkeypatch
     ):
         from anyinfer.types.capabilities import DiscoveredModel
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
         monkeypatch.setattr(MainWindow, "_refresh_token_hint", lambda _self: None)
@@ -1237,7 +1300,7 @@ class TestMainWindow:
 
     def test_send_tracks_model_selection(self, qapp: object, monkeypatch):
         from anyinfer.types.capabilities import DiscoveredModel
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
         monkeypatch.setattr(MainWindow, "_refresh_token_hint", lambda _self: None)
@@ -1256,7 +1319,7 @@ class TestMainWindow:
             window.close()
 
     def test_temperature_at_minimum_means_unset(self, qapp: object):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1269,7 +1332,7 @@ class TestMainWindow:
 
     def test_send_streams_an_answer_into_the_transcript(self, qapp: object, wait_for_models):
         """The whole path, driven as a user drives it: type, send, watch it stream."""
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1290,7 +1353,7 @@ class TestMainWindow:
 
     def test_a_failed_request_does_not_leave_a_dangling_user_turn(self, qapp: object, monkeypatch):
         from anyinfer.types.capabilities import DiscoveredModel
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
         monkeypatch.setattr(MainWindow, "_refresh_token_hint", lambda _self: None)
@@ -1319,7 +1382,7 @@ class TestMainWindow:
     def test_new_chat_persists_the_previous_conversation_to_disk(
         self, qapp: object, wait_for_models
     ):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1345,7 +1408,7 @@ class TestMainWindow:
     def test_open_saved_restores_a_conversation_in_a_tab(
         self, qapp: object, monkeypatch, wait_for_models
     ):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1359,7 +1422,7 @@ class TestMainWindow:
 
             window._on_tab_close(window._tabs.currentIndex())
             monkeypatch.setattr(
-                "demo_app.main_window.QFileDialog.getOpenFileName",
+                "anyinfer_demo.main_window.QFileDialog.getOpenFileName",
                 lambda *_args, **_kwargs: (str(saved_path), "JSON"),
             )
 
@@ -1370,7 +1433,7 @@ class TestMainWindow:
             window.close()
 
     def test_deleting_a_conversation_removes_its_file(self, qapp: object, wait_for_models):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1389,7 +1452,7 @@ class TestMainWindow:
             window.close()
 
     def test_hiding_the_right_sidebar_collapses_the_inspector_splitter(self, qapp: object):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1410,7 +1473,7 @@ class TestMainWindow:
             window.close()
 
     def test_toggle_right_sidebar_flips_visibility(self, qapp: object):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1424,7 +1487,7 @@ class TestMainWindow:
             window.close()
 
     def test_hiding_an_inspector_section_hides_only_that_section(self, qapp: object):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1440,7 +1503,7 @@ class TestMainWindow:
             window.close()
 
     def test_sidebar_is_a_top_level_menu(self, qapp: object):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1464,7 +1527,7 @@ class TestMainWindow:
 
     def test_saves_to_the_config_path_the_app_was_started_with(self, qapp: object, tmp_path):
         """A session started with `--config PATH` must save back to that path."""
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         path = tmp_path / "custom" / "session.json"
         window = MainWindow(default_config(), config_path=path)
@@ -1478,7 +1541,7 @@ class TestMainWindow:
     def test_local_models_can_add_default_llama_cpp_in_one_click(
         self, qapp: object, tmp_path, monkeypatch
     ):
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo.main_window import MainWindow
 
         path = tmp_path / "demo.json"
         monkeypatch.setattr(MainWindow, "_discover_enabled_providers", lambda _self: None)
@@ -1497,8 +1560,8 @@ class TestMainWindow:
             window.close()
 
     def test_custom_theme_can_be_selected_and_restyles_the_window(self, qapp: object):
-        from demo_app import theme
-        from demo_app.main_window import MainWindow
+        from anyinfer_demo import theme
+        from anyinfer_demo.main_window import MainWindow
 
         window = MainWindow(default_config())
         try:
@@ -1509,7 +1572,7 @@ class TestMainWindow:
             window.close()
 
     def test_every_theme_survives_config_round_trip(self):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         for key, _label in theme.THEME_CHOICES:
             config = replace(default_config(), theme=key)
@@ -1518,8 +1581,8 @@ class TestMainWindow:
 
 class TestEngineBar:
     def _bar(self, config=None):
-        from demo_app.fake_provider import register_demo_provider
-        from demo_app.widgets.engine_bar import EngineBar
+        from anyinfer_demo.fake_provider import register_demo_provider
+        from anyinfer_demo.widgets.engine_bar import EngineBar
 
         registry = ProviderRegistry()
         register_demo_provider(registry)
@@ -1737,7 +1800,7 @@ class TestEngineBar:
 
 class TestTheme:
     def test_light_and_dark_render_the_brand_palette(self):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         light = theme.stylesheet(theme.palette_colors(dark=False))
         dark = theme.stylesheet(theme.palette_colors(dark=True))
@@ -1746,20 +1809,20 @@ class TestTheme:
         assert "#E8963C" in light and "#E8963C" in dark  # amber is a brand constant
 
     def test_an_explicit_preference_overrides_the_system(self, qapp: object):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         assert theme.resolve_dark(qapp, "dark") is True
         assert theme.resolve_dark(qapp, "light") is False
 
     def test_custom_themes_have_every_required_token(self):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         required = set(theme.palette_colors(dark=False))
         for name, tokens in theme.CUSTOM_THEMES.items():
             assert required <= set(tokens), f"{name} is missing tokens: {required - set(tokens)}"
 
     def test_custom_themes_render_a_valid_stylesheet_and_palette(self):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         for tokens in theme.CUSTOM_THEMES.values():
             css = theme.stylesheet(tokens)
@@ -1767,19 +1830,19 @@ class TestTheme:
             theme._qt_palette(tokens)  # must not raise
 
     def test_resolve_theme_returns_the_named_custom_palette(self, qapp: object):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         resolved = theme.resolve_theme(qapp, "forest")
         assert resolved == theme.CUSTOM_THEMES["forest"]
 
     def test_resolve_theme_falls_through_to_system_light_dark(self, qapp: object):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         assert theme.resolve_theme(qapp, "dark") == theme.palette_colors(dark=True)
         assert theme.resolve_theme(qapp, "light") == theme.palette_colors(dark=False)
 
     def test_apply_theme_tracks_is_dark_active(self, qapp: object):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         theme.apply_theme(qapp, "dark")
         assert theme.is_dark_active() is True
@@ -1787,7 +1850,7 @@ class TestTheme:
         assert theme.is_dark_active() is False
 
     def test_custom_theme_choices_are_distinct_from_defaults(self):
-        from demo_app import theme
+        from anyinfer_demo import theme
 
         default_keys = {key for key, _ in theme.DEFAULT_THEME_CHOICES}
         custom_keys = {key for key, _ in theme.CUSTOM_THEME_CHOICES}
@@ -1797,20 +1860,20 @@ class TestTheme:
 
 class TestAssets:
     def test_asset_path_resolves_bundled_files(self):
-        from demo_app.assets import asset_path
+        from anyinfer_demo.assets import asset_path
 
         path = asset_path("anyinfer-icon-512.svg")
         assert path.exists()
         assert path.name == "anyinfer-icon-512.svg"
 
     def test_read_svg_returns_svg_markup(self):
-        from demo_app.assets import read_svg
+        from anyinfer_demo.assets import read_svg
 
         svg = read_svg("anyinfer-icon-512.svg")
         assert svg.startswith("<svg")
 
     def test_both_wordmark_variants_are_bundled(self):
-        from demo_app.assets import asset_path
+        from anyinfer_demo.assets import asset_path
 
         assert asset_path("anyinfer-horizontal-light.svg").exists()
         assert asset_path("anyinfer-horizontal-dark.svg").exists()
@@ -1818,7 +1881,7 @@ class TestAssets:
 
 class TestMarkdownRenderer:
     def test_renders_common_constructs(self, qapp: object):
-        from demo_app.widgets.markdown_renderer import render_markdown
+        from anyinfer_demo.widgets.markdown_renderer import render_markdown
 
         html = render_markdown("# Title\n\nSome **bold** and `code`.")
         assert "<h1>Title</h1>" in html
@@ -1826,21 +1889,21 @@ class TestMarkdownRenderer:
         assert "<code>code</code>" in html
 
     def test_strips_disallowed_tags_but_keeps_content(self, qapp: object):
-        from demo_app.widgets.markdown_renderer import render_markdown
+        from anyinfer_demo.widgets.markdown_renderer import render_markdown
 
         html = render_markdown("<script>alert(1)</script>Hello")
         assert "<script>" not in html
         assert "alert" in html or "Hello" in html  # falls back to escaped plain text
 
     def test_only_href_survives_on_links(self, qapp: object):
-        from demo_app.widgets.markdown_renderer import render_markdown
+        from anyinfer_demo.widgets.markdown_renderer import render_markdown
 
         html = render_markdown("[text](https://example.com)")
         assert 'href="https://example.com"' in html
         assert "onclick" not in html
 
     def test_tolerates_html_void_tags_and_named_entities(self, qapp: object):
-        from demo_app.widgets.markdown_renderer import render_markdown
+        from anyinfer_demo.widgets.markdown_renderer import render_markdown
 
         html = render_markdown("before\n\n<hr>\n\na&nbsp;b and **bold**")
         assert "<pre>" not in html
@@ -1848,7 +1911,7 @@ class TestMarkdownRenderer:
         assert "<strong>bold</strong>" in html
 
     def test_drops_script_link_schemes(self, qapp: object):
-        from demo_app.widgets.markdown_renderer import render_markdown
+        from anyinfer_demo.widgets.markdown_renderer import render_markdown
 
         html = render_markdown('[unsafe](javascript:alert("x"))')
         assert "javascript:" not in html
@@ -1860,7 +1923,7 @@ class TestComposer:
         from PySide6.QtCore import Qt
         from PySide6.QtTest import QTest
 
-        from demo_app.widgets.composer import Composer
+        from anyinfer_demo.widgets.composer import Composer
 
         composer = Composer()
         sent = []
@@ -1874,7 +1937,7 @@ class TestComposer:
         from PySide6.QtCore import Qt
         from PySide6.QtTest import QTest
 
-        from demo_app.widgets.composer import Composer
+        from anyinfer_demo.widgets.composer import Composer
 
         composer = Composer()
         cancelled = []
@@ -1887,7 +1950,7 @@ class TestComposer:
 
     def test_action_button_morphs_between_send_and_stop(self, qapp: object):
         """One button: Send when idle, Stop when a request is in flight."""
-        from demo_app.widgets.composer import Composer
+        from anyinfer_demo.widgets.composer import Composer
 
         composer = Composer()
         sent, cancelled = [], []
@@ -1907,7 +1970,7 @@ class TestComposer:
         assert sent == [True]
 
     def test_send_is_disabled_without_a_target_but_cancel_remains_available(self, qapp: object):
-        from demo_app.widgets.composer import Composer
+        from anyinfer_demo.widgets.composer import Composer
 
         composer = Composer()
         sent: list[bool] = []
@@ -1923,7 +1986,7 @@ class TestComposer:
 
     def test_token_hint_sits_directly_above_the_input(self, qapp: object):
         """The hint and the text box are one instrument; the layout keeps them adjacent."""
-        from demo_app.widgets.composer import Composer
+        from anyinfer_demo.widgets.composer import Composer
 
         composer = Composer()
         layout = composer.layout()
@@ -1934,7 +1997,7 @@ class TestComposer:
         assert hint_row.itemAt(1).widget() is composer._budget_help
 
     def test_set_token_hint_flags_when_it_does_not_fit(self, qapp: object):
-        from demo_app.widgets.composer import Composer
+        from anyinfer_demo.widgets.composer import Composer
 
         composer = Composer()
         composer.set_token_hint(100, -5, False)
@@ -1942,7 +2005,7 @@ class TestComposer:
         assert composer._hint.styleSheet() != ""
 
     def test_wrapped_paragraph_grows_to_the_visual_line_cap(self, qapp: object):
-        from demo_app.widgets.composer import _MAX_LINES, _AutoGrowingTextEdit
+        from anyinfer_demo.widgets.composer import _MAX_LINES, _AutoGrowingTextEdit
 
         editor = _AutoGrowingTextEdit()
         editor.resize(180, editor.height())
@@ -1971,7 +2034,7 @@ class TestSystemPromptDialog:
         from PySide6.QtGui import QTextOption
         from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
-        from demo_app.main_window import _make_system_prompt_dialog
+        from anyinfer_demo.main_window import _make_system_prompt_dialog
 
         parent = QWidget()
         dialog = _make_system_prompt_dialog(parent, "instructions " * 40)
@@ -1987,7 +2050,7 @@ class TestCollapsibleSection:
     def test_starts_expanded(self, qapp: object):
         from PySide6.QtWidgets import QLabel
 
-        from demo_app.widgets.collapsible_section import CollapsibleSection
+        from anyinfer_demo.widgets.collapsible_section import CollapsibleSection
 
         content = QLabel("body")
         section = CollapsibleSection("Telemetry", content)
@@ -1997,7 +2060,7 @@ class TestCollapsibleSection:
     def test_minimizing_hides_content_and_pins_header_height(self, qapp: object):
         from PySide6.QtWidgets import QLabel
 
-        from demo_app.widgets.collapsible_section import HEADER_HEIGHT, CollapsibleSection
+        from anyinfer_demo.widgets.collapsible_section import HEADER_HEIGHT, CollapsibleSection
 
         content = QLabel("body")
         section = CollapsibleSection("Telemetry", content)
@@ -2010,7 +2073,7 @@ class TestCollapsibleSection:
     def test_restoring_unhides_content_and_unbounds_height(self, qapp: object):
         from PySide6.QtWidgets import QLabel
 
-        from demo_app.widgets.collapsible_section import HEADER_HEIGHT, CollapsibleSection
+        from anyinfer_demo.widgets.collapsible_section import HEADER_HEIGHT, CollapsibleSection
 
         content = QLabel("body")
         section = CollapsibleSection("Telemetry", content)
@@ -2024,7 +2087,7 @@ class TestCollapsibleSection:
     def test_toggle_minimized_flips_state(self, qapp: object):
         from PySide6.QtWidgets import QLabel
 
-        from demo_app.widgets.collapsible_section import CollapsibleSection
+        from anyinfer_demo.widgets.collapsible_section import CollapsibleSection
 
         section = CollapsibleSection("Telemetry", QLabel("body"))
         section.toggle_minimized()
@@ -2035,7 +2098,7 @@ class TestCollapsibleSection:
     def test_minimized_changed_signal_fires_with_new_state(self, qapp: object):
         from PySide6.QtWidgets import QLabel
 
-        from demo_app.widgets.collapsible_section import CollapsibleSection
+        from anyinfer_demo.widgets.collapsible_section import CollapsibleSection
 
         section = CollapsibleSection("Telemetry", QLabel("body"))
         seen = []
@@ -2048,7 +2111,7 @@ class TestCollapsibleSection:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QLabel, QSplitter
 
-        from demo_app.widgets.collapsible_section import HEADER_HEIGHT, CollapsibleSection
+        from anyinfer_demo.widgets.collapsible_section import HEADER_HEIGHT, CollapsibleSection
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         sections = [CollapsibleSection(name, QLabel(name)) for name in ("A", "B", "C")]
@@ -2070,7 +2133,7 @@ class TestCollapsibleSection:
 
 class TestCli:
     def test_help_needs_no_display(self):
-        from demo_app.app import build_parser
+        from anyinfer_demo.app import build_parser
 
         parser = build_parser()
         assert parser.prog == "anyinfer-demo"

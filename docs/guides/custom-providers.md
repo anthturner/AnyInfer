@@ -74,6 +74,12 @@ Declare `SetupField.env_var` on any field with a conventional variable: the bare
 already usable on somebody's machine, and a config UI to say "we found this in your
 environment", without either of them parsing an example sentence.
 
+An endpoint field is trusted configuration: AnyInfer fetches whatever URL it is given,
+without host filtering, because pointing an adapter at a service on your own network is
+the normal case. If your application ever lets a lower-trust party supply that value,
+validate it against your own allowlist first — see
+[URLs in configuration are trusted input](../reference/configuration.md#urls-in-configuration-are-trusted-input).
+
 ## Certify It
 
 ```bash

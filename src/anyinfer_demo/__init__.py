@@ -19,7 +19,7 @@ demonstrate, in a form a person can click through, the things AnyInfer claims to
 It runs with no credentials and no network by default, against the in-process fakes from
 `anyinfer.testing.fakes`.
 
-Run it with ``anyinfer-demo`` or ``python -m demo_app``.
+Run it with ``anyinfer-demo`` or ``python -m anyinfer_demo``.
 """
 
 __all__ = ["main"]

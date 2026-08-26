@@ -67,6 +67,9 @@ class M365CopilotAdapter:
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     # ---- auth ------------------------------------------------------------------------
@@ -312,6 +315,10 @@ descriptor = ProviderDescriptor(
         "stop",
         "tools",
         "reasoning",
+        "seed",
+        "presence_penalty",
+        "frequency_penalty",
+        "logprobs",
     ),
 )
 """Descriptor for the Microsoft 365 Copilot provider."""

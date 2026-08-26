@@ -80,6 +80,9 @@ class JinaAdapter(OpenAIShapedRetrievalMixin):
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     # ---- embedding ---------------------------------------------------------------------

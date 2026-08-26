@@ -7,12 +7,13 @@ which are used throughout the client and provider boundary.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
-from .messages import AudioPart, DocumentPart, ImagePart, Message
+from .messages import AudioPart, DocumentPart, ImagePart, Message, VideoPart
 
 if TYPE_CHECKING:
     from ..context_request import ContextRequest
@@ -26,6 +27,8 @@ __all__ = [
     "DEFAULT_MAX_RESPONSE_BYTES",
     "DEFAULT_TIMEOUT_S",
     "HISTORY_MODES",
+    "MAX_TOP_LOGPROBS",
+    "SERVER_TOOL_KINDS",
     "ArenaPolicy",
     "CacheMechanism",
     "CacheMode",
@@ -39,6 +42,8 @@ __all__ = [
     "ResolvedTarget",
     "Sampling",
     "SchemaSpec",
+    "ServerToolKind",
+    "ServerToolSpec",
     "SpendPolicy",
     "SupportsJSONSchema",
     "Target",
@@ -97,16 +102,110 @@ class Sampling:
         top_p: Nucleus-sampling cutoff — the probability mass considered for each token.
         max_output_tokens: Upper bound on how many tokens the model may generate.
         stop: Sequences that end generation as soon as one is produced.
+        seed: Requested sampling seed. A provider that honors it makes repeated identical
+            requests more likely to produce identical output — *more likely*, never
+            guaranteed: every provider that ships this field documents it as best-effort,
+            and none of them promise reproducibility across model or backend revisions.
+            Each descriptor spells it in its own dialect (``seed``, ``random_seed``);
+            targets that have no such field report a dropped parameter rather than
+            silently sampling freely.
+        presence_penalty: Penalty applied to tokens that have already appeared at all,
+            discouraging repeated topics. Provider scales differ; the value is passed
+            through unchanged rather than rescaled, because a rescaled penalty is a
+            number the caller cannot reason about.
+        frequency_penalty: Penalty scaled by how often a token has already appeared,
+            discouraging verbatim repetition.
     """
 
     temperature: float | None = None
     top_p: float | None = None
     max_output_tokens: int | None = None
     stop: tuple[str, ...] = ()
+    seed: int | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+
+    def __post_init__(self) -> None:
+        """Reject sampling values no provider could act on.
+
+        Raises:
+            ValueError: If the seed is negative, or a penalty is not finite.
+        """
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("sampling seed must not be negative")
+        for name in ("presence_penalty", "frequency_penalty"):
+            value = getattr(self, name)
+            if value is not None and not math.isfinite(value):
+                raise ValueError(f"{name} must be a finite number")
 
 
-ReasoningEffort = Literal["minimal", "low", "medium", "high"]
-"""Normalized reasoning effort; each descriptor translates it to its provider's wire form."""
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high"]
+"""Normalized reasoning effort; each descriptor translates it to its provider's wire form.
+
+``none`` asks for reasoning to be *disabled*, and is distinct from both ``minimal`` and
+from leaving the field unset. ``minimal`` means "think as little as you can", ``none``
+means "do not think", and `None` means "whatever this model does by default" — three
+different requests that produce three different wire forms. The level exists because
+OpenAI's own vocabulary accepts it on current models, and a sidecar caller sending it
+against an OpenAI backend must not be refused for using the dialect the gateway claims.
+
+Not every provider can express it. Where a provider publishes a reasoning enum with no
+off value, the descriptor omits the field rather than substituting a level the caller did
+not ask for; each `ReasoningTranslator` documents its own choice.
+"""
+
+
+ServerToolKind = Literal["web_search", "code_execution"]
+"""A tool the *provider* runs, rather than one the caller runs.
+
+Only two, and deliberately so: these are the capabilities several providers execute
+server-side inside a single request/response, which is squarely translate-only territory.
+Anything requiring the caller to run code, hold state between turns, or plan is a
+client-executed `ToolSpec` — or an agent framework, which this
+library is explicitly not.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerToolSpec:
+    """A capability the provider executes itself during one generation.
+
+    Distinct from `ToolSpec` in the one way that matters: nothing comes back to the caller
+    to run. The provider searches, or executes code, inside the same request and folds the
+    result into its own answer — so there is no tool-call loop, no arguments to parse, and
+    no result to feed back.
+
+    Kept to a normalized kind plus a use ceiling rather than a per-provider option bag.
+    Each provider spells these very differently (a dated tool type, a bare marker object, a
+    container spec), and a spec that carried every provider's knobs would be the per-engine
+    branch this library exists to remove. Provider-specific tuning stays in
+    ``provider_options``, where it is visibly provider-specific.
+
+    Attributes:
+        kind: Which capability to enable.
+        max_uses: Most invocations the provider may make within one generation, or
+            ``None`` for the provider's own default. Worth having typed because these are
+            billed per invocation: a search tool with no ceiling is an unbounded line
+            item on a request the caller thought was fixed-price.
+    """
+
+    kind: ServerToolKind
+    max_uses: int | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a ceiling no provider could act on.
+
+        Raises:
+            ValueError: The kind is unknown, or the use ceiling is not positive.
+        """
+        if self.kind not in SERVER_TOOL_KINDS:
+            raise ValueError(f"unknown server tool kind {self.kind!r}")
+        if self.max_uses is not None and self.max_uses < 1:
+            raise ValueError("server tool max_uses must be at least 1 when set")
+
+
+SERVER_TOOL_KINDS: tuple[ServerToolKind, ...] = ("web_search", "code_execution")
+"""Every `ServerToolKind`, for validation and for iterating the set."""
 
 
 @runtime_checkable
@@ -512,6 +611,15 @@ DEFAULT_MAX_INPUT_PART_BYTES = 20 * 1024 * 1024
 DEFAULT_MAX_INPUT_BYTES = 50 * 1024 * 1024
 """Maximum inline multimodal bytes across one generation request."""
 
+MAX_TOP_LOGPROBS = 20
+"""Most alternative tokens per position a request may ask for.
+
+The ceiling is the smallest one published by a provider that accepts the field at all
+(OpenAI's ``top_logprobs``), so a request valid here is valid everywhere the feature
+exists. Refusing at construction beats discovering the limit as a provider 400 after the
+prompt has already been assembled.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class GenerationRequest:
@@ -552,6 +660,27 @@ class GenerationRequest:
             never see it; the client runs and selects every candidate before projection.
         context: Explicit caller-approved documents to reduce for the resolved target.
             ``None`` preserves ordinary generation byte-for-byte.
+        logprobs: How many alternative tokens to report a log-probability for at each
+            generated position. ``None`` — the default — asks for none, and is the only
+            value that costs nothing: every provider that returns logprobs inflates the
+            response with them. ``0`` asks for the chosen token's own probability and no
+            alternatives, which is what a confidence-scoring caller needs; a positive value
+            additionally asks for that many runners-up. A target known not to report them
+            emits a dropped-parameter event rather than returning an empty ``logprobs``
+            a caller would have to notice for themselves.
+        server_tools: Capabilities the *provider* should run itself during this
+            generation — web search, code execution. Empty by default and never inferred:
+            every one is billed per invocation, and a request that quietly started
+            searching would surprise a caller on their bill rather than in their output.
+            A target whose capabilities trustedly lack one refuses before dispatch, since
+            an answer produced without the search the caller asked for is a different
+            answer, not a degraded one.
+        cite_documents: Ask the target to attribute its answer to the documents this
+            request supplied. Every dialect that can do this treats it as a request-side
+            opt-in — a model does not volunteer citations — and several bill differently
+            for a cited answer, so it is off by default and never inferred from the mere
+            presence of a `DocumentPart`. A target that cannot cite reports a dropped
+            parameter; the answer still arrives, without attributions.
     """
 
     messages: tuple[Message, ...]
@@ -571,16 +700,23 @@ class GenerationRequest:
     cache: CachePolicy | None = None
     arena: ArenaPolicy | None = None
     context: ContextRequest | None = None
+    logprobs: int | None = None
+    cite_documents: bool = False
+    server_tools: tuple[ServerToolSpec, ...] = ()
 
     def __post_init__(self) -> None:
         """Enforce multimodal request byte ceilings before any adapter can run."""
         if self.max_input_part_bytes < 1 or self.max_input_bytes < 1:
             raise ValueError("multimodal input byte ceilings must be positive")
+        if self.logprobs is not None and not 0 <= self.logprobs <= MAX_TOP_LOGPROBS:
+            raise ValueError(f"logprobs must be between 0 and {MAX_TOP_LOGPROBS}")
         total = 0
         for message in self.messages:
             for part in message.content:
                 data = (
-                    part.data if isinstance(part, ImagePart | DocumentPart | AudioPart) else None
+                    part.data
+                    if isinstance(part, ImagePart | DocumentPart | AudioPart | VideoPart)
+                    else None
                 )
                 if data is None:
                     continue

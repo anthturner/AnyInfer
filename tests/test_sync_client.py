@@ -212,3 +212,57 @@ def test_resolve_does_not_need_the_loop() -> None:
 
     assert resolved.provider_id == "openai-compat"
     assert resolved.model == "some-model"
+
+
+def test_every_forwarded_method_keeps_the_async_signature() -> None:
+    """The facade is logic-free, so its only real failure mode is silent drift.
+
+    `Client` restates every async signature by hand, with no codegen and — until this
+    test — nothing checking them. A keyword added to `AsyncClient.generate` simply never
+    appeared on `Client.generate`, and the sync caller's first hint was a `TypeError` at
+    runtime rather than a red test here.
+
+    Only the keyword-only parameters are compared. Positional spelling is not part of the
+    contract (the facade is free to name its first argument differently), but a missing or
+    renamed keyword is exactly the drift this guards.
+    """
+    import inspect
+
+    mismatches: list[str] = []
+    for name in dir(ai.Client):
+        if name.startswith("_"):
+            continue
+        sync_attr = getattr(ai.Client, name, None)
+        async_attr = getattr(ai.AsyncClient, name, None)
+        if not callable(sync_attr) or not callable(async_attr):
+            continue
+        try:
+            sync_sig = inspect.signature(sync_attr)
+            async_sig = inspect.signature(async_attr)
+        except (TypeError, ValueError):  # pragma: no cover — C-level callables
+            continue
+
+        def keywords(signature: inspect.Signature) -> dict[str, object]:
+            return {
+                key: parameter.default
+                for key, parameter in signature.parameters.items()
+                if parameter.kind is inspect.Parameter.KEYWORD_ONLY
+            }
+
+        sync_keywords = keywords(sync_sig)
+        async_keywords = keywords(async_sig)
+        missing = set(async_keywords) - set(sync_keywords)
+        extra = set(sync_keywords) - set(async_keywords)
+        if missing:
+            mismatches.append(f"Client.{name} is missing {sorted(missing)}")
+        if extra:
+            mismatches.append(f"Client.{name} has extra {sorted(extra)}")
+        differing = {
+            key
+            for key in set(sync_keywords) & set(async_keywords)
+            if sync_keywords[key] != async_keywords[key]
+        }
+        if differing:
+            mismatches.append(f"Client.{name} defaults differ for {sorted(differing)}")
+
+    assert not mismatches, "sync facade drifted from the async client:\n" + "\n".join(mismatches)

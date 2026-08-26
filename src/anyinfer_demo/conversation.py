@@ -25,6 +25,7 @@ from anyinfer.types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from anyinfer.types.results import Generation
 
@@ -286,7 +287,7 @@ def _part_to_json(part: ContentPart) -> dict[str, Any]:
             "name": part.name,
             "arguments": dict(part.arguments),
         }
-    if isinstance(part, ImagePart | DocumentPart | AudioPart):
+    if isinstance(part, ImagePart | DocumentPart | AudioPart | VideoPart):
         # The demo's transcript store is intentionally payload-free. A future attachment
         # picker can own a separate asset store; silently embedding binary request data in
         # conversation JSON would violate the existing persistence contract.

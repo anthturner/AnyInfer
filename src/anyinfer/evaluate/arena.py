@@ -7,8 +7,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from .types.requests import ArenaPolicy, ResolvedTarget
-from .types.results import ErrorInfo, Generation, Usage
+from ..types.requests import ArenaPolicy, ResolvedTarget
+from ..types.results import ErrorInfo, Generation, Usage
 
 __all__ = [
     "ARENA_ENVELOPE_FORMAT",

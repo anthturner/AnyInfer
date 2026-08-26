@@ -11,7 +11,8 @@ because a user's explicit correction must never lose to data the library merely 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Flag, auto
 from typing import TYPE_CHECKING, Generic, Literal, TypeVar
@@ -30,6 +31,7 @@ __all__ = [
     "RateLimitHeaders",
     "Sourced",
     "TokenCalibration",
+    "TokenizerKind",
     "conjunction",
 ]
 
@@ -62,6 +64,16 @@ class Sourced(Generic[_T]):
         return _PROVENANCE_RANK[self.provenance] >= _PROVENANCE_RANK[other.provenance]
 
 
+TokenizerKind = Literal["tiktoken", "anthropic_count_tokens", "llama_server_tokenize"]
+"""Exact-counting strategies AnyInfer knows how to drive.
+
+Each names a real endpoint or library, not a family of them: `tiktoken` is the published
+OpenAI-family vocabulary, `anthropic_count_tokens` is Anthropic's own counting endpoint,
+and `llama_server_tokenize` is a supervised llama-server's `/tokenize`. A provider whose
+tokenizer is neither published nor exposed declares nothing.
+"""
+
+
 @dataclass(frozen=True, slots=True)
 class TokenCalibration:
     """How much a provider's own envelope inflates the prompt it is sent.
@@ -82,14 +94,29 @@ class TokenCalibration:
     dispatch, and a lower bound may only claim tokens the provider certainly charges —
     envelope overhead is a correction we believe, not one we can prove.
 
+    A provider also declares *how* its tokens can be counted exactly, when they can be.
+    That belongs here rather than in a table beside it because it is the same fact from
+    the same source: what this provider's numbers mean and where an exact one comes from.
+
     Attributes:
         multiplier: Factor applied to the planning estimate of prompt-proportional
             content. ``1.0`` means the provider counts what was sent.
         overhead_tokens: Flat tokens the envelope adds per request, counted once.
+        tokenizer: Which exact-counting strategy this provider's models can use, or
+            ``None`` where none exists and the heuristic is the honest answer. Naming a
+            strategy does not install one — the estimators live behind extras, and a
+            caller who has not configured one still gets the heuristic.
+        tokenizer_provenance: How the `tokenizer` claim was arrived at, under the same
+            trust rules as every other capability. Only `TRUSTED_PROVENANCE` values let
+            the gate treat a resulting floor as exact: a `default` guess about which
+            tokenizer applies could produce a floor that is wrong in the direction that
+            matters, and the gate *refuses* on the floor.
     """
 
     multiplier: float = 1.0
     overhead_tokens: int = 0
+    tokenizer: TokenizerKind | None = None
+    tokenizer_provenance: Provenance = "default"
 
     def __post_init__(self) -> None:
         """Reject calibrations that would corrupt every estimate downstream.
@@ -160,6 +187,10 @@ class Feature(Flag):
     ``CACHE_USAGE`` and ``CACHE_PLACEMENT`` are deliberately separate facts: reporting what
     the prompt cache did is not the same as accepting instructions about where it should
     apply, and a provider may do either without the other.
+
+    ``LOGPROBS`` is a *model* fact rather than a provider one: several dialects accept the
+    field on their completion models and reject it on their reasoning models, so it is
+    carried here beside the input modalities instead of on the descriptor.
     """
 
     STREAMING = auto()
@@ -174,6 +205,11 @@ class Feature(Flag):
     VISION = auto()
     DOCUMENT = auto()
     AUDIO_IN = auto()
+    LOGPROBS = auto()
+    VIDEO_IN = auto()
+    CITATIONS = auto()
+    WEB_SEARCH = auto()
+    CODE_EXECUTION = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,6 +236,12 @@ class Pricing:
             by searches rather than tokens. ``None`` when the provider does not bill this
             way or the rate is not recorded — a rerank cost stays unknown rather than
             being priced through an invented token equivalence.
+        per_server_tool_use: Price per invocation of a provider-run tool, keyed by kind.
+            Web search is billed per search rather than per token, so a generation that
+            searched costs more than its token counts say — and a caller who set
+            ``max_uses`` did so precisely because that line item is real. A kind absent
+            from the mapping is not free; it is *unpriced*, and makes the whole cost
+            unknown rather than being silently counted as zero.
     """
 
     input_per_1m: Decimal
@@ -208,6 +250,7 @@ class Pricing:
     cache_write_per_1m: Decimal | None = None
     currency: str = "USD"
     per_search_unit: Decimal | None = None
+    per_server_tool_use: Mapping[str, Decimal] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

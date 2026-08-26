@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import aclosing
+from dataclasses import replace
 from typing import Any
 
 import httpx2
@@ -38,7 +39,15 @@ from ..types.capabilities import (
     ModelCapabilities,
     Sourced,
 )
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    CitationDelta,
+    ReasoningDelta,
+    ServerToolDelta,
+    ServerToolSource,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import (
     AudioPart,
     DocumentPart,
@@ -47,10 +56,17 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.operations import EmbeddingCapabilities, EmbeddingInputIntent
-from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
+from ..types.requests import ReasoningEffort, Sampling, ServerToolKind, ToolSpec
+from ..types.results import (
+    Citation,
+    FinishReason,
+    ServerToolUse,
+    TokenLogprob,
+    Usage,
+)
 from ._multimodal import base64_data
 from .base import (
     AdapterEvent,
@@ -145,6 +161,9 @@ class GeminiAdapter:
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     def _model_path(self, model: str, method: str) -> str:
@@ -361,10 +380,14 @@ class GeminiAdapter:
         if config:
             payload["generationConfig"] = config
 
+        tools: list[dict[str, Any]] = [
+            dict(_GEMINI_SERVER_TOOLS[spec.kind]) for spec in req.server_tools
+        ]
         if req.tools:
-            payload["tools"] = [
-                {"functionDeclarations": [self._encode_tool(t) for t in req.tools]}
-            ]
+            tools.append({"functionDeclarations": [self._encode_tool(t) for t in req.tools]})
+        if tools:
+            payload["tools"] = tools
+        if req.tools:
             mode = self._encode_tool_choice(req.tool_choice)
             if mode is not None:
                 payload["toolConfig"] = {"functionCallingConfig": mode}
@@ -384,6 +407,20 @@ class GeminiAdapter:
             config["maxOutputTokens"] = sampling.max_output_tokens
         if sampling.stop:
             config["stopSequences"] = list(sampling.stop)
+        if sampling.seed is not None:
+            config["seed"] = sampling.seed
+        if sampling.presence_penalty is not None:
+            config["presencePenalty"] = sampling.presence_penalty
+        if sampling.frequency_penalty is not None:
+            config["frequencyPenalty"] = sampling.frequency_penalty
+
+        if req.logprobs is not None:
+            # Two fields again, spelled differently: `responseLogprobs` switches the
+            # feature on and `logprobs` is the alternatives count. Gemini rejects a
+            # `logprobs` of 0, so a bare "chosen token only" ask sends the switch alone.
+            config["responseLogprobs"] = True
+            if req.logprobs > 0:
+                config["logprobs"] = req.logprobs
 
         if req.mechanism in ("json_schema", "grammar") and req.wire_schema is not None:
             config["responseMimeType"] = "application/json"
@@ -420,14 +457,22 @@ class GeminiAdapter:
                         }
                     }
                 )
-            elif isinstance(part, ImagePart | DocumentPart | AudioPart):
+            elif isinstance(part, ImagePart | DocumentPart | AudioPart | VideoPart):
                 if isinstance(part, AudioPart) or part.data is not None:
                     data = part.data if part.data is not None else b""
-                    parts.append(
-                        {"inlineData": {"mimeType": part.media_type, "data": base64_data(data)}}
-                    )
+                    encoded: dict[str, Any] = {
+                        "inlineData": {"mimeType": part.media_type, "data": base64_data(data)}
+                    }
                 else:
-                    parts.append({"fileData": {"mimeType": part.media_type, "fileUri": part.url}})
+                    encoded = {"fileData": {"mimeType": part.media_type, "fileUri": part.url}}
+                if isinstance(part, VideoPart):
+                    metadata = _video_metadata(part)
+                    if metadata:
+                        # `videoMetadata` is a sibling of the source block, not a member
+                        # of it: the same clip window applies whether the bytes are inline
+                        # or hosted.
+                        encoded["videoMetadata"] = metadata
+                parts.append(encoded)
 
         # Tool results ride on a user turn in this dialect; only the model speaks "model".
         role = "model" if message.role == "assistant" else "user"
@@ -538,6 +583,8 @@ class GeminiAdapter:
             usage=final.usage,
             phases=final.phases,
             raw=body,
+            logprobs=final.logprobs,
+            server_tool_uses=final.server_tool_uses,
         )
 
     def _events_from_chunk(self, chunk: Any, state: _StreamState) -> Iterable[AdapterEvent]:
@@ -574,6 +621,11 @@ class GeminiAdapter:
         if isinstance(reason, str):
             state.finish_reason = _FINISH_REASONS.get(reason, "other")
 
+        state.logprobs.extend(_parse_logprobs(candidate.get("logprobsResult")))
+
+        for citation in _parse_citations(candidate.get("citationMetadata"), state):
+            yield CitationDelta(citation)
+
         content = candidate.get("content")
         if not isinstance(content, Mapping):
             return
@@ -585,6 +637,18 @@ class GeminiAdapter:
             if not isinstance(part, Mapping):
                 continue
             yield from self._events_from_part(part, state)
+
+        # Search is reported as grounding metadata on the candidate rather than as a part,
+        # so it is counted here; code execution arrives as parts and is counted there.
+        grounding = candidate.get("groundingMetadata")
+        queries = _nested_list(grounding, "webSearchQueries")
+        if queries and not state.server_tools.get("web_search"):
+            state.server_tools["web_search"] = len(queries)
+            yield ServerToolDelta(
+                kind="web_search",
+                status="completed",
+                sources=_grounding_sources(grounding),
+            )
 
     def _events_from_part(
         self, part: Mapping[str, Any], state: _StreamState
@@ -598,6 +662,25 @@ class GeminiAdapter:
                 yield ReasoningDelta(text)
             else:
                 yield TextDelta(text)
+
+        if isinstance(part.get("executableCode"), Mapping):
+            state.server_tools["code_execution"] = (
+                state.server_tools.get("code_execution", 0) + 1
+            )
+            yield ServerToolDelta(kind="code_execution", status="started")
+        result = part.get("codeExecutionResult")
+        if isinstance(result, Mapping):
+            outcome = str(result.get("outcome", ""))
+            ok = outcome.endswith("OK")
+            output = str(result.get("output", "") or "")
+            yield ServerToolDelta(
+                kind="code_execution",
+                status="completed" if ok else "failed",
+                # Gemini puts both the printed output and the failure message in the
+                # same `output` field, so it lands on whichever half is accurate.
+                output=output if ok else "",
+                detail="" if ok else (output or outcome),
+            )
 
         call = part.get("functionCall")
         if isinstance(call, Mapping):
@@ -622,12 +705,27 @@ class GeminiAdapter:
 class _StreamState:
     """Accumulates cross-chunk streaming state so the final event is complete."""
 
-    __slots__ = ("finish_reason", "tool_slots", "usage")
+    __slots__ = (
+        "citations_emitted",
+        "finish_reason",
+        "logprobs",
+        "server_tools",
+        "tool_slots",
+        "usage",
+    )
 
     def __init__(self) -> None:
         self.finish_reason: FinishReason = "stop"
         self.usage = Usage()
         self.tool_slots = 0
+        self.logprobs: list[TokenLogprob] = []
+        self.server_tools: dict[ServerToolKind, int] = {}
+        self.citations_emitted = 0
+        """How many citation sources have already been yielded.
+
+        `citationMetadata` is cumulative across streamed chunks, not incremental, so this
+        is what stops a long grounded answer re-emitting its first citation on every
+        chunk."""
 
     def next_tool_slot(self) -> int:
         """Allocate the next dense tool-call index.
@@ -645,7 +743,147 @@ class _StreamState:
         return AdapterFinal(
             finish_reason=self.finish_reason,
             usage=usage if usage != Usage() else None,
+            logprobs=tuple(self.logprobs),
+            server_tool_uses=tuple(
+                ServerToolUse(kind=kind, uses=count)
+                for kind, count in sorted(self.server_tools.items())
+            ),
         )
+
+
+def _grounding_sources(grounding: Any) -> tuple[ServerToolSource, ...]:
+    """Pull the pages a Gemini search consulted out of its grounding metadata.
+
+    Gemini reports the sources as `groundingChunks`, each of which is a one-key object
+    naming its retrieval kind; only the `web` kind carries a URL, and the others (a
+    caller's own retrieval corpus) are not the search tool's results.
+    """
+    chunks = _nested_list(grounding, "groundingChunks")
+    sources: list[ServerToolSource] = []
+    for chunk in chunks:
+        web = chunk.get("web") if isinstance(chunk, Mapping) else None
+        if isinstance(web, Mapping) and web.get("uri"):
+            sources.append(
+                ServerToolSource(
+                    url=str(web.get("uri", "") or ""),
+                    title=str(web.get("title", "") or ""),
+                )
+            )
+    return tuple(sources)
+
+
+_GEMINI_SERVER_TOOLS: Mapping[str, Mapping[str, Any]] = {
+    # Bare marker objects, and they are *siblings* of `functionDeclarations` in the same
+    # `tools` array rather than entries beside the declarations — which is why the tools
+    # list is assembled rather than replaced.
+    "web_search": {"googleSearch": {}},
+    "code_execution": {"codeExecution": {}},
+}
+
+
+def _nested_list(container: Any, key: str) -> list[Any]:
+    """Read a list from a mapping, treating anything else as absent."""
+    if not isinstance(container, Mapping):
+        return []
+    value = container.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _parse_citations(metadata: Any, state: _StreamState) -> Iterable[Citation]:
+    """Translate ``citationMetadata.citationSources`` into normalized citations.
+
+    Gemini reports offsets into its own answer, which map straight across. It also resends
+    the *cumulative* list on every streamed chunk rather than only the new entries, so the
+    stream state remembers how many have already been emitted — without that, a long
+    grounded answer would emit the first citation once per chunk.
+    """
+    if not isinstance(metadata, Mapping):
+        return
+    sources = metadata.get("citationSources")
+    if not isinstance(sources, list):
+        return
+    for source in sources[state.citations_emitted :]:
+        state.citations_emitted += 1
+        if not isinstance(source, Mapping):
+            continue
+        uri = source.get("uri")
+        start = source.get("startIndex")
+        end = source.get("endIndex")
+        if not isinstance(uri, str) and not isinstance(start, int):
+            continue
+        yield Citation(
+            start_index=start if isinstance(start, int) and not isinstance(start, bool) else None,
+            end_index=end if isinstance(end, int) and not isinstance(end, bool) else None,
+            uri=uri if isinstance(uri, str) else "",
+        )
+
+
+def _video_metadata(part: VideoPart) -> dict[str, Any]:
+    """Build a ``videoMetadata`` block from a video part's clip and sampling window.
+
+    Offsets are spelled as protobuf durations — a decimal string ending in ``s`` — which
+    is the one place this dialect departs from plain JSON numbers. Returns an empty dict
+    when the caller set none of the three, so the field is omitted rather than sent with
+    provider defaults restated as if the caller had chosen them.
+    """
+    metadata: dict[str, Any] = {}
+    if part.start_offset_s is not None:
+        metadata["startOffset"] = f"{part.start_offset_s}s"
+    if part.end_offset_s is not None:
+        metadata["endOffset"] = f"{part.end_offset_s}s"
+    if part.fps is not None:
+        metadata["fps"] = part.fps
+    return metadata
+
+
+def _parse_logprobs(result: Any) -> tuple[TokenLogprob, ...]:
+    """Read a candidate's ``logprobsResult`` into normalized tokens.
+
+    Gemini splits what other dialects nest: ``chosenCandidates`` lists the tokens that were
+    actually generated, and ``topCandidates`` lists the alternatives *per position* in a
+    parallel array. Zipping the two by position is what recovers one dialect-neutral token
+    with its runners-up attached. A missing or short ``topCandidates`` is normal — it is
+    absent entirely unless the request asked for alternatives — so the chosen list drives
+    the zip and alternatives are filled in where they exist.
+    """
+    if not isinstance(result, Mapping):
+        return ()
+    chosen = result.get("chosenCandidates")
+    if not isinstance(chosen, list):
+        return ()
+    tops = result.get("topCandidates")
+    top_groups: list[Any] = tops if isinstance(tops, list) else []
+    tokens: list[TokenLogprob] = []
+    for position, entry in enumerate(chosen):
+        parsed = _parse_logprob_candidate(entry)
+        if parsed is None:
+            continue
+        alternatives: tuple[TokenLogprob, ...] = ()
+        if position < len(top_groups):
+            group = top_groups[position]
+            if isinstance(group, Mapping):
+                raw = group.get("candidates")
+                if isinstance(raw, list):
+                    alternatives = tuple(
+                        candidate
+                        for candidate in (_parse_logprob_candidate(item) for item in raw)
+                        if candidate is not None
+                    )
+        tokens.append(replace(parsed, top=alternatives))
+    return tuple(tokens)
+
+
+def _parse_logprob_candidate(entry: Any) -> TokenLogprob | None:
+    """Parse one ``LogprobsResult.Candidate``, or ``None`` when it is unusable."""
+    if not isinstance(entry, Mapping):
+        return None
+    token = entry.get("token")
+    logprob = entry.get("logProbability")
+    if not isinstance(token, str) or not isinstance(logprob, int | float):
+        return None
+    if isinstance(logprob, bool):
+        return None
+    return TokenLogprob(token=token, logprob=float(logprob))
 
 
 def _split_system(messages: Sequence[Message]) -> tuple[str, list[Message]]:
@@ -744,6 +982,11 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
+    if effort == "none":
+        # `thinkingLevel` has no off value; the budget field does, and zero is Gemini's
+        # documented way to disable thinking. Models that cannot disable it clamp upward
+        # server-side, the same as for any other level.
+        return {"thinkingConfig": {"thinkingBudget": 0}}
     return {"thinkingConfig": {"thinkingLevel": _THINKING_LEVELS[effort]}}
 
 
@@ -755,6 +998,11 @@ _GEMINI_FEATURES = (
     | Feature.REASONING
     | Feature.SYSTEM_PROMPT
     | Feature.CACHE_USAGE
+    | Feature.LOGPROBS
+    | Feature.VIDEO_IN
+    | Feature.CITATIONS
+    | Feature.WEB_SEARCH
+    | Feature.CODE_EXECUTION
 )
 
 
@@ -812,6 +1060,9 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
+    server_tools=frozenset({"web_search", "code_execution"}),
+    # Bare marker objects with no per-tool ceiling, as with the Responses dialect.
+    ignored_parameters=("server_tools.max_uses",),
     default_capabilities=ModelCapabilities(features=Sourced(_GEMINI_FEATURES, "default")),
 )
 """Descriptor for the Google Gemini provider."""

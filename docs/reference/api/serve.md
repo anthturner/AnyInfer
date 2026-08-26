@@ -1,4 +1,4 @@
-# Serve
+# Sidecar Frontend
 
 The `anyinfer.serve` frontend: an OpenAI-compatible loopback service over any configured
 provider, embeddable as an ASGI app. Guide: [serve](../../serve/README.md).

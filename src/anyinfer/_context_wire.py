@@ -14,8 +14,18 @@ __all__ = ["decode_context_request", "encode_context_request"]
 _FIELD = "anyinfer_context"
 
 
-def decode_context_request(raw: Any) -> ContextRequest | None:
-    """Decode a bounded caller-approved corpus request from a JSON-shaped value."""
+def decode_context_request(
+    raw: Any, *, default_tuning: ContextTuning | None = None
+) -> ContextRequest | None:
+    """Decode a bounded caller-approved corpus request from a JSON-shaped value.
+
+    Args:
+        raw: The parsed extension field.
+        default_tuning: Tuning to apply when the request omits its own ``tuning`` block.
+            The gateway passes the deployment's configured `AnyInferConfig.context` here,
+            so a sidecar caller inherits the operator's tuning the same way a Python
+            caller does. ``None`` keeps `ContextRequest`'s own default.
+    """
     if raw is None:
         return None
     if not isinstance(raw, Mapping):
@@ -58,12 +68,15 @@ def decode_context_request(raw: Any) -> ContextRequest | None:
                 extract=(str(item["extract"]) if "extract" in item else None),
             )
         )
-    tuning_raw = raw.get("tuning", {})
-    if not isinstance(tuning_raw, Mapping):
-        raise ValueError(f"{_FIELD}.tuning must be an object")
     values = dict(raw)
     values["documents"] = tuple(decoded)
-    values["tuning"] = ContextTuning.from_mapping(tuning_raw)
+    if "tuning" in raw:
+        tuning_raw = raw["tuning"]
+        if not isinstance(tuning_raw, Mapping):
+            raise ValueError(f"{_FIELD}.tuning must be an object")
+        values["tuning"] = ContextTuning.from_mapping(tuning_raw)
+    elif default_tuning is not None:
+        values["tuning"] = default_tuning
     try:
         return ContextRequest(**values)
     except (TypeError, ValueError) as exc:

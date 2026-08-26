@@ -170,3 +170,134 @@ def test_runtime_rm_reports_that_nothing_was_installed(
     monkeypatch.setenv("ANYINFER_RUNTIME_DIR", str(tmp_path))
     assert main(["runtime", "rm", "cuda"]) == 1
     assert "no cuda runtime is installed" in capsys.readouterr().err
+
+
+# ---- guided eviction through the CLI --------------------------------------------------
+
+
+@pytest.fixture
+def populated_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A store with two entries whose bytes exist on disk, one fresh and one stale."""
+    import time
+
+    from anyinfer.local.store import MODEL_DIR_ENV, ModelStore, StoredFile, StoreEntry
+
+    monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
+    store = ModelStore(tmp_path)
+    now = time.time()
+    index: dict[str, StoreEntry] = {}
+    for entry_id, size, days in (("fresh-entry", 4096, 1), ("stale-entry", 8192, 120)):
+        directory = tmp_path / entry_id
+        directory.mkdir()
+        (directory / "weights.gguf").write_bytes(b"x" * size)
+        index[entry_id] = StoreEntry(
+            id=entry_id,
+            model_id=f"catalog/{entry_id}",
+            directory=entry_id,
+            files=(
+                StoredFile(path="weights.gguf", size_bytes=size, digest="d", verified=True),
+            ),
+            installed_at=now - days * 86400,
+            last_used_at=now - days * 86400,
+        )
+    store._write_index(index)
+    return tmp_path
+
+
+def test_models_prune_dry_run_prints_the_plan_and_deletes_nothing(
+    populated_store: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["models", "prune", "--keep-bytes", "5000", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "stale-entry" in out
+    assert "fresh-entry" not in out, "the recently-used entry must not be proposed"
+    assert (populated_store / "stale-entry" / "weights.gguf").exists()
+
+
+def test_models_prune_json_reports_the_plan_without_acting(
+    populated_store: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["models", "prune", "--keep-bytes", "5000", "--dry-run", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert [p["entry_id"] for p in payload["proposals"]] == ["stale-entry"]
+    assert payload["total_bytes"] == 12288
+    assert payload["remaining_bytes"] == 4096
+    assert (populated_store / "stale-entry").exists()
+
+
+def test_models_prune_with_yes_actually_deletes(
+    populated_store: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["models", "prune", "--keep-bytes", "5000", "--yes"]) == 0
+    assert "freeing" in capsys.readouterr().out
+    assert not (populated_store / "stale-entry").exists()
+    assert (populated_store / "fresh-entry" / "weights.gguf").exists()
+
+
+def test_models_prune_refuses_to_delete_without_a_terminal_or_yes(
+    populated_store: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deliberately stricter than every other confirmation in this CLI.
+
+    `_confirm` proceeds when stdin is not a tty, which is right for writing a config file
+    and wrong for deleting tens of gigabytes a pipeline never meant to touch.
+    """
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False, raising=False)
+    assert main(["models", "prune", "--keep-bytes", "5000"]) == 1
+    assert "nothing was deleted" in capsys.readouterr().err
+    assert (populated_store / "stale-entry").exists()
+
+
+def test_models_prune_needs_exactly_one_limit(populated_store: Path) -> None:
+    """No default budget: an invented one would silently delete real gigabytes."""
+    with pytest.raises(SystemExit):
+        main(["models", "prune"])
+    with pytest.raises(SystemExit):
+        main(["models", "prune", "--keep-bytes", "1", "--older-than-days", "1"])
+
+
+def test_models_prune_by_age_ignores_the_disk_total(
+    populated_store: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["models", "prune", "--older-than-days", "30", "--dry-run", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert [p["entry_id"] for p in payload["proposals"]] == ["stale-entry"]
+    assert payload["keep_bytes"] is None
+
+
+def test_a_store_that_already_fits_says_so_and_succeeds(
+    populated_store: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["models", "prune", "--keep-bytes", "1GB"]) == 0
+    assert "nothing to prune" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("500", 500),
+        ("40GB", 40_000_000_000),
+        ("40GiB", 42_949_672_960),
+        ("1.5 tb", 1_500_000_000_000),
+        ("500mib", 524_288_000),
+    ],
+)
+def test_a_size_suffix_means_what_the_tool_that_printed_it_meant(
+    text: str, expected: int
+) -> None:
+    """GB and GiB are both accepted and kept distinct: 7% of a disk budget is real space."""
+    from anyinfer.cli import _byte_size
+
+    assert _byte_size(text) == expected
+
+
+@pytest.mark.parametrize("text", ["", "-5", "12PB", "lots"])
+def test_an_unparseable_size_is_refused_by_the_parser(text: str) -> None:
+    import argparse
+
+    from anyinfer.cli import _byte_size
+
+    with pytest.raises(argparse.ArgumentTypeError):
+        _byte_size(text)

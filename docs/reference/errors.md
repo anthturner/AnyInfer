@@ -4,7 +4,7 @@ Every exception AnyInfer raises, when it is raised, and what the user will see.
 
 ## The Shape of Every Error
 
-The hierarchy is shallow, about ten classes, with rich structured fields, because callers
+The hierarchy is shallow, eighteen classes, with rich structured fields, because callers
 branch on fields far more often than on exception class:
 
 ```python
@@ -263,7 +263,7 @@ except ai.SchemaViolationError as error:
 
 !!! tip "How to fix"
     Increase `Repair.max_attempts`, simplify the schema, inspect `error.partial` and
-    `error.missing_fields`, or debug the bounded `error.raw_text`. Partial members are not
+    `error.missing_required`, or debug the bounded `error.raw_text`. Partial members are not
     schema-validated and no truncated value is guessed.
     See [structured output](../concepts/structured-output.md#repair).
 

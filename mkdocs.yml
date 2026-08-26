@@ -126,8 +126,8 @@ nav:
       - Why and When to Use AnyInfer: why-anyinfer.md
       - Shared Configuration: reference/configuration.md
       - Surfaces:
-          - Python SDK: guides/python-sdk.md
-          - Command-Line Tool: guides/cli.md
+          - Integrate the Python SDK: guides/python-sdk.md
+          - Run a Prompt from the Shell: guides/cli.md
           - OpenAI-Compatible Sidecar: serve/README.md
           - Running the Sidecar as a Service: serve/running-as-a-service.md
       - Python Tasks:
@@ -139,14 +139,14 @@ nav:
           - Test Your Application Offline: guides/testing-your-app.md
           - Compare Targets Without Spending: guides/comparing-targets.md
           - Add Your Own Provider: guides/custom-providers.md
-          - Embed, Store, and Query a Small Corpus: guides/vector-store.md
+          - Embed, Store, and Query Without a Database: guides/vector-store.md
       - Operations:
           - Run a Model Locally: guides/local-inference.md
           - Observability: guides/observability.md
       - Confidentiality Tiers: guides/confidentiality-tiers.md
       - Coding Agents: guides/coding-agents.md
       - Integration Procedure: agents/INTEGRATION.md
-      - Reference Application: guides/demo-app.md
+      - The Pack-In Demo Application: guides/demo-app.md
   - Concepts:
       - concepts/README.md
       - The Request Path:
@@ -211,6 +211,7 @@ nav:
           - Embeddings and Reranking: reference/api/embeddings.md
           - Portability Diff Tool: reference/api/compare-diff.md
           - Vector Store Add-On: reference/api/vector-store.md
+          - Confidentiality Add-Ons: reference/api/confidential.md
           - Routing: reference/api/routing.md
           - Capabilities: reference/api/capabilities.md
           - Context Reduction: reference/api/context.md
@@ -233,3 +234,4 @@ nav:
       - The Conformance Suite: contributing/conformance.md
       - Testing: contributing/testing.md
       - Branching and Releases: contributing/releasing.md
+      - The Changelog: contributing/changelog.md

@@ -10,6 +10,13 @@ the parallel).
 Enforcement and any pre-flight capability check a caller makes both call
 `anyinfer.local.attestation.confidential_execution_status` — one source of truth, so they
 can never drift out of sync with each other.
+
+**What the gate is, today.** The `end_to_end` field this adapter refuses on is TEE
+*detection*, not verified attestation: no quote is generated or checked against a vendor
+root of trust. The refusal path is real and the fail-closed posture holds, but a host that
+passes this gate has not proven anything to a remote party — a fabricated device node
+satisfies every probe. Do not present a successful `generate()` here as cryptographic
+assurance to anyone off this machine until quote verification ships.
 """
 
 from __future__ import annotations

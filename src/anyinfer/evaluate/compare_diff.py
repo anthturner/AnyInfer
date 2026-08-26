@@ -39,12 +39,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .errors import ConfigError
-from .types.messages import Message, assistant, system, user
-from .types.requests import GenerationRequest
+from ..errors import ConfigError
+from ..types.messages import Message, assistant, system, user
+from ..types.requests import GenerationRequest
 
 if TYPE_CHECKING:
-    from ._client.sync_client import Client
+    from .._client.sync_client import Client
 
 __all__ = [
     "FIXTURE_SCHEMA_VERSION",

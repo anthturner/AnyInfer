@@ -34,9 +34,21 @@ budget calculator are explained in
 
 ::: anyinfer.HeuristicTokenEstimator
 
+::: anyinfer.TiktokenEstimator
+
+::: anyinfer.AnthropicCountTokensEstimator
+
+::: anyinfer.LlamaServerTokenizeEstimator
+
+::: anyinfer.PrewarmsCounts
+
+::: anyinfer.TargetAwareTokenEstimator
+
 ::: anyinfer.RequestEstimate
 
 ::: anyinfer.TokenCalibration
+
+::: anyinfer.TokenizerKind
 
 ::: anyinfer.build_context_budget
 

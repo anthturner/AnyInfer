@@ -28,7 +28,13 @@ import httpx2
 from ..errors import ConfigError, ProviderError, StreamProtocolError
 from ..registry import ProviderDescriptor, ProviderSetupSpec, SetupField
 from ..types.capabilities import DiscoveredModel, Feature, Health, ModelCapabilities, Sourced
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    CitationDelta,
+    ReasoningDelta,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import Message, Text, ToolCall, ToolResult
 from ..types.operations import (
     EmbeddingCapabilities,
@@ -37,7 +43,7 @@ from ..types.operations import (
     RerankCapabilities,
 )
 from ..types.requests import ReasoningEffort, Sampling, ToolSpec
-from ..types.results import FinishReason, Usage
+from ..types.results import Citation, FinishReason, Usage
 from ._multimodal import has_multimodal, unsupported
 from .base import (
     AdapterEvent,
@@ -110,6 +116,9 @@ class CohereAdapter:
             headers=headers,
             timeout_s=config.timeout_s,
             transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
         )
 
     # ---- discovery -------------------------------------------------------------------
@@ -219,6 +228,12 @@ class CohereAdapter:
             payload["max_tokens"] = sampling.max_output_tokens
         if sampling.stop:
             payload["stop_sequences"] = list(sampling.stop)
+        if sampling.seed is not None:
+            payload["seed"] = sampling.seed
+        if sampling.presence_penalty is not None:
+            payload["presence_penalty"] = sampling.presence_penalty
+        if sampling.frequency_penalty is not None:
+            payload["frequency_penalty"] = sampling.frequency_penalty
 
     def _encode_message(self, message: Message) -> dict[str, Any]:
         """Encode one message, splitting tool results into their own role."""
@@ -399,6 +414,12 @@ class CohereAdapter:
                 thinking = content.get("thinking")
                 if isinstance(thinking, str) and thinking:
                     yield ReasoningDelta(thinking)
+            return
+
+        if kind == "citation-start":
+            citation = _parse_citation(_nested(delta, "message", "citations"))
+            if citation is not None:
+                yield CitationDelta(citation)
             return
 
         if kind == "tool-call-start":
@@ -625,6 +646,51 @@ def _nested(container: Any, *keys: str) -> Any:
     return current
 
 
+def _parse_citation(raw: Any) -> Citation | None:
+    """Translate one Cohere v2 citation into a normalized `Citation`.
+
+    Cohere is the one dialect that reports offsets into its *own answer*, which is exactly
+    what a caller highlighting a sentence needs, so ``start``/``end`` map straight across.
+    Sources are a list because one span may be supported by several documents; the first
+    is taken and the rest are left on the raw payload — the alternative is a citation type
+    with a nested source list that every other dialect would fill with exactly one entry.
+
+    Returns ``None`` when the object names no span and no source.
+    """
+    if not isinstance(raw, Mapping):
+        return None
+    start = raw.get("start")
+    end = raw.get("end")
+    sources = raw.get("sources")
+    source = sources[0] if isinstance(sources, list) and sources else None
+    document_id: str = ""
+    title = ""
+    if isinstance(source, Mapping):
+        document_id = str(source.get("id", ""))
+        document = source.get("document")
+        if isinstance(document, Mapping):
+            for key in ("title", "id"):
+                value = document.get(key)
+                if isinstance(value, str) and value:
+                    title = value
+                    break
+    if start is None and end is None and not document_id and not title:
+        return None
+    return Citation(
+        start_index=_offset(start),
+        end_index=_offset(end),
+        quoted_text=str(raw.get("text", "")),
+        title=title or document_id,
+    )
+
+
+def _offset(value: Any) -> int | None:
+    """Read a character offset, treating anything non-integral as "not stated"."""
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return None
+
+
 def _tool_choice(choice: str) -> str | None:
     """Translate normalized tool choice into Cohere's uppercase enum.
 
@@ -741,7 +807,7 @@ def _translate_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
     """
     if effort is None:
         return {}
-    if effort == "minimal":
+    if effort in ("none", "minimal"):
         return {"thinking": {"type": "disabled"}}
     return {"thinking": {"type": "enabled", "token_budget": _THINKING_BUDGETS[effort]}}
 
@@ -753,6 +819,7 @@ _COHERE_FEATURES = (
     | Feature.TOOLS
     | Feature.REASONING
     | Feature.SYSTEM_PROMPT
+    | Feature.CITATIONS
 )
 
 
@@ -839,6 +906,7 @@ descriptor = ProviderDescriptor(
         model_selection="discover-or-manual",
     ),
     reasoning_translator=_translate_reasoning,
+    ignored_parameters=("logprobs",),
     default_capabilities=ModelCapabilities(features=Sourced(_COHERE_FEATURES, "default")),
 )
 """Descriptor for the Cohere provider."""

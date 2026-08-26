@@ -142,6 +142,12 @@ class ConformanceHarness:
             suite passes a scenario name so the harness can program its fake or select its
             cassette.
         supports: Declared capabilities; unsupported cases are skipped.
+        covered_elsewhere: Capability names that are implemented and tested, but in a
+            dedicated module instead of this harness — usually because exercising them
+            here would need a second fake with a different shape. Named explicitly so
+            the matrix can distinguish "this adapter cannot" from "the proof is next
+            door"; a name here without the matching `supports` flag left ``False`` is a
+            contradiction, so the annotation cannot quietly overstate coverage.
         retry: The policy the rate-limiting cases route through. It defaults to no
             backoff because those cases assert the *attempt trail* -- that a 429 is
             recorded as a retried attempt and typed retryable -- and never assert how
@@ -155,6 +161,7 @@ class ConformanceHarness:
     model: str
     build_client: Callable[[str], Awaitable[AsyncClient]]
     supports: Capabilities = Capabilities()
+    covered_elsewhere: frozenset[str] = frozenset()
     embedding_model: str | None = None
     rerank_model: str | None = None
     retry: Retry = Retry(max_attempts=2, backoff_base_s=0.0)
@@ -195,17 +202,29 @@ class CaseResult:
         passed: Whether the check succeeded. Also ``False`` for skipped cases; check
             ``skipped`` first.
         skipped: The harness declared the capability unsupported, so the case did not run.
+        covered_elsewhere: The capability *is* implemented, but its coverage lives in a
+            dedicated test module rather than this shared harness. Refines ``skipped``
+            rather than replacing it — the case still did not run here, so every
+            failure check stays correct — but the matrix draws it differently, because
+            collapsing both onto ``➖`` reported working adapters as unable.
         detail: Why the case failed (truncated), or why it was skipped; empty on a pass.
     """
 
     name: str
     passed: bool
     skipped: bool = False
+    covered_elsewhere: bool = False
     detail: str = ""
 
     @property
     def symbol(self) -> str:
-        """Matrix symbol: ``✅`` pass, ``➖`` declared-unsupported, ``❌`` failure."""
+        """The cell this result draws in the conformance matrix.
+
+        ``✅`` pass · ``🔗`` implemented, covered by dedicated tests · ``➖``
+        declared-unsupported · ``❌`` failure.
+        """
+        if self.covered_elsewhere:
+            return "🔗"
         if self.skipped:
             return "➖"
         return "✅" if self.passed else "❌"
@@ -673,6 +692,17 @@ async def run_conformance(
         if only is not None and case.name not in only:
             continue
         if not getattr(harness.supports, case.requires, True):
+            if case.requires in harness.covered_elsewhere:
+                results.append(
+                    CaseResult(
+                        case.name,
+                        passed=False,
+                        skipped=True,
+                        covered_elsewhere=True,
+                        detail="covered by this adapter's dedicated tests",
+                    )
+                )
+                continue
             results.append(
                 CaseResult(case.name, passed=False, skipped=True, detail="declared unsupported")
             )

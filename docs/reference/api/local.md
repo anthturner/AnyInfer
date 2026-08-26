@@ -176,6 +176,10 @@ in a provider adapter.
 
 ::: anyinfer.local.RemovalReport
 
+::: anyinfer.local.PrunePlan
+
+::: anyinfer.local.PruneProposal
+
 </div>
 
 ## Sources
@@ -332,5 +336,11 @@ see the [Confidentiality Tiers guide](../../guides/confidentiality-tiers.md).
 ::: anyinfer.local.hash_model_weights
 
 ::: anyinfer.local.verify_model_manifest
+
+::: anyinfer.local.WeightsProvenance
+
+::: anyinfer.local.open_verified_weights
+
+::: anyinfer.local.VerifiedWeights
 
 </div>

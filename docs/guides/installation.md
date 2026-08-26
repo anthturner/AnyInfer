@@ -19,7 +19,9 @@ small supply-chain attack surface.
 | `keyring` | `keyring` | `credential://` references |
 | `otel` | `opentelemetry-api` | The OpenTelemetry bridge |
 | `serve` | `starlette`, `uvicorn` | The OpenAI-compatible sidecar |
+| `tokenizers` | `tiktoken` | [Exact token counting](../concepts/budgeting.md#counting-exactly) instead of the byte heuristic |
 | `demo` | `PySide6`, `markdown` | The [pack-in demo app](demo-app.md) (`anyinfer-demo`) |
+| `mcp` | nothing — a feature marker | [MCP tool sources](tool-loop.md#tools-from-an-mcp-server); the protocol is spoken with httpx2 and the standard library |
 | `all` | everything above | |
 
 ```bash
@@ -72,3 +74,21 @@ code-signed; verify `SHA256SUMS` from the GitHub Release before running them.
 anyinfer providers   # every registered provider and what it needs
 anyinfer doctor      # detected hardware and the recommended local tier
 ```
+
+!!! tip "Key Takeaways"
+    - The core install is two runtime dependencies; everything else is an extra you ask for.
+    - An extra exists per capability, not per provider — `serve`, `otel`, `keyring` are
+      about what AnyInfer does, not who it talks to.
+    - The add-on packages ship separately and install from a checkout until their first
+      PyPI release.
+    - Most providers need nothing extra: an API key and a target string is the whole setup.
+
+## See Also
+
+<div class="anyinfer-see-also" markdown>
+
+- [Quickstart](quickstart.md): from this install to a working result.
+- [Configuration](../reference/configuration.md): the file the SDK, CLI, and sidecar share.
+- [Providers](../providers/README.md): what each backend needs from you.
+
+</div>

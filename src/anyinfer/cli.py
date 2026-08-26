@@ -8,15 +8,18 @@ import json
 import mimetypes
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from . import __version__
 from .config import AnyInferConfig, load_config
 from .errors import AnyInferError, ConfigError
+
+if TYPE_CHECKING:  # pragma: no cover — annotations only; `local` is imported lazily
+    from .local import ModelStore, PrunePlan
 
 __all__ = ["build_parser", "main"]
 
@@ -31,6 +34,50 @@ _DEFAULT_CONFIG_NAME = "anyinfer.json"
 
 _DEFAULT_STARTER_NAME = "starter.py"
 """The runnable program ``init`` writes beside the configuration."""
+
+
+_BYTE_UNITS: Mapping[str, int] = {
+    "": 1,
+    "b": 1,
+    "kb": 1000,
+    "mb": 1000**2,
+    "gb": 1000**3,
+    "tb": 1000**4,
+    "kib": 1024,
+    "mib": 1024**2,
+    "gib": 1024**3,
+    "tib": 1024**4,
+}
+"""Suffixes `--keep-bytes` accepts. Both spellings, because a disk budget is quoted by
+vendors in one and reported by tools in the other, and silently treating ``GB`` as
+``GiB`` would delete 7% more than the user asked to free."""
+
+
+def _byte_size(text: str) -> int:
+    """Parse a byte size with an optional unit suffix, for argparse.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a number, carries an unknown
+            suffix, or is negative.
+    """
+    cleaned = text.strip().replace("_", "")
+    digits = cleaned
+    suffix = ""
+    for index, character in enumerate(cleaned):
+        if not (character.isdigit() or character == "."):
+            digits, suffix = cleaned[:index], cleaned[index:].strip().lower()
+            break
+    multiplier = _BYTE_UNITS.get(suffix)
+    if multiplier is None:
+        known = ", ".join(unit.upper() for unit in _BYTE_UNITS if unit)
+        raise argparse.ArgumentTypeError(f"unknown size unit {suffix!r}; use one of {known}")
+    try:
+        value = float(digits)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a size") from None
+    if value < 0:
+        raise argparse.ArgumentTypeError("a size must not be negative")
+    return int(value * multiplier)
 
 
 def _add_serve_flags(parser: argparse.ArgumentParser) -> None:
@@ -60,6 +107,18 @@ def _add_serve_flags(parser: argparse.ArgumentParser) -> None:
         default=[],
         metavar="TARGET",
         help="advertise a concrete provider:model target from /v1/models (repeatable)",
+    )
+    # Default resolved in `cmd_serve`, not here: the constant lives in `serve.app`, which
+    # is imported lazily so building this parser never costs the serve import.
+    parser.add_argument(
+        "--max-request-bytes",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "reject request bodies larger than N bytes with 413 "
+            "(default: 10 MiB; 0 disables the check)"
+        ),
     )
 
 
@@ -310,7 +369,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--reasoning",
         default=None,
-        choices=["minimal", "low", "medium", "high"],
+        choices=["none", "minimal", "low", "medium", "high"],
         help="reasoning effort, on models that expose it",
     )
     run.add_argument(
@@ -854,6 +913,28 @@ def build_parser() -> argparse.ArgumentParser:
     remove = model_commands.add_parser("rm", help="delete a downloaded model")
     remove.add_argument("entry", help="a store entry id, as shown by 'models installed'")
 
+    prune = model_commands.add_parser(
+        "prune", help="propose least-recently-used deletions to fit a disk budget"
+    )
+    prune_limit = prune.add_mutually_exclusive_group(required=True)
+    prune_limit.add_argument(
+        "--keep-bytes",
+        type=_byte_size,
+        metavar="SIZE",
+        help="disk budget to fit within, e.g. 40GB or 500MiB",
+    )
+    prune_limit.add_argument(
+        "--older-than-days",
+        type=float,
+        metavar="DAYS",
+        help="propose every model idle for longer than this",
+    )
+    prune.add_argument(
+        "--dry-run", action="store_true", help="print the plan and delete nothing"
+    )
+    prune.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    prune.add_argument("--json", action="store_true", help="emit machine-readable output")
+
     runtime = subcommands.add_parser("runtime", help="manage llama-server runtime variants")
     runtime_commands = runtime.add_subparsers(dest="runtime_command", required=True)
 
@@ -964,7 +1045,8 @@ def _serve_run(args: argparse.Namespace) -> int:
         return 1
 
     from . import AsyncClient
-    from .serve.app import create_app
+    from .config import build_observers
+    from .serve.app import DEFAULT_MAX_REQUEST_BYTES, create_app
 
     config = _config(args.config)
     settings, route = list(config.providers), config.route
@@ -976,10 +1058,22 @@ def _serve_run(args: argparse.Namespace) -> int:
         operation_routes=config.operation_routes,
         history=config.history,
         cache=config.cache,
+        repair=config.repair,
+        observers=list(build_observers(config.observers)),
         arena=config.arena,
         arenas=config.arenas,
     )
-    app = create_app(client, auth_token=token, expose_targets=tuple(args.expose))
+    app = create_app(
+        client,
+        auth_token=token,
+        expose_targets=tuple(args.expose),
+        max_request_bytes=(
+            DEFAULT_MAX_REQUEST_BYTES
+            if args.max_request_bytes is None
+            else args.max_request_bytes
+        ),
+        context_tuning=config.context,
+    )
 
     print(f"anyinfer {__version__} serving on http://{args.host}:{args.port}")
     print(f"  authentication: {'bearer token' if token else 'disabled (loopback only)'}")
@@ -1302,7 +1396,7 @@ def _confirm(question: str, args: argparse.Namespace) -> bool:
 def _compare(args: argparse.Namespace) -> int:
     """Compare a request across targets without dispatching it.
 
-    Dispatches to the portability diff tool (`anyinfer.compare_diff`) first when
+    Dispatches to the portability diff tool (`anyinfer.evaluate.compare_diff`) first when
     ``--snapshot``, ``--diff``, or ``--diff-request`` was given; otherwise runs the
     original single ad hoc comparison.
     """
@@ -1401,7 +1495,7 @@ def _compare(args: argparse.Namespace) -> int:
 def _compare_snapshot(args: argparse.Namespace) -> int:
     """`anyinfer compare --snapshot`: write a compare_diff snapshot to --out."""
     from . import Client
-    from . import compare_diff as cd
+    from .evaluate import compare_diff as cd
 
     if args.fixtures is None or args.out is None:
         print("--snapshot needs --fixtures and --out", file=sys.stderr)
@@ -1426,7 +1520,7 @@ def _compare_snapshot(args: argparse.Namespace) -> int:
 
 def _compare_diff_files(args: argparse.Namespace) -> int:
     """`anyinfer compare --diff BASELINE CURRENT`: structural diff, no client needed."""
-    from . import compare_diff as cd
+    from .evaluate import compare_diff as cd
 
     baseline_path, current_path = args.diff
     try:
@@ -1469,7 +1563,7 @@ def _compare_diff_request(args: argparse.Namespace) -> int:
     The ad hoc, no-baseline-file "should I move from A to B" report for one fixture.
     """
     from . import Client
-    from . import compare_diff as cd
+    from .evaluate import compare_diff as cd
 
     if args.fixtures is None or args.diff_target_a is None or args.diff_target_b is None:
         print(
@@ -2113,7 +2207,7 @@ def _result_payload(generation: Any) -> dict[str, Any]:
         "warnings": list(generation.warnings),
     }
     if generation.arena is not None:
-        from .arena import arena_to_dict
+        from .evaluate.arena import arena_to_dict
 
         payload["arena"] = arena_to_dict(generation.arena)
     return payload
@@ -3430,6 +3524,8 @@ def _models(args: argparse.Namespace) -> int:
         return _models_where(args)
     if args.models_command == "rm":
         return _models_remove(args)
+    if args.models_command == "prune":
+        return _models_prune(args)
     return 2
 
 
@@ -3687,6 +3783,103 @@ def _models_remove(args: argparse.Namespace) -> int:
     else:
         print(f"removed {args.entry}, freeing {_gib(report.freed_bytes)}")
     return 0
+
+
+def _models_prune(args: argparse.Namespace) -> int:
+    """Propose least-recently-used deletions and, once confirmed, perform them.
+
+    Guided rather than automatic, in three deliberate steps: the store computes a plan,
+    this prints it, and only then does anything get deleted. Multi-gigabyte downloads are
+    expensive to re-fetch, so the plan is always visible before it runs.
+    """
+    from .local import ModelStore
+
+    store = ModelStore()
+    plan = store.plan_prune(keep_bytes=args.keep_bytes, older_than_days=args.older_than_days)
+
+    if args.json:
+        print(json.dumps(_prune_plan_json(store, plan), indent=2))
+        if args.dry_run or not plan:
+            return 0
+
+    if not plan:
+        if not args.json:
+            limit = (
+                f"{_gib(args.keep_bytes)} budget"
+                if args.keep_bytes is not None
+                else f"{args.older_than_days:g}-day idle cut"
+            )
+            print(f"nothing to prune: {_gib(plan.total_bytes)} in store fits the {limit}")
+        return 0
+
+    if not args.json:
+        print(f"{'ENTRY':<44} {'SIZE':>9}  {'IDLE':>9}  MODEL")
+        for proposal in plan.proposals:
+            idle = "never used" if proposal.idle_days is None else f"{proposal.idle_days:.0f}d"
+            print(
+                f"{proposal.entry.id:<44} {_gib(proposal.freed_bytes):>9}  {idle:>9}  "
+                f"{proposal.entry.model_id}"
+            )
+        print(
+            f"\nwould free {_gib(plan.freed_bytes)} of {_gib(plan.total_bytes)}, "
+            f"leaving {_gib(plan.remaining_bytes)}"
+        )
+        for entry_id, reason in sorted(plan.protected.items()):
+            print(f"keeping  {entry_id}: {reason}")
+
+    if args.dry_run:
+        return 0
+    if not _confirm_prune(plan, args):
+        print("nothing was deleted", file=sys.stderr)
+        return 1
+
+    reports = store.apply_prune(plan)
+    freed = sum(report.freed_bytes for report in reports)
+    removed = sum(1 for report in reports if report.removed)
+    print(f"removed {removed} of {len(reports)}, freeing {_gib(freed)}")
+    return 0
+
+
+def _confirm_prune(plan: PrunePlan, args: argparse.Namespace) -> bool:
+    """Confirm a prune, refusing rather than assuming consent off a terminal.
+
+    Deliberately the opposite default from `_confirm`: that one proceeds when stdin is not
+    a tty, which is right for writing a config file and wrong for deleting tens of
+    gigabytes a pipeline never meant to touch. Here a non-interactive run must say
+    ``--yes``.
+    """
+    if args.yes:
+        return True
+    if not sys.stdin.isatty():
+        print(
+            "refusing to prune without a terminal to confirm at; pass --yes to proceed",
+            file=sys.stderr,
+        )
+        return False
+    question = f"delete {len(plan.proposals)} model(s), freeing {_gib(plan.freed_bytes)}?"
+    return input(f"\n{question} [y/N] ").strip().lower() in ("y", "yes")
+
+
+def _prune_plan_json(store: ModelStore, plan: PrunePlan) -> dict[str, Any]:
+    """Render a prune plan for machine consumption."""
+    return {
+        "store": str(store.root),
+        "total_bytes": plan.total_bytes,
+        "freed_bytes": plan.freed_bytes,
+        "remaining_bytes": plan.remaining_bytes,
+        "keep_bytes": plan.keep_bytes,
+        "proposals": [
+            {
+                "entry_id": proposal.entry.id,
+                "model_id": proposal.entry.model_id,
+                "quantization": proposal.entry.quantization,
+                "freed_bytes": proposal.freed_bytes,
+                "idle_days": proposal.idle_days,
+            }
+            for proposal in plan.proposals
+        ],
+        "protected": dict(plan.protected),
+    }
 
 
 # ---- runtime -------------------------------------------------------------------------

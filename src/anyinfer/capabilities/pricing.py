@@ -66,8 +66,32 @@ def compute_cost(usage: Usage, capabilities: ModelCapabilities | None) -> Decima
         return None
 
     pricing: Pricing = capabilities.pricing.value
+    tool_cost = _server_tool_cost(usage, pricing)
+    if tool_cost is None:
+        # An unpriced invocation is not a free one. A generation that searched costs more
+        # than its tokens say, and reporting the token figure as the total would understate
+        # the bill in exactly the direction a cost-aware caller cannot afford.
+        return None
     output_cost = (Decimal(usage.output_tokens) / _PER_MILLION) * pricing.output_per_1m
-    return _input_cost(usage, pricing) + output_cost
+    return _input_cost(usage, pricing) + output_cost + tool_cost
+
+
+def _server_tool_cost(usage: Usage, pricing: Pricing) -> Decimal | None:
+    """Price the provider-run tool invocations, or refuse to price the call at all.
+
+    Returns ``None`` when a kind that ran has no recorded rate, which makes the whole cost
+    unknown — the same rule the rest of this module follows. Zero when nothing ran, which
+    is a real answer rather than a missing one.
+    """
+    if not usage.server_tool_uses:
+        return Decimal(0)
+    total = Decimal(0)
+    for kind, uses in usage.server_tool_uses.items():
+        rate = pricing.per_server_tool_use.get(kind)
+        if rate is None:
+            return None
+        total += Decimal(uses) * rate
+    return total
 
 
 def _input_cost(usage: Usage, pricing: Pricing) -> Decimal:

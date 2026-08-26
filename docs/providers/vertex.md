@@ -145,11 +145,15 @@ Vertex also serves Anthropic models, but through a different surface
 (`rawPredict`/`streamRawPredict` with the Messages body). This adapter does not cover it;
 point the [Anthropic adapter](anthropic.md) at that endpoint instead.
 
+## Wire Contract
+
+For the exact request/response fields this adapter depends on, see
+[contracts/vertex.md](https://github.com/anthturner/AnyInfer/blob/main/contracts/vertex.md).
+
 ## See Also
 
 <div class="anyinfer-see-also" markdown>
 
-- [Contract snapshot](https://github.com/anthturner/AnyInfer/blob/main/contracts/vertex.md)
 - [Google Gemini](gemini.md): the same models with API-key auth.
 
 </div>

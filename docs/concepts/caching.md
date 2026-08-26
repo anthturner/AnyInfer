@@ -91,6 +91,26 @@ If `cache_read_tokens` stays at zero while hits are expected, that is where to l
 [Context reduction](context-reduction.md) renders in path order by default for exactly
 this reason.
 
+## Over the Sidecar
+
+A caller reaching the [sidecar](../serve/README.md) sets the same policy per request with
+the `anyinfer_cache` body extension, which decodes into exactly this `CachePolicy`:
+
+```json
+{
+  "model": "anthropic:claude-sonnet-4-5",
+  "messages": [...],
+  "anyinfer_cache": {"mode": "off", "min_segment_tokens": 2048}
+}
+```
+
+`false` is shorthand for `{"mode": "off"}`, `true` for the defaults, and a malformed
+policy is a `400` rather than a silent fallback to the gateway's configured setting.
+Absent, the gateway's own configuration applies — which is normally no caching at all.
+This matters most for the decision in the other direction: a caller who must not have
+their prompt held on the provider's side can guarantee that per request, without needing
+their own deployment.
+
 !!! tip "Key Takeaways"
     - Caching is opt-in, and a policy on a target that supports neither mechanism is
       reported as dropped, never silently ignored.

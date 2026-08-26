@@ -6,7 +6,7 @@ import base64
 from pathlib import PurePath
 
 from ..errors import UnsupportedInputError
-from ..types.messages import AudioPart, DocumentPart, ImagePart, Message
+from ..types.messages import AudioPart, DocumentPart, ImagePart, Message, VideoPart
 
 __all__ = [
     "base64_data",
@@ -57,7 +57,7 @@ def unsupported(provider: str, modality: str, detail: str = "") -> UnsupportedIn
 def has_multimodal(messages: tuple[Message, ...]) -> bool:
     """Whether a request contains any non-text input payload."""
     return any(
-        isinstance(part, ImagePart | DocumentPart | AudioPart)
+        isinstance(part, ImagePart | DocumentPart | AudioPart | VideoPart)
         for message in messages
         for part in message.content
     )

@@ -758,3 +758,144 @@ def test_a_vllm_snapshot_lands_as_a_directory_with_no_pickle_weights(tmp_path: P
     assert hints["engine"] == "vllm"
     assert hints["quantization"] == "awq"
     assert hints["max_model_len"] == 32768
+
+
+# ---- guided eviction -------------------------------------------------------------------
+#
+# `prune` proposes and a person disposes. Every test here asserts on the *plan*, because
+# the plan is the product: automatic eviction is a stated non-goal, so the interesting
+# behaviour is entirely in what gets proposed, in what order, and what is left alone.
+
+
+def _stored(store: ModelStore, entry_id: str, *, size: int, used_days_ago: float | None) -> None:
+    """Register one entry with a size and an idle age, writing no bytes."""
+    now = 1_700_000_000.0
+    index = store.load_index()
+    index[entry_id] = StoreEntry(
+        id=entry_id,
+        model_id=f"model-for-{entry_id}",
+        files=(StoredFile(path=f"{entry_id}.gguf", size_bytes=size, digest="d", verified=True),),
+        installed_at=now - 365 * 86400,
+        last_used_at=0.0 if used_days_ago is None else now - used_days_ago * 86400,
+    )
+    store._write_index(index)
+
+
+def _now() -> float:
+    return 1_700_000_000.0
+
+
+def test_a_budget_prune_proposes_least_recently_used_first(tmp_path: Path) -> None:
+    store = ModelStore(tmp_path)
+    _stored(store, "fresh", size=8, used_days_ago=1)
+    _stored(store, "stale", size=5, used_days_ago=30)
+    _stored(store, "ancient", size=3, used_days_ago=100)
+
+    plan = store.plan_prune(keep_bytes=9, now=_now())
+
+    assert [p.entry.id for p in plan.proposals] == ["ancient", "stale"]
+    assert plan.total_bytes == 16
+    assert plan.freed_bytes == 8
+    assert plan.remaining_bytes == 8, "what remains must fit the budget"
+
+
+def test_a_budget_that_already_fits_proposes_nothing(tmp_path: Path) -> None:
+    """An empty plan is a success, not a failure to find anything."""
+    store = ModelStore(tmp_path)
+    _stored(store, "one", size=4, used_days_ago=50)
+
+    plan = store.plan_prune(keep_bytes=10, now=_now())
+    assert not plan
+    assert plan.proposals == ()
+
+
+def test_an_age_cut_proposes_everything_past_it_regardless_of_size(tmp_path: Path) -> None:
+    store = ModelStore(tmp_path)
+    _stored(store, "recent", size=100, used_days_ago=3)
+    _stored(store, "old", size=1, used_days_ago=45)
+
+    plan = store.plan_prune(older_than_days=30, now=_now())
+    assert [p.entry.id for p in plan.proposals] == ["old"]
+
+
+def test_a_never_used_entry_is_ordered_by_install_time_and_reports_no_idle_age(
+    tmp_path: Path,
+) -> None:
+    """"Never used" is a plausible thing to evict but not a measured idle age."""
+    store = ModelStore(tmp_path)
+    _stored(store, "never", size=5, used_days_ago=None)
+    _stored(store, "used-recently", size=5, used_days_ago=1)
+
+    plan = store.plan_prune(keep_bytes=5, now=_now())
+    assert [p.entry.id for p in plan.proposals] == ["never"]
+    assert plan.proposals[0].idle_days is None
+
+
+def test_external_entries_are_never_proposed_and_never_counted(tmp_path: Path) -> None:
+    """Removing one frees nothing, so proposing it would misreport the space reclaimed."""
+    store = ModelStore(tmp_path)
+    _stored(store, "owned", size=5, used_days_ago=1)
+    index = store.load_index()
+    index["adopted"] = StoreEntry(
+        id="adopted",
+        external=True,
+        files=(StoredFile(path="x.safetensors", size_bytes=999, digest="d", verified=True),),
+        last_used_at=1.0,
+    )
+    store._write_index(index)
+
+    plan = store.plan_prune(keep_bytes=0, now=_now())
+
+    assert [p.entry.id for p in plan.proposals] == ["owned"]
+    assert plan.total_bytes == 5, "another tool's bytes are not this store's disk usage"
+    assert "adopted" in plan.protected
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{}, {"keep_bytes": 1, "older_than_days": 1}, {"keep_bytes": -1}, {"older_than_days": -1}],
+)
+def test_a_prune_with_no_single_stated_limit_is_refused(
+    tmp_path: Path, kwargs: dict[str, float]
+) -> None:
+    """A default budget would be an invented number deleting real gigabytes."""
+    with pytest.raises(ValueError):
+        ModelStore(tmp_path).plan_prune(**kwargs)  # type: ignore[arg-type]
+
+
+def test_applying_a_plan_deletes_exactly_what_it_proposed(tmp_path: Path) -> None:
+    store = ModelStore(tmp_path)
+    for entry_id, days in (("keep", 1), ("drop", 90)):
+        directory = tmp_path / entry_id
+        directory.mkdir()
+        (directory / f"{entry_id}.gguf").write_bytes(b"x" * 4)
+        index = store.load_index()
+        index[entry_id] = StoreEntry(
+            id=entry_id,
+            directory=entry_id,
+            files=(
+                StoredFile(path=f"{entry_id}.gguf", size_bytes=4, digest="d", verified=True),
+            ),
+            last_used_at=_now() - days * 86400,
+        )
+        store._write_index(index)
+
+    plan = store.plan_prune(keep_bytes=4, now=_now())
+    reports = store.apply_prune(plan)
+
+    assert [r.entry_id for r in reports] == ["drop"]
+    assert all(r.removed for r in reports)
+    assert not (tmp_path / "drop").exists()
+    assert (tmp_path / "keep" / "keep.gguf").exists()
+    assert store.get("drop") is None and store.get("keep") is not None
+
+
+def test_applying_a_stale_plan_reports_the_miss_instead_of_failing(tmp_path: Path) -> None:
+    """A plan computed before someone else ran `models rm` must still complete."""
+    store = ModelStore(tmp_path)
+    _stored(store, "gone", size=5, used_days_ago=90)
+    plan = store.plan_prune(keep_bytes=0, now=_now())
+    store.unregister("gone")
+
+    reports = store.apply_prune(plan)
+    assert [(r.entry_id, r.removed) for r in reports] == [("gone", False)]

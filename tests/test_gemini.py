@@ -437,7 +437,10 @@ HARNESS = ConformanceHarness(
     provider_id="gemini",
     model="gemini-2.5-flash",
     build_client=_build_client,
+    # Embeddings go through batchEmbedContents, a different endpoint shape than this
+    # harness's fake serves; the dedicated tests in this module cover them.
     supports=Capabilities(cancellation=True),
+    covered_elsewhere=frozenset({"embedding"}),
 )
 
 

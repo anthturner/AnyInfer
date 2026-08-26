@@ -14,6 +14,13 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ### Auth
 - Delegated: existing `gh`/Copilot CLI login (device flow); no key material handled by us;
   `COPILOT_CLI_PATH` overrides CLI discovery
+### Runtime location
+- The `cli_path` option and `COPILOT_CLI_PATH` are passed as
+  `CopilotClient(connection=StdioRuntimeConnection(path=...))`, **not** as a flat
+  `cli_path=` keyword: `CopilotClient.__init__` is keyword-only with no `**kwargs`, so an
+  unrecognized name raises `TypeError` rather than being ignored. Absent, nothing is sent
+  and the SDK performs its own discovery. `tests/test_copilot.py` binds the adapter's
+  kwargs against the installed SDK's real signature so a rename fails there.
 ### Version pins
 - `github-copilot-sdk` version range pinned in the `[copilot]` extra (set at M1)
 ### Request fields

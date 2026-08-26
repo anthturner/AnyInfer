@@ -21,6 +21,8 @@ telemetry, and shared configuration.
 ```python
 import anyinfer as ai
 
+text = "AnyInfer 0.1 adds embeddings, reranking, and an OpenAI-compatible sidecar."
+
 client = ai.Client(
     [
         ai.ProviderSettings.of("anthropic", api_key="env://ANTHROPIC_API_KEY"),
@@ -38,7 +40,9 @@ print(result.usage.output_tokens, "tokens in", result.timing.total_ms, "ms")
 Point the same call at a local model by changing one string:
 
 ```python
-result = client.generate(prompt, target="ollama:qwen3:8b")  # "medium" is a catalog alias
+result = client.generate(
+    "Summarize this release note:\n" + text, target="ollama:qwen3:8b"
+)  # "medium" is a catalog alias
 ```
 
 Embeddings and reranking are the same client, the same routing, and the same batching —
@@ -56,7 +60,7 @@ ranked = client.rerank("which passage answers the question", passages, target="c
 There are already good libraries for switching between cloud providers, good gateways for
 centralizing model traffic, and good local-model servers. If one of those is your whole
 problem, you may not need AnyInfer. See
-[when AnyInfer is the right layer](https://anyinfer.dev/guides/when-to-use/).
+[when a smaller tool is the better boundary](https://anyinfer.dev/why-anyinfer/#when-a-smaller-tool-is-the-better-boundary).
 
 AnyInfer is for applications that need those environments to behave as one runtime. It
 keeps provider translation, local process ownership, context preparation, routing, and
@@ -110,8 +114,8 @@ LM Studio, or LocalAI directly when a dedicated local-model service is the produ
 
 **[Why AnyInfer →](https://anyinfer.dev/why-anyinfer/)** goes through the five capabilities
 that are genuinely unusual here, with a dated comparison by category and the commands that
-check each claim. The [decision guide](https://anyinfer.dev/guides/when-to-use/) argues the
-other side and names the tools that are a better fit when they are.
+check each claim. The same page argues the other side, naming the tools that are a better
+fit when they are.
 
 ## Install
 
@@ -201,9 +205,10 @@ See the [complete provider list](https://anyinfer.dev/providers/all/),
 the [provider guides](https://anyinfer.dev/providers/) and the
 [conformance matrix](https://anyinfer.dev/reference/conformance-matrix/) for exactly what each supports.
 
-Embeddings and/or reranking are live today on OpenAI, Azure AI Foundry, Google Vertex AI,
-AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio, and four
-OpenAI-compatible presets (Together AI, Fireworks AI, DeepInfra, Mistral) — see
+Embeddings and/or reranking are live today on OpenAI, Google Gemini, Azure AI Foundry,
+Google Vertex AI, AWS Bedrock (Titan), Cohere, Voyage AI, Jina AI, TEI, Ollama, LM Studio,
+llama.cpp (against an embeddings-mode server), and four OpenAI-compatible presets
+(Together AI, Fireworks AI, DeepInfra, Mistral) — see
 [Embeddings and reranking](https://anyinfer.dev/concepts/embeddings/) and the
 [semantic-search example](https://anyinfer.dev/examples/semantic-search/).
 
@@ -226,7 +231,7 @@ All three use the same engine and the same versioned JSON configuration format:
 ```
 
 Load it with `ai.load_config("anyinfer.json")`, pass it to `anyinfer run --config`, or use
-it unchanged with the sidecar. See [choosing an integration path](https://anyinfer.dev/guides/integration-paths/)
+it unchanged with the sidecar. See [choosing an integration path](https://anyinfer.dev/guides/#choose-a-path)
 and [shared configuration](https://anyinfer.dev/reference/configuration/).
 
 ## Documentation

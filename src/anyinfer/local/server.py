@@ -34,7 +34,7 @@ import sys
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -44,6 +44,7 @@ import httpx2
 from ..errors import LocalRuntimeError
 from ..events.telemetry import ServerLifecycle
 from .hardware import AcceleratorKind, HardwareProfile
+from .provenance import VerifiedWeights, WeightsProvenance
 from .tuning import ServerPlan
 
 __all__ = [
@@ -278,16 +279,35 @@ class ServerSupervisor:
     # ---- acquisition -----------------------------------------------------------------
 
     async def acquire(
-        self, model_key: str, model_path: Path, plan: ServerPlan, *, persist: bool = False
+        self,
+        model_key: str,
+        model_path: Path,
+        plan: ServerPlan,
+        *,
+        persist: bool = False,
+        provenance: WeightsProvenance | None = None,
     ) -> ManagedServer:
         """Get a ready server for a model, starting or reusing one.
 
         Blocks until the server answers its health probe. Concurrent callers requesting
         different models are serialized, so loads never overlap.
 
+        Args:
+            model_key: Cache key for the running server.
+            model_path: The weights to load.
+            plan: The rendered llama-server configuration.
+            persist: Keep the server alive past the usual idle reaping.
+            provenance: Tier 4 — a signed manifest and the vendor key. When given, the
+                weights are verified *inside this call*, immediately before the process
+                is started, and their identity is re-confirmed in the instant before
+                exec. Verifying anywhere else leaves a gap of unbounded length between
+                the check and the load; this parameter exists so there is no such gap.
+
         Raises:
             LocalRuntimeError: If the model cannot fit, the binary is missing, or the
                 server fails to become ready.
+            ConfidentialExecutionError: `provenance` was supplied and the weights do not
+                match it, or changed between verification and start. Nothing is spawned.
         """
         existing = self._servers.get(model_key)
         if existing is not None and existing.is_running:
@@ -304,7 +324,9 @@ class ServerSupervisor:
             await self._reap_dead()
             await self._enforce_capacity(model_key)
             self._check_admission(plan, model_key)
-            handle = await self._spawn(model_key, model_path, plan, persist=persist)
+            handle = await self._spawn(
+                model_key, model_path, plan, persist=persist, provenance=provenance
+            )
             self._servers[model_key] = handle
             return ManagedServer(handle)
 
@@ -355,10 +377,39 @@ class ServerSupervisor:
 
     # ---- process lifecycle -----------------------------------------------------------
 
+    @contextlib.contextmanager
+    def _pinned_weights(
+        self, model_path: Path, provenance: WeightsProvenance | None
+    ) -> Iterator[VerifiedWeights | None]:
+        """Verify and pin the weights, or do nothing when no provenance was asked for.
+
+        A null context when `provenance` is `None`, so the unverified path — which is
+        every ordinary local run — costs nothing and reads the same.
+        """
+        if provenance is None:
+            yield None
+            return
+        from .provenance import open_verified_weights
+
+        with open_verified_weights(provenance, model_path) as verified:
+            yield verified
+
     async def _spawn(
-        self, model_key: str, model_path: Path, plan: ServerPlan, *, persist: bool
+        self,
+        model_key: str,
+        model_path: Path,
+        plan: ServerPlan,
+        *,
+        persist: bool,
+        provenance: WeightsProvenance | None = None,
     ) -> ServerHandle:
-        """Start a server and wait for it to report healthy."""
+        """Start a server and wait for it to report healthy.
+
+        When `provenance` is supplied, verification happens here rather than somewhere a
+        caller happened to do it earlier: the weights are hashed through open descriptors
+        and their identity re-checked in the instant before `Popen`, so the bytes that
+        were verified and the bytes the loader is pointed at are the same file.
+        """
         if not model_path.exists():
             raise LocalRuntimeError(
                 f"model file not found: {model_path}",
@@ -373,18 +424,23 @@ class ServerSupervisor:
         ]
 
         self._emit(model_key, "starting", f"port {port}")
-        try:
-            process = subprocess.Popen(
-                args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                **_process_group_kwargs(),
-            )
-        except OSError as exc:
-            raise LocalRuntimeError(
-                f"could not start llama-server: {exc}",
-                hint=f"check that {binary} is executable",
-            ) from exc
+        with self._pinned_weights(model_path, provenance) as verified:
+            if verified is not None:
+                # Last thing before exec: everything above (binary resolution, port
+                # allocation) is time the file could have been swapped in.
+                verified.assert_unchanged()
+            try:
+                process = subprocess.Popen(
+                    args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    **_process_group_kwargs(),
+                )
+            except OSError as exc:
+                raise LocalRuntimeError(
+                    f"could not start llama-server: {exc}",
+                    hint=f"check that {binary} is executable",
+                ) from exc
 
         handle = ServerHandle(
             model_key=model_key,

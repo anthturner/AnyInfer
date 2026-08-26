@@ -45,8 +45,9 @@ from ..types.capabilities import (
     LocalModelInfo,
     ModelCapabilities,
     Sourced,
+    TokenCalibration,
 )
-from ..types.messages import AudioPart, DocumentPart, ImagePart
+from ..types.messages import AudioPart, DocumentPart, ImagePart, VideoPart
 from ..types.results import Diagnostic
 from ._multimodal import unsupported
 from .base import (
@@ -559,6 +560,8 @@ class LlamaCppAdapter:
                     raise unsupported(self.provider_id, "document")
                 elif isinstance(part, AudioPart):
                     raise unsupported(self.provider_id, "audio")
+                elif isinstance(part, VideoPart):
+                    raise unsupported(self.provider_id, "video")
         if image_input and artifact.projector is None:
             raise unsupported(
                 self.provider_id,
@@ -750,6 +753,9 @@ descriptor = ProviderDescriptor(
             ),
         ),
         model_selection="manual-only",
+    ),
+    token_calibration=TokenCalibration(
+        tokenizer="llama_server_tokenize", tokenizer_provenance="catalog"
     ),
     default_capabilities=ModelCapabilities(features=Sourced(_LLAMA_FEATURES, "default")),
     supports_sessions=True,

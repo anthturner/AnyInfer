@@ -251,7 +251,7 @@ class Sampling:
     stop: tuple[str, ...] = ()
 
 
-ReasoningEffort = Literal["minimal", "low", "medium", "high"]  # normalized; adapters translate
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high"]  # adapters translate
 
 
 @dataclass(frozen=True, slots=True)
@@ -807,45 +807,95 @@ result = client.generate(
 src/anyinfer/
   __init__.py            # curated public surface
   types/                 # messages.py requests.py results.py events.py capabilities.py
+                         # operations.py
   errors.py
-  _client/               # async_client.py sync_client.py stream.py tools.py
+  _client/               # async_client.py generation.py arena_exec.py spend.py
+                         # stream.py messages.py sync_client.py tools.py wire.py
+                         # models.py operations.py providers.py rankers.py
   registry.py
-  routing/               # policy.py health.py attempts.py
-  schema/                # spec.py mechanism.py project.py validate.py repair.py
-  events/                # observers.py dispatch.py redaction.py privacy.py
+  routing/               # policy.py health.py attempts.py limits.py
+  schema/                # mechanism.py project.py validate.py repair.py partial.py
+  events/                # observers.py telemetry.py sinks.py
+  redaction.py           # event-stream redaction (root module, not under events/)
+  _private_files.py      # owner-only file permissions, and where they cannot be applied
+  plugins.py             # entry-point discovery beyond provider adapters
   otel.py
   credentials/           # resolver.py env.py literal.py keyring_store.py
   session.py             # the session handle
   benchmark.py           # throughput measurement, live samples + caller-owned store
   verification.py        # the end-to-end target probe
+  evaluate/              # arena.py compare.py compare_diff.py — questions *about* targets
+                         # (fan-out selection, capability/cost comparison, portability diff)
+  manifest.py            # run manifests
+  context_request.py     # wire-facing context-reduction request type; stays a root module
+                         # because the architecture contracts pin it there — see below
+  _agents_md.py          # the `agents-md` command's generator
+  _context_wire.py       # context-request wire codec
+  _starter.py            # `init` scaffolding
+  _usage.py              # usage accounting helpers
   config/                # shared, versioned JSON configuration
   catalog/               # model.py resolve.py default.json models.json
-  capabilities/          # assemble.py probes.py pricing.py estimate.py budget.py gating.py
+  capabilities/          # assemble.py probes.py pricing.py pricing_table.py estimate.py
+                         # tokenizers.py remote_tokenizers.py budget.py gating.py
+                         # cache.py ledger.py pricing.json
   local/                 # hardware.py metrics.py backends.py runtimes.py runtimes.json tuning.py
                          # services.py discovery.py fit.py variants.py artifacts.py downloads.py
-                         # acquire.py store.py sources/ server.py recommend.py
-  providers/             # base.py sse.py openai_compat.py openai.py anthropic.py
+                         # acquire.py store.py server.py recommend.py
+                         # sources/ direct_url.py huggingface.py local_path.py
+                         # attestation.py provenance.py
+  providers/             # base.py sse.py eventstream.py http.py cloud_auth.py
+                         # _logprobs.py _multimodal.py _openai_batch.py
+                         # openai_compat.py openai_compat_embeddings.py
+                         # openai_shaped_retrieval.py openai.py anthropic.py
                          # ollama.py openrouter.py azure_foundry.py copilot.py
                          # m365_copilot.py llama_cpp.py gemini.py deepseek.py xai.py
-                         # vertex.py bedrock.py cohere.py lm_studio.py nebius.py presets.py
+                         # vertex.py bedrock.py cohere.py lm_studio.py nebius.py
+                         # jina.py voyage.py tei.py confidential_execution.py presets.py
   context/               # corpus reduction: documents.py rank.py structure.py
                          # envelope.py select.py tiers.py pack.py distill.py
                          # settings.py dedup.py compact.py history.py
   mcp/                   # protocol.py transport.py toolset.py
-  testing/               # conformance.py scripted.py fakes.py cassettes.py plugin.py
-  cli.py                 # init, agents-md, run, verify, benchmark, doctor, providers,
-                         # models, runtime, context, mcp, conform, serve
-  serve/                 # openai_codec.py app.py __main__.py — see §22, ADR-009
+  testing/               # conformance.py scripted.py scripted_operations.py fakes.py
+                         # cassettes.py recording.py plugin.py certify.py manifests.py
+                         # mcp_fake.py scaffold.py
+  cli.py                 # init, agents-md, run, embed, rerank, compare, verify,
+                         # benchmark, doctor, providers, models, runtime, context,
+                         # mcp, conform, serve
+  serve/                 # openai_codec.py responses_codec.py embeddings_codec.py
+                         # app.py service.py __main__.py — see §22, ADR-009
 
 tests/                   # unit + conformance runs (cassette & fake modes)
 contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§24)
 docs/                    # provider guides, published site sources (§25)
 ```
 
+**`context_request.py` stays a root module — pinned by contract, not by inertia.** The
+obvious homes are both closed. It cannot live under `types/`: it imports
+`anyinfer.context`, which the "Types are leaf modules" contract forbids. It cannot live
+under `context/` either: `types/requests.py` and `types/results.py` refer to
+`ContextRequest`/`ContextSummary`, and moving the definitions inside `anyinfer.context`
+would turn those into direct type-package imports of a forbidden module. The root
+placement is what lets request and result types name the records without depending on the
+reduction implementation, which is the whole reason it was split out. Revisit only if
+those contracts change.
+
+**`cli.py` stays one module — a decision, not an accident.** It is ~3,800 lines across
+sixteen command families, the second-largest module in the repository. It stays single
+because argparse subcommand wiring is the kind of code that reads worse spread across
+sixteen files than gathered in one, and because the lazy per-command import style is what
+keeps `anyinfer --help` cheap: nothing a command needs is imported until that command
+runs. The boundary that matters is enforced separately — the CLI imports only public core
+surfaces and never reaches into `_client`. **Revisit at 4,500 lines** — a concrete trigger
+rather than a judgement call re-litigated per pull request, and roughly 700 lines of head-
+room from the ~3,800 this decision was recorded at. The exit is a `cli/` package whose
+`__init__.py` still exports `main`, so
+`[project.scripts] anyinfer = "anyinfer.cli:main"` is untouched.
+
 **Packaging:** mandatory deps `httpx2`, `jsonschema`. Extras: `[copilot]`
 github-copilot-sdk · `[azure]` azure-identity · `[vertex]` cryptography · `[keyring]`
 keyring · `[otel]` opentelemetry-api · `[serve]` ASGI server deps · `[demo]` PySide6 and
-Markdown · `[mcp]` an explicit dependency-free feature marker · `[all]`. The complete local
+Markdown · `[attest]` cryptography, for Tier 4 weight-provenance verification ·
+`[mcp]` an explicit dependency-free feature marker · `[all]`. The complete local
 subsystem is core; llama-server binaries and model weights are runtime-fetched, never pip
 dependencies. Missing-extra errors raise `ConfigError` with an install hint.
 
@@ -894,8 +944,13 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    the loop-thread future, early stream exit closes the async iterator, and facade shutdown
    cancels outstanding tasks with bounded waits. Dedicated tests cover early exit and thread
    stress; supervised local servers survive request cancellation.
-4. **Default catalog contents and update cadence** — which models, who bumps them, does a
-   catalog update constitute a library release? (Risk R6.)
+4. ~~**Default catalog contents and update cadence** — which models, who bumps them, does a
+   catalog update constitute a library release?~~ *Resolved as scheduled automation:*
+   `.github/workflows/catalog-refresh.yml` runs the deterministic drift check and opens a
+   re-pinning PR when upstream moves, and `pricing-refresh.yml` does the same for the
+   pricing table. Nobody bumps entries by hand, and a catalog change rides the next ordinary
+   release rather than forcing one. Risk R6 is the residual staleness *between* runs, not an
+   unanswered question.
 5. ~~**M365 Copilot headless story.**~~ *Resolved as a documented degraded mode:* auth is
    interactive-only, the adapter is exempt from credentialed headless live runs, and its
    fixed capability surface is covered offline.
@@ -903,6 +958,34 @@ provider breadth expanded through dedicated adapters and compatibility presets.
    Ollama-adapter warnings?~~ *Resolved:* adapter-reported runtime
    diagnostics, declared on the descriptor and surfaced on `Generation.warnings` plus a
    `ProviderDiagnostic` event.
+
+## 20a. Fenced non-goals worth a deliberate revisit
+
+These are **decisions, not defects**, and each is currently held by a fence stated
+elsewhere in this document. They are recorded here because a fence nobody revisits stops
+being a decision and becomes an accident. Dated so the next reader knows how old the
+reasoning is. *(Recorded 2026-08-25.)*
+
+1. **MCP server exposure.** AnyInfer *consumes* MCP tool sources; it does not project
+   itself as an MCP server. The tool-loop guide routes non-Python clients to the OpenAI
+   sidecar, which MCP-only hosts — Claude Desktop, IDE agents — cannot consume. An MCP
+   projection would sit inside the existing wire-codec discipline rather than against it,
+   which is what makes this worth revisiting rather than merely possible.
+   **Revisit when** a concrete MCP-only integration is asked for.
+
+2. **Exact-match response replay.** ADR-012 puts response caching permanently out of
+   scope, but its reasoning is aimed at *semantic* caching — similarity thresholds,
+   stale-answer risk, correctness that degrades invisibly. Exact-match replay keyed on the
+   full normalized request has none of those properties and is table stakes in comparable
+   gateways. The fence may be broader than the argument behind it.
+   **Revisit when** the cost case is made concretely; the ADR would need amending, not
+   ignoring.
+
+3. **Same-provider key pooling.** The load-balancing fence prohibits choosing a *different
+   target* because one is busy. Rotating among several credentials for the *same* target
+   is arguably not target selection at all, and is ordinary at scale. Whether it falls
+   inside the fence is genuinely unclear, which is the point of recording it.
+   **Revisit when** a deployment hits per-key limits it cannot raise.
 
 ## 21. Risks and complexity traps
 
@@ -1348,13 +1431,14 @@ and (nightly, where auth permits) live modes.
 
 > **Implementation status.** Twenty dedicated adapters are implemented
 > (the original nine plus Gemini, DeepSeek, xAI, Vertex AI, Bedrock, Cohere, LM Studio,
-> Voyage AI, Jina AI, and Text Embeddings Inference), alongside a preset registry of
+> Nebius Token Factory, Voyage AI, Jina AI, and Text Embeddings Inference), alongside a
+> preset registry of
 > eighty-six OpenAI-compatible providers
 > sharing the `openai_compat` adapter. The
 > *executed* matrix — generated from a real conformance run rather than hand-maintained —
 > lives at [docs/reference/conformance-matrix.md](docs/reference/conformance-matrix.md);
 > regenerate it with `workspace matrix`. **Every dedicated adapter now has a row there**,
-> at whatever boundary it actually has: an HTTP transport for the twenty that speak HTTP,
+> at whatever boundary it actually has: an HTTP transport for those that speak HTTP,
 > a fake SDK for `copilot`, and a stub supervisor for `llama-cpp`. The table below remains
 > the design-intent matrix. Cells marked `?` are design questions, several of which the
 > implementation has now answered:
@@ -1781,12 +1865,41 @@ directly against the BYOK posture in §30.0. That tension is documented rather t
 what the relay sees (the assembled request, transiently) and what it persists (nothing, by
 design and by audit) are both stated, with logs carrying metadata only.
 
+**Pacing and admission control** *(2026-08-25)*. Two bounds, both inert until configured,
+both holding timing metadata only — so the zero-retention claim above is unchanged and
+still structural.
+
+A pooled `RateLimiter` fixes an inertness that was structural, not accidental:
+`Relay._forward` builds a client per call because a BYOK credential must die with the
+request that carried it, and the token bucket and header-observed windows lived inside that
+client. Pooling the limiter — never the client — keeps the pacing while the credential
+lifetime is untouched, keyed by a per-process salted digest rather than by the key.
+
+Per-tenant admission caps make one tenant unable to consume the process. Isolation is
+structural rather than scheduled: each tenant has its own counter, cap, and queue, so there
+is no shared queue for one tenant's burst to delay another's request in. What waits is a
+caller, never a stored request — a durable queue would have to persist slot-fills and
+assembled prompts, which is a different product with a weaker guarantee than this section
+states.
+
+Every number returned to a caller — `Retry-After`, `RateLimit-Remaining` — derives only
+from that caller's own tenant state. A figure computed from process-wide load would reopen
+the enumeration hole `RelayRegistry.resolve`'s uniform error message closes on purpose.
+
+**The ceiling, stated honestly:** this bounds one process. It is not cross-process quota
+enforcement, and a multi-process Relay gets one set of bounds per process. A global quota
+belongs in a fronting gateway, which is the same call `routing/limits.py` makes for core.
+
 ### 30.4 Tier 3 — attested local execution
 
-The only tier with a real cryptographic guarantee, because it targets the local adapters
-rather than a cloud call. Where the host exposes a trusted execution environment, the
-runtime executes inside it and remote attestation proves that to the vendor's software
-before any prompt is sent.
+The only tier *designed for* a real cryptographic guarantee, because it targets the local
+adapters rather than a cloud call. Where the host exposes a trusted execution environment,
+the runtime executes inside it. **What ships today is TEE detection, not attestation:**
+`end_to_end` reflects guest device nodes and `nvidia-smi` output, so it is an
+advisory-local signal, not evidence a remote relying party can check. Quote generation and
+verification against AMD/Intel roots of trust is planned and scoped (§G of the codebase
+status tracker); until it lands, nothing here proves anything *to the vendor's software*,
+and no surface may claim it does.
 
 It **fails closed**: a caller who requests confidential execution on a host that cannot
 provide it gets a refusal and a typed signal, never a silent downgrade to unattested
@@ -1810,9 +1923,14 @@ Market facts that gate what may be *claimed*, and that will move — re-verify o
 - **The open-source NVIDIA kernel modules (OpenRM) do support Hopper CC**, implementing the
   SPDM attestation protocol; Blackwell platforms *require* them. No driver-choice caveat is
   needed, and OpenRM is the forward-looking default rather than a fallback.
-- **Owner decision: invest in real Nitro Enclaves support**, against the original plan's
-  "skip for v1" lean — real new scope, since enclaves have no GPU, no persistent storage,
-  and vsock-only networking.
+- **Nitro Enclaves support: deferred past 1.0** *(2026-08-25)*. An earlier owner decision
+  leaned toward investing in it against the original "skip for v1" plan; nothing was
+  started, and recording an unstarted commitment as a decision made the roadmap read as
+  more certain than it was. Deferred explicitly instead. The scope if it is ever taken up:
+  vsock-only networking, no GPU, no persistent storage, with attestation via NSM documents
+  as a follow-on to the CPU quote-verification work. **Re-evaluate when** a design partner
+  needs an enclave deployment, or when the CPU attestation path (which NSM would extend
+  rather than duplicate) has shipped.
 - Attestation-quote cryptographic verification is **deliberately not implemented**: this
   environment cannot exercise the positive case against real CC-capable hardware, and
   shipping unverified security-critical code is worse than an honest, documented gap.

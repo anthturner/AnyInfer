@@ -9,7 +9,7 @@ import httpx2
 import pytest
 from anyinfer.types.operations import EmbeddingSpace
 
-from anyinfer_store import VectorStore, query_and_rerank
+from anyinfer_store import query_and_rerank
 from anyinfer_store.errors import VectorStoreError
 
 
@@ -43,8 +43,8 @@ def _client() -> ai.AsyncClient:
     )
 
 
-async def test_query_and_rerank_reorders_coarse_candidates(tmp_path: Path) -> None:
-    store = VectorStore.open(tmp_path / "s.db")
+async def test_query_and_rerank_reorders_coarse_candidates(tmp_path: Path, open_store) -> None:
+    store = open_store(tmp_path / "s.db")
     space = _space()
     store.add("a", [1.0, 0.0, 0.0, 0.0], space=space, text="alpha doc")
     store.add("b", [0.9, 0.1, 0.0, 0.0], space=space, text="beta doc")
@@ -70,8 +70,8 @@ async def test_query_and_rerank_reorders_coarse_candidates(tmp_path: Path) -> No
     assert scores == sorted(scores, reverse=True)
 
 
-async def test_query_and_rerank_refuses_when_text_is_missing(tmp_path: Path) -> None:
-    store = VectorStore.open(tmp_path / "s.db")
+async def test_query_and_rerank_refuses_when_text_is_missing(tmp_path: Path, open_store) -> None:
+    store = open_store(tmp_path / "s.db")
     space = _space()
     store.add("a", [1.0, 0.0, 0.0, 0.0], space=space)  # no text=
 

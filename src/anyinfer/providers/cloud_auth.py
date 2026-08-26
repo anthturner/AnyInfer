@@ -268,6 +268,17 @@ class GoogleTokenSource:
             the caller owns its lifetime.
         options: Provider options, consulted for ``credentials_file`` and ``scope``.
         transport: Test seam — an ``httpx2`` transport for the token exchange.
+        proxy: Proxy URL for the token exchange, from the provider instance's settings.
+        verify: TLS verification for the token exchange, from the same settings.
+        client_cert: Client certificate for the token exchange, from the same settings.
+
+    Note:
+        The connection settings are threaded here rather than left to the environment
+        because the data plane already honors them per instance. A Vertex instance
+        configured with a corporate CA behind an intercepting proxy would otherwise have
+        ``generateContent`` succeed and its token exchange fail TLS verification — one
+        instance, two different trust decisions, for no reason a user could infer. As on
+        the data plane, they are ignored when a `transport` is supplied.
     """
 
     def __init__(
@@ -276,10 +287,16 @@ class GoogleTokenSource:
         explicit_token: str | None = None,
         options: Mapping[str, Any] | None = None,
         transport: Any | None = None,
+        proxy: str | None = None,
+        verify: str | bool | None = None,
+        client_cert: str | tuple[str, str] | tuple[str, str, str] | None = None,
     ) -> None:
         self._explicit = explicit_token
         self._options = dict(options or {})
         self._transport = transport
+        self._proxy = proxy
+        self._verify = verify
+        self._client_cert = client_cert
         self._scope = str(self._options.get("scope") or GOOGLE_CLOUD_SCOPE)
         self._token: str | None = None
         self._expires_at = 0.0
@@ -392,7 +409,20 @@ class GoogleTokenSource:
         """
         import httpx2
 
-        with httpx2.Client(transport=self._transport, timeout=30.0) as client:
+        # Passed only when set, and only without a transport, matching `build_client`:
+        # httpx distinguishes "not supplied" from an explicit `None`/`False`, and
+        # forwarding a default would override its own environment-variable handling.
+        # `tls_kwargs` is shared with the data plane so the token exchange resolves a
+        # CA bundle and a client certificate exactly the way generation does.
+        from .http import tls_kwargs
+
+        tls: dict[str, Any] = {}
+        if self._transport is None:
+            if self._proxy is not None:
+                tls["proxy"] = self._proxy
+            tls.update(tls_kwargs(self._verify, self._client_cert))
+
+        with httpx2.Client(transport=self._transport, timeout=30.0, **tls) as client:
             response = client.post(
                 _GOOGLE_TOKEN_URL,
                 data={"grant_type": _JWT_BEARER_GRANT, "assertion": assertion},

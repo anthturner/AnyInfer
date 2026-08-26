@@ -13,16 +13,34 @@ immediately before rendering it, and best-effort-zeroes the decrypted buffer aft
 "best effort" because CPython strings are immutable and the interpreter may retain copies
 the caller has no handle to; this module never claims stronger than that.
 
-Decryption is gated on a vendor-issued, signed, time-boxed `LicenseBlob`. This is a
-second, independent motivation beyond confidentiality: an install without a valid,
-unexpired, correctly-signed license cannot produce a single rendered prompt. See
-`license.py` for issuance and verification.
+`TemplateVault.render()` is gated on a vendor-issued, signed, time-boxed `LicenseBlob`:
+without a valid, unexpired, correctly-signed license, `render()` raises and returns no
+prompt. See `license.py` for issuance and verification.
+
+**What that gate is, precisely.** It is enforcement in *this code path*, not a
+cryptographic lock on the ciphertext. License validity never enters key derivation: a
+`TemplateVault` holds the AES key (via its `KeyRing`) and the ciphertext, so someone
+holding the bundle can call `AESGCM(key).decrypt(...)` themselves and skip the check
+entirely. Two further limits worth stating plainly:
+
+- **Expiry is a signed field, not a cryptographic property.** It is compared against local
+  wall-clock time, so rolling the clock back defeats it. Key-wrapping the template under
+  material carried in the license would not fix this — that material ships in the same
+  bundle and does not itself expire.
+- **Revocation defaults to fail-open** (`revocation_fail_closed=False`), so an unreachable
+  revocation service degrades to the offline answer rather than refusing to render.
+
+This is inherent to client-side sealing, and it is the same ceiling Tier 1's
+*confidentiality* claim already states: the adversary owns the machine. The licensing gate
+raises the cost and makes unlicensed use unambiguous and detectable — it does not make it
+impossible, and nothing here should be sold as if it did.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -203,6 +221,23 @@ class TemplateVault:
         self._revocation_checker = revocation_checker
         self._revocation_fail_closed = revocation_fail_closed
         self._last_revocation_ok: bool | None = None
+        # Guards `_last_revocation_ok`, the one piece of mutable state on this object.
+        # Only taken when a checker is configured, which is also the only case in which
+        # `render` is ever called from more than one thread (see `renders_may_block`).
+        self._revocation_lock = threading.Lock()
+
+    @property
+    def renders_may_block(self) -> bool:
+        """Whether `render` can block on something other than CPU.
+
+        Exposed as a capability rather than left for a caller to infer from a private
+        attribute, because exactly one caller needs it and the answer decides whether that
+        caller offloads to a thread. The crypto path — license verification, AES-GCM
+        decryption, formatting — is sub-millisecond and belongs on the event loop; a
+        *network-backed* revocation checker does not, since one synchronous round trip
+        there stalls every concurrent request in the process.
+        """
+        return self._revocation_checker is not None
 
     def render(self, template: EncryptedTemplate, **slots: object) -> str:
         """Decrypt `template`, render it against `slots`, and discard the plaintext.
@@ -243,6 +278,16 @@ class TemplateVault:
         return rendered
 
     def _check_revocation(self, license: LicenseBlob) -> None:
+        """Consult the deny-list, if one is configured.
+
+        Thread-safe: `render` may be called from a worker thread when
+        `renders_may_block` is true, and `_last_revocation_ok` is shared across those
+        calls. The checker itself runs *outside* the lock — it is the slow, possibly
+        networked part, and serializing it would reintroduce exactly the stall the thread
+        offload exists to avoid. Only the read-and-write of the cached answer is guarded,
+        so two threads that observe different answers leave consistent state rather than
+        an interleaved one.
+        """
         if self._revocation_checker is None:
             return
         try:
@@ -255,12 +300,15 @@ class TemplateVault:
                     f"revocation check for deployment {license.deployment_id!r} could "
                     "not be completed and revocation_fail_closed=True"
                 )
-            if self._last_revocation_ok is False:
+            with self._revocation_lock:
+                last_known = self._last_revocation_ok
+            if last_known is False:
                 raise RevokedLicenseError(
                     f"deployment {license.deployment_id!r} was revoked as of the last "
                     "successful check, and a fresh check could not be completed"
                 )
             return  # fail-open to the last known-good answer (or "never checked yet")
-        self._last_revocation_ok = ok
+        with self._revocation_lock:
+            self._last_revocation_ok = ok
         if not ok:
             raise RevokedLicenseError(f"deployment {license.deployment_id!r} is revoked")

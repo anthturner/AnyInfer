@@ -142,3 +142,48 @@ def test_serve_frontend_does_not_import_context_implementation() -> None:
         source = path.read_text(encoding="utf-8")
         assert "..context" not in source
         assert "anyinfer.context" not in source
+
+
+def test_wire_context_request_inherits_the_deployments_configured_tuning() -> None:
+    """A gateway caller that omits `tuning` gets the operator's, not the library's.
+
+    The config file's `context` block reached every other frontend and stopped at the
+    sidecar, so an operator who tuned reduction saw it ignored for wire traffic.
+    """
+    from anyinfer.context.settings import ContextTuning
+    from anyinfer.serve.openai_codec import CONTEXT_FIELD, request_from_openai
+
+    configured = ContextTuning(expansion_terms=7)
+    body = {
+        "model": "openai:gpt-5",
+        "messages": [{"role": "user", "content": "hi"}],
+        CONTEXT_FIELD: {
+            "documents": [{"path": "a.py", "content": "x = 1"}],
+            "query": "what is x",
+            "max_tokens": 100,
+        },
+    }
+
+    _, request, _ = request_from_openai(body, context_tuning=configured)
+    assert request.context is not None
+    assert request.context.tuning.expansion_terms == 7
+
+
+def test_an_explicit_wire_tuning_still_wins_over_the_configured_default() -> None:
+    from anyinfer.context.settings import ContextTuning
+    from anyinfer.serve.openai_codec import CONTEXT_FIELD, request_from_openai
+
+    body = {
+        "model": "openai:gpt-5",
+        "messages": [{"role": "user", "content": "hi"}],
+        CONTEXT_FIELD: {
+            "documents": [{"path": "a.py", "content": "x = 1"}],
+            "query": "what is x",
+            "max_tokens": 100,
+            "tuning": {"expansion_terms": 3},
+        },
+    }
+
+    _, request, _ = request_from_openai(body, context_tuning=ContextTuning(expansion_terms=7))
+    assert request.context is not None
+    assert request.context.tuning.expansion_terms == 3

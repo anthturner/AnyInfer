@@ -25,11 +25,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from .results import AttemptRecord, Generation, Usage
+from .requests import ServerToolKind
+from .results import AttemptRecord, Citation, Generation, Usage
 
 __all__ = [
     "AttemptFailed",
+    "CitationDelta",
     "ReasoningDelta",
+    "ServerToolDelta",
+    "ServerToolSource",
+    "ServerToolStatus",
     "StreamEnded",
     "StreamEvent",
     "TextDelta",
@@ -74,6 +79,79 @@ class ToolCallDelta:
     call_id: str | None
     name: str | None
     arguments_fragment: str
+
+
+@dataclass(frozen=True, slots=True)
+class CitationDelta:
+    """One attribution the model reported, as soon as it reported it.
+
+    Named a *delta* to match its siblings even though a citation arrives whole: it is a
+    stream event that adds to the answer, and callers rendering attributions live need it
+    at the moment it lands rather than at `StreamEnded`. Every citation on the terminal
+    result also appeared here first, so a consumer may use either and never both.
+
+    Deliberately **not** a content event: a citation does not start the first-token clock.
+    Cohere emits its first citation only after the span it supports, so counting one as
+    first content would report a time-to-first-token later than the text the user already
+    saw.
+
+    Attributes:
+        citation: The attribution, with whatever the dialect reported about it.
+    """
+
+    citation: Citation
+
+
+ServerToolStatus = Literal["started", "completed", "failed"]
+"""Where a provider-run tool is in its lifecycle."""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerToolSource:
+    """One source a provider-run search consulted.
+
+    Attributes:
+        url: Where it came from.
+        title: The page's title, when the provider reports one.
+    """
+
+    url: str = ""
+    title: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ServerToolDelta:
+    """A provider-run tool started, or finished and returned something.
+
+    Emitted so a caller watching a stream can say *why* an answer paused — a web search
+    takes seconds, and a stream that stops producing text for that long is otherwise
+    indistinguishable from a stalled connection — and, on completion, what it found.
+
+    Carrying the result is the point rather than a nicety. "Grounded answer with fresh web
+    results" is the application feature this exists for, and an application that can render
+    the answer but not the sources behind it has the less useful half. This is a *stream*
+    event, on the content channel beside `TextDelta`, so carrying content is what it is for;
+    the payload-free rule governs telemetry events, which these are not.
+
+    Deliberately **not** a content event, so it does not start the first-token clock: a
+    provider that searches before writing anything has not produced a token yet, and
+    counting one would make time-to-first-token mean something different for those requests
+    than for every other.
+
+    Attributes:
+        kind: Which capability ran.
+        status: Where in its lifecycle it is.
+        sources: What a search returned, in the order the provider listed it. Empty on a
+            ``started`` event, and for kinds that return no sources.
+        output: What a code execution printed. Empty when there was none.
+        detail: Why a ``failed`` invocation failed, as the provider stated it.
+    """
+
+    kind: ServerToolKind
+    status: ServerToolStatus
+    sources: tuple[ServerToolSource, ...] = ()
+    output: str = ""
+    detail: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +201,8 @@ StreamEvent = (
     TextDelta
     | ReasoningDelta
     | ToolCallDelta
+    | CitationDelta
+    | ServerToolDelta
     | UsageUpdate
     | TimingMark
     | AttemptFailed

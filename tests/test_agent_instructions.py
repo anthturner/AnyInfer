@@ -225,3 +225,84 @@ def test_public_docstrings_carry_no_adr_identifier() -> None:
                 name = getattr(node, "name", "<module>")
                 offenders.append(f"{path.relative_to(ROOT)}:{name}")
     assert offenders == []
+
+
+def _design_section_18_modules() -> set[str]:
+    """Module filenames enumerated in DESIGN.md §18's package-layout block."""
+    design = _read("DESIGN.md")
+    start = design.index("## 18. Package layout")
+    fence = design.index("```\nsrc/anyinfer/", start)
+    block = design[fence : design.index("\n```", fence)]
+    # `__init__.py` is named once for the top-level curated surface; per-package
+    # ones are not enumerated on either side.
+    return set(re.findall(r"[\w.]+\.py", block)) - {"__init__.py"}
+
+
+def _tree_modules() -> set[str]:
+    """Module filenames actually shipped under src/anyinfer/."""
+    package = ROOT / "src" / "anyinfer"
+    return {
+        path.name
+        for path in package.rglob("*.py")
+        if "__pycache__" not in path.parts and path.name != "__init__.py"
+    }
+
+
+def test_design_section_18_layout_matches_the_tree() -> None:
+    """§18 is declared normative, so a stale enumeration there is a bug, not prose drift.
+
+    AGENTS.md sends agents to §18 before they write code; an omitted module means an
+    agent misplaces a new helper or re-implements one that already exists. Both
+    directions fail: a module the tree lost must leave §18 too.
+    """
+    documented = _design_section_18_modules()
+    shipped = _tree_modules()
+
+    missing = sorted(shipped - documented)
+    assert not missing, (
+        f"DESIGN.md §18 omits shipped modules: {missing}. "
+        "Add them to the layout block or delete the module."
+    )
+
+    phantom = sorted(documented - shipped)
+    assert not phantom, (
+        f"DESIGN.md §18 lists modules that do not exist: {phantom}. "
+        "Remove them from the layout block."
+    )
+
+
+def test_design_section_18_places_each_module_in_the_right_package() -> None:
+    """Filenames matching is not enough — §18's claim is about *where* each module lives.
+
+    The block is laid out per package, so an agent reads it for placement, not inventory.
+    Comparing bare filenames let a module move between packages while §18 kept pointing at
+    its old home and the test stayed green; that is the same silent doc drift §18's
+    enumeration exists to prevent, one level down.
+    """
+    design = _read("DESIGN.md")
+    start = design.index("## 18. Package layout")
+    fence = design.index("```\nsrc/anyinfer/", start)
+    block = design[fence : design.index("\n```", fence)]
+
+    misplaced: list[str] = []
+    package = ROOT / "src" / "anyinfer"
+    for path in sorted(package.rglob("*.py")):
+        if "__pycache__" in path.parts or path.name == "__init__.py":
+            continue
+        relative = path.relative_to(package)
+        if not relative.parent.parts:
+            continue  # root modules are listed bare, with no package line to match
+        # The owning package is named once as a `name/` heading; the module must appear
+        # somewhere at or after it, before the next package heading.
+        owner = f"{relative.parts[0]}/"
+        if owner not in block:
+            misplaced.append(f"{relative.as_posix()} (no '{owner}' entry in §18)")
+            continue
+        section = block[block.index(owner) :]
+        if relative.name not in section:
+            misplaced.append(f"{relative.as_posix()} (listed outside '{owner}')")
+
+    assert not misplaced, (
+        "DESIGN.md §18 places these modules somewhere other than where they ship: "
+        f"{misplaced}"
+    )

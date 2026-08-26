@@ -21,11 +21,11 @@ import binascii
 import json
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from .._context_wire import decode_context_request, encode_context_request
-from ..arena import arena_to_dict
-from ..types.events import StreamEvent, TextDelta, ToolCallDelta
+from ..evaluate.arena import arena_to_dict
+from ..types.events import CitationDelta, StreamEvent, TextDelta, ToolCallDelta
 from ..types.messages import (
     AudioPart,
     ContentPart,
@@ -35,29 +35,53 @@ from ..types.messages import (
     Text,
     ToolCall,
     ToolResult,
+    VideoPart,
 )
 from ..types.requests import (
+    SERVER_TOOL_KINDS,
     ArenaPolicy,
     CachePolicy,
     GenerationRequest,
     HistoryPolicy,
+    ReasoningEffort,
     Sampling,
     SchemaSpec,
+    ServerToolSpec,
     ToolSpec,
 )
-from ..types.results import FinishReason, Generation, Usage
+from ..types.results import (
+    Citation,
+    FinishReason,
+    Generation,
+    ServerToolUse,
+    TokenLogprob,
+    Usage,
+)
 
 __all__ = [
     "ARENA_FIELD",
     "CACHE_FIELD",
+    "CITATIONS_FIELD",
+    "CITE_DOCUMENTS_FIELD",
     "CONTEXT_FIELD",
     "HISTORY_FIELD",
     "MANIFEST_FIELD",
     "OPENAI_FINISH_REASONS",
+    "SERVER_TOOLS_FIELD",
+    "VIDEO_CONTENT_TYPE",
     "chunk_from_event",
     "completion_from_generation",
     "decode_messages",
+    "decode_passthrough",
+    "decode_server_tools",
+    "encode_arena_policy",
+    "encode_cache_policy",
+    "encode_citation",
+    "encode_history_policy",
+    "encode_logprobs",
     "encode_messages",
+    "encode_passthrough",
+    "encode_server_tool_uses",
     "final_chunk",
     "manifest_chunk",
     "request_from_openai",
@@ -109,6 +133,49 @@ ARENA_FIELD = "anyinfer_arena"
 CONTEXT_FIELD = "anyinfer_context"
 """Stateless caller-supplied corpus reduction request and content-free summary."""
 
+CITATIONS_FIELD = "anyinfer_citations"
+"""Result-side extension carrying the answer's attributions.
+
+Chat completions has no citation surface, so grounded answers previously came back with
+their attributions stranded in the provider's raw payload — visible in Python, invisible
+through the gateway. This carries them on the buffered body's choice, and as its own
+streamed frame per citation, so a wire caller sees them at the same moment a Python
+caller does.
+
+Request-side, `CITE_DOCUMENTS_FIELD` turns them on. Absent both, a stock OpenAI client's
+response is byte-identical to what it was before citations existed.
+"""
+
+CITE_DOCUMENTS_FIELD = "anyinfer_cite_documents"
+"""Request-body extension asking the target to attribute its answer to supplied documents."""
+
+SERVER_TOOLS_FIELD = "anyinfer_server_tools"
+"""Request-body extension asking the provider to run tools of its own, and the result-side
+report of how many times it did.
+
+Chat completions has no surface for these — its ``tools`` array is client-executed
+functions, and putting a provider-run capability there would make a stock client try to
+execute something that already ran. Request form is a list of
+``{"kind": "web_search", "max_uses": 3}``; response form is a list of
+``{"kind": "web_search", "uses": 2}``, counts only. The Responses dialect carries the same
+request shape but has native output items for the results.
+"""
+
+VIDEO_CONTENT_TYPE = "anyinfer_video"
+"""Message-content extension carrying a video input part.
+
+The other four extensions are top-level request keys; this one is a *content item*,
+because that is how the dialect it extends grows — `input_audio` and `file` were both
+added as content types, not as request fields, and a video belongs inside the message it
+was attached to. Its object is the wire spelling of a
+`VideoPart`: ``{"url"|"data", "media_type",
+"start_offset_s"?, "end_offset_s"?, "fps"?}``.
+
+A stock OpenAI client never sends it and never sees it. It exists so the request surface
+stays a genuine superset — a video part expressible in Python must survive the round trip
+through this codec, and chat completions has no content type of its own to carry one.
+"""
+
 _RESERVED_FIELDS = frozenset(
     {
         "model",
@@ -123,11 +190,16 @@ _RESERVED_FIELDS = frozenset(
         "tools",
         "tool_choice",
         "response_format",
+        "reasoning_effort",
         "metadata",
         "n",
+        "logprobs",
+        "top_logprobs",
         "user",
         HISTORY_FIELD,
         CACHE_FIELD,
+        CITE_DOCUMENTS_FIELD,
+        SERVER_TOOLS_FIELD,
         MANIFEST_FIELD,
         ARENA_FIELD,
         CONTEXT_FIELD,
@@ -207,6 +279,58 @@ def _as_text(content: Any) -> str:
     return ""
 
 
+def _decode_video(raw: Any) -> VideoPart:
+    """Decode the video content extension into a `VideoPart`.
+
+    Raises:
+        ValueError: The object is missing, is not an object, names neither a URL nor
+            inline data, or carries a non-numeric offset or frame rate. Refused rather
+            than defaulted: a video the gateway silently dropped is a question answered
+            about footage the model never saw.
+    """
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{VIDEO_CONTENT_TYPE} content requires an object")
+    url = raw.get("url")
+    data = raw.get("data")
+    if isinstance(url, str) and url:
+        media_type, decoded, resolved_url = _decode_data_url(url)
+    elif isinstance(data, str) and data:
+        media_type, decoded, resolved_url = None, _decode_base64(data), None
+    else:
+        raise ValueError(f"{VIDEO_CONTENT_TYPE} content requires url or base64 data")
+
+    def _number(key: str) -> float | None:
+        value = raw.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, int | float) or isinstance(value, bool):
+            raise ValueError(f"{VIDEO_CONTENT_TYPE}.{key} must be a number")
+        return float(value)
+
+    return VideoPart(
+        data=decoded,
+        url=resolved_url,
+        media_type=str(raw.get("media_type") or media_type or "video/mp4"),
+        start_offset_s=_number("start_offset_s"),
+        end_offset_s=_number("end_offset_s"),
+        fps=_number("fps"),
+    )
+
+
+def _encode_video(part: VideoPart) -> dict[str, Any]:
+    """Encode a `VideoPart` back into the content extension, omitting unset fields."""
+    encoded: dict[str, Any] = {"media_type": part.media_type}
+    if part.url is not None:
+        encoded["url"] = part.url
+    else:
+        encoded["data"] = base64.b64encode(part.data or b"").decode("ascii")
+    for key in ("start_offset_s", "end_offset_s", "fps"):
+        value = getattr(part, key)
+        if value is not None:
+            encoded[key] = value
+    return encoded
+
+
 def _decode_content(content: Any) -> tuple[ContentPart, ...]:
     if isinstance(content, str):
         return (Text(content),) if content else ()
@@ -236,6 +360,8 @@ def _decode_content(content: Any) -> tuple[ContentPart, ...]:
                     detail=(detail if detail in ("auto", "low", "high") else None),
                 )
             )
+        elif kind == VIDEO_CONTENT_TYPE:
+            parts.append(_decode_video(raw.get(VIDEO_CONTENT_TYPE)))
         elif kind == "input_audio":
             audio = raw.get("input_audio")
             if not isinstance(audio, Mapping) or not isinstance(audio.get("data"), str):
@@ -295,11 +421,19 @@ def _parse_arguments(raw: Any) -> Mapping[str, Any]:
     return {}
 
 
-def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest, bool]:
+def request_from_openai(
+    body: Mapping[str, Any], *, context_tuning: Any = None
+) -> tuple[str, GenerationRequest, bool]:
     """Decode an OpenAI chat-completions request body.
 
     Args:
         body: The parsed request JSON.
+        context_tuning: Default ``ContextTuning`` for a request whose context extension
+            omits its own ``tuning``. The gateway supplies the deployment's configured
+            tuning, so wire callers inherit it rather than always falling back to the
+            library defaults. Typed opaquely on purpose: the sidecar is a codec and does
+            not import the context implementation, so it forwards the object onward
+            without inspecting it.
 
     Returns:
         A ``(target, request, stream)`` triple. ``target`` is the ``model`` field taken
@@ -308,11 +442,25 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
     """
     target = str(body.get("model", "")).strip()
 
+    # Refused, not ignored. The codec's rule elsewhere is that telling the client beats
+    # silently applying the gateway's default, and `n` was reserved but never read — so
+    # n=3 returned one choice with no error. The companion `logprobs` refusal is gone:
+    # the normalized result now carries log-probabilities, so the field decodes instead.
+    requested_choices = body.get("n")
+    if requested_choices is not None and requested_choices != 1:
+        raise ValueError(
+            f"n={requested_choices!r} is not supported: AnyInfer returns one choice per "
+            "request. Use the anyinfer_arena extension to fan out across targets."
+        )
+
     sampling = Sampling(
         temperature=_opt_float(body.get("temperature")),
         top_p=_opt_float(body.get("top_p")),
         max_output_tokens=_opt_int(body.get("max_completion_tokens", body.get("max_tokens"))),
         stop=_decode_stop(body.get("stop")),
+        seed=_opt_int(body.get("seed")),
+        presence_penalty=_opt_float(body.get("presence_penalty")),
+        frequency_penalty=_opt_float(body.get("frequency_penalty")),
     )
 
     tools = tuple(
@@ -333,14 +481,121 @@ def request_from_openai(body: Mapping[str, Any]) -> tuple[str, GenerationRequest
         tools=tools,
         tool_choice=_decode_tool_choice(body.get("tool_choice")),
         sampling=sampling,
+        reasoning=_decode_reasoning_effort(body.get("reasoning_effort")),
         history=_decode_history(body.get(HISTORY_FIELD)),
         cache=_decode_cache(body.get(CACHE_FIELD)),
         arena=_decode_arena(body.get(ARENA_FIELD)),
-        context=_decode_context(body.get(CONTEXT_FIELD)),
-        provider_options=_decode_passthrough(body),
+        context=_decode_context(body.get(CONTEXT_FIELD), context_tuning),
+        provider_options=decode_passthrough(body),
         metadata={k: str(v) for k, v in (body.get("metadata") or {}).items()},
+        logprobs=_decode_logprobs(body),
+        cite_documents=_decode_flag(body, CITE_DOCUMENTS_FIELD),
+        server_tools=decode_server_tools(body.get(SERVER_TOOLS_FIELD)),
     )
     return target, request, bool(body.get("stream"))
+
+
+def decode_server_tools(raw: Any) -> tuple[ServerToolSpec, ...]:
+    """Decode the server-tool request extension, shared by both dialects.
+
+    Raises:
+        ValueError: The value is not a list of objects, or names a kind this library does
+            not have. Refused rather than skipped: a caller who misspelled ``web_serach``
+            would otherwise get a confident answer assembled without any search at all.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError(f"{SERVER_TOOLS_FIELD} must be an array")
+    specs: list[ServerToolSpec] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            raise ValueError(f"each {SERVER_TOOLS_FIELD} entry must be an object")
+        kind = entry.get("kind")
+        if kind not in SERVER_TOOL_KINDS:
+            raise ValueError(
+                f"unknown server tool kind {kind!r}; known kinds are "
+                + ", ".join(SERVER_TOOL_KINDS)
+            )
+        specs.append(
+            ServerToolSpec(kind=kind, max_uses=_opt_int(entry.get("max_uses")))
+        )
+    return tuple(specs)
+
+
+def encode_server_tool_uses(uses: Sequence[ServerToolUse]) -> list[dict[str, Any]]:
+    """Encode the result-side counts, shared by both dialects."""
+    return [{"kind": use.kind, "uses": use.uses} for use in uses]
+
+
+def _decode_flag(body: Mapping[str, Any], field_name: str) -> bool:
+    """Read a boolean request extension, refusing a mis-typed one.
+
+    Raises:
+        ValueError: If the field is present but is not a boolean, so a client that sent
+            the string ``"true"`` learns rather than silently getting the default.
+    """
+    if field_name not in body:
+        return False
+    value = body[field_name]
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} must be true or false")
+    return value
+
+
+def _decode_logprobs(body: Mapping[str, Any]) -> int | None:
+    """Collapse the dialect's two log-probability fields into one normalized count.
+
+    OpenAI splits the ask across a boolean and a count, and only the boolean turns the
+    feature on — ``top_logprobs`` without ``logprobs: true`` is an error upstream. The
+    normalized request has one field, so the pair collapses: absent or false means no ask,
+    true means the count (defaulting to zero, "the chosen token only").
+
+    Raises:
+        ValueError: If ``top_logprobs`` was sent without ``logprobs: true``, or the pair
+            is not the documented boolean-and-integer. Refused rather than reinterpreted,
+            because guessing which half the caller meant is how a request gets billed for
+            data nobody asked for.
+    """
+    enabled = body.get("logprobs")
+    count = body.get("top_logprobs")
+    if enabled is not None and not isinstance(enabled, bool):
+        raise ValueError("logprobs must be true or false")
+    if count is not None and (not isinstance(count, int) or isinstance(count, bool)):
+        raise ValueError("top_logprobs must be an integer")
+    if not enabled:
+        if count is not None:
+            raise ValueError("top_logprobs requires logprobs: true")
+        return None
+    return count or 0
+
+
+def _decode_reasoning_effort(raw: Any) -> ReasoningEffort | None:
+    """Decode OpenAI's ``reasoning_effort`` into the normalized effort level.
+
+    Typed rather than passed through, so the core's cross-provider translation engages
+    for sidecar callers too — an Anthropic thinking budget, a Gemini thinking config.
+    Passing it through verbatim silently did nothing for every non-OpenAI dialect.
+
+    ``none`` is accepted alongside the four effort levels because OpenAI's own vocabulary
+    accepts it on current models: a stock client that worked against this gateway by
+    passthrough must not start getting a 400 for speaking the dialect the gateway claims
+    to project. It decodes to a request for reasoning *off*, which each descriptor spells
+    in its provider's own terms.
+
+    Raises:
+        ValueError: The value is not one of the normalized levels. Refused rather than
+            dropped: now that the field is reserved, silently ignoring an unrecognized
+            value would tell the caller nothing while quietly changing what the model was
+            asked to do.
+    """
+    if raw is None:
+        return None
+    if raw in ("none", "minimal", "low", "medium", "high"):
+        return cast("ReasoningEffort", raw)
+    raise ValueError(
+        f"reasoning_effort must be one of none, minimal, low, medium, high (got {raw!r})"
+    )
 
 
 def _decode_cache(raw: Any) -> CachePolicy | None:
@@ -408,9 +663,9 @@ def _decode_arena(raw: Any) -> ArenaPolicy | None:
         raise ValueError(f"{ARENA_FIELD} is invalid: {exc}") from exc
 
 
-def _decode_context(raw: Any) -> Any:
+def _decode_context(raw: Any, default_tuning: Any = None) -> Any:
     """Decode the context extension; reduction remains in the core client."""
-    return decode_context_request(raw)
+    return decode_context_request(raw, default_tuning=default_tuning)
 
 
 def _decode_history(raw: Any) -> HistoryPolicy | None:
@@ -487,15 +742,26 @@ def _decode_response_format(raw: Any) -> SchemaSpec | None:
     return SchemaSpec(json_schema=dict(schema), name=str(spec.get("name", "response")))
 
 
-def _decode_passthrough(body: Mapping[str, Any]) -> Mapping[str, Mapping[str, Any]]:
+def decode_passthrough(
+    body: Mapping[str, Any], reserved: frozenset[str] = frozenset()
+) -> Mapping[str, Mapping[str, Any]]:
     """Route unrecognized extra-body fields to ``provider_options``.
 
     OpenAI clients rely on extra-body passthrough to reach provider-specific features; the
     escape hatch must survive the codec or the frontend is strictly less capable than the
     SDK. Fields outside any provider namespace land under the ``"*"`` wildcard, which the
     core forwards to whichever provider ends up serving the request.
+
+    Args:
+        body: The parsed request JSON.
+        reserved: Field names this dialect reads itself, which must therefore *not* be
+            forwarded. Defaults to the chat-completions set. The parameter exists because
+            the two dialects reserve different names — `input` and `text` are core fields
+            in one and unknown in the other — and a codec that consulted the wrong set
+            would forward its own request body to the provider as extra keys.
     """
-    extra = {k: v for k, v in body.items() if k not in _RESERVED_FIELDS}
+    reserved = reserved or _RESERVED_FIELDS
+    extra = {k: v for k, v in body.items() if k not in reserved}
     if not extra:
         return {}
     namespaced = extra.pop("provider_options", None)
@@ -518,6 +784,120 @@ def _opt_int(value: Any) -> int | None:
 # ---- request: AnyInfer -> OpenAI (round-trip verification) ---------------------------
 
 
+def encode_passthrough(
+    body: dict[str, Any], provider_options: Mapping[str, Mapping[str, Any]]
+) -> None:
+    """Re-emit ``provider_options`` onto a request body, in place.
+
+    The inverse of `decode_passthrough`, and it was missing. A field that decodes into a
+    typed value but never encodes back is one-way, which DESIGN §22's first invariant calls
+    a design bug rather than a shortcut — a gateway chaining to another gateway re-encodes,
+    and the escape hatch vanished on the second hop.
+
+    The wildcard namespace goes back to top-level keys, which is where it came from;
+    explicitly-namespaced entries go under ``provider_options``, which
+    `decode_passthrough` reads. Existing keys are never overwritten: a core field always
+    outranks a passthrough one of the same name.
+    """
+    namespaced = {
+        provider_id: dict(options)
+        for provider_id, options in provider_options.items()
+        if provider_id != "*"
+    }
+    for key, value in provider_options.get("*", {}).items():
+        body.setdefault(key, value)
+    if namespaced:
+        body.setdefault("provider_options", namespaced)
+
+
+def encode_history_policy(policy: HistoryPolicy) -> dict[str, Any]:
+    """Encode a compaction policy for the wire.
+
+    Shared by both dialects rather than inlined in each: the extension objects are the same
+    shape whichever request surface carried them, and a second copy is a second place for
+    a new field to be forgotten — which is exactly how a one-way codec field arises.
+    """
+    return {
+        "enabled": policy.enabled,
+        "mode": policy.mode,
+        "keep_recent": policy.keep_recent,
+        "keep_system": policy.keep_system,
+    }
+
+
+def encode_cache_policy(policy: CachePolicy) -> dict[str, Any]:
+    """Encode a prompt-cache placement policy for the wire."""
+    return {
+        "mode": policy.mode,
+        "min_segment_tokens": policy.min_segment_tokens,
+        "max_marks": policy.max_marks,
+        "include_tools": policy.include_tools,
+        "include_system": policy.include_system,
+    }
+
+
+def encode_arena_policy(policy: ArenaPolicy) -> dict[str, Any]:
+    """Encode a fixed fan-out policy for the wire."""
+    return {
+        "targets": list(policy.targets),
+        "strategy": policy.strategy,
+        "judge_target": policy.judge_target,
+        "instructions": policy.instructions,
+        "concurrency": policy.concurrency,
+        "min_candidates": policy.min_candidates,
+        "reveal_targets": policy.reveal_targets,
+        "memoize_tools": policy.memoize_tools,
+    }
+
+
+def encode_citation(citation: Citation) -> dict[str, Any]:
+    """Encode one `Citation` for the wire, omitting what the provider did not state.
+
+    Absent keys rather than nulls or zeros: an offset of ``0`` and "the provider located
+    this only in the source" are different claims, and a wire shape that cannot tell them
+    apart pushes a fabricated highlight onto whoever renders it.
+    """
+    encoded: dict[str, Any] = {}
+    for key in ("start_index", "end_index", "document_index"):
+        value = getattr(citation, key)
+        if value is not None:
+            encoded[key] = value
+    for key in ("quoted_text", "title", "uri"):
+        value = getattr(citation, key)
+        if value:
+            encoded[key] = value
+    return encoded
+
+
+def encode_logprobs(logprobs: Sequence[TokenLogprob]) -> dict[str, Any]:
+    """Encode normalized log-probabilities into the dialect's ``logprobs`` object.
+
+    Args:
+        logprobs: The result's tokens, in generation order.
+
+    Returns:
+        The ``{"content": [...]}`` object a chat-completions choice carries. ``bytes`` is
+        emitted as ``null`` when the upstream provider did not report it, rather than
+        being reconstructed by encoding the token: a client comparing byte offsets would
+        then be trusting our guess about the provider's tokenizer.
+    """
+    return {"content": [_encode_logprob(token, with_top=True) for token in logprobs]}
+
+
+def _encode_logprob(token: TokenLogprob, *, with_top: bool) -> dict[str, Any]:
+    """Encode one token entry, with its alternatives when this is a top-level one."""
+    entry: dict[str, Any] = {
+        "token": token.token,
+        "logprob": token.logprob,
+        "bytes": list(token.bytes) if token.bytes is not None else None,
+    }
+    if with_top:
+        entry["top_logprobs"] = [
+            _encode_logprob(alternative, with_top=False) for alternative in token.top
+        ]
+    return entry
+
+
 def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
     """Encode typed messages back into an OpenAI ``messages`` array."""
     encoded: list[dict[str, Any]] = []
@@ -533,7 +913,10 @@ def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
             )
             continue
 
-        modal = any(isinstance(p, ImagePart | DocumentPart | AudioPart) for p in message.content)
+        modal = any(
+            isinstance(p, ImagePart | DocumentPart | AudioPart | VideoPart)
+            for p in message.content
+        )
         if modal:
             modal_content: list[dict[str, Any]] = []
             for part in message.content:
@@ -554,6 +937,10 @@ def encode_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
                     if part.filename is not None:
                         file["filename"] = part.filename
                     modal_content.append({"type": "file", "file": file})
+                elif isinstance(part, VideoPart):
+                    modal_content.append(
+                        {"type": VIDEO_CONTENT_TYPE, VIDEO_CONTENT_TYPE: _encode_video(part)}
+                    )
                 elif isinstance(part, AudioPart):
                     fmt = "mp3" if part.media_type in ("audio/mp3", "audio/mpeg") else "wav"
                     modal_content.append(
@@ -612,6 +999,31 @@ def request_to_openai(
         body["max_tokens"] = sampling.max_output_tokens
     if sampling.stop:
         body["stop"] = list(sampling.stop)
+    if sampling.seed is not None:
+        body["seed"] = sampling.seed
+    if sampling.presence_penalty is not None:
+        body["presence_penalty"] = sampling.presence_penalty
+    if sampling.frequency_penalty is not None:
+        body["frequency_penalty"] = sampling.frequency_penalty
+
+    if request.logprobs is not None:
+        # Back out to the dialect's two fields, mirroring `_decode_logprobs`. `0` means
+        # "chosen token only", which the dialect spells as the boolean with no count.
+        body["logprobs"] = True
+        if request.logprobs > 0:
+            body["top_logprobs"] = request.logprobs
+
+    if request.cite_documents:
+        body[CITE_DOCUMENTS_FIELD] = True
+
+    if request.server_tools:
+        body[SERVER_TOOLS_FIELD] = [
+            {"kind": spec.kind, **({"max_uses": spec.max_uses} if spec.max_uses else {})}
+            for spec in request.server_tools
+        ]
+
+    if request.reasoning is not None:
+        body["reasoning_effort"] = request.reasoning
 
     if request.tools:
         body["tools"] = [
@@ -632,25 +1044,14 @@ def request_to_openai(
         )
 
     if request.history is not None:
-        body[HISTORY_FIELD] = {
-            "enabled": request.history.enabled,
-            "mode": request.history.mode,
-            "keep_recent": request.history.keep_recent,
-            "keep_system": request.history.keep_system,
-        }
+        body[HISTORY_FIELD] = encode_history_policy(request.history)
+    if request.cache is not None:
+        body[CACHE_FIELD] = encode_cache_policy(request.cache)
     if request.arena is not None:
-        body[ARENA_FIELD] = {
-            "targets": list(request.arena.targets),
-            "strategy": request.arena.strategy,
-            "judge_target": request.arena.judge_target,
-            "instructions": request.arena.instructions,
-            "concurrency": request.arena.concurrency,
-            "min_candidates": request.arena.min_candidates,
-            "reveal_targets": request.arena.reveal_targets,
-            "memoize_tools": request.arena.memoize_tools,
-        }
+        body[ARENA_FIELD] = encode_arena_policy(request.arena)
     if request.context is not None:
         body[CONTEXT_FIELD] = encode_context_request(request.context)
+    encode_passthrough(body, request.provider_options)
 
     if request.schema is not None:
         body["response_format"] = {
@@ -714,6 +1115,14 @@ def completion_from_generation(
             }
         ],
     }
+    if result.logprobs:
+        body["choices"][0]["logprobs"] = encode_logprobs(result.logprobs)
+    if result.server_tool_uses:
+        body[SERVER_TOOLS_FIELD] = encode_server_tool_uses(result.server_tool_uses)
+    if result.citations:
+        body["choices"][0][CITATIONS_FIELD] = [
+            encode_citation(citation) for citation in result.citations
+        ]
     usage = _encode_usage(result.usage)
     if usage is not None:
         body["usage"] = usage
@@ -793,6 +1202,16 @@ def chunk_from_event(
     if isinstance(event, TextDelta):
         envelope["choices"] = [
             {"index": 0, "delta": {"content": event.text}, "finish_reason": None}
+        ]
+        return envelope
+
+    if isinstance(event, CitationDelta):
+        envelope["choices"] = [
+            {
+                "index": 0,
+                "delta": {CITATIONS_FIELD: [encode_citation(event.citation)]},
+                "finish_reason": None,
+            }
         ]
         return envelope
 

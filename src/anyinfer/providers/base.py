@@ -17,11 +17,30 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from ..types.capabilities import DiscoveredModel, Health
-from ..types.events import ReasoningDelta, TextDelta, ToolCallDelta, UsageUpdate
+from ..types.events import (
+    CitationDelta,
+    ReasoningDelta,
+    ServerToolDelta,
+    TextDelta,
+    ToolCallDelta,
+    UsageUpdate,
+)
 from ..types.messages import Message
-from ..types.operations import EmbeddingInputIntent
-from ..types.requests import Sampling, ToolSpec
-from ..types.results import Diagnostic, FinishReason, Mechanism, Usage
+from ..types.operations import (
+    BatchHandle,
+    BatchReport,
+    BatchResult,
+    EmbeddingInputIntent,
+)
+from ..types.requests import Sampling, ServerToolSpec, ToolSpec
+from ..types.results import (
+    Diagnostic,
+    FinishReason,
+    Mechanism,
+    ServerToolUse,
+    TokenLogprob,
+    Usage,
+)
 
 if TYPE_CHECKING:
     from ..events.telemetry import TelemetryEvent
@@ -29,6 +48,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AdapterEvent",
     "AdapterFinal",
+    "BatchWireRequest",
     "EmbeddingWireRequest",
     "EmbeddingWireResult",
     "EmbedsText",
@@ -40,6 +60,7 @@ __all__ = [
     "RerankWireRequest",
     "RerankWireResult",
     "ReranksText",
+    "SubmitsBatches",
     "SupportsDiagnostics",
     "WireRankedItem",
     "WireRequest",
@@ -118,6 +139,18 @@ class ProviderConfig:
     """Optional ``httpx2`` transport override. Used by the fake-server and cassette test
     modes to intercept traffic without touching the adapter's wire logic."""
 
+    proxy: str | None = None
+    """Proxy URL for this instance's traffic, e.g. ``http://corp-proxy:3128``. ``None``
+    leaves httpx's environment-variable behaviour untouched."""
+
+    verify: str | bool | None = None
+    """TLS verification: a CA-bundle path for a private or intercepting CA, ``False`` to
+    disable verification, or ``None`` for the default trust store."""
+
+    client_cert: str | tuple[str, str] | tuple[str, str, str] | None = None
+    """Client certificate for mTLS: a combined PEM path, or ``(cert, key)`` /
+    ``(cert, key, password)``. ``None`` when the endpoint needs no client certificate."""
+
     events: Callable[[TelemetryEvent], None] | None = None
     """Sink for adapter-side lifecycle telemetry (`ServerLifecycle`, `DownloadProgress`).
 
@@ -149,6 +182,18 @@ class WireRequest:
             policy, and for every provider whose cache needs no marks. An adapter's whole
             duty here is to spell each mark in its own wire format; deciding *where* they
             go is the core's, and belongs to `anyinfer.capabilities.cache`.
+        server_tools: Capabilities the provider should run itself. Already gated by
+            capability — an adapter that receives one may enable it, and one that cannot
+            never sees it, because the core refuses that request before dispatch.
+        cite_documents: Whether the caller asked supplied documents to be cited. Only
+            providers declaring the capability receive ``True``; an adapter that gets it
+            turns on its dialect's citation flag, which for every dialect that has one is
+            a *request-side* opt-in rather than something the model volunteers.
+        logprobs: How many alternative tokens per position the caller asked for
+            log-probabilities on, or ``None`` for none. Already gated by capability — an
+            adapter that receives a value may send it. Each dialect spells the ask
+            differently (a flag plus a count, a single integer, a boolean); the count is
+            normalized here and the adapter projects it.
         extra_options: ``provider_options[this_provider]``, passed through verbatim.
         session_state: Opaque continuation data from an open
             `Session`, or ``None`` for an
@@ -172,6 +217,9 @@ class WireRequest:
     timeout_s: float = 120.0
     max_response_bytes: int = 1_048_576
     cache_marks: tuple[int, ...] = ()
+    server_tools: tuple[ServerToolSpec, ...] = ()
+    cite_documents: bool = False
+    logprobs: int | None = None
     extra_options: Mapping[str, Any] = field(default_factory=dict)
     session_state: Mapping[str, Any] | None = None
 
@@ -188,6 +236,12 @@ class AdapterFinal:
             on the result only when the client opted in via ``retain_raw``.
         session_state: Continuation data to remember for the next turn of an open
             session, or ``None`` when there is none. Opaque to the core.
+        server_tool_uses: How many times the provider ran each of its own tools. Counts
+            only; never the queries or their results.
+        logprobs: Per-token log-probabilities the provider returned, in generation order.
+            Empty when none were requested or the provider returned none. Carried on the
+            terminal event rather than streamed per token because no dialect emits them
+            in a form the core could reassemble incrementally without buffering anyway.
     """
 
     finish_reason: FinishReason
@@ -195,9 +249,19 @@ class AdapterFinal:
     phases: Mapping[str, float] = field(default_factory=dict)
     raw: Any | None = None
     session_state: Mapping[str, Any] | None = None
+    logprobs: tuple[TokenLogprob, ...] = ()
+    server_tool_uses: tuple[ServerToolUse, ...] = ()
 
 
-AdapterEvent = TextDelta | ReasoningDelta | ToolCallDelta | UsageUpdate | AdapterFinal
+AdapterEvent = (
+    TextDelta
+    | ReasoningDelta
+    | ToolCallDelta
+    | CitationDelta
+    | ServerToolDelta
+    | UsageUpdate
+    | AdapterFinal
+)
 """The strict subset of events an adapter may emit."""
 
 
@@ -404,6 +468,71 @@ class ReranksText(Protocol):
             anyinfer.errors.ProviderError: With ``retryable``/``retry_after_s`` set.
         """
         ...
+
+
+@runtime_checkable
+class SubmitsBatches(Protocol):
+    """Deferred, discounted execution of many generations at once.
+
+    Opt-in and separate from `GeneratesText` because the two are genuinely different
+    protocols, not one with a flag: a batch endpoint takes a whole job, returns an id, and
+    answers hours later, where generation takes one request and streams. An adapter
+    implements this only if its provider sells a batch tier, and its descriptor declares
+    ``"batch"`` in ``operations``.
+
+    Every method takes or returns a `BatchHandle` rather than
+    consulting anything the adapter remembers. That is what keeps the run-retention
+    non-goal intact through a feature whose whole shape invites breaking it: the answer
+    arrives in another process hours later, and the caller is the only one who stored
+    anything.
+    """
+
+    async def submit_batch(self, req: BatchWireRequest) -> BatchHandle:
+        """Submit a batch and return the handle that reclaims it.
+
+        Raises:
+            anyinfer.errors.ProviderError: The provider refused the submission.
+        """
+        ...
+
+    async def batch_status(self, handle: BatchHandle) -> BatchReport:
+        """Report a batch's current state without downloading its results."""
+        ...
+
+    async def fetch_batch(self, handle: BatchHandle) -> BatchResult:
+        """Download a finished batch's lines.
+
+        Raises:
+            anyinfer.errors.ProviderError: The batch is not finished, or the download
+                failed.
+        """
+        ...
+
+    async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
+        """Ask the provider to stop a batch, returning its state after the request."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class BatchWireRequest:
+    """A batch resolved for one provider: its lines, already translated.
+
+    Each line is a `WireRequest` — the same fully-resolved shape a live generation would
+    send, so an adapter's batch path serializes exactly what its streaming path would have
+    sent, through the same `build_payload`.
+
+    Attributes:
+        model: The model every line runs against.
+        lines: ``(custom_id, wire request)`` pairs, in submission order.
+        completion_window: The provider's own vocabulary for how long it may take, or
+            ``None`` for its default.
+        metadata: Opaque labels, passed to providers that accept them.
+    """
+
+    model: str
+    lines: tuple[tuple[str, WireRequest], ...]
+    completion_window: str | None = "24h"
+    metadata: Mapping[str, str] = field(default_factory=dict)
 
 
 @runtime_checkable

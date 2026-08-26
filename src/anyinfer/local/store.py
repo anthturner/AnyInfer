@@ -43,6 +43,8 @@ __all__ = [
     "MODEL_DIR_ENV",
     "STORE_FORMAT_VERSION",
     "ModelStore",
+    "PrunePlan",
+    "PruneProposal",
     "RemovalReport",
     "ResolvedModel",
     "StoreEntry",
@@ -246,6 +248,64 @@ class RemovalReport:
     removed: bool = False
     freed_bytes: int = 0
     external: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class PruneProposal:
+    """One entry a prune plan suggests deleting, and why.
+
+    Attributes:
+        entry: The store entry proposed for deletion.
+        freed_bytes: Bytes this deletion would reclaim.
+        idle_days: Days since the entry was last located, or ``None`` when it has never
+            been used since installation — which is not the same as "idle forever" and is
+            shown differently, since a model downloaded an hour ago and never run should
+            not read as the stalest thing in the store.
+    """
+
+    entry: StoreEntry
+    freed_bytes: int
+    idle_days: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class PrunePlan:
+    """What a prune would delete, computed but not yet performed.
+
+    Separating the plan from the deletion is the whole design. Eviction here is *guided*,
+    never automatic: the store proposes, a person confirms, and the same plan object is
+    what the CLI renders and what a programmatic caller inspects. Nothing in this type
+    touches the filesystem.
+
+    Attributes:
+        proposals: Entries to delete, least-recently-used first — the order they would be
+            deleted in, so a caller taking a prefix gets the same answer as a smaller
+            budget would have produced.
+        keep_bytes: The disk budget the plan was computed against, or ``None`` when the
+            caller asked for an age cut instead.
+        total_bytes: Bytes the store occupies now, counting only entries this store owns.
+        protected: Entries excluded from consideration, with the reason — externally
+            adopted bytes another tool owns, most of all.
+    """
+
+    proposals: tuple[PruneProposal, ...] = ()
+    keep_bytes: int | None = None
+    total_bytes: int = 0
+    protected: Mapping[str, str] = field(default_factory=dict)
+
+    @property
+    def freed_bytes(self) -> int:
+        """Bytes the whole plan would reclaim."""
+        return sum(proposal.freed_bytes for proposal in self.proposals)
+
+    @property
+    def remaining_bytes(self) -> int:
+        """Bytes the store would occupy after the plan ran."""
+        return self.total_bytes - self.freed_bytes
+
+    def __bool__(self) -> bool:
+        """Whether the plan proposes anything at all."""
+        return bool(self.proposals)
 
 
 def default_store_root() -> Path:
@@ -556,6 +616,109 @@ class ModelStore:
             _prune_empty(directory.parent, self._root)
         self.unregister(entry_id)
         return RemovalReport(entry_id=entry_id, removed=True, freed_bytes=freed)
+
+    def plan_prune(
+        self,
+        *,
+        keep_bytes: int | None = None,
+        older_than_days: float | None = None,
+        now: float | None = None,
+    ) -> PrunePlan:
+        """Propose least-recently-used deletions, without deleting anything.
+
+        Two ways to say what "too much" means, and exactly one must be given:
+
+        - ``keep_bytes`` is a disk budget. Entries are proposed least-recently-used first
+          until what remains fits, so the newest-used models survive.
+        - ``older_than_days`` is an age cut. Every entry idle for longer is proposed,
+          regardless of what that leaves behind.
+
+        Neither is a default. A prune with no stated limit would have to invent one, and
+        an invented disk budget silently deleting multi-gigabyte downloads is exactly the
+        automatic eviction this store does not do.
+
+        **Externally adopted entries are never proposed.** Their bytes belong to another
+        tool's cache, and `remove` would only unregister them anyway — proposing a
+        deletion that frees nothing would misreport the space a prune reclaims.
+
+        An entry that has never been located since installation is ordered by its install
+        time and reports ``idle_days`` of ``None``: it is a plausible thing to evict, but
+        calling it "idle for N days" would overstate what is known about it.
+
+        Args:
+            keep_bytes: Disk budget to fit within, in bytes.
+            older_than_days: Idle age beyond which an entry is proposed.
+            now: Clock override for tests; defaults to the current time.
+
+        Returns:
+            The plan. An empty plan means nothing needs deleting, which is a success.
+
+        Raises:
+            ValueError: If neither limit or both were given, or a limit is negative.
+        """
+        if (keep_bytes is None) == (older_than_days is None):
+            raise ValueError("prune requires exactly one of keep_bytes or older_than_days")
+        if keep_bytes is not None and keep_bytes < 0:
+            raise ValueError("keep_bytes must not be negative")
+        if older_than_days is not None and older_than_days < 0:
+            raise ValueError("older_than_days must not be negative")
+
+        clock = time.time() if now is None else now
+        entries = self.load_index()
+        protected = {
+            entry.id: "adopted from another tool's cache; removal frees no space"
+            for entry in entries.values()
+            if entry.external
+        }
+        owned = [entry for entry in entries.values() if not entry.external]
+        total = sum(entry.total_bytes for entry in owned)
+
+        def _last_touch(entry: StoreEntry) -> float:
+            return entry.last_used_at or entry.installed_at
+
+        def _propose(entry: StoreEntry) -> PruneProposal:
+            idle = (clock - entry.last_used_at) / 86400.0 if entry.last_used_at else None
+            return PruneProposal(
+                entry=entry,
+                freed_bytes=entry.total_bytes,
+                idle_days=max(idle, 0.0) if idle is not None else None,
+            )
+
+        ordered = sorted(owned, key=_last_touch)
+        proposals: list[PruneProposal] = []
+        if older_than_days is not None:
+            cutoff = clock - older_than_days * 86400.0
+            proposals = [_propose(entry) for entry in ordered if _last_touch(entry) < cutoff]
+        else:
+            assert keep_bytes is not None  # noqa: S101 — narrowed by the guard above
+            remaining = total
+            for entry in ordered:
+                if remaining <= keep_bytes:
+                    break
+                proposals.append(_propose(entry))
+                remaining -= entry.total_bytes
+
+        return PrunePlan(
+            proposals=tuple(proposals),
+            keep_bytes=keep_bytes,
+            total_bytes=total,
+            protected=protected,
+        )
+
+    def apply_prune(self, plan: PrunePlan) -> tuple[RemovalReport, ...]:
+        """Delete everything a plan proposed, in the plan's own order.
+
+        Re-reads each entry through `remove`, so a plan computed against a store that has
+        since changed deletes what is still there and reports ``removed=False`` for what is
+        not, rather than failing partway through.
+
+        Args:
+            plan: A plan from `plan_prune`.
+
+        Returns:
+            One report per proposal, in plan order.
+        """
+        return tuple(self.remove(proposal.entry.id) for proposal in plan.proposals)
 
     def clear_staging(self, entry_id: str) -> None:
         """Remove an entry's staging directory and its partial transfers."""

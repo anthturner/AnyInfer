@@ -1,0 +1,18 @@
+# Actions are pinned to full commit SHAs (see any workflow's `uses:` lines), which stops a
+# force-moved or compromised tag from executing in a job that holds ANTHROPIC_API_KEY,
+# CLAUDE_CODE_OAUTH_TOKEN, or the PyPI OIDC identity. A pin only stays safe if something
+# moves it forward, so Dependabot owns that: it opens a PR when an upstream release lands,
+# rewriting the SHA and the version comment together.
+#
+# Actions only. Python dependencies are deliberately not tracked here: the slim core
+# declares two runtime dependencies with wide floors, and the extras carry justification
+# comments, so a bot proposing floor bumps would be noise rather than signal.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore

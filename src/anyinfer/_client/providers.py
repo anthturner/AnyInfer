@@ -7,6 +7,10 @@ supervised local servers are expensive to create and must outlive a single reque
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import hashlib
+import secrets
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
@@ -16,7 +20,7 @@ import httpx2
 from ..catalog.model import Catalog
 from ..credentials import ResolverChain, default_resolver
 from ..errors import ConfigError, CredentialError
-from ..events.telemetry import TelemetryEvent
+from ..events.telemetry import CredentialRotated, TelemetryEvent
 from ..local.server import is_loopback
 from ..providers.base import (
     EmbedsText,
@@ -24,6 +28,7 @@ from ..providers.base import (
     ProviderConfig,
     ProviderLifecycle,
     ReranksText,
+    SubmitsBatches,
 )
 from ..registry import ProviderDescriptor, ProviderRegistry, normalize_provider_id
 from ..routing.limits import GoverningTransport, RateLimiter
@@ -62,6 +67,25 @@ class ProviderSettings:
         limits: Client-side pacing for this instance, or ``None`` for none. Rate limits
             belong to *an account at a provider* rather than to the application, which is
             why they are configured here and not as a client-wide policy.
+        proxy: Proxy URL for this instance's traffic, e.g. ``"http://corp-proxy:3128"``.
+            ``None`` leaves httpx's ``HTTPS_PROXY``/``NO_PROXY`` environment handling in
+            place, which is the default.
+        verify: TLS verification for this instance: a CA-bundle path for a private or
+            intercepting CA, ``False`` to disable verification entirely, or ``None`` for
+            the default trust store. Per instance on purpose — one provider can trust a
+            corporate CA while another keeps the public roots.
+        client_cert: Client certificate for mTLS: a combined PEM path, or
+            ``(cert, key)`` / ``(cert, key, password)``. ``None`` when the endpoint needs
+            no client certificate.
+
+    Note:
+        `proxy`, `verify`, and `client_cert` are ignored when `transport` is supplied — a
+        caller bringing its own transport has taken over connection handling. They also
+        do not reach connections AnyInfer does not open for this instance: MCP servers,
+        model downloads, and auth token endpoints other than Google's follow the process
+        environment instead. An adapter that delegates transport to a vendor SDK declares
+        ``honors_connection_settings=False`` and the config parser refuses the keys
+        outright rather than accepting them and doing nothing.
     """
 
     provider_id: str
@@ -72,6 +96,9 @@ class ProviderSettings:
     options: Mapping[str, Any] = field(default_factory=dict)
     timeout_s: float = 120.0
     transport: Any | None = None
+    proxy: str | None = None
+    verify: str | bool | None = None
+    client_cert: str | tuple[str, str] | tuple[str, str, str] | None = None
     alias: str | None = None
     limits: RateLimits | None = None
 
@@ -91,6 +118,35 @@ class ProviderSettings:
         )
 
 
+@dataclass(slots=True)
+class _CredentialState:
+    """What an already-built adapter was constructed with, and when that was checked.
+
+    Only a salted digest is kept, never the credential. The pool needs to answer one
+    question — *did this change?* — and a digest answers it without holding a second copy
+    of a secret whose whole lifecycle the credentials module already owns. The salt is
+    generated once per process and never leaves memory, so a digest is not comparable
+    across runs or across processes and is worthless if it ever leaked.
+
+    Attributes:
+        digest: Salted SHA-256 of the resolved credential, or of the empty string when the
+            provider has none.
+        checked_at: Monotonic time of the last re-resolution.
+    """
+
+    digest: str
+    checked_at: float
+
+
+_CREDENTIAL_SALT = secrets.token_bytes(16)
+"""Process-lifetime salt for credential-change digests. Never logged, never emitted."""
+
+
+def _credential_digest(value: str | None) -> str:
+    """Digest a resolved credential for change detection only."""
+    return hashlib.sha256(_CREDENTIAL_SALT + (value or "").encode("utf-8")).hexdigest()
+
+
 class AdapterPool:
     """Owns adapter instances and their lifecycles for one client.
 
@@ -107,11 +163,17 @@ class AdapterPool:
         catalog: Catalog | None = None,
         resolver: ResolverChain | None = None,
         events: Callable[[TelemetryEvent], None] | None = None,
+        credential_ttl_s: float | None = None,
+        limiters: Mapping[str, RateLimiter] | None = None,
     ) -> None:
         self._registry = registry
         self._catalog = catalog
         self._resolver = resolver or default_resolver()
         self._events = events
+        self._credential_ttl_s = credential_ttl_s
+        self._injected_limiters = dict(limiters or {})
+        self._credentials: dict[str, _CredentialState] = {}
+        self._clock = time.monotonic
         self._settings: dict[str, ProviderSettings] = {}
         self._order: list[str] = []
         for setting in settings:
@@ -261,20 +323,115 @@ class AdapterPool:
     async def get(self, provider_id: str) -> ProviderLifecycle:
         """Return the adapter for a provider instance, building it on first use.
 
+        With a ``credential_ttl_s`` configured, a cached adapter whose credential has not
+        been re-checked within the TTL is re-checked here — and *rebuilt only if the
+        credential actually changed*. That distinction is the whole design: adapters own
+        connection pools and, for the supervised local engine, a running process, so
+        rebuilding one on a timer rather than on a rotation would trade a restart-free key
+        rotation for a periodic connection storm.
+
         Raises:
             ConfigError: If the provider is unknown, or its required settings are missing.
         """
         key = self._registry.resolve_alias(provider_id)
         adapter = self._adapters.get(key)
-        if adapter is not None:
+        if adapter is not None and not self._credential_may_have_rotated(key):
             return adapter
         async with self._lock:
+            adapter = self._adapters.get(key)
+            if adapter is not None and not self._credential_may_have_rotated(key):
+                return adapter
+            if adapter is not None and not await self._rotate_if_changed(key):
+                return adapter
             adapter = self._adapters.get(key)
             if adapter is not None:
                 return adapter
             adapter = self._build(key)
             self._adapters[key] = adapter
             return adapter
+
+    def _credential_may_have_rotated(self, key: str) -> bool:
+        """Whether this instance's credential is due a re-check.
+
+        Always ``False`` when no TTL is configured, which is the default — so a client
+        that never asked for rotation takes no clock reading and no lock it did not take
+        before.
+        """
+        if self._credential_ttl_s is None:
+            return False
+        state = self._credentials.get(key)
+        if state is None:
+            return False
+        return self._clock() - state.checked_at >= self._credential_ttl_s
+
+    async def _rotate_if_changed(
+        self, key: str, trigger: Literal["ttl", "auth-failure"] = "ttl"
+    ) -> bool:
+        """Re-resolve one instance's credential; rebuild its adapter if it moved.
+
+        Must be called with the pool lock held.
+
+        Args:
+            key: A resolved instance id.
+            trigger: What prompted this re-resolution, for the emitted event.
+
+        Returns:
+            ``True`` when the adapter was discarded and the caller should build a new one.
+        """
+        state = self._credentials.get(key)
+        try:
+            resolved = self._resolve_credential(key)
+        except CredentialError:
+            # A resolver that has gone away — an unreadable file, a keychain that locked —
+            # is not a reason to tear down a working adapter. The existing credential may
+            # well still be valid; if it is not, the provider says 401 and the ordinary
+            # auth path reports it. Re-check again after the next TTL.
+            if state is not None:
+                state.checked_at = self._clock()
+            return False
+
+        digest = _credential_digest(resolved)
+        if state is not None and digest == state.digest:
+            state.checked_at = self._clock()
+            return False
+
+        self._credentials[key] = _CredentialState(digest=digest, checked_at=self._clock())
+        retired = self._adapters.pop(key, None)
+        if retired is not None:
+            await _close_quietly(retired)
+            self._emit(CredentialRotated(provider=key, trigger=trigger))
+        return True
+
+    def _resolve_credential(self, key: str) -> str | None:
+        """Resolve one instance's credential reference to its current value."""
+        settings = self._settings.get(key)
+        return self._resolver.resolve(settings.api_key) if settings is not None else None
+
+    async def refresh_credential(self, provider_id: str) -> bool:
+        """Re-resolve an instance's credential now, whatever the TTL says.
+
+        The 401 path: a provider that authenticated a moment ago and now refuses is the
+        strongest possible signal that a key rotated underneath us, and it is worth one
+        re-resolution before the failure is reported. Returns whether anything actually
+        changed, so a caller can retry on ``True`` and stop on ``False`` — re-sending the
+        same rejected credential would only buy a second identical failure.
+
+        Args:
+            provider_id: The instance whose credential should be re-resolved.
+
+        Returns:
+            ``True`` when the credential changed and the adapter was rebuilt.
+        """
+        key = self._registry.resolve_alias(provider_id)
+        async with self._lock:
+            if key not in self._adapters:
+                return False
+            return await self._rotate_if_changed(key, "auth-failure")
+
+    def _emit(self, event: TelemetryEvent) -> None:
+        """Send one pool-side lifecycle event, when the client wired a sink."""
+        if self._events is not None:
+            self._events(event)
 
     def _build(self, provider_id: str) -> ProviderLifecycle:
         descriptor = self._registry.get(provider_id)
@@ -307,10 +464,16 @@ class AdapterPool:
             options=options,
             timeout_s=settings.timeout_s,
             transport=self._govern(provider_id, descriptor, settings),
+            proxy=settings.proxy,
+            verify=settings.verify,
+            client_cert=settings.client_cert,
             events=self._events,
         )
         adapter = descriptor.factory(config)
         self._validate_operations(provider_id, descriptor, adapter)
+        self._credentials[provider_id] = _CredentialState(
+            digest=_credential_digest(api_key), checked_at=self._clock()
+        )
         return adapter
 
     def _validate_operations(
@@ -326,6 +489,7 @@ class AdapterPool:
             "generation": GeneratesText,
             "embedding": EmbedsText,
             "rerank": ReranksText,
+            "batch": SubmitsBatches,
         }
         for operation in descriptor.operations:
             protocol = checks.get(operation)
@@ -352,7 +516,31 @@ class AdapterPool:
         A provider that builds its own transport gets its limiter registered anyway — the
         client applies concurrency around the call, and the limiter is skipped here because
         there is nothing of ours to wrap.
+
+        An **injected** limiter wins over a constructed one. This is the single place a
+        `RateLimiter` is built, which is what makes injection a seam rather than a
+        refactor: a caller that constructs short-lived clients around one long-lived key
+        can hand in the limiter that key's pacing state belongs to, and the token bucket
+        and header-observed windows survive the client. Limiter *identity* is what
+        `anyinfer.routing.limits` already says the unit of pacing is — one account at one
+        provider — so preserving it is exactly the semantics, where exporting and
+        re-importing its private state would not be.
         """
+        injected = self._injected_limiters.get(provider_id)
+        if injected is not None:
+            # Inertness is judged from the injected limiter's own configuration, not the
+            # settings': the caller owning that limiter is the one who decided what it
+            # paces against, and reading the settings here would let an unconfigured
+            # `ProviderSettings` silently discard a limiter the caller deliberately
+            # supplied.
+            if not injected.limits.active:
+                return settings.transport
+            self._limiters[provider_id] = injected
+            if descriptor.governs_own_transport:
+                return settings.transport
+            inner = settings.transport or httpx2.AsyncHTTPTransport()
+            return GoverningTransport(inner, injected)
+
         limits = settings.limits
         if limits is None or not limits.active:
             return settings.transport
@@ -411,3 +599,15 @@ class AdapterPool:
         for result in results:
             if isinstance(result, BaseException) and not isinstance(result, Exception):
                 raise result
+
+
+async def _close_quietly(adapter: ProviderLifecycle) -> None:
+    """Close a retired adapter without letting its teardown fail the live request.
+
+    A rotation happens *during* somebody's call. The old adapter's connection pool has
+    already been superseded, so a failure closing it is a leak to log rather than an error
+    to raise at a caller who asked for a generation and got a socket teardown instead. A
+    `BaseException` still propagates: cancellation is not ours to swallow.
+    """
+    with contextlib.suppress(Exception):
+        await adapter.aclose()

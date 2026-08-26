@@ -68,8 +68,46 @@ payload-carrying event.
 
 ## A JSONL Trail
 
-An audit trail needs no special support: consume the events directly and have your
-observer serialize each one to a JSONL file.
+An audit trail ships with the library — `JsonlObserver` appends one redacted JSON object
+per line to a file it opens once and holds:
+
+```python
+import anyinfer as ai
+
+with ai.JsonlObserver("telemetry.jsonl") as trail:
+    client.subscribe(trail)
+```
+
+On POSIX the file is created at mode `0600`, since even payload-free telemetry names
+targets, models, and spend. Windows has no equivalent through `chmod` — the file is not
+owner-restricted there, so put it somewhere whose ACL already excludes other accounts. `LoggingObserver` is the same idea aimed at a `logging.Logger`: the
+event name is the message and the full mapping rides as an `anyinfer_event` record
+attribute, so a JSON formatter renders it while a plain one still prints something
+readable.
+
+Neither sink needs code to configure. Both can be named from the
+[shared configuration file](../reference/configuration.md#the-observers-block), which is
+the only way to reach them from the [sidecar](../serve/README.md):
+
+```json
+{
+  "observers": [
+    "logging",
+    {"name": "jsonl", "options": {"path": "/var/log/anyinfer/telemetry.jsonl"}}
+  ]
+}
+```
+
+Sinks are described, not built: loading a configuration file never opens a log file.
+`anyinfer.config.build_observers` constructs them when a frontend decides to observe. A
+config-named sink is always payload-free — the opt-in above is a *code* decision, and a
+file that could be edited into leaking prompt text would be the wrong default. See
+[the ready-made sinks](../reference/api/telemetry.md#ready-made-sinks) for the full
+signatures.
+
+**Writing your own** is still first-class and unchanged: an observer is any object with an
+`on_event` method, and `anyinfer.events.sinks.event_to_dict` is public precisely so a
+third sink can reuse the redacting serializer rather than reinvent it.
 
 ## OpenTelemetry
 
@@ -113,7 +151,10 @@ silent financial error. See
       raises is isolated rather than allowed to fail a generation.
     - `ParameterDropped`, `UsageEstimated`, and `RateLimitWaited` make degradation visible
       that would otherwise look exactly like success.
-    - Payloads are opt-in per observer, and redaction runs before any event is delivered.
+    - Payloads are opt-in per observer, and redaction runs before any event is delivered;
+      a sink named from a configuration file is always payload-free.
+    - `LoggingObserver` and `JsonlObserver` ship with the library and can be named from
+      configuration, so an audit trail needs no code.
     - The OTel bridge consumes the same event contract as your observers, so the two
       paths never disagree and can run side by side.
     - Never record an unknown cost as zero; `cost_usd` is `None` when the price is not

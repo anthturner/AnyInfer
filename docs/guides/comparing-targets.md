@@ -87,7 +87,7 @@ OpenAI-shaped request plus a `targets` array.
 ## From One Comparison to a Diff
 
 `compare()` answers "what does this request become on this target, right now." The
-portability diff tool (`anyinfer.compare_diff`) answers two follow-on questions: did
+portability diff tool (`anyinfer.evaluate.compare_diff`) answers two follow-on questions: did
 that answer just change (regression detection), and what exactly changes in a move from
 A to B (a portability report). It reuses `compare()`'s no-dispatch guarantee: no
 provider is called, and no target is ranked or recommended.

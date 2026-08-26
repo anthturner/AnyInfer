@@ -35,6 +35,7 @@ from ..registry import (
     SetupField,
 )
 from ..types.capabilities import Feature, Health, ModelCapabilities, Sourced
+from ..types.operations import InferenceOperation
 from ..types.requests import ReasoningEffort
 from .base import ProviderConfig, WireRequest
 from .openai_compat import OpenAICompatAdapter
@@ -117,6 +118,12 @@ class CompatPreset:
             `contracts/openai-compat-presets.md`) — **not** inferred from chat
             compatibility. Off by default: an unverified preset is generation-only, the
             correct default per the plan (BH.I.2) rather than an optimistic guess.
+        batches: Whether this preset sells the OpenAI-shaped deferred batch tier
+            (``/files`` + ``/batches``), verified against the provider's own documentation
+            and recorded in the contract snapshot. Off by default under the same rule as
+            `embeddings`: chat compatibility does not imply batch compatibility, and a
+            preset that declares a tier it does not have fails at submit rather than
+            refusing locally.
         note: One-line quirk summary, rendered into the generated provider index.
     """
 
@@ -141,6 +148,7 @@ class CompatPreset:
     default_top_p: float | None = None
     default_port: int | None = None
     embeddings: bool = False
+    batches: bool = False
     note: str = ""
 
 
@@ -198,13 +206,24 @@ class PresetEmbeddingAdapter(OpenAICompatEmbeddingsMixin, PresetCompatAdapter):
 
 
 def _translate_effort(effort: ReasoningEffort | None) -> Mapping[str, Any]:
-    """``reasoning_effort`` pass-through for providers accepting all four levels."""
+    """``reasoning_effort`` pass-through for providers accepting the full OpenAI ladder.
+
+    Including ``none``, which OpenAI's current vocabulary accepts and these providers
+    track. A provider that has not caught up rejects it loudly, which is the right
+    failure: the caller asked for reasoning off, and silently leaving it on would be worse
+    than a 400 naming the value.
+    """
     return {} if effort is None else {"reasoning_effort": effort}
 
 
 def _translate_effort_min_low(effort: ReasoningEffort | None) -> Mapping[str, Any]:
-    """``reasoning_effort`` with ``minimal`` mapped to the provider's lowest level."""
-    if effort is None:
+    """``reasoning_effort`` with ``minimal`` mapped to the provider's lowest level.
+
+    ``none`` is omitted rather than clamped. Clamping it onto ``low`` would ask for more
+    reasoning than the caller wanted — the direction `effort-min-named` exists to avoid —
+    and these providers publish no off value to send instead.
+    """
+    if effort is None or effort == "none":
         return {}
     return {"reasoning_effort": "low" if effort == "minimal" else effort}
 
@@ -217,8 +236,11 @@ def _translate_effort_three_level(effort: ReasoningEffort | None) -> Mapping[str
     documentation differs: these providers publish a three-value enum and validate it,
     whereas ``effort-min-low`` providers merely omit ``minimal`` from a longer ladder.
     Conflating them would lose that distinction the next time either enum moves.
+
+    That validated enum is also why ``none`` is omitted here rather than passed through:
+    these providers would reject it outright.
     """
-    if effort is None:
+    if effort is None or effort == "none":
         return {}
     return {"reasoning_effort": "low" if effort == "minimal" else effort}
 
@@ -229,15 +251,24 @@ def _translate_effort_min_named(effort: ReasoningEffort | None) -> Mapping[str, 
     Requesty documents ``min`` (a synonym for ``none``) alongside low/medium/high.
     Clamping onto ``low`` like the other translators would work but would quietly ask
     for more reasoning than the caller wanted, so the near-homograph is worth honoring.
+    A normalized ``none`` reaches the same ``min``, which is what that synonym means.
     """
     if effort is None:
         return {}
-    return {"reasoning_effort": "min" if effort == "minimal" else effort}
+    return {"reasoning_effort": "min" if effort in ("none", "minimal") else effort}
 
 
 def _translate_reasoning_object(effort: ReasoningEffort | None) -> Mapping[str, Any]:
-    """The gateway-normalized ``reasoning`` object (Vercel AI Gateway)."""
-    return {} if effort is None else {"reasoning": {"effort": effort}}
+    """The gateway-normalized ``reasoning`` object (Vercel AI Gateway).
+
+    ``none`` uses the object's ``enabled: false`` switch: the gateway normalizes across
+    upstream ladders that differ, and the disable flag means the same thing to all of them.
+    """
+    if effort is None:
+        return {}
+    if effort == "none":
+        return {"reasoning": {"enabled": False}}
+    return {"reasoning": {"effort": effort}}
 
 
 def _no_reasoning(effort: ReasoningEffort | None) -> Mapping[str, Any]:
@@ -262,7 +293,11 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         display_name="Groq",
         base_url="https://api.groq.com/openai/v1",
         key_env="GROQ_API_KEY",
-        note="LPU-served open models; rejects logprobs/logit_bias-style parameters.",
+        batches=True,
+        note=(
+            "LPU-served open models; rejects logprobs/logit_bias-style parameters. "
+            "Sells a discounted deferred batch tier at the OpenAI-shaped endpoints."
+        ),
     ),
     CompatPreset(
         id="cerebras",
@@ -1304,6 +1339,21 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
     )
 
 
+def _operations(preset: CompatPreset) -> frozenset[InferenceOperation]:
+    """Which operations this preset's verified endpoints actually cover.
+
+    Every preset shares one adapter, so the class implementing a protocol says nothing
+    about whether this provider sells that tier — the declaration is the only gate, and
+    it follows the contract snapshot rather than chat compatibility.
+    """
+    operations: set[InferenceOperation] = {"generation"}
+    if preset.embeddings:
+        operations.add("embedding")
+    if preset.batches:
+        operations.add("batch")
+    return frozenset(operations)
+
+
 def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
     """Materialize one preset into a registrable descriptor."""
     adapter_class = PresetEmbeddingAdapter if preset.embeddings else PresetCompatAdapter
@@ -1315,11 +1365,7 @@ def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
         locality=preset.locality,
         default_base_url=preset.base_url,
         requires_base_url=preset.requires_base_url,
-        operations=(
-            frozenset({"generation", "embedding"})
-            if preset.embeddings
-            else frozenset({"generation"})
-        ),
+        operations=_operations(preset),
         setup=_setup_spec(preset),
         default_capabilities=ModelCapabilities(
             features=Sourced(preset.features, "default"),

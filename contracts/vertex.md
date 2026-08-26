@@ -134,7 +134,47 @@ gecko model). Output dimensions: up to 3,072 for `gemini-embedding-001`, up to 7
 `text-embedding-005` and `text-multilingual-embedding-002` (declared as `dimensions`,
 the default when `outputDimensionality` is not set).
 
+## Deferred batches
+
+### Endpoints
+- `POST {base}/projects/{p}/locations/{l}/batchPredictionJobs` — create
+- `GET {base}/{jobName}` — poll · `POST {base}/{jobName}:cancel` — cancel
+- `POST https://storage.googleapis.com/upload/storage/v1/b/{bucket}/o?uploadType=media` —
+  stage the input · `GET https://storage.googleapis.com/storage/v1/b/{bucket}/o/{key}?alt=media`
+  — read the predictions
+
+Both storage calls carry the same OAuth bearer the API does.
+
+### Shape
+`BatchPredictionJob` does not carry the job: input and output are JSONL objects in the
+caller's own bucket, configured as `batch_gcs_uri`. Input lines are `{"request": {...}}`
+where the inner object is the live `generateContent` body; predictions are
+`{"request", "response"}` or `{"request", "status"}` in one file.
+
+There is **no `custom_id` field**, so a submitted line's id rides in the request body's
+`labels` under `anyinfer_line_id`. The predictions file echoes the request back verbatim,
+which is the only channel the API leaves for pairing an answer with the row that asked
+for it.
+
+The output directory is *not* the prefix that was requested: Vertex appends a timestamped
+directory of its own naming and reports the result in `outputInfo.gcsOutputDirectory`,
+which is read back at fetch rather than predicted. `JOB_STATE_PARTIALLY_SUCCEEDED` maps to
+`completed`, for the same reason Bedrock's `PartiallyCompleted` does.
+
+### Server-side tools
+Declared identically to Gemini (`web_search`, `code_execution`) because this adapter *is*
+the Gemini adapter pointed at a Vertex endpoint and does not override tool encoding — the
+`googleSearch` and `codeExecution` blocks it emits are byte-identical.
+
 ## Watchlist
+
+- **Server-side tools are not claimed here, though the adapter inherits Gemini's
+  projection.** Vertex has published a different spelling for grounded search than the
+  Gemini API at various points (`googleSearchRetrieval` versus `googleSearch`), and the
+  current one has not been verified against Google's own documentation. The descriptor
+  therefore declares no `server_tools`, so a request naming one is refused locally rather
+  than sent as a block Vertex may reject. Verify the spelling on the next drift run and
+  declare it then. Noted 2026-08-25.
 - **Claude on Vertex** uses `rawPredict`/`streamRawPredict` with the Anthropic Messages
   body and an `anthropic_version` field — a different surface this adapter does not cover.
   Reachable today by pointing the **anthropic** adapter's `base_url` at it.
@@ -149,3 +189,6 @@ the default when `outputDimensionality` is not set).
   `publishers.models` alongside `predict` — not documented in the how-to guide used
   here, so not assumed to be a live alternate surface for any current model. Re-check
   if a future embedding model's docs point at it instead of `:predict`.
+- **Batch prediction is not verified live.** The job shape, the label echo, and the
+  `outputInfo` directory are read from Google's published reference rather than from
+  a run against a real project. Noted 2026-08-25.
