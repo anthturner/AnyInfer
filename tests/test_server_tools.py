@@ -711,3 +711,100 @@ def test_openai_code_logs_reach_the_caller() -> None:
     )
     delta = next(e for e in produced if isinstance(e, ServerToolDelta))
     assert (delta.status, delta.output) == ("completed", "hello\n")
+
+
+# ---- the invocation is a priced line item ----------------------------------------------------
+#
+# A generation that searched costs more than its token counts say. The rate is a *provider*
+# fact rather than a per-model one — one search costs the same whichever model asked — so it
+# is declared once per provider in the pricing table and applied to every entry under it.
+
+
+def _table(rates: dict[str, object]) -> object:
+    from anyinfer.capabilities.pricing_table import PricingTable
+
+    return PricingTable.from_mapping(
+        {
+            "format_version": 1,
+            "server_tools": rates,
+            "providers": {
+                "anthropic": [
+                    {
+                        "model": "claude-sonnet-4-5",
+                        "input_per_1m": "3",
+                        "output_per_1m": "15",
+                        "last_verified": "2026-08-25",
+                        "source": "https://example.test/pricing",
+                    }
+                ]
+            },
+        }
+    )
+
+
+def test_a_declared_rate_reaches_every_model_of_that_provider() -> None:
+    from decimal import Decimal
+
+    table = _table(
+        {
+            "anthropic": {
+                "web_search": {
+                    "per_use": "0.01",
+                    "last_verified": "2026-08-25",
+                    "source": "https://example.test/pricing",
+                }
+            }
+        }
+    )
+    priced = table.lookup("anthropic", "claude-sonnet-4-5")
+    assert priced.value.per_server_tool_use == {"web_search": Decimal("0.01")}
+
+
+def test_a_declared_rate_is_added_to_the_cost_of_a_generation_that_searched() -> None:
+    from decimal import Decimal
+
+    from anyinfer.capabilities.pricing import compute_cost
+
+    table = _table(
+        {
+            "anthropic": {
+                "web_search": {
+                    "per_use": "0.01",
+                    "last_verified": "2026-08-25",
+                    "source": "https://example.test/pricing",
+                }
+            }
+        }
+    )
+    capabilities = ModelCapabilities(pricing=table.lookup("anthropic", "claude-sonnet-4-5"))
+    usage = ai.Usage(
+        input_tokens=1_000_000, output_tokens=0, server_tool_uses={"web_search": 3}
+    )
+    # A million prompt tokens at $3, plus three searches at a cent each.
+    assert compute_cost(usage, capabilities) == Decimal("3.03")
+
+
+def test_an_unpriced_invocation_makes_the_whole_cost_unknown_rather_than_free() -> None:
+    """An unpriced search makes the total unknown, not free.
+
+    Reporting the token figure as the total understates the bill, which is the one
+    direction a cost-aware caller cannot afford.
+    """
+    from anyinfer.capabilities.pricing import compute_cost
+
+    capabilities = ModelCapabilities(
+        pricing=_table({}).lookup("anthropic", "claude-sonnet-4-5")
+    )
+    searched = ai.Usage(
+        input_tokens=1_000, output_tokens=10, server_tool_uses={"web_search": 1}
+    )
+    assert compute_cost(searched, capabilities) is None
+    # The same generation without a search prices normally, so this is about the rate
+    # being missing rather than about the entry being unusable.
+    assert compute_cost(ai.Usage(input_tokens=1_000, output_tokens=10), capabilities) is not None
+
+
+def test_a_rate_without_a_date_and_source_is_refused_like_every_other_price() -> None:
+    """Same discipline as a token rate: an unverified figure cannot be added quietly."""
+    with pytest.raises(ai.ConfigError, match="missing field"):
+        _table({"anthropic": {"web_search": {"per_use": "0.01"}}})
