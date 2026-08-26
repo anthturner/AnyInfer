@@ -1,7 +1,20 @@
 {
-  // A directory, rather than an OS-specific executable: the Python extension resolves
-  // .venv/Scripts/python.exe on Windows and .venv/bin/python on macOS/Linux.
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  // No `python.defaultInterpreterPath` on purpose. It used to name the `.venv`
+  // *directory*, on the assumption that each extension would resolve it to
+  // Scripts/python.exe or bin/python per platform. The Python extension does; Ruff and
+  // Mypy Type Checker do not — they spawn the configured path verbatim, which on POSIX
+  // means exec'ing a directory:
+  //
+  //   Resolved Python executable for Ruff lookup: '.../AnyInfer/.venv'
+  //   Error while trying to find the Ruff binary: Error: spawn .../AnyInfer/.venv EACCES
+  //
+  // Both then fell back — Ruff to its bundled binary, Mypy to nothing at all ("could not
+  // connect to server") — so the editor silently stopped agreeing with `workspace check`,
+  // which is the one thing `importStrategy: fromEnvironment` below exists to guarantee.
+  // An OS-specific path would fix POSIX and break Windows, and settings.json has no
+  // per-platform mechanism for this key (tasks.json does, and uses it). Omitting the key
+  // is the portable answer: the Python extension discovers `${workspaceFolder}/.venv` on
+  // every platform without being told.
 
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": ["tests"],
