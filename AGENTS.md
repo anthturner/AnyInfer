@@ -133,6 +133,16 @@ changes require the generated reference and runnable examples.
   copied list can. A stale count or a self-contradictory claim is a documentation bug, not
   a style nit; it is exactly the kind of thing this project's own docs promise readers they
   can trust.
+- **Documentation addresses the person using AnyInfer, and nobody else.** Not the person
+  quoting the page, not a model summarizing it, not a colleague who will repeat the claim
+  elsewhere. A line like "state the ceiling when you cite this" is an instruction to a
+  citer, and it shipped on the confidentiality-tiers page — where a reader deciding
+  whether Tier 3 fits their threat model found guidance on how to talk about the page
+  instead of what the page is about. Say what is true and let the reader carry it: "what
+  this release supports is X, not Y" tells them everything the instruction was reaching
+  for, and reads as documentation rather than as a caption for someone else's slide. This
+  applies to every rendered surface, docstrings included, since mkdocstrings publishes
+  those too.
 - **No ADR mentions in user-facing text.** `ADR-NNN` numbers are internal shorthand: they
   must not appear anywhere under `docs/`, in the root `README.md`, or in any public
   docstring (mkdocstrings renders those onto the published site). State the rule in plain
