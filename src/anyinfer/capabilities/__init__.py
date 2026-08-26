@@ -31,6 +31,11 @@ from .probes import (
     ProbeOutcome,
     ProbeReport,
 )
+from .remote_tokenizers import (
+    AnthropicCountTokensEstimator,
+    LlamaServerTokenizeEstimator,
+    PrewarmsCounts,
+)
 from .tokenizers import (
     DEFAULT_ENCODING,
     TargetAwareTokenEstimator,
@@ -46,11 +51,14 @@ __all__ = [
     "DEFAULT_PROBE_FEATURES",
     "PROBEABLE_FEATURES",
     "TRUSTED_PROVENANCE",
+    "AnthropicCountTokensEstimator",
     "CapabilityStore",
     "ContextBudget",
     "CostEstimate",
     "FeatureProbe",
     "HeuristicTokenEstimator",
+    "LlamaServerTokenizeEstimator",
+    "PrewarmsCounts",
     "PricingEntry",
     "PricingTable",
     "ProbeOutcome",

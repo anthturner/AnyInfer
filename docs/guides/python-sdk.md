@@ -170,11 +170,23 @@ without the search you asked for is a different answer built from stale training
 and it looks exactly like a good one. Two things are checked: whether this library has a
 wire form for that provider at all, and whether the model itself supports it.
 
-`ServerToolUse` carries a count and nothing else. What the provider searched for is your
-own content and its reasoning about it; the count is what you actually need, because the
-question a result must answer here is how many invocations you just paid for. Streaming
-callers get a `ServerToolDelta` when one starts and finishes, which is what distinguishes
-a pause for a slow search from a stalled connection.
+`ServerToolUse` carries a count, because the question a *result* must answer here is how
+many invocations you paid for. What the tool actually returned arrives on the stream:
+`ServerToolDelta` fires when one starts and again when it finishes, carrying the sources a
+search consulted and the output a code execution printed.
+
+```python
+async for event in stream:
+    if isinstance(event, ai.ServerToolDelta) and event.status == "completed":
+        for source in event.sources:
+            print(f"  {source.title} — {source.url}")
+```
+
+The start event is what distinguishes a pause for a slow search from a stalled
+connection; the sources on the finish event are what let you render a grounded answer
+*with* its grounding, rather than asking the reader to take it on faith. Neither is a
+content event, so a search that runs before any text is written does not start the
+first-token clock.
 
 ## Run a Batch at Half Price
 
@@ -200,10 +212,32 @@ effort its live twin would. That is the whole argument for batching *through* th
 rather than around it: the typed request model and cost accounting are more valuable on
 your highest-volume traffic, not less.
 
-Anthropic and OpenAI are both bound. Their APIs differ in shape — Anthropic takes the
-whole job as JSON, while OpenAI uploads it as a file and returns results as two more, one
-for successes and one for rejections — but that difference stays behind the interface: the
-same four calls work against either.
+Five providers are bound, across three genuinely different lifecycle shapes, and all of
+it stays behind the same four calls:
+
+| Provider | How the job travels |
+| --- | --- |
+| Anthropic | The whole job as one JSON request |
+| OpenAI, Groq | Uploaded as a file; results come back as two more, successes and rejections |
+| Bedrock, Vertex | Staged as an object in **your own** S3 or GCS bucket, referenced by URI |
+
+The third shape needs one piece of configuration the others do not, because those APIs
+never carry a batch over the wire at all:
+
+```python
+ai.ProviderSettings.of(
+    "bedrock",
+    options={
+        "region": "us-east-1",
+        "batch_s3_uri": "s3://my-bucket/anyinfer",
+        "batch_role_arn": "arn:aws:iam::...:role/AnyInferBatch",
+    },
+)
+```
+
+The bucket is yours. AnyInfer writes the input object, submits the job, and reads the
+answers back; it never creates or manages storage on your account. Vertex takes a single
+`batch_gcs_uri` the same way.
 
 The handle is yours to persist. Run retention is a stated non-goal, and a job answered
 hours later in another process is exactly where it would be most tempting to break it —

@@ -36,6 +36,12 @@ budget calculator are explained in
 
 ::: anyinfer.TiktokenEstimator
 
+::: anyinfer.AnthropicCountTokensEstimator
+
+::: anyinfer.LlamaServerTokenizeEstimator
+
+::: anyinfer.PrewarmsCounts
+
 ::: anyinfer.TargetAwareTokenEstimator
 
 ::: anyinfer.RequestEstimate

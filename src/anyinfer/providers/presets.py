@@ -35,6 +35,7 @@ from ..registry import (
     SetupField,
 )
 from ..types.capabilities import Feature, Health, ModelCapabilities, Sourced
+from ..types.operations import InferenceOperation
 from ..types.requests import ReasoningEffort
 from .base import ProviderConfig, WireRequest
 from .openai_compat import OpenAICompatAdapter
@@ -1338,6 +1339,21 @@ def _setup_spec(preset: CompatPreset) -> ProviderSetupSpec:
     )
 
 
+def _operations(preset: CompatPreset) -> frozenset[InferenceOperation]:
+    """Which operations this preset's verified endpoints actually cover.
+
+    Every preset shares one adapter, so the class implementing a protocol says nothing
+    about whether this provider sells that tier — the declaration is the only gate, and
+    it follows the contract snapshot rather than chat compatibility.
+    """
+    operations: set[InferenceOperation] = {"generation"}
+    if preset.embeddings:
+        operations.add("embedding")
+    if preset.batches:
+        operations.add("batch")
+    return frozenset(operations)
+
+
 def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
     """Materialize one preset into a registrable descriptor."""
     adapter_class = PresetEmbeddingAdapter if preset.embeddings else PresetCompatAdapter
@@ -1349,11 +1365,7 @@ def _descriptor(preset: CompatPreset) -> ProviderDescriptor:
         locality=preset.locality,
         default_base_url=preset.base_url,
         requires_base_url=preset.requires_base_url,
-        operations=frozenset(
-            {"generation"}
-            | ({"embedding"} if preset.embeddings else set())
-            | ({"batch"} if preset.batches else set())
-        ),
+        operations=_operations(preset),
         setup=_setup_spec(preset),
         default_capabilities=ModelCapabilities(
             features=Sourced(preset.features, "default"),

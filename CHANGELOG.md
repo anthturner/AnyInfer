@@ -29,14 +29,19 @@ never rewritten.
 - The sidecar serves `POST /v1/responses`, OpenAI's current-generation dialect, with
   its semantic streaming events — so a Responses-first SDK no longer 404s.
 - Provider-run tools: `server_tools=` asks a target to search the web or run code inside
-  one request, with invocation counts reported back and priced.
-- Deferred batch inference at a provider's discounted batch tier, via `submit_batch()`,
-  `batch_status()`, and `fetch_batch()`, bound for Anthropic and OpenAI.
+  one request, and `ServerToolDelta` carries back what it found.
+- Deferred batch inference at a provider's discounted tier, via `submit_batch()`,
+  `batch_status()`, and `fetch_batch()`.
+- Exact token counts from Anthropic's count-tokens endpoint and llama-server's
+  `/tokenize`, alongside the local tokenizers.
 - Telemetry sinks, plugin groups, proxy and TLS settings, and a decision log.
 - The confidential Relay paces and bounds its own traffic: pooled provider pacing,
   per-tenant admission limits, and 429s carrying `Retry-After` and `RateLimit-*` headers.
 
 ### Fixed
+- Batched OpenAI lines target `/v1/responses`; the unversioned path was rejected at
+  submit.
+- `Client.fetch_batch()` forwards `schema=`, matching its async counterpart.
 - The demo app no longer persists literal API keys, and writes its configuration with
   owner-only permissions.
 - The confidential Relay is authenticated, and its key material is written with

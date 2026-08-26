@@ -864,7 +864,9 @@ def _batch_arguments(fragment: str) -> Mapping[str, Any]:
 
 def _events_from_message(
     message: Mapping[str, Any], state: _StreamState
-) -> Iterable[TextDelta | ReasoningDelta | ToolCallDelta | CitationDelta | UsageUpdate]:
+) -> Iterable[
+    TextDelta | ReasoningDelta | ToolCallDelta | CitationDelta | ServerToolDelta | UsageUpdate
+]:
     """Translate a buffered message body into the events a stream would have produced."""
     usage = _parse_usage(message.get("usage"))
     if usage is not None:

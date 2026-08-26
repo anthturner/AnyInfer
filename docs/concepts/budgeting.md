@@ -109,12 +109,48 @@ client = ai.Client(providers, estimator=ai.TiktokenEstimator("cl100k_base"))
 ```
 
 Anything else plugs in through the `TokenEstimator` protocol, and an estimator that
-implements `for_model()` is specialized per target the same way this one is. Two more
-accurate sources — a provider's own count-tokens endpoint and llama-server's `/tokenize` —
-are deliberately **not** shipped: the protocol is synchronous, and a blocking HTTP call
-inside an async client stalls the event loop for every concurrent request. Making them work
-means an async estimator protocol, which is a change to make deliberately rather than
-smuggle in behind a blocking call.
+implements `for_model()` is specialized per target the same way this one is.
+
+### Counting Against a Tokenizer You Cannot Run
+
+Anthropic's vocabulary is not published, and neither is that of whatever quantized GGUF a
+local server happens to be holding. For those two, the exact count has to come from the
+service that owns the tokenizer:
+
+```python
+client = ai.AsyncClient(
+    providers,
+    estimator=ai.AnthropicCountTokensEstimator(api_key=key, model="claude-sonnet-4-5"),
+)
+```
+
+These need a round trip, and `TokenEstimator.estimate` is synchronous — a blocking HTTP
+call underneath it would stall the event loop for every other request in flight. So the
+*fetch* moves ahead of the counting instead: an async client awaits one warm-up call
+before it starts sizing, and the synchronous counting that follows reads what came back.
+Nothing about that is visible at the call site; you configure the estimator and the client
+does the rest.
+
+Two consequences worth knowing. A text that was not warmed falls back to the byte
+heuristic rather than blocking, so an unusual code path gets a worse number and never a
+stalled loop. And a counting service that is down degrades the same way — a request that
+could have been sized approximately should not fail outright for want of an exact number.
+
+`LlamaServerTokenizeEstimator` does the same against a supervised llama-server's
+`/tokenize`, where the tokenizer is the one loaded with the weights.
+
+### When a Floor Is Actually Exact
+
+Being an exact counter is not enough to make a floor exact — it has to be exact *for the
+target being counted*. A `tiktoken` estimator pointed at Claude produces a confident
+number from the wrong vocabulary.
+
+So each provider declares which counting strategy its models use, on
+`TokenCalibration.tokenizer`, with a provenance like every other capability claim. The
+gate treats a floor as certain only when the estimator implements that strategy **and**
+the declaration carries trusted provenance. A `default`-provenance guess about which
+tokenizer applies is not enough, because the gate *refuses* on the floor — and a floor
+that over-claims turns into a refused request that would have fit.
 
 ## When the Provider Bills for More Than You Sent
 

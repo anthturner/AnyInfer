@@ -116,7 +116,7 @@ class OpenAIBatchMixin:
         A batch is answered whole, so `stream` is meaningless and the API rejects it.
         Everything else is identical, which is the point of reusing `build_payload`.
         """
-        body = self.build_payload(line)  # type: ignore[attr-defined]
+        body: dict[str, Any] = self.build_payload(line)  # type: ignore[attr-defined]
         body.pop("stream", None)
         body.pop("stream_options", None)
         return body
@@ -229,7 +229,7 @@ class OpenAIBatchMixin:
             raise self._classify(  # type: ignore[attr-defined]
                 response.status_code, read_error_detail(response.content), response.headers
             )
-        return response.text
+        return str(response.text)
 
     def _parse_lines(self, jsonl: str, *, ok: bool) -> Iterable[BatchLine]:
         """Parse one manifest file, one entry per submitted request."""

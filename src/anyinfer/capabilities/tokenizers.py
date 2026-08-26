@@ -126,7 +126,7 @@ def _kind_applies(estimator: TokenEstimator, calibration: TokenCalibration) -> b
     if kind is None:
         # Not an exact estimator at all; nothing to mismatch, and nothing to claim.
         return calibration.tokenizer is None
-    return kind == calibration.tokenizer
+    return bool(kind == calibration.tokenizer)
 
 
 class TiktokenEstimator:
