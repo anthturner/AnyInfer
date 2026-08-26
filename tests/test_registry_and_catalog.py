@@ -640,7 +640,7 @@ class TestEveryProviderIsWellFormed:
     to satisfy them without anyone remembering to add a test.
     """
 
-    def test_every_provider_is_instantiable(self) -> None:
+    async def test_every_provider_is_instantiable(self) -> None:
         """A descriptor whose factory raises is a provider that exists only in a list.
 
         `ConfigError` is the one acceptable failure and is not a defect: it is how an
@@ -665,13 +665,22 @@ class TestEveryProviderIsWellFormed:
                 transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
             )
             try:
-                assert descriptor.factory(config) is not None
+                adapter = descriptor.factory(config)
             except ConfigError:
                 continue
             except Exception as exc:
                 raise AssertionError(
                     f"{descriptor.id} failed to build: {type(exc).__name__}: {exc}"
                 ) from exc
+            assert adapter is not None
+            # Closed, not merely built. Some adapters own more than an HTTP client — the
+            # Copilot one spawns a CLI process — and a mock transport does nothing about a
+            # child process. Left running, it resurfaces as an unraisable ResourceWarning
+            # inside whichever test the collector interrupts: a failure in another file,
+            # on one interpreter, with no visible cause.
+            closer = getattr(adapter, "aclose", None)
+            if closer is not None:
+                await closer()
 
     def test_every_default_base_url_is_absolute_https_or_loopback(self) -> None:
         """A relative or scheme-less default silently becomes a different request."""
