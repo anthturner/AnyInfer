@@ -12,6 +12,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -58,10 +59,67 @@ def validate(path: Path = PRICING_PATH) -> list[str]:
                 problems.append(f"{where}: source must be an https URL")
             if entry.pricing.input_per_1m == 0 and entry.pricing.output_per_1m == 0:
                 problems.append(f"{where}: zero prices belong to local engines, not table entries")
+    problems.extend(_server_tool_problems(data, today))
+
     try:
         problems.extend(validate_policies(load_bundled(data)))
     except (KeyError, TypeError, ValueError) as error:
         problems.append(f"coverage policy validation failed: {error}")
+    return problems
+
+
+def _server_tool_problems(data: dict, today: _dt.date) -> list[str]:
+    """Apply the token-rate discipline to per-invocation rates.
+
+    Read from the raw document rather than through the table, because the loader keeps
+    only the rate itself — the date and source exist to be audited here, and dropping
+    them into the loader's return type would put audit metadata on every priced call.
+
+    Without this, a search rate could land with a date in the future and a source that is
+    not a URL and still pass the gate, which is precisely the discipline the block was
+    added to inherit rather than to sit beside.
+    """
+    block = data.get("server_tools")
+    if block is None:
+        return []
+    if not isinstance(block, dict):
+        return ["server_tools must be a mapping of provider id to rates"]
+
+    problems: list[str] = []
+    for provider, rates in block.items():
+        if not isinstance(rates, dict):
+            problems.append(f"server_tools:{provider}: must be an object")
+            continue
+        for kind, entry in rates.items():
+            if kind.startswith("_"):
+                continue
+            where = f"server_tools:{provider}:{kind}"
+            if not isinstance(entry, dict):
+                problems.append(f"{where}: must be an object")
+                continue
+
+            verified_raw = entry.get("last_verified")
+            try:
+                verified = _dt.date.fromisoformat(str(verified_raw))
+            except ValueError:
+                problems.append(f"{where}: last_verified {verified_raw!r} is not ISO")
+            else:
+                if verified > today:
+                    problems.append(f"{where}: last_verified {verified} is in the future")
+
+            source = entry.get("source")
+            if not isinstance(source, str) or not source.startswith("https://"):
+                problems.append(f"{where}: source must be an https URL")
+
+            # Zero is not a rate a provider charges; it is a rate nobody filled in. An
+            # entry that means "free" should be absent, which prices the call as unknown
+            # rather than asserting a number.
+            raw_rate = entry.get("per_use")
+            try:
+                if Decimal(str(raw_rate)) <= 0:
+                    problems.append(f"{where}: per_use must be positive, not {raw_rate!r}")
+            except (ArithmeticError, InvalidOperation):
+                problems.append(f"{where}: per_use {raw_rate!r} is not a decimal string")
     return problems
 
 

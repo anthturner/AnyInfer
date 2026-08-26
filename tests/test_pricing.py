@@ -333,3 +333,63 @@ def test_fetch_pricing_rejects_a_malformed_document() -> None:
     )
     with pytest.raises(ConfigError):
         fetch_pricing("https://fake.invalid/pricing.json", transport=transport)
+
+
+# ---- per-invocation rates inherit the token-rate discipline ----------------------------------
+#
+# The block was added so provider-run tools could be priced. It would be worth little if a
+# rate could arrive with a date nobody earned and a source nobody can open — that discipline
+# is the reason the table is trustworthy at all.
+
+
+def _with_server_tools(rate: dict[str, object]) -> list[str]:
+    import json
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import validate_pricing
+
+    data = json.loads(validate_pricing.PRICING_PATH.read_text(encoding="utf-8"))
+    data["server_tools"] = {"anthropic": {"web_search": rate}}
+    probe = Path(__file__).resolve().parent.parent / "build" / "pricing_probe.json"
+    probe.parent.mkdir(exist_ok=True)
+    probe.write_text(json.dumps(data), encoding="utf-8")
+    try:
+        return validate_pricing.validate(probe)
+    finally:
+        probe.unlink(missing_ok=True)
+
+
+_GOOD = {"per_use": "0.01", "last_verified": "2026-08-20", "source": "https://example.test/p"}
+
+
+def test_a_well_formed_rate_passes() -> None:
+    assert _with_server_tools(dict(_GOOD)) == []
+
+
+def test_a_date_nobody_earned_is_refused() -> None:
+    problems = _with_server_tools({**_GOOD, "last_verified": "2099-01-01"})
+    assert any("is in the future" in problem for problem in problems)
+
+
+def test_a_source_nobody_can_open_is_refused() -> None:
+    problems = _with_server_tools({**_GOOD, "source": "somebody-told-me"})
+    assert any("must be an https URL" in problem for problem in problems)
+
+
+def test_a_zero_rate_is_refused_because_free_is_spelled_by_absence() -> None:
+    """A zero asserts a number; an absent kind reports the cost as unknown."""
+    problems = _with_server_tools({**_GOOD, "per_use": "0"})
+    assert any("must be positive" in problem for problem in problems)
+
+
+def test_the_block_is_optional() -> None:
+    """The shipped table carries no rates yet, and that is a valid table."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import validate_pricing
+
+    assert validate_pricing.validate() == []
