@@ -194,6 +194,34 @@ class TestVerbs:
         assert "gh api --method DELETE" in workflow
         assert "artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}" in workflow
 
+    def test_claude_action_jobs_can_request_oidc_tokens(self):
+        """Every Claude action job must expose GitHub's OIDC environment variables."""
+        action = "uses: anthropics/claude-code-action@"
+        checked: list[str] = []
+
+        for path in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+            lines = path.read_text(encoding="utf-8").splitlines()
+            job_start = 0
+            for index, line in enumerate(lines):
+                if re.fullmatch(r"  [A-Za-z0-9_-]+:", line):
+                    job_start = index
+                if action not in line:
+                    continue
+
+                job_header = lines[job_start].strip()
+                job_prefix = lines[job_start:index]
+                grants_oidc = any(
+                    line.split("#", 1)[0].rstrip() == "      id-token: write"
+                    for line in job_prefix
+                )
+                assert grants_oidc, (
+                    f"{path.name} job {job_header} uses claude-code-action without "
+                    "id-token: write"
+                )
+                checked.append(f"{path.name}:{job_header}")
+
+        assert checked, "no Claude action jobs were checked"
+
     def test_check_announces_each_phase_with_a_heading(self, recorded, capsys):
         assert workspace.main(["check"]) == 0
         output = capsys.readouterr().out
