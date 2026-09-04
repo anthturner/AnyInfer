@@ -63,6 +63,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write # exchange for the Claude GitHub App token
     needs: check
     if: needs.check.outputs.drift == 'true' || inputs.force_propose
     runs-on: ubuntu-latest

@@ -135,6 +135,7 @@ jobs:
       contents: write        # push the entry onto the feature branch
       actions: write         # re-dispatch CI if a pull request is already open
       pull-requests: read    # ...and to find out whether one is
+      id-token: write        # exchange for the Claude GitHub App token
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
