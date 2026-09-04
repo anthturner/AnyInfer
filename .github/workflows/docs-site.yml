@@ -45,7 +45,7 @@ jobs:
       # Same installer as CI, for the same reason: the ~1 GB `[all,dev]` environment is
       # this job's entire cost, and uv's cache hardlinks it into place instead of
       # re-unpacking it on every deploy.
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
