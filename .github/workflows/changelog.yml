@@ -155,6 +155,10 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The pricing and contract-drift workflows open their pull requests as the
+          # Claude app, so the `opened` event's actor is that bot and the action's
+          # human-actor gate would otherwise refuse to draft their entries.
+          allowed_bots: claude
           claude_args: "--allowedTools Bash,Read,Edit,Write"
           prompt: |
             Add this branch's changelog entries to the `## Unreleased` section of
@@ -215,6 +219,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: claude
           claude_args: "--allowedTools Bash,Read,Edit,Write"
           prompt: |
             The `## ${{ needs.mode.outputs.version }}` section of CHANGELOG.md does not
