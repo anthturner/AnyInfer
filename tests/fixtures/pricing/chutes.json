@@ -9,7 +9,7 @@
     {"id": "moonshotai/Kimi-K2.6-TEE", "pricing": {"prompt": 0.58, "completion": 3.4}},
     {"id": "moonshotai/Kimi-K3-TEE", "pricing": {"prompt": 3.0, "completion": 15.0}},
     {"id": "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE", "pricing": {"prompt": 0.2989, "completion": 1.1957}},
-    {"id": "deepseek-ai/DeepSeek-V4-Flash-0731-TEE", "pricing": {"prompt": 0.14, "completion": 0.28}},
+    {"id": "deepseek-ai/DeepSeek-V4-Flash-0731-TEE", "pricing": {"prompt": 0.44, "completion": 1.32}},
     {"id": "unsloth/Mistral-Nemo-Instruct-2407-TEE", "pricing": {"prompt": 0.0245, "completion": 0.0978}},
     {"id": "zai-org/GLM-5.2-TEE", "pricing": {"prompt": 1.25, "completion": 3.95}},
     {"id": "Nemotron-3-Nano-Omni-30B-TEE", "pricing": {"prompt": 0.0245, "completion": 0.0978}},
