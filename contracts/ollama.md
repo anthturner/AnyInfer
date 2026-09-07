@@ -1,11 +1,11 @@
 # ollama — Protocol Contract
 
 Status: M1 adapter — **implemented** (native API, not the /v1 compat layer).
-Last verified: 2026-08-05 (generation) — code survey of the sibling projects; adapter
-implemented against this snapshot. **Not yet verified against live provider documentation**
-for the generation endpoints — run the drift check before relying on them.
+Last verified: 2026-09-07 (generation) — live-verified against all five Upstream sources
+below. Findings from this run: contract-drift/2026-09-07.
 Embeddings section last verified: 2026-08-11 — fetched live against
-`docs.ollama.com/api/embed` and the GitHub `docs/api.md`.
+`docs.ollama.com/api/embed` and the GitHub `docs/api.md`; re-checked 2026-09-07 against the
+same two sources with no change found.
 
 ## Upstream sources
 - https://github.com/ollama/ollama/blob/main/docs/api.md
@@ -31,14 +31,37 @@ Embeddings section last verified: 2026-08-11 — fetched live against
 - None; behavior tracked via release notes
 ### Request fields
 - `model`, `messages`, `stream`, `format` (JSON-schema object for grammar-enforced
-  structured output, or `"json"`), `think` (bool or effort for reasoning models),
-  `keep_alive` (session retention, e.g. `"10m"`), `options: {num_predict, temperature,
-  top_p, stop, seed, presence_penalty, frequency_penalty, num_ctx, num_gpu}`
-  (the last three sampling keys added 2026-08-25). `/api/chat` defines no
-  log-probability field at all, so the descriptor declares `logprobs` in
-  `ignored_parameters` rather than the adapter dropping it silently. Verified 2026-08-10: vision-capable models accept
-  base64 image strings in `messages[].images`. The native chat API does not define URL,
-  document, or audio inputs, so those are refused before transport.
+  structured output, or `"json"`), `keep_alive` (session retention, e.g. `"10m"`).
+- **`think` — resolved 2026-09-07** (was Watchlist "effort levels vs boolean"): confirmed
+  bool *or* one of the string levels `"low"`, `"medium"`, `"high"`, `"max"` (no `"xhigh"`,
+  unlike Anthropic's effort enum). Verified against https://docs.ollama.com/api/chat.
+- **`logprobs`/`top_logprobs` — DRIFT, found 2026-09-07.** `docs.ollama.com/api/chat` now
+  documents top-level request fields `logprobs` (bool, "whether to return log probabilities
+  of the output tokens") and `top_logprobs` (int, count of most-likely tokens per
+  position), plus a `logprobs` response array. This directly contradicts the snapshot's
+  prior claim that "`/api/chat` defines no log-probability field at all," which is why
+  `logprobs` was declared in `ignored_parameters`. **Adapter follow-up needed** (not
+  changed here): if confirmed live against a running server, `ignored_parameters` should
+  drop `logprobs`/`top_logprobs` and the response mapping should read the new field.
+  Verified against https://docs.ollama.com/api/chat.
+- **`tools` — NEW-CAPABILITY, found 2026-09-07.** `/api/chat` now documents a top-level
+  `tools` array ("optional list of function tools the model may call during the chat"),
+  not previously recorded here. Verified against https://docs.ollama.com/api/chat.
+- **`options` object — DRIFT, found 2026-09-07.** The live, verbatim key list on
+  `docs.ollama.com/api/chat` is `seed, temperature, top_k, top_p, min_p, stop, num_ctx,
+  num_predict` — it no longer lists `presence_penalty`, `frequency_penalty`, or `num_gpu`
+  (which this snapshot recorded as "added 2026-08-25"), and it now lists `top_k` and
+  `min_p`, which were not recorded at all. This may be a documentation-completeness gap
+  rather than a real removal (Ollama's `options` often passes through to the runtime and
+  isn't always exhaustively documented) — **flagged, not asserted as removed**. Proposed
+  action: confirm against a live server's accepted/rejected options before changing the
+  adapter's option set.
+- Verified 2026-08-10, unchanged 2026-09-07: vision-capable models accept base64 image
+  strings in `messages[].images`. The native chat API does not define URL, document, or
+  audio inputs, so those are refused before transport.
+- **`images` response field — NEW-CAPABILITY, found 2026-09-07.** The response `message`
+  object may now include an `images` array (base64-encoded response images), not
+  previously recorded. Verified against https://docs.ollama.com/api/chat.
 ### Pull request/response fields
 - Request: `{"model": "<name>", "stream": true}`
 - Response: NDJSON lines carrying `status` (phase text), and per **layer**
@@ -86,9 +109,19 @@ Embeddings section last verified: 2026-08-11 — fetched live against
 ## Watchlist
 - Schema-projection quirks: llama.cpp grammar limits under `format` (the adapter strips
   minLength/maxLength, drops minItems/maxItems ≥ 2000) — revalidate per release
-- `think` parameter evolution (effort levels vs boolean)
+- ~~`think` parameter evolution~~ — **RESOLVED 2026-09-07**: bool or `low`/`medium`/`high`/
+  `max` (see Request fields)
 - GPU-spill detection fields (`size_vram` in /api/ps) — the adapter warns when a GPU model
-  spills to CPU; field shape must hold
+  spills to CPU; field shape must hold — not independently re-checked this run
 - Native /v1 OpenAI-compat layer maturing (could someday replace native dialect)
 - `/api/embed` error-body shape and batch-size ceiling remain unverified against upstream
-  documentation (see above); revisit when either is confirmed or contradicted
+  documentation (re-checked 2026-09-07, still absent from both sources; genuinely
+  UNVERIFIABLE, not merely stale)
+- **New, 2026-09-07**: `logprobs`/`top_logprobs`/`tools` request fields and an `images`
+  response field, and a possible `options` key-set change (`top_k`/`min_p` in, `presence_
+  penalty`/`frequency_penalty`/`num_gpu` no longer documented) — see Request fields DRIFT
+  items; needs adapter-side confirmation against a live server before any code change
+- **New, 2026-09-07**: release v0.33.3 (2026-09-02) changelog says "Report cached prompt
+  tokens" with no field name given in the release notes text available to this run —
+  UNVERIFIABLE which response field this adds; check `/api/chat` and `/api/embed` response
+  schemas directly next run
