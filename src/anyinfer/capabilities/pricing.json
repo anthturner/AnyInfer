@@ -2140,9 +2140,9 @@
       },
       {
         "model": "deepseek-ai/DeepSeek-V4-Flash-0731-TEE",
-        "input_per_1m": "0.14",
-        "output_per_1m": "0.28",
-        "last_verified": "2026-08-07",
+        "input_per_1m": "0.44",
+        "output_per_1m": "1.32",
+        "last_verified": "2026-09-07",
         "source": "https://chutes.ai/pricing"
       },
       {
