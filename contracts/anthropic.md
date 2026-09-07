@@ -1,7 +1,9 @@
 # anthropic — Protocol Contract
 
 Status: M2 adapter — **implemented** (Messages API).
-Last verified: 2026-08-05 — code survey of the sibling projects; adapter implemented against this snapshot. **Not yet verified against live provider documentation** — run the drift check before relying on it.
+Last verified: 2026-09-07 — live-verified against all six Upstream sources below (the four
+`docs.anthropic.com` URLs now 301 to `platform.claude.com`; fetched at the redirect target).
+Findings from this run: contract-drift/2026-09-07.
 
 ## Upstream sources
 - https://docs.anthropic.com/en/api/messages
@@ -14,8 +16,11 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
 ## Wire contract
 ### Endpoints
 - `POST https://api.anthropic.com/v1/messages` — generation
-- `GET https://api.anthropic.com/v1/models` — discovery (cursor-paginated: `first_page`,
-  `has_more`, `after_id`)
+- `GET https://api.anthropic.com/v1/models` — discovery (cursor-paginated). **Corrected
+  2026-09-07** (was `first_page`, a field the API does not have): query params `after_id`,
+  `before_id`, `limit` (default 20, max 1000); response fields `first_id`, `last_id`,
+  `has_more`. Verified against
+  https://platform.claude.com/docs/en/api/models-list.
 ### Auth
 Two mutually exclusive credential shapes; the adapter sends one or the other, never both.
 - **API key** (console.anthropic.com): `x-api-key: <key>`
@@ -31,9 +36,37 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
 ### Request fields
 - `model`, `max_tokens` (required), `system` (top-level, not a message role),
   `messages[{role: user|assistant, content}]`, `stream`, `temperature`, `top_p`,
-  `stop_sequences`, `tools`, `tool_choice`; reasoning-effort wire form recorded in
-  `output_config: {"effort": e}` — VERIFY on first drift run (extended
-  thinking may instead use `thinking: {"type":"enabled","budget_tokens":N}`)
+  `stop_sequences`, `tools`, `tool_choice`.
+- **Reasoning/effort wire form — resolved 2026-09-07** (was an open VERIFY): the two
+  mechanisms coexist and are not alternatives for the same thing.
+  `output_config: {"effort": "low"|"medium"|"high"|"xhigh"|"max"}` picks a discrete effort
+  preset; `thinking: {"type": "enabled", "budget_tokens": N, "display": "summarized"|
+  "omitted"}` is extended thinking with a token budget (minimum 1024, counts toward
+  `max_tokens`). `thinking.type` also accepts `"disabled"` and `"adaptive"` (the latter
+  taking the same optional `display` field, no `budget_tokens`). Verified against
+  https://platform.claude.com/docs/en/api/messages/create.
+- **Native structured output — NEW-CAPABILITY, resolves Watchlist open question 7**:
+  `output_config.format: {"type": "json_schema", "schema": <JSON Schema>}` is a first-class
+  output mode. The `GET /v1/models` response now carries a per-model
+  `capabilities.structured_outputs.supported` flag. AnyInfer's tool-based emulation is no
+  longer the only mechanism available; this is a capability-catalog / adapter follow-up
+  item, not applied here. Verified against
+  https://platform.claude.com/docs/en/api/messages/create and
+  https://platform.claude.com/docs/en/api/models-list.
+- **`temperature`/`top_p`/`top_k` deprecated for newer models — DRIFT**: verbatim from the
+  live reference, "Models released after Claude Opus 4.6 do not support setting
+  temperature. A value of 1.0 will be accepted for backwards compatibility, all other
+  values will be rejected with a 400 error" (`top_p`: values `>= 0.99` accepted; `top_k`:
+  any value rejected). The snapshot listed these as ordinary sampling fields with no such
+  caveat. Impact: on post-Opus-4.6 models, a caller-supplied temperature/top_p/top_k
+  outside the accepted band now fails the request instead of being honored or silently
+  dropped; `ignored_parameters` handling should be revisited per-model rather than treated
+  as globally supported. Verified against
+  https://platform.claude.com/docs/en/api/messages/create.
+- **New request fields not previously recorded** (NEW-CAPABILITY): `service_tier`
+  (`"auto"|"standard_only"`), `container` (skills-loading container reuse), `inference_geo`
+  (region override), `metadata.user_id` (abuse-detection identifier). Verified against
+  https://platform.claude.com/docs/en/api/messages/create.
 - **Server-side tools** (added 2026-08-25) are `tools[]` entries whose `type` carries a
   **date**: `web_search_20250305` and `code_execution_20250522`, each with a `name` and an
   optional `max_uses`. The date is part of the wire type, so a version bump upstream is a
@@ -58,10 +91,13 @@ Two mutually exclusive credential shapes; the adapter sends one or the other, ne
   one is told, rather than getting a successful answer that ignored it.
 
 ### Multimodal inputs
-Verified 2026-08-10 against the provider-owned vision and PDF guides. Images use `image`
-content blocks and documents use `document` blocks. Their `source` is either `base64` with
-`media_type` and `data`, or `url` with `url`. Audio content is not projected by this
-Messages adapter and is refused before transport.
+Verified 2026-09-07 against the provider-owned vision and PDF guides. Images use `image`
+content blocks and documents use `document` blocks. `source` is one of three types
+(**NEW-CAPABILITY 2026-09-07**: a third, `file`, was not in the prior snapshot): `base64`
+with `media_type` and `data`; `url` with `url`; or `file` with a `file_id` from the Files
+API — the Files API graduated out of beta on 2026-08-19 per the release notes and no
+longer requires the `files-api-2025-04-14` beta header. Audio content is not projected by
+this Messages adapter and is refused before transport.
 ### Prompt caching (placement)
 - Mechanism: **explicit**. `cache_control: {"type": "ephemeral"}` attaches to a content
   block, a `system` content block, or a tool declaration, and marks everything *before and
@@ -143,11 +179,21 @@ Verified 2026-08-09 against https://platform.claude.com/docs/en/api/rate-limits 
 
 ## Watchlist
 - Rate-limit header names and the RFC 3339 reset format; whether the `tokens` pair keeps
-  its "most restrictive limit in effect" meaning
-- `anthropic-version` header updates / new required beta headers
-- `oauth-2025-04-20` beta flag: whether it graduates to GA (making it droppable) or is
-  superseded, and whether the endpoint set it gates widens beyond `/v1/messages`
-- Native structured-output mechanism (we plan tool-based emulation — open question 7;
-  verify whether a first-class json_schema output mode now exists)
-- Reasoning/effort wire form (see Request fields caveat)
-- New usage fields; models-list pagination shape
+  its "most restrictive limit in effect" meaning — not re-verified this run (its cited URL,
+  `platform.claude.com/docs/en/api/rate-limits`, is outside this run's Upstream sources)
+- `anthropic-version` header updates / new required beta headers — no change found in
+  `anthropic-version` itself (still `2023-06-01`); a large number of new `anthropic-beta`
+  values now exist (structured-outputs, mid-conversation output-config/system-clear,
+  thinking-binding-controls, thinking-display-updates, computer/browser-use toolsets,
+  managed-agents, compliance/admin APIs) — see release notes, most are outside this
+  adapter's M2 scope and are not itemized field-by-field here
+- `oauth-2025-04-20` beta flag: **no update found this run** — still open whether it
+  graduates to GA or widens beyond `/v1/messages`
+- ~~Native structured-output mechanism~~ — **RESOLVED 2026-09-07, NEW-CAPABILITY**: exists
+  as `output_config.format.type: "json_schema"` (see Request fields)
+- ~~Reasoning/effort wire form~~ — **RESOLVED 2026-09-07**: `output_config.effort` and
+  `thinking` are parallel, non-overlapping mechanisms (see Request fields)
+- ~~Models-list pagination shape~~ — **RESOLVED 2026-09-07, DRIFT fixed**: see Endpoints
+- New usage fields — none found beyond what is already recorded; Files API, Skills API,
+  and the Computer/Browser Use toolsets graduated out of beta 2026-08-19 and no longer
+  require their beta headers (informational; outside current adapter scope)
