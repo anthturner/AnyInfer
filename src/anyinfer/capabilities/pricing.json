@@ -2084,9 +2084,9 @@
       },
       {
         "model": "moonshotai/Kimi-K2.6-TEE",
-        "input_per_1m": "0.58",
-        "output_per_1m": "3.4",
-        "last_verified": "2026-08-07",
+        "input_per_1m": "0.5",
+        "output_per_1m": "2.85",
+        "last_verified": "2026-09-21",
         "source": "https://chutes.ai/pricing"
       },
       {
