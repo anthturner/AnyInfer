@@ -64,9 +64,17 @@ jobs:
     # A fork's branch cannot be pushed to, and a fork's pull request should not be
     # granting write scope to anything. Contributors from forks write their own entry;
     # the gate tells them so.
+    #
+    # Dependabot is turned away for a different reason. GitHub hands its runs a read-only
+    # GITHUB_TOKEN and withholds this repository's secrets, so the model cannot be reached
+    # and the push would 403 even if it could -- the job cannot succeed, only fail loudly
+    # on every bump. A dependency bump owes no entry either (docs/contributing/changelog.md
+    # scopes entries to user-facing change), so nothing is lost by never starting.
     if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event_name != 'pull_request' || (
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.login != 'dependabot[bot]'
+      )
     outputs:
       mode: ${{ steps.decide.outputs.mode }}
       branch: ${{ steps.decide.outputs.branch }}
