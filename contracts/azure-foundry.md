@@ -70,10 +70,12 @@ Microsoft's own chat reference (see below), not just carried over from the 2026-
   optional `dimensions`, optional `encoding_format`); no Azure-specific fields observed.
 ### Response fields
 - As openai-compat
-- NEW-CAPABILITY (chat reference, 2026-09-21): `usage.prompt_tokens_details.cached_tokens`,
-  `usage.completion_tokens_details.{reasoning_tokens,audio_tokens,accepted_prediction_tokens,
-  rejected_prediction_tokens}`, and message-level `annotations[].url_citation` (for web-search
-  results) are present on the wire and not currently read — same gap as openai-compat.md.
+- NEW-CAPABILITY (chat reference, 2026-09-21): `usage.completion_tokens_details.{audio_tokens,
+  accepted_prediction_tokens,rejected_prediction_tokens}` and message-level
+  `annotations[].url_citation` (for web-search results) are present on the wire and not currently
+  read — same gap as openai-compat.md. `usage.prompt_tokens_details.cached_tokens` and
+  `usage.completion_tokens_details.reasoning_tokens` are read here too: `AzureFoundryAdapter`
+  inherits `OpenAICompatAdapter._parse_usage` and does not override it.
 - Embeddings: as `openai_compat_embeddings.py` (`data[].{index,embedding}`, `model`,
   `usage.{prompt_tokens,total_tokens}`)
 ### Streaming

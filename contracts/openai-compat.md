@@ -51,12 +51,15 @@ or document support, and an upstream rejection remains explicit.
 - `choices[0].message.content`, `choices[0].message.tool_calls[]`,
   `choices[0].finish_reason` (`stop|length|tool_calls|content_filter`),
   `usage.prompt_tokens`, `usage.completion_tokens`, `usage.total_tokens`
-- **Not read (verified 2026-09-21, mirror OpenAPI spec):** `usage.prompt_tokens_details.{cached_tokens,audio_tokens}`
-  and `usage.completion_tokens_details.{reasoning_tokens,audio_tokens,accepted_prediction_tokens,rejected_prediction_tokens}`
+- **Read (verified 2026-09-21, mirror OpenAPI spec):** `usage.prompt_tokens_details.cached_tokens` and
+  `usage.completion_tokens_details.reasoning_tokens` land in `Usage.cache_read_tokens` and
+  `Usage.reasoning_tokens`, and `capabilities/pricing.py` reprices the cached share against
+  `cache_read_per_1m` wherever an entry carries one. `cached_tokens` is counted inside
+  `prompt_tokens`, the same accounting shape as the Responses dialect's implicit caching (openai.md).
+- **Not read (verified 2026-09-21, mirror OpenAPI spec):** `usage.prompt_tokens_details.audio_tokens`
+  and `usage.completion_tokens_details.{audio_tokens,accepted_prediction_tokens,rejected_prediction_tokens}`
   exist on the wire for this dialect (mirrors the Azure chat-completions surface confirmed the same run — see
-  azure-foundry.md). `cached_tokens` is counted inside `prompt_tokens`, same accounting shape as the Responses
-  dialect's implicit caching (openai.md). Cache-aware pricing for openai-compat-family providers currently has no
-  read path for this — proposed adapter work item, not applied here.
+  azure-foundry.md) — proposed adapter work item, not applied here.
 - `choices[0].logprobs.content[]` — entries of
   `{token, logprob, bytes[], top_logprobs[{token, logprob, bytes[]}]}`. Read defensively:
   a malformed entry is skipped rather than failing a generation that otherwise succeeded,
