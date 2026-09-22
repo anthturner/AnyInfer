@@ -92,7 +92,10 @@ commits, writes what qualifies into `## Unreleased`, and pushes that commit onto
 branch. Most branches earn an entry or two; a branch confined to tests, CI, refactoring,
 or documentation earns none, and the workflow writes nothing rather than inventing
 something. It runs once per pull request and skips a branch that already touches
-`CHANGELOG.md`, so an entry you edit in review stays edited.
+`CHANGELOG.md`, so an entry you edit in review stays edited. It skips forks and Dependabot
+outright: neither run can push with the credentials it carries, and a dependency bump owes
+no entry in the first place. A fork's contributor writes their own entry, and the gate says
+so.
 
 **Promote**, when a push to a feature branch declares a version that has no tag and no
 section. `## Unreleased` is renamed to `## <version> — <date>` in place and a fresh empty
