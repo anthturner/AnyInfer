@@ -1,14 +1,21 @@
 # openai — Protocol Contract
 
 Status: M2 adapter — **implemented** (Responses API).
-Last verified: 2026-08-05 — code survey of the sibling projects; adapter implemented against this snapshot. **Not yet verified against live provider documentation** — run the drift check before relying on it.
+Last verified: 2026-09-21 — live drift check. `platform.openai.com/docs/api-reference/{responses,models}` are
+bot-walled (403, confirmed again this run); verified instead against the `developers.openai.com` mirrors, the
+same substitution already established for the embeddings section below.
 
 ## Upstream sources
-- https://platform.openai.com/docs/api-reference/responses
-- https://platform.openai.com/docs/api-reference/models
-- https://platform.openai.com/docs/changelog
+- https://platform.openai.com/docs/api-reference/responses (403 bot-walled as of 2026-09-21, mirrored below)
+- https://platform.openai.com/docs/api-reference/models (403 bot-walled as of 2026-09-21, mirrored below)
+- https://developers.openai.com/api/docs/api-reference/responses (working mirror, fetched 2026-09-21)
+- https://developers.openai.com/api/docs/api-reference/models (working mirror, fetched 2026-09-21)
+- https://platform.openai.com/docs/changelog — **moved**: now 301s to
+  https://developers.openai.com/api/docs/changelog (confirmed 2026-09-21); fetched at the new location
 - https://developers.openai.com/api/docs/guides/images-vision
 - https://developers.openai.com/api/docs/guides/file-inputs
+- https://developers.openai.com/api/docs/guides/prompt-caching (fetched 2026-09-21, resolves the caching
+  VERIFY item below)
 
 ## Wire contract
 ### Endpoints
@@ -31,6 +38,13 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   pair. The intermediate `.searching`/`.interpreting` events are deliberately not mapped:
   they say the same thing with more granularity than a normalized status carries, and
   counting them would inflate the invocation count.
+- **NEW-CAPABILITY (mirror fetch, 2026-09-21):** the current `tools[]` reference also lists
+  `file_search`, `computer_use`, `image_generation`, and custom-format tools as server-side
+  tool markers alongside `web_search`/`code_interpreter`. None of these are wired up by the
+  adapter today; left as an adapter work item rather than applied here.
+- **NEW-CAPABILITY (changelog, 2026-09-03):** async tool calling, mid-turn steering, and
+  changing `reasoning.effort` mid-conversation are now supported for long-running Responses
+  turns. Not in the normalized feature set; feeds the capability/roadmap catalog.
 - **Absent from this dialect** (verified 2026-08-25): `seed`, `presence_penalty`, and
   `frequency_penalty` exist on chat-completions but not on Responses, so the adapter never
   sends them and the descriptor declares all three in `ignored_parameters`.
@@ -38,9 +52,12 @@ Last verified: 2026-08-05 — code survey of the sibling projects; adapter imple
   value meaning "the chosen token's own probability, no alternatives".
 
 ### Multimodal inputs
-Verified 2026-08-10 against the provider-owned image and file-input guides above.
+Verified 2026-08-10 against the provider-owned image and file-input guides above; re-fetched
+2026-09-21, unchanged.
 - Image input is an `input_image` content item with `image_url` set to an HTTPS URL or a
-  `data:<media-type>;base64,...` URL; `detail` is preserved when supplied.
+  `data:<media-type>;base64,...` URL; `detail` is preserved when supplied. The guide also
+  documents a `file_id` field (a prior Files-API upload) as an alternative to `image_url` on
+  the same item — not currently sent by the adapter, which only ever produces `image_url`.
 - Inline documents are `input_file` items with `filename` and a data URL in `file_data`;
   remote documents use `file_url`.
 - Audio is projected as an `input_audio` item only for models that accept audio input.
@@ -53,8 +70,20 @@ Verified 2026-08-10 against the provider-owned image and file-input guides above
 - Declared on the descriptor as `cache_mechanism="implicit"`, with no mark budget.
 - Cache hits are reported in the usage block (see Response fields) and are counted inside
   the reported prompt-token total on this API — which is why cache-aware pricing reprices
-  rather than adds. **VERIFY on the next drift run**: both the automatic-caching threshold
-  and whether cached tokens remain included in `prompt_tokens`.
+  rather than adds.
+- **Resolved 2026-09-21** (https://developers.openai.com/api/docs/guides/prompt-caching):
+  cached tokens are confirmed still included in `usage.input_tokens`; the per-model breakout
+  lives in `usage.input_tokens_details.cached_tokens`. The automatic-caching threshold is
+  **1,024 visible input tokens for GPT-5.6 and later**; earlier models have a threshold that
+  varies with request shape (tools, images, output schema, reasoning effort, verbosity) rather
+  than a fixed number — that variability is inherent to the older models, not something this
+  snapshot can pin further.
+- **NEW-CAPABILITY (same source, 2026-09-21):** `usage.input_tokens_details.cache_write_tokens`
+  is now also reported, alongside `cached_tokens`. Ordinary (non-cache) input tokens are
+  `input_tokens - cached_tokens - cache_write_tokens`. Prompt Cache Diagnostics (GA'd
+  2026-09-08 per the changelog) exposes cache-reuse comparisons against a prior response for
+  GPT-5.6+. Neither `cache_write_tokens` nor the diagnostics endpoint is read by the adapter
+  today — proposed adapter work item, not applied here.
 
 ### Response fields
 - `output_text` aggregate; `output[]` items (message / reasoning / tool call),
@@ -63,8 +92,15 @@ Verified 2026-08-10 against the provider-owned image and file-input guides above
 ### Streaming
 - SSE typed events; text via `response.output_text.delta`; completion via
   `response.completed` (carries final usage); tool-call and reasoning events per event type
+- **UNVERIFIABLE (2026-09-21):** the mirror's rendered content did not enumerate the full typed
+  event catalog (only confirmed the two above still exist); the live reference presumably lists
+  more event types (matching the new server-side tools and async-turn features noted above) but
+  the fetch tool's summary didn't surface them. Re-check with a targeted fetch next run rather
+  than assuming today's confirmation covers the full event list.
 ### Errors
 - Non-2xx `{"error": {...}}`; retryable statuses {408, 409, 425, 429} ∪ ≥500; `Retry-After`
+- NEW-CAPABILITY (changelog, 2026-09-02): same `429 slow_down` / `503 server_is_overloaded`
+  typed-code split documented in openai-compat.md applies here too; both already retryable.
 ### Rate-limit headers
 Verified 2026-08-09 against https://developers.openai.com/api/docs/guides/rate-limits (the
 `platform.openai.com` guide URL now 301s there).
@@ -135,8 +171,14 @@ Verified 2026-08-09 against https://developers.openai.com/api/docs/guides/rate-l
 
 ## Watchlist
 - Rate-limit header names and the duration format of the reset values
-- Responses API evolves quickly: new event types, `text.format` schema-mode changes
+- Responses API evolves quickly: new event types, `text.format` schema-mode changes — see the
+  UNVERIFIABLE note above on the full event catalog
 - Chat-completions deprecation posture for first-party API
-- Model catalog churn (gpt-5 family) affecting bundled capability catalog + pricing
+- Model catalog churn (now gpt-5 *and* gpt-6 family — `gpt-6-astra` released 2026-09-03)
+  affecting bundled capability catalog + pricing
 - Embeddings: the 2,048-input / 8,192-token / 300k-summed-token limits, and whether the
   reference starts stating per-model default dimensions (unverified today)
+- NEW-CAPABILITY (mirror fetch, 2026-09-21): `GET /v1/models` list/retrieve responses now
+  include a `shutdown_date` field (planned retirement date, or `null`) per model — not read by
+  the adapter's model-discovery path today; would let discovery surface deprecation ahead of
+  actual sunset instead of only reacting to a 404.
