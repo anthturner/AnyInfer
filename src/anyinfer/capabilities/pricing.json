@@ -2156,9 +2156,9 @@
     "avian": [
       {
         "model": "deepseek/deepseek-v4-flash",
-        "input_per_1m": "0.0805",
-        "output_per_1m": "0.161",
-        "last_verified": "2026-08-07",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-10-05",
         "source": "https://avian.io/pricing/"
       },
       {
