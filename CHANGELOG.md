@@ -17,6 +17,8 @@ never rewritten.
 ## Unreleased
 
 ### Fixed
+- Avian's bundled rate for `deepseek-v4-flash` was stale at $0.0805/$0.161 per 1M
+  input/output tokens; cost estimates now use the current $0.14/$0.28.
 - Building an Azure Foundry provider no longer runs the Entra credential chain, which
   shelled out to `az`, `pwsh`, and `azd`; the token is now acquired per request and
   refreshed before it expires.
