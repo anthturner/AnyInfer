@@ -1,9 +1,9 @@
 # jina — Protocol Contract
 
 Status: **implemented** — `providers/jina.py`, embeddings and reranker.
-Last verified: 2026-08-12 — against Jina's product documentation and its own model
-publications (sources below); the interactive API reference (`api.jina.ai/redoc`) is
-JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
+Last verified: 2026-10-05 — against Jina's product documentation (sources below); the
+interactive API reference (`api.jina.ai/redoc`) is still JS-only and unfetchable
+headlessly, confirmed again this run. Not yet verified against live API traffic.
 
 ## Upstream sources
 - https://jina.ai/embeddings/ (request shape, task vocabulary, models)
@@ -25,8 +25,10 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
 
 ### Version pins
 - The API version is in the path (`/v1`). No header or query parameter carries a version.
-  Jina publishes model generations (v3, v4, m0) as *model ids* rather than API versions,
-  so a new generation is a catalog change, not a wire change.
+  Jina publishes model generations (v3, v4, m0, and now v5 — e.g.
+  `jina-embeddings-v5-text-small`, confirmed 2026-10-05 via
+  https://jina.ai/embeddings/) as *model ids* rather than API versions, so a new
+  generation is a catalog change, not a wire change.
 
 ### Embeddings request fields (verified 2026-08-12)
 - `model` (required), `input` (array of strings; no per-request ceiling documented —
@@ -39,7 +41,7 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
 - The adapter sends `model`, `input`, `task` (when an intent was given), and
   `dimensions`; everything else is reachable via `provider_options`.
 
-### Embeddings response (corroborated 2026-08-12, not yet live-verified)
+### Embeddings response (corroborated 2026-08-12, reconfirmed 2026-10-05; not yet verified against live API traffic)
 - OpenAI-shaped: `data[]` with `embedding`/`index` (adapter orders by the reported
   index and rejects out-of-range/duplicates), `usage.total_tokens` →
   `Usage.total_tokens` only, never assumed into `input_tokens`.
@@ -68,9 +70,17 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
 Embeddings and rerank responses are not streamed.
 
 ## Watchlist
-- **Not yet live-verified** — first live lane confirms the embeddings response shape,
-  error bodies, and usage fields.
+- **Not yet verified against live API traffic** — first live lane confirms the
+  embeddings response shape, error bodies, and usage fields.
 - The clustering→`separation` mapping, should Jina document its tasks more precisely.
 - `late_chunking`, multimodal inputs (v4/m0), quantized `embedding_type` values —
-  unmodelled; reachable via `provider_options`.
+  unmodelled; reachable via `provider_options`. Confirmed 2026-10-05
+  (https://jina.ai/embeddings/): multimodal input is a typed object in the `input`
+  array keyed `image`/`audio`/`video`/`pdf` with a public URL or base64 value, mixable
+  with text in one batch; the `usage` object adds an `image_tokens` breakdown for such
+  requests. Still unread by the adapter — text-only input is all we send and read.
+- `jina-reranker-v3.5` is now Jina's recommended default reranker, documented as a
+  "drop-in replacement" for `jina-reranker-v3` (confirmed 2026-10-05,
+  https://jina.ai/reranker/). No wire change — same request/response shape — but the
+  model catalog/pricing table should pick up the new id if it has not already.
 - A listing endpoint, if one appears.
