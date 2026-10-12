@@ -2084,9 +2084,9 @@
       },
       {
         "model": "moonshotai/Kimi-K2.6-TEE",
-        "input_per_1m": "0.5",
-        "output_per_1m": "2.85",
-        "last_verified": "2026-09-21",
+        "input_per_1m": "0.45",
+        "output_per_1m": "1.95",
+        "last_verified": "2026-10-12",
         "source": "https://chutes.ai/pricing"
       },
       {
@@ -2105,16 +2105,16 @@
       },
       {
         "model": "moonshotai/Kimi-K3-TEE",
-        "input_per_1m": "3.0",
-        "output_per_1m": "15.0",
-        "last_verified": "2026-08-07",
+        "input_per_1m": "1.85",
+        "output_per_1m": "9.5",
+        "last_verified": "2026-10-12",
         "source": "https://chutes.ai/pricing"
       },
       {
         "model": "Qwen/Qwen3.6-27B-TEE",
-        "input_per_1m": "0.3",
+        "input_per_1m": "0.25",
         "output_per_1m": "2.0",
-        "last_verified": "2026-08-07",
+        "last_verified": "2026-10-12",
         "source": "https://chutes.ai/pricing"
       },
       {
@@ -2156,9 +2156,9 @@
     "avian": [
       {
         "model": "deepseek/deepseek-v4-flash",
-        "input_per_1m": "0.0805",
-        "output_per_1m": "0.161",
-        "last_verified": "2026-08-07",
+        "input_per_1m": "0.14",
+        "output_per_1m": "0.28",
+        "last_verified": "2026-10-12",
         "source": "https://avian.io/pricing/"
       },
       {
