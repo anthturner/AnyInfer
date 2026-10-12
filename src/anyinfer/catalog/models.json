@@ -13,7 +13,7 @@
     "A vision candidate must name one exact projector; the pinning pass verifies and records",
     "that companion beside every weight variant rather than matching an mmproj heuristically."
   ],
-  "generated": "2026-08-24",
+  "generated": "2026-10-12",
   "models": [
     {
       "id": "deepseek-r1-distill-llama-70b",
@@ -920,12 +920,12 @@
       "est_file_bytes": 7300575264,
       "est_ram_bytes": 11192889376,
       "est_vram_bytes": 11058671648,
-      "last_verified": "2026-08-08",
+      "last_verified": "2026-10-12",
       "source": "https://huggingface.co/google/gemma-3-12b-it",
       "sources": {
         "ollama": {
           "tag": "gemma3:12b",
-          "digest": "sha256:6819964c2bcf53f6dd3593f9571e91cbf2bab9665493f870f96eeb29873049b4"
+          "digest": "sha256:fe25b92561cfd1b4fcc523d5f151f86c64254733bd4b8847b8252d15a0366262"
         }
       },
       "variants": [
@@ -1045,12 +1045,12 @@
       "est_file_bytes": 806058496,
       "est_ram_bytes": 1879800320,
       "est_vram_bytes": 1745582592,
-      "last_verified": "2026-08-08",
+      "last_verified": "2026-10-12",
       "source": "https://huggingface.co/google/gemma-3-1b-it",
       "sources": {
         "ollama": {
           "tag": "gemma3:1b",
-          "digest": "sha256:120007c81bf8b4eb54e896a4a3e5ff9949f124b0ea42295277c8523f7fa9c7f6"
+          "digest": "sha256:76a6b777faea7a8fda1d339bfc81ea919ed429c64ed0d7c1b0617bc14afc76b6"
         }
       },
       "variants": [
@@ -1171,12 +1171,12 @@
       "est_file_bytes": 16546404992,
       "est_ram_bytes": 21915114112,
       "est_vram_bytes": 21780896384,
-      "last_verified": "2026-08-08",
+      "last_verified": "2026-10-12",
       "source": "https://huggingface.co/google/gemma-3-27b-it",
       "sources": {
         "ollama": {
           "tag": "gemma3:27b",
-          "digest": "sha256:f838f048d36876f9f411d302e8fc45cea6793a37cd978af1b6a0b042fcfb2f31"
+          "digest": "sha256:13906c96098db5eea4219881cf7029319ca5d65c8abc097d76437b76da0caacd"
         }
       },
       "variants": [
@@ -1297,12 +1297,12 @@
       "est_file_bytes": 2489758112,
       "est_ram_bytes": 4100370848,
       "est_vram_bytes": 3966153120,
-      "last_verified": "2026-08-08",
+      "last_verified": "2026-10-12",
       "source": "https://huggingface.co/google/gemma-3-4b-it",
       "sources": {
         "ollama": {
           "tag": "gemma3:4b",
-          "digest": "sha256:b6ae5839783f2ba248e65e4b960ab15f9c4b7118db285827dba6cba9754759e2"
+          "digest": "sha256:4bf7b0a45f1af5d9f6f8b847044d8379eef6b36f3ca8b4dcc63a8dfed7426e53"
         }
       },
       "variants": [
@@ -1549,12 +1549,12 @@
       "est_file_bytes": 63387346208,
       "est_ram_bytes": 74661635360,
       "est_vram_bytes": 74527417632,
-      "last_verified": "2026-08-08",
+      "last_verified": "2026-10-12",
       "source": "https://huggingface.co/openai/gpt-oss-120b",
       "sources": {
         "ollama": {
           "tag": "gpt-oss:120b",
-          "digest": "sha256:0b3eaefc220f88ee3875909c1306654b2fbda9e31dae0133d6cdf488b37f9402"
+          "digest": "sha256:8357ba40fe8885a0ea9932f02c77867fbff15705950372ffdd34822c78ee834f"
         }
       },
       "variants": [
@@ -1601,12 +1601,12 @@
       "est_file_bytes": 12109566624,
       "est_ram_bytes": 16941404832,
       "est_vram_bytes": 16807187104,
-      "last_verified": "2026-08-08",
+      "last_verified": "2026-10-12",
       "source": "https://huggingface.co/openai/gpt-oss-20b",
       "sources": {
         "ollama": {
           "tag": "gpt-oss:20b",
-          "digest": "sha256:776beb3adb235076157cfea408b8ea2a2d25eae99d7f5da997f607f6b69fa0fa"
+          "digest": "sha256:e103573196b6deeff79ec124b4131b4fad700cee60b584a8f9d689ffed115038"
         }
       },
       "variants": [
