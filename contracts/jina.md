@@ -1,9 +1,10 @@
 # jina — Protocol Contract
 
 Status: **implemented** — `providers/jina.py`, embeddings and reranker.
-Last verified: 2026-08-12 — against Jina's product documentation and its own model
+Last verified: 2026-10-12 — against Jina's product documentation and its own model
 publications (sources below); the interactive API reference (`api.jina.ai/redoc`) is
-JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
+still JS-only and unfetchable headlessly — reconfirmed 2026-10-12, a ~4KB `<div
+id="app">` shell with no inline schema. Not yet verified against live traffic.
 
 ## Upstream sources
 - https://jina.ai/embeddings/ (request shape, task vocabulary, models)
@@ -71,6 +72,16 @@ Embeddings and rerank responses are not streamed.
 - **Not yet live-verified** — first live lane confirms the embeddings response shape,
   error bodies, and usage fields.
 - The clustering→`separation` mapping, should Jina document its tasks more precisely.
-- `late_chunking`, multimodal inputs (v4/m0), quantized `embedding_type` values —
-  unmodelled; reachable via `provider_options`.
+- `late_chunking`, multimodal inputs (v4/m0, now also v5-omni), quantized
+  `embedding_type` values — unmodelled; reachable via `provider_options`.
 - A listing endpoint, if one appears.
+- **Model catalog is behind current publications (confirmed 2026-10-12):** Jina now
+  publishes `jina-embeddings-v5-text-{nano,small}` and `jina-embeddings-v5-omni-
+  {nano,small}` (multimodal: text/image/audio/video) on jina.ai/embeddings/, and
+  `jina-reranker-v3.5` on jina.ai/reranker/. None of these are in the adapter's static
+  capability tables (`_STATIC_EMBEDDING_CAPABILITIES`, `_STATIC_RERANK_CAPABILITIES` in
+  `providers/jina.py`), which still list only v3/v4 embeddings and v2-base-
+  multilingual/v3/m0 reranker ids. Per the Version pins note above this is a catalog
+  change, not a wire change — the request/response shapes this snapshot records were
+  reconfirmed unchanged on jina.ai. Adding the new model ids to the static tables is a
+  follow-up work item, not made by this audit.
