@@ -20,6 +20,8 @@ never rewritten.
 - Building an Azure Foundry provider no longer runs the Entra credential chain, which
   shelled out to `az`, `pwsh`, and `azd`; the token is now acquired per request and
   refreshed before it expires.
+- Corrected stale trusted pricing for several avian and chutes models, which had been
+  under- or over-reporting per-token cost in estimates and spend budgets.
 
 ## 0.1.3 — 2026-08-26
 
