@@ -81,7 +81,7 @@ def test_source_parsers_preserve_exact_units_and_ignore_other_dimensions() -> No
     assert chutes["Qwen/Qwen3-32B-TEE"].output_per_1m == Decimal("0.416")
 
     avian = parse_avian(_fixture("avian.json"))
-    assert avian["deepseek/deepseek-v4-flash"].input_per_1m == Decimal("0.0805")
+    assert avian["deepseek/deepseek-v4-flash"].input_per_1m == Decimal("0.14")
     assert avian["xiaomi/mimo-v2.5"].output_per_1m == Decimal("0.4")
 
 

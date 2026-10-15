@@ -1,6 +1,6 @@
 {
   "data": [
-    {"id": "deepseek/deepseek-v4-flash", "pricing": {"input_per_million": 0.0805, "output_per_million": 0.161}},
+    {"id": "deepseek/deepseek-v4-flash", "pricing": {"input_per_million": 0.14, "output_per_million": 0.28}},
     {"id": "deepseek/deepseek-v4-pro", "pricing": {"input_per_million": 1.305, "output_per_million": 2.61}},
     {"id": "deepseek/deepseek-v3.2", "pricing": {"input_per_million": 0.23, "output_per_million": 0.33}},
     {"id": "minimax/minimax-m2.5", "pricing": {"input_per_million": 0.27, "output_per_million": 1.08}},
