@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from anyinfer._client.stream import AsyncStream
+from anyinfer.events.telemetry import ParameterDropped, RepairAttempted
 from anyinfer.schema._capture import _ACTIVE
 
 from . import runner
@@ -64,19 +65,18 @@ async def test_runner_records_supplied_wire_controls_and_repair_drop_telemetry()
     controls["request"]["timeout_s"] = 17
     controls["request"]["max_response_bytes"] = 321
     clamped = load_fixture("repair", "provider-ceiling-clamp-parameter-dropped")
-    repair = load_fixture("repair", "invalid-then-valid")
-    repair["request"]["schema"]["properties"] = {"age": {"type": "integer"}}
 
     supplied = await run_fixture(controls)
     dropped = await run_fixture(clamped)
-    repaired = await run_fixture(repair)
 
     wire = supplied.requests[0]
     assert wire.sampling.seed == 7
     assert wire.sampling.stop == ["END", "STOP"]
     assert wire.timeout_s == 17 and wire.max_response_bytes == 321
-    assert {type(event).__name__ for event in dropped.telemetry} == {"ParameterDropped"}
-    assert {type(event).__name__ for event in repaired.telemetry} == {"RepairAttempted"}
+    assert [type(event) for event in dropped.telemetry] == [ParameterDropped, RepairAttempted]
+    parameter_dropped, repair_attempted = dropped.telemetry
+    assert parameter_dropped.parameter == "repair.max_attempts"
+    assert repair_attempted.attempt_number == 1
 
 
 async def test_runner_observes_health_skip_and_expiry_from_native_requests() -> None:

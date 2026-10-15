@@ -476,14 +476,30 @@ M1 and later use `src/python/` paths and therefore depend on it.
       > repository gate passed all 13 steps in 560.5 seconds with xdist workers capped at
       > two and no excluded tests. Expectations remain pending; this is an execution-layer
       > checkpoint, not a frozen reference or conformance release.
-    - [ ] M1.5b.2 Implement `tests/testing/portable/proofs.py` and `test_proofs.py` for the
+    - [x] M1.5b.2 Implement `tests/testing/portable/proofs.py`, `test_proofs.py`,
+      `proof_timeouts.py` and `test_proof_timeouts.py` for the
       five core driver recipes in shared §17: concurrency, assessment completeness, effective
       default/explicit limits, per-entry timeout reset, and cleanup/disposal timeout. Observe
       actual native contexts and real timeout/cancellation; spies delegate native behavior.
       The HTTP byte-budget driver recipe remains M1.6. **Gate:** each core recipe produces
       nonempty native evidence only after its predicate succeeds; controlled missing/faulted
       evidence is error, and the targeted proof module passes without elapsed thresholds.
-    - [ ] M1.5b.3 Implement private `driver.py`, `conftest.py` and `test_driver.py` under
+      > NOTE: One owner implements concurrency/assessment and the public private-driver
+      > dispatcher in `proofs.py`; another owns native timer proofs in `proof_timeouts.py`.
+      > `CORE_DRIVER_RECIPE_IDS` lists the five exact core recipe IDs;
+      > `await run_core_driver_assertion(recipe_ref)` returns the actual development case
+      > record with native evidence. Missing evidence cannot produce a passing record.
+      > NOTE: Native proof execution caught a draft fixture error before M1.7: repair
+      > examples supplied string-valued `age` but their schemas only required its presence,
+      > so Python correctly accepted them. Audit/correct the eight repair inputs against
+      > their named intent, leaving expectations pending. Do not weaken exhaustion or
+      > correction predicates or change Python to make those examples fail.
+      > NOTE: Accepted after native proof execution, independent closure reviews and the
+      > complete repository gate passing all 13 steps in 274.5 seconds. Ordered timeout
+      > lifecycle evidence delegates native context semantics; assessment evidence never
+      > parses feedback prose. The eight repair input schemas now enforce integer ages;
+      > scripts and pending expectations are unchanged. Production Python is unchanged.
+    - [x] M1.5b.3 Implement private `driver.py`, `conftest.py` and `test_driver.py` under
       `tests/testing/portable/` for pytest development-output integration. Record the hashed
       selected draft inventory, actual source/environment binding, available case records and
       explicitly unexecuted transport/driver IDs; pending fixtures cannot become passes.
@@ -492,10 +508,53 @@ M1 and later use `src/python/` paths and therefore depend on it.
       are explicitly unreleased, preserve case/evidence identities, and cannot validate as
       qualified `report-v0`; driver/plugin tests pass. The parent box stays open until all
       waves and the M1.5c support required by its original gate are complete.
+      > NOTE: This owner may author alongside the independent recipe modules after the
+      > execution checkpoint. The selected asset root is the specification directory;
+      > development output binds its raw inventory and input hashes and explicitly lists
+      > unexecuted IDs. It has no release/report-v0 identity. Reference writing remains
+      > fail-closed until the later preflight support is implemented.
+      > NOTE: The development preflight requires all executable core inputs, while M1.6's
+      > declared transport inputs may still be absent. Unexecuted rows retain their inventory
+      > identity and explicit missing/present status; present transport inputs are validated
+      > and hashed from the selected root. Missing core inputs remain errors. This staged
+      > observation cannot satisfy the later complete release/reference gates.
+      > NOTE: Accepted with clean independent review and actual pytest CLI execution:
+      > 85 core observations (76 pending, 9 declared extensions), 5 passing native driver
+      > recipes and 12 explicitly unexecuted transport obligations. No executed record is
+      > fail/error; the output remains UNRELEASED and cannot qualify as report-v0. The
+      > complete repository gate passed; parent M1.5b remains open for M1.5c support.
   - [ ] M1.5c Reference/report identity support and `scripts/compare_reports.py` with its
     required negative tests. Gate: incomplete/development/wrong-identity/failing reports
     cannot qualify, and the documented qualified synthetic/Python comparisons behave exactly
     as required. The enclosing M1.5 gate still requires all waves together.
+    - [ ] M1.5c.1 Explicit selected-root validation and shared release binding. Extend
+      `scripts/validate_fixtures.py` so schema/report/normative-ref validation can use an
+      explicit specification root, preserving existing defaults. Add
+      `scripts/portable_release_assets.py` and `tests/test_portable_release_assets.py` for
+      strict ordinary-JSON loading, safe canonical asset paths, raw hashes, complete release
+      inventory/input/reference binding, and qualified-report validation. Reuse existing
+      validation policy; never execute Python from a selected data root. Standalone tools
+      and the private driver consume this helper without changing `sys.path`.
+      **Gate:** selected-root/schema/ref isolation and missing/changed/extra/pending/unsafe
+      asset negatives pass; release/report inputs remain data-only and fail closed.
+    - [ ] M1.5c.2 Implement `scripts/compare_reports.py` and
+      `tests/test_compare_reports.py` over the accepted release-binding API. Verify trusted
+      selected release bytes, exact unique IDs, derived counts, committed source/driver
+      identities, driver evidence, declared eligible extensions and zero fail/error before
+      comparing. Allow only the reference implementation's extension versus another
+      implementation's pass disagreement; matching failures never qualify.
+      **Gate:** qualified synthetic comparisons pass, all named negative cases fail, and
+      development observations cannot qualify by copying release fields.
+    - [ ] M1.5c.3 Add private `tests/testing/portable/reference.py` and
+      `test_reference.py` for clean committed-source/import preflight, complete environment
+      lock and selected validator/resource/warning identities, and reference output support.
+      Integrate with `driver.py`/`conftest.py` only after the helper API is stable. Required
+      executable inputs must be clean; only specifically named generated outputs may be
+      output exceptions. Actual reference production still waits for complete M1.6 inputs
+      and M1.7 reconciliation. Reproduction of A with selected frozen B assets must preserve
+      the maintenance contract's non-circular binding. **Gate:** dirty/wrong-import/wrong-
+      revision/incomplete-environment/incomplete-corpus preflights refuse before writes,
+      clean synthetic preflight succeeds, and existing development output remains truthful.
 - [ ] M1.6 Transport fixtures and driver support in `tests/testing/portable/transport.py` for an
   actual native mocked OpenAI chat-completions transport. `transport-v0` distinguishes an
   `adapter` case (`input.adapter_config` and `input.wire`) from a `core_http` case

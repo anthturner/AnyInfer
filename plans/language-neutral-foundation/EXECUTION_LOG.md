@@ -456,3 +456,148 @@ extension evidence. No fixture expectation or production runtime changed in this
 Pending expectations remain pending, and no reference manifest, frozen release or qualified
 conformance report is claimed. M1.5b remains open for core driver predicates and development
 output; M1.5c and later gates remain untouched.
+
+### M1.5b.2 and M1.5b.3 execution history
+
+The native execution checkpoint is committed at
+`1275e889f576bbaab7492c24ff691ab3722ca3ef`. Three disjoint Terra-medium owners are now
+authoring the existing next obligations:
+
+- Core concurrency/assessment recipes and `proofs.py` dispatcher: agent
+  `04f0bc20-ef3f-4048-9249-961fffa69ee4`, owning `proofs.py`/`test_proofs.py`.
+- Real native timer/context recipes: agent `cab6145b-7c79-48e5-a321-0dbc60795f0e`,
+  owning `proof_timeouts.py`/`test_proof_timeouts.py`.
+- Explicitly unreleased observation driver/pytest integration: agent
+  `1e09179c-3413-4551-b0e4-65cb177a5654`, owning `driver.py`/`conftest.py`/`test_driver.py`.
+
+All paths are beneath `tests/testing/portable/`. The dispatcher contract is the five exact
+core recipe IDs and `await run_core_driver_assertion(recipe_ref)` returning actual native
+evidence only after its predicate. The timeout module returns native facts through
+`await observe_timeout_recipe(recipe_ref)`. Development output binds selected draft inputs,
+keeps pending/extension outcomes honest and names unexecuted inventory IDs. Reference writing
+still fails closed until the later clean-reference preflight.
+
+Workers run lightweight lint/types but request a coordinator test slot before launching
+pytest. One tracked targeted gate runs at a time; no repeated detached 30-second invocations.
+The coordinator owns shared plan acceptance. No native recipe, development-output or parent
+M1.5b checkbox is accepted yet; await these owners' implementation reports, then verify them.
+
+Concurrency/assessment recipes and the development driver are code-ready with Ruff passing;
+their independent read-only reviews are active. Their cross-module type checks and targeted
+tests await the timeout helper. The driver owner corrects its own canonical shared-exception
+import rather than changing a peer's export. No placeholder timeout module or unconfirmed
+test result is accepted, and no worker pytest slot has been granted yet.
+
+All three next-wave modules are now code-ready. The timeout owner passed compile/Ruff;
+its PATH did not expose mypy, so the coordinator will use `.venv/Scripts/mypy.exe`.
+Core-proof review found one P1 before testing: merely retaining a list of assessment kinds
+did not prove the required extraction/late-invalid-schema kinds and actual selected native
+occurrences. The owner adds structural predicates and controlled mutation negatives before
+the tracked combined slot. Native timer and development-driver reviews proceed independently;
+all pytest launches remain held until these static corrections are ready.
+
+Timeout review identified a separate P1: final entered/exited flags could not prove disposal
+before the next native entry. Its owner records ordered native enter/exit facts and asserts
+each prior exit precedes the next entry, with out-of-order/missing-disposal negative controls.
+This adds evidence only, without replacing native timers or comparing elapsed thresholds.
+
+Development-driver review found that requiring all declared transport files at this stage
+would block the native core observation before M1.6 authors those files. Development preflight
+therefore requires every executable core and normative input, explicitly records missing future
+transport files as unexecuted with their inventory identities, and validates/hashes any selected
+transport files already present. It never falls back to checkout inputs. Complete reference and
+release gates still require every transport file. The driver owner also reconciles the agreed
+driver evidence envelope and tests the actual executable import boundary before acceptance.
+
+Core-assessment structural review closed its first finding, then caught a native-message prefix
+comparison that would parse rendered prose. The owner removes that comparison and keeps typed
+metadata and captured native feedback as independent facts from the same actual assessment.
+Timeout ordered-disposal corrections are ready for independent closure. No new test pass or
+checkbox is claimed until the tracked combined proof/driver gate executes.
+
+The first tracked combined proof/development-driver gate exited 1: **4 failed, 17 passed**
+(shell `282788d4-6928-453f-97b0-742a66be64dd`). Development-driver tests passed. The native
+proof failures exposed an extraction-predicate mismatch, a test monkeypatch importing the
+non-package `tests` namespace, and two timeout predicates reading a nonexistent `category`
+from the actual typed `ErrorInfo` attempt snapshot. Owners correct those private proof
+assumptions using native captured facts and structured snapshot fields; production Python,
+fixture expectations and retry/repair behavior stay unchanged. Combined explicit mypy and
+portable Ruff passed before this run, but they did not establish native proof acceptance.
+
+The second tracked targeted run exited 1: **1 failed, 21 passed**. Native timeout and
+cancellation proofs now pass; assessment completeness exposed a genuine draft fixture error:
+`repair/exhaustion-two-invalid` and `repair/invalid-then-valid` require `age` but do not
+constrain its type, so their scripted string ages are valid and never enter correction.
+Python's result is correct. This is early M1.7-style input reconciliation, not an SDK defect
+or a reason to weaken the proof. Agent `c16f5f94-b124-40f4-9deb-8121afdbc093` owns a bounded
+audit/correction of all eight repair JSON inputs, preserving pending expectations and LF bytes,
+with actual native per-case observations. The proof owner holds semantic predicates until
+those inputs are stable. No new milestone is accepted yet.
+
+The repair-family correction adds only `properties.age.type: integer` to each of the eight
+schemas; scripts, controls and pending expectations are unchanged. Independent review confirms
+the intended branch inputs. The core-proof owner's single authorized tracked run passed
+**4 tests**, exit 0 (shell `a62abbc9-d8f0-45ce-9d1a-5d0eaa91bd24`); the coordinator inspected
+its retained log. Final core/timer and development-driver code reviews are clear.
+
+The coordinator is now exercising the actual pytest `--portable-report` path in shell
+`0d91864b-619f-4491-b0ad-bb27b961c7a2`, including fresh execution of all core observations
+and five native driver recipes. Its output remains explicitly UNRELEASED, with transport
+obligations unexecuted. Full repository acceptance and the next checkpoint commit remain
+pending; no checkbox is changed yet.
+
+The actual pytest development-output command passed **10 timeout-proof tests**, exit 0.
+The coordinator parsed its output: 90 executed records comprise 85 core fixtures (76 pending,
+9 declared extensions) and 5 passing core driver recipes; all 12 transport obligations are
+explicitly unexecuted. No executed record is fail/error. The output remains UNRELEASED and
+ineligible for `report-v0`. The full repository gate is running in tracked shell
+`51f9db42-1d1f-45c3-8ce5-78e62bc93646` with the existing two-worker cap and isolated cache.
+
+Read-only preparation for M1.5c identified implicit checkout schema/normative globals in the
+existing validator and duplicated selected-root checks in the private driver. The next wave
+first makes those validation inputs explicit and creates one shared data-only release-binding
+helper; comparison and reference consumers follow its accepted API. No source code from a
+selected corpus directory is executed. This is upcoming work, not a current-gate acceptance.
+
+The first full repository gate stopped at its test phase with one stale runner-test assertion:
+`test_runner_records_supplied_wire_controls_and_repair_drop_telemetry` expected only
+`ParameterDropped`. The corrected ceiling fixture now genuinely repairs and correctly also
+emits `RepairAttempted`. Lint, types, both contract steps, fixtures and changelog passed;
+the test phase failed, so this is not a full-gate pass. The test owner updates the exact typed
+telemetry assertions and removes its now-redundant local schema workaround, then runs the
+single affected node in its granted tracked slot. A complete repository rerun remains required.
+
+The single affected telemetry test and Ruff passed (tracked owner shell
+`4f6010e0-4ce5-47b8-990f-4aa112904535`); the coordinator inspected the diff and log.
+It asserts exact ordered typed drop/repair events and their parameter/attempt fields using
+the corrected canonical fixture. The full gate rerun uses the same root shell with cache
+`.tmp-tests/m15b-native-proof-checkpoint-final`; its result is pending.
+
+An additional optional strict-mypy sweep of the entire private test subtree found 32 test-only
+annotation/negative-input diagnostics in five pre-existing test modules. No runtime driver
+module was diagnosed; this sweep is broader than the project's configured source-only gate.
+The seven new proof/driver modules pass explicit strict mypy. Do not describe the optional
+whole-test sweep as passing or change runtime behavior to satisfy test-annotation assumptions.
+
+### M1.5b.2 and M1.5b.3 accepted
+
+The final full repository gate passed **all 13 steps in 274.5 seconds**, exit 0, in root
+shell `51f9db42-1d1f-45c3-8ce5-78e62bc93646`. The coordinator inspected the retained
+summary. Core/timer, development-driver, repair-input and telemetry-test reviews are clean.
+The existing source-only mypy gate passes; the seven new modules also pass explicit mypy.
+Actual CLI observation retains 85 core cases, five passing native driver predicates and
+12 unexecuted transport obligations without manufacturing a qualified report.
+
+The accepted checkpoint includes seven private proof/driver files, the corrected eight
+repair schemas, the exact telemetry-test correction and plan evidence. It changes no
+production Python behavior or pending fixture expectations. Parent M1.5/M1.5b remain open
+for reference/report support; HTTP, reference production, corpus freeze and C# remain later
+gates.
+
+### Current resume point: M1.5c.1
+
+Commit this reviewed checkpoint, then execute the first unchecked M1.5c.1 box. Start with
+explicit selected-root validation and one shared data-only release/report binding helper;
+comparison/reference consumers depend on its accepted API. No owner is authorized to alter
+Python retry/repair or implement aggregate accounting. The coordinator owns shared plan
+acceptance and serializes tracked test slots.

@@ -23,7 +23,12 @@
       "type": "object",
       "required": [
         "age"
-      ]
+      ],
+      "properties": {
+        "age": {
+          "type": "integer"
+        }
+      }
     },
     "consume": "buffered",
     "repair": {
