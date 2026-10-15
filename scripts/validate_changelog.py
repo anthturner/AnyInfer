@@ -280,6 +280,7 @@ def baseline_tail(problems: list[str]) -> str | None:
             cwd=ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
         )
         if result.returncode == 0:

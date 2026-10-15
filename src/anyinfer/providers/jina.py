@@ -180,12 +180,48 @@ _STATIC_EMBEDDING_CAPABILITIES = {
     model: EmbeddingCapabilities(input_intents=_EMBED_INTENTS)
     for model in ("jina-embeddings-v4", "jina-embeddings-v3")
 }
+_STATIC_EMBEDDING_CAPABILITIES.update(
+    {
+        # jina.ai/embeddings (verified 2026-10-15): the v5 omni models also
+        # accept text, but this adapter intentionally retains its text-only
+        # input contract.  Both v5 families support Matryoshka dimensions.
+        "jina-embeddings-v5-text-small": EmbeddingCapabilities(
+            dimensions=1_024,
+            dimension_choices=(32, 64, 128, 256, 512, 1_024),
+            max_input_tokens=32_768,
+            input_intents=_EMBED_INTENTS,
+        ),
+        "jina-embeddings-v5-omni-small": EmbeddingCapabilities(
+            dimensions=1_024,
+            dimension_choices=(32, 64, 128, 256, 512, 1_024),
+            max_input_tokens=32_768,
+            input_intents=_EMBED_INTENTS,
+        ),
+        "jina-embeddings-v5-text-nano": EmbeddingCapabilities(
+            dimensions=768,
+            dimension_choices=(32, 64, 128, 256, 512, 768),
+            max_input_tokens=8_192,
+            input_intents=_EMBED_INTENTS,
+        ),
+        "jina-embeddings-v5-omni-nano": EmbeddingCapabilities(
+            dimensions=768,
+            dimension_choices=(32, 64, 128, 256, 512, 768),
+            max_input_tokens=8_192,
+            input_intents=_EMBED_INTENTS,
+        ),
+    }
+)
 
 _STATIC_RERANK_CAPABILITIES = {
     # jina.ai/reranker (verified 2026-08-12): "no hard limit on the number of documents
     # per request" — so none is declared, and the sanity ceiling governs.
     model: RerankCapabilities(native_top_n=True)
-    for model in ("jina-reranker-v3", "jina-reranker-m0", "jina-reranker-v2-base-multilingual")
+    for model in (
+        "jina-reranker-v3",
+        "jina-reranker-v3.5",
+        "jina-reranker-m0",
+        "jina-reranker-v2-base-multilingual",
+    )
 }
 
 

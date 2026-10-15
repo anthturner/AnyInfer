@@ -16,7 +16,7 @@ from anyinfer.providers.base import (
     RerankWireDocument,
     RerankWireRequest,
 )
-from anyinfer.providers.jina import JinaAdapter
+from anyinfer.providers.jina import JinaAdapter, descriptor
 from anyinfer.testing.conformance import (
     Capabilities,
     ConformanceHarness,
@@ -203,6 +203,32 @@ async def test_client_embed_and_rerank_end_to_end() -> None:
         assert [item.index for item in ranked.items] == [0, 1]
     finally:
         await client.aclose()
+
+
+async def test_v5_models_have_static_operation_and_text_capabilities() -> None:
+    """Published v5 ids are known before discovery, with only text facts exposed."""
+    client = ai.AsyncClient(
+        [ai.ProviderSettings.of("jina", api_key="k")], use_default_catalog=False
+    )
+    try:
+        for model in (
+            "jina-embeddings-v5-text-small",
+            "jina-embeddings-v5-text-nano",
+            "jina-embeddings-v5-omni-small",
+            "jina-embeddings-v5-omni-nano",
+        ):
+            assert client.operations_for(f"jina:{model}") == frozenset({"embedding"})
+        assert client.operations_for("jina:jina-reranker-v3.5") == frozenset({"rerank"})
+    finally:
+        await client.aclose()
+
+    small = descriptor.static_embedding_capabilities["jina-embeddings-v5-text-small"]
+    nano = descriptor.static_embedding_capabilities["jina-embeddings-v5-omni-nano"]
+    assert (small.dimensions, small.max_input_tokens) == (1_024, 32_768)
+    assert small.dimension_choices == (32, 64, 128, 256, 512, 1_024)
+    assert (nano.dimensions, nano.max_input_tokens) == (768, 8_192)
+    assert nano.dimension_choices == (32, 64, 128, 256, 512, 768)
+    assert "jina-reranker-v3.5" in descriptor.static_rerank_capabilities
 
 
 # ---- response bombs -----------------------------------------------------------------

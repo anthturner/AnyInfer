@@ -1,7 +1,7 @@
 # voyage — Protocol Contract
 
 Status: **implemented** — `providers/voyage.py`, embeddings and reranker.
-Last verified: 2026-08-12 — against live Voyage documentation (sources below). Not yet
+Last verified: 2026-10-12 — against live Voyage documentation (sources below). Not yet
 verified against live traffic; flagged in the watchlist.
 
 ## Upstream sources
@@ -71,13 +71,18 @@ counterpart to TEI's retrieval-only shape.
 Embeddings and rerank responses are not streamed.
 
 ### Errors
-- Standard HTTP statuses mapped by the shared classification. **Unverified:** the exact
-  error-body shape (the reference does not document it); `read_error_detail`'s generic
-  parsing applies.
+- Standard HTTP statuses mapped by the shared classification. **Verified 2026-10-12:**
+  both reference pages embed an OpenAPI schema documenting the 4XX body as
+  `{"detail": "<string>"}` ("The error message."); 5XX carries no documented body
+  schema. `read_error_detail`'s generic fallback (`providers/http.py`) reads an
+  unwrapped top-level `detail` key correctly already, so no adapter change follows from
+  this.
 
 ## Watchlist
-- **Not yet live-verified** — the first live lane should confirm the error-body shape,
-  usage fields, and that `data[]` ordering matches the documented index semantics.
+- **Not yet live-verified** — the first live lane should confirm the usage fields and
+  that `data[]` ordering matches the documented index semantics. The error-body shape is
+  now confirmed from the docs' embedded OpenAPI schema (see Errors above) but not yet
+  seen on live traffic.
 - `output_dtype` quantized encodings and base64 `encoding_format` — unmodelled (float
   only); reachable via `provider_options`.
 - The 1,000-input and 1,000-document ceilings, and the per-model token budgets.

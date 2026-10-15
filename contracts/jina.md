@@ -1,13 +1,18 @@
 # jina — Protocol Contract
 
 Status: **implemented** — `providers/jina.py`, embeddings and reranker.
-Last verified: 2026-08-12 — against Jina's product documentation and its own model
+Last verified: 2026-10-12 — against Jina's product documentation and its own model
 publications (sources below); the interactive API reference (`api.jina.ai/redoc`) is
-JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
+still JS-only and unfetchable headlessly — reconfirmed 2026-10-12, a ~4KB `<div
+id="app">` shell with no inline schema. Not yet verified against live traffic.
 
 ## Upstream sources
 - https://jina.ai/embeddings/ (request shape, task vocabulary, models)
 - https://jina.ai/reranker/ (rerank request shape, models, no-hard-limit statement)
+- https://jina.ai/en-US/news/jina-embeddings-v5-text-distilling-4b-quality-into-sub-1b-multilingual-embeddings/
+  (v5 text dimensions and context limits)
+- https://jina.ai/en-US/news/jina-embeddings-v5-omni-multimodal-embeddings-for-text-image-audio-and-video/
+  (v5 omni text compatibility, dimensions, and context limits)
 - https://huggingface.co/jinaai/jina-reranker-v3 and Jina's reranker announcement posts
   (rerank response shape: `results[]` with `index`/`relevance_score`,
   `usage.total_tokens`)
@@ -35,7 +40,8 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
   classification→`classification`, and **clustering→`separation`** (Jina's
   clustering-flavored task; a deliberate mapping recorded here, not an upstream
   equivalence claim), plus `text-matching` (unmapped), `dimensions` (Matryoshka
-  truncation), `late_chunking`, `embedding_type`/format options, `normalized`.
+  truncation), `truncate` (over-limit inputs otherwise fail), `late_chunking`,
+  `embedding_type`/format options, `normalized`.
 - The adapter sends `model`, `input`, `task` (when an intent was given), and
   `dimensions`; everything else is reachable via `provider_options`.
 
@@ -43,7 +49,11 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
 - OpenAI-shaped: `data[]` with `embedding`/`index` (adapter orders by the reported
   index and rejects out-of-range/duplicates), `usage.total_tokens` →
   `Usage.total_tokens` only, never assumed into `input_tokens`.
-- **Unverified:** per-model default dimensions; the exact error-body shape.
+- For multimodal calls, Jina also documents a `usage.image_tokens` breakdown. The
+  adapter remains text-only, so it preserves the complete raw payload but does not
+  normalize that modality-specific field.
+- **Unverified:** default dimensions for the older v3/v4 models; the exact error-body
+  shape.
 
 ### Rerank request fields (verified 2026-08-12)
 - `model`, `query`, `documents` (list of strings; **"no hard limit on the number of
@@ -67,10 +77,22 @@ JS-only and unfetchable headlessly, recorded as such. Not yet live-verified.
 ### Streaming
 Embeddings and rerank responses are not streamed.
 
+### Published static model capabilities (verified 2026-10-15)
+- `jina-embeddings-v5-text-small` and `jina-embeddings-v5-omni-small`: 1,024
+  dimensions; Matryoshka choices 32/64/128/256/512/1,024; 32,768-token text input.
+- `jina-embeddings-v5-text-nano` and `jina-embeddings-v5-omni-nano`: 768 dimensions;
+  Matryoshka choices 32/64/128/256/512/768; 8,192-token text input.
+- `jina-reranker-v3.5`: native `top_n`; a 131,072-token shared window for the query
+  and all documents, with automatic truncation. That is not a per-document ceiling, so
+  `max_tokens_per_document` remains unset.
+
+The omni models accept multimodal inputs upstream, but AnyInfer's embedding request is
+text-only. They are listed here only for their verified text-compatible operation.
+
 ## Watchlist
 - **Not yet live-verified** — first live lane confirms the embeddings response shape,
   error bodies, and usage fields.
 - The clustering→`separation` mapping, should Jina document its tasks more precisely.
-- `late_chunking`, multimodal inputs (v4/m0), quantized `embedding_type` values —
-  unmodelled; reachable via `provider_options`.
+- `late_chunking`, multimodal inputs (v4/m0 and v5-omni), quantized
+  `embedding_type` values — unmodelled; reachable via `provider_options`.
 - A listing endpoint, if one appears.

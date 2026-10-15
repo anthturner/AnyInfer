@@ -33,7 +33,7 @@ import contextlib
 import hashlib
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -318,8 +318,9 @@ def _read_at(fd: int, size: int, offset: int) -> bytes:
         verification runs to completion before the fd is handed on — so the two behave
         identically in this use.
     """
-    if hasattr(os, "pread"):
-        return os.pread(fd, size, offset)
+    pread: Callable[[int, int, int], bytes] | None = getattr(os, "pread", None)
+    if pread is not None:
+        return pread(fd, size, offset)
     saved = os.lseek(fd, 0, os.SEEK_CUR)
     try:
         os.lseek(fd, offset, os.SEEK_SET)
