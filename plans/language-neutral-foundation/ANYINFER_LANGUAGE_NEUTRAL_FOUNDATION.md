@@ -141,7 +141,8 @@ M1 and later use `src/python/` paths and therefore depend on it.
   the upstream integration result, original PR dispositions, issues inventory and resulting
   baseline commit are recorded in `EXECUTION_LOG.md`. No unrelated untracked work is removed.
   > NOTE: The reset and verified plan overlay completed at source HEAD `13b9e65`; the
-  > user's existing untracked nested `AnyInfer/` checkout is retained. Content authoring for
+  > user's existing untracked nested `AnyInfer/` checkout was retained during reset and
+  > later removed at their explicit cleanup request. Content authoring for
   > M1.2/M1.2U may proceed independently; no runtime box is accepted before its prerequisites.
   > NOTE: PR #51 contains the reviewed combined updates at `b166241` and passed all 12
   > local gate steps. M0.1 authoring proceeds from that commit while GitHub CI runs;
@@ -454,6 +455,43 @@ M1 and later use `src/python/` paths and therefore depend on it.
     > Next add driver recipes and pytest development-output integration after this core
     > execution wave is reviewed. Pending expectations remain pending and cannot count as
     > passes; no report-v0 or release identity is manufactured by these development runs.
+    > NOTE: Cold review rejected the first projection slice despite its green unit tests:
+    > extension records had the wrong shape, wire/correction provenance was insufficiently
+    > checked, configuration errors were unmapped, and JSON projection coerced object keys.
+    > Require native captured positives and isolated evidence mutations before acceptance.
+    > Raw run records additionally retain the actual caller messages/schema and a typed
+    > native request-construction origin. These are private driver facts, not SDK changes.
+    > Shared §12 remains authoritative: request-construction phase is null, while target/
+    > configuration phase is configure; an earlier coordinator brief misstated the former.
+    > NOTE: `tests/testing/portable/test_execution.py` must compose the actual runner,
+    > projection and comparator for every authored core case. Mandatory pending cases retain
+    > a pending verdict, while declared boundary extensions must retain honest native evidence.
+    > Passing isolated layer tests does not replace this end-to-end evidence gate.
+    - [x] M1.5b.1 Native core execution checkpoint: raw records, runner, projection,
+      comparator and their tests, including `test_execution.py`. **Gate:** the combined
+      portable suite executes every current core fixture, independent review has no open
+      finding, and `workspace check --fail-fast` passes before the checkpoint commit.
+      > NOTE: Accepted with all 234 portable tests passing, including 85 composed core
+      > fixture executions; all independent review findings are closed. The complete
+      > repository gate passed all 13 steps in 560.5 seconds with xdist workers capped at
+      > two and no excluded tests. Expectations remain pending; this is an execution-layer
+      > checkpoint, not a frozen reference or conformance release.
+    - [ ] M1.5b.2 Implement `tests/testing/portable/proofs.py` and `test_proofs.py` for the
+      five core driver recipes in shared §17: concurrency, assessment completeness, effective
+      default/explicit limits, per-entry timeout reset, and cleanup/disposal timeout. Observe
+      actual native contexts and real timeout/cancellation; spies delegate native behavior.
+      The HTTP byte-budget driver recipe remains M1.6. **Gate:** each core recipe produces
+      nonempty native evidence only after its predicate succeeds; controlled missing/faulted
+      evidence is error, and the targeted proof module passes without elapsed thresholds.
+    - [ ] M1.5b.3 Implement private `driver.py`, `conftest.py` and `test_driver.py` under
+      `tests/testing/portable/` for pytest development-output integration. Record the hashed
+      selected draft inventory, actual source/environment binding, available case records and
+      explicitly unexecuted transport/driver IDs; pending fixtures cannot become passes.
+      Register `--portable-report` and `--write-reference`; the latter fails closed until
+      M1.5c/M1.7 reference preflight is available. **Gate:** real CLI development observations
+      are explicitly unreleased, preserve case/evidence identities, and cannot validate as
+      qualified `report-v0`; driver/plugin tests pass. The parent box stays open until all
+      waves and the M1.5c support required by its original gate are complete.
   - [ ] M1.5c Reference/report identity support and `scripts/compare_reports.py` with its
     required negative tests. Gate: incomplete/development/wrong-identity/failing reports
     cannot qualify, and the documented qualified synthetic/Python comparisons behave exactly

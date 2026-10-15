@@ -23,7 +23,8 @@ Aggregate operation accounting remains M3; publishing packages remains a separat
 - Backup directory:
   `C:/Users/antho/.traycer/epics/a4822703-eee2-44cb-960c-47b3ae3d4c73/scratch/foundation-backup-20261015-115654/`.
 - Execution branch: `feature/language-neutral-foundation`.
-- Pre-existing untracked nested `AnyInfer/` tree remains outside the change.
+- Pre-existing untracked nested `AnyInfer/` tree was preserved during reset, then removed
+  at the user's explicit cleanup request below.
 - Stale native `group_foundation_plans` agent was already interrupted; stop was reissued.
   Traycer's task inventory showed no other live child at the initial audit.
 
@@ -255,7 +256,7 @@ into disjoint ownership before a second wave wires the native runner/projection.
 M1.5c complete native predicates and fail-closed report/reference tooling. These subdivisions
 make the existing box executable; they add no SDK scope or conformance claim.
 
-### Current resume point: M1.5a
+### M1.5a handoff
 
 M1.4 is committed at `55442cfdbbd5b86fd8de927ce2a7f758e41ba5b3`. The coordinator created
 the private portable package initializer before parallel work began. Current disjoint owners
@@ -295,3 +296,163 @@ flags under `capabilities`.
 Resume at M1.5b: build raw records/projection, native execution, and comparison in disjoint
 files before adding driver recipes and pytest development output. The parent M1.5 box is
 unchecked; neither pending expectations nor passing substrate tests establish conformance.
+
+### M1.5b first-wave handoff
+
+Accepted M1.5a commit: `3dffc424676dc405bb61c614b9275d011828c934`. Three disjoint
+implementation briefs are active: `records.py`, `projection.py`, `test_projection.py`;
+`runner.py`, `test_runner.py`; and `comparison.py`, `test_comparison.py`, all beneath
+`tests/testing/portable/`. The frozen `NativeRun` record carries actual native events,
+result/exception and failure stage, telemetry, capture records, adapter wires, clock advances,
+cleanup facts and an optional independent buffered mirror. Projection never recomputes
+validation; execution never reads expected outcomes; comparison expands only typed expected
+segments against actual causal evidence. Pending expectations cannot receive a pass verdict.
+
+All three owners report back before acceptance or the next implementation wave. Timer and
+other mandatory driver recipes, pytest development output, and M1.5c qualification tooling
+are still outstanding. Resume with their implementation reports and independent cold review;
+the master M1.5b and parent M1.5 boxes remain unchecked.
+
+### M1.5b first-wave review — not accepted
+
+The initial runner executes all 85 authored core inputs, but that run does not yet prove
+the intended cancellation threshold or complete observation fidelity. Its review is active.
+The initial six-test projection slice was rejected by independent review for four P1 gaps:
+malformed extension evidence; incomplete actual-wire/correction-source verification;
+unmapped construction/configuration failures; and JSON key coercion/domain bypass. The
+11-test comparison slice is separately under review. No M1.5b acceptance gate has passed.
+
+Corrections retain the agreed APIs and shared contract. `NativeRun` gains three additive
+raw facts at the end of the dataclass: actual `input_messages`, original `input_schema`, and
+`construction_origin` set only around the native sampling constructor. This permits causal
+and typed-origin checks without parsing error prose or recomputing native validation.
+Request-construction errors keep a null phase as shared §12 requires; only target and
+configuration failures use `configure`. The coordinator corrected an earlier brief that
+had misstated construction phase, without amending the contract or Python behavior.
+
+Runner review also rejected the initial cancellation path: it ignored the declared event
+threshold and suppressed the cancellation outcome. Script/harness faults were mislabeled as
+operation errors, making the 85-case smoke assertion vacuous. Comparison review rejected a
+non-normative `same_as_call` encoding, subset-only result comparison, and a mirror predicate
+that could accept copied streamed evidence. Those corrections are assigned to their owners.
+The raw record now also retains actual `consumption_mode`; mirror comparison requires a
+buffered mode plus distinct native operation identities/objects and matching case binding.
+The first projection revision is under re-review; its new raw-input fields do not alone
+establish template/prefix verification. All M1.5b checkboxes remain open.
+
+### M1.5b recovery ownership
+
+Projection re-review kept open template/original-prefix verification, type-aware actual-wire
+checks, redacted error evidence and complete ordinary-JSON output validation. The coordinator
+transferred `projection.py`/`test_projection.py` to a fresh native implementer
+`projection_repair`; the prior owner is held. The runner's two requested parent-cancellation/
+watchdog cleanup tests were still not delivered after repeated handoffs, so `runner.py`/
+`test_runner.py` transfer to fresh native implementer `runner_lifecycle_repair`; its prior
+owner is held too. The latter may extend only the existing `construction_origin` Literal in
+`records.py` with actual native messages/repair/route constructor tags. All other record fields
+and agreed projection APIs remain stable. Known native construction failures retain null
+phase; driver codec/setup failures are harness faults.
+
+Comparison's same-as encoding and complete result shape passed closure review. Its owner
+adds disjoint native operation-ID verification alongside object identity so a copied stream
+capture cannot masquerade as a fresh buffered mirror. These are private proof corrections,
+without production or specification changes. Resume at the still-unchecked M1.5b from
+`3dffc424676dc405bb61c614b9275d011828c934`, with the current working changes preserved.
+
+Comparison closure is now independently clean. The verifier confirmed normative reference
+encoding, complete result comparison, and fresh-mirror checks using distinct capture objects
+and disjoint valid native operation IDs; its targeted module passes all 12 tests. The review
+artifact is `foundation-execution/comparison-review` in the task artifact tree. This accepts
+the comparator correction only. Projection and runner lifecycle corrections, their independent
+reviews, mandatory driver recipes, development-output integration and the joint M1.5b gate
+remain outstanding.
+
+### User-authorized nested-directory cleanup
+
+The user explicitly requested removing the nested `AnyInfer/` copy on 2026-10-15.
+The coordinator verified its resolved absolute path was exactly
+`D:/projects/AnyInfer/AnyInfer`, beneath the intended workspace and not a reparse point,
+then removed only that directory with native PowerShell. The path no longer exists and
+Git status no longer lists it. The earlier reset and preservation statements describe the
+reset-time precaution; no foundation source or tracked work was reset during this cleanup.
+
+Projection's fresh-implementation review found two further P1s before acceptance: extension
+capture must validate original/correction roles even when portable mechanism projection is
+unavailable, and a terminal schema assessment must belong to the final actual entered wire.
+The owner is correcting both with real-capture mutation tests; the prior nine-test green
+result does not close these proof obligations. Runner lifecycle review is still independent
+and active. No M1.5b checkbox or unreviewed driver source is committed as complete.
+
+Runner review otherwise cleared lifecycle/native execution and identified one remaining
+fixture-sweep assertion gap: nonempty adapter requests must require exactly one available
+operation capture, rather than accepting an empty list through `all(...)`. Its owner fixes
+that test. A separate `test_execution.py` owner now composes actual execution, projection and
+comparison across all 85 core fixtures, with honest declared extensions and no pass verdict
+for pending expectations. Cross-layer failures are reported for correction before any joint
+gate; they cannot be skipped or weakened into pending success.
+
+### Serialized verification recovery
+
+Final projection code inspection closed the unknown-role and stale-terminal-assessment P1s;
+the reviewer's independent test attempt did not finish and is explicitly unconfirmed. The
+runner smoke predicate is corrected, with its final test retry also unconfirmed after lost
+tool handles. The integration test exists but its first run likewise has no captured exit.
+No unconfirmed command is recorded as a pass.
+
+Process inspection found stale pytest invocations from this task's earlier runs. The
+coordinator removed 122 verified workspace-owned stale roots and their descendants (248
+processes total), checking executable/command ownership, parent absence or PID reuse, task
+timestamps and live process start times. One earlier task-cache invocation with a stale live
+parent was identified separately. Audit manifests are in task scratch as
+`pytest-orphan-cleanup-20261015.json` and `pytest-orphan-cleanup-20261015-final.json`.
+Unrelated processes were excluded.
+
+One tracked serialized gate now runs in shell `a6e4a58d-a01f-473e-93fd-870770be3179`:
+`pytest.exe -q -n 0 -o cache_dir=.tmp-tests/portable-joined-serial tests/testing/portable`.
+All workers are held from additional test launches. This run supplies the missing joint
+execution/projection/comparison evidence; its result is pending.
+
+The tracked serial gate completed with exit 1 and exactly two failing integration cases:
+`schema-admission/unsupported-boolean-subschema` and
+`schema-admission/unsupported-dialect-null`. The comparator attempted mandatory portable-error
+projection before its declared-extension branch, rejecting the native `TypeError` and actual
+warnings-as-errors `DeprecationWarning`. Their honest native extension evidence is allowed by
+the settled contract. The comparator owner corrects dispatch order without bypassing capture
+integrity, changing warning policy, weakening the integration test or editing Python behavior.
+Runner's final code review is clean; the joined run reported no runner/projection unit failure.
+The whole portable gate remains failed until its tracked rerun passes.
+
+The next tracked run passed all 85 real core integrations and 228 tests overall, with one
+stale unit-test mock failure: its `validate_capture` double omitted the newly exercised
+`allow_unprojectable` keyword. Independent review also found that early extension dispatch
+needed an explicit cancellation/fatal-BaseException guard. Both are assigned to the comparator
+owner; no fixture, warning policy or production behavior changes. The 229-test run is still
+failed, not a gate pass, until the correction is verified in the serialized rerun.
+
+The final portable rerun passed **234 tests in 6.31 seconds**, exit 0, with all 85 real
+fixture integrations. Independent comparator code review closed the cancellation/fatal guard;
+projection and runner closure reviews are also clear. The full repository gate is now running
+in shell `a4c48aa8-dc1d-4922-957d-30621139f3d7`, with an isolated pytest cache and the
+installed xdist plugin's supported `PYTEST_XDIST_AUTO_NUM_WORKERS=2` cap. This limits
+parallelism only; no gate or test is excluded.
+
+M1.5b is subdivided into the native execution checkpoint, five core native driver recipes,
+and pytest development-output integration. These subdivisions make the existing obligations
+explicit; reference qualification remains M1.5c/M1.7/M1.G and HTTP proof remains M1.6.
+No native recipe or development-output file is authored until its checkpoint prerequisite
+passes. The full-gate result and checkpoint commit remain pending.
+
+### M1.5b.1 execution checkpoint accepted
+
+The tracked full gate passed all 13 steps in **560.5 seconds**, exit 0 (shell
+`a4c48aa8-dc1d-4922-957d-30621139f3d7`). It used the supported xdist two-worker cap and
+an isolated cache without excluding any test. The separate combined portable gate passed
+**234 tests**, including every one of the 85 current core fixtures through actual native
+execution, projection and comparison. Projection, comparator and runner reviews are clean.
+
+The checkpoint includes raw typed facts, lossless capture/projection linkage, native
+fixture execution/cancellation/lifecycle, strict scoped comparison and honest declared
+extension evidence. No fixture expectation or production runtime changed in this wave.
+Pending expectations remain pending, and no reference manifest, frozen release or qualified
+conformance report is claimed. M1.5b remains open for core driver predicates and development
+output; M1.5c and later gates remain untouched.
