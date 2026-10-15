@@ -79,6 +79,14 @@ from ..routing.attempts import AttemptBuffer
 from ..routing.health import HealthCache
 from ..routing.limits import AttemptPacing, RateLimiter
 from ..routing.policy import Route, backoff_delay
+from ..schema._capture import (
+    _OperationCapture,
+    allocate_entry,
+    capture_scope,
+    new_operation,
+    record_entered_wire,
+    record_preparation,
+)
 from ..schema.partial import partial_object
 from ..schema.repair import build_repair_messages
 from ..schema.validate import extract_json, validate
@@ -326,6 +334,10 @@ class GenerationExecutionMixin:
         builder: ManifestBuilder | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run the route and yield its events."""
+        # The capture state belongs to this executing generator, rather than a ContextVar
+        # lifetime spanning yields.  A consumer may advance or close this stream in another
+        # task, while synchronous helper calls below briefly activate the ContextVar.
+        capture_operation = new_operation()
         if request_id is None:
             request_id, builder = self._new_run(request, route, None)
         try:
@@ -342,6 +354,7 @@ class GenerationExecutionMixin:
                     session=session,
                     request_id=request_id,
                     builder=builder,
+                    capture_operation=capture_operation,
                 )
             ) as events:
                 async for event in events:
@@ -363,6 +376,7 @@ class GenerationExecutionMixin:
         session: Session | None,
         request_id: str,
         builder: ManifestBuilder | None,
+        capture_operation: _OperationCapture | None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run the route proper, once the run is registered."""
         if session is not None:
@@ -451,6 +465,7 @@ class GenerationExecutionMixin:
                                 if route.content_policy_targets and not content_redirected
                                 else None
                             ),
+                            capture_operation=capture_operation,
                         )
                     ) as attempt_events:
                         async for event in attempt_events:
@@ -775,6 +790,7 @@ class GenerationExecutionMixin:
         builder: ManifestBuilder | None = None,
         context_summary: ContextSummary | None = None,
         content_chain: Callable[[], list[Target]] | None = None,
+        capture_operation: _OperationCapture | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Run one attempt against one target, including the schema repair loop.
 
@@ -833,6 +849,7 @@ class GenerationExecutionMixin:
                 ParameterDropped(request_id, resolved, "repair.max_attempts", repair_clamp_reason)
             )
         repair_attempts = 0
+        repair_assessment_ref: str | None = None
         yielded_content = False
 
         cache_plan = self._plan_cache(
@@ -880,32 +897,41 @@ class GenerationExecutionMixin:
                 # `aclosing_if_supported` rather than `contextlib.aclosing`: `adapter` is
                 # `ProviderAdapter`-typed, and `GeneratesText.generate()` does not promise
                 # `.aclose()` (see that Protocol's docstring).
-                async with (
-                    self._client_side_pacing(limiter, descriptor),
-                    asyncio.timeout(current.effective_timeout_s),
-                    aclosing_if_supported(adapter.generate(wire)) as adapter_events,
+                async with self._client_side_pacing(limiter, descriptor), asyncio.timeout(
+                    current.effective_timeout_s
                 ):
-                    async for event in adapter_events:
-                        # Pacing is over once anything comes back, and the marker must not
-                        # outlive it: this is an async generator, so a marker still set at a
-                        # yield would follow the consumer into whatever it does next.
-                        pacing.detach()
-                        if isinstance(event, AdapterFinal):
-                            final = event
-                            continue
-                        if is_content_event(event) and not first_token_seen:
-                            first_token_seen = True
-                            at_ms = active_buffer.mark_first_token(time.monotonic())
-                            self._emit(FirstToken(request_id, resolved, at_ms))
-                            yield TimingMark("first_token", at_ms)
-                        if isinstance(event, UsageUpdate):
-                            saw_usage_event = True
-                            active_buffer.usage = active_buffer.usage.merge(event.usage)
-                        else:
-                            active_buffer.absorb(event)
-                        if is_content_event(event):
-                            yielded_content = True
-                        yield event
+                    # This is deliberately after pacing and timeout entry: an ordinal means
+                    # an actual adapter invocation, not cancellable request preparation.
+                    entry_ordinal = allocate_entry(capture_operation)
+                    record_entered_wire(
+                        capture_operation,
+                        entry_ordinal=entry_ordinal,
+                        role="original" if repair_attempts == 0 else "correction",
+                        repair_assessment_ref=repair_assessment_ref,
+                        wire=wire,
+                    )
+                    async with aclosing_if_supported(adapter.generate(wire)) as adapter_events:
+                        async for event in adapter_events:
+                            # Pacing is over once anything comes back, and the marker must not
+                            # outlive it: this is an async generator, so a marker still set at a
+                            # yield would follow the consumer into whatever it does next.
+                            pacing.detach()
+                            if isinstance(event, AdapterFinal):
+                                final = event
+                                continue
+                            if is_content_event(event) and not first_token_seen:
+                                first_token_seen = True
+                                at_ms = active_buffer.mark_first_token(time.monotonic())
+                                self._emit(FirstToken(request_id, resolved, at_ms))
+                                yield TimingMark("first_token", at_ms)
+                            if isinstance(event, UsageUpdate):
+                                saw_usage_event = True
+                                active_buffer.usage = active_buffer.usage.merge(event.usage)
+                            else:
+                                active_buffer.absorb(event)
+                            if is_content_event(event):
+                                yielded_content = True
+                            yield event
             except TimeoutError:
                 # asyncio.timeout raises the builtin TimeoutError, which would bypass
                 # the router's ProviderError handling — no attempt record, no retry,
@@ -965,7 +991,9 @@ class GenerationExecutionMixin:
                     )
                     raise _ContentPolicyRedirect(chain)
 
-            structured, errors = self._validate(current, active_buffer)
+            structured, errors = self._validate(
+                current, active_buffer, capture_operation, entry_ordinal
+            )
 
             if errors and repair_attempts < repair_budget:
                 if builder is not None:
@@ -980,9 +1008,28 @@ class GenerationExecutionMixin:
                         active_buffer.text if self._events.wants_payloads else None,
                     )
                 )
-                current = request.with_messages(
-                    build_repair_messages(request.messages, active_buffer.text, errors)
+                with capture_scope(capture_operation, entry_ordinal):
+                    built_messages = build_repair_messages(
+                        request.messages, active_buffer.text, errors
+                    )
+                assessment_ref = (
+                    capture_operation.latest_assessment_id
+                    if capture_operation is not None
+                    else None
                 )
+                preparation_retained = False
+                if assessment_ref is not None and entry_ordinal is not None:
+                    preparation_retained = record_preparation(
+                        capture_operation,
+                        source_entry_ordinal=entry_ordinal,
+                        assessment_ref=assessment_ref,
+                        original_messages=request.messages,
+                        raw_text=active_buffer.text,
+                        errors=errors,
+                        built_messages=built_messages,
+                    )
+                current = request.with_messages(built_messages)
+                repair_assessment_ref = assessment_ref if preparation_retained else None
                 repair_attempts += 1
                 continue
 
@@ -1048,7 +1095,11 @@ class GenerationExecutionMixin:
             return
 
     def _validate(
-        self, request: GenerationRequest, buffer: AttemptBuffer
+        self,
+        request: GenerationRequest,
+        buffer: AttemptBuffer,
+        capture_operation: _OperationCapture | None = None,
+        entry_ordinal: int | None = None,
     ) -> tuple[Any, tuple[str, ...]]:
         """Extract and validate structured output, if the request asked for any."""
         if request.schema is None:
@@ -1056,12 +1107,14 @@ class GenerationExecutionMixin:
 
         candidate = _structured_candidate(request, buffer)
         if candidate is None:
-            parsed, parse_error = extract_json(buffer.text)
+            with capture_scope(capture_operation, entry_ordinal):
+                parsed, parse_error = extract_json(buffer.text)
             if parse_error is not None:
                 return None, (parse_error,)
             candidate = parsed
 
-        errors = validate(candidate, request.schema.json_schema)
+        with capture_scope(capture_operation, entry_ordinal):
+            errors = validate(candidate, request.schema.json_schema)
         return (candidate, ()) if not errors else (None, errors)
 
     def _assemble(

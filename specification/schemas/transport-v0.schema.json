@@ -1,0 +1,117 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "transport-v0.schema.json",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "fixture_version",
+        "id",
+        "family",
+        "profile",
+        "description",
+        "kind",
+        "input",
+        "responses",
+        "expected"
+    ],
+    "properties": {
+        "fixture_version": {"const": "0"},
+        "id": {"type": "string", "pattern": "^transport/openai-chat/[a-z0-9][a-z0-9-]*$"},
+        "family": {"const": "transport/openai-chat"},
+        "profile": {"const": "core-generation"},
+        "description": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["adapter", "core_http"]},
+        "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["adapter_config"],
+            "properties": {
+                "adapter_config": {"type": "object"},
+                "wire": {"type": "object"},
+                "operation": {"type": "object"}
+            }
+        },
+        "responses": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["status", "headers", "byte_chunks"],
+                "properties": {
+                    "status": {"type": "integer", "minimum": 100, "maximum": 599},
+                    "headers": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "byte_chunks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["bytes"],
+                            "properties": {
+                                "bytes": {"type": "string", "contentEncoding": "base64"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["http_requests", "wire_limits"],
+            "properties": {
+                "http_requests": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["method", "path", "headers", "json", "stream_mode"],
+                        "properties": {
+                            "method": {"type": "string", "minLength": 1},
+                            "path": {"type": "string", "pattern": "^/"},
+                            "headers": {
+                                "type": "object",
+                                "additionalProperties": {"type": "string"}
+                            },
+                            "json": {},
+                            "stream_mode": {"type": "boolean"}
+                        }
+                    }
+                },
+                "wire_limits": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["timeout_s", "max_response_bytes"],
+                        "properties": {
+                            "timeout_s": {"type": "number"},
+                            "max_response_bytes": {"type": "integer", "minimum": 0}
+                        }
+                    }
+                },
+                "adapter_outcome": {"type": "object"},
+                "core": {"type": "object"}
+            }
+        }
+    },
+    "allOf": [
+        {
+            "if": {"properties": {"kind": {"const": "adapter"}}, "required": ["kind"]},
+            "then": {
+                "properties": {
+                    "input": {"required": ["wire"], "not": {"required": ["operation"]}},
+                    "expected": {"required": ["adapter_outcome"], "not": {"required": ["core"]}}
+                }
+            }
+        },
+        {
+            "if": {"properties": {"kind": {"const": "core_http"}}, "required": ["kind"]},
+            "then": {
+                "properties": {
+                    "input": {"required": ["operation"], "not": {"required": ["wire"]}},
+                    "expected": {"required": ["core"], "not": {"required": ["adapter_outcome"]}}
+                }
+            }
+        }
+    ]
+}

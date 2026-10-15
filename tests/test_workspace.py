@@ -151,13 +151,18 @@ class TestVerbs:
                 and (subcommand is None or (len(cmd) > 1 and cmd[1] == subcommand))
             )
 
-        # Fastest-feedback-first: static analysis, types, contracts, then the suites,
+        # Fastest-feedback-first: static analysis, types, contracts, fixtures, then the suites,
         # then the docs gates and the artifact build the deploy publishes.
         # The docs gates are the in-process sentinels the `recorded` fixture plants.
         positions = [
             position("ruff", "check"),
             position("mypy"),
             position("lint-imports"),
+            next(
+                i
+                for i, cmd in enumerate(recorded)
+                if any("validate_fixtures.py" in argument for argument in cmd)
+            ),
             position("pytest"),
             recorded.index(["<docstrings>"]),
             recorded.index(["<doc-links>"]),
@@ -267,10 +272,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The eight default phases comprise twelve steps — ten subprocesses plus the two
+        # The nine default phases comprise thirteen steps — eleven subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
         # (contracts and conformance have two steps each, docs-check three).
-        assert len(calls) == 12
+        assert len(calls) == 13
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

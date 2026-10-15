@@ -392,7 +392,8 @@ All fixture, adapter, expected, and report values are ordinary JSON values. `$sp
 and expected results. v0 recognizes no tagged-value interpretation.
 
 - A JSON number without a fraction or exponent has an exact integer lexeme and must be within
-  Â±2^63. A JSON number with a fraction or exponent is finite binary64; its lexical form,
+  ±2^63, including both endpoints (−9,223,372,036,854,775,808 through
+  +9,223,372,036,854,775,808). A JSON number with a fraction or exponent is finite binary64; its lexical form,
   including signed zero, is retained where comparison needs it.
 - `structured`, `enum`, and `const` use JSON Schema equality (`1 == 1.0`, `true != 1`; object
   key order ignored). Other fields use type-aware JSON equality.
@@ -526,6 +527,15 @@ Rules:
   records entry and signals readiness, then suspends native async execution until the driver
   releases the named gate. In a timeout case the driver never releases it before the native
   timeout outcome. Actions occur at their literal place among events.
+- Script events are closed, single-field records: `{text: <string>}`, `{usage: <usage>}`,
+  `{final: {finish_reason, usage?}}`, or `{await_release: <nonempty gate-id>}`. `usage` is
+  null or an object containing only the six nullable integer token fields in §11; omitted
+  fields mean null. A final event's `finish_reason` is one of the five §11 values and defaults
+  to `stop` when omitted; its omitted usage is null. Script `usage` becomes a native usage
+  update; its public projection is `usage_update`. `fail` and `fail_in_cleanup` are mutually
+  exclusive. `fail_in_cleanup` requires an `events` list containing a final event; it is not
+  a standalone entry. An entry without either failure field requires `events`, which may
+  be empty. Unknown action fields and multi-field event/action records are invalid assets.
 - Usage objects anywhere in `expected` may omit fields whose value is `null`; `{}` means all
   six fields null. `timing` values are `"non_null"`, `"null"`, or `"present"`.
 - Attempt records and `attempt_failed` carry `error: {category}` when the outcome is
@@ -758,7 +768,7 @@ adapter advertises only the prompt mechanism.
 |---|---|
 | O1 | Nonfinite JSON literals and a future injective tagged codec (some parsers accept nonstandard forms; implementations differ). |
 | O2 | Unicode whitespace at response edges. |
-| O3 | Integers beyond Â±2^63 in responses and schemas; exact int-versus-float equality above 2^53. |
+| O3 | Integers beyond ±2^63 in responses and schemas; exact int-versus-float equality above 2^53. |
 | O4 | Stable numeric error codes; needed when a second port exists. |
 | O5 | `redirected` attempt outcome (context-window and content-policy routes). |
 | O6 | Native JSON-mode, grammar, and tool-call structured-output mechanisms, including selection cases. |

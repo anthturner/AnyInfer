@@ -1,0 +1,10 @@
+{
+  "fixture_version": "0",
+  "id": "normalization/missing-expected",
+  "family": "normalization",
+  "profile": "core-generation",
+  "description": "Deliberately invalid fixture: expected is required.",
+  "request": {"messages": []},
+  "route": {"targets": ["fixture:alpha"]},
+  "adapter": {"max_repair_attempts": null, "models": {}, "health_preset": [], "script": []}
+}

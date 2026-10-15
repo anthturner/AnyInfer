@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "inventory-v0.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "profile_revision", "requirements", "cases"],
+  "properties": {
+    "profile": {"const": "core-generation"},
+    "profile_revision": {"const": "v0"},
+    "requirements": {"type": "array", "items": {"$ref": "#/$defs/requirement"}},
+    "cases": {"type": "array", "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*(?:/[a-z0-9][a-z0-9-]*)+$"},
+    "extension": {"type": ["string", "null"], "enum": [null, "schema.ref", "schema.combinators", "schema.other_dialects", "schema.boolean_subschema", "schema.unknown_keywords_ignored", "messages.tool_role", "targets.alias", "messages.non_text_parts"]},
+    "requirement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "spec_ref", "case_ids"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "spec_ref": {"type": "string", "minLength": 1}, "case_ids": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/id"}}}
+    },
+    "case": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["id", "kind", "path", "family", "extension"], "properties": {"id": {"$ref": "#/$defs/id"}, "kind": {"const": "fixture"}, "path": {"type": "string", "pattern": "^specification/fixtures/(?:core-generation|transport)/.+\\.json$"}, "family": {"type": "string", "minLength": 1}, "extension": {"$ref": "#/$defs/extension"}}},
+        {"type": "object", "additionalProperties": false, "required": ["id", "kind", "path", "family", "extension", "recipe_ref"], "properties": {"id": {"$ref": "#/$defs/id"}, "kind": {"const": "driver_assertion"}, "path": {"type": "null"}, "family": {"const": "driver"}, "extension": {"const": null}, "recipe_ref": {"type": "string", "minLength": 1}}}
+      ]
+    }
+  }
+}

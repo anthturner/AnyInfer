@@ -504,6 +504,7 @@ GATE_ORDER = (
     "format",
     "types",
     "contracts",
+    "fixtures",
     "changelog",
     "test",
     "conformance",
@@ -511,7 +512,7 @@ GATE_ORDER = (
     "docs-build",
 )
 """Every phase ``check`` knows, in execution order: fastest feedback first (static
-analysis, then the type checker, then the architecture contracts, then the changelog),
+analysis, then the type checker, architecture contracts, portable fixtures, and the changelog),
 the suite after the cheap gates, and the documentation gates last because they partly
 re-run suite tests.
 
@@ -876,6 +877,19 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
             ),
         ),
         Phase(
+            "fixtures",
+            "portable fixture and inventory schema validation",
+            (
+                (
+                    "validate portable assets",
+                    lambda: run(
+                        [sys.executable, str(ROOT / "scripts" / "validate_fixtures.py")],
+                        check=False,
+                    ),
+                ),
+            ),
+        ),
+        Phase(
             "changelog",
             "changelog shape, and that released sections have not been rewritten",
             (
@@ -987,7 +1001,8 @@ def _check_arguments(p: argparse.ArgumentParser) -> object:
 
 @verb(
     "check",
-    "Run every CI gate: lint, types, contracts, test, conformance, docs-check, docs-build.",
+    "Run every CI gate: lint, types, contracts, fixtures, test, conformance, docs-check, "
+    "docs-build.",
     group="Quality",
     arguments=_check_arguments,
 )
@@ -1005,6 +1020,7 @@ def cmd_check(args: argparse.Namespace) -> int:
       format       ruff formatting — OPT-IN via --only=format, never a default gate
       types        mypy --strict
       contracts    the architecture contracts (import-linter)
+      fixtures     portable fixture and inventory schema validation
       test         the full pytest suite, headless
       conformance  provider conformance + the serve invariants (ADR-009)
       docs-check   docstring coverage, doc links, runnable doc examples
@@ -1064,6 +1080,7 @@ how to record a cassette are covered in
 [the conformance suite](../contributing/conformance.md).
 
 """
+
 
 _MATRIX_FOOTER = f"""
 ## What the Cases Check

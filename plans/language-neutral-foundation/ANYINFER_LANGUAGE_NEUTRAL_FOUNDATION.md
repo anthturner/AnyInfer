@@ -192,7 +192,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
 
 ### M1: Specification, corpus, and Python driver
 
-- [ ] M1.1 Lossless native assessment seam. Keep the existing `validator_for` / `check_schema` /
+- [x] M1.1 Lossless native assessment seam. Keep the existing `validator_for` / `check_schema` /
   `iter_errors` / relevance / cap path and its exact selected native strings for every schema,
   including schemas outside the profile. Do not refactor `validate` through
   `render_issue(portable_issue)`. In `src/python/anyinfer/schema/validate.py`, add frozen,
@@ -258,6 +258,15 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > integration proofs have disjoint test files. The seam remains unaccepted until all bounded
   > proof/isolation cases and independent code review pass; initial partial green runs did not
   > establish completion.
+  > NOTE: Cold review found that a failed preparation snapshot could leave a correction-wire
+  > assessment reference without its preparation record. Retention now has an explicit success
+  > result; the caller must retain the correction role but omit the reference after capture
+  > failure. Acceptance also requires independent assessment-count/byte-cap proofs and exact
+  > selected occurrence, native feedback and builder/wire linkage checks.
+  > NOTE: Accepted after final independent fault-boundary review, the exact four-file schema/
+  > capture gate (91 tests), and all 13 repository gate steps passing in 76.6 seconds.
+  > Argument-construction and entered-wire sink failures are contained by observation-only
+  > guards; direct fault tests preserve native returns, exceptions, cancellation and repair.
 - [x] M1.2 Write `specification/README.md` and `specification/core-generation.md` from the
   specification draft §1 to §18. Promote the normative fixture format, driver actions and
   language-neutral proof recipes/predicates from §§14 and 17; the draft must not remain their
@@ -288,7 +297,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > NOTE: Independent review required explicit change-trigger checks and preservation of
   > reference/release manifest field identities. Both were added; final review reports the
   > maintenance/bootstrap contract compatible, with no ownership or support-window claim.
-- [ ] M1.3 Write `specification/schemas/fixture-v0.schema.json`, `transport-v0.schema.json`,
+- [x] M1.3 Write `specification/schemas/fixture-v0.schema.json`, `transport-v0.schema.json`,
   `report-v0.schema.json`, and `inventory-v0.schema.json` from the shared specification, plus
   `scripts/validate_fixtures.py` (stdlib and `jsonschema` only) that validates every file under `specification/fixtures/core-generation/`
   against the fixture schema and every file under `specification/fixtures/transport/` against the
@@ -320,6 +329,21 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > adapter-entry evidence; it cannot be an unsupported-input baseline plus a verdict label.
   > Failed/errored cases may report unavailable evidence as null, preserving terminal-failure
   > reporting while preventing a qualified result. The §16 record shapes own these rules.
+  > NOTE: Cold review requires mutually exclusive transport inputs, strict Base64 validation,
+  > coverage resolved against the supplied asset root, and consecutive extension-entry ordinals.
+  > Coordinator review additionally found the core outcome schema rejected every legal outcome;
+  > positive result/error/none fixtures must pass alongside the negative gates. The §13 integer
+  > bound is the stated inclusive ±2^63 range; its two corrupted glyphs are repaired and the
+  > endpoints made explicit. This fixes the asset codec, without changing Python input handling.
+  > NOTE: Further positive-case review requires nullable mechanisms for unstructured calls and
+  > rule-specific nullable extraction/invalid-schema paths. Inventory records must agree with
+  > the selected file's path, ID and family; sampling/actions and expected-message marker
+  > positions must satisfy the closed fixture protocol. Shared §14 now spells out script
+  > event/action variants so drivers cannot invent semantics for otherwise untyped actions.
+  > NOTE: Accepted after independent review found no correctness blocker, all 13 repository
+  > gate steps passed, and the final 12-test asset gate closed direct path-substitution and
+  > family-drift proof gaps. Schemas are UTF-8 without BOM, LF-only. Authoring validation
+  > remains developmental: no inventory, reference observation or release is claimed yet.
 - [ ] M1.4 Author `specification/inventories/core-generation-v0.json` before the final oracle:
   its requirement-to-case mappings and exact case records define the named core inventory. Add
   one fixture file per `kind: fixture` record; record transport coverage obligations that M1.6

@@ -164,6 +164,9 @@ jobs:
         # types stay leaf modules.
         run: python workspace.py check --only=contracts
 
+      - name: portable fixture assets
+        run: python workspace.py check --only=fixtures
+
       # Shape, and that no released section has been rewritten. The second half is the
       # one that matters: entries are drafted by a model on the branch that bumps the
       # version, and history has to be structurally unwritable rather than merely asked

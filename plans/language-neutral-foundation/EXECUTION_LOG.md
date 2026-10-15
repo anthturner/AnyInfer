@@ -129,7 +129,7 @@ Python implementation symbols. The first unchecked master box is M1.1.
 - `gh`, Git, `dotnet`, and `uv` are available; `rg` is absent, so discovery uses `git grep`.
 - Full/heavy checks run serially. M0 and the independently authored M1.2/M1.2U gates passed.
 
-## Current implementation handoff
+## Handoff after shared-contract authoring (`9ad4bdd`)
 
 - Plan-overlay commit: `2399c6f`; completed relocation commit: `baf06e1`.
 - First unchecked box: M1.1. Its private records/helpers and generator integration are split
@@ -143,3 +143,63 @@ Python implementation symbols. The first unchecked master box is M1.1.
   permitted on errored/failed cases. Independent review found these clarifications consistent
   with the settled bounded profile.
 - The native corpus and C# implementation remain future boxes. No package has been published.
+
+### M1.1 / M1.3 cold-review correction history
+
+M1.1 review found an absent preparation could still leave a correction assessment reference.
+The helper now returns whether evidence was retained; the generation owner makes that linkage
+conditional while preserving the actual correction role and native repair result. Additional
+proofs distinguish assessment-count limits from byte limits and assert selected occurrence
+order, exact native feedback, preparation and wire causality, cancellation and cross-task
+consumer-context isolation. Review and the combined gate remain pending.
+
+M1.3 review found transport inputs were not exclusive, Base64 encoding was only annotated,
+custom-root coverage could consult the checkout, and extension-entry ordinals needed semantic
+validation. The coordinator also found no positive core-outcome test: the schema's property
+closure rejected all legal outcomes. Those corrections are assigned before fixture authoring.
+The original ±2^63 value-model wording is inclusive at both endpoints; the shared text now
+spells those endpoints explicitly and repairs two corrupted ± glyphs. No Python domain or
+retry/repair semantics are changed by that asset-codec correction.
+
+Independent M1.1 re-review is clean after the linkage and proof corrections. The first
+combined gate passed lint, types, import/contract checks, asset validation and changelog,
+then failed the test phase: the new script test imported `scripts` only under
+`python -m pytest`, while the real gate invokes `pytest.exe` in workers; and DESIGN §18
+omitted the new private `_capture.py` module. Both are assigned for narrow corrections.
+Gate shell: `08fc4b48-514b-42ce-a9d2-8bccc6ba4070` (exit 1). No milestone is checked from this run.
+
+Coordinator fault injection then found two argument-construction paths outside the capture
+guard: extraction and invalid-schema evidence could throw from the validation module's
+imported `_freeze` binding. Both are now assigned narrow observation-only guards and exact
+native-return parity tests. A prior clean review did not establish that proof.
+
+The M1.3 second review also requires declared fixture path/ID/family agreement, closed
+sampling and script variants, and positional repair/schema placeholders. Positive cases
+exposed nullable mechanism and extraction/schema-error path representation gaps; those
+are corrected before corpus authoring. The shared fixture protocol now explicitly names
+its script event/action variants. All remain acceptance work for the existing boxes.
+
+The fault-boundary audit found one further unguarded entry-sink append before adapter
+invocation. The helper now contains that controlled failure, and an actual SDK integration
+test proves the request still enters the adapter and returns its valid native result while
+capture is marked unavailable. Extraction and late-schema projection faults now target the
+actual imported binding. The final M1.1 review and repository gate remain required.
+
+### M1.1 / M1.3 acceptance
+
+Final independent M1.1 fault-boundary review has no open finding. The coordinator reran the
+exact four-file capture/schema gate successfully (91 tests). M1.3 review has no correctness
+blocker; its final test-only additions directly reject declared-path substitution and family
+drift, and the exact `pytest.exe -n 2 tests/test_portable_assets.py` gate passes all 12 tests.
+
+The second combined `workspace check --fail-fast` run passed all 13 steps in 76.6 seconds,
+including the complete test suite, architecture/provider conformance, fixtures, executable
+documentation and strict site build. Shell `08fc4b48-514b-42ce-a9d2-8bccc6ba4070` retains
+both runs; the second exits 0. Two final test-only identity negatives were verified by the
+incremental 12-test asset run after that full run. Shared Markdown links pass across 23 files.
+All four schema files have explicit UTF-8/no-BOM/LF byte checks. No public Python API,
+retry/repair, usage, ledger or manifest behavior changed.
+
+The master now checks M1.1/M1.3. Resume at M1.4: author the named data-only core fixture
+families and full requirement inventory, keeping unobserved expectations explicitly pending.
+No corpus release, qualified report, reference environment or native C# proof exists yet.

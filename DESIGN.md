@@ -814,7 +814,8 @@ src/python/anyinfer/
                          # models.py operations.py providers.py rankers.py
   registry.py
   routing/               # policy.py health.py attempts.py limits.py
-  schema/                # mechanism.py project.py validate.py repair.py partial.py
+  schema/                # mechanism.py project.py validate.py repair.py partial.py _capture.py
+                          # _capture.py: private conformance observation records
   events/                # observers.py telemetry.py sinks.py
   redaction.py           # event-stream redaction (root module, not under events/)
   _private_files.py      # owner-only file permissions, and where they cannot be applied
