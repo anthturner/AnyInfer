@@ -128,3 +128,18 @@ Python implementation symbols. The first unchecked master box is M1.1.
 - Installed .NET SDKs: 6.0.428, 8.0.425, 10.0.401. The C# proof targets `net8.0`.
 - `gh`, Git, `dotnet`, and `uv` are available; `rg` is absent, so discovery uses `git grep`.
 - Full/heavy checks run serially. M0 and the independently authored M1.2/M1.2U gates passed.
+
+## Current implementation handoff
+
+- Plan-overlay commit: `2399c6f`; completed relocation commit: `baf06e1`.
+- First unchecked box: M1.1. Its private records/helpers and generator integration are split
+  between disjoint owners; the initial incomplete slice was not accepted. Unit proofs and
+  native integration proofs must both pass independent review and the combined repository gate.
+- M1.3 schemas/validator/CI wiring are authored and under independent review. Empty authoring
+  validation is developmental; no corpus, reference run, release identity or C# proof is claimed.
+- §14 closes the already-required image-boundary input representation with an extension-only
+  typed parts form. §16 requires native extension outcomes/actual entries and passing driver
+  recipe observations; missing evidence becomes an error, with honest unavailable evidence
+  permitted on errored/failed cases. Independent review found these clarifications consistent
+  with the settled bounded profile.
+- The native corpus and C# implementation remain future boxes. No package has been published.

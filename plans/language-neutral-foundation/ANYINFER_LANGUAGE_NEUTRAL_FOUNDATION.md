@@ -113,6 +113,7 @@ Literal paths. Create nothing until the box that owns it.
 | `specification/releases/core-generation-v0.json` | M1.G | Frozen identity: hashes of normative specifications, schemas, exact fixture inventories, reference manifest, and the reference environment identity artifact. |
 | `scripts/validate_fixtures.py` | M1.3 | Validates fixtures and inventories, including named coverage checks; `workspace check` phase. |
 | `tests/test_schema_capture.py` | M1.1 | Private assessment-collector compatibility tests. |
+| `tests/test_schema_capture_integration.py` | M1.1 | Native operation, correction, cancellation and consumer-context capture proofs. |
 | `scripts/freeze_release.py` | M1.G | Writes the release file; with `--verify` recomputes and compares hashes. |
 | `scripts/compare_reports.py` | M1.5 | Rejects unqualified/development reports and compares two qualified report files case by case. |
 | `tests/testing/portable/bad_fixtures/core-generation/missing-expected.json` | M1.3 | Deliberately broken fixture for the validator's negative test. |
@@ -239,8 +240,9 @@ M1 and later use `src/python/` paths and therefore depend on it.
   five in original required order, interleaved tied rules, distinct source/correction IDs and
   ordinal linkage, terminal exhaustion, malformed
   extraction/native `SchemaError`, simultaneous independent operations, capture fault/cap
-  isolation, and disabled capture in `tests/test_schema_capture.py`. SDK users do nothing new.
-  **Gate:** `.\.venv\Scripts\python.exe -m pytest -q tests/test_schema.py tests/test_schema_partial.py tests/test_schema_capture.py`
+  isolation, and disabled capture in `tests/test_schema_capture.py` and
+  `tests/test_schema_capture_integration.py`. SDK users do nothing new.
+  **Gate:** `.\.venv\Scripts\python.exe -m pytest -q tests/test_schema.py tests/test_schema_partial.py tests/test_schema_capture.py tests/test_schema_capture_integration.py`
   passes with existing string assertions untouched and the A6 bounded-proof/isolation tests
   passing. If either gate cannot be met, stop and revisit archived O1 full capture before
   changing native behavior.
@@ -251,6 +253,11 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > and scopes ContextVar activation to synchronous helper calls. Add consumer-context and
   > cross-task stream advancement/close isolation tests. This changes private observation
   > mechanics only; public stream, validation, retry and repair behavior stay unchanged.
+  > NOTE: Private record/collector types live in `schema/_capture.py`; actual helper
+  > assessment remains in `schema/validate.py`. Unit projection/bounds and native operation
+  > integration proofs have disjoint test files. The seam remains unaccepted until all bounded
+  > proof/isolation cases and independent code review pass; initial partial green runs did not
+  > establish completion.
 - [x] M1.2 Write `specification/README.md` and `specification/core-generation.md` from the
   specification draft §1 to §18. Promote the normative fixture format, driver actions and
   language-neutral proof recipes/predicates from §§14 and 17; the draft must not remain their
@@ -299,6 +306,20 @@ M1 and later use `src/python/` paths and therefore depend on it.
   **Gate:** the script exits 0 on an empty fixtures tree and exits non-zero with
   `--root tests/testing/portable/bad_fixtures`; its inventory validation rejects an invalid
   record and its coverage mode rejects a missing requirement mapping.
+  > NOTE: Schema authoring exposed a representation gap in the already-required image
+  > extension case: text-only fixture messages cannot construct an image input. Shared §14
+  > now permits an explicit `{role, parts}` input variant only for `messages.non_text_parts`,
+  > with typed text/image-URL parts. Drivers invoke the native boundary honestly; the profile
+  > stays text-only. Schema negatives must reject the variant on an ordinary core case.
+  > NOTE: Review clarified that extension fixtures' zero-call `unsupported_input` expectation
+  > is the portable baseline, not a replacement for declared extensions' actual native outcome.
+  > Required driver cases now have an explicit `evidence: {recipe_ref, observations}` report
+  > record: the recipe must match the inventory and native observations must be nonempty.
+  > This closes the existing mandatory-evidence requirement without prescribing native spy APIs.
+  > NOTE: An `extension` verdict also requires an explicit native outcome and ordered actual
+  > adapter-entry evidence; it cannot be an unsupported-input baseline plus a verdict label.
+  > Failed/errored cases may report unavailable evidence as null, preserving terminal-failure
+  > reporting while preventing a qualified result. The §16 record shapes own these rules.
 - [ ] M1.4 Author `specification/inventories/core-generation-v0.json` before the final oracle:
   its requirement-to-case mappings and exact case records define the named core inventory. Add
   one fixture file per `kind: fixture` record; record transport coverage obligations that M1.6
@@ -345,7 +366,8 @@ M1 and later use `src/python/` paths and therefore depend on it.
   `driver/concurrent-operations-independent` assertion (§17) lives here as a plain test.
   Also implement `scripts/compare_reports.py` and its negative tests against synthetic/Python
   reports: reject development observations, missing/extra/duplicate IDs, wrong release/hash,
-  stale counts, errors/failures, and ineligible extension verdicts; permit only the qualified
+  stale counts, errors/failures, absent/mismatched driver evidence, absent native extension
+  outcomes/entry evidence, and ineligible extension verdicts; permit only the qualified
   reference-extension versus other-language-pass disagreement.
   **Gate:** `.\.venv\Scripts\python.exe -m pytest -q tests/testing/portable` passes against
    every named extraction/repair requirement plus the seam, timeout, wire-limit projection, and independent
@@ -487,6 +509,7 @@ From the checkout on PowerShell:
 .\.venv\Scripts\python.exe -c "import anyinfer; print(anyinfer.__file__)"
 .\.venv\Scripts\python.exe -m pytest -q tests/test_schema.py tests/test_schema_partial.py
 .\.venv\Scripts\python.exe -m pytest -q tests/test_schema_capture.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_schema_capture_integration.py
 .\.venv\Scripts\python.exe -m pytest -q tests/testing/portable
 .\.venv\Scripts\python.exe scripts/validate_fixtures.py
 .\.venv\Scripts\python.exe scripts/validate_fixtures.py --check-coverage --family core-generation

@@ -204,4 +204,3 @@ and authorization notes below are historical, not current instructions.
   > fixture, external artifact or commit. HEAD remains
   > `13b9e65acfb01038464069ca5fa80f50a9df035c`. W1 and future implementation/evidence
   > gates remain open. Resume at P2.1 only with further authorization and its gates met.
-
