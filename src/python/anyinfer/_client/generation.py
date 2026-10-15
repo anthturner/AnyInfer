@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
-from collections.abc import AsyncGenerator, Callable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
@@ -277,6 +277,7 @@ class GenerationExecutionMixin:
         _ledger: SpendLedger | None
         _pool: AdapterPool
         _retain_raw: bool
+        _sleep: Callable[[float], Awaitable[None]] | None
 
         def resolve(self, target: Target) -> ResolvedTarget: ...
 
@@ -531,7 +532,10 @@ class GenerationExecutionMixin:
                             )
                         )
                         if delay > 0:
-                            await asyncio.sleep(delay)
+                            if self._sleep is not None:
+                                await self._sleep(delay)
+                            else:
+                                await asyncio.sleep(delay)
                         continue
 
                     if isinstance(error, TransportError | ProviderUnavailableError):

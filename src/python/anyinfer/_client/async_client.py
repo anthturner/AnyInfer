@@ -12,7 +12,7 @@ import contextlib
 import math
 import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -320,6 +320,8 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         model_dir: Path | None = None,
         credential_ttl_s: float | None = None,
         limiters: Mapping[str, RateLimiter] | None = None,
+        _clock: Callable[[], float] | None = None,
+        _sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self._registry = registry or default_registry
         self._events = EventDispatcher(list(observers or []))
@@ -339,7 +341,8 @@ class AsyncClient(GenerationExecutionMixin, ArenaExecutionMixin, SpendGovernance
         )
         self._default_route = route
         self._operation_routes: dict[str, Route] = dict(operation_routes or {})
-        self._health = HealthCache()
+        self._health = HealthCache(clock=_clock)
+        self._sleep = _sleep
         self._capabilities = CapabilityStore(
             pricing=pricing_table,
             overrides=_parse_overrides(capability_overrides, self._registry),

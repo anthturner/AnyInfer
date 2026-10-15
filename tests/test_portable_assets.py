@@ -100,6 +100,32 @@ def test_every_schema_accepts_a_minimal_valid_document_and_core_outcomes_are_clo
     for outcome in ({"result": {}}, {"error": {"category": "transport"}}, {"none": True}):
         assert not list(fixture_validator.iter_errors(_core_fixture(outcome)))
     assert list(fixture_validator.iter_errors(_core_fixture({"result": {}, "none": True})))
+    nested_model = _core_fixture({"none": True})
+    nested_model["adapter"]["models"] = {
+        "fixture:alpha": {
+            "capabilities": {"grammar": False, "json_schema": False, "json_mode": False}
+        }
+    }
+    assert not list(fixture_validator.iter_errors(nested_model))
+    nested_model["adapter"]["models"] = {
+        "fixture:alpha": {"grammar": False, "json_schema": False, "json_mode": False}
+    }
+    assert list(fixture_validator.iter_errors(nested_model))
+    nested_model["adapter"]["models"] = {
+        "fixture:alpha": {"capabilities": {"grammar": False, "json_schema": False}}
+    }
+    assert list(fixture_validator.iter_errors(nested_model))
+    nested_model["adapter"]["models"] = {
+        "fixture:alpha": {
+            "capabilities": {
+                "grammar": False,
+                "json_schema": False,
+                "json_mode": False,
+                "unknown": False,
+            }
+        }
+    }
+    assert list(fixture_validator.iter_errors(nested_model))
     scripted = _core_fixture({"none": True})
     scripted["request"]["sampling"] = {"temperature": 0.5, "seed": -1, "stop": ["END"]}
     scripted["adapter"]["script"] = [

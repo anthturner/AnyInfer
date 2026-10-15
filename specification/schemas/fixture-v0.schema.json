@@ -417,7 +417,24 @@
           "minimum": 0
         },
         "models": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["capabilities"],
+            "properties": {
+              "capabilities": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["grammar", "json_schema", "json_mode"],
+                "properties": {
+                  "grammar": {"const": false},
+                  "json_schema": {"const": false},
+                  "json_mode": {"const": false}
+                }
+              }
+            }
+          }
         },
         "health_preset": {
           "type": "array",

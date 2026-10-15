@@ -396,12 +396,26 @@ and expected results. v0 recognizes no tagged-value interpretation.
   +9,223,372,036,854,775,808). A JSON number with a fraction or exponent is finite binary64; its lexical form,
   including signed zero, is retained where comparison needs it.
 - `structured`, `enum`, and `const` use JSON Schema equality (`1 == 1.0`, `true != 1`; object
-  key order ignored). Other fields use type-aware JSON equality.
+  key order ignored). Declared numeric controls below use numeric equality. All other fields
+  use type-aware JSON equality, including the distinction between integer and binary64 values
+  and between positive and negative binary64 zero.
 - Nonfinite values and lone surrogates are excluded. An injective tagged codec for those
   values is deferred with O1 and O8.
 - `{"$schema_prompt": true}` and `{"$repair_feedback": true}` are placeholders only in the
   schema-typed expected-message segment positions defined in §14. They are never interpreted
   in arbitrary result, schema, request, adapter, or expected JSON.
+
+**Numeric controls.** Compare `timeout_s`, error `retry_after_s`, route
+`retry.backoff_base_s`, `retry.backoff_max_s`, `health_ttl_s`, and sampling `temperature`,
+`top_p`, `presence_penalty`, and `frequency_penalty` numerically at their declared typed
+positions, including their corresponding effective wire and outgoing HTTP fields. Thus
+`17` equals `17.0`, and positive and negative zero compare equally in these positions.
+Omission remains distinct from a present value; null equals only null, and booleans are not
+numbers. This rule is selected by the field's declared role, never by matching a key name
+inside caller JSON. It does not apply to schema data, structured results, portable issue
+parameters, `seed`, `max_output_tokens`, usage, byte limits, ordinals, or counters. Native
+implementations retain their existing control-value handling; this is an observation
+comparison rule, not a request coercion requirement.
 
 Numeric decoding invariants are checked before value equivalence: an integer lexeme cannot
 be rounded through binary64 merely to compare it. Pure integer observations remain exact

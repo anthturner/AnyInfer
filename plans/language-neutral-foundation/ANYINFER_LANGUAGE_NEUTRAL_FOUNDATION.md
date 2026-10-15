@@ -53,7 +53,7 @@ path; it is not the strategy for first-class language support.
 | A6 | Repair feedback is compared as ordered portable issues (rule, instance path, schema path, parameters) and implementation-local native feedback. Python preserves its current selected native strings byte-for-byte and captures the actual assessment made for each production helper invocation; it never recomputes validation to infer selection. A private immutable `NativeAssessment` pairs the selected portable `Issue` projection with the selected native rendered messages and native error metadata. Projection outside v0 may be unavailable and never narrows the Python API. | Portable issue identity permits cross-language comparison while the lossless native assessment preserves Python's current feedback, including broader schemas. The small call-local seam is preferred to restoring the full archived capture; revisit that capture only if the bounded proof or isolation gates fail. |
 | A7 | W1 is closed. A root `$schema` other than absent or exactly `https://json-schema.org/draft/2020-12/schema` (including `null`) is outside the admitted domain. | The exclusion closes the portable question; it does not erase honestly recorded native warning observations. |
 | A8 | Dialect pinned to the Draft 2020-12 keyword subset in the specification draft §4. C# implements that subset directly over `System.Text.Json`'s `Utf8JsonReader` (not `JsonNode`, which rejects duplicate keys); string ordering uses code-point comparison, not `CompareOrdinal`. No third-party validator. | The selected hand-written validator gives direct control of issue identity and ordering. |
-| A9 | v0 observations use ordinary JSON only: integers remain exact and finite decimal values retain binary64 lexical distinction including signed zero. `$special` and `$codepoints` are literal object keys everywhere. Nonfinite values, lone surrogates, and an injective future tagged encoding are deferred together. Parsed structured results use JSON Schema equality; other observations use type-aware comparison. Placeholder objects are allowed only at explicitly schema-typed expected-message segment positions, never inside arbitrary schema or result JSON. | Ordinary JSON prevents collisions between value tags and admitted literal objects while keeping v0 fixtures directly inspectable. |
+| A9 | v0 observations use ordinary JSON only: integers remain exact and finite decimal values retain binary64 lexical distinction including signed zero. `$special` and `$codepoints` are literal object keys everywhere. Nonfinite values, lone surrogates, and an injective future tagged encoding are deferred together. Parsed structured results use JSON Schema equality. The declared numeric controls in shared §13 compare numerically; all other observations use type-aware comparison. Placeholder objects are allowed only at explicitly schema-typed expected-message segment positions, never inside arbitrary schema or result JSON. | Ordinary JSON prevents collisions between value tags and admitted literal objects while keeping v0 fixtures directly inspectable. Numeric control comparison accommodates native numeric field representations without changing Python behavior or JSON data comparison. |
 | A10 | Fixture format v0 uses a virtual clock for routing health and backoff, an adapter script at the adapter-event level, and a distinct transport fixture family for the OpenAI chat dialect. Timeout and byte-limit proof uses native timeout and mocked transport behavior. | Routing and repair semantics need fixture control; timeout and raw-wire behavior must be tested at their actual boundaries. |
 | A11 | C# targets `net8.0`. Runtime dependencies: none beyond the BCL. Test dependency: xunit. A `netstandard2.0` target for .NET Framework consumers is a packaging decision after M2, not part of the proof, because it would add `System.Text.Json` and `Microsoft.Bcl.AsyncInterfaces` as package dependencies. | Broadest reach: a `net8.0` library is consumable from .NET 8, 9, and 10 applications, and everything the profile needs (`IAsyncEnumerable`, `CancellationToken`, `Utf8JsonReader`, streaming `HttpClient`) is in the .NET 8 BCL. .NET 8's support end date (2026-11-10) affects runtime patching for consumers, not what the library can target or what CI can build. Compatibility breadth is the point of the port. |
 | A12 | Python tooling is not the universal driver API. A final conformance driver verifies the corpus release identity before running and reports its own environment binding; an unreleased development observation verifies its hashed inventory instead. | Independence is the point of a native port. |
@@ -423,15 +423,37 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > Then wire native execution/projection and driver predicates; finally add report/reference
   > identity and fail-closed comparison tooling. The coordinator records each wave below and
   > owns this shared checkbox. No partial wave establishes the M1.5 gate.
-  - [ ] M1.5a Replay substrate: `tests/testing/portable/{__init__,adapter,test_adapter}.py`;
+  > NOTE: Replay setup found that authored model flags were direct fields while the normative
+  > §14 example nests them under `capabilities`. Before native fixture execution, wrap those
+  > same three false flags in the specified object and close the model schema so the mismatch
+  > cannot recur. This changes unreleased fixture encoding only; runtime behavior is unchanged.
+  > NOTE: Native observation found that an unset timeout becomes `120.0`, while explicit
+  > `17` and `17.0` retain their respective Python numeric types. The user chose numeric
+  > comparison for declared control fields on 2026-10-15. Shared §13 names those positions
+  > explicitly; generic JSON, issue parameters, exact integers and signed-zero comparison
+  > elsewhere remain unchanged. This is a conformance comparison amendment, not an SDK change.
+  - [x] M1.5a Replay substrate: `tests/testing/portable/{__init__,adapter,test_adapter}.py`;
     private time seam in `_client/{async_client,generation}.py` plus
     `tests/testing/portable/test_time_seam.py`; value/segment helpers in
     `tests/testing/portable/{values,test_values}.py`. Each owner runs its targeted tests and
     lint/types; an independent review clears their interfaces before the execution runner.
+    > NOTE: Accepted after independent closure review of watchdog and feedback-evidence
+    > faults and all 13 repository gate steps passing in 71.7 seconds. Registration is
+    > `ProviderRegistry(load_builtins=False, load_entry_points=False)` followed by
+    > `registry.register(descriptor, replace=True)`. A separate data comparison confirms all
+    > 85 fixture changes only wrap existing flags under `capabilities`; no script, input or
+    > pending expectation changes. Numeric-control equivalence follows the user-approved §13.
   - [ ] M1.5b Native runner/projection, all core fixture executions, explicit buffered mirror,
     native duplicate-key order, capture causality and real timeout/cancellation/lifecycle
     predicates; pytest options write development observations only. Gate: targeted portable
     tests execute every authored core fixture with no unavailable mandatory evidence.
+    > NOTE: First build raw native-run records/projection in `records.py`, `projection.py`
+    > and `test_projection.py`; actual client execution in `runner.py` and `test_runner.py`;
+    > and expected-observation comparison in `comparison.py` and `test_comparison.py`, all
+    > under `tests/testing/portable/`. These are disjoint owners with one agreed record API.
+    > Next add driver recipes and pytest development-output integration after this core
+    > execution wave is reviewed. Pending expectations remain pending and cannot count as
+    > passes; no report-v0 or release identity is manufactured by these development runs.
   - [ ] M1.5c Reference/report identity support and `scripts/compare_reports.py` with its
     required negative tests. Gate: incomplete/development/wrong-identity/failing reports
     cannot qualify, and the documented qualified synthetic/Python comparisons behave exactly

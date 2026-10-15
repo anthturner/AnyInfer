@@ -40,9 +40,11 @@
     "max_repair_attempts": null,
     "models": {
       "alpha": {
-        "grammar": false,
-        "json_schema": false,
-        "json_mode": false
+        "capabilities": {
+          "grammar": false,
+          "json_schema": false,
+          "json_mode": false
+        }
       }
     },
     "health_preset": [],

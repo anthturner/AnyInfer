@@ -204,7 +204,7 @@ The master now checks M1.1/M1.3. Resume at M1.4: author the named data-only core
 families and full requirement inventory, keeping unobserved expectations explicitly pending.
 No corpus release, qualified report, reference environment or native C# proof exists yet.
 
-### Current resume point: M1.4
+### M1.4 authoring handoff (`90c2605`)
 
 Accepted private capture and asset gates are committed at
 `90c26057b8b96b7b064f37f6356fe2022c27d564`. Three disjoint data-only authoring briefs own:
@@ -254,3 +254,44 @@ Resume at M1.5a. It splits replay adapter/gates, private time seam, and value/se
 into disjoint ownership before a second wave wires the native runner/projection. M1.5b and
 M1.5c complete native predicates and fail-closed report/reference tooling. These subdivisions
 make the existing box executable; they add no SDK scope or conformance claim.
+
+### Current resume point: M1.5a
+
+M1.4 is committed at `55442cfdbbd5b86fd8de927ce2a7f758e41ba5b3`. The coordinator created
+the private portable package initializer before parallel work began. Current disjoint owners
+are replay adapter/gates with native adapter tests; the private client time seam with its
+independent tests; and a mechanical fixture model-shape correction plus schema/negative tests.
+The correction preserves the three false capability flags and nests them under `capabilities`
+as §14's existing example specifies. This unreleased encoding mismatch was found while
+settling the replay interface and is closed before native fixture execution. Value/segment
+helpers follow as the remaining M1.5a slice. No M1.5 sub-box is accepted yet.
+
+### M1.5a numeric-control decision and review
+
+Actual native execution observed timeout `None` becoming wire `120.0`, explicit `17`
+remaining an integer, and explicit `17.0` remaining a float. On 2026-10-15 the user selected
+numeric comparison for declared control fields. Shared §13 and master A9 now scope that
+rule to timeout, Retry-After, route backoff/health duration, and continuous sampling controls
+at their typed positions, including wire/HTTP projections. It does not coerce requests,
+relax generic observation equality, round exact integers, or change Python runtime behavior.
+
+Cold review cleared the private time seam and fixture model wrapper. Adapter review found
+an unbounded readiness wait; the corrected wait uses the same watchdog and harness-error
+classification as release waits. Independent closure review and its 12-test gate are clean.
+Value helpers remain under independent review; the joint sub-box stays unchecked until the
+combined gate passes.
+
+### M1.5a accepted
+
+Value-helper review found that a bare string could masquerade as a sequence of native
+messages. The helper now rejects scalar/non-sequence evidence and preserves actual tuple
+order and multiplicity. The five-test helper gate and independent closure review are clean.
+The combined pre-fix targeted gate passed 96 tests; the final repository gate includes the
+added feedback tests and passed all 13 steps in 71.7 seconds, exit 0 (shell
+`313448c6-6cf5-4574-901a-495f334cc810`). Shared Markdown links pass across 23 files.
+An independent data check confirms all 85 core fixture edits only wrap their existing model
+flags under `capabilities`.
+
+Resume at M1.5b: build raw records/projection, native execution, and comparison in disjoint
+files before adding driver recipes and pytest development output. The parent M1.5 box is
+unchecked; neither pending expectations nor passing substrate tests establish conformance.
