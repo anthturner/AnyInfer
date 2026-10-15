@@ -54,12 +54,12 @@ jobs:
       # build needs a real install, same as the docs gates in CI.
       - run: uv pip install --system -e ".[all,dev]"
 
-      # Sharded add-ons (src/anyinfer-*, own pyproject.toml) that ship a mkdocstrings
+      # Sharded add-ons (src/python/anyinfer-*, own pyproject.toml) that ship a mkdocstrings
       # reference page need their own editable install too — see the CI gates job.
       # All of them: this listed only `anyinfer-store` while `anyinfer-confidential`
       # already had a reference page in the nav, so the first run of this workflow died
       # on a module it had never installed.
-      - run: uv pip install --system -e src/anyinfer-store -e src/anyinfer-shared -e src/anyinfer-confidential
+      - run: uv pip install --system -e src/python/anyinfer-store -e src/python/anyinfer-shared -e src/python/anyinfer-confidential
 
       - name: build the site
         run: python workspace.py build docs

@@ -106,7 +106,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [src]
+          paths: [src/python]
           options:
             docstring_style: google
             members_order: source

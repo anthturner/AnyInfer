@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "src" / "python"))
 
 from anyinfer.providers.presets import COMPAT_PRESETS  # noqa: E402
 from anyinfer.registry import ProviderRegistry  # noqa: E402

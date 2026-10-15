@@ -16,9 +16,9 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PRICING_PATH = REPO_ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json"
+PRICING_PATH = REPO_ROOT / "src" / "python" / "anyinfer" / "capabilities" / "pricing.json"
 
-sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "src" / "python"))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from pricing_check import load_bundled, validate_policies  # noqa: E402

@@ -61,11 +61,11 @@ Start in the narrowest workstream that owns the behavior:
 
 | Workstream | Primary paths | Responsibility |
 |---|---|---|
-| Core engine and Python SDK | `src/anyinfer/` except `cli.py` and `serve/` | Requests, typed events, routing, adapters, capabilities, local inference, client lifecycle |
-| Shared configuration | `src/anyinfer/config/` | The versioned JSON contract used by every integration path |
-| Command-line tool | `src/anyinfer/cli.py` | Human and shell interface for `run`, `doctor`, `providers`, and sidecar startup |
-| OpenAI-compatible sidecar | [`src/anyinfer/serve/`](../serve/README.md) | OpenAI wire codec and ASGI application; never a second routing core |
-| Demo application | [`src/anyinfer_demo/`](../guides/demo-app.md) | Offline reference UI and integration example; not part of core behavior |
+| Core engine and Python SDK | `src/python/anyinfer/` except `cli.py` and `serve/` | Requests, typed events, routing, adapters, capabilities, local inference, client lifecycle |
+| Shared configuration | `src/python/anyinfer/config/` | The versioned JSON contract used by every integration path |
+| Command-line tool | `src/python/anyinfer/cli.py` | Human and shell interface for `run`, `doctor`, `providers`, and sidecar startup |
+| OpenAI-compatible sidecar | [`src/python/anyinfer/serve/`](../serve/README.md) | OpenAI wire codec and ASGI application; never a second routing core |
+| Demo application | [`src/python/anyinfer_demo/`](../guides/demo-app.md) | Offline reference UI and integration example; not part of core behavior |
 
 Tests mirror those boundaries under `tests/`. Shared behavior belongs in the engine or
 configuration package, not copied into the CLI, sidecar, or demo. A change that crosses a

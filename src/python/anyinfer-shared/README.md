@@ -16,5 +16,5 @@ and the [Confidentiality Tiers guide](https://anyinfer.dev/guides/confidentialit
 explains what each tier means. (DESIGN.md §30 is the internal record behind both.)
 
 ```bash
-pip install -e src/anyinfer-shared
+pip install -e src/python/anyinfer-shared
 ```

@@ -44,7 +44,7 @@ __all__ = [
 
 DEFAULT_PRICING_URL = (
     "https://raw.githubusercontent.com/anthturner/AnyInfer/main/"
-    "src/anyinfer/capabilities/pricing.json"
+    "src/python/anyinfer/capabilities/pricing.json"
 )
 """Where the repo publishes the continuously-maintained pricing file."""
 

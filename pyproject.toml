@@ -49,7 +49,7 @@ serve = ["starlette>=0.37", "uvicorn>=0.30"]
 # Optional because most callers never budget context, and because the default heuristic's
 # only real cost is a loose *floor* — which matters solely to the pre-dispatch gate.
 tokenizers = ["tiktoken>=0.7"]
-# The pack-in PySide6 reference application (`src/anyinfer_demo`). Kept in an extra so ADR-007's
+# The pack-in PySide6 reference application (`src/python/anyinfer_demo`). Kept in an extra so ADR-007's
 # slim core holds: nothing in `anyinfer` imports Qt, and a library install never pulls it in.
 demo = ["PySide6>=6.6", "markdown>=3.6"]
 all = [
@@ -104,14 +104,14 @@ Issues = "https://github.com/anthturner/AnyInfer/issues"
 # installs a generic top-level `workspace` module would collide with unrelated
 # distributions claiming the same name. It stays a repo-root tool (`python workspace.py`).
 [tool.hatch.build.targets.wheel]
-packages = ["src/anyinfer", "src/anyinfer_demo"]
+packages = ["src/python/anyinfer", "src/python/anyinfer_demo"]
 
 [tool.hatch.build.targets.sdist]
 # The sdist is a working source tree: it can rebuild the wheel, run the test suite, and
 # build the docs (which is why mkdocs.yml, overrides/, and scripts/ ship alongside docs/).
 include = [
-  "src/anyinfer",
-  "src/anyinfer_demo",
+  "src/python/anyinfer",
+  "src/python/anyinfer_demo",
   "tests",
   "docs",
   "overrides",
@@ -129,7 +129,7 @@ include = [
 [tool.ruff]
 line-length = 99
 target-version = "py311"
-src = ["src", "tests"]
+src = ["src/python", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -154,16 +154,16 @@ convention = "google"
   "E501", "D100", "D101", "D102", "D103", "D104", "D105", "BLE001", "SIM117", "S101",
 ]
 # Assertions are the public conformance kit's failure protocol, not runtime invariants.
-"src/anyinfer/testing/*" = ["S101"]
+"src/python/anyinfer/testing/*" = ["S101"]
 # The conformance matrix uses ✅/➖/❌ deliberately; they are the published symbols.
 # workspace.py renders the matrix page, so its template strings carry them too, as do the
 # certification command and the provider scaffold that quote the same matrix vocabulary.
-"src/anyinfer/testing/conformance.py" = ["RUF001", "RUF002"]
-"src/anyinfer/testing/certify.py" = ["RUF001", "RUF002"]
-"src/anyinfer/testing/scaffold.py" = ["RUF001", "RUF002"]
+"src/python/anyinfer/testing/conformance.py" = ["RUF001", "RUF002"]
+"src/python/anyinfer/testing/certify.py" = ["RUF001", "RUF002"]
+"src/python/anyinfer/testing/scaffold.py" = ["RUF001", "RUF002"]
 "workspace.py" = ["RUF001", "RUF002"]
 # Raw SVG path data — splitting it across lines would fragment the "d" attribute string.
-"src/anyinfer_demo/widgets/icons.py" = ["E501"]
+"src/python/anyinfer_demo/widgets/icons.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["anyinfer", "anyinfer_demo"]
@@ -171,7 +171,7 @@ known-first-party = ["anyinfer", "anyinfer_demo"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src/anyinfer", "src/anyinfer_demo", "workspace.py"]
+files = ["src/python/anyinfer", "src/python/anyinfer_demo", "workspace.py"]
 warn_unreachable = true
 disallow_any_generics = true
 no_implicit_reexport = false
@@ -210,9 +210,9 @@ asyncio_mode = "auto"
 # ships as its own distribution but is developed in this tree, so it is gated here.
 testpaths = [
     "tests",
-    "src/anyinfer-store/tests",
-    "src/anyinfer-shared/tests",
-    "src/anyinfer-confidential/tests",
+    "src/python/anyinfer-store/tests",
+    "src/python/anyinfer-shared/tests",
+    "src/python/anyinfer-confidential/tests",
 ]
 markers = [
     # Two tracks, so the inner loop is seconds and the gate is still exhaustive.

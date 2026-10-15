@@ -10,8 +10,8 @@ the customer's own prompt data from AnyInfer or the vendor — BYOK already prov
 Never imported by `anyinfer` core, and never a dependency of it.
 
 ```bash
-pip install -e src/anyinfer-confidential
-pip install -e "src/anyinfer-confidential[relay]"   # only if you're running the Relay service
+pip install -e src/python/anyinfer-confidential
+pip install -e "src/python/anyinfer-confidential[relay]"   # only if you're running the Relay service
 ```
 
 Every public signature is generated onto the

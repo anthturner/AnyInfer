@@ -442,7 +442,7 @@ class TestClean:
 
     def test_never_touches_source_or_virtualenvs(self, tmp_path, monkeypatch):
         monkeypatch.setattr(workspace, "ROOT", tmp_path)
-        source = tmp_path / "src" / "anyinfer"
+        source = tmp_path / "src" / "python" / "anyinfer"
         source.mkdir(parents=True)
         (source / "__init__.py").write_text("x", encoding="utf-8")
         venv_cache = tmp_path / ".venv" / "lib" / "__pycache__"
@@ -457,7 +457,7 @@ class TestClean:
 class TestRepositoryRoot:
     def test_the_checkout_is_found_from_the_repository(self):
         assert (workspace.ROOT / "pyproject.toml").exists()
-        assert (workspace.ROOT / "src" / "anyinfer").is_dir()
+        assert (workspace.ROOT / "src" / "python" / "anyinfer").is_dir()
 
     def test_a_directory_without_the_markers_is_not_a_checkout(self, tmp_path, monkeypatch):
         """With the module outside a checkout too, nothing is found.
@@ -476,8 +476,8 @@ class TestRepositoryRoot:
         assert workspace._find_repository_root() == workspace.ROOT
 
     def test_a_subdirectory_resolves_to_the_checkout(self, monkeypatch):
-        """Running from `src/` or `docs/` must still find the repository root."""
-        monkeypatch.chdir(workspace.ROOT / "src")
+        """Running from `src/python/` or `docs/` must still find the repository root."""
+        monkeypatch.chdir(workspace.ROOT / "src" / "python")
         assert workspace._find_repository_root() == workspace.ROOT
 
     def test_running_outside_a_checkout_refuses_with_a_reason(self, tmp_path, monkeypatch, capsys):
@@ -578,7 +578,7 @@ class TestShardParity:
         """A new shard directory must join `SHARDS`, or it is installed nowhere."""
         on_disk = sorted(
             path.as_posix()
-            for path in (workspace.ROOT / "src").glob("anyinfer-*")
+            for path in (workspace.ROOT / "src" / "python").glob("anyinfer-*")
             if path.is_dir() and (path / "pyproject.toml").exists()
         )
         declared = sorted((workspace.ROOT / shard).as_posix() for shard in workspace.SHARDS)
@@ -599,10 +599,10 @@ class TestShardParity:
         checked: list[str] = []
         for path in workflows:
             for line in path.read_text(encoding="utf-8").splitlines():
-                if "uv pip install" not in line or "src/anyinfer-" not in line:
+                if "uv pip install" not in line or "src/python/anyinfer-" not in line:
                     continue
                 installed = sorted(
-                    token for token in line.split() if token.startswith("src/anyinfer-")
+                    token for token in line.split() if token.startswith("src/python/anyinfer-")
                 )
                 assert installed == sorted(workspace.SHARDS), (
                     f"{path.name} installs {installed}, but workspace.SHARDS is "

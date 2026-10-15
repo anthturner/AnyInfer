@@ -44,9 +44,9 @@ Some features ship as separate, independently-versioned distributions rather tha
 | `anyinfer-store` | `VectorStore`, `query_and_rerank` | Small-scale [embedded vector storage](vector-store.md) over `embed()`/`rerank()` results |
 
 ```bash
-pip install -e src/anyinfer-confidential   # from a repository checkout, until a first
-pip install -e src/anyinfer-shared         # PyPI release ships
-pip install -e src/anyinfer-store
+pip install -e src/python/anyinfer-confidential   # from a repository checkout, until a first
+pip install -e src/python/anyinfer-shared         # PyPI release ships
+pip install -e src/python/anyinfer-store
 ```
 
 ## Which Providers Need Nothing Extra

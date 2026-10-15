@@ -152,7 +152,7 @@ boundary-clean. What remains below is watch-list, not debt.
 ## A.1 — Physically group the root evaluation modules
 
 **Severity:** Low · **Confidence:** High · **Was:** A.5 (remainder)
-**Paths:** `src/anyinfer/arena.py`, `compare.py`, `compare_diff.py`, `context_request.py`
+**Paths:** `src/python/anyinfer/arena.py`, `compare.py`, `compare_diff.py`, `context_request.py`
 
 **Brief:** The v1 sprawl finding was closed by documenting every root module in §18 (drift-
 tested), but the physical grouping was deliberately deferred because moving changes public
@@ -164,7 +164,7 @@ deprecation shims forever; before it, the move is one commit plus import updates
 
 **Remediation:**
 - [x] **A.1.1** Done 2026-08-25: `arena.py`, `compare.py`, `compare_diff.py` moved to
-  `src/anyinfer/evaluate/` with a package docstring stating why the three group together.
+  `src/python/anyinfer/evaluate/` with a package docstring stating why the three group together.
   Top-level re-exports in `anyinfer/__init__.py` are unchanged, so `ai.ArenaResult` and
   `ai.TargetComparison` still resolve; `anyinfer.compare_diff` did move to
   `anyinfer.evaluate.compare_diff` (its API-reference directives, `workspace.py`'s
@@ -187,7 +187,7 @@ deprecation shims forever; before it, the move is one commit plus import updates
 ## A.2 — Mixin `TYPE_CHECKING` signature stubs can drift compatibly
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/_client/generation.py:237-291`, `arena_exec.py:85-180`,
+**Paths:** `src/python/anyinfer/_client/generation.py:237-291`, `arena_exec.py:85-180`,
 `spend.py:55-66`
 
 **Brief:** The A.1 split's mixins carry hand-maintained `TYPE_CHECKING` copies of sibling
@@ -213,7 +213,7 @@ not yet costing anything.
 ## A.3 — `cli.py` stay-single-file decision lacks a growth threshold
 
 **Severity:** Low · **Confidence:** Medium · **Was:** new
-**Paths:** `src/anyinfer/cli.py` (3,801 lines), `DESIGN.md:869-877`
+**Paths:** `src/python/anyinfer/cli.py` (3,801 lines), `DESIGN.md:869-877`
 
 **Brief:** The recorded decision's exit condition is "revisit if it keeps growing" with no
 number — and the file grew 25 lines in the very batch that recorded it (D.3-of-v1 serve
@@ -243,7 +243,7 @@ place.
 ## B.1 — README embeddings enumeration omits Gemini and llama.cpp
 
 **Severity:** Low-Medium · **Confidence:** High · **Was:** new
-**Paths:** `README.md:208-210` vs `src/anyinfer/providers/gemini.py:789`,
+**Paths:** `README.md:208-210` vs `src/python/anyinfer/providers/gemini.py:789`,
 `llama_cpp.py:664`, `docs/providers/gemini.md:103`, `docs/providers/llama-cpp.md:105`
 
 **Brief:** The front-page "Embeddings and/or reranking are live today on …" sentence omits
@@ -265,7 +265,7 @@ class.
 ## B.2 — Observability guide contradicts the shipped sinks it never mentions
 
 **Severity:** Medium-Low · **Confidence:** High · **Was:** new
-**Paths:** `docs/guides/observability.md:69-72` vs `src/anyinfer/events/sinks.py`,
+**Paths:** `docs/guides/observability.md:69-72` vs `src/python/anyinfer/events/sinks.py`,
 `docs/reference/configuration.md:481-504`
 
 **Brief:** The guide's "A JSONL Trail" section tells users to hand-write the exact ~40-line
@@ -285,7 +285,7 @@ actually read when they want an audit trail.
 ## B.3 — Serve page's wire-contract prose trails the codec
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `docs/serve/README.md:95-105` vs `src/anyinfer/serve/openai_codec.py:127,328-341,367`
+**Paths:** `docs/serve/README.md:95-105` vs `src/python/anyinfer/serve/openai_codec.py:127,328-341,367`
 
 **Brief:** The "Survives" list omits `reasoning_effort` (now typed and cross-provider
 translated, added in `ff8fdcc` after the page's last edit), and the deliberate 400s for
@@ -299,7 +299,7 @@ accepts.
 ## B.4 — Proxy/TLS keys documented as universal but no-op on copilot
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `docs/reference/configuration.md:48-77` vs `src/anyinfer/providers/copilot.py`
+**Paths:** `docs/reference/configuration.md:48-77` vs `src/python/anyinfer/providers/copilot.py`
 
 **Brief:** The configuration reference presents `proxy`/`verify`/`client_cert` as
 per-provider-instance keys with no exceptions; every HTTP adapter honors them via
@@ -342,7 +342,7 @@ the guides and API-reference surfaces users reach first.
 ## C.1 — `anyinfer.credential_stores` entry-point group undocumented
 
 **Severity:** Low-Medium · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/plugins.py:48-49`, `src/anyinfer/credentials/resolver.py:102-115`
+**Paths:** `src/python/anyinfer/plugins.py:48-49`, `src/python/anyinfer/credentials/resolver.py:102-115`
 vs `docs/concepts/credentials.md`, `docs/reference/configuration.md:151`
 
 **Brief:** A shipped extension point whose stated purpose is discoverability-from-config
@@ -362,7 +362,7 @@ so the precedence and failure semantics described are the hardened ones.
 ## C.2 — New config/plugins public API missing from the API reference
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/config/__init__.py:29-41`, `src/anyinfer/plugins.py` vs
+**Paths:** `src/python/anyinfer/config/__init__.py:29-41`, `src/python/anyinfer/plugins.py` vs
 `docs/reference/api/configuration.md`
 
 **Brief:** `ObserverSpec`, `build_observers`, and `BUILTIN_OBSERVERS` joined
@@ -381,7 +381,7 @@ surface. This dents the previously verified "every public export has a directive
 ## C.3 — Request-body cap has a flag but no prose documentation
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/serve/app.py:57-64`, `src/anyinfer/cli.py:66-75` vs
+**Paths:** `src/python/anyinfer/serve/app.py:57-64`, `src/python/anyinfer/cli.py:66-75` vs
 `docs/serve/README.md` (Security section)
 
 **Brief:** The 10 MiB default, the 413 response, `--max-request-bytes`, and the `0` disable
@@ -428,7 +428,7 @@ model store already tracks `last_used_at`, so only the `prune` surface remains (
 ## D.1 — `anyinfer_cache` wire extension: undocumented, one-way, untested
 
 **Severity:** Medium-Low · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/serve/openai_codec.py:88,134,369,400-428` vs
+**Paths:** `src/python/anyinfer/serve/openai_codec.py:88,134,369,400-428` vs
 `docs/serve/README.md:241-243`, `docs/concepts/caching.md`; `request_to_openai`
 
 **Brief:** The codec decodes a fifth extension, `anyinfer_cache` (→ typed `CachePolicy`),
@@ -451,8 +451,8 @@ forbids. Whoever added the decode did the request side only.
 ## D.2 — Proxy/TLS settings do not reach auth token exchanges; boundary unstated
 
 **Severity:** Medium-Low · **Confidence:** High (code), Medium (impact) · **Was:** new
-**Paths:** `src/anyinfer/providers/cloud_auth.py:395`, `providers/azure_foundry.py:76-95`,
-`src/anyinfer/mcp/transport.py:190`, `src/anyinfer/local/sources/huggingface.py:182`,
+**Paths:** `src/python/anyinfer/providers/cloud_auth.py:395`, `providers/azure_foundry.py:76-95`,
+`src/python/anyinfer/mcp/transport.py:190`, `src/python/anyinfer/local/sources/huggingface.py:182`,
 `local/services.py:112-117`
 
 **Brief:** The v1-E.9 settings thread through all eleven HTTP data-plane adapters, but the
@@ -471,8 +471,8 @@ token exchange fail TLS verification, and no doc sentence draws the line.
 ## D.3 — Sidecar rejects `reasoning_effort: "none"`
 
 **Severity:** Low · **Confidence:** Medium · **Was:** new
-**Paths:** `src/anyinfer/serve/openai_codec.py` (`_decode_reasoning_effort`),
-`src/anyinfer/types/requests.py:108` (`ReasoningEffort` literal)
+**Paths:** `src/python/anyinfer/serve/openai_codec.py` (`_decode_reasoning_effort`),
+`src/python/anyinfer/types/requests.py:108` (`ReasoningEffort` literal)
 
 **Brief:** The v1-D.2 fix types `reasoning_effort` and refuses unknown values loudly —
 correct — but the normalized vocabulary (`minimal|low|medium|high`) is narrower than
@@ -501,7 +501,7 @@ passthrough now gets a 400 against an OpenAI backend.
 ## D.4 — `LoggingObserver` options escape load-time validation
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/events/sinks.py:101-115`, `src/anyinfer/config/__init__.py:965-1012`
+**Paths:** `src/python/anyinfer/events/sinks.py:101-115`, `src/python/anyinfer/config/__init__.py:965-1012`
 
 **Brief:** `build_observers` promises a typo "fails at load rather than at the first event,"
 but `LoggingObserver.__init__` accepts any `level` unvalidated: `{"level": "INFO"}` (a
@@ -517,7 +517,7 @@ the dispatcher suppresses after one `RuntimeWarning` — a silently empty access
 ## D.5 — Observer-config decisions unrecorded
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/config/__init__.py:950-955`, `src/anyinfer/plugins.py:66-68`,
+**Paths:** `src/python/anyinfer/config/__init__.py:950-955`, `src/python/anyinfer/plugins.py:66-68`,
 `docs/reference/configuration.md:503`
 
 **Brief:** Two defensible-looking choices in the observers block are nowhere recorded as
@@ -535,7 +535,7 @@ code during `load_config`.
 ## D.6 — `ProviderSettings` TLS docstrings + missing forwarding test
 
 **Severity:** Low · **Confidence:** High · **Was:** new
-**Paths:** `src/anyinfer/_client/providers.py:37-66`, `tests/test_config.py:585-636`
+**Paths:** `src/python/anyinfer/_client/providers.py:37-66`, `tests/test_config.py:585-636`
 
 **Brief:** `ProviderSettings`' Attributes list stops before the new
 `proxy`/`verify`/`client_cert` fields, and no test pins that `build_client` actually
@@ -660,7 +660,7 @@ extension point.
 
 **Severity:** High (claim-integrity) · **Confidence:** High · **Was:** F.1 ·
 **Class:** accepted-risk (now honestly labeled everywhere)
-**Paths:** `src/anyinfer/local/attestation.py`, `src/anyinfer/providers/confidential_execution.py`
+**Paths:** `src/python/anyinfer/local/attestation.py`, `src/python/anyinfer/providers/confidential_execution.py`
 
 **Brief:** Unchanged in substance: `end_to_end` rests on device-node existence and
 `nvidia-smi` parsing; no quote is generated or verified. What DID land (v1 G.1): the
@@ -677,9 +677,9 @@ references: F.1.1→G.3, F.1.2→G.3.3, F.1.3/F.1.4→done (v1 G.1), F.1.5→G.3
 
 **Severity:** Medium · **Confidence:** High · **Was:** new · **Class:** vulnerability
 (silent misconfiguration → reference string sent as a credential)
-**Paths:** `src/anyinfer/credentials/literal.py:22-28`,
-`src/anyinfer/credentials/resolver.py:108-115`, `src/anyinfer/plugins.py:95-134`,
-`src/anyinfer/config/__init__.py:949-961`
+**Paths:** `src/python/anyinfer/credentials/literal.py:22-28`,
+`src/python/anyinfer/credentials/resolver.py:108-115`, `src/python/anyinfer/plugins.py:95-134`,
+`src/python/anyinfer/config/__init__.py:949-961`
 
 **Brief:** `LiteralResolver.handles` declines only the built-in scheme names, so a
 third-party reference like `vault://prod/openai` whose plugin is missing or failed to import
@@ -707,8 +707,8 @@ leak). Contrast observers, where an unknown config name is a `ConfigError` at lo
 ## F.3 — Credential-store plugins can shadow built-in schemes
 
 **Severity:** Low-Medium · **Confidence:** High · **Was:** new · **Class:** hardening
-**Paths:** `src/anyinfer/credentials/resolver.py:108-115`, `src/anyinfer/plugins.py:95-134`
-vs `src/anyinfer/registry.py:741-763`
+**Paths:** `src/python/anyinfer/credentials/resolver.py:108-115`, `src/python/anyinfer/plugins.py:95-134`
+vs `src/python/anyinfer/registry.py:741-763`
 
 **Brief:** Discovered resolvers are imported, instantiated, and placed *ahead of* the
 built-ins whenever the default chain is built, with no collision guard — any installed
@@ -731,8 +731,8 @@ inconsistent with the discipline the providers group established.
 
 **Severity:** Low · **Confidence:** High (reproduced) · **Was:** new · **Class:**
 vulnerability (robustness; fails closed, no bypass)
-**Paths:** `src/anyinfer-confidential/src/anyinfer_confidential/app.py:53`,
-`src/anyinfer/serve/app.py:451-458`
+**Paths:** `src/python/anyinfer-confidential/src/anyinfer_confidential/app.py:53`,
+`src/python/anyinfer/serve/app.py:451-458`
 
 **Brief:** `secrets.compare_digest` raises `TypeError` on non-ASCII strings; Starlette
 decodes headers latin-1, so any request with a byte ≥ 0x80 in the Authorization value turns
@@ -747,7 +747,7 @@ sidecar's `_check_auth` shares the pattern.
 ## F.5 — Relay HTTP surface lacks the request-body cap
 
 **Severity:** Low · **Confidence:** High · **Was:** new · **Class:** hardening
-**Paths:** `src/anyinfer-confidential/src/anyinfer_confidential/app.py:104`
+**Paths:** `src/python/anyinfer-confidential/src/anyinfer_confidential/app.py:104`
 
 **Brief:** `await request.json()` unbounded — the same allocation issue the v1 F.6 fix
 closed on the sidecar, on the relay app that shipped in the same wave. Post-auth only, so
@@ -762,7 +762,7 @@ serving other tenants' prompt assembly.
 ## F.6 — Telemetry-sink redaction edge gaps
 
 **Severity:** Low · **Confidence:** High · **Was:** new · **Class:** hardening
-**Paths:** `src/anyinfer/events/sinks.py:63,145,150`
+**Paths:** `src/python/anyinfer/events/sinks.py:63,145,150`
 
 **Brief:** `event_to_dict`'s value redaction is thorough, but mapping *keys* never pass
 through `redact()`, `json.dumps(..., default=str)` stringifies any missed leaf without
@@ -778,7 +778,7 @@ file is not re-chmodded, unlike the demo-config pattern).
 
 **Severity:** Low · **Confidence:** High (path), Medium (reachability) · **Was:** new ·
 **Class:** hardening
-**Paths:** `src/anyinfer_demo/config.py:66-67`
+**Paths:** `src/python/anyinfer_demo/config.py:66-67`
 
 **Brief:** `_secret_field_keys()` returns an empty set when the provider id is absent from
 the registry, so `_without_literal_secrets` strips nothing for that entry — a stale config
@@ -794,7 +794,7 @@ exposure.
 ## F.8 — Body-limit middleware replays a truncated body on disconnect
 
 **Severity:** Low · **Confidence:** High · **Was:** new · **Class:** hardening
-**Paths:** `src/anyinfer/serve/app.py:504-508` (`_with_body_limit` disconnect branch)
+**Paths:** `src/python/anyinfer/serve/app.py:504-508` (`_with_body_limit` disconnect branch)
 
 **Brief:** On `http.disconnect` mid-read, the wrapper replays accumulated chunks downstream
 with `more_body: False`, presenting truncation as a complete request instead of forwarding
@@ -940,8 +940,8 @@ somewhere it would be read out of context.
 ## H.1 — Documented `verify` + `client_cert` combination raises `TypeError`
 
 **Severity:** Medium-High · **Confidence:** High (reproduced) · **Was:** new
-**Paths:** `src/anyinfer/providers/http.py` (`build_client`, `tls_kwargs`),
-`src/anyinfer/providers/cloud_auth.py:_exchange`,
+**Paths:** `src/python/anyinfer/providers/http.py` (`build_client`, `tls_kwargs`),
+`src/python/anyinfer/providers/cloud_auth.py:_exchange`,
 `docs/reference/configuration.md` (Proxies, Private CAs, and mTLS)
 
 **Brief:** httpx2 2.10 deprecates both `verify=<str>` (a CA-bundle path) and `cert=...` (a
@@ -982,7 +982,7 @@ JSON. The conversion is confined to `tls_kwargs`.
 ## H.2 — Copilot `cli_path` raises `TypeError`; `aclose` leaks the CLI process
 
 **Severity:** Medium-High · **Confidence:** High (both reproduced) · **Was:** new
-**Paths:** `src/anyinfer/providers/copilot.py` (`_ensure_client`, `aclose`, `_map_error`),
+**Paths:** `src/python/anyinfer/providers/copilot.py` (`_ensure_client`, `aclose`, `_map_error`),
 `contracts/copilot.md`, `docs/providers/copilot.md`
 
 **Brief:** Two independent breaks against `github-copilot-sdk` 1.0.9, found by sweeping for
@@ -1076,7 +1076,7 @@ of claim section B exists to prevent.
 **Brief:** Two environment definitions had drifted apart. `workspace setup` installs all
 three sharded add-ons editable; `ci.yml` installed only `anyinfer-store`, in all four of
 its install sites — while the comment directly above that line correctly said *"sharded
-add-ons (src/anyinfer-*, …) need their own editable install"*. Consequences:
+add-ons (src/python/anyinfer-*, …) need their own editable install"*. Consequences:
 
 - **`docs-build` failed** — mkdocstrings imports every documented package, and
   `docs/reference/api/confidential.md` (added in `ae60818`) resolves
@@ -1085,7 +1085,7 @@ add-ons (src/anyinfer-*, …) need their own editable install"*. Consequences:
   mkdocs build ran inside `tests/test_workspace.py::TestBuild`, one test, no useful
   message beyond `assert 1 == 0`.
 - **64 shard tests were collected by nothing.** `testpaths = ["tests"]` excluded
-  `src/anyinfer-*/tests` entirely, so they ran neither in CI nor in `workspace check` —
+  `src/python/anyinfer-*/tests` entirely, so they ran neither in CI nor in `workspace check` —
   including the Relay authentication and body-cap tests added by F.4 and F.5 *in this very
   pass*, on a branch whose purpose was closing security findings.
 
@@ -1105,7 +1105,7 @@ environment built by `workspace setup` has all three shards.
 ## I.2 — `os.pread` is POSIX-only; every Windows lane failed
 
 **Severity:** Medium-High · **Confidence:** High (reproduced in CI) · **Was:** new
-**Paths:** `src/anyinfer/local/provenance.py` (`_hash_fd`, `_read_at`)
+**Paths:** `src/python/anyinfer/local/provenance.py` (`_hash_fd`, `_read_at`)
 
 **Brief:** The F.11 weight-verification work (`eb5fe76`) hashes through a held descriptor
 rather than reopening a path — the right design, since reopening is the TOCTOU hole it
@@ -1128,9 +1128,9 @@ tests across `test_local_provenance.py` and `test_local_server.py` failed with
 ## I.3 — `chmod(0o600)` does not restrict anything on Windows
 
 **Severity:** Medium · **Confidence:** High (CI reported `key.bin is mode 666`) · **Was:** new
-**Paths:** `src/anyinfer/_private_files.py` (new),
-`src/anyinfer-confidential/src/anyinfer_confidential/cli.py`,
-`src/anyinfer/events/sinks.py`, `src/anyinfer_demo/config.py`
+**Paths:** `src/python/anyinfer/_private_files.py` (new),
+`src/python/anyinfer-confidential/src/anyinfer_confidential/cli.py`,
+`src/python/anyinfer/events/sinks.py`, `src/python/anyinfer_demo/config.py`
 
 **Brief:** `Path.chmod(0o600)` on Windows toggles a read-only attribute and leaves the
 file's ACL untouched, so a file "protected" that way stays readable by every other local

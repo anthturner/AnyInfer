@@ -34,7 +34,7 @@ from pricing_check import (
 from pricing_fetch import fetch_json
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PRICING_PATH = REPO_ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json"
+PRICING_PATH = REPO_ROOT / "src" / "python" / "anyinfer" / "capabilities" / "pricing.json"
 
 
 def _checked_at() -> str:

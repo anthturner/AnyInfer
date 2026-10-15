@@ -27,7 +27,7 @@ Findings from this run: contract-drift/2026-09-07.
      (synchronous) or `.../chat/stream` (`copilotconversation-chatoverstream`, SSE) with
      the actual message → `200 OK`, body is the updated `copilotConversation` including the
      new turn's messages.
-  - **Adapter mismatch, needs follow-up (not fixed here)**: `src/anyinfer/providers/
+  - **Adapter mismatch, needs follow-up (not fixed here)**: `src/python/anyinfer/providers/
     m365_copilot.py` defaults `_DEFAULT_BASE_URL` to `https://graph.microsoft.com/v1.0` and
     issues a single `POST {base}/copilot/conversations` per request
     (`_CHAT_PATH = "/copilot/conversations"`, used directly with the user message as the

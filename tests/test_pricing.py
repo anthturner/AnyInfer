@@ -319,7 +319,7 @@ async def test_generate_computes_cost_from_the_table() -> None:
 
 
 def test_fetch_pricing_parses_a_served_table() -> None:
-    document = (REPO_ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json").read_text(
+    document = (REPO_ROOT / "src" / "python" / "anyinfer" / "capabilities" / "pricing.json").read_text(
         "utf-8"
     )
     transport = httpx2.MockTransport(lambda request: httpx2.Response(200, text=document))

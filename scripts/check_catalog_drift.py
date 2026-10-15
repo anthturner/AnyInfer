@@ -28,8 +28,8 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MODELS_PATH = REPO_ROOT / "src" / "anyinfer" / "catalog" / "models.json"
-RUNTIMES_PATH = REPO_ROOT / "src" / "anyinfer" / "local" / "runtimes.json"
+MODELS_PATH = REPO_ROOT / "src" / "python" / "anyinfer" / "catalog" / "models.json"
+RUNTIMES_PATH = REPO_ROOT / "src" / "python" / "anyinfer" / "local" / "runtimes.json"
 
 HF_RESOLVE = "https://huggingface.co/{repo}/resolve/{revision}/{path}"
 OLLAMA_MANIFEST = "https://registry.ollama.ai/v2/library/{name}/manifests/{tag}"

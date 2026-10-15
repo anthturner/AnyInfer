@@ -208,7 +208,7 @@ def test_no_rendered_text_instructs_the_reader_on_how_to_quote_it() -> None:
     for path in sorted((ROOT / "docs").rglob("*.md")):
         for match in _ADDRESSED_TO_A_QUOTER.finditer(path.read_text(encoding="utf-8")):
             offenders.append(f"{path.relative_to(ROOT)}: {match.group(0)!r}")
-    for path in sorted((ROOT / "src").rglob("*.py")):
+    for path in sorted((ROOT / "src" / "python").rglob("*.py")):
         for match in _ADDRESSED_TO_A_QUOTER.finditer(path.read_text(encoding="utf-8")):
             offenders.append(f"{path.relative_to(ROOT)}: {match.group(0)!r}")
     for match in _ADDRESSED_TO_A_QUOTER.finditer(_read("README.md")):
@@ -259,7 +259,7 @@ def test_public_docstrings_carry_no_adr_identifier() -> None:
     import ast
 
     offenders: list[str] = []
-    for path in sorted((ROOT / "src" / "anyinfer").rglob("*.py")):
+    for path in sorted((ROOT / "src" / "python" / "anyinfer").rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if not isinstance(
@@ -277,7 +277,7 @@ def _design_section_18_modules() -> set[str]:
     """Module filenames enumerated in DESIGN.md §18's package-layout block."""
     design = _read("DESIGN.md")
     start = design.index("## 18. Package layout")
-    fence = design.index("```\nsrc/anyinfer/", start)
+    fence = design.index("```\nsrc/python/anyinfer/", start)
     block = design[fence : design.index("\n```", fence)]
     # `__init__.py` is named once for the top-level curated surface; per-package
     # ones are not enumerated on either side.
@@ -285,8 +285,8 @@ def _design_section_18_modules() -> set[str]:
 
 
 def _tree_modules() -> set[str]:
-    """Module filenames actually shipped under src/anyinfer/."""
-    package = ROOT / "src" / "anyinfer"
+    """Module filenames actually shipped under src/python/anyinfer/."""
+    package = ROOT / "src" / "python" / "anyinfer"
     return {
         path.name
         for path in package.rglob("*.py")
@@ -327,11 +327,11 @@ def test_design_section_18_places_each_module_in_the_right_package() -> None:
     """
     design = _read("DESIGN.md")
     start = design.index("## 18. Package layout")
-    fence = design.index("```\nsrc/anyinfer/", start)
+    fence = design.index("```\nsrc/python/anyinfer/", start)
     block = design[fence : design.index("\n```", fence)]
 
     misplaced: list[str] = []
-    package = ROOT / "src" / "anyinfer"
+    package = ROOT / "src" / "python" / "anyinfer"
     for path in sorted(package.rglob("*.py")):
         if "__pycache__" in path.parts or path.name == "__init__.py":
             continue

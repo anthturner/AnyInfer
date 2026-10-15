@@ -43,7 +43,7 @@ It ships as a separate package. Until its first PyPI release, install it from a
 repository checkout — see [the add-on packages](installation.md#optional-add-on-packages):
 
 ```bash
-pip install -e "src/anyinfer-confidential[relay]"   # relay is optional; Tier 1 needs no extra
+pip install -e "src/python/anyinfer-confidential[relay]"   # relay is optional; Tier 1 needs no extra
 ```
 
 ```python

@@ -75,7 +75,7 @@ ArgumentAdder = Callable[[argparse.ArgumentParser], object]
 """Adds a verb's flags to its parser. The return value is discarded — argparse's
 ``add_argument`` returns an ``Action``, which callers have no use for."""
 
-REPO_MARKERS = ("pyproject.toml", "src", "tests")
+REPO_MARKERS = ("pyproject.toml", "src/python", "tests")
 """Files and directories that together identify an AnyInfer checkout."""
 
 
@@ -132,7 +132,7 @@ def _warn_if_shadowed() -> str | None:
 
 
 # Paths every quality gate operates on, matching .github/workflows/ci.yml.
-LINT_PATHS = ("src", "tests", "workspace.py")
+LINT_PATHS = ("src/python", "tests", "workspace.py")
 
 # Build outputs and tool caches. Directories are removed wholesale; the glob patterns are
 # swept recursively. Nothing here is ever a source file.
@@ -450,7 +450,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     """Install the project in editable mode with its development extras."""
     python("-m", "pip", "install", "--upgrade", "pip")
     python("-m", "pip", "install", "-e", f".[{args.extras}]")
-    # Sharded add-ons (src/anyinfer-*, each its own pyproject.toml per the monorepo
+    # Sharded add-ons (src/python/anyinfer-*, each its own pyproject.toml per the monorepo
     # sharding convention) aren't in the root package's dependency graph. They are
     # installed editable for two reasons: their mkdocstrings reference pages need them
     # importable for `workspace build docs` / `workspace check --only=docs-build`, and
@@ -543,7 +543,11 @@ _DOCSTRING_INHERITED_EXEMPT = frozenset(
 )
 """Members every exported class inherits; requiring docstrings for these is noise."""
 
-SHARDS = ("src/anyinfer-store", "src/anyinfer-shared", "src/anyinfer-confidential")
+SHARDS = (
+    "src/python/anyinfer-store",
+    "src/python/anyinfer-shared",
+    "src/python/anyinfer-confidential",
+)
 """The sharded add-ons, each its own pyproject.toml per the monorepo sharding convention.
 
 Named once because two places must agree: `cmd_setup`, which builds a contributor's
@@ -634,7 +638,7 @@ def _scan_public_boundaries() -> tuple[list[str], dict[str, bool]]:
     """Find undeclared public names and constant documentation states."""
     leaks: list[str] = []
     constant_docs: dict[str, bool] = {}
-    for path in sorted((ROOT / "src" / "anyinfer").rglob("*.py")):
+    for path in sorted((ROOT / "src" / "python" / "anyinfer").rglob("*.py")):
         if path.name == "__main__.py" or "__pycache__" in path.parts:
             continue
         exported, documented = _module_bindings(path)
@@ -1257,7 +1261,7 @@ someone changing one adapter forgets to run.
 
 def _known_provider_ids() -> set[str]:
     """Every registered provider id and alias, read from the registry itself."""
-    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT / "src" / "python"))
     from anyinfer.registry import ProviderRegistry
 
     known: set[str] = set()
@@ -1592,7 +1596,7 @@ def _run_pyinstaller(
         "--name",
         name,
         "--paths",
-        str(ROOT / "src"),
+        str(ROOT / "src" / "python"),
         "--distpath",
         str(work_dir / "dist"),
         "--workpath",
@@ -1726,7 +1730,8 @@ def _build_demo_bundle() -> int:
             "--copy-metadata",
             "markdown",
             "--add-data",
-            f"{ROOT / 'src' / 'anyinfer_demo' / 'assets'}{os.pathsep}anyinfer_demo/assets",
+            f"{ROOT / 'src' / 'python' / 'anyinfer_demo' / 'assets'}"
+            f"{os.pathsep}anyinfer_demo/assets",
         ),
     )
     _write_bundle_info(

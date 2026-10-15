@@ -804,7 +804,7 @@ result = client.generate(
 ## 18. Package layout
 
 ```
-src/anyinfer/
+src/python/anyinfer/
   __init__.py            # curated public surface
   types/                 # messages.py requests.py results.py events.py capabilities.py
                          # operations.py
@@ -868,6 +868,11 @@ tests/                   # unit + conformance runs (cassette & fake modes)
 contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§24)
 docs/                    # provider guides, published site sources (§25)
 ```
+
+`src/python/` is the current implementation root. The language-neutral behavior contract and
+data-only corpus live under `specification/`. A future C# proof has a separate `src/csharp/`
+root; it is not currently a supported implementation or release-ready product. Python remains
+the current product implementation.
 
 **`context_request.py` stays a root module — pinned by contract, not by inertia.** The
 obvious homes are both closed. It cannot live under `types/`: it imports
@@ -1829,7 +1834,7 @@ that oversells is worse than no tier.
 
 ### 30.1 Packaging
 
-`src/anyinfer-confidential/` and `src/anyinfer-shared/`, each with its own
+`src/python/anyinfer-confidential/` and `src/python/anyinfer-shared/`, each with its own
 `pyproject.toml`, hyphenated directory and underscored importable package,
 `anyinfer-confidential` depending on `anyinfer` and never the reverse, `anyinfer-shared`
 imported by neither core nor the add-on's dependents by accident. Tiers 1 and 2 touch

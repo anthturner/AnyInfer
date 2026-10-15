@@ -49,7 +49,7 @@ def test_the_validator_script_exits_zero() -> None:
 def test_the_validator_catches_an_unpinned_entry(tmp_path: Path) -> None:
     """The gate has to actually reject something, or it is decoration."""
     document = json.loads(
-        (REPO_ROOT / "src" / "anyinfer" / "catalog" / "models.json").read_text(encoding="utf-8")
+        (REPO_ROOT / "src" / "python" / "anyinfer" / "catalog" / "models.json").read_text(encoding="utf-8")
     )
     entry = document["models"][0]
     entry["variants"][0]["source"]["revision"] = "main"
@@ -64,7 +64,7 @@ def test_the_validator_catches_an_unpinned_entry(tmp_path: Path) -> None:
 
 def test_the_validator_catches_a_license_outside_the_allowlist(tmp_path: Path) -> None:
     document = json.loads(
-        (REPO_ROOT / "src" / "anyinfer" / "catalog" / "models.json").read_text(encoding="utf-8")
+        (REPO_ROOT / "src" / "python" / "anyinfer" / "catalog" / "models.json").read_text(encoding="utf-8")
     )
     document["models"][0]["license"] = "cc-by-nc-4.0"
     broken = tmp_path / "models.json"
@@ -75,7 +75,7 @@ def test_the_validator_catches_a_license_outside_the_allowlist(tmp_path: Path) -
 
 def test_the_validator_catches_a_fabricated_future_date(tmp_path: Path) -> None:
     document = json.loads(
-        (REPO_ROOT / "src" / "anyinfer" / "catalog" / "models.json").read_text(encoding="utf-8")
+        (REPO_ROOT / "src" / "python" / "anyinfer" / "catalog" / "models.json").read_text(encoding="utf-8")
     )
     document["models"][0]["last_verified"] = "2099-01-01"
     broken = tmp_path / "models.json"

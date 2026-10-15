@@ -1,7 +1,7 @@
 # The Pack-In Demo Application
 
 AnyInfer ships a PySide6 reference application in
-[`src/anyinfer_demo/`](https://github.com/anthturner/AnyInfer/blob/main/src/anyinfer_demo).
+[`src/python/anyinfer_demo/`](https://github.com/anthturner/AnyInfer/blob/main/src/python/anyinfer_demo).
 It is a worked example of integration, not part of the library's public API; nothing in
 `anyinfer` imports it, and nothing in it is importable from `anyinfer`. It runs with no
 credentials and no network: the default configuration talks to an in-process fake
@@ -31,7 +31,7 @@ python -m anyinfer_demo
 ## The Integration Pattern Worth Copying
 
 Qt owns the main thread; the `Client` owns a background loop thread.
-[`anyinfer_demo/engine.py`](https://github.com/anthturner/AnyInfer/blob/main/src/anyinfer_demo/engine.py)
+[`anyinfer_demo/engine.py`](https://github.com/anthturner/AnyInfer/blob/main/src/python/anyinfer_demo/engine.py)
 keeps them apart:
 
 - Every call runs on a `QThreadPool` worker; never on the GUI thread.

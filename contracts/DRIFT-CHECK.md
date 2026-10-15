@@ -88,7 +88,7 @@ meaning of `lfs.oid`, pagination, and the redirect origin rule.
 
 ## The pricing table
 
-The bundled pricing table (`src/anyinfer/capabilities/pricing.json`) is drift-checked on
+The bundled pricing table (`src/python/anyinfer/capabilities/pricing.json`) is drift-checked on
 its own automated track — the weekly `pricing-refresh` workflow — and does not need to be
 covered by a manual run of this procedure. For reference, its rules mirror this file's:
 

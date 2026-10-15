@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pin the bundled local-model catalog against upstream repositories.
 
-This is the **only** way numbers enter ``src/anyinfer/catalog/models.json``. Hashes, sizes,
+This is the **only** way numbers enter ``src/python/anyinfer/catalog/models.json``. Hashes, sizes,
 revisions, and ``last_verified`` dates are read from upstream at run time and written
 verbatim; nothing here invents a value, and a candidate whose files cannot be resolved is
 reported and skipped rather than shipped half-pinned.
@@ -36,7 +36,7 @@ from typing import Any
 import httpx2
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "src" / "anyinfer" / "catalog" / "models.json"
+OUTPUT = ROOT / "src" / "python" / "anyinfer" / "catalog" / "models.json"
 
 HF_API = "https://huggingface.co/api/models"
 HF_RESOLVE = "https://huggingface.co"

@@ -84,8 +84,8 @@ jobs:
           claude_args: "--allowedTools Bash,Read,Edit,Write,WebSearch,WebFetch"
           prompt: |
             You are refreshing this repository's bundled local-model catalog
-            (src/anyinfer/catalog/models.json) and llama-server runtime table
-            (src/anyinfer/local/runtimes.json). Read each file's _comment block first —
+            (src/python/anyinfer/catalog/models.json) and llama-server runtime table
+            (src/python/anyinfer/local/runtimes.json). Read each file's _comment block first —
             it states the rules.
 
             1. Run `python scripts/check_catalog_drift.py` to see exactly what drifted.

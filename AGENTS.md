@@ -25,6 +25,10 @@ architecture document — it carries the goals and non-goals, the ADRs, the open
 and the risk register. Read it before proposing or writing code. Do not contradict an ADR
 or a stated non-goal without flagging it explicitly as a proposed reversal.
 
+The current Python implementation lives under `src/python/`; the shared language-neutral
+contract and corpus live under `specification/`. A separate future C# proof root does not mean
+that a C# implementation is currently supported or release-ready.
+
 **Branch model:** `feature/*` → `develop` → `main`, both protected branches gated on the
 aggregate `ci-ok` check. Merges to `main` rebuild the library distribution and a Linux
 bundle; a version bump builds the full bundle matrix and cuts a GitHub Release. See
@@ -56,11 +60,11 @@ Keep these product surfaces distinct:
 
 | Workstream | Owned paths | Boundary |
 |---|---|---|
-| Core SDK / inference engine | `src/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
-| Demo application | `src/anyinfer_demo/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
-| One-shot CLI and operator commands | `src/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `init`, `agents-md`, `run`, `embed`, `rerank`, `compare`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, `context`, `conform`, `mcp`, and `serve`. `serve`'s parser lives here, but its semantics belong to the sidecar workstream. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`, and endpoint/credential discovery for `init` belongs in `anyinfer.local.discovery`. |
-| OpenAI-compatible sidecar | `src/anyinfer/serve/`, sidecar tests | Owns the OpenAI wire codec and ASGI lifecycle, plus the operator-tooling renderer `service.py` (systemd/launchd/Windows units) that ships beside them — it emits text and imports nothing but `errors`, so it lives with the thing it starts rather than in the CLI. It stays a projection over `AsyncClient`; no provider, routing, validation, or config policy belongs here. The import-linter contract covers the whole package, so a new `serve/` module is inside the boundary the moment it exists. |
-| Shared configuration | `src/anyinfer/config/`, configuration docs and tests | One versioned format feeds Python SDK callers, the CLI, the sidecar, and compatible demo settings. Frontends may add flags, but they must not fork file semantics. |
+| Core SDK / inference engine | `src/python/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
+| Demo application | `src/python/anyinfer_demo/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
+| One-shot CLI and operator commands | `src/python/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `init`, `agents-md`, `run`, `embed`, `rerank`, `compare`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, `context`, `conform`, `mcp`, and `serve`. `serve`'s parser lives here, but its semantics belong to the sidecar workstream. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`, and endpoint/credential discovery for `init` belongs in `anyinfer.local.discovery`. |
+| OpenAI-compatible sidecar | `src/python/anyinfer/serve/`, sidecar tests | Owns the OpenAI wire codec and ASGI lifecycle, plus the operator-tooling renderer `service.py` (systemd/launchd/Windows units) that ships beside them — it emits text and imports nothing but `errors`, so it lives with the thing it starts rather than in the CLI. It stays a projection over `AsyncClient`; no provider, routing, validation, or config policy belongs here. The import-linter contract covers the whole package, so a new `serve/` module is inside the boundary the moment it exists. |
+| Shared configuration | `src/python/anyinfer/config/`, configuration docs and tests | One versioned format feeds Python SDK callers, the CLI, the sidecar, and compatible demo settings. Frontends may add flags, but they must not fork file semantics. |
 
 Cross-cutting changes must update every affected workstream in one change. In particular,
 changes to shared configuration require SDK, CLI, sidecar, reference-doc, and example
@@ -103,7 +107,7 @@ changes require the generated reference and runnable examples.
 - Secrets: anything credential-shaped goes through `anyinfer.credentials` and is registered
   for redaction. Never log, print, or embed secrets in errors, events, or fixtures.
 - Local servers bind `127.0.0.1` only unless `allow_remote_exposure=True`.
-- Layout: `src/anyinfer/` per DESIGN.md §18. Tests are flat `tests/test_<area>.py` modules — an area is often a group of related adapters, so bedrock's tests live in `test_bedrock_vertex.py` — plus mirrored subpackages for `context/`, `demo_app/`, `mcp/`, and `testing/`. Grep for the symbol rather than guessing a path from the module name.
+- Layout: `src/python/anyinfer/` per DESIGN.md §18. Tests are flat `tests/test_<area>.py` modules — an area is often a group of related adapters, so bedrock's tests live in `test_bedrock_vertex.py` — plus mirrored subpackages for `context/`, `demo_app/`, `mcp/`, and `testing/`. Grep for the symbol rather than guessing a path from the module name.
 
 ## Testing and documentation obligations
 

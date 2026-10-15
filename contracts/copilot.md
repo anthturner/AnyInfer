@@ -28,7 +28,7 @@ Findings from this run: contract-drift/2026-09-07.
   `.for_tcp(port=0, connection_token=None, path=None, args=None)`, `.for_uri(url,
   connection_token=None)`, `.for_inprocess()` (experimental, FFI) — not a directly
   constructed `StdioRuntimeConnection(path=...)` class, which is what the adapter calls
-  (`src/anyinfer/providers/copilot.py`, `_ensure_client`). If `copilot.StdioRuntimeConnection`
+  (`src/python/anyinfer/providers/copilot.py`, `_ensure_client`). If `copilot.StdioRuntimeConnection`
   no longer exists as of the version actually resolved by `>=0.1`, every request that sets
   `cli_path`/`COPILOT_CLI_PATH` raises `AttributeError` instead of working. `tests/
   test_copilot.py`'s signature-binding check only catches this against whatever version is
@@ -63,7 +63,7 @@ Findings from this run: contract-drift/2026-09-07.
   context-manager form (`async with await client.create_session(...) as session`) is also
   now supported. The adapter's per-request cleanup
   (`getattr(session, "close", None) or getattr(session, "aclose", None)`,
-  `src/anyinfer/providers/copilot.py:246`) and its swept-session shutdown
+  `src/python/anyinfer/providers/copilot.py:246`) and its swept-session shutdown
   (`_SHUTDOWN_METHODS = ("stop", "close", "aclose")`, same file, applied to held sessions
   too) do not probe for `disconnect`. If the installed SDK's `Session` no longer exposes
   `close`/`aclose`, both paths silently find nothing to call (the `if close is not None`

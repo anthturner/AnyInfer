@@ -6,7 +6,7 @@ fetchable builds is pinned data with the same discipline as the model catalog: a
 tag, real asset URLs, real sha256 digests, real sizes, and a real ``last_verified`` date,
 all read from the upstream GitHub release rather than typed by hand.
 
-Writes ``src/anyinfer/local/runtimes.json``. Run from the repository root::
+Writes ``src/python/anyinfer/local/runtimes.json``. Run from the repository root::
 
     python scripts/pin_runtimes.py                 # pin the latest release
     python scripts/pin_runtimes.py --tag b10327    # pin a specific build
@@ -26,7 +26,7 @@ from typing import Any
 import httpx2
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "src" / "anyinfer" / "local" / "runtimes.json"
+OUTPUT = ROOT / "src" / "python" / "anyinfer" / "local" / "runtimes.json"
 
 RELEASES = "https://api.github.com/repos/ggml-org/llama.cpp/releases"
 

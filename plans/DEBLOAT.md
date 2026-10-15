@@ -90,9 +90,9 @@ content, and a **live Cohere credential sits at the repo root** (§G — do this
 
 ## A — Dead code: delete outright (~900 LOC)
 
-- [ ] **A.1 · `src/anyinfer-shared/`: advertised package, zero known consumers — a
+- [ ] **A.1 · `src/python/anyinfer-shared/`: advertised package, zero known consumers — a
   product decision, not a code cleanup** — its only export (`ConfidentialityReport`,
-  `src/anyinfer-shared/src/anyinfer_shared/__init__.py:51`) is imported by nothing in the
+  `src/python/anyinfer-shared/src/anyinfer_shared/__init__.py:51`) is imported by nothing in the
   repo, and the only object ever satisfying its `from_status()` protocol is a fake in its
   own test. But it is *documented as a shipping PyPI package* whose stated purpose is
   downstream composition (`docs/guides/installation.md:42`,
@@ -158,7 +158,7 @@ content, and a **live Cohere credential sits at the repo root** (§G — do this
 ## B — Provider-layer duplication (~1,700 LOC)
 
 The primitives mostly exist (`providers/http.py`, `presets.py:_TRANSLATORS`); what's
-missing is composition. Items B.1–B.4 are one refactor wave over `src/anyinfer/providers/`.
+missing is composition. Items B.1–B.4 are one refactor wave over `src/python/anyinfer/providers/`.
 **Shared risk shape for the whole section:** wide blast radius (every adapter) but strong
 gates (per-adapter tests + conformance suite + `mypy --strict`); the danger is not a loud
 break but a *quiet semantic change* to one adapter's error mapping or wire format. The

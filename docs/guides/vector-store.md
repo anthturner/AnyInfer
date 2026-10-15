@@ -7,7 +7,7 @@ prototypes, personal tools, notebooks, small internal apps, single-tenant deskto
 local-first applications.
 
 ```bash
-pip install -e src/anyinfer-store   # from a repository checkout, until a first PyPI release
+pip install -e src/python/anyinfer-store   # from a repository checkout, until a first PyPI release
 ```
 
 The core package installs [as usual](installation.md); the store is a separate sub-project.

@@ -65,7 +65,7 @@ is not sufficient evidence — see Step 6.
 
 ## Step 2 — write the adapter
 
-`src/anyinfer/providers/<id>.py`. An adapter exposes exactly `list_models`, `health`,
+`src/python/anyinfer/providers/<id>.py`. An adapter exposes exactly `list_models`, `health`,
 `generate`, `aclose`, plus `embed` / `rerank` when it serves those operations. It
 translates and nothing else: no retry, no backoff, no schema validation or repair, no
 timing, no routing or catalog lookups, no redaction policy. `lint-imports` enforces the
@@ -105,7 +105,7 @@ Rules that every one of them already encodes, and that reviews check for:
 
 ## Step 3 — register and describe it
 
-1. Add the module name to `_BUILTIN_MODULES` in `src/anyinfer/providers/__init__.py`.
+1. Add the module name to `_BUILTIN_MODULES` in `src/python/anyinfer/providers/__init__.py`.
 2. Fill in the `ProviderDescriptor`. Four invariants are enforced by
    `tests/test_registry_and_catalog.py`, and each one exists because the alternative
    silently misconfigures a user:

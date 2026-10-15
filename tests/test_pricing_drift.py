@@ -43,7 +43,7 @@ def _fixture(name: str) -> dict[str, Any]:
 
 
 def _pricing() -> dict[str, Any]:
-    path = ROOT / "src" / "anyinfer" / "capabilities" / "pricing.json"
+    path = ROOT / "src" / "python" / "anyinfer" / "capabilities" / "pricing.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 

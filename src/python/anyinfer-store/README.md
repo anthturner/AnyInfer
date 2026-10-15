@@ -11,7 +11,7 @@ Pinecone, ...) at `anyinfer.embed()`/`anyinfer.rerank()` directly; both consume 
 public `EmbeddingResult`/`RerankResult` types this package does.
 
 ```bash
-pip install -e src/anyinfer-store
+pip install -e src/python/anyinfer-store
 ```
 
 ```python

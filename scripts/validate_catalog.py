@@ -16,12 +16,12 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CATALOG_DIR = REPO_ROOT / "src" / "anyinfer" / "catalog"
+CATALOG_DIR = REPO_ROOT / "src" / "python" / "anyinfer" / "catalog"
 MODELS_PATH = CATALOG_DIR / "models.json"
 DEFAULT_PATH = CATALOG_DIR / "default.json"
-RUNTIMES_PATH = REPO_ROOT / "src" / "anyinfer" / "local" / "runtimes.json"
+RUNTIMES_PATH = REPO_ROOT / "src" / "python" / "anyinfer" / "local" / "runtimes.json"
 
-sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "src" / "python"))
 
 from anyinfer.catalog.model import BEST_AT, MODEL_KINDS, Catalog  # noqa: E402
 from anyinfer.local.downloads import license_allowed  # noqa: E402
