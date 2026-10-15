@@ -1,0 +1,82 @@
+{
+  "fixture_version": "0",
+  "id": "routing/auth-never-retried",
+  "family": "routing",
+  "profile": "core-generation",
+  "description": "An auth failure falls through despite retryable metadata.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "fixture input"
+      }
+    ],
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha",
+      "fixture:beta"
+    ],
+    "retry": {
+      "max_attempts": 3,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      },
+      "beta": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "fail": {
+          "category": "auth",
+          "retryable": true,
+          "retry_after_s": null,
+          "http_status": 401,
+          "phase": "generate"
+        }
+      },
+      {
+        "events": [
+          {
+            "text": "beta success"
+          },
+          {
+            "final": {
+              "finish_reason": "stop",
+              "usage": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

@@ -536,6 +536,13 @@ Rules:
   exclusive. `fail_in_cleanup` requires an `events` list containing a final event; it is not
   a standalone entry. An entry without either failure field requires `events`, which may
   be empty. Unknown action fields and multi-field event/action records are invalid assets.
+- A scripted failure is a closed record with required `category` in `auth`, `rate_limit`,
+  `transport`, `provider_unavailable`, `model_not_found`, `context_length`, `stream_protocol`,
+  or `unsupported_input`. Optional fields are `retryable` (boolean), `retry_after_s` (number
+  or null), `http_status` (integer or null), and `phase` (one of the §12 phases or null).
+  Omitted fields use the corresponding native error defaults. Aliases such as `protocol`
+  are not categories. Core outcomes such as schema exhaustion, all-targets failure and
+  cancellation must arise from native execution, rather than an adapter-script injection.
 - Usage objects anywhere in `expected` may omit fields whose value is `null`; `{}` means all
   six fields null. `timing` values are `"non_null"`, `"null"`, or `"present"`.
 - Attempt records and `attempt_failed` carry `error: {category}` when the outcome is
@@ -684,11 +691,17 @@ eligible extension case. The release inventory asset `specification/inventories/
   release inputs. Driver assertions have `path: null` and a `recipe_ref` to their shared
   normative predicate below; they are driver assertions, not fixture inputs.
 
+Requirement mappings identify the runtime and adapter behaviors in §§2–14 that each case
+exercises; a family label or a reference to this inventory section alone is not a behavior
+mapping. Report shape, release identity, hashes, completeness and evidence eligibility are
+mandatory global qualification checks (§16 and [MAINTENANCE.md](MAINTENANCE.md)), rather than
+claims attached to an unrelated runtime case. Passing runtime cases cannot waive those checks.
+
 The inventory validator checks its schema, unique IDs, resolved requirement mappings and
 recipes, fixture files, and eligible extension names. A staged family check may leave only
 explicitly excluded transport obligations pending; staged coverage never qualifies a release
 report. Release verification requires the full inventory and every required case. Every named case below must be in the
-inventory, every normative v0 requirement must map to a case, and no fixture or mandatory
+inventory, every normative v0 runtime/adapter requirement must map to a case, and no fixture or mandatory
 driver assertion can silently disappear. A skipped/unexecuted driver assertion is an error.
 
 **normalization:** `roles-ordered-text`, `multi-part-text-concatenated`,
@@ -735,6 +748,22 @@ driver assertion can silently disappear. A skipped/unexecuted driver assertion i
 `driver/concurrent-operations-independent`, `driver/assessment-completeness`,
 `driver/timeout-effective-default-explicit`, `driver/timeout-reset-per-entry`,
 `driver/timeout-cleanup-disposal`, and `driver/http-correction-byte-budget-reset`.
+
+`streaming/buffered-equals-streamed` uses `consume: "stream"` for its primary observation.
+Its driver also runs a fresh native buffered operation with identical input, a reset adapter
+script and an independent clock/capture scope. Both operations must satisfy the same call,
+telemetry and normalized outcome expectations; only the primary stream supplies the public
+event sequence. The two normalized outcomes must agree, including timing presence rather
+than elapsed values. A missing mirror run is an error and a mismatch is a failure. Adapter
+entries are checked separately per operation; they are not added into a new accounting total.
+
+For `extraction/duplicate-key-last-value-first-position`, value comparison still uses JSON
+Schema equality. The driver additionally observes the native root object's member iteration
+order and compares it to the ordered members of `expected.outcome.result.structured` as
+written in the fixture. Reference writing preserves that datum's member order rather than
+sorting it as metadata. The interleaved duplicate input must distinguish retaining a key's
+first position from deleting and reinserting it. Missing native order observation is an
+error. This case-specific predicate does not change general JSON object-value equality.
 
 Their shared predicates, implemented and reported by every native driver, are:
 

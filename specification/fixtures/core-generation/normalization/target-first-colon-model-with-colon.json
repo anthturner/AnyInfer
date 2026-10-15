@@ -1,0 +1,66 @@
+{
+  "fixture_version": "0",
+  "id": "normalization/target-first-colon-model-with-colon",
+  "family": "normalization",
+  "profile": "core-generation",
+  "description": "Pending normalization case target-first-colon-model-with-colon; the oracle records the native outcome.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Keep the model suffix after the first colon."
+      }
+    ],
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha:version:with:colons"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "{\"case\":\"target-colon\"}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

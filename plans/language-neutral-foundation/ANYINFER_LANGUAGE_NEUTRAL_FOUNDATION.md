@@ -344,7 +344,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > gate steps passed, and the final 12-test asset gate closed direct path-substitution and
   > family-drift proof gaps. Schemas are UTF-8 without BOM, LF-only. Authoring validation
   > remains developmental: no inventory, reference observation or release is claimed yet.
-- [ ] M1.4 Author `specification/inventories/core-generation-v0.json` before the final oracle:
+- [x] M1.4 Author `specification/inventories/core-generation-v0.json` before the final oracle:
   its requirement-to-case mappings and exact case records define the named core inventory. Add
   one fixture file per `kind: fixture` record; record transport coverage obligations that M1.6
   must satisfy as requirement mappings, while language-neutral driver assertions carry their
@@ -368,6 +368,27 @@ M1 and later use `src/python/` paths and therefore depend on it.
   missing or extra fixture files, and extension feature names are exactly the declared set. This
   is partial DEVELOPMENT coverage only, never release-qualified proof. No fixed case total is
   asserted.
+  > NOTE: Authoring starts from accepted seam/assets commit `90c2605`. Three disjoint owners
+  > write normalization/repair, schema-admission/extraction/validation, and routing/streaming/
+  > lifecycle plus the shared inventory. The coordinator owns this joint checkbox and reconciles
+  > coverage after all families report, avoiding concurrent edits to the master. Initial
+  > expectations stay `to_be_observed`; their empty observations are authoring placeholders,
+  > not claims about native outcomes. Asset files must be UTF-8 without BOM and LF-only.
+  > NOTE: Review requires fine-grained runtime/adapter obligation mappings to §§2–14 rather
+  > than family-level §17 labels. Shared §17 distinguishes these case mappings from mandatory
+  > global report/release qualification checks; no runtime case can waive those gates. The
+  > admitted-full-subset fixture must actually include the admitted keywords and annotation
+  > data, not merely carry a comprehensive-sounding name.
+  > NOTE: Input review found generic-success routing/lifecycle scripts that could not enter
+  > their named branches; a fresh owner corrects all 25 affected files. Scripted failure
+  > categories are closed to real adapter errors, including `stream_protocol`; core failures
+  > cannot be injected. Shared §17 makes buffered/streamed mirroring and native duplicate-key
+  > iteration-order observation explicit, so ordinary value equality cannot hide missing proof.
+  > NOTE: Accepted with 85 pending core fixtures, 112 case/crosscutting requirement mappings,
+  > exact canonical case-kind/recipe identities, clean independent re-reviews, the staged core
+  > coverage gate, and all 13 repository gate steps passing in 79.5 seconds. The final
+  > incremental 15-test asset gate also passes. Full coverage deliberately fails only for the
+  > 11 transport fixture files due in M1.6; these counts describe this authored revision.
 - [ ] M1.5 Python driver under `tests/testing/portable/`. Includes the A14 time seam:
   `AsyncClient.__init__` gains `_clock: Callable[[], float] | None = None` and
   `_sleep: Callable[[float], Awaitable[None]] | None = None`; `_clock` is forwarded to the
@@ -397,6 +418,24 @@ M1 and later use `src/python/` paths and therefore depend on it.
    every named extraction/repair requirement plus the seam, timeout, wire-limit projection, and independent
   operation tests. The development observation identifies script/core evidence; it is not a
   release-qualified conformance report.
+  > NOTE: Execute this larger box in bounded waves. First establish the replay adapter/gates,
+  > the private time seam, and independent value/expected-segment helpers in disjoint files.
+  > Then wire native execution/projection and driver predicates; finally add report/reference
+  > identity and fail-closed comparison tooling. The coordinator records each wave below and
+  > owns this shared checkbox. No partial wave establishes the M1.5 gate.
+  - [ ] M1.5a Replay substrate: `tests/testing/portable/{__init__,adapter,test_adapter}.py`;
+    private time seam in `_client/{async_client,generation}.py` plus
+    `tests/testing/portable/test_time_seam.py`; value/segment helpers in
+    `tests/testing/portable/{values,test_values}.py`. Each owner runs its targeted tests and
+    lint/types; an independent review clears their interfaces before the execution runner.
+  - [ ] M1.5b Native runner/projection, all core fixture executions, explicit buffered mirror,
+    native duplicate-key order, capture causality and real timeout/cancellation/lifecycle
+    predicates; pytest options write development observations only. Gate: targeted portable
+    tests execute every authored core fixture with no unavailable mandatory evidence.
+  - [ ] M1.5c Reference/report identity support and `scripts/compare_reports.py` with its
+    required negative tests. Gate: incomplete/development/wrong-identity/failing reports
+    cannot qualify, and the documented qualified synthetic/Python comparisons behave exactly
+    as required. The enclosing M1.5 gate still requires all waves together.
 - [ ] M1.6 Transport fixtures and driver support in `tests/testing/portable/transport.py` for an
   actual native mocked OpenAI chat-completions transport. `transport-v0` distinguishes an
   `adapter` case (`input.adapter_config` and `input.wire`) from a `core_http` case

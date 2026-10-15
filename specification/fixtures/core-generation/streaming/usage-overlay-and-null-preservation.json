@@ -1,0 +1,96 @@
+{
+  "fixture_version": "0",
+  "id": "streaming/usage-overlay-and-null-preservation",
+  "family": "streaming",
+  "profile": "core-generation",
+  "description": "Usage overlays and explicit nulls span initial, later, and final events.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "fixture input"
+      }
+    ],
+    "consume": "stream"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      },
+      "beta": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "usage": {
+              "input_tokens": 1,
+              "output_tokens": 2,
+              "total_tokens": 3,
+              "cache_read_tokens": 4,
+              "cache_write_tokens": 5,
+              "reasoning_tokens": 6
+            }
+          },
+          {
+            "usage": {
+              "input_tokens": null,
+              "output_tokens": 20,
+              "total_tokens": null,
+              "cache_read_tokens": null,
+              "cache_write_tokens": null,
+              "reasoning_tokens": null
+            }
+          },
+          {
+            "final": {
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 8,
+                "output_tokens": null,
+                "total_tokens": 88,
+                "cache_read_tokens": null,
+                "cache_write_tokens": null,
+                "reasoning_tokens": null
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

@@ -203,3 +203,54 @@ retry/repair, usage, ledger or manifest behavior changed.
 The master now checks M1.1/M1.3. Resume at M1.4: author the named data-only core fixture
 families and full requirement inventory, keeping unobserved expectations explicitly pending.
 No corpus release, qualified report, reference environment or native C# proof exists yet.
+
+### Current resume point: M1.4
+
+Accepted private capture and asset gates are committed at
+`90c26057b8b96b7b064f37f6356fe2022c27d564`. Three disjoint data-only authoring briefs own:
+
+- normalization and repair fixtures;
+- schema-admission, extraction and validation fixtures;
+- routing, streaming and lifecycle fixtures plus the single complete inventory.
+
+The coordinator will run the development family coverage gate and independent review after
+all owners finish. Transport fixture paths and driver assertions appear as future obligations
+in the inventory, while transport data/execution remain M1.6. Pending expectations carry no
+native-equivalence claim. Resume from this unchecked box and commit if context is lost.
+
+### M1.4 authoring review
+
+The core tree contains 85 pending fixture files. The complete inventory lists 96 fixture
+obligations (including 11 transport inputs still owned by M1.6) and six native driver
+assertions; these are authoring counts, not execution or conformance counts. The staged core
+coverage gate passes. Full coverage correctly fails on the 11 missing transport files only.
+
+Cold review corrected the admission case to exercise the entire admitted subset, and a fresh
+owner corrected all 25 routing/streaming/lifecycle files after generic success scripts had
+failed to enter their named paths. The corrected scenarios pass re-review. Case mappings are
+now individual behavior records plus crosscutting prompt/result/value obligations, with real
+normative fragments. Reference validation rejects missing targets/fragments and escape paths
+outside the selected specification tree. Script failures use closed native adapter categories;
+core outcomes cannot be injected to fake a passing case.
+
+Shared §17 now explicitly requires a fresh buffered mirror for the buffered/streamed case,
+and a native member-order observation for the interleaved `z,a,z` duplicate-key case. General
+JSON Schema value equality remains unchanged. Full-subset, ordering and reference-boundary
+re-reviews are clean. Final canonical case-kind/recipe checks are in progress to prevent
+substituting a different driver predicate while retaining a mandatory case ID.
+
+The M1.4 full repository gate is running in shell `f0f8247e-04e1-487c-82e7-0de264c4cc7c`.
+The master box remains unchecked until that run and the final incremental negative tests pass.
+
+### M1.4 acceptance and next resume point
+
+The full gate passed all 13 steps in 79.5 seconds (shell above, exit 0). The staged core
+coverage command exits 0; full coverage exits 1 with exactly the 11 not-yet-authored transport
+files. Final incremental asset tests pass all 15 cases, including canonical driver recipe and
+case-kind substitutions; independent review found no open material finding. Shared Markdown
+links pass across 23 files. All 85 core expectations remain `to_be_observed`.
+
+Resume at M1.5a. It splits replay adapter/gates, private time seam, and value/segment helpers
+into disjoint ownership before a second wave wires the native runner/projection. M1.5b and
+M1.5c complete native predicates and fail-closed report/reference tooling. These subdivisions
+make the existing box executable; they add no SDK scope or conformance claim.

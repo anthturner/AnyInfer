@@ -1,0 +1,77 @@
+{
+  "fixture_version": "0",
+  "id": "normalization/unsupported-image-part",
+  "family": "normalization",
+  "profile": "core-generation",
+  "description": "Pending extension case unsupported-image-part; the oracle records the native outcome without fetching the example URL.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "Describe this image."
+          },
+          {
+            "kind": "image_url",
+            "url": "https://example.invalid/images/fixture.png",
+            "media_type": "image/png"
+          }
+        ]
+      }
+    ],
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "{\"case\":\"image-part\"}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  },
+  "extension": "messages.non_text_parts"
+}

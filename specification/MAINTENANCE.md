@@ -64,7 +64,7 @@ The release file has this shape:
   "reference_manifest": "specification/reference/python-<rev7>.json",
   "files": { "specification/core-generation.md": "<sha256 hex>" },
   "case_inventory": [
-    { "id": "repair/zero-budget", "path": "specification/fixtures/core-generation/repair/zero-budget.json", "family": "repair", "extension": null }
+    { "id": "repair/zero-budget", "kind": "fixture", "path": "specification/fixtures/core-generation/repair/zero-budget.json", "family": "repair", "extension": null }
   ]
 }
 ```

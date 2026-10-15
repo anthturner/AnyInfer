@@ -1,0 +1,81 @@
+{
+  "fixture_version": "0",
+  "id": "routing/backoff-cap",
+  "family": "routing",
+  "profile": "core-generation",
+  "description": "A retryable failure with a large retry-after exercises the backoff cap.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "fixture input"
+      }
+    ],
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 2,
+      "backoff_base_s": 0.5,
+      "backoff_max_s": 3
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      },
+      "beta": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "fail": {
+          "category": "transport",
+          "retryable": true,
+          "retry_after_s": 999,
+          "http_status": 503,
+          "phase": "generate"
+        }
+      },
+      {
+        "events": [
+          {
+            "text": "capped retry"
+          },
+          {
+            "final": {
+              "finish_reason": "stop",
+              "usage": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

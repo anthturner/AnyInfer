@@ -1,0 +1,79 @@
+{
+  "fixture_version": "0",
+  "id": "streaming/synthesized-usage-update-from-final",
+  "family": "streaming",
+  "profile": "core-generation",
+  "description": "A nonnull final usage arrives without an earlier usage event.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "fixture input"
+      }
+    ],
+    "consume": "stream"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      },
+      "beta": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "content"
+          },
+          {
+            "final": {
+              "finish_reason": "stop",
+              "usage": {
+                "input_tokens": 11,
+                "output_tokens": 7,
+                "total_tokens": 18,
+                "cache_read_tokens": 2,
+                "cache_write_tokens": 3,
+                "reasoning_tokens": 4
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

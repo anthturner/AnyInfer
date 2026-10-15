@@ -1,0 +1,81 @@
+{
+  "fixture_version": "0",
+  "id": "routing/backoff-retry-after-floor",
+  "family": "routing",
+  "profile": "core-generation",
+  "description": "A retry-after floor exceeds the exponential backoff.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "fixture input"
+      }
+    ],
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 2,
+      "backoff_base_s": 0.5,
+      "backoff_max_s": 30
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      },
+      "beta": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "fail": {
+          "category": "rate_limit",
+          "retryable": true,
+          "retry_after_s": 2,
+          "http_status": 429,
+          "phase": "generate"
+        }
+      },
+      {
+        "events": [
+          {
+            "text": "floor retry"
+          },
+          {
+            "final": {
+              "finish_reason": "stop",
+              "usage": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

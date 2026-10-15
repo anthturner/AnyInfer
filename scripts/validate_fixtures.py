@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
+import importlib.util
 import json
 import math
 import re
@@ -249,6 +250,49 @@ def _validate_inventory(
     requirements = inventory.get("requirements", [])
     if not isinstance(cases, list) or not isinstance(requirements, list):
         return problems
+    for requirement in requirements:
+        if not isinstance(requirement, dict) or not isinstance(requirement.get("spec_ref"), str):
+            continue
+        ref = requirement["spec_ref"]
+        path_text, separator, fragment = ref.partition("#")
+        normative_root = root.parent.parent if root.name == "fixtures" else ROOT
+        path = Path(path_text)
+        specification_root = (normative_root / "specification").resolve()
+        noncanonical = (
+            "\\" in path_text
+            or path.is_absolute()
+            or path_text.startswith(("/", "\\"))
+            or bool(re.match(r"^[A-Za-z]:", path_text))
+            or ".." in path.parts
+            or not path.parts
+            or path.parts[0] != "specification"
+        )
+        target = (normative_root / path).resolve()
+        try:
+            target.relative_to(specification_root)
+        except ValueError:
+            noncanonical = True
+        if (
+            not separator
+            or not fragment
+            or noncanonical
+            or not target.is_file()
+            or target.suffix.lower() != ".md"
+        ):
+            problems.append(f"requirement {requirement.get('id')!r} has invalid spec_ref {ref!r}")
+            continue
+        module_spec = importlib.util.spec_from_file_location(
+            "markdown_link_anchors", ROOT / "scripts" / "check_markdown_links.py"
+        )
+        if module_spec is None or module_spec.loader is None:
+            problems.append("cannot load Markdown anchor validator")
+            continue
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+        if fragment not in module.anchors(target):
+            problems.append(
+                f"requirement {requirement.get('id')!r} references missing fragment {ref!r}"
+            )
     by_id: dict[str, dict[str, Any]] = {}
     for case in cases:
         if not isinstance(case, dict) or not isinstance(case.get("id"), str):
@@ -287,10 +331,17 @@ def _validate_inventory(
         expected_extension = EXTENSION_CASES.get(case_id)
         if case.get("extension") != expected_extension:
             problems.append(f"{case_id}: extension must be {expected_extension!r}")
-        if case.get("kind") == "driver_assertion":
-            if case.get("recipe_ref") not in RECIPES:
-                problems.append(f"{case_id}: recipe_ref must name its §17 driver predicate")
+        if case_id in RECIPES:
+            if (
+                case.get("kind") != "driver_assertion"
+                or case.get("family") != "driver"
+                or case.get("path") is not None
+                or case.get("recipe_ref") != case_id
+            ):
+                problems.append(f"{case_id}: must be its canonical driver_assertion record")
             continue
+        if case.get("kind") != "fixture" or case.get("family") != case_id.rsplit("/", 1)[0]:
+            problems.append(f"{case_id}: must be its canonical fixture record")
         path_value = case.get("path")
         if not isinstance(path_value, str):
             problems.append(f"{case_id}: unsafe or missing fixture path")

@@ -1,0 +1,69 @@
+{
+  "fixture_version": "0",
+  "id": "routing/lazy-invalid-second-target",
+  "family": "routing",
+  "profile": "core-generation",
+  "description": "The invalid empty model is reached only after alpha has failed.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "fixture input"
+      }
+    ],
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha",
+      "fixture:   "
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      },
+      "beta": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "fail": {
+          "category": "provider_unavailable",
+          "retryable": false,
+          "retry_after_s": null,
+          "http_status": 503,
+          "phase": "generate"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

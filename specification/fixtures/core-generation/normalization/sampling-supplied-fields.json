@@ -1,0 +1,78 @@
+{
+  "fixture_version": "0",
+  "id": "normalization/sampling-supplied-fields",
+  "family": "normalization",
+  "profile": "core-generation",
+  "description": "Pending normalization case sampling-supplied-fields; the oracle records the native outcome.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "All portable sampling fields are supplied."
+      }
+    ],
+    "sampling": {
+      "temperature": 0.25,
+      "top_p": 0.75,
+      "presence_penalty": 0.5,
+      "frequency_penalty": -0.25,
+      "max_output_tokens": 23,
+      "seed": 7,
+      "stop": [
+        "END",
+        "STOP"
+      ]
+    },
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "{\"case\":\"sampling-supplied\"}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

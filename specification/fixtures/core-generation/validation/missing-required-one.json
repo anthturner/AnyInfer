@@ -1,0 +1,72 @@
+{
+  "fixture_version": "0",
+  "id": "validation/missing-required-one",
+  "family": "validation",
+  "profile": "core-generation",
+  "description": "Pending validation case missing-required-one; the oracle records the native outcome.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Return the scripted JSON response."
+      }
+    ],
+    "schema": {
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "{}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

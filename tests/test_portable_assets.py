@@ -104,9 +104,9 @@ def test_every_schema_accepts_a_minimal_valid_document_and_core_outcomes_are_clo
     scripted["request"]["sampling"] = {"temperature": 0.5, "seed": -1, "stop": ["END"]}
     scripted["adapter"]["script"] = [
         {"events": [{"text": "x"}, {"usage": None}, {"final": {"usage": None}}]},
-        {"events": [{"await_release": "gate"}], "fail": {}},
-        {"events": [{"final": {}}], "fail_in_cleanup": {}},
-        {"fail": {}},
+        {"events": [{"await_release": "gate"}], "fail": {"category": "transport"}},
+        {"events": [{"final": {}}], "fail_in_cleanup": {"category": "transport"}},
+        {"fail": {"category": "transport"}},
     ]
     assert not list(fixture_validator.iter_errors(scripted))
     scripted["request"]["sampling"] = {"unknown": 1}
@@ -114,6 +114,35 @@ def test_every_schema_accepts_a_minimal_valid_document_and_core_outcomes_are_clo
     scripted["request"]["sampling"] = {"seed": -1}
     scripted["adapter"]["script"] = [{"events": [{"text": "x", "usage": None}]}]
     assert list(fixture_validator.iter_errors(scripted))
+
+
+def test_script_failures_admit_only_native_adapter_categories_and_fields() -> None:
+    fixture_schema = json.loads(
+        (ROOT / "specification" / "schemas" / "fixture-v0.schema.json").read_text(encoding="utf-8")
+    )
+    validator = Draft202012Validator(fixture_schema)
+    fixture = _core_fixture({"none": True})
+    fixture["adapter"]["script"] = [
+        {
+            "events": [{"text": "x"}],
+            "fail": {
+                "category": "stream_protocol",
+                "retryable": False,
+                "retry_after_s": None,
+                "http_status": 503,
+                "phase": "stream",
+            },
+        }
+    ]
+    assert not list(validator.iter_errors(fixture))
+    fixture["adapter"]["script"][0]["fail"]["category"] = "protocol"
+    assert list(validator.iter_errors(fixture))
+    fixture["adapter"]["script"][0]["fail"] = {"category": "transport", "extra": True}
+    assert list(validator.iter_errors(fixture))
+    fixture["adapter"]["script"][0]["fail"] = {"category": "schema_violation"}
+    assert list(validator.iter_errors(fixture))
+    fixture["adapter"]["script"][0]["fail"] = {"category": "cancelled"}
+    assert list(validator.iter_errors(fixture))
 
     transport_schema = json.loads(
         (ROOT / "specification" / "schemas" / "transport-v0.schema.json").read_text(
@@ -349,6 +378,90 @@ def test_default_root_inventory_path_rejects_family_mismatch(tmp_path: Path, mon
     monkeypatch.setattr(validate_fixtures, "SPECIFICATION", specification)
     problems = validate_fixtures.validate(root, coverage=True, family="core-generation")
     assert any("fixture family does not match inventory family" in problem for problem in problems)
+
+
+def test_inventory_spec_refs_use_the_supplied_normative_tree_and_reject_missing_targets(
+    tmp_path: Path,
+) -> None:
+    specification = tmp_path / "specification"
+    root = specification / "fixtures"
+    (root / "inventories").mkdir(parents=True)
+    normative = specification / "core-generation.md"
+    normative.write_text("# Supplied anchor\n", encoding="utf-8", newline="\n")
+    inventory = root / "inventories" / "core-generation-v0.json"
+
+    def problems_for(spec_ref: str) -> list[str]:
+        inventory.write_text(
+            json.dumps(
+                {
+                    "profile": "core-generation",
+                    "profile_revision": "v0",
+                    "requirements": [
+                        {
+                            "id": "proof",
+                            "spec_ref": spec_ref,
+                            "case_ids": ["normalization/roles-ordered-text"],
+                        }
+                    ],
+                    "cases": [],
+                }
+            ),
+            encoding="utf-8",
+            newline="\n",
+        )
+        return validate_fixtures.validate(root)
+
+    valid = problems_for("specification/core-generation.md#supplied-anchor")
+    assert not any(
+        "has invalid spec_ref" in problem or "missing fragment" in problem for problem in valid
+    )
+    missing_fragment = problems_for("specification/core-generation.md#checkout-only-anchor")
+    assert any("missing fragment" in problem for problem in missing_fragment)
+    missing_path = problems_for("specification/missing.md#supplied-anchor")
+    assert any("has invalid spec_ref" in problem for problem in missing_path)
+    (tmp_path / "outside.md").write_text("# Supplied anchor\n", encoding="utf-8", newline="\n")
+    for escaped in (
+        "../outside.md#supplied-anchor",
+        "specification/../outside.md#supplied-anchor",
+        str(tmp_path / "outside.md") + "#supplied-anchor",
+        "specification\\core-generation.md#supplied-anchor",
+    ):
+        assert any("has invalid spec_ref" in problem for problem in problems_for(escaped))
+
+
+def test_inventory_named_ids_cannot_swap_driver_recipes_or_kinds(tmp_path: Path) -> None:
+    inventory = json.loads(
+        (ROOT / "specification" / "inventories" / "core-generation-v0.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    path = tmp_path / "inventory.json"
+    validator = validate_fixtures._schema("inventory-v0.schema.json")
+
+    def problems_for(document: dict[str, object]) -> list[str]:
+        path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
+        return validate_fixtures._validate_inventory(
+            path, validator, {}, tmp_path, coverage=False, family=None
+        )
+
+    assert not any("canonical" in problem for problem in problems_for(inventory))
+    swapped = json.loads(json.dumps(inventory))
+    driver = next(
+        case for case in swapped["cases"] if case["id"] == "driver/timeout-cleanup-disposal"
+    )
+    driver["recipe_ref"] = "driver/concurrent-operations-independent"
+    assert any("canonical driver_assertion" in problem for problem in problems_for(swapped))
+    wrong_kind = json.loads(json.dumps(inventory))
+    fixture = next(case for case in wrong_kind["cases"] if case["id"] == "routing/backoff-cap")
+    fixture.update(
+        {
+            "kind": "driver_assertion",
+            "path": None,
+            "family": "driver",
+            "recipe_ref": "driver/backoff-cap",
+        }
+    )
+    assert any("canonical fixture" in problem for problem in problems_for(wrong_kind))
 
 
 def test_json_integer_bounds_are_inclusive_at_plus_or_minus_two_to_the_63rd(

@@ -1,0 +1,1520 @@
+{
+  "profile": "core-generation",
+  "profile_revision": "v0",
+  "requirements": [
+    {
+      "id": "behavior/driver/assessment-completeness",
+      "spec_ref": "specification/core-generation.md#17-case-inventory-for-v0",
+      "case_ids": [
+        "driver/assessment-completeness"
+      ]
+    },
+    {
+      "id": "behavior/driver/concurrent-operations-independent",
+      "spec_ref": "specification/core-generation.md#17-case-inventory-for-v0",
+      "case_ids": [
+        "driver/concurrent-operations-independent"
+      ]
+    },
+    {
+      "id": "behavior/driver/http-correction-byte-budget-reset",
+      "spec_ref": "specification/core-generation.md#17-case-inventory-for-v0",
+      "case_ids": [
+        "driver/http-correction-byte-budget-reset"
+      ]
+    },
+    {
+      "id": "behavior/driver/timeout-cleanup-disposal",
+      "spec_ref": "specification/core-generation.md#17-case-inventory-for-v0",
+      "case_ids": [
+        "driver/timeout-cleanup-disposal"
+      ]
+    },
+    {
+      "id": "behavior/driver/timeout-effective-default-explicit",
+      "spec_ref": "specification/core-generation.md#17-case-inventory-for-v0",
+      "case_ids": [
+        "driver/timeout-effective-default-explicit"
+      ]
+    },
+    {
+      "id": "behavior/driver/timeout-reset-per-entry",
+      "spec_ref": "specification/core-generation.md#17-case-inventory-for-v0",
+      "case_ids": [
+        "driver/timeout-reset-per-entry"
+      ]
+    },
+    {
+      "id": "behavior/extraction/braces-inside-string",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/braces-inside-string"
+      ]
+    },
+    {
+      "id": "behavior/extraction/duplicate-key-last-value-first-position",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/duplicate-key-last-value-first-position"
+      ]
+    },
+    {
+      "id": "behavior/extraction/empty-response",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/empty-response"
+      ]
+    },
+    {
+      "id": "behavior/extraction/fenced-object-in-prose",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/fenced-object-in-prose"
+      ]
+    },
+    {
+      "id": "behavior/extraction/integer-above-2pow53-preserved",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/integer-above-2pow53-preserved"
+      ]
+    },
+    {
+      "id": "behavior/extraction/malformed-first-candidate-no-rescue",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/malformed-first-candidate-no-rescue"
+      ]
+    },
+    {
+      "id": "behavior/extraction/prose-then-array",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/prose-then-array"
+      ]
+    },
+    {
+      "id": "behavior/extraction/scalar-root-42",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/scalar-root-42"
+      ]
+    },
+    {
+      "id": "behavior/extraction/whole-json-object",
+      "spec_ref": "specification/core-generation.md#6-extraction",
+      "case_ids": [
+        "extraction/whole-json-object"
+      ]
+    },
+    {
+      "id": "behavior/lifecycle/repeated-close-idempotent",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "lifecycle/repeated-close-idempotent"
+      ]
+    },
+    {
+      "id": "behavior/normalization/empty-messages",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/empty-messages"
+      ]
+    },
+    {
+      "id": "behavior/normalization/invalid-sampling-negative-seed",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/invalid-sampling-negative-seed"
+      ]
+    },
+    {
+      "id": "behavior/normalization/multi-part-text-concatenated",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/multi-part-text-concatenated"
+      ]
+    },
+    {
+      "id": "behavior/normalization/roles-ordered-text",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/roles-ordered-text"
+      ]
+    },
+    {
+      "id": "behavior/normalization/sampling-omitted-when-unset",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/sampling-omitted-when-unset"
+      ]
+    },
+    {
+      "id": "behavior/normalization/sampling-supplied-fields",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/sampling-supplied-fields"
+      ]
+    },
+    {
+      "id": "behavior/normalization/target-empty-model-invalid",
+      "spec_ref": "specification/core-generation.md#3-targets-and-route",
+      "case_ids": [
+        "normalization/target-empty-model-invalid"
+      ]
+    },
+    {
+      "id": "behavior/normalization/target-first-colon-model-with-colon",
+      "spec_ref": "specification/core-generation.md#3-targets-and-route",
+      "case_ids": [
+        "normalization/target-first-colon-model-with-colon"
+      ]
+    },
+    {
+      "id": "behavior/normalization/target-model-whitespace-stripped",
+      "spec_ref": "specification/core-generation.md#3-targets-and-route",
+      "case_ids": [
+        "normalization/target-model-whitespace-stripped"
+      ]
+    },
+    {
+      "id": "behavior/normalization/unsupported-alias-target",
+      "spec_ref": "specification/core-generation.md#3-targets-and-route",
+      "case_ids": [
+        "normalization/unsupported-alias-target"
+      ]
+    },
+    {
+      "id": "behavior/normalization/unsupported-image-part",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/unsupported-image-part"
+      ]
+    },
+    {
+      "id": "behavior/normalization/unsupported-tool-role",
+      "spec_ref": "specification/core-generation.md#2-request-normalization",
+      "case_ids": [
+        "normalization/unsupported-tool-role"
+      ]
+    },
+    {
+      "id": "behavior/repair/correction-prompt-exact-template",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/correction-prompt-exact-template"
+      ]
+    },
+    {
+      "id": "behavior/repair/exhaustion-two-invalid",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/exhaustion-two-invalid"
+      ]
+    },
+    {
+      "id": "behavior/repair/invalid-then-valid",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/invalid-then-valid"
+      ]
+    },
+    {
+      "id": "behavior/repair/invalid-without-repair-fails",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/invalid-without-repair-fails"
+      ]
+    },
+    {
+      "id": "behavior/repair/negative-budget-behaves-as-zero",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/negative-budget-behaves-as-zero"
+      ]
+    },
+    {
+      "id": "behavior/repair/provider-ceiling-clamp-parameter-dropped",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/provider-ceiling-clamp-parameter-dropped"
+      ]
+    },
+    {
+      "id": "behavior/repair/valid-no-correction",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/valid-no-correction"
+      ]
+    },
+    {
+      "id": "behavior/repair/zero-budget",
+      "spec_ref": "specification/core-generation.md#8-structured-output-and-repair",
+      "case_ids": [
+        "repair/zero-budget"
+      ]
+    },
+    {
+      "id": "behavior/routing/all-targets-failed-trail",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/all-targets-failed-trail"
+      ]
+    },
+    {
+      "id": "behavior/routing/auth-never-retried",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/auth-never-retried"
+      ]
+    },
+    {
+      "id": "behavior/routing/backoff-cap",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/backoff-cap"
+      ]
+    },
+    {
+      "id": "behavior/routing/backoff-retry-after-floor",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/backoff-retry-after-floor"
+      ]
+    },
+    {
+      "id": "behavior/routing/cleanup-failure-after-final-restarts",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/cleanup-failure-after-final-restarts"
+      ]
+    },
+    {
+      "id": "behavior/routing/duplicate-target-skipped",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/duplicate-target-skipped"
+      ]
+    },
+    {
+      "id": "behavior/routing/health-recovery-after-ttl",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/health-recovery-after-ttl"
+      ]
+    },
+    {
+      "id": "behavior/routing/health-skip-in-trail",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/health-skip-in-trail"
+      ]
+    },
+    {
+      "id": "behavior/routing/lazy-invalid-second-target",
+      "spec_ref": "specification/core-generation.md#3-targets-and-route",
+      "case_ids": [
+        "routing/lazy-invalid-second-target"
+      ]
+    },
+    {
+      "id": "behavior/routing/nonretryable-falls-over",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/nonretryable-falls-over"
+      ]
+    },
+    {
+      "id": "behavior/routing/post-content-stream-protocol-in-correction-fatal",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/post-content-stream-protocol-in-correction-fatal"
+      ]
+    },
+    {
+      "id": "behavior/routing/post-content-stream-protocol-no-retry",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/post-content-stream-protocol-no-retry"
+      ]
+    },
+    {
+      "id": "behavior/routing/post-content-transport-error-retries",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/post-content-transport-error-retries"
+      ]
+    },
+    {
+      "id": "behavior/routing/restart-after-correction-transport-failure",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/restart-after-correction-transport-failure"
+      ]
+    },
+    {
+      "id": "behavior/routing/retryable-then-ok-same-target",
+      "spec_ref": "specification/core-generation.md#9-routing-retry-backoff-health",
+      "case_ids": [
+        "routing/retryable-then-ok-same-target"
+      ]
+    },
+    {
+      "id": "behavior/schema-admission/admitted-full-subset-valid-response",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "schema-admission/admitted-full-subset-valid-response"
+      ]
+    },
+    {
+      "id": "behavior/schema-admission/unknown-keyword-ignored",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "schema-admission/unknown-keyword-ignored"
+      ]
+    },
+    {
+      "id": "behavior/schema-admission/unsupported-anyof",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "schema-admission/unsupported-anyof"
+      ]
+    },
+    {
+      "id": "behavior/schema-admission/unsupported-boolean-subschema",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "schema-admission/unsupported-boolean-subschema"
+      ]
+    },
+    {
+      "id": "behavior/schema-admission/unsupported-dialect-draft7",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "schema-admission/unsupported-dialect-draft7"
+      ]
+    },
+    {
+      "id": "behavior/schema-admission/unsupported-dialect-null",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "schema-admission/unsupported-dialect-null"
+      ]
+    },
+    {
+      "id": "behavior/schema-admission/unsupported-ref",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "schema-admission/unsupported-ref"
+      ]
+    },
+    {
+      "id": "behavior/streaming/buffered-equals-streamed",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "streaming/buffered-equals-streamed"
+      ]
+    },
+    {
+      "id": "behavior/streaming/cancel-mid-stream",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "streaming/cancel-mid-stream"
+      ]
+    },
+    {
+      "id": "behavior/streaming/failed-attempt-deltas-visible",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "streaming/failed-attempt-deltas-visible"
+      ]
+    },
+    {
+      "id": "behavior/streaming/finish-reason-other",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "streaming/finish-reason-other"
+      ]
+    },
+    {
+      "id": "behavior/streaming/first-token-mark-once-per-attempt",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "streaming/first-token-mark-once-per-attempt"
+      ]
+    },
+    {
+      "id": "behavior/streaming/reported-total-not-recomputed",
+      "spec_ref": "specification/core-generation.md#11-result",
+      "case_ids": [
+        "streaming/reported-total-not-recomputed"
+      ]
+    },
+    {
+      "id": "behavior/streaming/synthesized-usage-update-from-final",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "streaming/synthesized-usage-update-from-final"
+      ]
+    },
+    {
+      "id": "behavior/streaming/usage-overlay-and-null-preservation",
+      "spec_ref": "specification/core-generation.md#11-result",
+      "case_ids": [
+        "streaming/usage-overlay-and-null-preservation"
+      ]
+    },
+    {
+      "id": "behavior/streaming/zero-advance-close",
+      "spec_ref": "specification/core-generation.md#10-streaming-and-public-events",
+      "case_ids": [
+        "streaming/zero-advance-close"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/correction-byte-budget-reset",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/correction-byte-budget-reset"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/done-sentinel",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/done-sentinel"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/frame-split-mid-json",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/frame-split-mid-json"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/non-sse-error-body-status-503",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/non-sse-error-body-status-503"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/outbound-buffered-message-projection",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/outbound-buffered-message-projection"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/outbound-sampling-omitted",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/outbound-sampling-omitted"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/outbound-streamed-sampling-supplied",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/outbound-streamed-sampling-supplied"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/protocol-error-after-content",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/protocol-error-after-content"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/raw-byte-cap-multibyte-utf8",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/raw-byte-cap-multibyte-utf8"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/single-frame",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/single-frame"
+      ]
+    },
+    {
+      "id": "behavior/transport/openai-chat/trailing-usage-chunk",
+      "spec_ref": "specification/core-generation.md#14-fixture-format-v0",
+      "case_ids": [
+        "transport/openai-chat/trailing-usage-chunk"
+      ]
+    },
+    {
+      "id": "behavior/validation/additional-properties-aggregate",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/additional-properties-aggregate"
+      ]
+    },
+    {
+      "id": "behavior/validation/boolean-not-number-or-integer",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/boolean-not-number-or-integer"
+      ]
+    },
+    {
+      "id": "behavior/validation/const-fails",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/const-fails"
+      ]
+    },
+    {
+      "id": "behavior/validation/dotted-key-nested-path-collision",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/dotted-key-nested-path-collision"
+      ]
+    },
+    {
+      "id": "behavior/validation/enum-empty-always-fails",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/enum-empty-always-fails"
+      ]
+    },
+    {
+      "id": "behavior/validation/enum-numeric-equality",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/enum-numeric-equality"
+      ]
+    },
+    {
+      "id": "behavior/validation/integral-float-is-integer",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/integral-float-is-integer"
+      ]
+    },
+    {
+      "id": "behavior/validation/literal-reserved-key-objects",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/literal-reserved-key-objects"
+      ]
+    },
+    {
+      "id": "behavior/validation/malformed-examples-17-invalid-schema",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "validation/malformed-examples-17-invalid-schema"
+      ]
+    },
+    {
+      "id": "behavior/validation/malformed-required-17-invalid-schema",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "validation/malformed-required-17-invalid-schema"
+      ]
+    },
+    {
+      "id": "behavior/validation/malformed-schema-extraction-precedes-assessment",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "validation/malformed-schema-extraction-precedes-assessment"
+      ]
+    },
+    {
+      "id": "behavior/validation/malformed-title-17-invalid-schema",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "validation/malformed-title-17-invalid-schema"
+      ]
+    },
+    {
+      "id": "behavior/validation/malformed-type-17-invalid-schema",
+      "spec_ref": "specification/core-generation.md#4-schema-admission",
+      "case_ids": [
+        "validation/malformed-type-17-invalid-schema"
+      ]
+    },
+    {
+      "id": "behavior/validation/maximum-fails",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/maximum-fails"
+      ]
+    },
+    {
+      "id": "behavior/validation/maxitems-fails",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/maxitems-fails"
+      ]
+    },
+    {
+      "id": "behavior/validation/maxlength-fails",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/maxlength-fails"
+      ]
+    },
+    {
+      "id": "behavior/validation/minimum-fails",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/minimum-fails"
+      ]
+    },
+    {
+      "id": "behavior/validation/minitems-fails",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/minitems-fails"
+      ]
+    },
+    {
+      "id": "behavior/validation/minlength-counts-code-points",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/minlength-counts-code-points"
+      ]
+    },
+    {
+      "id": "behavior/validation/missing-required-one",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/missing-required-one"
+      ]
+    },
+    {
+      "id": "behavior/validation/nested-deeper-issue-first",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/nested-deeper-issue-first"
+      ]
+    },
+    {
+      "id": "behavior/validation/ordering-tied-rules",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/ordering-tied-rules"
+      ]
+    },
+    {
+      "id": "behavior/validation/six-missing-required-first-five-in-order",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/six-missing-required-first-five-in-order"
+      ]
+    },
+    {
+      "id": "behavior/validation/type-mismatch-string-for-integer",
+      "spec_ref": "specification/core-generation.md#7-issue-model",
+      "case_ids": [
+        "validation/type-mismatch-string-for-integer"
+      ]
+    },
+    {
+      "id": "prompt.prepend-system",
+      "spec_ref": "specification/core-generation.md#5-mechanism-selection-and-prompt-injection",
+      "case_ids": [
+        "schema-admission/admitted-full-subset-valid-response"
+      ]
+    },
+    {
+      "id": "prompt.append-last-system",
+      "spec_ref": "specification/core-generation.md#5-mechanism-selection-and-prompt-injection",
+      "case_ids": [
+        "repair/valid-no-correction",
+        "repair/correction-prompt-exact-template"
+      ]
+    },
+    {
+      "id": "prompt.canonical-rendering",
+      "spec_ref": "specification/core-generation.md#5-mechanism-selection-and-prompt-injection",
+      "case_ids": [
+        "schema-admission/admitted-full-subset-valid-response",
+        "repair/correction-prompt-exact-template"
+      ]
+    },
+    {
+      "id": "result.winning-entry-text",
+      "spec_ref": "specification/core-generation.md#11-result",
+      "case_ids": [
+        "streaming/buffered-equals-streamed",
+        "repair/invalid-then-valid"
+      ]
+    },
+    {
+      "id": "result.usage-timing-finish",
+      "spec_ref": "specification/core-generation.md#11-result",
+      "case_ids": [
+        "streaming/usage-overlay-and-null-preservation",
+        "streaming/reported-total-not-recomputed",
+        "streaming/finish-reason-other"
+      ]
+    },
+    {
+      "id": "result.target-repaircount-warnings",
+      "spec_ref": "specification/core-generation.md#11-result",
+      "case_ids": [
+        "repair/invalid-then-valid",
+        "routing/retryable-then-ok-same-target"
+      ]
+    },
+    {
+      "id": "values.integer-exact",
+      "spec_ref": "specification/core-generation.md#13-observation-value-model",
+      "case_ids": [
+        "extraction/integer-above-2pow53-preserved"
+      ]
+    },
+    {
+      "id": "values.duplicate-last-first",
+      "spec_ref": "specification/core-generation.md#13-observation-value-model",
+      "case_ids": [
+        "extraction/duplicate-key-last-value-first-position"
+      ]
+    },
+    {
+      "id": "values.signedtype-equality",
+      "spec_ref": "specification/core-generation.md#13-observation-value-model",
+      "case_ids": [
+        "validation/integral-float-is-integer",
+        "validation/enum-numeric-equality",
+        "validation/boolean-not-number-or-integer"
+      ]
+    },
+    {
+      "id": "values.literal-reserved-keys",
+      "spec_ref": "specification/core-generation.md#13-observation-value-model",
+      "case_ids": [
+        "validation/literal-reserved-key-objects"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "driver/assessment-completeness",
+      "kind": "driver_assertion",
+      "path": null,
+      "family": "driver",
+      "extension": null,
+      "recipe_ref": "driver/assessment-completeness"
+    },
+    {
+      "id": "driver/concurrent-operations-independent",
+      "kind": "driver_assertion",
+      "path": null,
+      "family": "driver",
+      "extension": null,
+      "recipe_ref": "driver/concurrent-operations-independent"
+    },
+    {
+      "id": "driver/http-correction-byte-budget-reset",
+      "kind": "driver_assertion",
+      "path": null,
+      "family": "driver",
+      "extension": null,
+      "recipe_ref": "driver/http-correction-byte-budget-reset"
+    },
+    {
+      "id": "driver/timeout-cleanup-disposal",
+      "kind": "driver_assertion",
+      "path": null,
+      "family": "driver",
+      "extension": null,
+      "recipe_ref": "driver/timeout-cleanup-disposal"
+    },
+    {
+      "id": "driver/timeout-effective-default-explicit",
+      "kind": "driver_assertion",
+      "path": null,
+      "family": "driver",
+      "extension": null,
+      "recipe_ref": "driver/timeout-effective-default-explicit"
+    },
+    {
+      "id": "driver/timeout-reset-per-entry",
+      "kind": "driver_assertion",
+      "path": null,
+      "family": "driver",
+      "extension": null,
+      "recipe_ref": "driver/timeout-reset-per-entry"
+    },
+    {
+      "id": "extraction/braces-inside-string",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/braces-inside-string.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/duplicate-key-last-value-first-position",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/duplicate-key-last-value-first-position.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/empty-response",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/empty-response.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/fenced-object-in-prose",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/fenced-object-in-prose.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/integer-above-2pow53-preserved",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/integer-above-2pow53-preserved.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/malformed-first-candidate-no-rescue",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/malformed-first-candidate-no-rescue.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/prose-then-array",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/prose-then-array.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/scalar-root-42",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/scalar-root-42.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "extraction/whole-json-object",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/extraction/whole-json-object.json",
+      "family": "extraction",
+      "extension": null
+    },
+    {
+      "id": "lifecycle/repeated-close-idempotent",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/lifecycle/repeated-close-idempotent.json",
+      "family": "lifecycle",
+      "extension": null
+    },
+    {
+      "id": "normalization/empty-messages",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/empty-messages.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/invalid-sampling-negative-seed",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/invalid-sampling-negative-seed.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/multi-part-text-concatenated",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/multi-part-text-concatenated.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/roles-ordered-text",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/roles-ordered-text.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/sampling-omitted-when-unset",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/sampling-omitted-when-unset.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/sampling-supplied-fields",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/sampling-supplied-fields.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/target-empty-model-invalid",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/target-empty-model-invalid.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/target-first-colon-model-with-colon",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/target-first-colon-model-with-colon.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/target-model-whitespace-stripped",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/target-model-whitespace-stripped.json",
+      "family": "normalization",
+      "extension": null
+    },
+    {
+      "id": "normalization/unsupported-alias-target",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/unsupported-alias-target.json",
+      "family": "normalization",
+      "extension": "targets.alias"
+    },
+    {
+      "id": "normalization/unsupported-image-part",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/unsupported-image-part.json",
+      "family": "normalization",
+      "extension": "messages.non_text_parts"
+    },
+    {
+      "id": "normalization/unsupported-tool-role",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/normalization/unsupported-tool-role.json",
+      "family": "normalization",
+      "extension": "messages.tool_role"
+    },
+    {
+      "id": "repair/correction-prompt-exact-template",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/correction-prompt-exact-template.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "repair/exhaustion-two-invalid",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/exhaustion-two-invalid.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "repair/invalid-then-valid",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/invalid-then-valid.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "repair/invalid-without-repair-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/invalid-without-repair-fails.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "repair/negative-budget-behaves-as-zero",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/negative-budget-behaves-as-zero.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "repair/provider-ceiling-clamp-parameter-dropped",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/provider-ceiling-clamp-parameter-dropped.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "repair/valid-no-correction",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/valid-no-correction.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "repair/zero-budget",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/repair/zero-budget.json",
+      "family": "repair",
+      "extension": null
+    },
+    {
+      "id": "routing/all-targets-failed-trail",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/all-targets-failed-trail.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/auth-never-retried",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/auth-never-retried.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/backoff-cap",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/backoff-cap.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/backoff-retry-after-floor",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/backoff-retry-after-floor.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/cleanup-failure-after-final-restarts",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/cleanup-failure-after-final-restarts.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/duplicate-target-skipped",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/duplicate-target-skipped.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/health-recovery-after-ttl",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/health-recovery-after-ttl.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/health-skip-in-trail",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/health-skip-in-trail.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/lazy-invalid-second-target",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/lazy-invalid-second-target.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/nonretryable-falls-over",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/nonretryable-falls-over.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/post-content-stream-protocol-in-correction-fatal",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/post-content-stream-protocol-in-correction-fatal.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/post-content-stream-protocol-no-retry",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/post-content-stream-protocol-no-retry.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/post-content-transport-error-retries",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/post-content-transport-error-retries.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/restart-after-correction-transport-failure",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/restart-after-correction-transport-failure.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "routing/retryable-then-ok-same-target",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/routing/retryable-then-ok-same-target.json",
+      "family": "routing",
+      "extension": null
+    },
+    {
+      "id": "schema-admission/admitted-full-subset-valid-response",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/schema-admission/admitted-full-subset-valid-response.json",
+      "family": "schema-admission",
+      "extension": null
+    },
+    {
+      "id": "schema-admission/unknown-keyword-ignored",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/schema-admission/unknown-keyword-ignored.json",
+      "family": "schema-admission",
+      "extension": "schema.unknown_keywords_ignored"
+    },
+    {
+      "id": "schema-admission/unsupported-anyof",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/schema-admission/unsupported-anyof.json",
+      "family": "schema-admission",
+      "extension": "schema.combinators"
+    },
+    {
+      "id": "schema-admission/unsupported-boolean-subschema",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/schema-admission/unsupported-boolean-subschema.json",
+      "family": "schema-admission",
+      "extension": "schema.boolean_subschema"
+    },
+    {
+      "id": "schema-admission/unsupported-dialect-draft7",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/schema-admission/unsupported-dialect-draft7.json",
+      "family": "schema-admission",
+      "extension": "schema.other_dialects"
+    },
+    {
+      "id": "schema-admission/unsupported-dialect-null",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/schema-admission/unsupported-dialect-null.json",
+      "family": "schema-admission",
+      "extension": "schema.other_dialects"
+    },
+    {
+      "id": "schema-admission/unsupported-ref",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/schema-admission/unsupported-ref.json",
+      "family": "schema-admission",
+      "extension": "schema.ref"
+    },
+    {
+      "id": "streaming/buffered-equals-streamed",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/buffered-equals-streamed.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/cancel-mid-stream",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/cancel-mid-stream.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/failed-attempt-deltas-visible",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/failed-attempt-deltas-visible.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/finish-reason-other",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/finish-reason-other.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/first-token-mark-once-per-attempt",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/first-token-mark-once-per-attempt.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/reported-total-not-recomputed",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/reported-total-not-recomputed.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/synthesized-usage-update-from-final",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/synthesized-usage-update-from-final.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/usage-overlay-and-null-preservation",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/usage-overlay-and-null-preservation.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "streaming/zero-advance-close",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/streaming/zero-advance-close.json",
+      "family": "streaming",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/correction-byte-budget-reset",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/correction-byte-budget-reset.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/done-sentinel",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/done-sentinel.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/frame-split-mid-json",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/frame-split-mid-json.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/non-sse-error-body-status-503",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/non-sse-error-body-status-503.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/outbound-buffered-message-projection",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/outbound-buffered-message-projection.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/outbound-sampling-omitted",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/outbound-sampling-omitted.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/outbound-streamed-sampling-supplied",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/outbound-streamed-sampling-supplied.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/protocol-error-after-content",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/protocol-error-after-content.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/raw-byte-cap-multibyte-utf8",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/raw-byte-cap-multibyte-utf8.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/single-frame",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/single-frame.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "transport/openai-chat/trailing-usage-chunk",
+      "kind": "fixture",
+      "path": "specification/fixtures/transport/openai-chat/trailing-usage-chunk.json",
+      "family": "transport/openai-chat",
+      "extension": null
+    },
+    {
+      "id": "validation/additional-properties-aggregate",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/additional-properties-aggregate.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/boolean-not-number-or-integer",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/boolean-not-number-or-integer.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/const-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/const-fails.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/dotted-key-nested-path-collision",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/dotted-key-nested-path-collision.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/enum-empty-always-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/enum-empty-always-fails.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/enum-numeric-equality",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/enum-numeric-equality.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/integral-float-is-integer",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/integral-float-is-integer.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/literal-reserved-key-objects",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/literal-reserved-key-objects.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/malformed-examples-17-invalid-schema",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/malformed-examples-17-invalid-schema.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/malformed-required-17-invalid-schema",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/malformed-required-17-invalid-schema.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/malformed-schema-extraction-precedes-assessment",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/malformed-schema-extraction-precedes-assessment.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/malformed-title-17-invalid-schema",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/malformed-title-17-invalid-schema.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/malformed-type-17-invalid-schema",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/malformed-type-17-invalid-schema.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/maximum-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/maximum-fails.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/maxitems-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/maxitems-fails.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/maxlength-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/maxlength-fails.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/minimum-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/minimum-fails.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/minitems-fails",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/minitems-fails.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/minlength-counts-code-points",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/minlength-counts-code-points.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/missing-required-one",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/missing-required-one.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/nested-deeper-issue-first",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/nested-deeper-issue-first.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/ordering-tied-rules",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/ordering-tied-rules.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/six-missing-required-first-five-in-order",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/six-missing-required-first-five-in-order.json",
+      "family": "validation",
+      "extension": null
+    },
+    {
+      "id": "validation/type-mismatch-string-for-integer",
+      "kind": "fixture",
+      "path": "specification/fixtures/core-generation/validation/type-mismatch-string-for-integer.json",
+      "family": "validation",
+      "extension": null
+    }
+  ]
+}

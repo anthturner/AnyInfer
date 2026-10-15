@@ -1,0 +1,77 @@
+{
+  "fixture_version": "0",
+  "id": "validation/boolean-not-number-or-integer",
+  "family": "validation",
+  "profile": "core-generation",
+  "description": "Pending validation case boolean-not-number-or-integer; the oracle records the native outcome.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Return the scripted JSON response."
+      }
+    ],
+    "schema": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "number"
+        },
+        "integer": {
+          "type": "integer"
+        }
+      }
+    },
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "{\"number\":true,\"integer\":false}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

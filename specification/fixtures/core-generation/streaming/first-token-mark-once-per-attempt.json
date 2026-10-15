@@ -1,0 +1,100 @@
+{
+  "fixture_version": "0",
+  "id": "streaming/first-token-mark-once-per-attempt",
+  "family": "streaming",
+  "profile": "core-generation",
+  "description": "Each original and correction entry has multiple content pieces for first-token observation.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "fixture input"
+      }
+    ],
+    "consume": "stream",
+    "schema": {
+      "type": "object",
+      "required": [
+        "ok"
+      ]
+    },
+    "repair": {
+      "max_attempts": 1
+    }
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      },
+      "beta": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "{"
+          },
+          {
+            "text": "\"ok\":false}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop",
+              "usage": null
+            }
+          }
+        ]
+      },
+      {
+        "events": [
+          {
+            "text": "{"
+          },
+          {
+            "text": "\"ok\":true}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop",
+              "usage": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}

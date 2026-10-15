@@ -1,0 +1,224 @@
+{
+  "fixture_version": "0",
+  "id": "schema-admission/admitted-full-subset-valid-response",
+  "family": "schema-admission",
+  "profile": "core-generation",
+  "description": "Pending comprehensive admitted-schema case; the oracle records the native outcome.",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Return the scripted JSON response."
+      }
+    ],
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Admitted $schema \"$ref\" \u0001 😀",
+      "description": "Literal annotation $ref/$schema/$special/$codepoints; slash \\\\ quote \" control \u0001.",
+      "$comment": "Annotation data remains literal: $ref and $schema.",
+      "default": {
+        "$ref": "literal-default",
+        "$schema": "literal-schema",
+        "$special": "literal",
+        "$codepoints": "literal"
+      },
+      "examples": [
+        {
+          "$ref": "literal-example",
+          "$schema": "literal-schema",
+          "$special": "literal",
+          "$codepoints": "literal"
+        }
+      ],
+      "type": "object",
+      "properties": {
+        "$ref": {
+          "title": "A property literally named $ref",
+          "description": "Not a reference.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2,
+          "default": "😀",
+          "examples": [
+            "😀"
+          ]
+        },
+        "null_value": {
+          "type": "null",
+          "title": "null",
+          "default": {
+            "$special": "null-default"
+          }
+        },
+        "boolean_value": {
+          "type": "boolean",
+          "default": true,
+          "examples": [
+            false
+          ]
+        },
+        "number_value": {
+          "type": "number",
+          "minimum": -12.345,
+          "maximum": 12.345,
+          "default": 1.25,
+          "examples": [
+            -12.345,
+            12.345
+          ]
+        },
+        "integer_value": {
+          "type": "integer",
+          "minimum": -2,
+          "maximum": 2,
+          "default": 0,
+          "examples": [
+            -2,
+            2
+          ]
+        },
+        "numeric_enum": {
+          "type": "number",
+          "enum": [
+            1,
+            2
+          ],
+          "default": 1,
+          "examples": [
+            1,
+            2
+          ]
+        },
+        "const_value": {
+          "const": {
+            "$ref": "literal-const",
+            "$schema": "literal-schema",
+            "$special": "literal",
+            "$codepoints": "literal"
+          },
+          "default": {
+            "$ref": "literal-const",
+            "$schema": "literal-schema",
+            "$special": "literal",
+            "$codepoints": "literal"
+          }
+        },
+        "string_value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2,
+          "default": "😀",
+          "examples": [
+            "😀",
+            "a\u0001"
+          ]
+        },
+        "array_value": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2,
+            "title": "array item 😀"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "default": [
+            "😀"
+          ],
+          "examples": [
+            [
+              "a",
+              "😀"
+            ]
+          ]
+        },
+        "object_value": {
+          "type": "object",
+          "properties": {
+            "A\u0001\"\\😀": {
+              "type": "string",
+              "description": "Code-point key sort probe."
+            }
+          },
+          "required": [
+            "A\u0001\"\\😀"
+          ],
+          "additionalProperties": false,
+          "default": {
+            "A\u0001\"\\😀": "ok"
+          },
+          "examples": [
+            {
+              "A\u0001\"\\😀": "ok"
+            }
+          ]
+        }
+      },
+      "required": [
+        "$ref",
+        "null_value",
+        "boolean_value",
+        "number_value",
+        "integer_value",
+        "numeric_enum",
+        "const_value",
+        "string_value",
+        "array_value",
+        "object_value"
+      ],
+      "additionalProperties": false
+    },
+    "consume": "buffered"
+  },
+  "route": {
+    "targets": [
+      "fixture:alpha"
+    ],
+    "retry": {
+      "max_attempts": 1,
+      "backoff_base_s": 0,
+      "backoff_max_s": 0
+    },
+    "health_gate": false
+  },
+  "adapter": {
+    "max_repair_attempts": null,
+    "models": {
+      "alpha": {
+        "grammar": false,
+        "json_schema": false,
+        "json_mode": false
+      }
+    },
+    "health_preset": [],
+    "script": [
+      {
+        "events": [
+          {
+            "text": "{\"$ref\":\"😀\",\"null_value\":null,\"boolean_value\":true,\"number_value\":1.25,\"integer_value\":2,\"numeric_enum\":1,\"const_value\":{\"$ref\":\"literal-const\",\"$schema\":\"literal-schema\",\"$special\":\"literal\",\"$codepoints\":\"literal\"},\"string_value\":\"😀\",\"array_value\":[\"a\",\"😀\"],\"object_value\":{\"A\\u0001\\\"\\\\😀\":\"ok\"}}"
+          },
+          {
+            "final": {
+              "finish_reason": "stop"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "status": "to_be_observed",
+    "calls": [],
+    "clock_advances_ms": [],
+    "telemetry": {
+      "repair_attempted": [],
+      "parameter_dropped": []
+    },
+    "events": [],
+    "outcome": {
+      "none": true
+    },
+    "accounting": null
+  }
+}
