@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from anyinfer._client.async_client import AsyncClient
@@ -29,6 +29,72 @@ class _Telemetry:
             self.events.append(event)
 
 
+@dataclass(frozen=True, slots=True)
+class CoreOperation:
+    """Typed portable core operation inputs shared by fixture and HTTP runners."""
+
+    messages: tuple[Message, ...]
+    route: Route
+    sampling: Sampling | None
+    repair: Repair | None
+    schema: Any
+    consume: Any
+    timeout_s: Any
+    max_response_bytes: Any
+
+
+def _core_operation(
+    request: Mapping[str, Any],
+    *,
+    messages: tuple[Message, ...],
+    route: Route,
+    sampling: Sampling | None,
+    repair: Repair | None,
+) -> CoreOperation:
+    """Retain all caller-visible core controls without inspecting expected output."""
+    return CoreOperation(
+        messages=messages,
+        route=route,
+        sampling=sampling,
+        repair=repair,
+        schema=request.get("schema"),
+        consume=request.get("consume", "buffered"),
+        timeout_s=request.get("timeout_s"),
+        max_response_bytes=request.get("max_response_bytes"),
+    )
+
+
+async def _execute_core_operation(
+    client: AsyncClient, operation: CoreOperation, events: list[StreamEvent]
+) -> Any:
+    """Execute the ordinary buffered or fully-consumed streaming core operation."""
+    if operation.consume == "buffered":
+        return await client.generate(
+            operation.messages,
+            route=operation.route,
+            schema=operation.schema,
+            sampling=operation.sampling,
+            repair=operation.repair,
+            timeout_s=operation.timeout_s,
+            max_response_bytes=operation.max_response_bytes,
+        )
+    if operation.consume == "stream":
+        stream = client.stream(
+            operation.messages,
+            route=operation.route,
+            schema=operation.schema,
+            sampling=operation.sampling,
+            repair=operation.repair,
+            timeout_s=operation.timeout_s,
+            max_response_bytes=operation.max_response_bytes,
+        )
+        async with stream:
+            async for event in stream:
+                events.append(event)
+        return stream.result
+    raise HarnessError("fixture consume must be buffered or stream")
+
+
 def _messages(value: object) -> tuple[Message, ...]:
     if not isinstance(value, Sequence) or isinstance(value, str | bytes):
         raise HarnessError("fixture request.messages must be an array")
@@ -48,7 +114,9 @@ def _messages(value: object) -> tuple[Message, ...]:
                 if part.get("kind") == "text" and isinstance(part.get("text"), str):
                     content.append(Text(part["text"]))
                 elif part.get("kind") == "image_url" and isinstance(part.get("url"), str):
-                    content.append(ImagePart(url=part["url"], media_type=part.get("media_type", "image/png")))
+                    content.append(
+                        ImagePart(url=part["url"], media_type=part.get("media_type", "image/png"))
+                    )
                 else:
                     raise HarnessError("unsupported fixture input part")
             result.append(Message(role=role, content=tuple(content)))
@@ -123,7 +191,9 @@ async def run_fixture(fixture: Mapping[str, Any], *, with_mirror: bool = True) -
         if not isinstance(request, Mapping) or not isinstance(adapter, Mapping):
             raise HarnessError("fixture request and adapter are required objects")
         clock_data = fixture.get("clock", {})
-        clock = VirtualClock(int(clock_data.get("start_ms", 0)) if isinstance(clock_data, Mapping) else 0)
+        clock = VirtualClock(
+            int(clock_data.get("start_ms", 0)) if isinstance(clock_data, Mapping) else 0
+        )
         provider = FixtureProvider(adapter)
         observer = _Telemetry()
     except Exception as construction_error:
@@ -132,23 +202,55 @@ async def run_fixture(fixture: Mapping[str, Any], *, with_mirror: bool = True) -
     try:
         messages = _messages(request.get("messages"))
     except ValueError as error:
-        return NativeRun(case_id=case_id, error=error, error_stage="construction", construction_origin="messages", input_schema=request.get("schema"))
+        return NativeRun(
+            case_id=case_id,
+            error=error,
+            error_stage="construction",
+            construction_origin="messages",
+            input_schema=request.get("schema"),
+        )
     except Exception as construction_error:
         return NativeRun(case_id=case_id, error=construction_error, error_stage="harness")
 
     try:
         route = _route(fixture.get("route"))
     except ValueError as error:
-        return NativeRun(case_id=case_id, error=error, error_stage="construction", construction_origin="route", input_messages=messages, input_schema=request.get("schema"))
+        return NativeRun(
+            case_id=case_id,
+            error=error,
+            error_stage="construction",
+            construction_origin="route",
+            input_messages=messages,
+            input_schema=request.get("schema"),
+        )
     except Exception as construction_error:
-        return NativeRun(case_id=case_id, error=construction_error, error_stage="harness", input_messages=messages, input_schema=request.get("schema"))
+        return NativeRun(
+            case_id=case_id,
+            error=construction_error,
+            error_stage="harness",
+            input_messages=messages,
+            input_schema=request.get("schema"),
+        )
 
     try:
         sampling = _sampling(request.get("sampling"))
     except ValueError as error:
-        return NativeRun(case_id=case_id, error=error, error_stage="construction", construction_origin="sampling", input_messages=messages, input_schema=request.get("schema"))
+        return NativeRun(
+            case_id=case_id,
+            error=error,
+            error_stage="construction",
+            construction_origin="sampling",
+            input_messages=messages,
+            input_schema=request.get("schema"),
+        )
     except Exception as construction_error:
-        return NativeRun(case_id=case_id, error=construction_error, error_stage="harness", input_messages=messages, input_schema=request.get("schema"))
+        return NativeRun(
+            case_id=case_id,
+            error=construction_error,
+            error_stage="harness",
+            input_messages=messages,
+            input_schema=request.get("schema"),
+        )
 
     try:
         repair_data = request.get("repair")
@@ -156,80 +258,138 @@ async def run_fixture(fixture: Mapping[str, Any], *, with_mirror: bool = True) -
             raise HarnessError("fixture repair must be an object or null")
         repair = Repair(**dict(repair_data)) if repair_data is not None else None
         consume = request.get("consume", "buffered")
+        operation = _core_operation(
+            request,
+            messages=messages,
+            route=route,
+            sampling=sampling,
+            repair=repair,
+        )
     except ValueError as error:
-        return NativeRun(case_id=case_id, error=error, error_stage="construction", construction_origin="repair", input_messages=messages, input_schema=request.get("schema"))
+        return NativeRun(
+            case_id=case_id,
+            error=error,
+            error_stage="construction",
+            construction_origin="repair",
+            input_messages=messages,
+            input_schema=request.get("schema"),
+        )
     except Exception as construction_error:
-        return NativeRun(case_id=case_id, error=construction_error, error_stage="harness", input_messages=messages, input_schema=request.get("schema"))
+        return NativeRun(
+            case_id=case_id,
+            error=construction_error,
+            error_stage="harness",
+            input_messages=messages,
+            input_schema=request.get("schema"),
+        )
     events: list[StreamEvent] = []
     consumption_mode: Literal["buffered", "stream"] | None = None
     result = None
     operation_error: BaseException | None = None
     stage: Literal["construction", "operation", "harness"] | None = None
     with capture_enabled() as operations:
-      async with AsyncClient([provider.settings], registry=provider.registry, use_default_catalog=False, observers=[observer], _clock=clock, _sleep=clock.sleep) as client:
-        presets = adapter.get("health_preset", [])
-        if isinstance(presets, list):
-            for preset in presets:
-                if isinstance(preset, Mapping):
-                    clock._seconds = int(preset["failed_at_ms"]) / 1000
-                    client._health.mark_failed(client.resolve(str(preset["target"])))
-            clock_data = fixture.get("clock", {})
-            if isinstance(clock_data, Mapping):
-                clock._seconds = int(clock_data.get("start_ms", 0)) / 1000
-        try:
-            if consume == "buffered":
-                consumption_mode = "buffered"
-                result = await client.generate(messages, route=route, schema=request.get("schema"), sampling=sampling, repair=repair, timeout_s=request.get("timeout_s"), max_response_bytes=request.get("max_response_bytes"))
-            else:
-                consumption_mode = "stream"
-                stream = client.stream(messages, route=route, schema=request.get("schema"), sampling=sampling, repair=repair, timeout_s=request.get("timeout_s"), max_response_bytes=request.get("max_response_bytes"))
-                if consume == "close_without_advance":
-                    await stream.aclose()
-                elif isinstance(consume, str) and consume.startswith("stream_cancel_after_events:"):
-                    gate_ids = [
-                        next(iter(action.values()))
-                        for entry in adapter.get("script", [])
-                        if isinstance(entry, Mapping)
-                        for action in entry.get("events", [])
-                        if isinstance(action, Mapping) and set(action) == {"await_release"}
-                    ]
+        async with AsyncClient(
+            [provider.settings],
+            registry=provider.registry,
+            use_default_catalog=False,
+            observers=[observer],
+            _clock=clock,
+            _sleep=clock.sleep,
+        ) as client:
+            presets = adapter.get("health_preset", [])
+            if isinstance(presets, list):
+                for preset in presets:
+                    if isinstance(preset, Mapping):
+                        clock._seconds = int(preset["failed_at_ms"]) / 1000
+                        client._health.mark_failed(client.resolve(str(preset["target"])))
+                clock_data = fixture.get("clock", {})
+                if isinstance(clock_data, Mapping):
+                    clock._seconds = int(clock_data.get("start_ms", 0)) / 1000
+            try:
+                if consume in {"buffered", "stream"}:
+                    consumption_mode = consume
+                    result = await _execute_core_operation(client, operation, events)
+                else:
+                    consumption_mode = "stream"
+                    stream = client.stream(
+                        messages,
+                        route=route,
+                        schema=request.get("schema"),
+                        sampling=sampling,
+                        repair=repair,
+                        timeout_s=request.get("timeout_s"),
+                        max_response_bytes=request.get("max_response_bytes"),
+                    )
+                    if consume == "close_without_advance":
+                        await stream.aclose()
+                    elif isinstance(consume, str) and consume.startswith(
+                        "stream_cancel_after_events:"
+                    ):
+                        gate_ids = [
+                            next(iter(action.values()))
+                            for entry in adapter.get("script", [])
+                            if isinstance(entry, Mapping)
+                            for action in entry.get("events", [])
+                            if isinstance(action, Mapping) and set(action) == {"await_release"}
+                        ]
 
-                    async def drain() -> None:
+                        async def drain() -> None:
+                            async with stream:
+                                async for event in stream:
+                                    events.append(event)
+
+                        task = asyncio.create_task(drain())
+                        try:
+                            if len(gate_ids) != 1:
+                                raise HarnessError(
+                                    "cancellation requires exactly one fixture gate"
+                                )
+                            await provider.gates.wait_ready(str(gate_ids[0]))
+                            threshold = int(consume.rsplit(":", 1)[1])
+                            if threshold < 1:
+                                raise HarnessError("cancellation event threshold must be positive")
+                            if len(events) != threshold:
+                                raise HarnessError(
+                                    "cancellation gate did not establish the requested public-event threshold"
+                                )
+                            task.cancel()
+                            try:
+                                await task
+                            except asyncio.CancelledError as cancelled:
+                                operation_error, stage = cancelled, "operation"
+                        finally:
+                            if not task.done():
+                                task.cancel()
+                            with contextlib.suppress(asyncio.CancelledError):
+                                await task
+                    else:
                         async with stream:
                             async for event in stream:
                                 events.append(event)
-
-                    task = asyncio.create_task(drain())
-                    try:
-                        if len(gate_ids) != 1:
-                            raise HarnessError("cancellation requires exactly one fixture gate")
-                        await provider.gates.wait_ready(str(gate_ids[0]))
-                        threshold = int(consume.rsplit(":", 1)[1])
-                        if threshold < 1:
-                            raise HarnessError("cancellation event threshold must be positive")
-                        if len(events) != threshold:
-                            raise HarnessError("cancellation gate did not establish the requested public-event threshold")
-                        task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError as cancelled:
-                            operation_error, stage = cancelled, "operation"
-                    finally:
-                        if not task.done():
-                            task.cancel()
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await task
-                else:
-                    async with stream:
-                        async for event in stream:
-                            events.append(event)
-                    result = stream.result
-                    if consume == "close_twice_after_end":
-                        await stream.aclose()
-                        await stream.aclose()
-        except asyncio.CancelledError:
-            raise
-        except Exception as caught:
-            operation_error, stage = caught, "harness" if isinstance(caught, HarnessError | ScriptError) else "operation"
-    native = NativeRun(case_id=case_id, events=tuple(events), result=result, error=operation_error, error_stage=stage, telemetry=tuple(observer.events), operations=tuple(operations), requests=tuple(provider.adapter.requests if provider.adapter else ()), clock_advances_ms=tuple(delay * 1000 for delay in clock.sleeps), cleanup_records=tuple(provider.adapter.cleanup_records if provider.adapter else ()), input_messages=messages, input_schema=request.get("schema"), consumption_mode=consumption_mode)
+                        result = stream.result
+                        if consume == "close_twice_after_end":
+                            await stream.aclose()
+                            await stream.aclose()
+            except asyncio.CancelledError:
+                raise
+            except Exception as caught:
+                operation_error, stage = (
+                    caught,
+                    "harness" if isinstance(caught, HarnessError | ScriptError) else "operation",
+                )
+    native = NativeRun(
+        case_id=case_id,
+        events=tuple(events),
+        result=result,
+        error=operation_error,
+        error_stage=stage,
+        telemetry=tuple(observer.events),
+        operations=tuple(operations),
+        requests=tuple(provider.adapter.requests if provider.adapter else ()),
+        clock_advances_ms=tuple(delay * 1000 for delay in clock.sleeps),
+        cleanup_records=tuple(provider.adapter.cleanup_records if provider.adapter else ()),
+        input_messages=messages,
+        input_schema=request.get("schema"),
+        consumption_mode=consumption_mode,
+    )
     return native

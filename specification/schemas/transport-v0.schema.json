@@ -1,139 +1,46 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "transport-v0.schema.json",
-    "type": "object",
-    "additionalProperties": false,
-    "required": [
-        "fixture_version",
-        "id",
-        "family",
-        "profile",
-        "description",
-        "kind",
-        "input",
-        "responses",
-        "expected"
-    ],
-    "properties": {
-        "fixture_version": {"const": "0"},
-        "id": {"type": "string", "pattern": "^transport/openai-chat/[a-z0-9][a-z0-9-]*$"},
-        "family": {"const": "transport/openai-chat"},
-        "profile": {"const": "core-generation"},
-        "description": {"type": "string", "minLength": 1},
-        "kind": {"enum": ["adapter", "core_http"]},
-        "input": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["adapter_config"],
-            "properties": {
-                "adapter_config": {"type": "object"},
-                "wire": {"type": "object"},
-                "operation": {"type": "object"}
-            }
-        },
-        "responses": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["status", "headers", "byte_chunks"],
-                "properties": {
-                    "status": {"type": "integer", "minimum": 100, "maximum": 599},
-                    "headers": {"type": "object", "additionalProperties": {"type": "string"}},
-                    "byte_chunks": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": ["bytes"],
-                            "properties": {
-                                "bytes": {"type": "string", "contentEncoding": "base64"}
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "expected": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["status"],
-            "properties": {
-                "status": {"enum": ["observed", "to_be_observed"]},
-                "http_requests": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": ["method", "path", "headers", "json", "stream_mode"],
-                        "properties": {
-                            "method": {"type": "string", "minLength": 1},
-                            "path": {"type": "string", "pattern": "^/"},
-                            "headers": {
-                                "type": "object",
-                                "additionalProperties": {"type": "string"}
-                            },
-                            "json": {},
-                            "stream_mode": {"type": "boolean"}
-                        }
-                    }
-                },
-                "wire_limits": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": ["timeout_s", "max_response_bytes"],
-                        "properties": {
-                            "timeout_s": {"type": "number"},
-                            "max_response_bytes": {"type": "integer", "minimum": 0}
-                        }
-                    }
-                },
-                "adapter_outcome": {"type": "object"},
-                "core": {"type": "object"}
-            },
-            "allOf": [
-                {
-                    "if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]},
-                    "then": {"required": ["http_requests", "wire_limits"]},
-                    "else": {"maxProperties": 1}
-                }
-            ]
-        }
-    },
-    "allOf": [
-        {
-            "if": {"properties": {"kind": {"const": "adapter"}}, "required": ["kind"]},
-            "then": {
-                "properties": {
-                    "input": {"required": ["wire"], "not": {"required": ["operation"]}},
-                    "expected": {
-                        "allOf": [
-                            {
-                                "if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]},
-                                "then": {"required": ["adapter_outcome"], "not": {"required": ["core"]}}
-                            }
-                        ]
-                    }
-                }
-            }
-        },
-        {
-            "if": {"properties": {"kind": {"const": "core_http"}}, "required": ["kind"]},
-            "then": {
-                "properties": {
-                    "input": {"required": ["operation"], "not": {"required": ["wire"]}},
-                    "expected": {
-                        "allOf": [
-                            {
-                                "if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]},
-                                "then": {"required": ["core"], "not": {"required": ["adapter_outcome"]}}
-                            }
-                        ]
-                    }
-                }
-            }
-        }
-    ]
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "transport-v0.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fixture_version", "id", "family", "profile", "description", "kind", "input", "responses", "expected"],
+  "properties": {
+    "fixture_version": {"const": "0"},
+    "id": {"type": "string", "pattern": "^transport/openai-chat/[a-z0-9][a-z0-9-]*$"},
+    "family": {"const": "transport/openai-chat"},
+    "profile": {"const": "core-generation"},
+    "description": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["adapter", "core_http"]},
+    "input": {"$ref": "#/$defs/input"},
+    "responses": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["status", "headers", "byte_chunks"], "properties": {"status": {"type": "integer", "minimum": 100, "maximum": 599}, "headers": {"$ref": "#/$defs/headers"}, "byte_chunks": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["bytes"], "properties": {"bytes": {"type": "string", "contentEncoding": "base64"}}}}}}},
+    "expected": {"$ref": "#/$defs/expected"}
+  },
+  "allOf": [
+    {"if": {"properties": {"kind": {"const": "adapter"}}, "required": ["kind"]}, "then": {"properties": {"input": {"allOf": [{"$ref": "#/$defs/input"}, {"required": ["wire"], "not": {"required": ["operation"]}}]}, "expected": {"allOf": [{"$ref": "#/$defs/expected"}, {"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["adapter_outcome"], "not": {"required": ["core"]}}}]}}}},
+    {"if": {"properties": {"kind": {"const": "core_http"}}, "required": ["kind"]}, "then": {"properties": {"input": {"allOf": [{"$ref": "#/$defs/input"}, {"required": ["operation"], "not": {"required": ["wire"]}}]}, "expected": {"allOf": [{"$ref": "#/$defs/expected"}, {"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["core"], "not": {"required": ["adapter_outcome"]}}}]}}}}
+  ],
+  "$defs": {
+    "headers": {"type": "object", "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"}, "additionalProperties": {"type": "string"}},
+    "configured_headers": {"type": "object", "propertyNames": {"pattern": "^(?!content-type$)(?!authorization$)[a-z][a-z0-9-]*$"}, "additionalProperties": {"type": "string"}},
+    "adapter_config": {"type": "object", "additionalProperties": false, "required": ["provider_id", "base_url", "api_key", "headers", "timeout_s"], "properties": {"provider_id": {"const": "openai-compat"}, "base_url": {"const": "https://fixture.invalid/v1"}, "api_key": {"const": "fixture-token"}, "headers": {"$ref": "#/$defs/configured_headers"}, "timeout_s": {"type": "number", "minimum": 0}}},
+    "wire": {"type": "object", "additionalProperties": false, "required": ["model", "messages", "sampling", "mechanism", "stream", "timeout_s", "max_response_bytes"], "properties": {"model": {"type": "string", "minLength": 1}, "messages": {"type": "array", "items": {"$ref": "fixture-v0.schema.json#/$defs/input_message"}}, "sampling": {"$ref": "fixture-v0.schema.json#/$defs/request/properties/sampling"}, "mechanism": {"enum": [null, "prompt"]}, "stream": {"type": "boolean"}, "timeout_s": {"type": "number", "minimum": 0}, "max_response_bytes": {"type": "integer", "minimum": 0}}},
+    "operation_request": {"allOf": [{"$ref": "fixture-v0.schema.json#/$defs/request"}, {"properties": {"consume": {"enum": ["buffered", "stream"]}}}]},
+    "operation": {"type": "object", "additionalProperties": false, "required": ["request", "route"], "properties": {"request": {"$ref": "#/$defs/operation_request"}, "route": {"$ref": "fixture-v0.schema.json#/$defs/route"}}},
+    "input": {"type": "object", "additionalProperties": false, "required": ["adapter_config"], "properties": {"adapter_config": {"$ref": "#/$defs/adapter_config"}, "wire": {"$ref": "#/$defs/wire"}, "operation": {"$ref": "#/$defs/operation"}}},
+    "usage": {"$ref": "fixture-v0.schema.json#/$defs/usage"},
+    "adapter_event": {"oneOf": [
+      {"type": "object", "additionalProperties": false, "required": ["text_delta"], "properties": {"text_delta": {"type": "object", "additionalProperties": false, "required": ["text"], "properties": {"text": {"type": "string"}}}}},
+      {"type": "object", "additionalProperties": false, "required": ["usage"], "properties": {"usage": {"$ref": "#/$defs/usage"}}},
+      {"type": "object", "additionalProperties": false, "required": ["final"], "properties": {"final": {"type": "object", "additionalProperties": false, "required": ["finish_reason", "usage"], "properties": {"finish_reason": {"enum": ["stop", "length", "tool_calls", "content_filter", "other"]}, "usage": {"$ref": "#/$defs/usage"}}}}}
+    ]},
+    "adapter_error": {"type": "object", "additionalProperties": false, "required": ["category", "retryable", "retry_after_s", "http_status", "phase"], "properties": {"category": {"enum": ["invalid_request", "unsupported_input", "auth", "rate_limit", "transport", "provider_unavailable", "model_not_found", "context_length", "stream_protocol", "schema_violation", "all_targets_failed", "cancelled"]}, "retryable": {"type": "boolean"}, "retry_after_s": {"type": ["number", "null"]}, "http_status": {"type": ["integer", "null"]}, "phase": {"enum": ["configure", "discover", "generate", "stream", "validate", "cleanup", null]}}},
+    "adapter_outcome": {"oneOf": [
+      {"type": "object", "additionalProperties": false, "required": ["events"], "properties": {"events": {"type": "array", "items": {"$ref": "#/$defs/adapter_event"}}}},
+      {"type": "object", "additionalProperties": false, "required": ["error"], "properties": {"error": {"$ref": "#/$defs/adapter_error"}}}
+    ]},
+    "http_request": {"type": "object", "additionalProperties": false, "required": ["method", "path", "headers", "body", "stream"], "properties": {"method": {"type": "string", "minLength": 1}, "path": {"type": "string", "pattern": "^/"}, "headers": {"$ref": "#/$defs/headers"}, "body": {}, "stream": {"type": "boolean"}}},
+    "wire_limits": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["timeout_s", "max_response_bytes"], "properties": {"timeout_s": {"type": "number", "minimum": 0}, "max_response_bytes": {"type": "integer", "minimum": 0}}}},
+    "core": {"allOf": [{"$ref": "fixture-v0.schema.json#/$defs/expected"}, {"properties": {"status": {"const": "observed"}}, "required": ["status"]}]},
+    "expected": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["observed", "to_be_observed"]}, "http_requests": {"type": "array", "items": {"$ref": "#/$defs/http_request"}}, "wire_limits": {"$ref": "#/$defs/wire_limits"}, "adapter_outcome": {"$ref": "#/$defs/adapter_outcome"}, "core": {"$ref": "#/$defs/core"}}, "allOf": [{"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["http_requests", "wire_limits"]}, "else": {"maxProperties": 1}}]}
+  }
 }

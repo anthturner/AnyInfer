@@ -55,13 +55,30 @@ def _tree(
                     "profile": "core-generation",
                     "description": "synthetic",
                     "kind": "adapter",
-                    "input": {"adapter_config": {}, "wire": {}},
+                    "input": {
+                        "adapter_config": {
+                            "provider_id": "openai-compat",
+                            "base_url": "https://fixture.invalid/v1",
+                            "api_key": "fixture-token",
+                            "headers": {},
+                            "timeout_s": 120,
+                        },
+                        "wire": {
+                            "model": "synthetic",
+                            "messages": [{"role": "user", "text": "hello"}],
+                            "sampling": {},
+                            "mechanism": None,
+                            "stream": True,
+                            "timeout_s": 120,
+                            "max_response_bytes": 1024,
+                        },
+                    },
                     "responses": [],
                     "expected": {
                         "status": "observed",
                         "http_requests": [],
                         "wire_limits": [],
-                        "adapter_outcome": {},
+                        "adapter_outcome": {"events": []},
                     },
                 },
             )

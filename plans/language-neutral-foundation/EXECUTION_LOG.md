@@ -1075,3 +1075,147 @@ build. Root inspected the retained final summary and the final selected-root/dri
 closures. The separate unsuppressed strict check passed all 15 changed/new support modules.
 M1.5c.3c and its now-complete M1.5 parents are checked. No actual reference/release directory
 was produced. The next source work starts at M1.6a after this checkpoint commit.
+
+Checkpoint committed as `ecc4f2dfdfece1ab477d7dde1024e8027b3372ff` (`Bind reference evidence
+and qualify portable reports`); root verified the working tree was clean afterward.
+M1.6 now runs with disjoint owners: `c7089bf7-a970-4b5f-960e-4bbdbe32dd26` owns only the
+transport schema/profile wording; `c16f5f94-b124-40f4-9deb-8121afdbc093` owns selected local
+schema binding and synthetic asset tests; `1e09179c-3413-4551-b0e4-65cb177a5654` owns the
+private native HTTP runner/tests and minimal shared runner extraction. Existing SDK,
+projection strictness, driver dispatch and actual transport fixture authoring stay outside
+these first slices. Root serializes tests and master-checklist acceptance. No worker runs
+pytest until the shared contract/code is ready for a joined gate.
+
+M1.6a schema/selected-local resource support and synthetic controls are source-ready. Root's
+asset-only gate is `7b70530f-e8f0-46e2-b7dc-b7b1a8fffb8e`; independent contract review runs
+read-only alongside it. M1.6b cold review rejected the first runner slice: it ignored fixture
+adapter configuration, projected a shape incompatible with valid observed expectations, and
+failed to classify unused scripted responses after native errors as harness faults. The
+transport owner corrects these plus schema-valid baseline/real lifecycle proofs in its two
+private files. No native transport test is launched against that rejected slice, and no
+M1.6 box is checked yet.
+
+The asset gate `7b70530f-e8f0-46e2-b7dc-b7b1a8fffb8e` exited 1 with **74 passed, 1 skipped,
+1 failed** in 82.88 seconds. Its failure reproduces the independent resource-admission
+finding: a selected sibling without dialect metadata reaches `Resource.from_contents` and
+escapes as `CannotDetermineSpecification`. The validator owner now pins registered sibling
+objects to exact Draft 2020-12, self-checks them before resource creation, translates admission
+faults to diagnostics, and owns the sole narrow test slot for those controls. The existing
+unresolved-reference test keeps its distinct evaluation purpose by supplying valid explicit
+dialect metadata before the missing external reference. Transport runner correction remains
+in its separate private files; all other source is held.
+
+M1.6a's final joined gate in `7b70530f-e8f0-46e2-b7dc-b7b1a8fffb8e` passed **78 tests with
+one platform skip in 45.81 seconds**, exit 0. Root inspected the full retained result and
+reran affected Ruff plus unsuppressed strict mypy on the three eligible support modules.
+The contract/admission review is clean. Both old driver-test constructors now use valid
+pending data, with a valid-base64 baseline before its isolated malformed mutation. M1.6a is
+accepted; its owner receives the serialized checklist update. M1.6b source defects are closed
+by review; native runtime evidence still awaits actual HTTP lifecycle proofs and the focused
+test slot. Pending input authoring is independent and may now start under M1.6c.1.
+
+The first native HTTP gate `76c7f832-2bdf-4b58-a8cb-de2d640005df` exited 1 with **12 passed,
+4 failed** in 6.51 seconds. The core literal comparison needs a useful observed-delta
+diagnostic; a recorder cancellation control cancelled outside its generator-owned await;
+both core lifecycle controls had an invalid underscore in their fixture ID. Independent
+review additionally found real adapter cleanup bypass on cancellation. Root inspected the
+HTTP core path and found it omitted schema/repair, default consumption and native
+telemetry/clock/input-schema facts. The native owner now owns a minimal shared extraction in
+`runner.py` so both synthetic and HTTP adapters use the accepted execution body. The lifecycle
+owner rewrites its proofs through the actual transport runner, without manually closing the
+adapter after cancellation; private file ownership remains disjoint.
+
+All eleven pending transport inputs are authored and strict default coverage validates.
+They are not accepted yet: root decoded the raw-byte fixture and found escaped ASCII instead
+of actual multibyte UTF-8 (297 bytes equalled 297 full-response characters, over cap 80).
+The author corrects that stimulus using actual UTF-8 and a cap between whole-response decoded
+character count and raw-byte count. A separate cold intent review audits every literal input
+and response before M1.6c.1 acceptance. Expected blocks remain exactly status-only pending.
+
+M1.6c.1 data-only authoring is accepted after root reran strict complete coverage and
+independently decoded the corrected stored Base64: whole SSE response 147 Unicode code
+points, 177 UTF-8 bytes, cap 147, with 30 literal non-ASCII characters. The separate cold
+review closed all eleven pending inputs. No native outcome is inferred; M1.7 owns
+expectation reconciliation. The author receives the sole c.1 checklist lease.
+
+The first shared HTTP execution correction still omitted virtual health/backoff clocks and
+filtered configured headers by an x-prefix heuristic; root requested preservation of the
+accepted clock facts, all explicitly configured semantic headers, and typed core
+construction origins. The lifecycle proof now invokes the actual runner with no manual
+adapter/client cleanup; its SSE stimuli are being checked for actual LF framing and a
+real content observation before the next serialized gate.
+
+The next M1.6b joined gate is owned serially by the transport implementer in retained
+shell `75e9a0e8-0d98-4e4a-b3bc-2ecf868ab0a2`, covering transport, actual runner lifecycle,
+existing runner, projection and comparison tests. Root inspected the first two failure
+logs: lifecycle setup used zero total attempts (no HTTP execution) and repeated directory
+creation; the controlled expected core result used an incorrect timing marker and an
+invented `success` attempt value instead of native `ok`. These test inputs are corrected
+without changing SDK/projection semantics. A final source delta now preserves nested core
+comparison error-versus-fail and its diagnostic, with actual retry/backoff and typed
+construction-origin controls. Acceptance remains held pending the combined rerun and
+independent final review.
+
+M1.6b is accepted. Root inspected final retained shell
+`75e9a0e8-0d98-4e4a-b3bc-2ecf868ab0a2`: **148 passed in 20.87 seconds**, exit 0, covering
+transport, actual runner lifecycle, existing runner/projection/comparison. Root separately
+reran unsuppressed strict mypy over all four changed support modules, passing. Final cold
+review has no material finding. The transport owner completed the serialized b checkbox
+lease; SDK behavior and pending corpus expectations remain unchanged.
+
+M1.6c.2 and c.3 now have disjoint owners. `04f0bc20` owns only the new HTTP proof module/tests
+and existing centralized proof dispatcher/tests. `c16f5f94` owns only the driver and its
+driver/execution tests, removing staged optional transport handling and dispatching every
+inventory obligation. Their settled dispatcher signature stays unchanged and gains the
+sixth declared recipe, so source authoring can proceed together; runtime gates wait for
+both ready states. All selected fixtures must now be mandatory, hashed and passed to one
+trusted complete-coverage validation. Pending verdicts retain existing development
+representation; no qualified report, reference or release claim follows. Root retains the
+sole serialized heavy-test slot until a combined gate is granted.
+
+On the user's continuation, root checked live ownership and the proof worker's retained
+transcript. The worker had ended with mandatory predicates/tests unfinished; the proof was
+not accepted or runtime-gated. Root transferred only `proof_transport.py`/`proofs.py` to
+`1e09179c` and the independent `test_proof_transport.py`/`test_proofs.py` matrix to `c7089bf7`,
+with explicit expected replies and disjoint ownership. The former owner acknowledged hold.
+The invalid buffered cap-1 ASCII substitute and unconditional core-run rejection must be
+replaced with actual multibyte predicates; full correction linkage/raw-byte evidence remains
+mandatory. Driver source review is clean, and root inspected the separate 11-case boundary
+gate (2.72 seconds) plus forced-import compatibility node (1.98 seconds), both passing.
+The first unchecked box remains M1.6c.2; no full 102-case success is claimed yet.
+
+The new source/independent proof matrix passed root Ruff and unsuppressed strict mypy
+across seven integration modules. Root joined gate
+`d0f1faba-7694-4f9b-b85d-3bfa537e88a9` finished **163 passed, 2 failed in 23.57 seconds**.
+Both failures were negative-control diagnostic ordering: removing a native capture entry
+correctly hits the shared missing-evidence guard, and a one-byte malformed UTF-8 substitute
+no longer establishes the overflow stimulus. The independent native positives and fixture
+execution controls passed, but this is not proof acceptance. Cold review confirmed missing
+actual-mode binding, top-level HTTP/wire-to-core capture linkage, and the exact invalid/valid
+assessment predicate. Source and test owners now correct those in their disjoint files;
+root explicitly corrected the review's accidental minimum-rule wording to this fixture's
+actual age type violation. No SDK, fixture expectation, reference or release is changed.
+
+The corrected native proof matrix passed **22 tests in 0.51 seconds** in retained shell
+`901a7424-e06a-41d9-b149-7451b17d7e87`. Root inspected the final exact-one-issue guard and
+wrong-rule/wrong-path/surplus-issue mutations, then reran strict mypy across all 13 M1.6
+support modules successfully. The complete named M1.6 portable/OpenAI gate previously
+passed **378 tests with one platform skip in 39.98 seconds** in `d0f1faba...`. The last
+small guard is covered by the focused run and will be included in final repository checks.
+
+Root's final standalone development-driver audit has exactly 102 inventory-ordered unique
+rows, 104 raw-hashed selected inputs, and counts `{None: 87, extension: 9, pass: 6,
+unexecuted: 0}` with no unexecuted rows. Its JSON is explicitly UNRELEASED and remains under
+`.tmp-tests/m16-development-observation.json`; no reference or release was produced.
+The initial full repository run `92a35290-22a0-49c1-82fc-884824966c19` was deliberately
+stopped before the final exact-issue change; it is not acceptance evidence. A fresh-cache
+full rerun waits for final bounded cold-review closure. All executable source remains held.
+
+M1.6 is accepted. After clean final proof review, the fresh-cache rerun in
+`92a35290-22a0-49c1-82fc-884824966c19` passed **all 13 repository steps in 280.4 seconds**,
+exit 0. Root inspected the retained summary. The final source includes the exact invalid
+issue signature and its independent negative controls. The driver covers all 102 obligations
+with no fail/error or unexecuted row; all 96 fixture expectation blocks remain pending for
+M1.7. This establishes complete development execution, not a reference or released report.
+The driver owner receives the sole M1.6c.3/parent checkbox lease before the phase commit.
+Next is M1.7a's causal expectation-staging utility; no fixture expectation is changed yet.

@@ -17,14 +17,19 @@ import json
 import math
 import re
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
-from referencing import Registry
-from referencing.exceptions import NoSuchResource, Unresolvable, Unretrievable
+from referencing import Registry, Resource
+from referencing.exceptions import (
+    CannotDetermineSpecification,
+    NoSuchResource,
+    Unresolvable,
+    Unretrievable,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 SPECIFICATION = ROOT / "specification"
@@ -132,12 +137,28 @@ def _deny_schema_retrieval(uri: str) -> None:
     raise NoSuchResource(uri)
 
 
-def build_schema_validator(raw: Any) -> Draft202012Validator:
-    """Build a selected-asset validator that never retrieves unbound resources."""
+def build_schema_validator(
+    raw: Any, *, resources: Mapping[str, Any] | None = None
+) -> Draft202012Validator:
+    """Build a selected-asset validator with only explicit local resources."""
     Draft202012Validator.check_schema(raw)
-    return Draft202012Validator(
-        raw, registry=cast(Any, Registry)(retrieve=_deny_schema_retrieval)
-    )
+    registry = cast(Any, Registry)(retrieve=_deny_schema_retrieval)
+    for uri, resource in (resources or {}).items():
+        if not isinstance(uri, str) or not uri:
+            raise ValueError("selected schema resource URI is invalid")
+        if (
+            not isinstance(resource, Mapping)
+            or resource.get("$schema") != "https://json-schema.org/draft/2020-12/schema"
+        ):
+            raise ValueError(
+                f"selected schema resource {uri!r} must declare the Draft 2020-12 $schema"
+            )
+        Draft202012Validator.check_schema(resource)
+        try:
+            registry = registry.with_resource(uri, Resource.from_contents(resource))
+        except CannotDetermineSpecification as error:
+            raise ValueError(f"selected schema resource {uri!r} has no usable specification") from error
+    return Draft202012Validator(raw, registry=registry)
 
 
 def schema_errors(validator: Draft202012Validator, data: Any) -> list[ValidationError]:
@@ -152,7 +173,11 @@ def _schema(
     name: str, *, specification_root: Path | None = None
 ) -> Draft202012Validator:
     root = SPECIFICATION if specification_root is None else specification_root
-    return build_schema_validator(read_json(root / "schemas" / name))
+    raw = read_json(root / "schemas" / name)
+    resources: dict[str, Any] = {}
+    if name == "transport-v0.schema.json":
+        resources["fixture-v0.schema.json"] = read_json(root / "schemas" / "fixture-v0.schema.json")
+    return build_schema_validator(raw, resources=resources)
 
 
 def _errors(validator: Draft202012Validator, data: Any) -> list[str]:

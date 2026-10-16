@@ -11,9 +11,11 @@ import pytest
 
 from .comparison import compare_fixture
 from .runner import run_fixture
+from .transport import compare_transport_fixture, run_transport_fixture
 
 ROOT = Path(__file__).parents[3]
-FIXTURES = tuple(sorted((ROOT / "specification/fixtures/core-generation").rglob("*.json")))
+CORE_FIXTURES = tuple(sorted((ROOT / "specification/fixtures/core-generation").rglob("*.json")))
+TRANSPORT_FIXTURES = tuple(sorted((ROOT / "specification/fixtures/transport").rglob("*.json")))
 EXTENSIONS = (
     "schema.ref",
     "schema.combinators",
@@ -25,10 +27,11 @@ EXTENSIONS = (
     "messages.non_text_parts",
 )
 
-assert FIXTURES, "the canonical core-generation fixture discovery must not be empty"
+assert CORE_FIXTURES, "the canonical core-generation fixture discovery must not be empty"
+assert TRANSPORT_FIXTURES, "the canonical transport fixture discovery must not be empty"
 
 
-@pytest.mark.parametrize("path", FIXTURES, ids=lambda path: path.relative_to(ROOT).as_posix())
+@pytest.mark.parametrize("path", CORE_FIXTURES, ids=lambda path: path.relative_to(ROOT).as_posix())
 async def test_native_execution_retains_pending_or_extension_observations(path: Path) -> None:
     fixture = json.loads(path.read_text(encoding="utf-8"))
     run = await run_fixture(fixture)
@@ -77,3 +80,16 @@ def _assert_extension_evidence(evidence: Any) -> None:
             "max_response_bytes",
         }
         assert entry["entry_ordinal"] == ordinal
+
+
+@pytest.mark.parametrize(
+    "path", TRANSPORT_FIXTURES, ids=lambda path: path.relative_to(ROOT).as_posix()
+)
+async def test_transport_execution_retains_pending_observations(path: Path) -> None:
+    fixture = json.loads(path.read_text(encoding="utf-8"))
+    run = await run_transport_fixture(fixture)
+
+    assert run.error_stage != "harness", fixture["id"]
+    observed = compare_transport_fixture(fixture, run)
+    assert fixture["expected"]["status"] == "to_be_observed", fixture["id"]
+    assert observed["verdict"] is None, observed

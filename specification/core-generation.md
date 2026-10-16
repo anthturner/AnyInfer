@@ -599,32 +599,56 @@ Rules:
   unavailable because that input is outside v0 is not fabricated or compared.
 
 Transport fixtures exercise a real native OpenAI-compatible adapter over a fake HTTP transport,
-not only its parser. `transport-v0` has two mutually exclusive input variants:
+not only its parser. Their schema is `specification/schemas/transport-v0.schema.json`; it
+references the selected sibling `fixture-v0.schema.json` for shared request, route, message,
+sampling, usage, and core-expectation definitions. No transport schema copies those policies.
 
-- `kind: "adapter"`: `input.adapter_config` configures the adapter and `input.wire` supplies
-  the native wire request. `expected.adapter_outcome` contains either the ordered typed
-  adapter events or an error. Both buffered HTTP and streamed HTTP normalize to adapter
-  events; a buffered HTTP response does not create a second adapter result API.
-- `kind: "core_http"`: `input.adapter_config` configures the native adapter and
-  `input.operation` contains the profile request and route. The real native core runs over
-  that adapter; `expected.core` reuses the core expectation rules, including actual
-  assessment linkage, correction history, public events, result, and error.
+Every fixture has closed `input.adapter_config`:
+`provider_id: "openai-compat"`, `base_url: "https://fixture.invalid/v1"`,
+`api_key: "fixture-token"`, `headers`, and nonnegative finite `timeout_s` (the fixtures
+use 120). Configured header names are lowercase strings and may not be `content-type` or
+`authorization`; their values are strings. The fixed credential values are fixture-only
+placeholders. They do not describe a public adapter configuration API.
 
-Both variants supply an ordered `responses` array of `{status, headers, byte_chunks}`;
-each byte chunk is `{bytes: "<base64>"}`. It supplies one response per actual HTTP exchange,
-including corrections/retries; an exhausted response script is a driver error. The driver
-compares every actual request against the ordered `expected.http_requests` array of
-`{method, path, headers, json, stream_mode}`. Associated adapter-entry observations compare
-effective `timeout_s` and `max_response_bytes` to their expectations. These are wire-request
-limits, not invented HTTP header fields or a nonexistent `HttpClient` byte-limit argument.
-Functional raw-byte cases prove enforcement. Headers use nonsecret credential placeholders.
-The adapter receives only input configuration and scripted responses, never expected requests
-or outcomes. Parser-specific cases additionally compare normalized events without coalescing;
-byte chunks are fed at the specified boundaries but are not assumed to equal SSE frames.
+`transport-v0` has two mutually exclusive input variants:
+
+- `kind: "adapter"` requires `input.wire`. It is a closed direct wire request with a
+  nonempty `model`, shared input-message array, shared sampling object, `mechanism` of
+  `null` or `"prompt"`, `stream`, nonnegative `timeout_s`, and nonnegative integral
+  `max_response_bytes`. It intentionally omits wire-schema, schema-name, and native tool
+  fields, whose native defaults are not profile inputs. `expected.adapter_outcome` is either
+  ordered typed adapter events or one portable terminal error. Event rows are exactly
+  `{"text_delta":{"text":"..."}}`, `{"usage":<shared usage>}`, and
+  `{"final":{"finish_reason":<shared finish reason>,"usage":<shared usage or null>}}`.
+- `kind: "core_http"` requires `input.operation`, the closed pair
+  `{request, route}` from the shared fixture definitions. `request.consume` is the only
+  consumption control here and, when present, is `"buffered"` or `"stream"`; there is no
+  transport `consumption_mode`. `expected.core` is the complete shared core expectation
+  with nested `status: "observed"`, including its normal result, events, error, repair, and
+  assessment-linkage requirements.
+
+Both variants supply an ordered root `responses` array of
+`{status, headers, byte_chunks}`; each byte chunk is
+`{bytes: "<base64>"}`. It supplies one response per actual HTTP exchange, including
+corrections and retries; an exhausted or surplus response script is a driver error. The driver
+compares every actual request to ordered `expected.http_requests` rows of
+`{method, path, headers, body, stream}`, where `body` is decoded JSON and `stream` is the
+actual payload mode. It records the response bytes separately as raw facts. Associated
+`expected.wire_limits` compare effective wire-request `timeout_s` and
+`max_response_bytes`. These are not HTTP header fields or transport-client byte-limit
+arguments. Functional raw-byte cases prove enforcement.
+
+Semantic request headers are lowercased and include only content type, the fixture bearer
+authorization, and explicitly configured custom headers. Automatically generated client and
+framing headers are excluded. The adapter receives only input configuration and scripted
+responses, never expected requests or outcomes. Parser-specific cases compare normalized
+events without coalescing; byte chunks are delivered at the specified boundaries but need not
+be SSE frame boundaries. The transport projection excludes raw/session/timing metadata that is
+not part of this profile.
 
 Transport `expected.status` is `observed` or `to_be_observed`. An observed transport
-expectation includes its HTTP requests, wire limits, and the variant-specific adapter outcome
-or core expectation. A pending transport expectation is exactly
+expectation includes HTTP requests, wire limits, and the variant-specific adapter outcome or
+core expectation. A pending transport expectation is exactly
 `{ "status": "to_be_observed" }`: it retains runnable input and response data but does not
 invent wire or outcome assertions. Every pending expectation must be observed and reconciled
 before release freeze.

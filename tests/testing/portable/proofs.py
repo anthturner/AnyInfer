@@ -29,9 +29,10 @@ CORE_DRIVER_RECIPE_IDS = (
     "driver/timeout-effective-default-explicit",
     "driver/timeout-reset-per-entry",
     "driver/timeout-cleanup-disposal",
+    "driver/http-correction-byte-budget-reset",
 )
 
-_TIMEOUT_IDS = frozenset(CORE_DRIVER_RECIPE_IDS[2:])
+_TIMEOUT_IDS = frozenset(CORE_DRIVER_RECIPE_IDS[2:5])
 _ROOT = Path(__file__).parents[3] / "specification" / "fixtures" / "core-generation"
 
 
@@ -66,7 +67,10 @@ async def _concurrent_operations() -> dict[str, Any]:
     if len(left.operations) != 1 or len(right.operations) != 1:
         raise AssertionError("concurrent operations did not retain one capture each")
     left_operation, right_operation = left.operations[0], right.operations[0]
-    if left_operation is right_operation or left_operation.operation_id == right_operation.operation_id:
+    if (
+        left_operation is right_operation
+        or left_operation.operation_id == right_operation.operation_id
+    ):
         raise AssertionError("concurrent operations reused an operation identity")
     if not left_operation.assessments or not right_operation.assessments:
         raise AssertionError("concurrent operations lack native assessments")
@@ -74,16 +78,32 @@ async def _concurrent_operations() -> dict[str, Any]:
     right_ids = {assessment.assessment_id for assessment in right_operation.assessments}
     if left_ids & right_ids:
         raise AssertionError("concurrent operations shared assessment identities")
-    if any(assessment.operation_id != left_operation.operation_id for assessment in left_operation.assessments):
+    if any(
+        assessment.operation_id != left_operation.operation_id
+        for assessment in left_operation.assessments
+    ):
         raise AssertionError("left assessment crossed operation boundary")
-    if any(assessment.operation_id != right_operation.operation_id for assessment in right_operation.assessments):
+    if any(
+        assessment.operation_id != right_operation.operation_id
+        for assessment in right_operation.assessments
+    ):
         raise AssertionError("right assessment crossed operation boundary")
     left_projection, right_projection = project_run(left), project_run(right)
     if left_projection["outcome"] == right_projection["outcome"]:
-        raise AssertionError("distinguishable concurrent scripts yielded indistinguishable outcomes")
+        raise AssertionError(
+            "distinguishable concurrent scripts yielded indistinguishable outcomes"
+        )
     return {
-        "left": {"operation_id": left_operation.operation_id, "capture": left_capture, "outcome": left_projection["outcome"]},
-        "right": {"operation_id": right_operation.operation_id, "capture": right_capture, "outcome": right_projection["outcome"]},
+        "left": {
+            "operation_id": left_operation.operation_id,
+            "capture": left_capture,
+            "outcome": left_projection["outcome"],
+        },
+        "right": {
+            "operation_id": right_operation.operation_id,
+            "capture": right_capture,
+            "outcome": right_projection["outcome"],
+        },
         "active_capture_after_gather": False,
     }
 
@@ -132,7 +152,11 @@ async def _assessment_completeness() -> dict[str, Any]:
         "extraction": extraction_observation,
         "invalid_schema": invalid_schema_observation,
         "terminal_outcome": exhausted["outcome"],
-        "correction": {"assessment_ref": corrections[0].repair_assessment_ref, "native_feedback": list(feedback), "entry_ordinal": corrections[0].entry_ordinal},
+        "correction": {
+            "assessment_ref": corrections[0].repair_assessment_ref,
+            "native_feedback": list(feedback),
+            "entry_ordinal": corrections[0].entry_ordinal,
+        },
         "typed_paths": [list(path) for path in dotted_paths],
         "unavailable_controls": unavailable_controls,
     }
@@ -152,7 +176,11 @@ def _extraction_observation(assessments: list[Any]) -> dict[str, Any]:
     if assessment.issues is None or len(assessment.issues) != 1:
         raise MissingEvidenceError("extraction assessment lacks its portable issue")
     issue = assessment.issues[0]
-    if issue.rule != "no_json_candidate" or issue.instance_path is not None or issue.schema_path is not None:
+    if (
+        issue.rule != "no_json_candidate"
+        or issue.instance_path is not None
+        or issue.schema_path is not None
+    ):
         raise AssertionError("extraction assessment has the wrong portable rule or paths")
     if len(assessment.native_messages) != 1 or not assessment.native_messages[0]:
         raise MissingEvidenceError("extraction assessment lacks its native message")
@@ -177,16 +205,24 @@ def _invalid_schema_observation(assessments: list[Any]) -> dict[str, Any]:
     assessment = _one_assessment(assessments, "invalid_schema")
     required_path = ("required",)
     if assessment.schema_error_input_path != required_path:
-        raise MissingEvidenceError("invalid-schema assessment lacks the exact defective input path")
+        raise MissingEvidenceError(
+            "invalid-schema assessment lacks the exact defective input path"
+        )
     if assessment.issues is None or len(assessment.issues) != 1:
         raise MissingEvidenceError("invalid-schema assessment lacks its portable issue")
     issue = assessment.issues[0]
-    if issue.rule != "invalid_schema" or issue.instance_path is not None or issue.schema_path != required_path:
+    if (
+        issue.rule != "invalid_schema"
+        or issue.instance_path is not None
+        or issue.schema_path != required_path
+    ):
         raise AssertionError("invalid-schema assessment has the wrong typed issue paths")
     if len(assessment.native_messages) != 1 or not assessment.native_messages[0]:
         raise MissingEvidenceError("invalid-schema assessment lacks native feedback")
     if len(assessment.selected_native) != 1:
-        raise MissingEvidenceError("invalid-schema assessment lacks its selected native occurrence")
+        raise MissingEvidenceError(
+            "invalid-schema assessment lacks its selected native occurrence"
+        )
     occurrence = assessment.selected_native[0]
     if set(occurrence) != {"input_path", "message"}:
         raise MissingEvidenceError("invalid-schema selected occurrence has invalid metadata")
@@ -199,17 +235,35 @@ def _invalid_schema_observation(assessments: list[Any]) -> dict[str, Any]:
         "source_entry_ordinal": assessment.source_entry_ordinal,
         "rule": issue.rule,
         "schema_error_input_path": list(required_path),
-        "selected_occurrences": [{"input_path": list(occurrence["input_path"]), "message": occurrence["message"]}],
+        "selected_occurrences": [
+            {"input_path": list(occurrence["input_path"]), "message": occurrence["message"]}
+        ],
     }
 
 
-def _assert_assessment_rejection_controls(extraction: list[Any], invalid_schema: list[Any]) -> None:
+def _assert_assessment_rejection_controls(
+    extraction: list[Any], invalid_schema: list[Any]
+) -> None:
     """Ensure malformed capture records cannot turn the real positives into passes."""
     checks: tuple[tuple[Any, type[BaseException]], ...] = (
         (replace(_one_assessment(extraction, "extraction"), kind="validation"), AssertionError),
-        (replace(_one_assessment(extraction, "extraction"), selected_native=()), MissingEvidenceError),
-        (replace(_one_assessment(invalid_schema, "invalid_schema"), schema_error_input_path=None), MissingEvidenceError),
-        (replace(_one_assessment(invalid_schema, "invalid_schema"), selected_native=({"input_path": ("required",)},)), MissingEvidenceError),
+        (
+            replace(_one_assessment(extraction, "extraction"), selected_native=()),
+            MissingEvidenceError,
+        ),
+        (
+            replace(
+                _one_assessment(invalid_schema, "invalid_schema"), schema_error_input_path=None
+            ),
+            MissingEvidenceError,
+        ),
+        (
+            replace(
+                _one_assessment(invalid_schema, "invalid_schema"),
+                selected_native=({"input_path": ("required",)},),
+            ),
+            MissingEvidenceError,
+        ),
     )
     for mutated, expected in checks:
         try:
@@ -231,7 +285,9 @@ async def _unavailable_assessment_controls(baseline: Any) -> dict[str, Any]:
         raise AssertionError("baseline repair fixture did not produce a native result")
     original_append = capture_module._OperationCapture.append
 
-    def fault_append(self: Any, target: list[Any], record: Any, *, assessment: bool = False) -> bool:
+    def fault_append(
+        self: Any, target: list[Any], record: Any, *, assessment: bool = False
+    ) -> bool:
         if assessment:
             self.evidence_available = False
             return False
@@ -250,7 +306,10 @@ async def _unavailable_assessment_controls(baseline: Any) -> dict[str, Any]:
         capture_module._MAX_ASSESSMENTS = original_cap
     details: dict[str, str] = {}
     for name, run in (("fault", faulted), ("cap", capped)):
-        if getattr(getattr(run, "result", None), "text", None) != baseline_text or run.error is not None:
+        if (
+            getattr(getattr(run, "result", None), "text", None) != baseline_text
+            or run.error is not None
+        ):
             raise AssertionError(f"{name} observation control changed native repair behavior")
         try:
             validate_capture(run)
@@ -274,11 +333,22 @@ async def run_core_driver_assertion(recipe_ref: str) -> dict[str, Any]:
             observations = await _concurrent_operations()
         elif recipe_ref == "driver/assessment-completeness":
             observations = await _assessment_completeness()
-        else:
+        elif recipe_ref in _TIMEOUT_IDS:
             from .proof_timeouts import observe_timeout_recipe
 
             observations = await observe_timeout_recipe(recipe_ref)
-        return {"id": recipe_ref, "verdict": "pass", "detail": None, "evidence": _evidence(recipe_ref, observations)}
+        elif recipe_ref == "driver/http-correction-byte-budget-reset":
+            from .proof_transport import observe_transport_recipe
+
+            observations = await observe_transport_recipe(recipe_ref)
+        else:
+            raise AssertionError(f"unrecognized core driver recipe {recipe_ref!r}")
+        return {
+            "id": recipe_ref,
+            "verdict": "pass",
+            "detail": None,
+            "evidence": _evidence(recipe_ref, observations),
+        }
     except asyncio.CancelledError:
         raise
     except AssertionError as exc:

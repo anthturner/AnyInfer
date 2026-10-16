@@ -60,7 +60,24 @@ def _transport_fixture(*, chunks: list[dict[str, str]] | None = None) -> dict[st
         "profile": "core-generation",
         "description": "minimal valid transport fixture",
         "kind": "adapter",
-        "input": {"adapter_config": {}, "wire": {}},
+        "input": {
+            "adapter_config": {
+                "provider_id": "openai-compat",
+                "base_url": "https://fixture.invalid/v1",
+                "api_key": "fixture-token",
+                "headers": {},
+                "timeout_s": 120,
+            },
+            "wire": {
+                "model": "fixture-model",
+                "messages": [{"role": "user", "text": "hello"}],
+                "sampling": {},
+                "mechanism": None,
+                "stream": True,
+                "timeout_s": 120,
+                "max_response_bytes": 1024,
+            },
+        },
         "responses": [
             {"status": 200, "headers": {}, "byte_chunks": chunks or [{"bytes": "AA=="}]}
         ],
@@ -68,7 +85,7 @@ def _transport_fixture(*, chunks: list[dict[str, str]] | None = None) -> dict[st
             "status": "observed",
             "http_requests": [],
             "wire_limits": [],
-            "adapter_outcome": {},
+            "adapter_outcome": {"events": []},
         },
     }
 
@@ -184,12 +201,10 @@ def test_script_failures_admit_only_native_adapter_categories_and_fields() -> No
     fixture["adapter"]["script"][0]["fail"] = {"category": "cancelled"}
     assert list(validator.iter_errors(fixture))
 
-    transport_schema = json.loads(
-        (ROOT / "specification" / "schemas" / "transport-v0.schema.json").read_text(
-            encoding="utf-8"
-        )
+    transport_validator = validate_fixtures._schema(
+        "transport-v0.schema.json", specification_root=ROOT / "specification"
     )
-    assert not list(Draft202012Validator(transport_schema).iter_errors(_transport_fixture()))
+    assert not list(transport_validator.iter_errors(_transport_fixture()))
 
     inventory_schema = json.loads(
         (ROOT / "specification" / "schemas" / "inventory-v0.schema.json").read_text(
@@ -301,12 +316,9 @@ def test_transport_rejects_opposite_input_variant_and_non_base64_chunks(tmp_path
 
 
 def test_transport_expected_status_distinguishes_pending_and_observed() -> None:
-    schema = json.loads(
-        (ROOT / "specification" / "schemas" / "transport-v0.schema.json").read_text(
-            encoding="utf-8"
-        )
+    validator = validate_fixtures._schema(
+        "transport-v0.schema.json", specification_root=ROOT / "specification"
     )
-    validator = Draft202012Validator(schema)
     observed = _transport_fixture()
     assert not list(validator.iter_errors(observed))
 
@@ -338,36 +350,109 @@ def test_transport_expected_status_distinguishes_pending_and_observed() -> None:
 
     core_observed = _transport_fixture()
     core_observed["kind"] = "core_http"
-    core_observed["input"] = {"adapter_config": {}, "operation": {}}
+    core_observed["input"] = {
+        "adapter_config": _transport_fixture()["input"]["adapter_config"],
+        "operation": {
+            "request": {
+                "messages": [{"role": "user", "text": "hello"}],
+                "consume": "buffered",
+            },
+            "route": {"targets": ["openai-compat:fixture-model"]},
+        },
+    }
     core_observed["expected"] = {
         "status": "observed",
         "http_requests": [],
         "wire_limits": [],
-        "core": {},
+        "core": _core_fixture({"none": True})["expected"],
     }
     assert not list(validator.iter_errors(core_observed))
 
     core_pending = _transport_fixture()
     core_pending["kind"] = "core_http"
-    core_pending["input"] = {"adapter_config": {}, "operation": {}}
+    core_pending["input"] = core_observed["input"]
     core_pending["expected"] = {"status": "to_be_observed"}
     assert not list(validator.iter_errors(core_pending))
 
     core_with_adapter_outcome = _transport_fixture()
     core_with_adapter_outcome["kind"] = "core_http"
-    core_with_adapter_outcome["input"] = {"adapter_config": {}, "operation": {}}
+    core_with_adapter_outcome["input"] = core_observed["input"]
     core_with_adapter_outcome_expected = core_with_adapter_outcome["expected"]
     assert isinstance(core_with_adapter_outcome_expected, dict)
     core_with_adapter_outcome_expected.pop("adapter_outcome")
-    core_with_adapter_outcome_expected["core"] = {}
-    core_with_adapter_outcome_expected["adapter_outcome"] = {}
+    core_with_adapter_outcome_expected["core"] = _core_fixture({"none": True})["expected"]
+    core_with_adapter_outcome_expected["adapter_outcome"] = {"events": []}
     assert list(validator.iter_errors(core_with_adapter_outcome))
 
     adapter_with_core_outcome = _transport_fixture()
     adapter_with_core_outcome_expected = adapter_with_core_outcome["expected"]
     assert isinstance(adapter_with_core_outcome_expected, dict)
-    adapter_with_core_outcome_expected["core"] = {}
+    adapter_with_core_outcome_expected["core"] = _core_fixture({"none": True})["expected"]
     assert list(validator.iter_errors(adapter_with_core_outcome))
+
+
+def test_transport_schema_closes_config_wire_headers_and_outcome() -> None:
+    validator = validate_fixtures._schema(
+        "transport-v0.schema.json", specification_root=ROOT / "specification"
+    )
+
+    missing_config = _transport_fixture()
+    missing_input = missing_config["input"]
+    assert isinstance(missing_input, dict)
+    config = missing_input["adapter_config"]
+    assert isinstance(config, dict)
+    config.pop("api_key")
+    assert list(validator.iter_errors(missing_config))
+
+    reserved_header = _transport_fixture()
+    reserved_input = reserved_header["input"]
+    assert isinstance(reserved_input, dict)
+    headers = reserved_input["adapter_config"]["headers"]
+    assert isinstance(headers, dict)
+    headers["authorization"] = "Bearer override"
+    assert list(validator.iter_errors(reserved_header))
+
+    unsupported_mechanism = _transport_fixture()
+    unsupported_input = unsupported_mechanism["input"]
+    assert isinstance(unsupported_input, dict)
+    wire = unsupported_input["wire"]
+    assert isinstance(wire, dict)
+    wire["mechanism"] = "json_schema"
+    assert list(validator.iter_errors(unsupported_mechanism))
+
+    upper_case_header = _transport_fixture()
+    upper_case_expected = upper_case_header["expected"]
+    assert isinstance(upper_case_expected, dict)
+    upper_case_expected["http_requests"] = [
+        {"method": "POST", "path": "/chat/completions", "headers": {"X-Trace": "1"}, "body": {}, "stream": True}
+    ]
+    assert list(validator.iter_errors(upper_case_header))
+
+    invalid_event = _transport_fixture()
+    invalid_expected = invalid_event["expected"]
+    assert isinstance(invalid_expected, dict)
+    invalid_expected["adapter_outcome"] = {"events": [{"tool_call": {}}]}
+    assert list(validator.iter_errors(invalid_event))
+
+    invalid_consume = _transport_fixture()
+    invalid_consume["kind"] = "core_http"
+    invalid_consume["input"] = {
+        "adapter_config": _transport_fixture()["input"]["adapter_config"],
+        "operation": {
+            "request": {
+                "messages": [{"role": "user", "text": "hello"}],
+                "consume": "close_without_advance",
+            },
+            "route": {"targets": ["openai-compat:fixture-model"]},
+        },
+    }
+    invalid_consume["expected"] = {
+        "status": "observed",
+        "http_requests": [],
+        "wire_limits": [],
+        "core": _core_fixture({"none": True})["expected"],
+    }
+    assert list(validator.iter_errors(invalid_consume))
 
 
 def test_custom_corpus_paths_never_resolve_against_the_checkout(tmp_path: Path) -> None:
@@ -953,7 +1038,15 @@ def test_selected_schema_unresolved_references_are_diagnostics_without_network(
 
     monkeypatch.setattr(urllib.request, "urlopen", unexpected_network)
     fixture_schema = selected / "schemas" / "fixture-v0.schema.json"
-    fixture_schema.write_text(json.dumps({"$ref": "https://example.invalid/missing"}), encoding="utf-8")
+    fixture_schema.write_text(
+        json.dumps(
+            {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$ref": "https://example.invalid/missing",
+            }
+        ),
+        encoding="utf-8",
+    )
     fixture_problems = validate_fixtures.validate(fixtures, specification_root=selected)
     assert any("selected schema reference is unavailable" in problem for problem in fixture_problems)
 
@@ -972,6 +1065,102 @@ def test_selected_schema_unresolved_references_are_diagnostics_without_network(
     malformed_report = validate_fixtures.validate_report({}, specification_root=selected)
     assert len(malformed_report) == 1
     assert "report schema is unavailable or invalid" in malformed_report[0]
+
+
+def test_selected_transport_schema_uses_only_its_registered_fixture_sibling(
+    tmp_path: Path, monkeypatch
+) -> None:
+    selected = tmp_path / "selected-specification"
+    schemas = selected / "schemas"
+    fixtures = tmp_path / "corpus"
+    transport = fixtures / "transport" / "case.json"
+    schemas.mkdir(parents=True)
+    transport.parent.mkdir(parents=True)
+    fixture_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "fixture-v0.schema.json",
+        "$defs": {"value": {"type": "string"}},
+    }
+    transport_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "transport-v0.schema.json",
+        "type": "object",
+        "required": ["value"],
+        "properties": {"value": {"$ref": "fixture-v0.schema.json#/$defs/value"}},
+    }
+    (schemas / "fixture-v0.schema.json").write_text(json.dumps(fixture_schema), encoding="utf-8")
+    (schemas / "transport-v0.schema.json").write_text(
+        json.dumps(transport_schema), encoding="utf-8"
+    )
+    (schemas / "inventory-v0.schema.json").write_text("{}", encoding="utf-8")
+    transport.write_text(json.dumps({"value": "selected"}), encoding="utf-8")
+
+    retrieval_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def unexpected_network(*args: object, **kwargs: object) -> object:
+        retrieval_calls.append((args, kwargs))
+        raise AssertionError(f"schema evaluation attempted network retrieval: {args!r} {kwargs!r}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", unexpected_network)
+    assert not validate_fixtures.validate(fixtures, specification_root=selected)
+    assert retrieval_calls == []
+
+    fixture_schema["$defs"]["value"] = {"type": "integer"}
+    (schemas / "fixture-v0.schema.json").write_text(json.dumps(fixture_schema), encoding="utf-8")
+    assert any(
+        "is not of type 'integer'" in problem
+        for problem in validate_fixtures.validate(fixtures, specification_root=selected)
+    )
+
+    (schemas / "fixture-v0.schema.json").unlink()
+    assert any(
+        "selected schema is unavailable or invalid" in problem
+        for problem in validate_fixtures.validate(fixtures, specification_root=selected)
+    )
+
+
+def test_selected_transport_fixture_resource_requires_draft_2020_12(tmp_path: Path) -> None:
+    selected = tmp_path / "selected-specification"
+    schemas = selected / "schemas"
+    fixtures = tmp_path / "corpus"
+    transport = fixtures / "transport" / "case.json"
+    schemas.mkdir(parents=True)
+    transport.parent.mkdir(parents=True)
+    transport_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "transport-v0.schema.json",
+        "type": "object",
+        "properties": {"value": {"$ref": "fixture-v0.schema.json#/$defs/value"}},
+    }
+    (schemas / "transport-v0.schema.json").write_text(
+        json.dumps(transport_schema), encoding="utf-8"
+    )
+    (schemas / "inventory-v0.schema.json").write_text("{}", encoding="utf-8")
+    transport.write_text(json.dumps({"value": "selected"}), encoding="utf-8")
+
+    for sibling, detail in (
+        ({"$defs": {"value": {"type": "string"}}}, "must declare the Draft 2020-12"),
+        (
+            {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "$defs": {"value": {"type": "string"}},
+            },
+            "must declare the Draft 2020-12",
+        ),
+        (
+            {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": 3,
+            },
+            "selected schema is unavailable or invalid",
+        ),
+    ):
+        (schemas / "fixture-v0.schema.json").write_text(json.dumps(sibling), encoding="utf-8")
+        problems = validate_fixtures.validate(fixtures, specification_root=selected)
+        assert len(problems) == 1
+        assert "selected schema is unavailable or invalid" in problems[0]
+        assert detail in problems[0]
+
 
 def test_default_custom_fixture_tree_uses_adjacent_normative_markdown(tmp_path: Path) -> None:
     fixture_root = tmp_path / "specification" / "fixtures"

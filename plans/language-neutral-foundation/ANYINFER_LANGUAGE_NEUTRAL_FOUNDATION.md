@@ -643,7 +643,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
         > pytest cache after an unrelated pre-existing cache ACL blocked session cleanup.
         > All M1.5 waves are complete. No actual reference/release artifact exists; M1.6a is
         > the first unchecked execution box.
-- [ ] M1.6 Transport fixtures and driver support in `tests/testing/portable/transport.py` for an
+- [x] M1.6 Transport fixtures and driver support in `tests/testing/portable/transport.py` for an
   actual native mocked OpenAI chat-completions transport. `transport-v0` distinguishes an
   `adapter` case (`input.adapter_config` and `input.wire`) from a `core_http` case
   (`input.adapter_config` and `input.operation`). Ordered `responses` supply status, headers,
@@ -663,7 +663,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > `expected.core` reuses the complete core expectation with its nested status forced to
   > observed; pending outer expectations remain status-only. These are bounded fixture-data
   > rules and do not change Python adapter behavior.
-  - [ ] M1.6a Close transport authoring inputs/outcomes in
+  - [x] M1.6a Close transport authoring inputs/outcomes in
     `specification/schemas/transport-v0.schema.json` and the transport section of
     `specification/core-generation.md`. Reuse the fixture schema's request, route, message,
     nested sampling, usage and core expectation definitions; `request.consume` is the only
@@ -673,8 +673,15 @@ M1 and later use `src/python/` paths and therefore depend on it.
     **Gate:** both affected asset modules pass with local-reference, wrong-root, missing
     resource, semantic-header, variant and pending-status positives/negatives; cold review
     confirms no policy copies or checkout fallback.
-  - [ ] M1.6b Implement private `tests/testing/portable/transport.py` and
-    `test_transport.py`. Use ordinary `ProviderSettings.transport` with scripted native
+    > NOTE: Accepted with 78 passing tests and one platform skip in 45.81 seconds. Selected-
+    > local resource admission and the closed transport contract passed cold review; the root
+    > Ruff and strict checks across three modules passed.
+    > NOTE: Unreleased transport HTTP request rows use the settled schema and normative keys
+    > `body` (ordered JSON body) and boolean `stream` (streaming mode), superseding the draft
+    > `json` and `stream_mode` labels. This changes no released consumer or product behavior.
+  - [x] M1.6b Implement private `tests/testing/portable/transport.py`,
+    `test_transport.py` and `test_transport_lifecycle.py`. Use ordinary
+    `ProviderSettings.transport` with scripted native
     HTTP responses and a fresh built-in registry descriptor whose transparent wrapper records
     the exact `WireRequest` before delegating to the real OpenAI-compatible adapter. Keep
     explicit native lifecycle delegates and close the delegated async iterator on early exit.
@@ -683,7 +690,15 @@ M1 and later use `src/python/` paths and therefore depend on it.
     Record actual HTTP requests, raw chunks and effective wire limits alongside `NativeRun`.
     **Gate:** focused adapter/core HTTP observations, scripts, request projection, lifecycle,
     cap and failure controls pass together with the existing runner/projection/comparison tests.
-  - [ ] M1.6c Author the eleven named pending transport fixtures under
+    > NOTE: Review/runtime rejected a partial HTTP-only execution copy: schema/repair inputs,
+    > construction origins, telemetry and clock facts were omitted. Reuse of a small extracted
+    > native runner body is now required. Adapter cleanup must enclose iteration as well as
+    > script verification; cancellation proof invokes the actual transport runner with a
+    > blocked real HTTP stream and no manual adapter cleanup. Python SDK behavior is unchanged.
+    > NOTE: Accepted with 148 focused tests passing in 20.87 seconds. Shared runner and native
+    > HTTP execution, lifecycle cleanup/cancellation, transport projection/comparison, and
+    > strict checks across four modules passed; cold closure found no material issues.
+  - [x] M1.6c Author the eleven named pending transport fixtures under
     `specification/fixtures/transport/openai-chat/`, implement the real
     `driver/http-correction-byte-budget-reset` proof, and dispatch transport fixtures/proof
     from `tests/testing/portable/driver.py`. Transport comparison preserves pending verdicts
@@ -692,6 +707,29 @@ M1 and later use `src/python/` paths and therefore depend on it.
     **Gate:** all 102 inventory records execute in development mode with no unexecuted
     transport/driver rows, exact inventory coverage validates, and the complete M1.6 gate
     below passes without a qualified-report or reference-production claim.
+    - [x] M1.6c.1 Author only the eleven inventory-named JSON inputs/responses with exact
+      status-only pending expectations. Gate: strict selected-schema/default coverage
+      validation, UTF-8/LF checks and independent intent review pass; no expected native
+      outcome is invented. Input authoring may proceed after M1.6a while M1.6b proofs finish.
+      > NOTE: Accepted pending-only authoring for all eleven inventory-named transport inputs.
+      > Strict coverage/default validation, UTF-8/LF static checks, and cold review passed;
+      > no native outcome was filled. The complete raw-byte response measures 147 code points
+      > and 177 UTF-8 bytes with cap 147.
+    - [x] M1.6c.2 Add private `proof_transport.py` and `test_proof_transport.py`; extend the
+      existing `proofs.py` dispatcher for the sixth released recipe identity. Observe actual
+      correction-entry raw-byte reset plus both multibyte overflow modes; retain native
+      capture, HTTP exchanges, byte counts and terminal error facts. Gate: the proof and
+      controlled missing/wrong evidence tests pass with cancellation/fatal propagation.
+      > NOTE: Accepted with actual core-HTTP correction byte-budget reset, both UTF-8
+      > overflow modes, native causal evidence and mutation coverage; the focused proof
+      > matrix passed 22 tests and cold closure was clean.
+    - [x] M1.6c.3 Integrate transport fixture/proof dispatch into `driver.py` and update
+      development-driver/execution tests. Gate: selected roots execute every inventory row,
+      preserve pending verdicts and exact hashes/paths, and report no unexecuted obligations;
+      the complete M1.6 and repository gates pass before the phase commit.
+      > NOTE: Accepted after all 13 final gates passed in 280.4 seconds. The root inspected
+      > the final CLI audit: 102 inventory-ordered unique rows, 104 hashes, and counts
+      > None=87, extension=9, pass=6, unexecuted=0.
   **Gate:** `.\.venv\Scripts\python.exe -m pytest -q tests/testing/portable tests/test_openai_compat.py`
   passes; `.\.venv\Scripts\python.exe scripts/validate_fixtures.py --check-coverage` proves
   complete DEVELOPMENT coverage for core and transport requirements. This remains unreleased.
@@ -706,6 +744,35 @@ M1 and later use `src/python/` paths and therefore depend on it.
   Run the clean reference-observation oracle with Python declaring all eight extension feature
   names. Generated observation/manifest outputs may be output-only exceptions; executable inputs
   must not be dirty.
+  - [ ] M1.7a Add private `tests/testing/portable/reconcile.py` and
+    `test_reconcile.py` for staging expected data from actual `NativeRun`/`TransportRun`
+    facts. Reuse the accepted projections/capture validation; do not copy development
+    reports or implement another inference/validation policy. Markerize only causal schema
+    injection and selected correction-feedback positions, preserve caller literals and any
+    valid existing marker segments, and verify expansion against actual entered messages.
+    Preserve structured-object member order. The nine extension fixtures use the prescribed
+    nondeclaring portable baseline from shared section 14, with Python's honest native
+    extension outcome/entries retained separately in the staging audit. Gate: actual-run
+    positives, caller-text collision, marker roundtrip/missing-evidence, extension-baseline
+    and duplicate-member-order controls pass; strict typing and cold review are clean.
+  - [ ] M1.7b From the accepted M1.6 development driver, stage all 96 fixture expectations
+    in an isolated complete selected specification tree, retain native audit observations,
+    and review every changed expectation against its input and named requirement. Classify
+    each mismatch as fixture error, specification error or Python bug before applying data;
+    file Python bugs instead of changing SDK behavior in this box. Apply only reviewed
+    fixture expectation/authoring-metadata changes, retaining input/script/schema data and
+    member order. Update canonical execution tests to accept observed pass as well as
+    deliberately synthetic pending controls. Gate: no pending fixture, all 102 obligations
+    execute with zero fail/error and only the nine eligible Python extensions; strict
+    coverage and the complete repository gate pass before committing clean revision A.
+  - [ ] M1.7c From clean committed A, invoke the reviewed reference writer with the exact
+    nonzero A revision and its canonical new-only manifest/environment paths. Inspect the
+    complete native environment, input/import identities and reference outcome. Gate: both
+    raw-hash-bound artifacts pass the shared evidence validator, source inputs remain clean,
+    and all M1.7 parent requirements below pass before a reference-artifact commit.
+  > NOTE: The private staging mechanism is an authoring tool, not a new policy engine.
+  > It must fail on missing or ambiguous native provenance rather than finding prompt-like
+  > substrings in arbitrary caller text. No expectation is filled before M1.6 acceptance.
   **Gate:** no pending expectations; the clean reference observation has zero `fail`/`error`, exact inventory coverage and
   only permitted explicitly marked extension cases; the manifest records A13's complete
   environment binding; `.\workspace.cmd check` passes. This is not yet a `report-v0` or a

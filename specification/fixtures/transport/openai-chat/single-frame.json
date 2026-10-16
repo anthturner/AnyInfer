@@ -1,0 +1,49 @@
+{
+  "fixture_version": "0",
+  "id": "transport/openai-chat/single-frame",
+  "family": "transport/openai-chat",
+  "profile": "core-generation",
+  "description": "A buffered chat-completion JSON body yields the adapter's normalized text, usage, and final events.",
+  "kind": "adapter",
+  "input": {
+    "adapter_config": {
+      "provider_id": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "api_key": "fixture-token",
+      "headers": {
+        "x-fixture": "transport"
+      },
+      "timeout_s": 120
+    },
+    "wire": {
+      "model": "fixture-model",
+      "messages": [
+        {
+          "role": "user",
+          "text": "Hello."
+        }
+      ],
+      "sampling": {},
+      "mechanism": null,
+      "stream": false,
+      "timeout_s": 120,
+      "max_response_bytes": 1048576
+    }
+  },
+  "responses": [
+    {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "byte_chunks": [
+        {
+          "bytes": "eyJjaG9pY2VzIjpbeyJtZXNzYWdlIjp7ImNvbnRlbnQiOiJoZWxsbyJ9LCJmaW5pc2hfcmVhc29uIjoic3RvcCJ9XSwidXNhZ2UiOnsicHJvbXB0X3Rva2VucyI6MiwiY29tcGxldGlvbl90b2tlbnMiOjEsInRvdGFsX3Rva2VucyI6M319"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "status": "to_be_observed"
+  }
+}

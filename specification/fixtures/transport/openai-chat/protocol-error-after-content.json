@@ -1,0 +1,59 @@
+{
+  "fixture_version": "0",
+  "id": "transport/openai-chat/protocol-error-after-content",
+  "family": "transport/openai-chat",
+  "profile": "core-generation",
+  "description": "A streamed core operation receives text then malformed SSE JSON; post-content protocol failure must not fall through to a second target.",
+  "kind": "core_http",
+  "input": {
+    "adapter_config": {
+      "provider_id": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "api_key": "fixture-token",
+      "headers": {
+        "x-fixture": "transport"
+      },
+      "timeout_s": 120
+    },
+    "operation": {
+      "request": {
+        "messages": [
+          {
+            "role": "user",
+            "text": "Respond briefly."
+          }
+        ],
+        "sampling": {},
+        "timeout_s": 120,
+        "max_response_bytes": 1048576,
+        "consume": "stream"
+      },
+      "route": {
+        "targets": [
+          "openai-compat:fixture-model",
+          "openai-compat:backup"
+        ],
+        "retry": {
+          "max_attempts": 1
+        },
+        "health_gate": false
+      }
+    }
+  },
+  "responses": [
+    {
+      "status": 200,
+      "headers": {
+        "content-type": "text/event-stream"
+      },
+      "byte_chunks": [
+        {
+          "bytes": "ZGF0YTogeyJjaG9pY2VzIjpbeyJkZWx0YSI6eyJjb250ZW50IjoicGFydGlhbCJ9fV19CgpkYXRhOiB7bm90LWpzb259Cgo="
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "status": "to_be_observed"
+  }
+}

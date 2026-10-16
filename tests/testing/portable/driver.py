@@ -28,6 +28,7 @@ from .comparison import compare_fixture
 from .reference import ReferencePreflightError, _validator_module
 from .reference_writer import _publish_new, write_reference
 from .runner import run_fixture
+from .transport import compare_transport_fixture, run_transport_fixture
 from .values import MissingEvidenceError, ensure_value_domain
 
 _REPOSITORY_ROOT = Path(__file__).parents[3]
@@ -135,17 +136,9 @@ def _inventory(root: Path) -> list[dict[str, Any]]:
             path_value = record.get("path")
             if not isinstance(path_value, str):
                 raise DriverInputError(f"fixture case {case_id} lacks a path")
-            if path_value.startswith(_CORE_PREFIX):
-                _validate_fixture_identity(root, record, _selected_fixture(root, path_value))
-            elif path_value.startswith(_TRANSPORT_PREFIX):
-                candidate = (
-                    root / "fixtures" / Path(path_value).relative_to("specification/fixtures")
-                )
-                _inside(root, candidate)
-                if candidate.is_file():
-                    _validate_fixture_identity(root, record, _selected_fixture(root, path_value))
-            else:
+            if not path_value.startswith((_CORE_PREFIX, _TRANSPORT_PREFIX)):
                 raise DriverInputError(f"fixture case {case_id} has an unknown fixture domain")
+            _validate_fixture_identity(root, record, _selected_fixture(root, path_value))
         elif kind == "driver_assertion":
             if record.get("path") is not None or not isinstance(record.get("recipe_ref"), str):
                 raise DriverInputError(f"driver assertion {case_id} has an invalid recipe record")
@@ -156,7 +149,7 @@ def _inventory(root: Path) -> list[dict[str, Any]]:
 
 
 def _asset_problems(root: Path) -> list[str]:
-    """Use the trusted selected-root validator while transport remains optional."""
+    """Use the trusted selected-root validator for every selected fixture."""
     try:
         inventory = _load_json(root / _INVENTORY)
     except DriverInputError as error:
@@ -171,27 +164,17 @@ def _asset_problems(root: Path) -> list[str]:
         path_value = record.get("path")
         if not isinstance(path_value, str):
             return ["selected inventory fixture path is invalid"]
-        if path_value.startswith(_CORE_PREFIX):
-            try:
-                fixtures.append(_selected_fixture(root, path_value))
-            except DriverInputError as error:
-                return [str(error)]
-        elif path_value.startswith(_TRANSPORT_PREFIX):
-            candidate = root / "fixtures" / Path(path_value).relative_to("specification/fixtures")
-            try:
-                _inside(root, candidate)
-            except DriverInputError as error:
-                return [str(error)]
-            if candidate.is_file():
-                fixtures.append(candidate)
-        else:
+        if not path_value.startswith((_CORE_PREFIX, _TRANSPORT_PREFIX)):
             return [f"selected inventory fixture path has an unknown domain: {path_value}"]
+        try:
+            fixtures.append(_selected_fixture(root, path_value))
+        except DriverInputError as error:
+            return [str(error)]
     return cast(
         list[str],
         _validator_module().validate(
             root / "fixtures",
             coverage=True,
-            family="core-generation",
             fixture_paths=fixtures,
             specification_root=root,
         ),
@@ -213,9 +196,6 @@ def _hashes(root: Path, records: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         seen.add(relative)
         path = root / relative
         _inside(root, path)
-        if not path.is_file() and relative.as_posix().startswith("fixtures/transport/"):
-            result.append({"path": relative.as_posix(), "sha256": None})
-            continue
         if not path.is_file():
             raise DriverInputError(f"required selected input is missing: {relative.as_posix()}")
         result.append({"path": relative.as_posix(), "sha256": _sha256(path)})
@@ -314,74 +294,55 @@ async def observe_core(root: Path) -> dict[str, Any]:
     if problems:
         raise DriverInputError("selected fixture assets are invalid: " + "; ".join(problems))
     records = _inventory(root)
+    try:
+        from .proofs import CORE_DRIVER_RECIPE_IDS, run_core_driver_assertion
+    except ImportError as error:
+        proof_import_error: ImportError | None = error
+        core_driver_recipe_ids: tuple[str, ...] = ()
+    else:
+        proof_import_error = None
+        core_driver_recipe_ids = CORE_DRIVER_RECIPE_IDS
+
     cases: list[dict[str, Any]] = []
-    unexecuted: list[dict[str, Any]] = []
     for record in records:
         case_id = str(record["id"])
         if record["kind"] == "fixture":
             path = str(record["path"])
-            if path.startswith(_TRANSPORT_PREFIX):
-                candidate = root / "fixtures" / Path(path).relative_to("specification/fixtures")
-                fixture_path = _selected_fixture(root, path) if candidate.is_file() else None
-                unexecuted.append(
-                    {
-                        "id": case_id,
-                        "path": path,
-                        "family": str(record["family"]),
-                        "extension": record.get("extension"),
-                        "status": "present" if fixture_path is not None else "missing",
-                        "sha256": _sha256(fixture_path) if fixture_path is not None else None,
-                        "reason": "transport driver is not implemented",
-                    }
-                )
-                continue
             fixture = _load_json(_selected_fixture(root, path))
             if fixture.get("id") != case_id or fixture.get("family") != record.get("family"):
                 raise DriverInputError(
                     f"selected fixture identity does not match inventory: {case_id}"
                 )
-            cases.append(
-                compare_fixture(fixture, await run_fixture(fixture), extensions=_EXTENSIONS)
-            )
+            if path.startswith(_CORE_PREFIX):
+                cases.append(compare_fixture(fixture, await run_fixture(fixture), extensions=_EXTENSIONS))
+            elif path.startswith(_TRANSPORT_PREFIX):
+                cases.append(compare_transport_fixture(fixture, await run_transport_fixture(fixture)))
+            else:
+                raise DriverInputError(f"fixture case {case_id} has an unknown fixture domain")
             continue
         recipe_ref = str(record["recipe_ref"])
-        if recipe_ref == "driver/http-correction-byte-budget-reset":
-            unexecuted.append(
-                {
-                    "id": case_id,
-                    "path": None,
-                    "family": str(record["family"]),
-                    "extension": record.get("extension"),
-                    "status": "unavailable",
-                    "sha256": None,
-                    "reason": "HTTP driver recipe is not implemented",
-                }
-            )
-            continue
-        try:
-            from .proofs import CORE_DRIVER_RECIPE_IDS, run_core_driver_assertion
-        except ImportError as error:
+        if proof_import_error is not None:
             cases.append(
                 {
                     "id": case_id,
                     "verdict": "error",
-                    "detail": f"core proof driver unavailable: {error}",
+                    "detail": f"core proof driver unavailable: {proof_import_error}",
                     "evidence": None,
                 }
             )
             continue
-        if recipe_ref not in CORE_DRIVER_RECIPE_IDS:
+        if recipe_ref not in core_driver_recipe_ids:
             raise DriverInputError(
                 f"inventory recipe is not an available core recipe: {recipe_ref}"
             )
         cases.append(
             _check_recipe(await run_core_driver_assertion(recipe_ref), case_id, recipe_ref)
         )
-    identities = [case.get("id") for case in cases] + [case["id"] for case in unexecuted]
+    identities = [case.get("id") for case in cases]
     if len(identities) != len(records) or len(set(identities)) != len(records):
         raise DriverInputError("driver did not produce exact selected inventory coverage")
     counts = Counter(str(case.get("verdict")) for case in cases)
-    counts["unexecuted"] = len(unexecuted)
+    counts["unexecuted"] = 0
     return {
         "development_observation": "UNRELEASED",
         "report_v0_eligible": False,
@@ -392,7 +353,7 @@ async def observe_core(root: Path) -> dict[str, Any]:
         "implementation": _implementation(),
         "extensions": list(_EXTENSIONS),
         "cases": cases,
-        "unexecuted": unexecuted,
+        "unexecuted": [],
         "counts": dict(sorted(counts.items())),
     }
 

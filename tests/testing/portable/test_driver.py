@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from . import conftest, driver
+from .values import MissingEvidenceError, ValueDomainError
 
 pytest_plugins = ["pytester"]
 
@@ -21,7 +23,10 @@ def test_observation_is_unreleased_and_does_not_validate_as_report_v0() -> None:
     report = asyncio.run(driver.observe_core(driver._DEFAULT_ROOT))
     assert report["development_observation"] == "UNRELEASED"
     assert report["report_v0_eligible"] is False
-    assert report["counts"]["unexecuted"] == len(report["unexecuted"])
+    assert len(report["cases"]) == 102
+    assert len({case["id"] for case in report["cases"]}) == 102
+    assert report["unexecuted"] == []
+    assert report["counts"]["unexecuted"] == 0
     schema = json.loads((driver._DEFAULT_ROOT / "schemas/report-v0.schema.json").read_text())
     assert list(Draft202012Validator(schema).iter_errors(report))
 
@@ -32,16 +37,52 @@ def test_selected_root_hashes_and_paths_are_isolated(tmp_path: Path) -> None:
         destination = selected / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes((driver._DEFAULT_ROOT / relative).read_bytes())
-    source_fixtures = driver._DEFAULT_ROOT / "fixtures/core-generation"
+    source_fixtures = driver._DEFAULT_ROOT / "fixtures"
     for source in source_fixtures.rglob("*.json"):
-        destination = selected / "fixtures/core-generation" / source.relative_to(source_fixtures)
+        destination = selected / "fixtures" / source.relative_to(source_fixtures)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(source.read_bytes())
     report = asyncio.run(driver.observe_core(selected))
     assert report["selected_root"] == str(selected.resolve())
     assert all(
-        item["sha256"] is None for item in report["inputs"] if "fixtures/transport" in item["path"]
+        item["sha256"] is not None
+        for item in report["inputs"]
+        if "fixtures/transport" in item["path"]
     )
+
+
+def test_proof_import_failure_keeps_fixture_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_import = builtins.__import__
+
+    def fail_only_portable_proofs(
+        name: str,
+        globals: dict[str, Any] | None = None,
+        locals: dict[str, Any] | None = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> Any:
+        if name == "proofs" and level == 1 and globals and globals.get("__package__") == __package__:
+            raise ImportError("forced portable proof import failure")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fail_only_portable_proofs)
+    report = asyncio.run(driver.observe_core(driver._DEFAULT_ROOT))
+    inventory = driver._inventory(driver._DEFAULT_ROOT)
+    fixture_ids = {str(record["id"]) for record in inventory if record["kind"] == "fixture"}
+    driver_ids = {str(record["id"]) for record in inventory if record["kind"] == "driver_assertion"}
+
+    assert len(fixture_ids) == 96
+    assert {case["id"] for case in report["cases"] if case["id"] in fixture_ids} == fixture_ids
+    driver_rows = [case for case in report["cases"] if case["id"] in driver_ids]
+    assert len(driver_rows) == len(driver_ids) == 6
+    assert all(
+        row["verdict"] == "error"
+        and str(row["detail"]).startswith("core proof driver unavailable:")
+        and row["evidence"] is None
+        for row in driver_rows
+    )
+    assert len(report["cases"]) == len({case["id"] for case in report["cases"]}) == 102
+    assert report["unexecuted"] == [] and report["counts"]["unexecuted"] == 0
 
 
 def test_write_json_is_lf_and_preserves_member_order(tmp_path: Path) -> None:
@@ -246,27 +287,38 @@ def test_present_transport_uses_trusted_base64_validation(tmp_path: Path) -> Non
     )
     path = selected / str(record["path"]).removeprefix("specification/")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(
-            {
-                "fixture_version": "0",
-                "id": record["id"],
-                "family": record["family"],
-                "profile": "core-generation",
-                "description": "base64 validation",
-                "kind": "adapter",
-                "input": {"adapter_config": {}, "wire": {}},
-                "responses": [{"byte_chunks": [{"bytes": "!"}]}],
-                "expected": {
-                    "status": "observed",
-                    "http_requests": [],
-                    "wire_limits": [],
-                    "adapter_outcome": {},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
+    document = {
+        "fixture_version": "0",
+        "id": record["id"],
+        "family": record["family"],
+        "profile": "core-generation",
+        "description": "base64 validation",
+        "kind": "adapter",
+        "input": {
+            "adapter_config": {
+                "provider_id": "openai-compat",
+                "base_url": "https://fixture.invalid/v1",
+                "api_key": "fixture-token",
+                "headers": {},
+                "timeout_s": 120,
+            },
+            "wire": {
+                "model": "fixture-model",
+                "messages": [{"role": "user", "text": "hello"}],
+                "sampling": {},
+                "mechanism": None,
+                "stream": False,
+                "timeout_s": 120,
+                "max_response_bytes": 1048576,
+            },
+        },
+        "responses": [{"status": 200, "headers": {}, "byte_chunks": [{"bytes": ""}]}],
+        "expected": {"status": "to_be_observed"},
+    }
+    path.write_text(json.dumps(document), encoding="utf-8")
+    assert driver._asset_problems(selected) == []
+    document["responses"][0]["byte_chunks"][0]["bytes"] = "!"
+    path.write_text(json.dumps(document), encoding="utf-8")
     assert any("strict base64" in problem for problem in driver._asset_problems(selected))
 
 
@@ -473,53 +525,40 @@ def test_body_runs_after_startup():
     assert not marker.exists() and not refusal_report.exists()
 
 
-def test_absent_transport_entries_are_retained_as_honest_unexecuted_rows(tmp_path: Path) -> None:
+def test_missing_selected_transport_fixture_fails_closed(tmp_path: Path) -> None:
     selected = _copy_selected_core(tmp_path)
-    report = asyncio.run(driver.observe_core(selected))
-    transport = [row for row in report["unexecuted"] if row["path"] is not None]
-    assert transport and all(
-        row["status"] == "missing" and row["sha256"] is None for row in transport
-    )
+    transport = next(selected.joinpath("fixtures/transport").rglob("*.json"))
+    transport.unlink()
+    with pytest.raises(driver.DriverInputError, match="missing from selected root"):
+        asyncio.run(driver.observe_core(selected))
 
 
-def test_present_transport_hash_mutation_and_identity_are_bound(tmp_path: Path) -> None:
+def test_transport_hash_mutation_and_identity_are_bound(tmp_path: Path) -> None:
     selected = _copy_selected_core(tmp_path)
-    inventory = json.loads((selected / "inventories/core-generation-v0.json").read_text())
+    inventory = driver._load_json(selected / "inventories/core-generation-v0.json")
     record = next(
         case
         for case in inventory["cases"]
         if str(case.get("path")).startswith("specification/fixtures/transport/")
     )
     destination = selected / str(record["path"]).removeprefix("specification/")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(
-            {
-                "fixture_version": "0",
-                "id": record["id"],
-                "family": record["family"],
-                "profile": "core-generation",
-                "description": "synthetic selected-root transport identity test",
-                "kind": "adapter",
-                "input": {"adapter_config": {}, "wire": {}},
-                "responses": [],
-                "expected": {
-                    "status": "observed",
-                    "http_requests": [],
-                    "wire_limits": [],
-                    "adapter_outcome": {},
-                },
-            }
-        ),
-        encoding="utf-8",
+    before = next(
+        item["sha256"]
+        for item in driver._hashes(selected, driver._inventory(selected))
+        if item["path"] == str(record["path"]).removeprefix("specification/")
     )
-    report = asyncio.run(driver.observe_core(selected))
-    row = next(row for row in report["unexecuted"] if row["id"] == record["id"])
-    assert row["status"] == "present" and row["sha256"] == driver._sha256(destination)
-    document = json.loads(destination.read_text())
+    document = json.loads(destination.read_text(encoding="utf-8"))
+    document["description"] = "selected-root transport hash mutation"
+    destination.write_text(json.dumps(document), encoding="utf-8")
+    after = next(
+        item["sha256"]
+        for item in driver._hashes(selected, driver._inventory(selected))
+        if item["path"] == str(record["path"]).removeprefix("specification/")
+    )
+    assert after != before
     document["id"] = "transport/openai-chat/wrong"
     destination.write_text(json.dumps(document), encoding="utf-8")
-    with pytest.raises(driver.DriverInputError, match="fixture files lack inventory records"):
+    with pytest.raises(driver.DriverInputError, match="fixture ID is absent from fixture tree"):
         asyncio.run(driver.observe_core(selected))
 
 
@@ -547,15 +586,91 @@ def test_proof_dispatcher_accepts_agreed_envelope() -> None:
     assert record["evidence"]["recipe_ref"] == "driver/assessment-completeness"
 
 
+@pytest.mark.parametrize(
+    ("record", "error", "match"),
+    [
+        (None, driver.DriverInputError, "non-object"),
+        (
+            {
+                "id": "driver/wrong",
+                "verdict": "pass",
+                "detail": None,
+                "evidence": {"recipe_ref": "driver/assessment-completeness", "observations": {"native": True}},
+            },
+            driver.DriverInputError,
+            "wrong identity",
+        ),
+        (
+            {
+                "id": "driver/assessment-completeness",
+                "verdict": "pending",
+                "detail": None,
+                "evidence": None,
+            },
+            driver.DriverInputError,
+            "invalid verdict",
+        ),
+        (
+            {
+                "id": "driver/assessment-completeness",
+                "verdict": "pass",
+                "detail": None,
+                "evidence": None,
+            },
+            MissingEvidenceError,
+            "lacks observations",
+        ),
+        (
+            {
+                "id": "driver/assessment-completeness",
+                "verdict": "pass",
+                "detail": None,
+                "evidence": {"recipe_ref": "driver/wrong", "observations": {"native": True}},
+            },
+            MissingEvidenceError,
+            "lacks observations",
+        ),
+        (
+            {
+                "id": "driver/assessment-completeness",
+                "verdict": "pass",
+                "detail": None,
+                "evidence": {"recipe_ref": "driver/assessment-completeness", "observations": {}},
+            },
+            MissingEvidenceError,
+            "lacks observations",
+        ),
+        (
+            {
+                "id": "driver/assessment-completeness",
+                "verdict": "pass",
+                "detail": None,
+                "evidence": {
+                    "recipe_ref": "driver/assessment-completeness",
+                    "observations": {"native": float("nan")},
+                },
+            },
+            ValueDomainError,
+            "finite",
+        ),
+    ],
+)
+def test_proof_dispatcher_rejects_invalid_envelopes(
+    record: object, error: type[Exception], match: str
+) -> None:
+    with pytest.raises(error, match=match):
+        driver._check_recipe(record, "driver/assessment-completeness", "driver/assessment-completeness")
+
+
 def _copy_selected_core(tmp_path: Path) -> Path:
     selected = tmp_path / "specification"
     for relative in driver._NORMATIVE_INPUTS:
         destination = selected / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes((driver._DEFAULT_ROOT / relative).read_bytes())
-    source_fixtures = driver._DEFAULT_ROOT / "fixtures/core-generation"
+    source_fixtures = driver._DEFAULT_ROOT / "fixtures"
     for source in source_fixtures.rglob("*.json"):
-        destination = selected / "fixtures/core-generation" / source.relative_to(source_fixtures)
+        destination = selected / "fixtures" / source.relative_to(source_fixtures)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(source.read_bytes())
     return selected
