@@ -1,0 +1,1717 @@
+{
+  "report_version": "0",
+  "release": "core-generation-v0",
+  "release_sha256": "16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391",
+  "implementation": {
+    "name": "anyinfer-python",
+    "version": "0.1.3",
+    "source_revision": "a186458c750a50847c1785dd356ca9479f2dd53e",
+    "driver_revision": "a186458c750a50847c1785dd356ca9479f2dd53e",
+    "runtime": "cpython 3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+    "os": "Windows-11-10.0.26200-SP0",
+    "dependencies": {
+      "annotated-types": "0.8.0",
+      "anyinfer": "0.1.3",
+      "anyinfer-confidential": "0.1.0",
+      "anyinfer-shared": "0.1.0",
+      "anyinfer-store": "0.1.0",
+      "anyio": "4.15.1",
+      "ast-serialize": "0.11.2",
+      "attrs": "26.1.0",
+      "azure-core": "1.41.0",
+      "azure-identity": "1.25.3",
+      "babel": "2.18.0",
+      "backrefs": "8.0",
+      "certifi": "2026.7.22",
+      "cffi": "2.1.1",
+      "charset-normalizer": "3.5.1",
+      "click": "8.5.0",
+      "colorama": "0.4.6",
+      "cryptography": "50.0.1",
+      "execnet": "2.1.2",
+      "ghp-import": "2.1.0",
+      "github-copilot-sdk": "1.0.14",
+      "griffelib": "2.3.0",
+      "grimp": "3.17",
+      "h11": "0.16.0",
+      "httpcore": "1.0.9",
+      "httpcore2": "2.13.0",
+      "httpx": "0.28.1",
+      "httpx2": "2.13.0",
+      "idna": "3.20",
+      "import-linter": "2.15",
+      "iniconfig": "2.3.0",
+      "jaraco-classes": "3.4.0",
+      "jaraco-context": "6.1.2",
+      "jaraco-functools": "4.6.0",
+      "jinja2": "3.1.6",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "keyring": "25.7.0",
+      "librt": "0.15.0",
+      "markdown": "3.10.3",
+      "markdown-it-py": "4.2.0",
+      "markupsafe": "3.0.3",
+      "mdurl": "0.1.2",
+      "mergedeep": "1.3.4",
+      "mkdocs": "1.6.1",
+      "mkdocs-autorefs": "1.4.4",
+      "mkdocs-get-deps": "0.2.2",
+      "mkdocs-material": "9.7.7",
+      "mkdocs-material-extensions": "1.3.1",
+      "mkdocstrings": "1.0.6",
+      "mkdocstrings-python": "2.0.9",
+      "more-itertools": "11.1.0",
+      "msal": "1.39.0",
+      "msal-extensions": "1.3.1",
+      "mypy": "2.3.1",
+      "mypy-extensions": "1.1.0",
+      "opentelemetry-api": "1.44.0",
+      "opentelemetry-sdk": "1.44.0",
+      "opentelemetry-semantic-conventions": "0.65b0",
+      "packaging": "26.3",
+      "paginate": "0.5.7",
+      "pathspec": "1.1.1",
+      "pip": "26.2.1",
+      "platformdirs": "4.11.12",
+      "pluggy": "1.6.0",
+      "pycparser": "3.0",
+      "pydantic": "2.13.5",
+      "pydantic-core": "2.46.5",
+      "pygments": "2.21.0",
+      "pyjwt": "2.14.0",
+      "pymdown-extensions": "12.0.1",
+      "pyside6": "6.11.2",
+      "pyside6-addons": "6.11.2",
+      "pyside6-essentials": "6.11.2",
+      "pytest": "9.1.1",
+      "pytest-asyncio": "1.4.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pywin32-ctypes": "0.2.3",
+      "pyyaml": "6.0.3",
+      "pyyaml-env-tag": "1.1",
+      "referencing": "0.37.0",
+      "regex": "2026.9.10",
+      "requests": "2.34.2",
+      "rich": "15.0.0",
+      "rpds-py": "2026.6.3",
+      "ruff": "0.16.8",
+      "shiboken6": "6.11.2",
+      "six": "1.17.0",
+      "starlette": "1.6.0",
+      "tiktoken": "0.14.0",
+      "truststore": "0.10.4",
+      "typing-extensions": "4.16.0",
+      "typing-inspection": "0.4.4",
+      "urllib3": "2.8.0",
+      "uvicorn": "0.53.0",
+      "watchdog": "6.0.0"
+    },
+    "extensions": [
+      "schema.ref",
+      "schema.combinators",
+      "schema.other_dialects",
+      "schema.boolean_subschema",
+      "schema.unknown_keywords_ignored",
+      "messages.tool_role",
+      "targets.alias",
+      "messages.non_text_parts"
+    ]
+  },
+  "cases": [
+    {
+      "id": "driver/assessment-completeness",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": {
+        "recipe_ref": "driver/assessment-completeness",
+        "observations": {
+          "captures": [
+            {
+              "operations": 1,
+              "entries": 1,
+              "assessments": 1,
+              "evidence_available": true
+            },
+            {
+              "operations": 1,
+              "entries": 1,
+              "assessments": 1,
+              "evidence_available": true
+            },
+            {
+              "operations": 1,
+              "entries": 2,
+              "assessments": 2,
+              "evidence_available": true
+            },
+            {
+              "operations": 1,
+              "entries": 1,
+              "assessments": 1,
+              "evidence_available": true
+            },
+            {
+              "operations": 1,
+              "entries": 2,
+              "assessments": 2,
+              "evidence_available": true
+            }
+          ],
+          "extraction": {
+            "assessment_id": "aaa6047dd8c74b7fb12c014248e5b9ae",
+            "source_entry_ordinal": 0,
+            "rule": "no_json_candidate",
+            "instance_path": null,
+            "schema_path": null,
+            "selected_occurrences": [
+              {
+                "rule": "no_json_candidate",
+                "message": "response was not JSON and contained no JSON object or array"
+              }
+            ]
+          },
+          "invalid_schema": {
+            "assessment_id": "2f49dbc5625147ce8909a192c57a3e78",
+            "source_entry_ordinal": 0,
+            "rule": "invalid_schema",
+            "schema_error_input_path": [
+              "required"
+            ],
+            "selected_occurrences": [
+              {
+                "input_path": [
+                  "required"
+                ],
+                "message": "17 is not of type 'array'"
+              }
+            ]
+          },
+          "terminal_outcome": {
+            "error": {
+              "category": "schema_violation",
+              "retryable": false,
+              "retry_after_s": null,
+              "http_status": null,
+              "phase": "validate",
+              "issues": [
+                {
+                  "rule": "type",
+                  "instance_path": [
+                    "age"
+                  ],
+                  "schema_path": [
+                    "properties",
+                    "age",
+                    "type"
+                  ],
+                  "params": {
+                    "expected": "integer",
+                    "actual": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "correction": {
+            "assessment_ref": "85baa2fc915645eda27add03dc84d6f1",
+            "native_feedback": [
+              "age: 'not-an-integer' is not of type 'integer'"
+            ],
+            "entry_ordinal": 1
+          },
+          "typed_paths": [
+            [
+              "a",
+              "b"
+            ],
+            [
+              "a.b"
+            ]
+          ],
+          "unavailable_controls": {
+            "native_result_preserved": true,
+            "unavailable": {
+              "fault": "operation capture reports unavailable evidence",
+              "cap": "operation capture reports unavailable evidence"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "driver/concurrent-operations-independent",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": {
+        "recipe_ref": "driver/concurrent-operations-independent",
+        "observations": {
+          "left": {
+            "operation_id": "9a3bfcddf9fe4eaf94541be3d4714372",
+            "capture": {
+              "operations": 1,
+              "entries": 1,
+              "assessments": 1,
+              "evidence_available": true
+            },
+            "outcome": {
+              "error": {
+                "category": "schema_violation",
+                "retryable": false,
+                "retry_after_s": null,
+                "http_status": null,
+                "phase": "validate",
+                "issues": [
+                  {
+                    "rule": "type",
+                    "instance_path": [
+                      "a",
+                      "b"
+                    ],
+                    "schema_path": [
+                      "properties",
+                      "a",
+                      "properties",
+                      "b",
+                      "type"
+                    ],
+                    "params": {
+                      "expected": "integer",
+                      "actual": "string"
+                    }
+                  },
+                  {
+                    "rule": "type",
+                    "instance_path": [
+                      "a.b"
+                    ],
+                    "schema_path": [
+                      "properties",
+                      "a.b",
+                      "type"
+                    ],
+                    "params": {
+                      "expected": "integer",
+                      "actual": "string"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "right": {
+            "operation_id": "14bc5367e62c423482989dbbdcfa970f",
+            "capture": {
+              "operations": 1,
+              "entries": 2,
+              "assessments": 2,
+              "evidence_available": true
+            },
+            "outcome": {
+              "result": {
+                "text": "{\"age\":7}",
+                "structured": {
+                  "age": 7
+                },
+                "target": {
+                  "provider_id": "fixture",
+                  "model": "alpha"
+                },
+                "finish_reason": "stop",
+                "usage": {
+                  "input_tokens": null,
+                  "output_tokens": null,
+                  "total_tokens": null,
+                  "cache_read_tokens": null,
+                  "cache_write_tokens": null,
+                  "reasoning_tokens": null
+                },
+                "timing": {
+                  "first_token_ms": "non_null",
+                  "total_ms": "present"
+                },
+                "structured_mechanism": "prompt",
+                "repair_attempts": 1,
+                "attempts": [
+                  {
+                    "target": "fixture:alpha",
+                    "outcome": "ok"
+                  }
+                ],
+                "warnings": []
+              }
+            }
+          },
+          "active_capture_after_gather": false
+        }
+      }
+    },
+    {
+      "id": "driver/http-correction-byte-budget-reset",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": {
+        "recipe_ref": "driver/http-correction-byte-budget-reset",
+        "observations": {
+          "recipe_ref": "driver/http-correction-byte-budget-reset",
+          "correction": {
+            "request_count": 2,
+            "http_requests": [
+              {
+                "method": "POST",
+                "path": "/v1/chat/completions",
+                "headers": {
+                  "content-type": "application/json",
+                  "authorization": "Bearer fixture-token",
+                  "x-fixture": "transport"
+                },
+                "body": {
+                  "model": "fixture-model",
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Respond with ONLY a JSON value matching this JSON Schema. No prose. Schema:\n{\n  \"properties\": {\n    \"age\": {\n      \"type\": \"integer\"\n    }\n  },\n  \"required\": [\n    \"age\"\n  ],\n  \"type\": \"object\"\n}"
+                    },
+                    {
+                      "role": "user",
+                      "content": "Return a person age."
+                    }
+                  ]
+                },
+                "stream": false
+              },
+              {
+                "method": "POST",
+                "path": "/v1/chat/completions",
+                "headers": {
+                  "content-type": "application/json",
+                  "authorization": "Bearer fixture-token",
+                  "x-fixture": "transport"
+                },
+                "body": {
+                  "model": "fixture-model",
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Respond with ONLY a JSON value matching this JSON Schema. No prose. Schema:\n{\n  \"properties\": {\n    \"age\": {\n      \"type\": \"integer\"\n    }\n  },\n  \"required\": [\n    \"age\"\n  ],\n  \"type\": \"object\"\n}"
+                    },
+                    {
+                      "role": "user",
+                      "content": "Return a person age."
+                    },
+                    {
+                      "role": "assistant",
+                      "content": "{\"age\":\"x\"}"
+                    },
+                    {
+                      "role": "user",
+                      "content": "Your previous response did not match the required JSON schema. Errors:\n- age: 'x' is not of type 'integer'\nRespond again with ONLY a corrected JSON value that satisfies the schema. No prose, no code fences."
+                    }
+                  ]
+                },
+                "stream": false
+              }
+            ],
+            "wire_limits": [
+              {
+                "timeout_s": 120,
+                "max_response_bytes": 100
+              },
+              {
+                "timeout_s": 120,
+                "max_response_bytes": 100
+              }
+            ],
+            "wire_stream": [
+              false,
+              false
+            ],
+            "http_stream": [
+              false,
+              false
+            ],
+            "responses": [
+              {
+                "chunk_bytes": [
+                  78
+                ],
+                "total_bytes": 78,
+                "chunks_base64": [
+                  "eyJjaG9pY2VzIjpbeyJtZXNzYWdlIjp7ImNvbnRlbnQiOiJ7XCJhZ2VcIjpcInhcIn0ifSwiZmluaXNoX3JlYXNvbiI6InN0b3AifV19"
+                ]
+              },
+              {
+                "chunk_bytes": [
+                  74
+                ],
+                "total_bytes": 74,
+                "chunks_base64": [
+                  "eyJjaG9pY2VzIjpbeyJtZXNzYWdlIjp7ImNvbnRlbnQiOiJ7XCJhZ2VcIjo3fSJ9LCJmaW5pc2hfcmVhc29uIjoic3RvcCJ9XX0="
+                ]
+              }
+            ],
+            "cumulative_bytes": 152,
+            "mode": "buffered",
+            "capture": {
+              "operations": 1,
+              "entries": 2,
+              "assessments": 2,
+              "evidence_available": true
+            },
+            "outcome": {
+              "result": {
+                "text": "{\"age\":7}",
+                "structured": {
+                  "age": 7
+                },
+                "target": {
+                  "provider_id": "openai-compat",
+                  "model": "fixture-model"
+                },
+                "finish_reason": "stop",
+                "usage": {
+                  "input_tokens": null,
+                  "output_tokens": null,
+                  "total_tokens": null,
+                  "cache_read_tokens": null,
+                  "cache_write_tokens": null,
+                  "reasoning_tokens": null
+                },
+                "timing": {
+                  "first_token_ms": "non_null",
+                  "total_ms": "present"
+                },
+                "structured_mechanism": "prompt",
+                "repair_attempts": 1,
+                "attempts": [
+                  {
+                    "target": "openai-compat:fixture-model",
+                    "outcome": "ok"
+                  }
+                ],
+                "warnings": []
+              }
+            },
+            "entries": [
+              {
+                "entry_ordinal": 0,
+                "role": "original",
+                "repair_assessment_ref": null
+              },
+              {
+                "entry_ordinal": 1,
+                "role": "correction",
+                "repair_assessment_ref": "9afb6a1d2d9940e8a5d9456f668c09f9"
+              }
+            ],
+            "wire_http": [
+              {
+                "entry_ordinal": 0,
+                "method": "POST",
+                "path": "/v1/chat/completions",
+                "model": "fixture-model",
+                "stream": false,
+                "message_count": 2
+              },
+              {
+                "entry_ordinal": 1,
+                "method": "POST",
+                "path": "/v1/chat/completions",
+                "model": "fixture-model",
+                "stream": false,
+                "message_count": 4
+              }
+            ],
+            "selected_assessment": {
+              "assessment_id": "9afb6a1d2d9940e8a5d9456f668c09f9",
+              "source_entry_ordinal": 0,
+              "kind": "validation",
+              "native_feedback": [
+                "age: 'x' is not of type 'integer'"
+              ]
+            },
+            "terminal_assessment": {
+              "assessment_id": "78a94a8ce4244bc2b6e86995766941d3",
+              "source_entry_ordinal": 1,
+              "kind": "validation",
+              "issues": [],
+              "native_messages": [],
+              "selected_native": []
+            }
+          },
+          "buffered_overflow": {
+            "request_count": 1,
+            "http_requests": [
+              {
+                "method": "POST",
+                "path": "/v1/chat/completions",
+                "headers": {
+                  "content-type": "application/json",
+                  "authorization": "Bearer fixture-token",
+                  "x-fixture": "transport-proof"
+                },
+                "body": {
+                  "model": "fixture-model",
+                  "messages": [
+                    {
+                      "role": "user",
+                      "content": "prove UTF-8 cap"
+                    }
+                  ]
+                },
+                "stream": false
+              }
+            ],
+            "wire_limits": [
+              {
+                "timeout_s": 120,
+                "max_response_bytes": 80
+              }
+            ],
+            "wire_stream": [
+              false
+            ],
+            "http_stream": [
+              false
+            ],
+            "responses": [
+              {
+                "chunk_bytes": [
+                  47,
+                  48
+                ],
+                "total_bytes": 95,
+                "chunks_base64": [
+                  "eyJjaG9pY2VzIjpbeyJtZXNzYWdlIjp7ImNvbnRlbnQiOiLDqcOpw6nDqcOpw6k=",
+                  "w6nDqcOpw6nDqcOpw6nDqcOpw6kifSwiZmluaXNoX3JlYXNvbiI6InN0b3AifV19"
+                ]
+              }
+            ],
+            "cumulative_bytes": 95,
+            "mode": "buffered",
+            "error": {
+              "category": "stream_protocol",
+              "retryable": false,
+              "retry_after_s": null,
+              "http_status": null,
+              "phase": "stream"
+            }
+          },
+          "streamed_overflow": {
+            "request_count": 1,
+            "http_requests": [
+              {
+                "method": "POST",
+                "path": "/v1/chat/completions",
+                "headers": {
+                  "content-type": "application/json",
+                  "authorization": "Bearer fixture-token",
+                  "x-fixture": "transport-proof"
+                },
+                "body": {
+                  "model": "fixture-model",
+                  "messages": [
+                    {
+                      "role": "user",
+                      "content": "prove UTF-8 cap"
+                    }
+                  ],
+                  "stream": true,
+                  "stream_options": {
+                    "include_usage": true
+                  }
+                },
+                "stream": true
+              }
+            ],
+            "wire_limits": [
+              {
+                "timeout_s": 120,
+                "max_response_bytes": 80
+              }
+            ],
+            "wire_stream": [
+              true
+            ],
+            "http_stream": [
+              true
+            ],
+            "responses": [
+              {
+                "chunk_bytes": [
+                  46,
+                  46
+                ],
+                "total_bytes": 92,
+                "chunks_base64": [
+                  "ZGF0YTogeyJjaG9pY2VzIjpbeyJkZWx0YSI6eyJjb250ZW50Ijoiw6nDqcOpww==",
+                  "qcOpw6nDqcOpw6nDqcOpw6nDqcOpw6nDqSJ9fV19CgpkYXRhOiBbRE9ORV0KCg=="
+                ]
+              }
+            ],
+            "cumulative_bytes": 92,
+            "mode": "stream",
+            "error": {
+              "category": "stream_protocol",
+              "retryable": false,
+              "retry_after_s": null,
+              "http_status": null,
+              "phase": "stream"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "driver/timeout-cleanup-disposal",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": {
+        "recipe_ref": "driver/timeout-cleanup-disposal",
+        "observations": {
+          "contexts": [
+            {
+              "ordinal": 0,
+              "configured_timeout_s": 0.05,
+              "entered": true,
+              "exited": true,
+              "expired": true
+            }
+          ],
+          "context_events": [
+            {
+              "event_ordinal": 0,
+              "context_ordinal": 0,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 1,
+              "context_ordinal": 0,
+              "kind": "exit"
+            }
+          ],
+          "cleanup_ready": true,
+          "adapter_closed": true,
+          "terminal": {
+            "terminal_type": "AllTargetsFailedError",
+            "attempt_category": "transport",
+            "attempt_error_type": "TransportError",
+            "attempt_count": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "driver/timeout-effective-default-explicit",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": {
+        "recipe_ref": "driver/timeout-effective-default-explicit",
+        "observations": {
+          "contexts": [
+            {
+              "ordinal": 0,
+              "configured_timeout_s": 120.0,
+              "entered": true,
+              "exited": true,
+              "expired": false
+            },
+            {
+              "ordinal": 1,
+              "configured_timeout_s": 0.05,
+              "entered": true,
+              "exited": true,
+              "expired": false
+            },
+            {
+              "ordinal": 2,
+              "configured_timeout_s": 0.05,
+              "entered": true,
+              "exited": true,
+              "expired": true
+            }
+          ],
+          "context_events": [
+            {
+              "event_ordinal": 0,
+              "context_ordinal": 0,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 1,
+              "context_ordinal": 0,
+              "kind": "exit"
+            },
+            {
+              "event_ordinal": 2,
+              "context_ordinal": 1,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 3,
+              "context_ordinal": 1,
+              "kind": "exit"
+            },
+            {
+              "event_ordinal": 4,
+              "context_ordinal": 2,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 5,
+              "context_ordinal": 2,
+              "kind": "exit"
+            }
+          ],
+          "wire_timeout_and_bytes": [
+            [
+              120.0,
+              777
+            ],
+            [
+              0.05,
+              333
+            ],
+            [
+              0.05,
+              1048576
+            ]
+          ],
+          "terminal": {
+            "terminal_type": "AllTargetsFailedError",
+            "attempt_category": "transport",
+            "attempt_error_type": "TransportError",
+            "attempt_count": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "driver/timeout-reset-per-entry",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": {
+        "recipe_ref": "driver/timeout-reset-per-entry",
+        "observations": {
+          "contexts": [
+            {
+              "ordinal": 0,
+              "configured_timeout_s": 7.25,
+              "entered": true,
+              "exited": true,
+              "expired": false
+            },
+            {
+              "ordinal": 1,
+              "configured_timeout_s": 7.25,
+              "entered": true,
+              "exited": true,
+              "expired": false
+            },
+            {
+              "ordinal": 2,
+              "configured_timeout_s": 7.25,
+              "entered": true,
+              "exited": true,
+              "expired": false
+            },
+            {
+              "ordinal": 3,
+              "configured_timeout_s": 7.25,
+              "entered": true,
+              "exited": true,
+              "expired": false
+            }
+          ],
+          "context_events": [
+            {
+              "event_ordinal": 0,
+              "context_ordinal": 0,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 1,
+              "context_ordinal": 0,
+              "kind": "exit"
+            },
+            {
+              "event_ordinal": 2,
+              "context_ordinal": 1,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 3,
+              "context_ordinal": 1,
+              "kind": "exit"
+            },
+            {
+              "event_ordinal": 4,
+              "context_ordinal": 2,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 5,
+              "context_ordinal": 2,
+              "kind": "exit"
+            },
+            {
+              "event_ordinal": 6,
+              "context_ordinal": 3,
+              "kind": "enter"
+            },
+            {
+              "event_ordinal": 7,
+              "context_ordinal": 3,
+              "kind": "exit"
+            }
+          ],
+          "entry_count": 4,
+          "wire_timeouts": [
+            7.25,
+            7.25,
+            7.25,
+            7.25
+          ],
+          "winning_repair_attempts": 1
+        }
+      }
+    },
+    {
+      "id": "extraction/braces-inside-string",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/duplicate-key-last-value-first-position",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/empty-response",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/fenced-object-in-prose",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/integer-above-2pow53-preserved",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/malformed-first-candidate-no-rescue",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/prose-then-array",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/scalar-root-42",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "extraction/whole-json-object",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "lifecycle/repeated-close-idempotent",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/empty-messages",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/invalid-sampling-negative-seed",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/multi-part-text-concatenated",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/roles-ordered-text",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/sampling-omitted-when-unset",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/sampling-supplied-fields",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/target-empty-model-invalid",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/target-first-colon-model-with-colon",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/target-model-whitespace-stripped",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "normalization/unsupported-alias-target",
+      "verdict": "extension",
+      "detail": "eligible extension: targets.alias",
+      "evidence": {
+        "native_outcome": {
+          "error": {
+            "native_type": "ConfigError",
+            "message": "unknown target 'alpha' (hint: use 'provider:model' (e.g. 'anthropic:claude-sonnet-5'))",
+            "category": "invalid_request"
+          }
+        },
+        "adapter_entries": []
+      }
+    },
+    {
+      "id": "normalization/unsupported-image-part",
+      "verdict": "extension",
+      "detail": "eligible extension: messages.non_text_parts",
+      "evidence": {
+        "native_outcome": {
+          "error": {
+            "native_type": "AllTargetsFailedError",
+            "message": "all routing targets failed after 1 attempt(s); last error: fixture:alpha does not support attached vision input (hint: inspect error.attempts for the per-target trail)",
+            "category": "all_targets_failed"
+          }
+        },
+        "adapter_entries": []
+      }
+    },
+    {
+      "id": "normalization/unsupported-tool-role",
+      "verdict": "extension",
+      "detail": "eligible extension: messages.tool_role",
+      "evidence": {
+        "native_outcome": {
+          "result": {
+            "text": "{\"case\":\"tool-role\"}",
+            "structured": null,
+            "target": {
+              "provider_id": "fixture",
+              "model": "alpha"
+            },
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": null,
+              "output_tokens": null,
+              "total_tokens": null,
+              "cache_read_tokens": null,
+              "cache_write_tokens": null,
+              "reasoning_tokens": null
+            },
+            "timing": {
+              "first_token_ms": "non_null",
+              "total_ms": "present"
+            },
+            "structured_mechanism": null,
+            "repair_attempts": 0,
+            "attempts": [
+              {
+                "target": "fixture:alpha",
+                "outcome": "ok"
+              }
+            ],
+            "warnings": []
+          }
+        },
+        "adapter_entries": [
+          {
+            "entry_ordinal": 0,
+            "model": "alpha",
+            "role": "original",
+            "timeout_s": 120.0,
+            "max_response_bytes": 1048576
+          }
+        ]
+      }
+    },
+    {
+      "id": "repair/correction-prompt-exact-template",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "repair/exhaustion-two-invalid",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "repair/invalid-then-valid",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "repair/invalid-without-repair-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "repair/negative-budget-behaves-as-zero",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "repair/provider-ceiling-clamp-parameter-dropped",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "repair/valid-no-correction",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "repair/zero-budget",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/all-targets-failed-trail",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/auth-never-retried",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/backoff-cap",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/backoff-retry-after-floor",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/cleanup-failure-after-final-restarts",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/duplicate-target-skipped",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/health-recovery-after-ttl",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/health-skip-in-trail",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/lazy-invalid-second-target",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/nonretryable-falls-over",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/post-content-stream-protocol-in-correction-fatal",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/post-content-stream-protocol-no-retry",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/post-content-transport-error-retries",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/restart-after-correction-transport-failure",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "routing/retryable-then-ok-same-target",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "schema-admission/admitted-full-subset-valid-response",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "schema-admission/unknown-keyword-ignored",
+      "verdict": "extension",
+      "detail": "eligible extension: schema.unknown_keywords_ignored",
+      "evidence": {
+        "native_outcome": {
+          "result": {
+            "text": "{}",
+            "structured": {},
+            "target": {
+              "provider_id": "fixture",
+              "model": "alpha"
+            },
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": null,
+              "output_tokens": null,
+              "total_tokens": null,
+              "cache_read_tokens": null,
+              "cache_write_tokens": null,
+              "reasoning_tokens": null
+            },
+            "timing": {
+              "first_token_ms": "non_null",
+              "total_ms": "present"
+            },
+            "structured_mechanism": "prompt",
+            "repair_attempts": 0,
+            "attempts": [
+              {
+                "target": "fixture:alpha",
+                "outcome": "ok"
+              }
+            ],
+            "warnings": []
+          }
+        },
+        "adapter_entries": [
+          {
+            "entry_ordinal": 0,
+            "model": "alpha",
+            "role": "original",
+            "timeout_s": 120.0,
+            "max_response_bytes": 1048576
+          }
+        ]
+      }
+    },
+    {
+      "id": "schema-admission/unsupported-anyof",
+      "verdict": "extension",
+      "detail": "eligible extension: schema.combinators",
+      "evidence": {
+        "native_outcome": {
+          "result": {
+            "text": "{}",
+            "structured": {},
+            "target": {
+              "provider_id": "fixture",
+              "model": "alpha"
+            },
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": null,
+              "output_tokens": null,
+              "total_tokens": null,
+              "cache_read_tokens": null,
+              "cache_write_tokens": null,
+              "reasoning_tokens": null
+            },
+            "timing": {
+              "first_token_ms": "non_null",
+              "total_ms": "present"
+            },
+            "structured_mechanism": "prompt",
+            "repair_attempts": 0,
+            "attempts": [
+              {
+                "target": "fixture:alpha",
+                "outcome": "ok"
+              }
+            ],
+            "warnings": []
+          }
+        },
+        "adapter_entries": [
+          {
+            "entry_ordinal": 0,
+            "model": "alpha",
+            "role": "original",
+            "timeout_s": 120.0,
+            "max_response_bytes": 1048576
+          }
+        ]
+      }
+    },
+    {
+      "id": "schema-admission/unsupported-boolean-subschema",
+      "verdict": "extension",
+      "detail": "eligible extension: schema.boolean_subschema",
+      "evidence": {
+        "native_outcome": {
+          "error": {
+            "native_type": "TypeError",
+            "message": "schema must be a SchemaSpec, a JSON-schema mapping, or an object exposing model_json_schema(); got bool",
+            "category": null
+          }
+        },
+        "adapter_entries": []
+      }
+    },
+    {
+      "id": "schema-admission/unsupported-dialect-draft7",
+      "verdict": "extension",
+      "detail": "eligible extension: schema.other_dialects",
+      "evidence": {
+        "native_outcome": {
+          "result": {
+            "text": "{}",
+            "structured": {},
+            "target": {
+              "provider_id": "fixture",
+              "model": "alpha"
+            },
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": null,
+              "output_tokens": null,
+              "total_tokens": null,
+              "cache_read_tokens": null,
+              "cache_write_tokens": null,
+              "reasoning_tokens": null
+            },
+            "timing": {
+              "first_token_ms": "non_null",
+              "total_ms": "present"
+            },
+            "structured_mechanism": "prompt",
+            "repair_attempts": 0,
+            "attempts": [
+              {
+                "target": "fixture:alpha",
+                "outcome": "ok"
+              }
+            ],
+            "warnings": []
+          }
+        },
+        "adapter_entries": [
+          {
+            "entry_ordinal": 0,
+            "model": "alpha",
+            "role": "original",
+            "timeout_s": 120.0,
+            "max_response_bytes": 1048576
+          }
+        ]
+      }
+    },
+    {
+      "id": "schema-admission/unsupported-dialect-null",
+      "verdict": "extension",
+      "detail": "eligible extension: schema.other_dialects",
+      "evidence": {
+        "native_outcome": {
+          "error": {
+            "native_type": "DeprecationWarning",
+            "message": "The metaschema specified by $schema was not found. Using the latest draft to validate, but this will raise an error in the future.",
+            "category": null
+          }
+        },
+        "adapter_entries": [
+          {
+            "entry_ordinal": 0,
+            "model": "alpha",
+            "role": "original",
+            "timeout_s": 120.0,
+            "max_response_bytes": 1048576
+          }
+        ]
+      }
+    },
+    {
+      "id": "schema-admission/unsupported-ref",
+      "verdict": "extension",
+      "detail": "eligible extension: schema.ref",
+      "evidence": {
+        "native_outcome": {
+          "result": {
+            "text": "{}",
+            "structured": {},
+            "target": {
+              "provider_id": "fixture",
+              "model": "alpha"
+            },
+            "finish_reason": "stop",
+            "usage": {
+              "input_tokens": null,
+              "output_tokens": null,
+              "total_tokens": null,
+              "cache_read_tokens": null,
+              "cache_write_tokens": null,
+              "reasoning_tokens": null
+            },
+            "timing": {
+              "first_token_ms": "non_null",
+              "total_ms": "present"
+            },
+            "structured_mechanism": "prompt",
+            "repair_attempts": 0,
+            "attempts": [
+              {
+                "target": "fixture:alpha",
+                "outcome": "ok"
+              }
+            ],
+            "warnings": []
+          }
+        },
+        "adapter_entries": [
+          {
+            "entry_ordinal": 0,
+            "model": "alpha",
+            "role": "original",
+            "timeout_s": 120.0,
+            "max_response_bytes": 1048576
+          }
+        ]
+      }
+    },
+    {
+      "id": "streaming/buffered-equals-streamed",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/cancel-mid-stream",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/failed-attempt-deltas-visible",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/finish-reason-other",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/first-token-mark-once-per-attempt",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/reported-total-not-recomputed",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/synthesized-usage-update-from-final",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/usage-overlay-and-null-preservation",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "streaming/zero-advance-close",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/correction-byte-budget-reset",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/done-sentinel",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/frame-split-mid-json",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/non-sse-error-body-status-503",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/outbound-buffered-message-projection",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/outbound-sampling-omitted",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/outbound-streamed-sampling-supplied",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/protocol-error-after-content",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/raw-byte-cap-multibyte-utf8",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/single-frame",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "transport/openai-chat/trailing-usage-chunk",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/additional-properties-aggregate",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/boolean-not-number-or-integer",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/const-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/dotted-key-nested-path-collision",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/enum-empty-always-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/enum-numeric-equality",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/integral-float-is-integer",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/literal-reserved-key-objects",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/malformed-examples-17-invalid-schema",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/malformed-required-17-invalid-schema",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/malformed-schema-extraction-precedes-assessment",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/malformed-title-17-invalid-schema",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/malformed-type-17-invalid-schema",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/maximum-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/maxitems-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/maxlength-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/minimum-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/minitems-fails",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/minlength-counts-code-points",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/missing-required-one",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/nested-deeper-issue-first",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/ordering-tied-rules",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/six-missing-required-first-five-in-order",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    },
+    {
+      "id": "validation/type-mismatch-string-for-integer",
+      "verdict": "pass",
+      "detail": null,
+      "evidence": null
+    }
+  ],
+  "counts": {
+    "pass": 93,
+    "fail": 0,
+    "error": 0,
+    "extension": 9
+  }
+}

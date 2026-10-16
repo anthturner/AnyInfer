@@ -842,7 +842,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   only permitted explicitly marked extension cases; the manifest records A13's complete
   environment binding; `.\workspace.cmd check` passes. This is not yet a `report-v0` or a
   conformance claim.
-- [ ] M1.G **Corpus freeze.** Write `scripts/freeze_release.py` and freeze
+- [x] M1.G **Corpus freeze.** Write `scripts/freeze_release.py` and freeze
   `specification/releases/core-generation-v0.json` as a candidate. The candidate hashes
   `specification/README.md`, `core-generation.md`, `MAINTENANCE.md`, schemas, inventory, every
   listed fixture, reference manifest, and environment artifact. It embeds or derives the exact
@@ -902,7 +902,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
     > NOTE: Candidate creation/verification and the independent 106-file/102-case raw audit
     > passed. The final repository gate passed all 13 steps in 205.5 seconds. The clean
     > intermediate commit's full revision is recorded outside the release before M1.Gd.
-  - [ ] M1.Gd Run the final producer from clean C against the committed candidate, validate
+  - [x] M1.Gd Run the final producer from clean C against the committed candidate, validate
     the emitted report with `validate_qualified_report`, and independently review its actual
     source/runtime binding, raw release hash, exact 102-case evidence and 93/0/0/9 counts.
     Commit the report and accepted checklist/log; create only a local annotated retrieval
@@ -910,6 +910,12 @@ M1 and later use `src/python/` paths and therefore depend on it.
     commit outside the release file. **Gate:** immutable release verification and full
     report qualification remain successful; cold review has no open finding, all negative
     report gates remain passing, and no tag or package is published. Resume M2.1 only then.
+    > NOTE: Clean C is `a186458c750a50847c1785dd356ca9479f2dd53e`. Its actual
+    > `python-a186458.json` qualifies with 102 exact cases, 93/0/0/9 counts, eight
+    > declarations and 97 current dependency versions; independent evidence/environment
+    > reviews are clean. The final 13-step gate passed in 251.5 seconds. The complete
+    > record receives the local-only annotated `corpus/core-generation-v0` tag; its
+    > resolved commit is recorded outside the release. Resume at M2.1.
   > NOTE: Read-only M1.G preparation confirmed the existing shared release/report verifier
   > was complete while the freeze writer and final report producer were absent. M1.Ga/b
   > add those producers within the settled profile. Ordinary reports already

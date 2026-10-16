@@ -1477,3 +1477,34 @@ review, and the independent candidate audit confirms all 106 exact raw input has
 was repeated successfully with the same raw SHA. Root now commits only the eight
 reviewed tooling/test/plan/log/candidate paths as intermediate C, then verifies its clean
 full revision before executing M1.Gd. Resume at M1.Gd; no final report exists yet.
+
+Intermediate C is `a186458c750a50847c1785dd356ca9479f2dd53e` (`Freeze the corpus
+candidate and add qualified report production`). Root verified no tracked or untracked
+changes and recorded C outside the repository before execution. The actual private final
+producer ran in shell `69145b96-d010-4daa-b9a5-39bcd89b6189`, exited 0 and created only
+`specification/reports/python-a186458.json`. Its raw SHA-256 is
+`40c2fd77818e2a78a2fc92cd65dbeee67343a68bd8fb5276d8cee787f43dfd4a`.
+
+Root's separate `load_release_assets` plus `validate_qualified_report` call accepted the
+actual report: 102 unique cases, 93 pass / zero fail / zero error / nine extensions,
+eight declarations and 97 actual dependency versions. Source and driver both identify C;
+the release hash remains `16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391`,
+and historical reference A remains `fc537872b4e419fa0a01c60e595288099924564b`. Independent
+case/evidence and current-environment audits plus the repository gate with the generated
+report present are required before its commit and local annotated retrieval tag.
+
+M1.G is accepted. Independent report review verified the exact ordered 102 IDs, 87
+null-evidence ordinary fixture passes, six nonempty native proof records and nine honest
+eligible extension records. Independent current-environment review verified all 97 live
+distribution versions, CPython/runtime/OS fields, eight declarations and source/driver C,
+with the historical reference A binding unchanged. The final report raw hash remains
+`40c2fd77818e2a78a2fc92cd65dbeee67343a68bd8fb5276d8cee787f43dfd4a`.
+
+Root inspected the final generated-report gate in shell
+`16ab4376-30c1-410a-b101-ad5dacc74daa`: all 13 steps passed in 251.5 seconds, exit 0.
+Release verification and raw report hashing were repeated successfully. Root commits
+only the report and accepted master/log, then creates the local annotated retrieval tag
+`corpus/core-generation-v0` at that complete record. The tag's resolved commit is recorded
+in the execution artifact outside the immutable release, avoiding a self-reference. No
+remote tag or package publication is authorized. Resume at M2.1: author the bounded C#
+proof plan against the sealed corpus and record the coordinator's proceed/narrow/stop gate.
