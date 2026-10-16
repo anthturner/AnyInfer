@@ -937,7 +937,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
 
 ### M2: C# proof
 
-- [ ] M2.1 Write `ANYINFER_CSHARP_PROOF.md`: project list from §4, namespace layout, public type
+- [x] M2.1 Write `ANYINFER_CSHARP_PROOF.md`: project list from §4, namespace layout, public type
   names for request, message, result, event, and error, the single adapter-invocation boundary
   (A4), the fixture-adapter and driver design, native timer/assessment observation and mocked HTTP proof, release
   verification/report-completeness rules, `dotnet test` commands, and per-box file
@@ -947,10 +947,20 @@ M1 and later use `src/python/` paths and therefore depend on it.
   A scope expansion or compatibility reversal requires a new user decision.
   > NOTE: The user's 2026-10-15 execution request authorizes this bounded C# proof. It
   > supersedes the earlier separate approval handoff; it does not waive corpus or test gates.
-- [ ] M2.2 Types, schema subset validator over `Utf8JsonReader`, extraction, canonical JSON
+  > NOTE: Coordinator decision is **proceed** against local frozen tag
+  > `corpus/core-generation-v0` at `4208172c432ba03166e4422c4e69ac18d24eab0e`.
+  > Independent plan critique closed build/type ordering, the real selected-root CLI,
+  > iterator/timeout lifetime and SDK lookup gaps. The bounded plan keeps all executable
+  > boxes unchecked. Its .NET commands run from `src/csharp` so the local SDK pin applies.
+- [x] M2.2 Types, schema subset validator over `Utf8JsonReader`, extraction, canonical JSON
   rendering for prompt injection. Unit coverage for every admitted keyword, every extraction
   branch, duplicate keys, code-point string ordering, and the rendering of each JSON value kind.
-  **Gate:** `dotnet test src/csharp/AnyInfer.Tests` passes.
+  **Gate:** from `src/csharp`, `dotnet test AnyInfer.Tests --no-restore` passes.
+  > NOTE: Accepted after 111 complete native unit tests passed under SDK 8.0.425, with
+  > zero failures/skips and clean independent model, JSON, schema/extraction and admission
+  > review. Frozen corpus bytes remain unchanged. The repository acceptance gate passed
+  > all 13 steps in 200.9 seconds before the foundation checkpoint commit; resume at
+  > the bounded plan's M2.3a invocation boundary.
 - [ ] M2.3 Async core: request normalization, routing with retry/backoff/health, repair loop,
   streaming with `IAsyncEnumerable`, cancellation, the post-content guard, and the single
   adapter-invocation boundary (A4) through which every adapter entry passes. Own the internal

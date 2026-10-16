@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>AnyInfer</AssemblyName>
+    <RootNamespace>AnyInfer</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AnyInfer.Tests" />
+    <InternalsVisibleTo Include="AnyInfer.Conformance" />
+  </ItemGroup>
+</Project>

@@ -40,3 +40,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+src/csharp/**/bin/
+src/csharp/**/obj/
+src/csharp/**/TestResults/

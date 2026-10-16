@@ -1508,3 +1508,48 @@ only the report and accepted master/log, then creates the local annotated retrie
 in the execution artifact outside the immutable release, avoiding a self-reference. No
 remote tag or package publication is authorized. Resume at M2.1: author the bounded C#
 proof plan against the sealed corpus and record the coordinator's proceed/narrow/stop gate.
+
+The complete local record is `4208172c432ba03166e4422c4e69ac18d24eab0e`; annotated tag
+`corpus/core-generation-v0` resolves to it (tag object
+`ed00b6f1dccc1309f29448ed34c15ab78c161f85`). Root verified the clean checkout after commit.
+No remote tag or package was published.
+
+M2.1 is accepted with coordinator decision **proceed** within the already authorized M0–M2
+scope, which the user reaffirmed. `ANYINFER_CSHARP_PROOF.md` pins the frozen corpus,
+three-project net8.0/BCL-only architecture, immutable JSON/typed adapter model, single native
+entry boundary, actual timeout/assessment/HTTP proofs and independent selected-root/report
+driver. Fresh critique found concrete sequencing/interface gaps; these were closed before
+source authoring, including explicit SDK working directory and complete root/release commands.
+Installed SDK 8.0.425/runtime 8.0.31 can run the proof; test package restore remains a gate.
+Resume from the bounded plan's first unchecked M2.2a box at source checkpoint `4208172`.
+
+M2.2a and M2.2b are accepted in the working tree. The scaffold uses SDK 8.0.425 and
+restored pinned test packages; the final public-model gate passed 11 tests after review
+closed required fields/defaults, copied collections and nullable error phases. The final
+JSON gate passed 23 tests after direct escape-parity, binary64 metadata and strict
+UTF-8/UTF-16 controls; independent bounded review is clean. Root inspected both retained
+logs. No frozen corpus, Python source or generated report changed.
+
+Resume at M2.2c from committed checkpoint `4208172`, retaining the accepted uncommitted
+model/codec work. Disjoint cheap workers own schema source and independent tests. The
+assessment API retains actual native findings/messages from one extraction/validation pass
+with operation-entry-assessment identity; repair will consume those retained facts. Shared
+builds/tests remain serialized, and schema admission follows as M2.2d.
+
+M2.2 is accepted. The schema/extraction/prompt gate passed 48 tests plus its strengthened
+parser-cause node; admission passed 34 tests. Independent reviews closed exact numeric
+comparison/bounds, native constraint/instance and parser-diagnostic retention, reference-counted
+finding provenance, recursive schema-position admission, request forwarding and construction
+precedence. The source readability pass preserved those behaviors.
+
+Root ran the complete unit project from `src/csharp` under SDK 8.0.425 in retained shell
+`4f04f68d-7019-46a3-bd55-c5199d589d13`: 111 passed, zero failed/skipped, exit 0.
+The immutable release raw SHA remains
+`16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391`.
+Root inspected the repository acceptance log in retained shell
+`96c60dc9-379b-4203-be4a-a2e55b3ba60e`: all 13 steps passed in 200.9 seconds, exit 0.
+The foundation checkpoint contains only the reviewed C# model, JSON, schema and admission
+files, scoped build-output ignores and execution plans/log. Its exact resulting commit is
+recorded in the execution artifact, avoiding self-reference. Resume at M2.3a from that
+checkpoint. No async client, routing core, native transport or qualified C# report is claimed
+by this foundation gate.
