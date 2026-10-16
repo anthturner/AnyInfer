@@ -17,11 +17,14 @@ import json
 import math
 import re
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError, ValidationError
+from referencing import Registry
+from referencing.exceptions import NoSuchResource, Unresolvable, Unretrievable
 
 ROOT = Path(__file__).resolve().parent.parent
 SPECIFICATION = ROOT / "specification"
@@ -92,7 +95,8 @@ def _reject_constant(text: str) -> None:
     raise ValueError(f"non-finite JSON token {text!r}")
 
 
-def _read_json(path: Path) -> Any:
+def read_json(path: Path) -> Any:
+    """Read one ordinary-JSON asset under the v0 numeric and Unicode rules."""
     data = json.loads(
         path.read_text(encoding="utf-8"),
         parse_int=_bounded_int,
@@ -101,6 +105,10 @@ def _read_json(path: Path) -> Any:
     )
     _reject_surrogates(data)
     return data
+
+
+# Kept for existing private callers while release tooling adopts ``read_json``.
+_read_json = read_json
 
 
 def _reject_surrogates(value: Any) -> None:
@@ -116,17 +124,42 @@ def _reject_surrogates(value: Any) -> None:
             _reject_surrogates(item)
 
 
-def _schema(name: str) -> Draft202012Validator:
-    raw = _read_json(SCHEMAS / name)
+class SchemaEvaluationError(ValueError):
+    """A selected schema attempted an unbound reference during evaluation."""
+
+
+def _deny_schema_retrieval(uri: str) -> None:
+    raise NoSuchResource(uri)
+
+
+def build_schema_validator(raw: Any) -> Draft202012Validator:
+    """Build a selected-asset validator that never retrieves unbound resources."""
     Draft202012Validator.check_schema(raw)
-    return Draft202012Validator(raw)
+    return Draft202012Validator(
+        raw, registry=cast(Any, Registry)(retrieve=_deny_schema_retrieval)
+    )
+
+
+def schema_errors(validator: Draft202012Validator, data: Any) -> list[ValidationError]:
+    """Evaluate one selected schema, translating unresolved references for callers."""
+    try:
+        return sorted(validator.iter_errors(data), key=lambda item: list(item.path))
+    except (Unresolvable, Unretrievable) as error:
+        raise SchemaEvaluationError(f"selected schema reference is unavailable: {error}") from error
+
+
+def _schema(
+    name: str, *, specification_root: Path | None = None
+) -> Draft202012Validator:
+    root = SPECIFICATION if specification_root is None else specification_root
+    return build_schema_validator(read_json(root / "schemas" / name))
 
 
 def _errors(validator: Draft202012Validator, data: Any) -> list[str]:
-    return [
-        error.message
-        for error in sorted(validator.iter_errors(data), key=lambda item: list(item.path))
-    ]
+    try:
+        return [error.message for error in schema_errors(validator, data)]
+    except SchemaEvaluationError as error:
+        return [str(error)]
 
 
 def _safe_json_files(directory: Path) -> Iterable[Path]:
@@ -146,40 +179,102 @@ def _safe_json_files(directory: Path) -> Iterable[Path]:
 
 
 def _validate_fixture_tree(
-    root: Path, validators: dict[str, Draft202012Validator]
+    root: Path,
+    validators: dict[str, Draft202012Validator],
+    fixture_paths: Sequence[Path] | None = None,
 ) -> tuple[dict[str, tuple[Path, str | None]], list[str]]:
     ids: dict[str, tuple[Path, str | None]] = {}
     problems: list[str] = []
-    for directory, schema_name in (
-        ("core-generation", "fixture-v0.schema.json"),
-        ("transport", "transport-v0.schema.json"),
-    ):
-        try:
-            paths = _safe_json_files(root / directory)
-        except ValueError as error:
-            problems.append(str(error))
-            continue
-        for path in paths:
+    selected: list[tuple[Path, str]] = []
+    if fixture_paths is None:
+        for directory, schema_name in (
+            ("core-generation", "fixture-v0.schema.json"),
+            ("transport", "transport-v0.schema.json"),
+        ):
             try:
-                document = _read_json(path)
-            except (OSError, ValueError, json.JSONDecodeError) as error:
-                problems.append(f"{path}: invalid JSON: {error}")
-                continue
-            for schema_error in _errors(validators[schema_name], document):
-                problems.append(f"{path}: {schema_error}")
-            if schema_name == "transport-v0.schema.json":
-                problems.extend(_transport_base64_errors(path, document))
-            case_id = document.get("id") if isinstance(document, dict) else None
-            document_family = document.get("family") if isinstance(document, dict) else None
-            if isinstance(case_id, str):
-                if case_id in ids:
-                    problems.append(f"duplicate fixture id {case_id!r}: {ids[case_id]} and {path}")
-                else:
-                    ids[case_id] = (
-                        path,
-                        document_family if isinstance(document_family, str) else None,
-                    )
+                selected.extend((path, schema_name) for path in _safe_json_files(root / directory))
+            except ValueError as error:
+                problems.append(str(error))
+    else:
+        selected, selected_problems = _selected_fixture_files(root, fixture_paths)
+        problems.extend(selected_problems)
+    for path, schema_name in selected:
+        try:
+            document = _read_json(path)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            problems.append(f"{path}: invalid JSON: {error}")
+            continue
+        for schema_error in _errors(validators[schema_name], document):
+            problems.append(f"{path}: {schema_error}")
+        if schema_name == "transport-v0.schema.json":
+            problems.extend(_transport_base64_errors(path, document))
+        case_id = document.get("id") if isinstance(document, dict) else None
+        document_family = document.get("family") if isinstance(document, dict) else None
+        if isinstance(case_id, str):
+            if case_id in ids:
+                problems.append(f"duplicate fixture id {case_id!r}: {ids[case_id]} and {path}")
+            else:
+                ids[case_id] = (
+                    path,
+                    document_family if isinstance(document_family, str) else None,
+                )
     return ids, problems
+
+
+def _selected_fixture_files(
+    root: Path, fixture_paths: Sequence[Path]
+) -> tuple[list[tuple[Path, str]], list[str]]:
+    """Return explicitly selected corpus files after containment and family checks."""
+    selected: list[tuple[Path, str]] = []
+    problems: list[str] = []
+    lexical_root = root.absolute()
+    resolved_root = root.resolve()
+    seen: set[Path] = set()
+    schemas = {
+        "core-generation": "fixture-v0.schema.json",
+        "transport": "transport-v0.schema.json",
+    }
+    for supplied in fixture_paths:
+        path = supplied.absolute() if supplied.is_absolute() else lexical_root / supplied
+        try:
+            relative = path.relative_to(lexical_root)
+        except ValueError:
+            problems.append(f"unsafe selected fixture path: {supplied}")
+            continue
+        if ".." in relative.parts or any(
+            _is_link_or_reparse(lexical_root.joinpath(*relative.parts[:index]))
+            for index in range(1, len(relative.parts) + 1)
+        ):
+            problems.append(f"unsafe selected fixture path: {supplied}")
+            continue
+        resolved = path.resolve()
+        try:
+            resolved.relative_to(resolved_root)
+        except ValueError:
+            problems.append(f"unsafe selected fixture path: {supplied}")
+            continue
+        if resolved in seen:
+            problems.append(f"unsafe or duplicate selected fixture path: {supplied}")
+            continue
+        if (
+            path.suffix.lower() != ".json"
+            or len(relative.parts) < 2
+            or relative.parts[0] not in schemas
+        ):
+            problems.append(f"invalid selected fixture path: {supplied}")
+            continue
+        if not path.is_file():
+            problems.append(f"selected fixture is missing: {supplied}")
+            continue
+        seen.add(resolved)
+        selected.append((path, schemas[relative.parts[0]]))
+    return selected, problems
+
+
+def _is_link_or_reparse(path: Path) -> bool:
+    """Identify final or intermediate links, including Windows junctions when available."""
+    is_junction = getattr(path, "is_junction", None)
+    return path.is_symlink() or (callable(is_junction) and is_junction())
 
 
 def _transport_base64_errors(path: Path, document: Any) -> list[str]:
@@ -204,9 +299,11 @@ def _transport_base64_errors(path: Path, document: Any) -> list[str]:
     return problems
 
 
-def _inventory_path(root: Path) -> Path:
-    if root.resolve() == FIXTURES.resolve():
-        return SPECIFICATION / "inventories" / INVENTORY_NAME
+def _inventory_path(
+    root: Path, specification_root: Path, *, explicit_specification_root: bool
+) -> Path:
+    if explicit_specification_root or root.resolve() == (specification_root / "fixtures").resolve():
+        return specification_root / "inventories" / INVENTORY_NAME
     return root / "inventories" / INVENTORY_NAME
 
 
@@ -238,7 +335,12 @@ def _validate_inventory(
     *,
     coverage: bool,
     family: str | None,
+    specification_root: Path | None = None,
 ) -> list[str]:
+    normative_root = root.parent.parent if root.name == "fixtures" else ROOT
+    selected_specification = (
+        normative_root / "specification" if specification_root is None else specification_root
+    )
     try:
         inventory = _read_json(path)
     except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -255,9 +357,8 @@ def _validate_inventory(
             continue
         ref = requirement["spec_ref"]
         path_text, separator, fragment = ref.partition("#")
-        normative_root = root.parent.parent if root.name == "fixtures" else ROOT
         path = Path(path_text)
-        specification_root = (normative_root / "specification").resolve()
+        resolved_specification = selected_specification.resolve()
         noncanonical = (
             "\\" in path_text
             or path.is_absolute()
@@ -267,9 +368,13 @@ def _validate_inventory(
             or not path.parts
             or path.parts[0] != "specification"
         )
-        target = (normative_root / path).resolve()
+        target = (
+            normative_root / path
+            if specification_root is None
+            else selected_specification.joinpath(*path.parts[1:])
+        ).resolve()
         try:
-            target.relative_to(specification_root)
+            target.relative_to(resolved_specification)
         except ValueError:
             noncanonical = True
         if (
@@ -376,9 +481,14 @@ def _validate_inventory(
     return problems
 
 
-def validate_report(report: Any) -> list[str]:
+def validate_report(
+    report: Any, *, specification_root: Path | None = None
+) -> list[str]:
     """Validate a report document, including extension-call ordinal semantics."""
-    validator = _schema("report-v0.schema.json")
+    try:
+        validator = _schema("report-v0.schema.json", specification_root=specification_root)
+    except (OSError, ValueError, json.JSONDecodeError, SchemaError) as error:
+        return [f"report schema is unavailable or invalid: {error}"]
     problems = _errors(validator, report)
     if not isinstance(report, dict) or not isinstance(report.get("cases"), list):
         return problems
@@ -510,17 +620,29 @@ def _expected_message_problems(document: Any) -> list[str]:
     return problems
 
 
-def validate(root: Path, *, coverage: bool = False, family: str | None = None) -> list[str]:
+def validate(
+    root: Path,
+    *,
+    coverage: bool = False,
+    family: str | None = None,
+    specification_root: Path | None = None,
+    fixture_paths: Sequence[Path] | None = None,
+) -> list[str]:
     """Return fixture and optional inventory validation problems for one asset tree."""
-    validators = {
-        name: _schema(name)
-        for name in (
-            "fixture-v0.schema.json",
-            "transport-v0.schema.json",
-            "inventory-v0.schema.json",
-        )
-    }
-    fixture_ids, problems = _validate_fixture_tree(root, validators)
+    explicit_specification_root = specification_root is not None
+    selected_specification = SPECIFICATION if specification_root is None else specification_root
+    try:
+        validators = {
+            name: _schema(name, specification_root=selected_specification)
+            for name in (
+                "fixture-v0.schema.json",
+                "transport-v0.schema.json",
+                "inventory-v0.schema.json",
+            )
+        }
+    except (OSError, ValueError, json.JSONDecodeError, SchemaError) as error:
+        return [f"selected schema is unavailable or invalid: {error}"]
+    fixture_ids, problems = _validate_fixture_tree(root, validators, fixture_paths)
     for fixture_path, _family in fixture_ids.values():
         try:
             problems.extend(
@@ -529,7 +651,11 @@ def validate(root: Path, *, coverage: bool = False, family: str | None = None) -
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
             problems.append(f"{fixture_path}: invalid JSON: {error}")
-    inventory = _inventory_path(root)
+    inventory = _inventory_path(
+        root,
+        selected_specification,
+        explicit_specification_root=explicit_specification_root,
+    )
     if inventory.exists():
         problems.extend(
             _validate_inventory(
@@ -539,6 +665,7 @@ def validate(root: Path, *, coverage: bool = False, family: str | None = None) -
                 root,
                 coverage=coverage,
                 family=family,
+                specification_root=specification_root,
             )
         )
     elif coverage:

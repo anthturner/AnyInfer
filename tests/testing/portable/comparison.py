@@ -9,7 +9,6 @@ from typing import Any
 from uuid import UUID
 
 from .projection import (
-    MissingEvidenceError,
     extension_evidence,
     native_feedback_for_call,
     project_run,
@@ -18,6 +17,7 @@ from .projection import (
 )
 from .records import NativeRun
 from .values import (
+    MissingEvidenceError,
     ValueDomainError,
     coalesce_events,
     control_number_equal,

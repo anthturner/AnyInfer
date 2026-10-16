@@ -11,7 +11,6 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mappin
 from contextlib import contextmanager
 from typing import Any, cast
 
-from anyinfer._client import generation
 from anyinfer._client.async_client import AsyncClient
 from anyinfer.errors import AllTargetsFailedError
 from anyinfer.routing.policy import Retry, Route
@@ -44,7 +43,7 @@ class _TimeoutSpy:
 
     @contextmanager
     def installed(self) -> Iterator[None]:
-        original = generation.asyncio.timeout
+        original = asyncio.timeout
         self._original = original
 
         def factory(delay: float | None) -> Any:
@@ -96,11 +95,11 @@ class _TimeoutSpy:
             return ObservedTimeout()
 
         spy = self
-        generation.asyncio.timeout = factory
+        asyncio.timeout = factory
         try:
             yield
         finally:
-            generation.asyncio.timeout = original
+            asyncio.timeout = original
             self._original = None
 
 

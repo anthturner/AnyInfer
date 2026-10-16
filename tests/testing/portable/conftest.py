@@ -8,7 +8,17 @@ from typing import Any
 
 import pytest
 
-from .driver import _DEFAULT_ROOT, observe_core, write_json
+from .driver import (
+    _DEFAULT_ROOT,
+    _REPOSITORY_ROOT,
+    _reference_revision,
+    observe_core,
+    reference_output_paths,
+    reference_report_publisher,
+    write_json,
+)
+from .reference import ReferencePreflightError, preflight_reference
+from .reference_writer import write_reference
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -24,23 +34,85 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     group.addoption(
         "--write-reference",
-        type=Path,
-        help="reserved; fails closed until reference preflight exists",
+        metavar="REVISION",
+        help="write a clean-source reference for this lowercase 40-hex revision",
     )
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
-    if session.config.getoption("write_reference") is not None:
-        raise pytest.UsageError(
-            "--write-reference is unavailable until M1.5c/M1.7 reference preflight exists"
+    config = session.config
+    if hasattr(config, "workerinput"):
+        return
+    revision = config.getoption("write_reference")
+    if revision is None:
+        return
+    root = config.getoption("portable_root")
+    try:
+        revision = _reference_revision(revision)
+        manifest, environment = reference_output_paths(revision)
+        preflight_reference(
+            root,
+            expected_revision=revision,
+            output_manifest=manifest,
+            output_environment=environment,
+            repository_root=_REPOSITORY_ROOT,
         )
+        report = config.getoption("portable_report")
+        if report is not None:
+            reference_report_publisher(
+                report,
+                selected_root=root,
+                manifest_path=manifest,
+                environment_path=environment,
+            )
+    except (ReferencePreflightError, ValueError) as error:
+        raise pytest.UsageError(str(error)) from error
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     config = session.config
     path = config.getoption("portable_report")
-    if path is None or hasattr(config, "workerinput"):
+    if hasattr(config, "workerinput"):
         return
-    report: dict[str, Any] = asyncio.run(observe_core(config.getoption("portable_root")))
-    report["pytest"] = {"exit_status": exitstatus, "passed": exitstatus == pytest.ExitCode.OK}
-    write_json(path, report)
+    root = config.getoption("portable_root")
+    revision = config.getoption("write_reference")
+    metadata: dict[str, Any] = {
+        "exit_status": exitstatus,
+        "passed": exitstatus == pytest.ExitCode.OK,
+    }
+    if revision is None:
+        if path is None:
+            return
+        report: dict[str, Any] = asyncio.run(observe_core(root))
+        report["pytest"] = metadata
+        write_json(path, report)
+        return
+
+    revision = _reference_revision(revision)
+    manifest, environment = reference_output_paths(revision)
+    publisher = (
+        reference_report_publisher(
+            path,
+            selected_root=root,
+            manifest_path=manifest,
+            environment_path=environment,
+            pytest_metadata=metadata,
+        )
+        if path is not None
+        else None
+    )
+    if exitstatus != pytest.ExitCode.OK:
+        if publisher is not None:
+            publisher(asyncio.run(observe_core(root)))
+        return
+    asyncio.run(
+        write_reference(
+            root,
+            expected_revision=revision,
+            output_manifest=manifest,
+            output_environment=environment,
+            repository_root=_REPOSITORY_ROOT,
+            observe=observe_core,
+            publish_observation=publisher,
+        )
+    )

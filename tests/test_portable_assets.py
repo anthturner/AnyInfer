@@ -5,8 +5,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
@@ -62,8 +64,20 @@ def _transport_fixture(*, chunks: list[dict[str, str]] | None = None) -> dict[st
         "responses": [
             {"status": 200, "headers": {}, "byte_chunks": chunks or [{"bytes": "AA=="}]}
         ],
-        "expected": {"http_requests": [], "wire_limits": [], "adapter_outcome": {}},
+        "expected": {
+            "status": "observed",
+            "http_requests": [],
+            "wire_limits": [],
+            "adapter_outcome": {},
+        },
     }
+
+
+def _copy_validation_schemas(specification: Path) -> None:
+    schemas = specification / "schemas"
+    schemas.mkdir(parents=True, exist_ok=True)
+    for name in ("fixture-v0.schema.json", "transport-v0.schema.json", "inventory-v0.schema.json"):
+        shutil.copy2(ROOT / "specification" / "schemas" / name, schemas / name)
 
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -286,6 +300,76 @@ def test_transport_rejects_opposite_input_variant_and_non_base64_chunks(tmp_path
     assert "is not strict base64" in corrupt.stderr
 
 
+def test_transport_expected_status_distinguishes_pending_and_observed() -> None:
+    schema = json.loads(
+        (ROOT / "specification" / "schemas" / "transport-v0.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    validator = Draft202012Validator(schema)
+    observed = _transport_fixture()
+    assert not list(validator.iter_errors(observed))
+
+    pending = _transport_fixture()
+    pending["expected"] = {"status": "to_be_observed"}
+    assert not list(validator.iter_errors(pending))
+
+    unknown = _transport_fixture()
+    unknown_expected = unknown["expected"]
+    assert isinstance(unknown_expected, dict)
+    unknown_expected["status"] = "unknown"
+    assert list(validator.iter_errors(unknown))
+
+    missing = _transport_fixture()
+    missing_expected = missing["expected"]
+    assert isinstance(missing_expected, dict)
+    missing_expected.pop("status")
+    assert list(validator.iter_errors(missing))
+
+    pending_extra = _transport_fixture()
+    pending_extra["expected"] = {"status": "to_be_observed", "http_requests": []}
+    assert list(validator.iter_errors(pending_extra))
+
+    missing_outcome = _transport_fixture()
+    missing_outcome_expected = missing_outcome["expected"]
+    assert isinstance(missing_outcome_expected, dict)
+    missing_outcome_expected.pop("adapter_outcome")
+    assert list(validator.iter_errors(missing_outcome))
+
+    core_observed = _transport_fixture()
+    core_observed["kind"] = "core_http"
+    core_observed["input"] = {"adapter_config": {}, "operation": {}}
+    core_observed["expected"] = {
+        "status": "observed",
+        "http_requests": [],
+        "wire_limits": [],
+        "core": {},
+    }
+    assert not list(validator.iter_errors(core_observed))
+
+    core_pending = _transport_fixture()
+    core_pending["kind"] = "core_http"
+    core_pending["input"] = {"adapter_config": {}, "operation": {}}
+    core_pending["expected"] = {"status": "to_be_observed"}
+    assert not list(validator.iter_errors(core_pending))
+
+    core_with_adapter_outcome = _transport_fixture()
+    core_with_adapter_outcome["kind"] = "core_http"
+    core_with_adapter_outcome["input"] = {"adapter_config": {}, "operation": {}}
+    core_with_adapter_outcome_expected = core_with_adapter_outcome["expected"]
+    assert isinstance(core_with_adapter_outcome_expected, dict)
+    core_with_adapter_outcome_expected.pop("adapter_outcome")
+    core_with_adapter_outcome_expected["core"] = {}
+    core_with_adapter_outcome_expected["adapter_outcome"] = {}
+    assert list(validator.iter_errors(core_with_adapter_outcome))
+
+    adapter_with_core_outcome = _transport_fixture()
+    adapter_with_core_outcome_expected = adapter_with_core_outcome["expected"]
+    assert isinstance(adapter_with_core_outcome_expected, dict)
+    adapter_with_core_outcome_expected["core"] = {}
+    assert list(validator.iter_errors(adapter_with_core_outcome))
+
+
 def test_custom_corpus_paths_never_resolve_against_the_checkout(tmp_path: Path) -> None:
     root = tmp_path / "assets"
     (root / "core-generation").mkdir(parents=True)
@@ -369,6 +453,7 @@ def test_coverage_rejects_an_inventory_path_when_its_id_exists_elsewhere(tmp_pat
 def test_default_root_inventory_path_rejects_family_mismatch(tmp_path: Path, monkeypatch) -> None:
     specification = tmp_path / "specification"
     root = specification / "fixtures"
+    _copy_validation_schemas(specification)
     (root / "core-generation").mkdir(parents=True)
     (specification / "inventories").mkdir()
     (root / "core-generation" / "roles.json").write_text(
@@ -411,10 +496,11 @@ def test_inventory_spec_refs_use_the_supplied_normative_tree_and_reject_missing_
 ) -> None:
     specification = tmp_path / "specification"
     root = specification / "fixtures"
-    (root / "inventories").mkdir(parents=True)
+    _copy_validation_schemas(specification)
+    (specification / "inventories").mkdir(parents=True)
     normative = specification / "core-generation.md"
     normative.write_text("# Supplied anchor\n", encoding="utf-8", newline="\n")
-    inventory = root / "inventories" / "core-generation-v0.json"
+    inventory = specification / "inventories" / "core-generation-v0.json"
 
     def problems_for(spec_ref: str) -> list[str]:
         inventory.write_text(
@@ -435,7 +521,7 @@ def test_inventory_spec_refs_use_the_supplied_normative_tree_and_reject_missing_
             encoding="utf-8",
             newline="\n",
         )
-        return validate_fixtures.validate(root)
+        return validate_fixtures.validate(root, specification_root=specification)
 
     valid = problems_for("specification/core-generation.md#supplied-anchor")
     assert not any(
@@ -453,6 +539,232 @@ def test_inventory_spec_refs_use_the_supplied_normative_tree_and_reject_missing_
         "specification\\core-generation.md#supplied-anchor",
     ):
         assert any("has invalid spec_ref" in problem for problem in problems_for(escaped))
+
+
+def test_explicit_arbitrary_specification_root_resolves_canonical_refs_within_it(
+    tmp_path: Path,
+) -> None:
+    selected = tmp_path / "chosen-root"
+    fixtures = selected / "fixtures"
+    _copy_validation_schemas(selected)
+    (selected / "inventories").mkdir(parents=True)
+    (selected / "core-generation.md").write_text(
+        "# Selected anchor\n", encoding="utf-8", newline="\n"
+    )
+    inventory = selected / "inventories" / "core-generation-v0.json"
+
+    def problems_for(reference: str) -> list[str]:
+        inventory.write_text(
+            json.dumps(
+                {
+                    "profile": "core-generation",
+                    "profile_revision": "v0",
+                    "requirements": [
+                        {
+                            "id": "proof",
+                            "spec_ref": reference,
+                            "case_ids": ["normalization/roles-ordered-text"],
+                        }
+                    ],
+                    "cases": [],
+                }
+            ),
+            encoding="utf-8",
+            newline="\n",
+        )
+        return validate_fixtures.validate(fixtures, specification_root=selected)
+
+    valid = problems_for("specification/core-generation.md#selected-anchor")
+    assert not any("spec_ref" in problem for problem in valid)
+    missing = problems_for("specification/core-generation.md#checkout-only-anchor")
+    assert any("missing fragment" in problem for problem in missing)
+    (tmp_path / "specification").mkdir()
+    (tmp_path / "specification" / "core-generation.md").write_text(
+        "# Checkout only anchor\n", encoding="utf-8", newline="\n"
+    )
+    checkout_only = problems_for("specification/core-generation.md#checkout-only-anchor")
+    assert any("missing fragment" in problem for problem in checkout_only)
+    assert any(
+        "has invalid spec_ref" in problem
+        for problem in problems_for("specification/missing.md#selected-anchor")
+    )
+
+
+def test_selected_specification_root_controls_fixture_schema_and_leaves_globals_intact(
+    tmp_path: Path,
+) -> None:
+    selected = tmp_path / "specification"
+    schemas = selected / "schemas"
+    schemas.mkdir(parents=True)
+    for name in ("fixture-v0.schema.json", "transport-v0.schema.json", "inventory-v0.schema.json"):
+        shutil.copy2(ROOT / "specification" / "schemas" / name, schemas / name)
+    fixture_schema = json.loads((schemas / "fixture-v0.schema.json").read_text(encoding="utf-8"))
+    fixture_schema["allOf"] = [False]
+    (schemas / "fixture-v0.schema.json").write_text(json.dumps(fixture_schema), encoding="utf-8")
+    fixtures = selected / "fixtures"
+    target = fixtures / "core-generation" / "fixture.json"
+    target.parent.mkdir(parents=True)
+    target.write_text(json.dumps(_core_fixture({"none": True})), encoding="utf-8")
+
+    global_specification = validate_fixtures.SPECIFICATION
+    assert not validate_fixtures.validate(fixtures)
+    assert validate_fixtures.validate(fixtures, specification_root=selected)
+    assert global_specification == validate_fixtures.SPECIFICATION
+
+
+def test_selected_specification_root_controls_report_schema(tmp_path: Path) -> None:
+    selected = tmp_path / "specification"
+    schemas = selected / "schemas"
+    schemas.mkdir(parents=True)
+    report_schema = json.loads(
+        (ROOT / "specification" / "schemas" / "report-v0.schema.json").read_text(encoding="utf-8")
+    )
+    report_schema["allOf"] = [False]
+    (schemas / "report-v0.schema.json").write_text(json.dumps(report_schema), encoding="utf-8")
+    report = {
+        "report_version": "0",
+        "release": "core-generation-v0",
+        "release_sha256": "0" * 64,
+        "implementation": {
+            "name": "test",
+            "version": "0",
+            "source_revision": "x",
+            "driver_revision": "x",
+            "runtime": "test",
+            "os": "test",
+            "dependencies": {},
+            "extensions": [],
+        },
+        "cases": [
+            {
+                "id": "normalization/unsupported-image-part",
+                "verdict": "extension",
+                "detail": None,
+                "evidence": {"native_outcome": {"none": True}, "adapter_entries": []},
+            }
+        ],
+        "counts": {"pass": 0, "fail": 0, "error": 0, "extension": 1},
+    }
+    assert not validate_fixtures.validate_report(report)
+    assert validate_fixtures.validate_report(report, specification_root=selected)
+
+
+def test_explicit_specification_root_never_falls_back_to_fixture_tree_inventory(
+    tmp_path: Path,
+) -> None:
+    selected = tmp_path / "selected-specification"
+    _copy_validation_schemas(selected)
+    fixture_root = tmp_path / "other-fixtures"
+    fallback_inventory = fixture_root / "inventories" / "core-generation-v0.json"
+    fallback_inventory.parent.mkdir(parents=True)
+    fallback_inventory.write_text("{ broken", encoding="utf-8")
+
+    assert not validate_fixtures.validate(fixture_root, specification_root=selected)
+
+
+def test_explicit_fixture_paths_reject_intermediate_link_or_reparse_directory(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "fixtures"
+    target = root / "core-generation"
+    target.mkdir(parents=True)
+    fixture = target / "selected.json"
+    fixture.write_text(json.dumps(_core_fixture({"none": True})), encoding="utf-8")
+    linked = root / "linked"
+    selected = linked / "selected.json"
+    try:
+        linked.symlink_to(target, target_is_directory=True)
+    except OSError:
+        monkeypatch.setattr(
+            validate_fixtures,
+            "_is_link_or_reparse",
+            lambda path: path == linked,
+        )
+    problems = validate_fixtures.validate(root, fixture_paths=[selected])
+    assert any("unsafe selected fixture path" in problem for problem in problems)
+
+
+def test_missing_explicit_specification_root_returns_validation_diagnostics(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-specification"
+    root = tmp_path / "fixtures"
+    problems = validate_fixtures.validate(root, specification_root=missing)
+    assert len(problems) == 1
+    assert "selected schema is unavailable or invalid" in problems[0]
+    report_problems = validate_fixtures.validate_report({}, specification_root=missing)
+    assert len(report_problems) == 1
+    assert "report schema is unavailable or invalid" in report_problems[0]
+
+
+def test_explicit_fixture_paths_ignore_unlisted_future_fixture(tmp_path: Path) -> None:
+    root = tmp_path / "fixtures"
+    selected = root / "core-generation" / "selected.json"
+    extra = root / "core-generation" / "future.json"
+    selected.parent.mkdir(parents=True)
+    selected.write_text(
+        json.dumps(_core_fixture({"none": True}, case_id="normalization/other")),
+        encoding="utf-8",
+    )
+    extra.write_text("{ not JSON", encoding="utf-8")
+
+    assert not validate_fixtures.validate(root, fixture_paths=[selected])
+    assert validate_fixtures.validate(root)
+
+
+def test_explicit_fixture_paths_reject_missing_unsafe_duplicate_and_inventory_mismatch(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "fixtures"
+    selected = root / "core-generation" / "selected.json"
+    selected.parent.mkdir(parents=True)
+    selected.write_text(
+        json.dumps(_core_fixture({"none": True}, case_id="normalization/other")),
+        encoding="utf-8",
+    )
+    outside = tmp_path / "outside.json"
+    outside.write_text(json.dumps(_core_fixture({"none": True})), encoding="utf-8")
+
+    path_problems = validate_fixtures.validate(
+        root,
+        fixture_paths=[selected, selected, root / "core-generation" / "missing.json", outside],
+    )
+    assert any("unsafe or duplicate selected" in problem for problem in path_problems)
+    assert any("selected fixture is missing" in problem for problem in path_problems)
+    assert any("unsafe selected fixture" in problem for problem in path_problems)
+
+    inventory = root / "inventories" / "core-generation-v0.json"
+    inventory.parent.mkdir()
+    inventory.write_text(
+        json.dumps(
+            {
+                "profile": "core-generation",
+                "profile_revision": "v0",
+                "requirements": [
+                    {
+                        "id": "normalization",
+                        "spec_ref": "section-17",
+                        "case_ids": ["normalization/roles-ordered-text"],
+                    }
+                ],
+                "cases": [
+                    {
+                        "id": "normalization/roles-ordered-text",
+                        "kind": "fixture",
+                        "path": "specification/fixtures/core-generation/selected.json",
+                        "family": "normalization",
+                        "extension": None,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    mismatch = validate_fixtures.validate(
+        root,
+        coverage=True,
+        family="core-generation",
+        fixture_paths=[selected],
+    )
+    assert any("fixture ID is absent from fixture tree" in problem for problem in mismatch)
 
 
 def test_inventory_named_ids_cannot_swap_driver_recipes_or_kinds(tmp_path: Path) -> None:
@@ -622,3 +934,76 @@ def test_report_evidence_conditions_preserve_honest_driver_and_extension_results
         "consecutive zero-based" in problem
         for problem in validate_fixtures.validate_report(report)
     )
+
+def test_selected_schema_unresolved_references_are_diagnostics_without_network(
+    tmp_path: Path, monkeypatch
+) -> None:
+    selected = tmp_path / "specification"
+    fixtures = selected / "fixtures"
+    _copy_validation_schemas(selected)
+    fixture_path = fixtures / "core-generation" / "case.json"
+    fixture_path.parent.mkdir(parents=True)
+    fixture_path.write_text(json.dumps(_core_fixture({"none": True})), encoding="utf-8")
+
+    retrieval_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def unexpected_network(*args: object, **kwargs: object) -> object:
+        retrieval_calls.append((args, kwargs))
+        raise AssertionError(f"schema evaluation attempted network retrieval: {args!r} {kwargs!r}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", unexpected_network)
+    fixture_schema = selected / "schemas" / "fixture-v0.schema.json"
+    fixture_schema.write_text(json.dumps({"$ref": "https://example.invalid/missing"}), encoding="utf-8")
+    fixture_problems = validate_fixtures.validate(fixtures, specification_root=selected)
+    assert any("selected schema reference is unavailable" in problem for problem in fixture_problems)
+
+    report_schema = selected / "schemas" / "report-v0.schema.json"
+    report_schema.write_text(json.dumps({"$ref": "https://example.invalid/missing"}), encoding="utf-8")
+    report_problems = validate_fixtures.validate_report({}, specification_root=selected)
+    assert any("selected schema reference is unavailable" in problem for problem in report_problems)
+    assert retrieval_calls == []
+
+    fixture_schema.write_text(json.dumps({"type": 3}), encoding="utf-8")
+    malformed_fixture = validate_fixtures.validate(fixtures, specification_root=selected)
+    assert len(malformed_fixture) == 1
+    assert "selected schema is unavailable or invalid" in malformed_fixture[0]
+
+    report_schema.write_text(json.dumps({"type": 3}), encoding="utf-8")
+    malformed_report = validate_fixtures.validate_report({}, specification_root=selected)
+    assert len(malformed_report) == 1
+    assert "report schema is unavailable or invalid" in malformed_report[0]
+
+def test_default_custom_fixture_tree_uses_adjacent_normative_markdown(tmp_path: Path) -> None:
+    fixture_root = tmp_path / "specification" / "fixtures"
+    inventory = fixture_root / "inventories" / "core-generation-v0.json"
+    inventory.parent.mkdir(parents=True)
+    normative = tmp_path / "specification" / "core-generation.md"
+
+    def problems_for(reference: str, heading: str) -> list[str]:
+        normative.write_text(f"# {heading}\n", encoding="utf-8", newline="\n")
+        inventory.write_text(
+            json.dumps(
+                {
+                    "profile": "core-generation",
+                    "profile_revision": "v0",
+                    "requirements": [
+                        {
+                            "id": "adjacent",
+                            "spec_ref": reference,
+                            "case_ids": [],
+                        }
+                    ],
+                    "cases": [],
+                }
+            ),
+            encoding="utf-8",
+            newline="\n",
+        )
+        return validate_fixtures.validate(fixture_root)
+
+    valid = problems_for("specification/core-generation.md#adjacent-only", "Adjacent only")
+    assert not any("spec_ref" in problem or "missing fragment" in problem for problem in valid)
+    altered = problems_for("specification/core-generation.md#adjacent-only", "Altered")
+    assert any("missing fragment" in problem for problem in altered)
+    missing = problems_for("specification/missing.md#adjacent-only", "Adjacent only")
+    assert any("has invalid spec_ref" in problem for problem in missing)

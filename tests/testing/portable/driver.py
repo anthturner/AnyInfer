@@ -14,18 +14,19 @@ import importlib.metadata
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import tempfile
 import warnings
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import Any
-
-from jsonschema import Draft202012Validator
+from typing import Any, cast
 
 from .comparison import compare_fixture
+from .reference import ReferencePreflightError, _validator_module
+from .reference_writer import _publish_new, write_reference
 from .runner import run_fixture
 from .values import MissingEvidenceError, ensure_value_domain
 
@@ -74,8 +75,8 @@ def _inside(root: Path, path: Path) -> Path:
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        document = _validator_module().read_json(path)
+    except (OSError, ValueError) as error:
         raise DriverInputError(f"cannot read JSON input {path}: {error}") from error
     if not isinstance(document, dict):
         raise DriverInputError(f"JSON input must be an object: {path}")
@@ -155,62 +156,46 @@ def _inventory(root: Path) -> list[dict[str, Any]]:
 
 
 def _asset_problems(root: Path) -> list[str]:
-    """Validate selected core inputs with schemas from that same selected root."""
-    problems: list[str] = []
-    schemas: dict[str, Draft202012Validator] = {}
-    for name in (
-        "fixture-v0.schema.json",
-        "transport-v0.schema.json",
-        "inventory-v0.schema.json",
-    ):
-        path = root / "schemas" / name
-        try:
-            schemas[name] = Draft202012Validator(_load_json(path))
-        except Exception as error:  # jsonschema reports the selected schema failure below.
-            problems.append(f"selected schema {name} is invalid: {error}")
-    if problems:
-        return problems
-    inventory_path = root / _INVENTORY
+    """Use the trusted selected-root validator while transport remains optional."""
     try:
-        inventory = _load_json(inventory_path)
+        inventory = _load_json(root / _INVENTORY)
     except DriverInputError as error:
         return [str(error)]
-    problems.extend(
-        f"{_INVENTORY.as_posix()}: {error.message}"
-        for error in schemas["inventory-v0.schema.json"].iter_errors(inventory)
-    )
     cases = inventory.get("cases")
     if not isinstance(cases, list):
-        return problems
+        return ["selected inventory cases must be an array"]
+    fixtures: list[Path] = []
     for record in cases:
         if not isinstance(record, dict) or record.get("kind") != "fixture":
             continue
         path_value = record.get("path")
         if not isinstance(path_value, str):
-            continue
-        schema_name = (
-            "fixture-v0.schema.json"
-            if path_value.startswith(_CORE_PREFIX)
-            else "transport-v0.schema.json"
-        )
-        if path_value.startswith(_TRANSPORT_PREFIX):
+            return ["selected inventory fixture path is invalid"]
+        if path_value.startswith(_CORE_PREFIX):
+            try:
+                fixtures.append(_selected_fixture(root, path_value))
+            except DriverInputError as error:
+                return [str(error)]
+        elif path_value.startswith(_TRANSPORT_PREFIX):
             candidate = root / "fixtures" / Path(path_value).relative_to("specification/fixtures")
-            _inside(root, candidate)
-            if not candidate.is_file():
-                continue
-        elif not path_value.startswith(_CORE_PREFIX):
-            continue
-        try:
-            path = _selected_fixture(root, path_value)
-            fixture = _load_json(path)
-        except DriverInputError as error:
-            problems.append(str(error))
-            continue
-        problems.extend(
-            f"{path.relative_to(root).as_posix()}: {error.message}"
-            for error in schemas[schema_name].iter_errors(fixture)
-        )
-    return problems
+            try:
+                _inside(root, candidate)
+            except DriverInputError as error:
+                return [str(error)]
+            if candidate.is_file():
+                fixtures.append(candidate)
+        else:
+            return [f"selected inventory fixture path has an unknown domain: {path_value}"]
+    return cast(
+        list[str],
+        _validator_module().validate(
+            root / "fixtures",
+            coverage=True,
+            family="core-generation",
+            fixture_paths=fixtures,
+            specification_root=root,
+        ),
+    )
 
 
 def _hashes(root: Path, records: Iterable[Mapping[str, Any]]) -> list[dict[str, str | None]]:
@@ -428,20 +413,139 @@ def write_json(path: Path, value: Mapping[str, Any]) -> None:
         raise
 
 
+def _is_link_or_reparse(path: Path) -> bool:
+    return path.is_symlink() or bool(getattr(path, "is_junction", lambda: False)())
+
+
+def _safe_reference_report_path(
+    path: Path, *, selected_root: Path, manifest_path: Path, environment_path: Path
+) -> Path:
+    """Validate a new-only reference-mode development report destination."""
+    lexical_target = path.absolute()
+    for ancestor in (*tuple(reversed(lexical_target.parents)), lexical_target):
+        if _is_link_or_reparse(ancestor):
+            raise DriverInputError("reference-mode report path uses a link or reparse point")
+    target = lexical_target.resolve(strict=False)
+    repository = _REPOSITORY_ROOT.resolve(strict=False)
+    selected = selected_root.resolve(strict=False)
+    for protected, label in (
+        (repository / ".git", "executable checkout A metadata"),
+        (repository / "specification", "executable checkout A specification"),
+        (selected, "selected data root B"),
+    ):
+        try:
+            target.relative_to(protected)
+        except ValueError:
+            continue
+        raise DriverInputError(f"reference-mode report path is under {label}")
+    if target == manifest_path.resolve(strict=False) or target == environment_path.resolve(
+        strict=False
+    ):
+        raise DriverInputError("reference-mode report path aliases a reference output")
+    if target.exists():
+        raise DriverInputError("reference-mode report path already exists")
+    return target
+
+
+def _write_new_json(path: Path, value: Mapping[str, Any]) -> Callable[[], None]:
+    """Publish new ordered development JSON and return an owned safe rollback."""
+    for ancestor in (*tuple(reversed(path.parent.parents)), path.parent):
+        if ancestor.exists() and (_is_link_or_reparse(ancestor) or not ancestor.is_dir()):
+            raise DriverInputError("reference-mode report parent is unsafe")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if _is_link_or_reparse(path) or path.exists():
+        raise DriverInputError("reference-mode report path changed before publication")
+    payload = (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode(
+        "utf-8"
+    )
+    return _publish_new(path, payload)
+
+
+def reference_report_publisher(
+    path: Path,
+    *,
+    selected_root: Path,
+    manifest_path: Path,
+    environment_path: Path,
+    pytest_metadata: Mapping[str, Any] | None = None,
+) -> Callable[[Mapping[str, Any]], Callable[[], None]]:
+    """Build the writer hook for a safe optional reference-mode observation report."""
+    target = _safe_reference_report_path(
+        path,
+        selected_root=selected_root,
+        manifest_path=manifest_path,
+        environment_path=environment_path,
+    )
+
+    def publish(observation: Mapping[str, Any]) -> Callable[[], None]:
+        _safe_reference_report_path(
+            target,
+            selected_root=selected_root,
+            manifest_path=manifest_path,
+            environment_path=environment_path,
+        )
+        report = dict(observation)
+        if pytest_metadata is not None:
+            report["pytest"] = dict(pytest_metadata)
+        return _write_new_json(target, report)
+
+    return publish
+
+
+def _reference_revision(value: str) -> str:
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None or value == "0" * 40:
+        raise DriverInputError("--write-reference requires a nonzero lowercase 40-hex revision")
+    return value
+
+
+def reference_output_paths(revision: str) -> tuple[Path, Path]:
+    """Return the only legal A-side reference manifest and environment destinations."""
+    revision = _reference_revision(revision)
+    directory = _REPOSITORY_ROOT / "specification" / "reference"
+    return (
+        directory / f"python-{revision[:7]}.json",
+        directory / f"python-{revision[:7]}.environment.json",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the UNRELEASED development observer as a command."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=_DEFAULT_ROOT)
-    parser.add_argument("--portable-report", type=Path, required=True)
-    parser.add_argument("--write-reference", type=Path)
+    parser.add_argument("--portable-report", type=Path)
+    parser.add_argument("--write-reference", metavar="REVISION")
     args = parser.parse_args(argv)
-    if args.write_reference is not None:
-        parser.error(
-            "--write-reference is unavailable until M1.5c/M1.7 reference preflight exists"
-        )
+    if args.portable_report is None and args.write_reference is None:
+        parser.error("at least one of --portable-report or --write-reference is required")
     try:
-        write_json(args.portable_report, asyncio.run(observe_core(args.root)))
-    except DriverInputError as error:
+        if args.write_reference is None:
+            assert args.portable_report is not None
+            write_json(args.portable_report, asyncio.run(observe_core(args.root)))
+            return 0
+        revision = _reference_revision(args.write_reference)
+        manifest, environment = reference_output_paths(revision)
+        publisher = (
+            reference_report_publisher(
+                args.portable_report,
+                selected_root=args.root,
+                manifest_path=manifest,
+                environment_path=environment,
+            )
+            if args.portable_report is not None
+            else None
+        )
+        asyncio.run(
+            write_reference(
+                args.root,
+                expected_revision=revision,
+                output_manifest=manifest,
+                output_environment=environment,
+                repository_root=_REPOSITORY_ROOT,
+                observe=observe_core,
+                publish_observation=publisher,
+            )
+        )
+    except (DriverInputError, ReferencePreflightError) as error:
         parser.error(str(error))
     return 0
 

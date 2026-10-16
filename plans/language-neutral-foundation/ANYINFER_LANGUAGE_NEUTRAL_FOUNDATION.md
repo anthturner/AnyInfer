@@ -390,7 +390,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > coverage gate, and all 13 repository gate steps passing in 79.5 seconds. The final
   > incremental 15-test asset gate also passes. Full coverage deliberately fails only for the
   > 11 transport fixture files due in M1.6; these counts describe this authored revision.
-- [ ] M1.5 Python driver under `tests/testing/portable/`. Includes the A14 time seam:
+- [x] M1.5 Python driver under `tests/testing/portable/`. Includes the A14 time seam:
   `AsyncClient.__init__` gains `_clock: Callable[[], float] | None = None` and
   `_sleep: Callable[[float], Awaitable[None]] | None = None`; `_clock` is forwarded to the
   existing `HealthCache(clock=...)` at the construction site in `async_client.py`; `_sleep`
@@ -406,7 +406,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   every adapter entry, effective wire timeout/max bytes, every public event, every
   `repair_attempted` and `parameter_dropped` telemetry event, A6's actual assessment evidence,
   and the result or error, applies the A15 extension rule, and writes explicitly UNRELEASED
-  development observations against the hashed draft inventory; and `--write-reference <path>`
+  development observations against the hashed draft inventory; and `--write-reference REVISION`
   for the manifest (specification draft §15). It cannot write `report-v0` before M1.G supplies a
   release hash. The driver never reimplements routing, repair, or validation selection. The
   `driver/concurrent-operations-independent` assertion (§17) lives here as a plain test.
@@ -444,7 +444,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
     > `registry.register(descriptor, replace=True)`. A separate data comparison confirms all
     > 85 fixture changes only wrap existing flags under `capabilities`; no script, input or
     > pending expectation changes. Numeric-control equivalence follows the user-approved §13.
-  - [ ] M1.5b Native runner/projection, all core fixture executions, explicit buffered mirror,
+  - [x] M1.5b Native runner/projection, all core fixture executions, explicit buffered mirror,
     native duplicate-key order, capture causality and real timeout/cancellation/lifecycle
     predicates; pytest options write development observations only. Gate: targeted portable
     tests execute every authored core fixture with no unavailable mandatory evidence.
@@ -523,11 +523,11 @@ M1 and later use `src/python/` paths and therefore depend on it.
       > recipes and 12 explicitly unexecuted transport obligations. No executed record is
       > fail/error; the output remains UNRELEASED and cannot qualify as report-v0. The
       > complete repository gate passed; parent M1.5b remains open for M1.5c support.
-  - [ ] M1.5c Reference/report identity support and `scripts/compare_reports.py` with its
+  - [x] M1.5c Reference/report identity support and `scripts/compare_reports.py` with its
     required negative tests. Gate: incomplete/development/wrong-identity/failing reports
     cannot qualify, and the documented qualified synthetic/Python comparisons behave exactly
     as required. The enclosing M1.5 gate still requires all waves together.
-    - [ ] M1.5c.1 Explicit selected-root validation and shared release binding. Extend
+    - [x] M1.5c.1 Explicit selected-root validation and shared release binding. Extend
       `scripts/validate_fixtures.py` so schema/report/normative-ref validation can use an
       explicit specification root, preserving existing defaults. Add
       `scripts/portable_release_assets.py` and `tests/test_portable_release_assets.py` for
@@ -535,9 +535,33 @@ M1 and later use `src/python/` paths and therefore depend on it.
       inventory/input/reference binding, and qualified-report validation. Reuse existing
       validation policy; never execute Python from a selected data root. Standalone tools
       and the private driver consume this helper without changing `sys.path`.
+      Explicit release file selection must reuse the same checks while ignoring unrelated
+      later fixtures beside a frozen release. Authoring validation keeps its whole-tree
+      missing/extra checks. Matching eligible extension verdicts are valid; equal source
+      revisions are also legitimate when native implementations share a repository commit.
       **Gate:** selected-root/schema/ref isolation and missing/changed/extra/pending/unsafe
       asset negatives pass; release/report inputs remain data-only and fail closed.
-    - [ ] M1.5c.2 Implement `scripts/compare_reports.py` and
+      > NOTE: Accepted after selected-root/helper targeted gates and clean independent
+      > closure review, including inclusive numeric bounds, typed native extension evidence,
+      > exact reference metadata, immutable release facts and raw-hash closure. The corrected
+      > identity matrix and comparison CLI passed 25 combined tests, exit 0; the complete
+      > repository gate remains required before this wave is committed.
+    - [x] M1.5c.1a Close the draft transport expectation-status gap before reference support
+      relies on complete inputs. Update `specification/schemas/transport-v0.schema.json`
+      and its shared-profile example: `expected.status` is required; pending is exactly
+      `{"status":"to_be_observed"}`, while observed retains all existing HTTP, limit and
+      kind-specific assertions. Update synthetic transport builders and positive/negative
+      tests in `tests/test_portable_assets.py` and `tests/test_portable_release_assets.py`.
+      No actual transport fixture or expectation is authored here. **Gate:** pending and
+      observed shapes validate, malformed shapes fail, and a pending transport input is
+      refused by release binding; both affected test modules and cold review pass.
+      > NOTE: Read-only M1.6 preparation found that the closed transport schema omitted
+      > the profile's general status marker. This corrects an unreleased authoring-schema
+      > contradiction; the generic pending-release guard and Python behavior are unchanged.
+      > NOTE: Accepted with 64 affected-module tests passing (one platform skip), the
+      > final adapter/core_http status-branch test passing, and clean independent closure.
+      > Pending transport expectations now refuse release binding even with updated hashes.
+    - [x] M1.5c.2 Implement `scripts/compare_reports.py` and
       `tests/test_compare_reports.py` over the accepted release-binding API. Verify trusted
       selected release bytes, exact unique IDs, derived counts, committed source/driver
       identities, driver evidence, declared eligible extensions and zero fail/error before
@@ -545,9 +569,14 @@ M1 and later use `src/python/` paths and therefore depend on it.
       implementation's pass disagreement; matching failures never qualify.
       **Gate:** qualified synthetic comparisons pass, all named negative cases fail, and
       development observations cannot qualify by copying release fields.
-    - [ ] M1.5c.3 Add private `tests/testing/portable/reference.py` and
-      `test_reference.py` for clean committed-source/import preflight, complete environment
-      lock and selected validator/resource/warning identities, and reference output support.
+      > NOTE: Accepted with clean cold review and the 25-test combined identity/CLI gate,
+      > including actual CLI success/failure against temporary synthetic sealed assets.
+      > Equal commits and matching eligible extensions remain valid; no actual release,
+      > reference artifact or qualified native report is produced by these tests.
+    - [x] M1.5c.3 Add private `tests/testing/portable/reference.py` and
+      `test_reference.py` and `test_reference_preflight.py` for clean committed-source/import
+      preflight, complete environment lock and selected validator/resource/warning identities,
+      and reference output support.
       Integrate with `driver.py`/`conftest.py` only after the helper API is stable. Required
       executable inputs must be clean; only specifically named generated outputs may be
       output exceptions. Actual reference production still waits for complete M1.6 inputs
@@ -555,6 +584,65 @@ M1 and later use `src/python/` paths and therefore depend on it.
       the maintenance contract's non-circular binding. **Gate:** dirty/wrong-import/wrong-
       revision/incomplete-environment/incomplete-corpus preflights refuse before writes,
       clean synthetic preflight succeeds, and existing development output remains truthful.
+      > NOTE: The reference lock enumerates all installed distributions with exact versions,
+      > metadata/RECORD provenance and actual loaded-code identities; selected validator
+      > resources are content-hashed, not identified only by URI. Reference execution scopes
+      > and records an exact strict warning filter, restoring ambient policy afterward.
+      > The manifest package versions are the complete projection of the installed lock,
+      > including installed extras; required runtime packages are a subset. Metadata hashes
+      > are required, while explicitly present nullable RECORD/direct-URL hashes denote
+      > genuinely unavailable artifacts. No credential-bearing URL content is exported.
+      > Reproduction imports executable checkout A and uses B only for frozen data; output
+      > exceptions are exact generated paths and cannot overwrite sealed release inputs.
+      > NOTE: The private preflight uses new `python-<A7>.json` and
+      > `python-<A7>.environment.json` destinations under executable A's
+      > `specification/reference/` for both initial production and reproduction. Selected
+      > external B is verified read-only release data; its existing sealed evidence is
+      > never an output destination. Any existing A destination is also refused.
+      - [x] M1.5c.3a Complete the writer-free preflight/environment slice in
+        `reference.py`, `test_reference.py` and `test_reference_preflight.py`. Keep native
+        import roles, Git status, lexical containment and actual loaded-code/resource
+        identities observable without writing files. **Gate:** both test modules pass
+        together and independent review closes all source and direct-proof findings.
+        > NOTE: Accepted with 24 tests passing, one platform skip, and clean independent
+        > closure of direct corpus/Git/import/link/loader proofs. Production Python is
+        > unchanged; reference writing and plugin integration retain separate gates below.
+      - [x] M1.5c.3b Add `reference_writer.py` and `test_reference_writer.py`.
+        `write_reference(..., observe=...)` invokes the trusted native observer under strict
+        warnings, requires complete successful inventory/evidence, captures the actual
+        environment, and repeats preflight before writes to reject changed inputs/source.
+        Extract shared pure `validate_reference_evidence` policy into
+        `scripts/portable_release_assets.py`; reuse it in loading and writing.
+        Publish new environment bytes first and manifest last with atomic no-replace
+        semantics; clean this invocation's new artifacts on publication failure.
+        **Gate:** synthetic complete production succeeds; incomplete observations,
+        cancellation, drift, invalid metadata, existing outputs and publication faults
+        refuse without false evidence or overwritten files; targeted tests and review pass.
+        > NOTE: Accepted with 53 helper/writer tests passing, one platform skip, clean
+        > independent closure and unsuppressed strict typing. Native fixture/driver row
+        > shapes, whole-case ordinary JSON, B immutability and canonical A publication
+        > are exercised. Actual reference production remains blocked until M1.6/M1.7.
+      - [x] M1.5c.3c Integrate the reviewed writer into private `driver.py`, `conftest.py`
+        and `test_driver.py`, preserving truthful development output and keeping current
+        incomplete/dirty reference attempts fail-closed. **Gate:** actual CLI/plugin
+        success/refusal paths and the combined portable suite pass; the complete repository
+        gate passes before the phase commit. No actual reference artifact is produced
+        before M1.6/M1.7 satisfy the complete clean-input conditions.
+        > NOTE: `--write-reference REVISION` takes a nonzero lowercase 40-character A
+        > revision and derives both canonical A output filenames; `--portable-report` is
+        > optional, and at least one output mode is required. Pytest performs preflight
+        > before tests and never publishes a reference after a failed test session. A
+        > trusted optional observation publisher runs after final writer validation and
+        > before reference bytes; it returns an owned rollback action. Reference-mode
+        > observation publication is new-only, and later reference publication failure
+        > rolls back only outputs created by that invocation. Ordinary development-report
+        > output behavior remains unchanged.
+        > NOTE: Accepted after the focused real plugin/semantic/custom-root controls passed,
+        > all final independent reviews closed, unsuppressed strict mypy passed 15 support
+        > modules, and all 13 repository checks passed in 237.0 seconds. The gate used a fresh
+        > pytest cache after an unrelated pre-existing cache ACL blocked session cleanup.
+        > All M1.5 waves are complete. No actual reference/release artifact exists; M1.6a is
+        > the first unchecked execution box.
 - [ ] M1.6 Transport fixtures and driver support in `tests/testing/portable/transport.py` for an
   actual native mocked OpenAI chat-completions transport. `transport-v0` distinguishes an
   `adapter` case (`input.adapter_config` and `input.wire`) from a `core_http` case
@@ -566,6 +654,44 @@ M1 and later use `src/python/` paths and therefore depend on it.
   events, results and failures. Assert outgoing buffered/streamed requests, sampling omission,
   message/prompt projection, SSE split/chunk cases, non-SSE errors and functional raw-byte
   limits/reset. The adapter never receives expected outcomes as inputs.
+  > NOTE: Close the draft's open transport input shapes before authoring fixtures. Reuse
+  > the selected fixture schema's existing definitions through explicitly registered local
+  > resources; external schema retrieval stays disabled. Compare lowercased semantic headers
+  > (content type, fixture authorization and explicitly configured custom headers), excluding
+  > automatically generated client/framing headers. Fixture custom headers cannot override
+  > content type or authorization. Direct wire mechanisms remain null or prompt. Observed
+  > `expected.core` reuses the complete core expectation with its nested status forced to
+  > observed; pending outer expectations remain status-only. These are bounded fixture-data
+  > rules and do not change Python adapter behavior.
+  - [ ] M1.6a Close transport authoring inputs/outcomes in
+    `specification/schemas/transport-v0.schema.json` and the transport section of
+    `specification/core-generation.md`. Reuse the fixture schema's request, route, message,
+    nested sampling, usage and core expectation definitions; `request.consume` is the only
+    core consumption control. Register the finite selected local schema resources in
+    `scripts/validate_fixtures.py`, preserving denied external retrieval and selected-root
+    isolation. Update synthetic builders and both asset test modules for the closed shapes.
+    **Gate:** both affected asset modules pass with local-reference, wrong-root, missing
+    resource, semantic-header, variant and pending-status positives/negatives; cold review
+    confirms no policy copies or checkout fallback.
+  - [ ] M1.6b Implement private `tests/testing/portable/transport.py` and
+    `test_transport.py`. Use ordinary `ProviderSettings.transport` with scripted native
+    HTTP responses and a fresh built-in registry descriptor whose transparent wrapper records
+    the exact `WireRequest` before delegating to the real OpenAI-compatible adapter. Keep
+    explicit native lifecycle delegates and close the delegated async iterator on early exit.
+    Reuse existing runner construction/execution helpers, extracting a private shared body in
+    `runner.py` where required; retain all existing core capture and comparison checks.
+    Record actual HTTP requests, raw chunks and effective wire limits alongside `NativeRun`.
+    **Gate:** focused adapter/core HTTP observations, scripts, request projection, lifecycle,
+    cap and failure controls pass together with the existing runner/projection/comparison tests.
+  - [ ] M1.6c Author the eleven named pending transport fixtures under
+    `specification/fixtures/transport/openai-chat/`, implement the real
+    `driver/http-correction-byte-budget-reset` proof, and dispatch transport fixtures/proof
+    from `tests/testing/portable/driver.py`. Transport comparison preserves pending verdicts
+    until M1.7 reconciliation; the HTTP proof asserts individual-entry byte budgets and
+    buffered/streamed multibyte overflow through actual native execution.
+    **Gate:** all 102 inventory records execute in development mode with no unexecuted
+    transport/driver rows, exact inventory coverage validates, and the complete M1.6 gate
+    below passes without a qualified-report or reference-production claim.
   **Gate:** `.\.venv\Scripts\python.exe -m pytest -q tests/testing/portable tests/test_openai_compat.py`
   passes; `.\.venv\Scripts\python.exe scripts/validate_fixtures.py --check-coverage` proves
   complete DEVELOPMENT coverage for core and transport requirements. This remains unreleased.

@@ -622,6 +622,13 @@ The adapter receives only input configuration and scripted responses, never expe
 or outcomes. Parser-specific cases additionally compare normalized events without coalescing;
 byte chunks are fed at the specified boundaries but are not assumed to equal SSE frames.
 
+Transport `expected.status` is `observed` or `to_be_observed`. An observed transport
+expectation includes its HTTP requests, wire limits, and the variant-specific adapter outcome
+or core expectation. A pending transport expectation is exactly
+`{ "status": "to_be_observed" }`: it retains runnable input and response data but does not
+invent wire or outcome assertions. Every pending expectation must be observed and reconciled
+before release freeze.
+
 The HTTP proof covers buffered and streamed modes, message projection, supplied/omitted
 sampling, prompt projection, status 503/non-SSE input, raw-byte caps including multibyte
 UTF-8, and correction-entry byte-budget reset through the real core. Fixture schemas enforce

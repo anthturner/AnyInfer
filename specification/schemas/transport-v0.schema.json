@@ -57,8 +57,9 @@
         "expected": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["http_requests", "wire_limits"],
+            "required": ["status"],
             "properties": {
+                "status": {"enum": ["observed", "to_be_observed"]},
                 "http_requests": {
                     "type": "array",
                     "items": {
@@ -91,7 +92,14 @@
                 },
                 "adapter_outcome": {"type": "object"},
                 "core": {"type": "object"}
-            }
+            },
+            "allOf": [
+                {
+                    "if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]},
+                    "then": {"required": ["http_requests", "wire_limits"]},
+                    "else": {"maxProperties": 1}
+                }
+            ]
         }
     },
     "allOf": [
@@ -100,7 +108,14 @@
             "then": {
                 "properties": {
                     "input": {"required": ["wire"], "not": {"required": ["operation"]}},
-                    "expected": {"required": ["adapter_outcome"], "not": {"required": ["core"]}}
+                    "expected": {
+                        "allOf": [
+                            {
+                                "if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]},
+                                "then": {"required": ["adapter_outcome"], "not": {"required": ["core"]}}
+                            }
+                        ]
+                    }
                 }
             }
         },
@@ -109,7 +124,14 @@
             "then": {
                 "properties": {
                     "input": {"required": ["operation"], "not": {"required": ["wire"]}},
-                    "expected": {"required": ["core"], "not": {"required": ["adapter_outcome"]}}
+                    "expected": {
+                        "allOf": [
+                            {
+                                "if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]},
+                                "then": {"required": ["core"], "not": {"required": ["adapter_outcome"]}}
+                            }
+                        ]
+                    }
                 }
             }
         }

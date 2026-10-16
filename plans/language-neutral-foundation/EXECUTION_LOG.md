@@ -596,8 +596,482 @@ gates.
 
 ### Current resume point: M1.5c.1
 
-Commit this reviewed checkpoint, then execute the first unchecked M1.5c.1 box. Start with
+The reviewed checkpoint is committed at `ece93723c7e9558e1d680caa80a80d5b276002ac`;
+the coordinator verified a clean working tree and the relocated Python import. Execute
+the first unchecked M1.5c.1 box. Start with
 explicit selected-root validation and one shared data-only release/report binding helper;
 comparison/reference consumers depend on its accepted API. No owner is authorized to alter
 Python retry/repair or implement aggregate accounting. The coordinator owns shared plan
 acceptance and serializes tracked test slots.
+
+The first M1.5c.1 slice is assigned to agent `c16f5f94-b124-40f4-9deb-8121afdbc093`,
+owning only `scripts/validate_fixtures.py` and `tests/test_portable_assets.py`. It adds explicit
+selected specification-root parameters to validation/report APIs while preserving defaults,
+and a shared strict `read_json` entry point. Its one tracked asset-test slot is authorized.
+Agent `04f0bc20-ef3f-4048-9249-961fffa69ee4` prepares the release-binding API read-only;
+agent `1e09179c-3413-4551-b0e4-65cb177a5654` independently prepares reference/environment
+preflight facts read-only. No common helper, comparison script or reference writer is
+implemented until the coordinator settles those interfaces. No reference/release artifact
+or C# parity claim exists yet.
+
+Reference preparation settled implementation details before writer authoring: enumerate the
+complete installed distribution lock with exact versions and metadata/RECORD provenance,
+bind actual loaded runtime code and deterministic JSON content hashes of selected registry
+resources, and scope an exact strict warning filter only to reference execution (restore
+ambient filters afterward). No credential-bearing direct URL contents are exported. A/B
+reproduction imports clean executable A; B supplies frozen data only. Exact generated output
+exceptions never exempt arbitrary dirty source or overwrite sealed inputs.
+
+Release-helper proposal review corrected two compatibility traps: matching eligible extension
+verdicts remain allowed, and equal source/driver revisions across monorepo implementations are
+legitimate. Frozen release verification must validate its closed listed input set without
+globbing unrelated later fixtures. The validator owner therefore adds an optional explicit
+`fixture_paths` selection through the same checks; ordinary authoring validation retains its
+whole-tree missing/extra behavior.
+
+The initial selected-root API test run reported 15 pass/2 fail because temporary explicit
+roots lacked their own schemas. The owner corrected those test inputs honestly and is adding
+explicit-list isolation/negative tests before its next single tracked slot. No common helper,
+qualified comparison, reference artifact or M1.5c checkbox is accepted yet.
+
+The coordinator's tracked selected-validation gate passed **19 tests**, exit 0 (shell
+`2266a811-3809-46a9-8001-ea2518588d90`). Cold review nevertheless found explicit-root
+inventory fallback for a distinct fixture tree, acceptance of intermediate symlink-directory
+components, and inconsistent missing-root diagnostics. The validator owner closes these
+with targeted regressions before the API is accepted or used by the release helper. The
+passing first module run does not close those findings.
+
+Selected validation is now accepted as the helper's input API: all three review findings
+are closed; the owner's tracked 22-test asset-module run exited 0 in shell
+`d73f53d0-6892-47f1-b502-f5d82a5a376b`, whose log the coordinator inspected. The coordinator
+also reran validator mypy and both-file Ruff successfully. Defaults remain compatible;
+explicit roots bind schemas/inventory/normative refs, and explicit file lists reject links
+and escapes without globbing future inputs. The overall M1.5c.1 box stays open for its helper.
+
+Agent `04f0bc20-ef3f-4048-9249-961fffa69ee4` now owns only new
+`scripts/portable_release_assets.py` and `tests/test_portable_release_assets.py`. Its agreed
+API is `ReleaseBindingError`, frozen `ReleaseAssets`, `load_release_assets(root, release_path)`,
+`validate_qualified_report(report_path, assets)` and `require_comparable_reports(left, right,
+assets)`. It imports trusted source-checkout validation code only, verifies exact frozen
+file/inventory/reference/environment identities and report qualification, and performs no writes.
+The selected root remains data-only. Passing report rows never bypass full qualification.
+
+The helper owner has one exclusive persistent-shell test slot with at most three serialized
+owned-module runs; this replaces the inefficient one-failed-run handback pattern while still
+preventing concurrent suites and lost exec handles. Other workers remain test-held. Tests
+construct only temporary synthetic complete release trees; no actual M1.6 transport fixture,
+reference, release or qualified native report is authored by this box. Compare/reference
+consumers remain held until the helper API and private Python environment format are reviewed.
+
+The first helper draft is **not accepted**, despite three synthetic tests passing. Root/cold
+review found a direct-mapping qualification bypass, selected-root/manifest path gaps, numeric-key
+objects accepted as normalized results, fatal/cancellation evidence gaps, shallow mutable
+bindings, incomplete metadata checks and missing negative coverage. A broad six-code mypy
+suppression invalidated its claimed strict type-check evidence and must be removed. The same
+owner has one consolidated correction wave and exclusive tracked test slot; compare/reference
+consumers remain held.
+
+The coordinator refined one review finding: a complete installed-distribution lock is
+intentionally a superset of required runtime packages, and its raw environment digest already
+binds every extra row. For explicit producer consistency, manifest `packages` now projects
+the entire installed lock's name/version set exactly. Metadata hash is required; RECORD and
+direct-URL hash keys are explicit and nullable only for absent artifacts. Matching eligible
+extensions and equal monorepo commits remain legal. A normalized extension result must contain
+all ten named, typed fields; additional JSON fields remain allowed by the existing report
+schema. This corrects helper validation, not Python runtime behavior or release scope.
+
+The corrected helper passes coordinator-run Ruff and genuinely unsuppressed strict mypy.
+Its last authorized targeted run reports 19 pass/1 skip/1 fail; the remaining failure exposes
+the shared validator still reconstructing canonical normative refs through a directory named
+`specification`. Agent `c16f5f94-b124-40f4-9deb-8121afdbc093` owns the precise mapping fix
+and arbitrary-basename regression in its existing two files. No prose-filter, temp-tree,
+symlink workaround or policy exception is authorized. The helper is stable under cold
+re-review; compare/reference consumers and M1.5c.1 acceptance remain held.
+
+The shared normative-ref mapping fix is ready with its tracked asset module reporting
+23 pass, exit 0 (owner shell `a8b0b3ad-c26b-4963-b811-2808d15393be`); a separate read-only
+closure checks that precise delta. Helper review closed its path, immutable-binding,
+package-projection, unsuppressed-typing and shared-qualification fixes, then found two
+remaining evidence issues: legal `none: true` extension outcomes were rejected, and result
+subfields/direct mappings were not fully checked against the declared ordinary JSON domain.
+The helper owner fixes both within its next exclusive tracked slot.
+
+Hash closure also requires every inventory `spec_ref` target to belong to the verified
+release file set. An unrelated unreferenced future file remains ignored; an actual normative
+reference cannot silently point at unbound text. The correction includes that guard and a
+temporary synthetic regression, without globbing later assets or changing v0 runtime behavior.
+
+The owner’s final helper run reported **31 pass, 1 platform skip**, exit 0; the coordinator
+inspected its retained log. A subsequent defensive type guard had only static validation,
+so root launched the combined asset/helper modules against the final source in tracked shell
+`911289c5-1415-43b3-9f98-b7226bf6a811`. Final cold review closed the result, none-outcome,
+surrogate and normative-reference hash findings, but root/reviewer found one remaining domain
+contradiction: direct report validation excludes `+2^63` while the settled v0 domain includes
+both endpoints. Correct that bound and add direct-report endpoint regressions after this
+stable-source run; a green run of the preceding source cannot establish final acceptance.
+
+The combined stable-source gate passed **54 tests, 1 platform skip** in 105.23 seconds,
+exit 0. The subsequent endpoint node passed after placing its control values in schema-valid
+driver observations. A final bounded metadata review also requires present validator
+selection/defaults and nonempty hashed resource identities, and ties both reference artifact
+basenames to A's seven-character prefix. The helper owner closes those structural omissions
+without treating JSON metadata as proof of native execution.
+
+The three-function release-binding interface is stable while these final predicates are
+corrected. Agent `c16f5f94-b124-40f4-9deb-8121afdbc093` may therefore author M1.5c.2 in
+only new `scripts/compare_reports.py` and `tests/test_compare_reports.py`, with no shared
+helper edits and no pytest launch until the exclusive slot is granted. This parallel authoring
+does not accept M1.5c.1 or waive its pending review/test gate. Reference writing and all real
+reference/release artifacts remain held.
+
+Agent `1e09179c-3413-4551-b0e4-65cb177a5654` owns a disjoint first M1.5c.3 slice in new
+`tests/testing/portable/reference.py` and `test_reference.py`: real clean-source/import/corpus
+preflight, actual environment capture and scoped strict warnings. This slice performs no
+output writes or driver/plugin integration. It may author against the stable binding API;
+the writer is a later reviewed integration step. Tests remain serialized by root, and no
+reference or parent checkbox is accepted on code readiness alone.
+
+The initial writer-free reference slice is not proof-ready: its first tests covered only
+warning scope, leaving the requested provenance and environment failure matrix unproved.
+The owner acknowledged this and is expanding tests while closing lexical link, tracked-import
+and selected-B binding checks. Independent review owns the same scope read-only. Existing
+sealed B evidence cannot be an output destination; reproduction writes only the two exact
+new generated filenames under executable A's `specification/reference/`, never over an
+existing destination. This technical destination choice preserves the settled A/B contract.
+
+The comparison CLI is code-ready with static checks reported; its independent review and
+next exclusive tracked test slot remain pending. It imports trusted sibling binding code,
+loads selected release assets once, and writes no files. Neither code readiness nor prior
+helper tests accept the M1.5c parent.
+
+### M1.5c.1 and M1.5c.2 accepted; resume M1.5c.3
+
+The helper owner's metadata matrix ran **38 pass, 1 platform skip, 1 fail**, exposing URI
+uniqueness being checked on URI/hash pairs. Its minimal URI-key correction passed the final
+root identity/CLI gate: **25 tests passed in 97.48 seconds**, exit 0, shell
+`a50b0825-5927-4835-8b7d-339bc89bf6f7`. Root inspected the retained summary. The earlier
+combined asset/helper gate passed 54 tests with one platform skip; the endpoint correction
+also has direct report-boundary proof. Independent release-binding and CLI reviews are clear.
+Root reran Ruff over the six changed script/test files and unsuppressed strict mypy over
+the five applicable script/new-test modules successfully.
+
+M1.5c.1 and M1.5c.2 are checked. The parent and M1.5c.3 remain open for reviewed clean
+reference preflight, actual environment capture, writer/plugin integration and their gates.
+Nothing is committed yet; the full repository gate remains mandatory before the next commit.
+No actual frozen release/reference artifact or conformance claim exists. Current source HEAD
+remains `ece93723c7e9558e1d680caa80a80d5b276002ac`.
+
+The first writer-free reference-module gate (shell
+`c42bdc6f-21f2-4437-8ed1-b33bf60facc5`) exited 1. It showed two ordinary failures before
+a test-only global `sys.modules` replacement removed `warnings` and broke pytest's own
+failure reporting. No complete pass/fail tally or preflight acceptance is inferred from
+that interrupted run. The owner replaces this with scoped module facts/patches, corrects
+the noncallable validator stand-in and folds the remaining cold-review proof requirements.
+It has one exclusive persistent slot with at most two serialized owned-module reruns;
+all other pytest launches remain held. Production Python behavior and the corpus are unchanged.
+
+Final preflight review retains two High findings for the correction wave: supplied roots
+were resolved before lexical link checks, including a dangling final output link; capture
+could record a swapped foreign private driver without a fresh tracked/contained check.
+The owner must prove those actual rejection paths and the real dirty/pending/missing/import
+helpers, in addition to repairing the synthetic harness. Orchestration mocks alone do not
+establish this gate. Writer/plugin authoring remains held until the snapshot passes review
+and its targeted tests. Read-only preparation of M1.6's existing transport interfaces may
+proceed independently; no transport fixture or implementation is authorized in that prep.
+
+A read-only local toolchain check found .NET SDK **8.0.425** and runtime **8.0.31**
+installed, alongside other SDK/runtime versions. No installation or source change was needed.
+This removes a local setup uncertainty for the settled `net8.0` proof; it is not M2
+feasibility acceptance, which still depends on the frozen corpus and its named gates.
+
+The corrected writer-free reference module passed **12 tests, 1 platform skip** in
+23.07 seconds, exit 0 (owner shell `12436db1-7f3b-4cb0-977b-c56af666f248`); root inspected
+the log. The Git wrapper now preserves raw porcelain, and validator evidence distinguishes
+the actual instance format-checker default from the separately available class checker.
+Agent `c7089bf7-a970-4b5f-960e-4bbdbe32dd26` owns only new
+`test_reference_preflight.py` for independent direct helper/corpus/Git/link/import proofs;
+the preflight owner holds its existing two files. Final closure and these proofs remain open.
+
+Read-only transport preparation confirmed a separate unreleased schema contradiction:
+closed transport `expected` omitted the profile's general `status` marker, so pending native
+expectations could not be honestly represented. Corrective M1.5c.1a requires explicit
+observed/pending status, pending-only expected objects and the existing complete observed
+assertions. Agent `c16f5f94-b124-40f4-9deb-8121afdbc093` owns only that schema, its normative
+example, asset tests and the synthetic transport builder/release negative in
+`tests/test_portable_release_assets.py`. The previous helper owner has relinquished that test
+file. No actual transport inputs or expectations are authored. The first unchecked box is
+now M1.5c.1a; c.3 direct-proof authoring continues independently.
+
+The c.1a affected modules are running in root shell
+`20c4459f-ae94-4363-a903-e5493dac0525`. Markdown links passed across all 23 specification
+and plan files. Cold review found no transport-status schema defect but requests direct
+`core_http` observed/pending and both opposite-outcome negatives in addition to the adapter
+branch. Those test-only additions wait for the fixed-source run to finish.
+
+Final reference code review still found three fail-open paths despite the prior module pass:
+capture omitted role-prefix checks on tracked imports, foreign private modules could be
+classified from their path and skipped, and an intermediate ancestor of a supplied root
+could be resolved before link inspection. The preflight owner corrects source; the independent
+proof owner adds direct regressions plus a real trusted sibling-loader check. No writer
+integration or c.3 acceptance proceeds on the earlier green snapshot.
+
+M1.5c.1a is accepted: the two affected modules passed **64 tests, 1 platform skip** in
+132.61 seconds, exit 0 (root shell `20c4459f-ae94-4363-a903-e5493dac0525`), and the final
+status-branch node passed with clean review closure (owner shell
+`4b366c92-97f5-4b7c-a2c6-06aa531c75ea`). Root inspected both retained logs. No real
+transport fixture or expectation was authored.
+
+The combined final reference modules ran **22 pass, 1 platform skip, 1 fail** in 29.35
+seconds, exit 1 (root shell `048f86e8-7b7e-4685-baf6-f7728c99e737`). Every independent
+direct rejection proof passed. The remaining capture-unit setup used a fake checkout root
+while the actual private `portable` package was genuinely loaded elsewhere, so the improved
+capture correctly refused it. The preflight owner fixes only that unit setup using actual
+checkout provenance and a scoped temporary dependency probe; production guards stay intact.
+The first unchecked box remains M1.5c.3, including its still-unimplemented writer integration.
+
+The small capture-unit correction preserved actual checkout imports and introduced only a
+scoped temporary `httpx._reference_capture_probe`. Its two-node run proved the byte change,
+then failed on stale expected error wording for the correctly refused foreign import;
+the assertion alone was corrected. Root is rerunning both reference modules plus the
+symmetric tracked wrong-role driver proof in shell `62adbb0c-700b-40ce-b2c8-17e7d07764b0`.
+The shared helper/builder are held during that fixed-source run.
+
+M1.5c.3 is subdivided into writer-free proof, writer and driver integration gates. With the
+preflight source API reviewed and stable, agent `04f0bc20-ef3f-4048-9249-961fffa69ee4`
+owns only new `reference_writer.py`/`test_reference_writer.py` plus the narrow pure
+reference-evidence extraction in `scripts/portable_release_assets.py` and its test file.
+The helper test ownership returns from the completed transport-status owner. New writer
+authoring may proceed independently; helper/builder edits wait until root's current reference
+gate finishes. The callback is internal trusted native execution, never selected-root code
+or a user plugin. Pre/post execution input binding and no-replace publication are required;
+all real reference production remains gated to M1.7.
+
+M1.5c.3a is accepted: the final combined native-fact/direct-proof gate passed **24 tests,
+1 platform skip** in 33.86 seconds, exit 0 (root shell
+`62adbb0c-700b-40ce-b2c8-17e7d07764b0`), and the bounded final review closed its symmetric
+driver proof item without source weakening. Root inspected the retained result. The first
+unchecked child is now M1.5c.3b; the enclosing reference/phase boxes remain open.
+
+The first writer source is code-ready but **not proof-ready**: its assigned test file had
+only import-level coverage. Root transferred only `test_reference_writer.py` to agent
+`c7089bf7-a970-4b5f-960e-4bbdbe32dd26` for actual controlled-observer/publication tests;
+agent `04f0bc20-ef3f-4048-9249-961fffa69ee4` holds the writer and shared validation source
+pending consolidated cold review. Positives must use the actual development observation
+shape, and publication faults must preserve preexisting outputs/staging files. No writer
+pytest gate, actual artifact or parent acceptance is claimed from import/type checks.
+
+Cold writer review found four P1s before testing: its count check did not match actual
+development `Counter` output with `unexecuted: 0`; it omitted unexecuted and full native
+extension evidence checks; fixed PID staging cleanup could delete a preexisting file and
+did not bootstrap the absent output directory; and the extracted metadata validator could
+accept direct nonordinary JSON. The source owner corrects these together, sharing case/evidence
+policy with qualified-report validation and preserving typed counts (booleans never count
+as integers). The independent test owner uses actual development shapes and controlled
+native/publication failures. No writer gate or source acceptance is inferred yet.
+
+Root source inspection did not substantiate the first owner's later "all four fixed"
+report: the actual writer still lacked shared full case/evidence validation and missing
+reference-directory bootstrap, and checked an invented `UNRELEASED: true` marker instead
+of native `development_observation: "UNRELEASED"`. Its corrected typed sparse counts,
+ordinary-metadata guard and owned temporary staging are retained. The owner is held.
+Agent `c16f5f94-b124-40f4-9deb-8121afdbc093` now owns only `reference_writer.py`,
+`scripts/portable_release_assets.py` and `tests/test_portable_release_assets.py` for a fresh
+bounded correction. Agent `c7089bf7-a970-4b5f-960e-4bbdbe32dd26` retains the independent
+writer tests. No driver format change is authorized; positives use its real native envelope.
+No pytest begins until the mandatory tests and actual consolidated source fixes are ready.
+
+The replacement source owner reports the real native development envelope, shared batch
+case/evidence validation and first-run directory preparation implemented; independent writer
+tests now pass unsuppressed strict typing without an unrelated driver import. Source/tests
+remain held and pytest has not begun. Root's source inspection found that directory
+preparation still derives from selected data root B instead of executable A's specification
+directory, contrary to the accepted preflight contract. The cold reviewer is checking this
+and the complete writer correction before a test slot is granted. In parallel, the prior
+driver owner is mapping c.3c CLI/plugin integration read-only, including optional observation
+output failure handling. The first unchecked box remains M1.5c.3b.
+
+The consolidated writer review confirms the prior four corrections but identifies two
+remaining P1s: directory preparation targets B instead of A, and its development-row view
+incorrectly requires fixture-only top-level `observations` on native driver-assertion rows.
+The replacement source owner corrects both; the independent test owner now models real
+fixture/driver row shapes and separate B data with exact A output paths. No pytest slot is
+granted until this fixed snapshot is held for closure review.
+
+For c.3c, the private option will be `--write-reference REVISION`, a nonzero lowercase
+40-character A revision, deriving both canonical A filenames. `--portable-report` remains
+optional and ordinary development behavior is preserved. Reference-mode report publication
+will join the writer's owned transaction so a requested report failure cannot leave a false
+reference pair; the exact small callback interface is still to be finalized after c.3b.
+
+Final bounded source review closes both writer P1s. Root independently inspected the A-only
+directory preparation and native kind-specific row view, then ran Ruff and unsuppressed
+strict mypy over the four helper/writer source and test modules: both passed. Two test-only
+setup expectations were corrected without weakening source: synthetic A includes its existing
+`specification` directory, while only `reference` starts absent; an existing environment
+destination expects the early preflight error, while a raced hard-link still expects
+`FileExistsError`. The combined targeted gate is running in root shell
+`56ce0279-1b1b-4fa5-8b27-2fe356c8de5a`, with source and tests held.
+
+That gate exited 1: helper tests passed, while three writer tests all encountered the same
+invalid synthetic baseline. The test builder listed extension features per eligible case
+without deduplicating the shared dialect feature (nine cases, eight features), so the actual
+writer correctly refused before drift/publication predicates. The independent test owner
+corrects only the builder and strengthens negative-test causality: validate the untouched
+baseline, then check the intended diagnostic for each isolated mutation. Ineligible-case
+tests retain valid full declarations instead of substituting an unrelated invented feature.
+Writer/helper source stays held; root will rerun only the changed writer module next.
+
+The writer-only rerun (`acf089bf-ef43-461b-b1fd-6ad4140ca3e0`) passed six tests and failed
+one diagnostic-order assertion in 6.86 seconds. Successful A publication/B immutability,
+drift, cancellation, metadata refusal and race cleanup now pass. Null driver evidence is
+correctly rejected by the selected case schema before the later semantic recipe check;
+the negative matrix expected the later wording. The independent test owner has the sole
+pytest slot to correct only diagnostic-order expectations and run the complete seven-test
+writer module persistently. Source remains unchanged; a new source defect must be escalated.
+
+Root inspection and the reviewer confirmed an additional direct-case P1: the new shared
+successful-case validator checks ordinary JSON only in fixture observations, leaving driver
+or extension nested evidence able to contain nonfinite numbers, lone surrogates or integers
+outside v0 bounds. Qualified report mappings already reject those values. The helper owner
+will add the same whole-case-list guard and isolated nested-evidence regressions, preserving
+inclusive endpoints. Edits wait until the independent writer test owner's sole run releases
+the pytest slot; no source changes are allowed underneath that run. c.3b remains unchecked.
+
+M1.5c.3b is accepted: root's joined helper/writer gate
+`c9bf730d-5a82-47aa-b122-22e8d0bf8ac8` passed **53 tests, 1 platform skip** in 43.00
+seconds, exit 0. Root inspected the retained log, the whole-case guard and nested-evidence
+regressions; Ruff and unsuppressed strict mypy passed across all four helper/writer modules.
+The final independent code delta is clean. Both native case shapes and exact A-output/B-data
+separation are now proved. The first unchecked child is M1.5c.3c; no real reference artifact
+has been written, and the enclosing phase/full repository gate remains open.
+
+M1.5c.3c ownership is disjoint: agent `c16f5f94-b124-40f4-9deb-8121afdbc093` owns only
+the writer's optional trusted publication callback; agent
+`c7089bf7-a970-4b5f-960e-4bbdbe32dd26` owns its independent writer tests; agent
+`1e09179c-3413-4551-b0e4-65cb177a5654` owns driver/plugin integration and its tests.
+The callback runs after final validation, publishes an optional new observation report,
+and returns its owned rollback action so later reference failure cannot strand partial
+output. Ordinary development output keeps its existing replacement behavior. No agent
+runs pytest before root assigns the serialized joined slot.
+
+The driver owner also has two bounded private typing corrections: import the existing
+`MissingEvidenceError` from its canonical values module in `comparison.py`, and access
+the same stdlib `asyncio.timeout` object directly in `proof_timeouts.py` instead of relying
+on an implicit SDK-module re-export. These resolve six known transitive strict diagnostics
+without changing production code, timeout delegation or proof policy. Existing timeout
+and complete portable checks must still pass in the joined gate.
+
+The c.3c hook is source-ready and its independent callback tests are authored, but review
+found one remaining publication-ownership race: metadata cleanup unconditionally unlinks
+paths and can delete a replacement environment file. The writer owner changes the byte
+publisher to return an identity-guarded rollback, recording the owned staging identity before
+linking and comparing the destination's own identity on cleanup. Independent tests replace
+the environment inode before manifest failure and require that replacement to survive while
+the callback-owned report rolls back. The driver report publisher will reuse this same byte
+primitive after its path/serialization checks. No pytest runs during the correction.
+
+The integration source remains held for consolidated CLI/plugin/path review. Root also found
+that the requested shared strict loader/selected validator reuse was omitted and the new
+report-path guard blocks all of A rather than the named protected inputs. These are not
+accepted as silent scope changes; the driver owner receives one consolidated correction
+after review. The first unchecked box is still M1.5c.3c.
+
+Root's source-path-only Windows probe corrected one review assumption: `Path.absolute()`
+retains an absolute path's `..` segments here, allowing a lexical prefix test to miss a
+destination that resolves into protected inputs. The integration correction walks links
+before canonicalization, then checks and returns the canonical destination. It also reuses
+the trusted strict validator, permits named safe A output paths outside protected inputs,
+and adds real pytest parser/lifecycle/controller proofs rather than only direct hook calls.
+
+The isolated writer callback/identity-ownership gate
+`0c781d82-896d-4f2d-bf6b-4ceb1010ce28` exited 0 with **12 tests passing**. Root inspected
+the retained log and actual staging-before-link/lstat-guarded rollback implementation.
+The independent replacement-inode and callback-cleanup resilience tests pass. Driver
+integration remains in correction; the enclosing c.3c gate is not yet accepted.
+
+The driver correction is source-ready: strict loading and exact selected-fixture validation
+delegate to the trusted A-side validator; report destinations are canonicalized after link
+inspection and protect A metadata/specification plus B while permitting safe named scratch
+output. Report publication reuses the accepted identity-safe byte primitive. The subprocess
+harness was tightened before launch: explicit 60-second child timeouts, append-only startup
+events detecting duplicate worker hooks, and a real parser startup-refusal case. Root's
+35-test targeted driver/writer gate is running in
+`7b293ca3-8357-4550-9cad-a9e3e3a9e702`; all source/test files are held. Final driver
+review runs read-only in parallel. No reference files are generated in the checkout.
+
+The targeted integration gate exited 1: **32 passed, 2 failed, 1 setup error** in 22.92
+seconds. Writer tests passed. Test-only corrections enable the pytester fixture, expect the
+earlier shared inventory diagnostic, and mutate valid fixture fields for NaN/surrogate
+domain controls instead of unrelated malformed JSON/schema shapes. Final review also
+requires the child writer to await and forward the actual raw observer callback, rather
+than manually substitute its return value; that proof correction is authored.
+
+The selected-schema failure is a real shared-helper boundary defect: an unresolved asset
+schema `$ref` escapes during evaluation, after construction checks. The shared validator
+owner now owns only the two validator/release scripts and their two asset test modules to
+return useful diagnostics, keep local references working and disable external retrieval of
+unbound schema assets. The direct case validator must reuse that policy. Native SDK schema
+behavior is unchanged. Driver/writer files stay held; no pytest runs until this correction
+and its tests are stable for review.
+
+Read-only M1.6 preparation identified an open authoring-contract gap: transport inputs leave
+adapter configuration and direct-wire/core-operation fields schema-open, and the profile
+does not yet fix the header projection. The proposed minimal mapping follows existing
+native constructors; semantic controlled headers (content type, configured headers and
+nonsecret fixture authorization) are the proposed comparison boundary, excluding client
+framing/default headers. This is recorded as a proposal only. Root must settle and encode
+the literal shared data contract before transport fixture authoring; no M1.6 file was written.
+
+The joined selected-assets/driver/writer gate
+`35c1636d-5f9e-4059-b13f-5bff27dba4d3` exited 1 with **105 passed, 1 skipped and 2 failed**
+in 284.22 seconds. Both failures are driver test setup: a marker control searches the
+pending corpus for a marker that is absent, and the pytester child selects checkout
+configuration before loading the temporary trusted plugin. The driver test owner corrects
+those controls without changing product behavior. The shared-validator owner separately
+restores omitted-root custom-corpus Markdown resolution, proves no external retrieval by
+recording zero calls, and loads the trusted validator once per case-validation batch.
+Files remain under disjoint ownership; pytest is held until the corrections are stable.
+M1.5c.3c remains the first unchecked box.
+
+The five-node focused gate `56936ec7-ade6-4a6f-a1a2-fcab7fd01ad0` exited 1 with **2 passed
+and 3 failed** in 72.69 seconds. Both selected-schema evaluation controls passed. The new
+legacy positive exposed an incorrect inventory-depth inference; the validator now restores
+the exact prior root-based omitted-argument branch. The driver marker control used literal
+strings rather than typed marker objects, and its child pytest selected unrelated checkout
+tests; both are corrected in test setup with actual marker objects, isolated child config
+and explicit child test paths. The driver owner holds the sole persistent three-node slot
+for these controls and the adjacent-root regression. Other files remain held, and no broader
+suite or phase acceptance is claimed.
+
+The driver owner's retained shell `b19d89c7-6b2e-4a06-8854-85acfc03649a` now passes all
+three focused nodes in **9.93 seconds**, exit 0. Root inspected the final log and code:
+the child selects its own configuration/test file, explicitly loads the trusted plugin and
+xdist where needed, disables ambient plugin autoload, and preserves raw observer identity,
+controller-only startup and failure/refusal assertions. The legacy adjacent-root control
+also passes. Root now runs unsuppressed strict mypy over the 15 changed/new private support
+modules followed by the complete 13-phase `workspace check --fail-fast` in
+`ef2d5801-2a58-4341-860c-f999b1a335f7`, with two xdist workers. All source files remain
+held; M1.5c.3c awaits that gate and final bounded review closure.
+
+The first full-gate attempt reached test-session cleanup without a test-failure report but
+exited 1 because Windows denied access to the pre-existing `.pytest_cache/v/cache` directory;
+warnings-as-errors correctly made that cache warning fatal. No source or warning-policy
+change follows. Root restarted the same persistent shell with a fresh
+`.tmp-tests/reference-full-repository-final` pytest cache, retaining both workers and every
+repository phase. The prior unsuppressed 15-module type check passed. Both final cold
+reviews are clean; complete repository acceptance still awaits the rerun.
+
+M1.6's next execution slices are now explicit in the master checklist. The real adapter
+uses the configured HTTP transport seam; a transparent wrapper installed only in a fresh
+built-in descriptor registry records actual native WireRequest objects before delegation.
+This preserves the accepted capture-vs-request validation instead of weakening it to
+compare a snapshot with itself. No SDK API, global registry, provider behavior or actual
+transport fixture has changed during this preparation.
+
+The complete rerun in `ef2d5801-2a58-4341-860c-f999b1a335f7` exited 0: **all 13 repository
+steps passed in 237.0 seconds**, including the full test track, adapter/serve conformance,
+fixture validation, contracts, lint/types, documentation checks/examples and strict site
+build. Root inspected the retained final summary and the final selected-root/driver review
+closures. The separate unsuppressed strict check passed all 15 changed/new support modules.
+M1.5c.3c and its now-complete M1.5 parents are checked. No actual reference/release directory
+was produced. The next source work starts at M1.6a after this checkpoint commit.
