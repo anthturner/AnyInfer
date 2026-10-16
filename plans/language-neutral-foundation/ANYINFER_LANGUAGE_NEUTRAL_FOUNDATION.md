@@ -733,7 +733,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   **Gate:** `.\.venv\Scripts\python.exe -m pytest -q tests/testing/portable tests/test_openai_compat.py`
   passes; `.\.venv\Scripts\python.exe scripts/validate_fixtures.py --check-coverage` proves
   complete DEVELOPMENT coverage for core and transport requirements. This remains unreleased.
-- [ ] M1.7 Oracle run has two stages. First, run the UNRELEASED development oracle against the
+- [x] M1.7 Oracle run has two stages. First, run the UNRELEASED development oracle against the
   hashed draft inventory to fill every pending
   expectation and classify each mismatch as fixture error, specification error, or Python bug in
   a `> NOTE:` here; a Python bug is filed, not fixed in this box. Reconcile the inputs through the
@@ -823,11 +823,18 @@ M1 and later use `src/python/` paths and therefore depend on it.
       > 93 passes and nine honest extensions with no pending, failed, error or unexecuted
       > case. Commit these inputs as clean revision A, then resume at M1.7c without changing
       > executable or normative inputs during reference production.
-  - [ ] M1.7c From clean committed A, invoke the reviewed reference writer with the exact
+  - [x] M1.7c From clean committed A, invoke the reviewed reference writer with the exact
     nonzero A revision and its canonical new-only manifest/environment paths. Inspect the
     complete native environment, input/import identities and reference outcome. Gate: both
     raw-hash-bound artifacts pass the shared evidence validator, source inputs remain clean,
     and all M1.7 parent requirements below pass before a reference-artifact commit.
+    > NOTE: Input A is `fc537872b4e419fa0a01c60e595288099924564b`, verified clean with
+    > actual AnyInfer imports under `src/python/`. The real writer produced its canonical
+    > manifest/environment pair from A under warnings-as-errors. Shared metadata and all
+    > 102 case-evidence checks passed; independent production and environment audits are
+    > clean (97 distributions, 221 modules, 20 validator resources). The final repository gate
+    > with both generated outputs present passed all 13 steps in 188.1 seconds. M1.7 is
+    > accepted; commit the two reference artifacts and resume from M1.Ga below.
   > NOTE: The private staging mechanism is an authoring tool, not a new policy engine.
   > It must fail on missing or ambiguous native provenance rather than finding prompt-like
   > substrings in arbitrary caller text. No expectation is filled before M1.6 acceptance.
@@ -848,6 +855,59 @@ M1 and later use `src/python/` paths and therefore depend on it.
   fail-closed: `fail` or `error` is never success even
   if reports match; matching eligible extension verdicts are allowed, and the sole allowed
   disagreement is reference-extension versus another language's pass.
+  - [ ] M1.Ga Implement only `scripts/freeze_release.py` and `tests/test_freeze_release.py`.
+    CLI: `python scripts/freeze_release.py [--root specification] --reference
+    reference/python-fc53787.json core-generation-v0` writes the new candidate; the planned
+    `python scripts/freeze_release.py --verify core-generation-v0` loads and verifies it.
+    Derive the exact 106-file map from the 102-case inventory: three normative documents,
+    four schemas, inventory, 96 selected fixtures, and the explicit reference/environment
+    pair. Read ordinary JSON through the trusted validator; derive the embedded case set
+    and real UTC creation time; use code-point-sorted forward-slash paths and raw SHA-256.
+    Reuse `load_release_assets` for final qualification, never glob future fixtures or
+    duplicate its validation policy. New-only publication preserves existing release bytes
+    and removes only owned failed output. **Gate:** focused writer/verify tests prove closed
+    selection, no pending data, missing/changed/unsafe input refusal, self/report exclusion,
+    immutable collision handling and the existing shared loader's rejection paths; Ruff
+    and strict typing pass. No actual candidate is written before this gate.
+  - [ ] M1.Gb Implement private `tests/testing/portable/release_report.py` and
+    `test_release_report.py`. CLI: `python -m testing.portable.release_report --root
+    specification --release releases/core-generation-v0.json`; derive the new-only A-side
+    output `specification/reports/python-<current-code-rev7>.json`. Keep the development
+    CLI behavior unchanged. Verify the closed selected release before any native execution;
+    require current clean committed executable/driver imports, then run actual
+    `observe_core` under the strict warning policy and repeat source/release checks before
+    publishing. Require all 102 successful rows through the shared case validator; remove
+    development-only fixture observations, use null evidence for ordinary fixture passes,
+    and retain real extension/driver evidence. Derive all four count fields from rows.
+    Populate the existing report schema's source/driver revisions, runtime, OS, exact
+    dependency versions and eight Python extension declarations from the actual current
+    run. Do not copy reference A's environment, invent results, or extend report-v0.
+    A minimal extraction in `reference.py` may share its actual runtime/import/environment
+    collector while preserving the reference wrapper's exact contract; never fabricate a
+    `ReferencePreflight` to bypass its meaning. **Gate:** real native success plus dirty or
+    untracked source/import, changed release, incomplete/failed cases, missing evidence,
+    count, publication, cancellation/fatal and output-protection controls pass; existing
+    reference tests, Ruff and unsuppressed strict typing pass.
+  - [ ] M1.Gc After both tool gates and cold code review, create the candidate with the
+    explicit `python-fc53787.json` reference, verify it with the shared loader, and run the
+    full repository gate. Commit only reviewed tooling/tests, the candidate release and
+    checklist/log as an intermediate revision C. This intentionally commits the candidate
+    before actual report production, so the later producer requires a fully clean checkout
+    without exceptions for uncommitted release inputs. **Gate:** all 13 checks and candidate
+    verification pass; C is clean and its full revision is recorded before native execution.
+  - [ ] M1.Gd Run the final producer from clean C against the committed candidate, validate
+    the emitted report with `validate_qualified_report`, and independently review its actual
+    source/runtime binding, raw release hash, exact 102-case evidence and 93/0/0/9 counts.
+    Commit the report and accepted checklist/log; create only a local annotated retrieval
+    tag `corpus/core-generation-v0` targeting that complete record. Record tag and resolved
+    commit outside the release file. **Gate:** immutable release verification and full
+    report qualification remain successful; cold review has no open finding, all negative
+    report gates remain passing, and no tag or package is published. Resume M2.1 only then.
+  > NOTE: Read-only M1.G preparation confirmed the existing shared release/report verifier
+  > is complete, but the freeze writer and final report producer do not yet exist. These
+  > boxes add those missing producers within the settled profile. Ordinary reports already
+  > own runtime/OS/dependency fields; the complete A13 environment sidecar remains reference
+  > evidence, so no new shared schema or Python/C# environment-lock policy is introduced.
   **Gate:** `.\.venv\Scripts\python.exe scripts/freeze_release.py --verify core-generation-v0`
   exits 0; the final Python report has `fail: 0`, `error: 0`, exact inventory coverage, and only
   permitted marked extensions; negative gates reject empty, missing, extra, duplicate,

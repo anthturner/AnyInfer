@@ -1366,3 +1366,42 @@ with no pending, fail, error or unexecuted row. Root now commits the reviewed im
 driver, schema, specification and fixture inputs as revision A. Resume at M1.7c from that
 clean commit; no executable/normative input may change while the actual reference writer
 runs. The generated manifest will record the exact full A revision without a self-hash cycle.
+
+Clean input revision A was committed as `fc537872b4e419fa0a01c60e595288099924564b`
+(`Reconcile observed core and native transport expectations`), with exactly 110 approved
+paths including all 96 fixtures. Root verified no tracked/untracked input changes and
+actual import `D:/projects/AnyInfer/src/python/anyinfer/__init__.py` before production.
+Root shell `f3d4b84e-c1ab-4253-ac2e-533cff2c7990` then ran the actual private CLI with
+`--write-reference fc537872b4e419fa0a01c60e595288099924564b` and an ignored development
+observation output. It exited 0 and published only `specification/reference/python-fc53787.json`
+and `python-fc53787.environment.json`; no tracked input changed during production.
+
+Manifest SHA-256 is `0e43d1ba3ae5d7e02a19c411b0329b822a8f84a3ed41abb567441ceef72d7ead`;
+the bound raw environment SHA-256 is
+`f4660ede3c08285e498a12d5cfcb2fcbb09130efbc2b130077880d473265e4ea`.
+Root's shared evidence validation accepted the metadata and all 102 successful case rows,
+with eight declared feature names, 93 pass / nine honest extensions / zero unexecuted.
+The preserved observation is explicitly UNRELEASED/ineligible and remains ignored at
+`.tmp-tests/m17-reference-fc53787-observation.json`; the manifest itself is metadata only.
+Independent audits close source/revision/timestamp/raw input bindings and exact installed
+environment identity: 97 distribution locks, seven required packages, two import roles,
+221 loaded module files (158 repository / 63 virtual-environment), the actual interpreter,
+20 validator resources and strict warning policy. Both reviews have no open finding.
+M1.7c waits only for final repository checks with the generated outputs present and the
+reference metadata commit; no frozen release or qualified report exists yet.
+
+M1.7 is accepted. Root inspected final reference-output gate
+`6b66f310-cb2d-4c72-ac80-e4eb426a6bb3`: **all 13 repository steps passed in 188.1 seconds**,
+exit 0. Both canonical reference artifacts retain the independently checked raw hashes;
+their actual producer remains clean input A `fc537872b4e419fa0a01c60e595288099924564b`.
+The metadata commit records those outputs, completed M1.7 boxes and the next resume point
+M1.Ga. The ignored observation stays development-only, and no release or qualified report
+has been generated.
+
+Read-only M1.G preparation confirmed two missing producers: `scripts/freeze_release.py`
+and the private final-report writer. Root split their disjoint implementation/test ownership
+into M1.Ga/b, with candidate tooling/asset commit C before the actual complete report run.
+That sequence keeps ordinary report execution fully clean and binds its own current code,
+runtime, OS and dependency versions using the existing report-v0 fields; reference A's full
+environment sidecar is not copied or redefined. M1.Gc/d retain complete repository, native
+execution, cold review and local-only immutable retrieval gates before C# work begins.
