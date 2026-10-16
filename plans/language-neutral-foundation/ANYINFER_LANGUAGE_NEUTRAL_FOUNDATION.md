@@ -855,7 +855,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   fail-closed: `fail` or `error` is never success even
   if reports match; matching eligible extension verdicts are allowed, and the sole allowed
   disagreement is reference-extension versus another language's pass.
-  - [ ] M1.Ga Implement only `scripts/freeze_release.py` and `tests/test_freeze_release.py`.
+  - [x] M1.Ga Implement only `scripts/freeze_release.py` and `tests/test_freeze_release.py`.
     CLI: `python scripts/freeze_release.py [--root specification] --reference
     reference/python-fc53787.json core-generation-v0` writes the new candidate; the planned
     `python scripts/freeze_release.py --verify core-generation-v0` loads and verifies it.
@@ -869,7 +869,8 @@ M1 and later use `src/python/` paths and therefore depend on it.
     selection, no pending data, missing/changed/unsafe input refusal, self/report exclusion,
     immutable collision handling and the existing shared loader's rejection paths; Ruff
     and strict typing pass. No actual candidate is written before this gate.
-  - [ ] M1.Gb Implement private `tests/testing/portable/release_report.py` and
+    > NOTE: Focused freeze tests pass (12); cold review closed descriptor-identity cleanup, partial-write/replacement handling, portable open flags and derived-count selection. No candidate was written.
+  - [x] M1.Gb Implement private `tests/testing/portable/release_report.py` and
     `test_release_report.py`. CLI: `python -m testing.portable.release_report --root
     specification --release releases/core-generation-v0.json`; derive the new-only A-side
     output `specification/reports/python-<current-code-rev7>.json`. Keep the development
@@ -888,13 +889,19 @@ M1 and later use `src/python/` paths and therefore depend on it.
     untracked source/import, changed release, incomplete/failed cases, missing evidence,
     count, publication, cancellation/fatal and output-protection controls pass; existing
     reference tests, Ruff and unsuppressed strict typing pass.
-  - [ ] M1.Gc After both tool gates and cold code review, create the candidate with the
+    > NOTE: Accepted after clean callable and loaded-module role binding, real qualification/evidence
+    > baseline assertions, focused 43-pass/1-skip coverage plus actual-baseline and role-guard gates,
+    > static checks, and final cold closure.
+  - [x] M1.Gc After both tool gates and cold code review, create the candidate with the
     explicit `python-fc53787.json` reference, verify it with the shared loader, and run the
     full repository gate. Commit only reviewed tooling/tests, the candidate release and
     checklist/log as an intermediate revision C. This intentionally commits the candidate
     before actual report production, so the later producer requires a fully clean checkout
     without exceptions for uncommitted release inputs. **Gate:** all 13 checks and candidate
     verification pass; C is clean and its full revision is recorded before native execution.
+    > NOTE: Candidate creation/verification and the independent 106-file/102-case raw audit
+    > passed. The final repository gate passed all 13 steps in 205.5 seconds. The clean
+    > intermediate commit's full revision is recorded outside the release before M1.Gd.
   - [ ] M1.Gd Run the final producer from clean C against the committed candidate, validate
     the emitted report with `validate_qualified_report`, and independently review its actual
     source/runtime binding, raw release hash, exact 102-case evidence and 93/0/0/9 counts.
@@ -904,8 +911,8 @@ M1 and later use `src/python/` paths and therefore depend on it.
     report qualification remain successful; cold review has no open finding, all negative
     report gates remain passing, and no tag or package is published. Resume M2.1 only then.
   > NOTE: Read-only M1.G preparation confirmed the existing shared release/report verifier
-  > is complete, but the freeze writer and final report producer do not yet exist. These
-  > boxes add those missing producers within the settled profile. Ordinary reports already
+  > was complete while the freeze writer and final report producer were absent. M1.Ga/b
+  > add those producers within the settled profile. Ordinary reports already
   > own runtime/OS/dependency fields; the complete A13 environment sidecar remains reference
   > evidence, so no new shared schema or Python/C# environment-lock policy is introduced.
   **Gate:** `.\.venv\Scripts\python.exe scripts/freeze_release.py --verify core-generation-v0`

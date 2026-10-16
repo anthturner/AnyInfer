@@ -7,6 +7,7 @@ import hashlib
 import importlib
 import importlib.metadata
 import importlib.util
+import inspect
 import json
 import re
 import subprocess
@@ -256,6 +257,85 @@ def _require_tracked(repository: Path, path: Path, label: str) -> None:
     _git(repository, "ls-files", "--error-unmatch", "--", relative)
 
 
+def _runtime_import_paths(repository: Path, driver_path: Path) -> tuple[Path, Path]:
+    """Bind the loaded AnyInfer package and an executing portable driver to one checkout."""
+    import anyinfer
+
+    anyinfer_path = _inside(repository, Path(anyinfer.__file__), "anyinfer import")
+    portable_driver = _inside(repository, driver_path, "portable driver import")
+    if not anyinfer_path.is_relative_to(repository / "src" / "python"):
+        _fail("captured AnyInfer import is not under repository src/python")
+    if not portable_driver.is_relative_to(repository / "tests" / "testing" / "portable"):
+        _fail("captured private driver import is not under repository portable tests")
+    _require_tracked(repository, anyinfer_path, "anyinfer import")
+    _require_tracked(repository, portable_driver, "portable driver import")
+    return anyinfer_path, portable_driver
+
+
+def _loaded_runtime_modules(repository: Path) -> dict[str, dict[str, str]]:
+    """Bind every loaded runtime/private module that can affect portable execution."""
+    modules: dict[str, dict[str, str]] = {}
+    root = repository.resolve()
+    for name, module in sorted(sys.modules.items()):
+        path = getattr(module, "__file__", None)
+        if not isinstance(path, str):
+            continue
+        candidate = Path(path).resolve()
+        private_name = any(
+            name == item or name.startswith(f"{item}.") for item in _PORTABLE_NAMESPACES
+        )
+        private = candidate.is_relative_to(root / "tests" / "testing" / "portable")
+        anyinfer_module = name == "anyinfer" or name.startswith("anyinfer.")
+        required_runtime = any(
+            name == prefix or name.startswith(f"{prefix}.") for prefix in _RUNTIME_PREFIXES
+        )
+        if anyinfer_module or private_name or private:
+            if not candidate.is_file() or not candidate.is_relative_to(root):
+                _fail(f"loaded runtime module {name} is outside the committed checkout")
+            if anyinfer_module and not candidate.is_relative_to(root / "src" / "python"):
+                _fail(f"loaded AnyInfer module {name} is not under repository src/python")
+            if private_name and not private:
+                _fail(f"loaded private module {name} is outside portable tests")
+            _require_tracked(root, candidate, f"loaded runtime module {name}")
+        if required_runtime or private:
+            if not candidate.is_file():
+                _fail(f"loaded runtime module {name} has no hashable code file")
+            modules[name] = {"path": str(candidate), "sha256": _hash(candidate)}
+    for name, path in {
+        "trusted_validator": root / "scripts" / "validate_fixtures.py",
+        "trusted_release_assets": root / "scripts" / "portable_release_assets.py",
+    }.items():
+        _require_tracked(root, path, name)
+        modules[name] = {"path": str(path), "sha256": _hash(path)}
+    if not modules:
+        _fail("no loaded AnyInfer runtime modules have a committed source identity")
+    return modules
+
+
+def _runtime_provenance(
+    repository: Path, driver_path: Path, observer: object | None = None
+) -> tuple[Path, Path, dict[str, dict[str, str]]]:
+    """Require the executing observer and loaded runtime code to remain checkout-bound."""
+    anyinfer_path, portable_driver = _runtime_import_paths(repository, driver_path)
+    if observer is not None:
+        if not callable(observer):
+            _fail("native observer is not callable")
+        source = inspect.getsourcefile(observer)
+        module_name = getattr(observer, "__module__", None)
+        if not isinstance(source, str) or not isinstance(module_name, str):
+            _fail("native observer has no source module identity")
+        observer_path = _inside(repository, Path(source), "native observer import")
+        if not observer_path.is_relative_to(repository / "tests" / "testing" / "portable"):
+            _fail("native observer import is not under repository portable tests")
+        if not any(
+            module_name == item or module_name.startswith(f"{item}.")
+            for item in _PORTABLE_NAMESPACES
+        ):
+            _fail("native observer module is not a private portable module")
+        _require_tracked(repository, observer_path, "native observer import")
+    return anyinfer_path, portable_driver, _loaded_runtime_modules(repository)
+
+
 def preflight_reference(
     root: Path,
     *,
@@ -281,16 +361,7 @@ def preflight_reference(
     _fixtures, hashes = _inventory_paths(specification, validator)
     if specification != (repository / "specification").resolve():
         _bind_external_assets(specification, expected_revision, hashes)
-    import anyinfer
-
-    anyinfer_path = _inside(repository, Path(anyinfer.__file__), "anyinfer import")
-    driver_path = _inside(repository, Path(__file__), "reference driver import")
-    if not anyinfer_path.is_relative_to(
-        repository / "src" / "python"
-    ) or not driver_path.is_relative_to(repository / "tests" / "testing" / "portable"):
-        _fail("reference imports are not from the committed checkout")
-    _require_tracked(repository, anyinfer_path, "anyinfer import")
-    _require_tracked(repository, driver_path, "reference driver import")
+    _runtime_import_paths(repository, Path(__file__))
     return ReferencePreflight(
         expected_revision,
         repository,
@@ -405,22 +476,9 @@ def _validator_identity() -> dict[str, Any]:
 
 def capture_reference_environment(preflight: ReferencePreflight) -> dict[str, Any]:
     """Capture actual runtime evidence after a successful clean reference preflight."""
-    import anyinfer
-
-    anyinfer_path = _inside(
-        preflight.repository_root, Path(anyinfer.__file__), "captured anyinfer import"
+    anyinfer_path, driver_path, modules = _runtime_provenance(
+        preflight.repository_root, Path(__file__)
     )
-    driver_path = _inside(
-        preflight.repository_root, Path(__file__), "captured reference driver import"
-    )
-    _require_tracked(preflight.repository_root, anyinfer_path, "captured anyinfer import")
-    _require_tracked(preflight.repository_root, driver_path, "captured reference driver import")
-    if not anyinfer_path.is_relative_to(preflight.repository_root / "src" / "python"):
-        _fail("captured AnyInfer import is not under repository src/python")
-    if not driver_path.is_relative_to(
-        preflight.repository_root / "tests" / "testing" / "portable"
-    ):
-        _fail("captured private driver import is not under repository portable tests")
     imports = {
         "anyinfer": {
             "path": str(anyinfer_path),
@@ -428,39 +486,6 @@ def capture_reference_environment(preflight: ReferencePreflight) -> dict[str, An
         },
         "driver": {"path": str(driver_path), "sha256": _hash(driver_path)},
     }
-    modules: dict[str, dict[str, str]] = {}
-    root = preflight.repository_root.resolve()
-    for name, module in sorted(sys.modules.items()):
-        path = getattr(module, "__file__", None)
-        if not isinstance(path, str):
-            continue
-        candidate = Path(path).resolve()
-        private_name = any(
-            name == item or name.startswith(f"{item}.") for item in _PORTABLE_NAMESPACES
-        )
-        private = candidate.is_relative_to(root / "tests" / "testing" / "portable")
-        anyinfer_module = name == "anyinfer" or name.startswith("anyinfer.")
-        required_runtime = any(
-            name == prefix or name.startswith(f"{prefix}.") for prefix in _RUNTIME_PREFIXES
-        )
-        if anyinfer_module or private_name or private:
-            if not candidate.is_file() or not candidate.is_relative_to(root):
-                _fail(f"loaded runtime module {name} is outside the committed checkout")
-            if private_name and not private:
-                _fail(f"loaded private module {name} is outside portable tests")
-            _require_tracked(root, candidate, f"loaded runtime module {name}")
-        if required_runtime or private:
-            if not candidate.is_file():
-                _fail(f"loaded runtime module {name} has no hashable code file")
-            modules[name] = {"path": str(candidate), "sha256": _hash(candidate)}
-    for name, path in {
-        "trusted_validator": root / "scripts" / "validate_fixtures.py",
-        "trusted_release_assets": root / "scripts" / "portable_release_assets.py",
-    }.items():
-        _require_tracked(root, path, name)
-        modules[name] = {"path": str(path), "sha256": _hash(path)}
-    if not modules:
-        _fail("no loaded AnyInfer runtime modules have a committed source identity")
     with strict_reference_warnings() as warning_policy:
         return {
             "environment_version": "0",

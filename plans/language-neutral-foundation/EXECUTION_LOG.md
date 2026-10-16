@@ -1405,3 +1405,75 @@ That sequence keeps ordinary report execution fully clean and binds its own curr
 runtime, OS and dependency versions using the existing report-v0 fields; reference A's full
 environment sidecar is not copied or redefined. M1.Gc/d retain complete repository, native
 execution, cold review and local-only immutable retrieval gates before C# work begins.
+
+The reference metadata record was committed as `31784ab5638de56ec53484768d12e54be04c2253`
+(`Record clean Python reference environment and run`); root verified the resulting tree
+was clean. Reference-run A remains `fc537872b4e419fa0a01c60e595288099924564b`.
+Resume at M1.Ga. The new producer wave has disjoint ownership: `c7089bf7` owns only the
+freeze writer/test; `1e09179c` owns only the final-report producer/test and any minimal
+shared runtime-collector extraction in the reference helper/test. Both must finish source,
+meaningful negative controls and static checks before receiving the sole pytest/native
+slot. No candidate, final report or C# source is created in this authoring wave.
+
+M1.Ga's first eight focused tests passed in 10.73 seconds, but cold review correctly held
+acceptance for three source defects: payload-byte equality was not owned-file identity and
+left partial writes, `os.O_BINARY` was Windows-only, and fixed 102/96/106 cardinality gates
+duplicated inventory policy. The owner corrected only the freeze writer/test. Descriptor
+device/inode plus `lstat` now protects replacement files and cleans owned partial output;
+portable flags and inventory-derived counts have direct controls. Root inspected corrected
+source and retained `c90e92e2...`: **12 passed in 6.17 seconds**, exit 0, with Ruff, strict
+typing and clean final cold source review. M1.Ga is accepted; its serialized checkbox
+lease is complete and released. Four new producer source/test paths are marked intent-to-add solely for
+loaded-module tracking in tests; no content commit or actual candidate was produced.
+
+M1.Gb is source/static-ready with new producer/test and minimal shared import-path checking
+extraction in `reference.py`. Its disjoint cold review is in progress. Root granted the
+sole focused slot for the new report tests plus existing reference, preflight and writer
+compatibility tests, using a fresh cache. All canonical normative inputs, reference artifacts
+and release/report outputs remain held until that producer gate and code review close.
+
+The first M1.Gb compatibility gate passed 41 tests with one skip in 25.61 seconds. Cold
+review identified a remaining provenance defect: checking the package root and producer
+path did not bind the actual observer or already-loaded private/runtime submodules. The
+owner is correcting that boundary and adding foreign-module controls before a fresh
+four-file gate. The actual 102-row baseline already uses the shared release qualifier;
+its evidence/declaration assertions will be strengthened. M1.Gb remains unchecked, and
+no canonical candidate or final report has been written.
+
+M1.Gb is accepted after the retained four-file gate passed 43 tests with one skip in
+34.86 seconds, followed by the real qualification baseline and tracked wrong-role
+regressions (one pass each). Shared provenance binds the actual observer and loaded SDK
+and portable-module roles before observation and publication. The real 102-row baseline
+uses the shared qualifier and checks eight declarations, null ordinary evidence and
+structured driver/extension evidence. Ruff/strict typing and final cold review are clean.
+
+Root created the actual M1.Gc candidate with explicit `reference/python-fc53787.json`,
+then ran the planned `freeze_release.py --verify core-generation-v0`; both commands
+exited 0. Candidate raw SHA-256 is
+`16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391`.
+The reference manifest/environment retain their independently audited hashes. The
+candidate now awaits independent closed-set review and the full repository gate before
+the intermediate clean code/asset commit C. No final report has been produced.
+
+Independent candidate review verified all 106 raw hashes and the exact 102-case closed
+inventory with no pending data; the historical reference binding is unchanged. The first
+full candidate gate stopped at tests: all 11 failures come from the new freeze tests
+copying the now-existing canonical generated release into their temporary authoring tree.
+They then correctly encounter collision refusal before reaching their intended branches.
+Only that test-copy setup is being corrected to omit top-level release/report outputs;
+production writer policy and the audited candidate remain held unchanged. A fresh full
+gate is required after its focused controls and bounded review pass.
+
+The test helper now excludes generated outputs only at the top level of the copied
+specification, preserving every authored input and the explicit collision tests. Root
+inspected the retained final focused result: 12 passed in 7.56 seconds, exit 0. The
+candidate raw hash is unchanged. The full gate was restarted with a fresh cache; the
+intermediate commit and actual final-report run remain held until it passes.
+
+The corrected candidate gate passed all 13 repository steps in 205.5 seconds, exit 0,
+in root shell `16ab4376-30c1-410a-b101-ad5dacc74daa`. The test-copy delta has clean bounded
+review, and the independent candidate audit confirms all 106 exact raw input hashes,
+102 inventory records and the unchanged reference binding. Planned release verification
+was repeated successfully with the same raw SHA. Root now commits only the eight
+reviewed tooling/test/plan/log/candidate paths as intermediate C, then verifies its clean
+full revision before executing M1.Gd. Resume at M1.Gd; no final report exists yet.
