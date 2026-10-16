@@ -3,7 +3,7 @@
   "id": "schema-admission/admitted-full-subset-valid-response",
   "family": "schema-admission",
   "profile": "core-generation",
-  "description": "Pending comprehensive admitted-schema case; the oracle records the native outcome.",
+  "description": "Exercises an admitted full-subset schema with a valid response.",
   "request": {
     "messages": [
       {
@@ -210,8 +210,31 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "Return the scripted JSON response."
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
       "repair_attempted": [],
@@ -219,7 +242,57 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "result": {
+        "text": "{\"$ref\":\"😀\",\"null_value\":null,\"boolean_value\":true,\"number_value\":1.25,\"integer_value\":2,\"numeric_enum\":1,\"const_value\":{\"$ref\":\"literal-const\",\"$schema\":\"literal-schema\",\"$special\":\"literal\",\"$codepoints\":\"literal\"},\"string_value\":\"😀\",\"array_value\":[\"a\",\"😀\"],\"object_value\":{\"A\\u0001\\\"\\\\😀\":\"ok\"}}",
+        "structured": {
+          "$ref": "😀",
+          "null_value": null,
+          "boolean_value": true,
+          "number_value": 1.25,
+          "integer_value": 2,
+          "numeric_enum": 1,
+          "const_value": {
+            "$ref": "literal-const",
+            "$schema": "literal-schema",
+            "$special": "literal",
+            "$codepoints": "literal"
+          },
+          "string_value": "😀",
+          "array_value": [
+            "a",
+            "😀"
+          ],
+          "object_value": {
+            "A\u0001\"\\😀": "ok"
+          }
+        },
+        "target": {
+          "provider_id": "fixture",
+          "model": "alpha"
+        },
+        "finish_reason": "stop",
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null,
+          "cache_read_tokens": null,
+          "cache_write_tokens": null,
+          "reasoning_tokens": null
+        },
+        "timing": {
+          "first_token_ms": "non_null",
+          "total_ms": "present"
+        },
+        "structured_mechanism": "prompt",
+        "repair_attempts": 0,
+        "attempts": [
+          {
+            "target": "fixture:alpha",
+            "outcome": "ok"
+          }
+        ],
+        "warnings": []
+      }
     },
     "accounting": null
   }

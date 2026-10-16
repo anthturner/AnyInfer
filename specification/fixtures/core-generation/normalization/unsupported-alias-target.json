@@ -3,7 +3,7 @@
   "id": "normalization/unsupported-alias-target",
   "family": "normalization",
   "profile": "core-generation",
-  "description": "Pending extension case unsupported-alias-target; the oracle records the native outcome.",
+  "description": "Exercises the excluded alias target form.",
   "request": {
     "messages": [
       {
@@ -52,7 +52,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {
@@ -61,7 +61,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "unsupported_input",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "generate"
+      }
     },
     "accounting": null
   },

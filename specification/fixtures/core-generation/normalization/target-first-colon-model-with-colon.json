@@ -3,7 +3,7 @@
   "id": "normalization/target-first-colon-model-with-colon",
   "family": "normalization",
   "profile": "core-generation",
-  "description": "Pending normalization case target-first-colon-model-with-colon; the oracle records the native outcome.",
+  "description": "Splits a target at its first colon and retains later colons in the model.",
   "request": {
     "messages": [
       {
@@ -52,8 +52,22 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha:version:with:colons",
+        "role": "original",
+        "mechanism": null,
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "user",
+            "text": "Keep the model suffix after the first colon."
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
       "repair_attempted": [],
@@ -61,7 +75,36 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "result": {
+        "text": "{\"case\":\"target-colon\"}",
+        "structured": null,
+        "target": {
+          "provider_id": "fixture",
+          "model": "alpha:version:with:colons"
+        },
+        "finish_reason": "stop",
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null,
+          "cache_read_tokens": null,
+          "cache_write_tokens": null,
+          "reasoning_tokens": null
+        },
+        "timing": {
+          "first_token_ms": "non_null",
+          "total_ms": "present"
+        },
+        "structured_mechanism": null,
+        "repair_attempts": 0,
+        "attempts": [
+          {
+            "target": "fixture:alpha:version:with:colons",
+            "outcome": "ok"
+          }
+        ],
+        "warnings": []
+      }
     },
     "accounting": null
   }

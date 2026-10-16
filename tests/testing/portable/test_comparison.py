@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -13,9 +14,10 @@ import pytest
 from anyinfer.schema._capture import _OperationCapture
 
 from . import comparison
-from .projection import MissingEvidenceError
+from .reconcile import reconcile_fixture
 from .records import NativeRun
 from .runner import run_fixture
+from .values import MissingEvidenceError
 
 
 def _fixture(*, expected: dict[str, Any], extension: str | None = None, case_id: str = "routing/basic") -> dict[str, Any]:
@@ -27,6 +29,20 @@ def _fixture(*, expected: dict[str, Any], extension: str | None = None, case_id:
     if extension is not None:
         fixture["extension"] = extension
     return fixture
+
+
+def _fresh_pending_authoring_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
+    authoring = deepcopy(fixture)
+    authoring["expected"] = {
+        "status": "to_be_observed",
+        "calls": [],
+        "clock_advances_ms": [],
+        "telemetry": {"repair_attempted": [], "parameter_dropped": []},
+        "events": [],
+        "outcome": {"none": True},
+        "accounting": None,
+    }
+    return authoring
 
 
 def _actual(*, calls: list[dict[str, Any]] | None = None, **extra: Any) -> dict[str, Any]:
@@ -189,7 +205,7 @@ def test_extension_never_claims_cancellation_or_fatal_failure(error: BaseExcepti
 
 async def test_explicit_cancellation_remains_an_ordinary_pending_observation() -> None:
     path = Path(__file__).parents[3] / "specification/fixtures/core-generation/streaming/cancel-mid-stream.json"
-    fixture = json.loads(path.read_text(encoding="utf-8"))
+    fixture = _fresh_pending_authoring_fixture(json.loads(path.read_text(encoding="utf-8")))
     run = await run_fixture(fixture)
     answer = comparison.compare_fixture(fixture, run, extensions=("targets.alias",))
     assert fixture.get("extension") is None
@@ -208,6 +224,63 @@ async def test_native_extension_boundary_records_honest_extension(family: str, n
     assert answer["verdict"] == "extension", answer
     assert answer["observations"] is None
     assert answer["evidence"] is not None
+
+
+@pytest.mark.parametrize(
+    ("family", "name"),
+    (
+        ("routing", "retryable-then-ok-same-target"),
+        ("routing", "nonretryable-falls-over"),
+        ("streaming", "failed-attempt-deltas-visible"),
+    ),
+)
+async def test_retried_original_calls_with_prompt_markers_compare_as_full_literals(
+    family: str, name: str
+) -> None:
+    path = Path(__file__).parents[3] / "specification/fixtures/core-generation" / family / f"{name}.json"
+    fixture = _fresh_pending_authoring_fixture(json.loads(path.read_text(encoding="utf-8")))
+    fixture["request"]["schema"] = {
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+        "required": ["ok"],
+    }
+    run = await run_fixture(fixture)
+
+    staged = reconcile_fixture(fixture, run).fixture
+    calls = staged["expected"]["calls"]
+
+    assert len(calls) == 2
+    assert [call["role"] for call in calls] == ["original", "original"]
+    assert all(isinstance(call["messages"], list) for call in calls)
+    assert all(
+        call["messages"][0]["text"][-1] == {"$schema_prompt": True}
+        for call in calls
+    )
+    assert all(call["messages"][-1]["text"] == "fixture input" for call in calls)
+    assert comparison.compare_fixture(staged, run)["verdict"] == "pass"
+
+
+@pytest.mark.parametrize("numeric_marker", (1, 1.0))
+async def test_numeric_repair_marker_in_later_original_retry_message_is_a_domain_error(
+    monkeypatch: pytest.MonkeyPatch,
+    numeric_marker: float,
+) -> None:
+    path = Path(__file__).parents[3] / "specification/fixtures/core-generation/routing/retryable-then-ok-same-target.json"
+    fixture = _fresh_pending_authoring_fixture(json.loads(path.read_text(encoding="utf-8")))
+    fixture["request"]["schema"] = {"type": "object"}
+    run = await run_fixture(fixture)
+    staged = reconcile_fixture(fixture, run).fixture
+    calls = staged["expected"]["calls"]
+    calls[1]["messages"][-1]["text"] = [{"$repair_feedback": numeric_marker}]
+
+    def feedback_must_not_be_borrowed(_run: NativeRun, _ordinal: int) -> tuple[str, ...]:
+        raise AssertionError("numeric marker must not borrow repair feedback")
+
+    monkeypatch.setattr(comparison, "native_feedback_for_call", feedback_must_not_be_borrowed)
+    answer = comparison.compare_fixture(staged, run)
+
+    assert answer["verdict"] == "error"
+    assert answer["detail"] == "unknown expected-message segment"
 
 
 def test_unapproved_extension_compares_portable_baseline(monkeypatch: pytest.MonkeyPatch) -> None:

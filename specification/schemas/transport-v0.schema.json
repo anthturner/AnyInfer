@@ -17,7 +17,7 @@
   },
   "allOf": [
     {"if": {"properties": {"kind": {"const": "adapter"}}, "required": ["kind"]}, "then": {"properties": {"input": {"allOf": [{"$ref": "#/$defs/input"}, {"required": ["wire"], "not": {"required": ["operation"]}}]}, "expected": {"allOf": [{"$ref": "#/$defs/expected"}, {"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["adapter_outcome"], "not": {"required": ["core"]}}}]}}}},
-    {"if": {"properties": {"kind": {"const": "core_http"}}, "required": ["kind"]}, "then": {"properties": {"input": {"allOf": [{"$ref": "#/$defs/input"}, {"required": ["operation"], "not": {"required": ["wire"]}}]}, "expected": {"allOf": [{"$ref": "#/$defs/expected"}, {"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["core"], "not": {"required": ["adapter_outcome"]}}}]}}}}
+    {"if": {"properties": {"kind": {"const": "core_http"}}, "required": ["kind"]}, "then": {"properties": {"input": {"allOf": [{"$ref": "#/$defs/input"}, {"required": ["operation"], "not": {"required": ["wire"]}}]}, "expected": {"allOf": [{"$ref": "#/$defs/core_http_expected"}, {"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["core"], "not": {"required": ["adapter_outcome"]}}}]}}}}
   ],
   "$defs": {
     "headers": {"type": "object", "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"}, "additionalProperties": {"type": "string"}},
@@ -39,8 +39,15 @@
       {"type": "object", "additionalProperties": false, "required": ["error"], "properties": {"error": {"$ref": "#/$defs/adapter_error"}}}
     ]},
     "http_request": {"type": "object", "additionalProperties": false, "required": ["method", "path", "headers", "body", "stream"], "properties": {"method": {"type": "string", "minLength": 1}, "path": {"type": "string", "pattern": "^/"}, "headers": {"$ref": "#/$defs/headers"}, "body": {}, "stream": {"type": "boolean"}}},
+    "marker_segment": {"allOf": [{"$ref": "fixture-v0.schema.json#/$defs/expected_segment"}, {"type": "object"}]},
+    "marker_candidate": {"anyOf": [{"type": "object", "required": ["$schema_prompt"]}, {"type": "object", "required": ["$repair_feedback"]}]},
+    "core_http_content": {"oneOf": [{"type": "string"}, {"type": "array", "if": {"contains": {"$ref": "#/$defs/marker_candidate"}}, "then": {"items": {"$ref": "fixture-v0.schema.json#/$defs/expected_segment"}}, "else": {"items": {}}}]},
+    "core_http_message": {"type": "object", "additionalProperties": false, "required": ["role", "content"], "properties": {"role": {"enum": ["system", "user", "assistant"]}, "content": {"$ref": "#/$defs/core_http_content"}}},
+    "core_http_body": {"type": "object", "required": ["messages"], "properties": {"messages": {"type": "array", "items": {"$ref": "#/$defs/core_http_message"}}}},
+    "core_http_request": {"allOf": [{"$ref": "#/$defs/http_request"}, {"properties": {"body": {"$ref": "#/$defs/core_http_body"}}}]},
     "wire_limits": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["timeout_s", "max_response_bytes"], "properties": {"timeout_s": {"type": "number", "minimum": 0}, "max_response_bytes": {"type": "integer", "minimum": 0}}}},
     "core": {"allOf": [{"$ref": "fixture-v0.schema.json#/$defs/expected"}, {"properties": {"status": {"const": "observed"}}, "required": ["status"]}]},
-    "expected": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["observed", "to_be_observed"]}, "http_requests": {"type": "array", "items": {"$ref": "#/$defs/http_request"}}, "wire_limits": {"$ref": "#/$defs/wire_limits"}, "adapter_outcome": {"$ref": "#/$defs/adapter_outcome"}, "core": {"$ref": "#/$defs/core"}}, "allOf": [{"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["http_requests", "wire_limits"]}, "else": {"maxProperties": 1}}]}
+    "expected": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["observed", "to_be_observed"]}, "http_requests": {"type": "array", "items": {"$ref": "#/$defs/http_request"}}, "wire_limits": {"$ref": "#/$defs/wire_limits"}, "adapter_outcome": {"$ref": "#/$defs/adapter_outcome"}, "core": {"$ref": "#/$defs/core"}}, "allOf": [{"if": {"properties": {"status": {"const": "observed"}}, "required": ["status"]}, "then": {"required": ["http_requests", "wire_limits"]}, "else": {"maxProperties": 1}}]},
+    "core_http_expected": {"allOf": [{"$ref": "#/$defs/expected"}, {"properties": {"http_requests": {"type": "array", "items": {"$ref": "#/$defs/core_http_request"}}}}]}
   }
 }

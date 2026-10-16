@@ -3,7 +3,7 @@
   "id": "schema-admission/unsupported-anyof",
   "family": "schema-admission",
   "profile": "core-generation",
-  "description": "Pending schema-admission case unsupported-anyof; the oracle records the native outcome.",
+  "description": "Exercises the excluded anyOf schema boundary.",
   "request": {
     "messages": [
       {
@@ -62,7 +62,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {
@@ -71,7 +71,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "unsupported_input",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "generate"
+      }
     },
     "accounting": null
   },

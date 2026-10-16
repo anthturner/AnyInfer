@@ -3,7 +3,7 @@
   "id": "normalization/invalid-sampling-negative-seed",
   "family": "normalization",
   "profile": "core-generation",
-  "description": "Pending normalization case invalid-sampling-negative-seed; the oracle records the native outcome.",
+  "description": "Exercises construction-time rejection of a negative sampling seed.",
   "request": {
     "messages": [
       {
@@ -55,7 +55,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {
@@ -64,7 +64,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "invalid_request",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": null
+      }
     },
     "accounting": null
   }

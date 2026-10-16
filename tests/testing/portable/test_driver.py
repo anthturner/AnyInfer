@@ -26,7 +26,7 @@ def test_observation_is_unreleased_and_does_not_validate_as_report_v0() -> None:
     assert len(report["cases"]) == 102
     assert len({case["id"] for case in report["cases"]}) == 102
     assert report["unexecuted"] == []
-    assert report["counts"]["unexecuted"] == 0
+    assert report["counts"] == {"extension": 9, "pass": 93, "unexecuted": 0}
     schema = json.loads((driver._DEFAULT_ROOT / "schemas/report-v0.schema.json").read_text())
     assert list(Draft202012Validator(schema).iter_errors(report))
 

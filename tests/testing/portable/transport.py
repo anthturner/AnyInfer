@@ -22,7 +22,7 @@ from anyinfer.types.requests import Repair, Sampling
 
 from .adapter import HarnessError, VirtualClock
 from .comparison import compare_fixture
-from .projection import _error, project_run
+from .projection import _error, native_feedback_for_call, project_run
 from .records import NativeRun
 from .runner import (
     _core_operation,
@@ -32,7 +32,14 @@ from .runner import (
     _sampling,
     _Telemetry,
 )
-from .values import MissingEvidenceError, control_number_equal, json_value, type_aware_equal
+from .values import (
+    MissingEvidenceError,
+    ValueDomainError,
+    control_number_equal,
+    expand_segments,
+    json_value,
+    type_aware_equal,
+)
 
 __all__ = ["TransportRun", "compare_transport_fixture", "run_transport_fixture"]
 
@@ -527,12 +534,152 @@ def _observation(run: TransportRun) -> dict[str, Any]:
     return cast(dict[str, Any], json_value(observed))
 
 
-def _http_equal(wanted: Any, actual: Any) -> bool:
-    if type_aware_equal(wanted, actual):
+def _core_http_entries(run: TransportRun, expected_count: int) -> tuple[Any, ...]:
+    """Return only causally ordered core entries for HTTP marker expansion."""
+    core = run.core
+    if core is None or len(core.operations) != 1:
+        raise MissingEvidenceError("core HTTP marker comparison lacks one native operation")
+    operation = core.operations[0]
+    entries = tuple(operation.entries)
+    if (
+        len(run.requests) != expected_count
+        or len(core.requests) != expected_count
+        or len(entries) != expected_count
+        or len(run.http_requests) != expected_count
+    ):
+        raise MissingEvidenceError("core HTTP marker comparison has inconsistent row cardinality")
+    for ordinal, (request, core_request, entry, http) in enumerate(
+        zip(run.requests, core.requests, entries, run.http_requests, strict=True)
+    ):
+        snapshot = entry.wire_snapshot
+        if request is not core_request or entry.entry_ordinal != ordinal:
+            raise MissingEvidenceError("core HTTP marker comparison has misordered capture rows")
+        if not isinstance(snapshot, Mapping) or not isinstance(http, Mapping):
+            raise MissingEvidenceError("core HTTP marker comparison lacks native wire or HTTP facts")
+        body = http.get("body")
+        snapshot_messages = snapshot.get("messages")
+        body_messages = body.get("messages") if isinstance(body, Mapping) else None
+        if (
+            body.get("model") != request.model if isinstance(body, Mapping) else True
+        ) or not isinstance(snapshot_messages, Sequence) or isinstance(
+            snapshot_messages, str | bytes
+        ) or not isinstance(body_messages, list) or len(snapshot_messages) != len(
+            request.messages
+        ) or len(body_messages) != len(request.messages):
+            raise MissingEvidenceError("core HTTP marker comparison lacks ordered wire messages")
+        for captured, outgoing, message in zip(
+            snapshot_messages, body_messages, request.messages, strict=True
+        ):
+            if (
+                not isinstance(captured, Mapping)
+                or not isinstance(outgoing, Mapping)
+                or captured.get("role") != message.role
+                or captured.get("text") != message.text
+                or outgoing.get("role") != message.role
+            ):
+                raise MissingEvidenceError("core HTTP marker comparison has mismatched message facts")
+    return entries
+
+
+def _has_marker_candidate(value: object) -> bool:
+    return isinstance(value, list) and any(
+        isinstance(segment, Mapping)
+        and ("$schema_prompt" in segment or "$repair_feedback" in segment)
+        for segment in value
+    )
+
+
+def _has_repair_feedback_marker(value: object) -> bool:
+    return isinstance(value, list) and any(
+        isinstance(segment, Mapping) and segment.get("$repair_feedback") is True
+        for segment in value
+    )
+
+
+def _core_http_messages_equal(
+    wanted: object, actual: object, *, run: TransportRun, entry: Any, ordinal: int
+) -> bool:
+    if not isinstance(wanted, list) or not isinstance(actual, list) or len(wanted) != len(actual):
+        return False
+    if run.core is None:
+        raise MissingEvidenceError("core HTTP marker comparison lacks a native core run")
+    snapshot = entry.wire_snapshot
+    request = run.core.requests[ordinal]
+    if not isinstance(snapshot, Mapping):
+        raise MissingEvidenceError("core HTTP marker comparison lacks an entry wire snapshot")
+    captured_messages = snapshot.get("messages")
+    if not isinstance(captured_messages, Sequence) or isinstance(captured_messages, str | bytes):
+        raise MissingEvidenceError("core HTTP marker comparison lacks captured message facts")
+    for message_index, (expected_message, actual_message) in enumerate(
+        zip(wanted, actual, strict=True)
+    ):
+        if not isinstance(expected_message, Mapping) or not isinstance(actual_message, Mapping):
+            return False
+        if set(expected_message) != {"role", "content"} or set(actual_message) != {
+            "role",
+            "content",
+        }:
+            return False
+        if expected_message.get("role") != actual_message.get("role"):
+            return False
+        expected_content = expected_message.get("content")
+        actual_content = actual_message.get("content")
+        if not isinstance(expected_content, str | list):
+            raise ValueDomainError("core HTTP expected message content must be a string or segments")
+        if not _has_marker_candidate(expected_content):
+            if not type_aware_equal(expected_content, actual_content):
+                return False
+            continue
+        if not isinstance(actual_content, str) or message_index >= len(request.messages):
+            raise MissingEvidenceError("core HTTP marker comparison has no selected outgoing text")
+        captured = captured_messages[message_index]
+        selected = request.messages[message_index]
+        if (
+            not isinstance(captured, Mapping)
+            or captured.get("role") != selected.role
+            or captured.get("text") != selected.text
+            or actual_message.get("role") != selected.role
+            or actual_content != selected.text
+        ):
+            raise MissingEvidenceError("core HTTP marker comparison has mismatched selected message facts")
+        native_messages = None
+        if _has_repair_feedback_marker(expected_content):
+            if entry.role != "correction":
+                raise MissingEvidenceError("repair feedback marker is not bound to a correction entry")
+            native_messages = native_feedback_for_call(run.core, ordinal)
+        expanded = expand_segments(
+            expected_content,
+            schema=run.core.input_schema,
+            native_messages=native_messages,
+        )
+        if expanded != actual_content:
+            return False
+    return True
+
+
+def _has_http_marker_candidate(value: object) -> bool:
+    if not isinstance(value, list):
+        return False
+    for row in value:
+        if not isinstance(row, Mapping):
+            continue
+        body = row.get("body")
+        messages = body.get("messages") if isinstance(body, Mapping) else None
+        if not isinstance(messages, list):
+            continue
+        for message in messages:
+            if isinstance(message, Mapping) and _has_marker_candidate(message.get("content")):
+                return True
+    return False
+
+
+def _http_equal(wanted: Any, actual: Any, *, run: TransportRun, core_http: bool) -> bool:
+    if not (core_http and _has_http_marker_candidate(wanted)) and type_aware_equal(wanted, actual):
         return True
     if not isinstance(wanted, list) or not isinstance(actual, list) or len(wanted) != len(actual):
         return False
-    for left, right in zip(wanted, actual, strict=True):
+    entries = _core_http_entries(run, len(wanted)) if core_http else ()
+    for ordinal, (left, right) in enumerate(zip(wanted, actual, strict=True)):
         if not isinstance(left, Mapping) or not isinstance(right, Mapping):
             return False
         if set(left) != set(right) or any(
@@ -549,6 +696,11 @@ def _http_equal(wanted: Any, actual: Any) -> bool:
             candidate = right_body[key]
             if key in {"temperature", "top_p", "presence_penalty", "frequency_penalty"}:
                 if not control_number_equal(value, candidate):
+                    return False
+            elif key == "messages" and core_http:
+                if not _core_http_messages_equal(
+                    value, candidate, run=run, entry=entries[ordinal], ordinal=ordinal
+                ):
                     return False
             elif not type_aware_equal(value, candidate):
                 return False
@@ -604,7 +756,17 @@ def compare_transport_fixture(fixture: Mapping[str, Any], run: TransportRun) -> 
         result["detail"] = f"transport harness fault: {type(run.error).__name__}"
         return result
     differences: list[str] = []
-    if not _http_equal(expected.get("http_requests"), observed.get("http_requests")):
+    try:
+        http_equal = _http_equal(
+            expected.get("http_requests"),
+            observed.get("http_requests"),
+            run=run,
+            core_http=fixture.get("kind") == "core_http",
+        )
+    except (MissingEvidenceError, ValueDomainError) as error:
+        result["detail"] = str(error)
+        return result
+    if not http_equal:
         differences.append("http_requests")
     if not _limits_equal(expected.get("wire_limits"), observed.get("wire_limits")):
         differences.append("wire_limits")

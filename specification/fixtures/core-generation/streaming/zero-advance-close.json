@@ -60,7 +60,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {

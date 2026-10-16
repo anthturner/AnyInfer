@@ -3,7 +3,7 @@
   "id": "validation/six-missing-required-first-five-in-order",
   "family": "validation",
   "profile": "core-generation",
-  "description": "Pending validation case six-missing-required-first-five-in-order; the oracle records the native outcome.",
+  "description": "Orders six missing-required issues and retains the first five in order.",
   "request": {
     "messages": [
       {
@@ -63,8 +63,31 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "Return the scripted JSON response."
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
       "repair_attempted": [],
@@ -72,7 +95,65 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "schema_violation",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "validate",
+        "issues": [
+          {
+            "rule": "required",
+            "instance_path": [],
+            "schema_path": [
+              "required"
+            ],
+            "params": {
+              "property": "a"
+            }
+          },
+          {
+            "rule": "required",
+            "instance_path": [],
+            "schema_path": [
+              "required"
+            ],
+            "params": {
+              "property": "b"
+            }
+          },
+          {
+            "rule": "required",
+            "instance_path": [],
+            "schema_path": [
+              "required"
+            ],
+            "params": {
+              "property": "c"
+            }
+          },
+          {
+            "rule": "required",
+            "instance_path": [],
+            "schema_path": [
+              "required"
+            ],
+            "params": {
+              "property": "d"
+            }
+          },
+          {
+            "rule": "required",
+            "instance_path": [],
+            "schema_path": [
+              "required"
+            ],
+            "params": {
+              "property": "e"
+            }
+          }
+        ]
+      }
     },
     "accounting": null
   }

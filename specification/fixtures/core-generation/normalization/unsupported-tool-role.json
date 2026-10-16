@@ -3,7 +3,7 @@
   "id": "normalization/unsupported-tool-role",
   "family": "normalization",
   "profile": "core-generation",
-  "description": "Pending extension case unsupported-tool-role; the oracle records the native outcome without inventing a tool call identifier.",
+  "description": "Exercises the excluded tool role without inventing a tool call identifier.",
   "request": {
     "messages": [
       {
@@ -56,7 +56,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {
@@ -65,7 +65,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "unsupported_input",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "generate"
+      }
     },
     "accounting": null
   },

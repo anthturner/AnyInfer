@@ -32,7 +32,7 @@ assert TRANSPORT_FIXTURES, "the canonical transport fixture discovery must not b
 
 
 @pytest.mark.parametrize("path", CORE_FIXTURES, ids=lambda path: path.relative_to(ROOT).as_posix())
-async def test_native_execution_retains_pending_or_extension_observations(path: Path) -> None:
+async def test_native_execution_matches_observed_core_fixture(path: Path) -> None:
     fixture = json.loads(path.read_text(encoding="utf-8"))
     run = await run_fixture(fixture)
 
@@ -44,6 +44,8 @@ async def test_native_execution_retains_pending_or_extension_observations(path: 
         assert all(operation.evidence_available for operation in run.operations), fixture["id"]
 
     observed = compare_fixture(fixture, run, extensions=EXTENSIONS)
+    expected = fixture["expected"]
+    assert expected["status"] == "observed", fixture["id"]
     extension = fixture.get("extension")
     if extension is not None:
         assert extension in EXTENSIONS, fixture["id"]
@@ -51,9 +53,7 @@ async def test_native_execution_retains_pending_or_extension_observations(path: 
         _assert_extension_evidence(observed["evidence"])
         return
 
-    expected = fixture["expected"]
-    assert expected["status"] == "to_be_observed", fixture["id"]
-    assert observed["verdict"] is None, observed
+    assert observed["verdict"] == "pass", observed
 
 
 def _assert_extension_evidence(evidence: Any) -> None:
@@ -85,11 +85,11 @@ def _assert_extension_evidence(evidence: Any) -> None:
 @pytest.mark.parametrize(
     "path", TRANSPORT_FIXTURES, ids=lambda path: path.relative_to(ROOT).as_posix()
 )
-async def test_transport_execution_retains_pending_observations(path: Path) -> None:
+async def test_transport_execution_matches_observed_fixture(path: Path) -> None:
     fixture = json.loads(path.read_text(encoding="utf-8"))
     run = await run_transport_fixture(fixture)
 
     assert run.error_stage != "harness", fixture["id"]
     observed = compare_transport_fixture(fixture, run)
-    assert fixture["expected"]["status"] == "to_be_observed", fixture["id"]
-    assert observed["verdict"] is None, observed
+    assert fixture["expected"]["status"] == "observed", fixture["id"]
+    assert observed["verdict"] == "pass", observed

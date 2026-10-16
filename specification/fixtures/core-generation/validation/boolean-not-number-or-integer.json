@@ -3,7 +3,7 @@
   "id": "validation/boolean-not-number-or-integer",
   "family": "validation",
   "profile": "core-generation",
-  "description": "Pending validation case boolean-not-number-or-integer; the oracle records the native outcome.",
+  "description": "Distinguishes a boolean from number and integer schema types.",
   "request": {
     "messages": [
       {
@@ -63,8 +63,31 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "Return the scripted JSON response."
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
       "repair_attempted": [],
@@ -72,7 +95,45 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "schema_violation",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "validate",
+        "issues": [
+          {
+            "rule": "type",
+            "instance_path": [
+              "integer"
+            ],
+            "schema_path": [
+              "properties",
+              "integer",
+              "type"
+            ],
+            "params": {
+              "expected": "integer",
+              "actual": "boolean"
+            }
+          },
+          {
+            "rule": "type",
+            "instance_path": [
+              "number"
+            ],
+            "schema_path": [
+              "properties",
+              "number",
+              "type"
+            ],
+            "params": {
+              "expected": "number",
+              "actual": "boolean"
+            }
+          }
+        ]
+      }
     },
     "accounting": null
   }

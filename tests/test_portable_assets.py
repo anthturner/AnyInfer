@@ -296,6 +296,122 @@ def test_core_fixture_encodes_extraction_invalid_schema_and_no_schema_calls() ->
     )
 
 
+def _core_http_marker_fixture() -> dict[str, object]:
+    repair = [
+        "Your previous response did not match the required JSON schema. Errors:\n",
+        {"$repair_feedback": True},
+        "\nRespond again with ONLY a corrected JSON value that satisfies the schema. No prose, no code fences.",
+    ]
+    messages = [
+        {"role": "system", "text": ["caller", "\n\n", {"$schema_prompt": True}]},
+        {"role": "user", "text": "hello"},
+        {"role": "assistant", "text": "not-json"},
+        {"role": "user", "text": repair},
+    ]
+    core = _core_fixture({"none": True})["expected"]
+    assert isinstance(core, dict)
+    core["calls"] = [
+        {
+            "model": "fixture-model",
+            "role": "correction",
+            "mechanism": "prompt",
+            "timeout_s": 17,
+            "max_response_bytes": 1024,
+            "messages": messages,
+            "issues": [],
+        }
+    ]
+    fixture = _transport_fixture()
+    fixture["kind"] = "core_http"
+    fixture["input"] = {
+        "adapter_config": fixture["input"]["adapter_config"],
+        "operation": {
+            "request": {
+                "messages": [{"role": "system", "text": "caller"}, {"role": "user", "text": "hello"}],
+                "schema": {"type": "object"},
+                "sampling": {},
+                "consume": "stream",
+                "timeout_s": 17,
+                "max_response_bytes": 1024,
+            },
+            "route": {"targets": ["openai-compat:fixture-model"], "retry": {"max_attempts": 1}},
+        },
+    }
+    fixture["expected"] = {
+        "status": "observed",
+        "http_requests": [
+            {
+                "method": "POST",
+                "path": "/v1/chat/completions",
+                "headers": {"content-type": "application/json", "authorization": "Bearer fixture-token"},
+                "body": {
+                    "messages": [
+                        {"role": message["role"], "content": message["text"]} for message in messages
+                    ]
+                },
+                "stream": True,
+            }
+        ],
+        "wire_limits": [{"timeout_s": 17, "max_response_bytes": 1024}],
+        "core": core,
+    }
+    return fixture
+
+
+def test_core_http_expected_message_markers_are_causal_and_typed() -> None:
+    fixture = _core_http_marker_fixture()
+    validator = validate_fixtures._schema(
+        "transport-v0.schema.json", specification_root=ROOT / "specification"
+    )
+    assert not list(validator.iter_errors(fixture))
+    assert not validate_fixtures._expected_message_problems(fixture)
+
+    def mutated() -> dict[str, object]:
+        return json.loads(json.dumps(fixture))
+
+    wrong_role = mutated()
+    wrong_role["expected"]["http_requests"][0]["body"]["messages"][3]["role"] = "assistant"
+    assert any("role does not align" in item for item in validate_fixtures._expected_message_problems(wrong_role))
+
+    missing_row = mutated()
+    missing_row["expected"]["http_requests"] = []
+    assert any("one-to-one" in item for item in validate_fixtures._expected_message_problems(missing_row))
+
+    misaligned = mutated()
+    misaligned["expected"]["http_requests"][0]["body"]["messages"].pop()
+    assert any("messages must align" in item for item in validate_fixtures._expected_message_problems(misaligned))
+
+    malformed = mutated()
+    malformed["expected"]["http_requests"][0]["body"]["messages"][3]["content"][1] = {"$repair_feedback": 1}
+    assert any("correction needs exactly one $repair_feedback" in item for item in validate_fixtures._expected_message_problems(malformed))
+
+    adapter_literal = _transport_fixture()
+    adapter_literal["expected"]["http_requests"] = [
+        {"method": "POST", "path": "/x", "headers": {}, "body": {"marker": {"$repair_feedback": True}}, "stream": True}
+    ]
+    assert not validate_fixtures._expected_message_problems(adapter_literal)
+
+    other_position = mutated()
+    other_position["expected"]["http_requests"][0]["body"]["metadata"] = {"$repair_feedback": True}
+    assert not validate_fixtures._expected_message_problems(other_position)
+
+    multipart = mutated()
+    part = [{"type": "text", "text": "literal {$repair_feedback}"}]
+    multipart["expected"]["http_requests"][0]["body"]["messages"][1]["content"] = part
+    assert not list(validator.iter_errors(multipart))
+    assert not validate_fixtures._expected_message_problems(multipart)
+
+    split_literals = mutated()
+    split_literals["expected"]["http_requests"][0]["body"]["messages"][0]["content"] = [
+        "cal",
+        "ler",
+        "\n\n",
+        {"$schema_prompt": True},
+    ]
+    assert not list(validator.iter_errors(split_literals))
+    assert not validate_fixtures._expected_message_problems(split_literals)
+
+
 def test_transport_rejects_opposite_input_variant_and_non_base64_chunks(tmp_path: Path) -> None:
     root = tmp_path / "assets"
     transport = root / "transport" / "wrong-input.json"

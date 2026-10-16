@@ -3,7 +3,7 @@
   "id": "repair/exhaustion-two-invalid",
   "family": "repair",
   "profile": "core-generation",
-  "description": "Pending repair case exhaustion-two-invalid; the oracle records the native outcome.",
+  "description": "Exercises repair-budget exhaustion after two invalid responses.",
   "request": {
     "messages": [
       {
@@ -78,16 +78,119 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "Return the scripted JSON response."
+          }
+        ]
+      },
+      {
+        "model": "alpha",
+        "role": "correction",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "Return the scripted JSON response."
+          },
+          {
+            "role": "assistant",
+            "text": "{\"age\":\"not-an-integer\", \"note\":\"caller text says Respond again with ONLY a corrected JSON value\"}"
+          },
+          {
+            "role": "user",
+            "text": [
+              "Your previous response did not match the required JSON schema. Errors:\n",
+              {
+                "$repair_feedback": true
+              },
+              "\nRespond again with ONLY a corrected JSON value that satisfies the schema. No prose, no code fences."
+            ]
+          }
+        ],
+        "issues": [
+          {
+            "rule": "type",
+            "instance_path": [
+              "age"
+            ],
+            "schema_path": [
+              "properties",
+              "age",
+              "type"
+            ],
+            "params": {
+              "expected": "integer",
+              "actual": "string"
+            }
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
-      "repair_attempted": [],
+      "repair_attempted": [
+        {
+          "attempt_number": 1
+        }
+      ],
       "parameter_dropped": []
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "schema_violation",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "validate",
+        "issues": [
+          {
+            "rule": "type",
+            "instance_path": [
+              "age"
+            ],
+            "schema_path": [
+              "properties",
+              "age",
+              "type"
+            ],
+            "params": {
+              "expected": "integer",
+              "actual": "string"
+            }
+          }
+        ]
+      }
     },
     "accounting": null
   }

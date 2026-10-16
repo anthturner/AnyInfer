@@ -3,7 +3,7 @@
   "id": "schema-admission/unsupported-dialect-draft7",
   "family": "schema-admission",
   "profile": "core-generation",
-  "description": "Pending schema-admission case unsupported-dialect-draft7; the oracle records the native outcome.",
+  "description": "Exercises the excluded Draft 7 schema dialect boundary.",
   "request": {
     "messages": [
       {
@@ -56,7 +56,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {
@@ -65,7 +65,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "unsupported_input",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "generate"
+      }
     },
     "accounting": null
   },

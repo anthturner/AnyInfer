@@ -47,7 +47,7 @@ response byte limit, and a route.
 | Element | Rule | Out of v0 |
 |---|---|---|
 | Message | `role` in `system`, `user`, `assistant`; `content` is an ordered list of text parts. A message's text is the concatenation of its text parts in order. | Role `tool` (extension `messages.tool_role`); any non-text part (extension `messages.non_text_parts`). |
-| Empty message list | The empty-list behavior is not yet observed; its fixture expectation remains `to_be_observed` and must be observed and reconciled before the corpus is frozen. | |
+| Empty message list | An empty message list is admitted and remains empty during normalization; no synthetic caller message is inserted. Schema-prompt injection follows §5. | |
 | Sampling | Fields: `temperature`, `top_p`, `max_output_tokens`, `stop` (list of strings), `seed`, `presence_penalty`, `frequency_penalty`. Unset fields are omitted from the wire request; the provider default applies. `stop` empty is omitted. | Provider option escape hatches. |
 | Sampling validity | Negative `seed`, non-finite `presence_penalty` or `frequency_penalty` is `invalid_request` at construction, before acceptance. | |
 | Timeout | Per adapter entry, including corrections. Default 120 s when unset. | |
@@ -402,8 +402,9 @@ and expected results. v0 recognizes no tagged-value interpretation.
 - Nonfinite values and lone surrogates are excluded. An injective tagged codec for those
   values is deferred with O1 and O8.
 - `{"$schema_prompt": true}` and `{"$repair_feedback": true}` are placeholders only in the
-  schema-typed expected-message segment positions defined in §14. They are never interpreted
-  in arbitrary result, schema, request, adapter, or expected JSON.
+  schema-typed expected-message segment positions defined in §14, including the scoped outbound
+  `core_http` HTTP-message content position. They are never interpreted in arbitrary result,
+  schema, request, adapter, or other expected JSON.
 
 **Numeric controls.** Compare `timeout_s`, error `retry_after_s`, route
 `retry.backoff_base_s`, `retry.backoff_max_s`, `health_ttl_s`, and sampling `temperature`,
@@ -520,6 +521,17 @@ Rules:
   correction user's repair-message position and has the §8 meaning. Message text is the
   concatenation of segments. A message with several caller text parts is written as a list of
   strings; comparison is on concatenated text.
+- For an observed `core_http` fixture only,
+  `expected.http_requests[i].body.messages[j]` is the closed `{role, content}` outbound
+  OpenAI message row. Its `content` is a literal string, a literal array, or an array of the
+  same typed segments above. A marker candidate in that array requires every member to be a
+  valid typed segment; ordinary multipart arrays without a marker candidate, including arbitrary
+  ordinary-JSON objects, remain literal. The driver pairs HTTP row `i` with captured core entry and `expected.core.calls[i]`:
+  the outbound role must match that entry, schema-prompt expansion uses that entry's actual
+  schema injection, and repair-feedback expansion uses its selected native assessment. Missing
+  paired entry, call, role, or assessment evidence fails observation. `adapter` HTTP rows and
+  every other HTTP body field remain literal ordinary JSON, even when an object resembles a
+  marker.
 - The boundary case marked `extension: "messages.non_text_parts"` may instead encode an
   input message as `{role, parts}`. `parts` is an ordered nonempty list of
   `{kind: "text", text: "..."}` or `{kind: "image_url", url: "...", media_type: "image/png"}`
@@ -638,6 +650,11 @@ actual payload mode. It records the response bytes separately as raw facts. Asso
 `max_response_bytes`. These are not HTTP header fields or transport-client byte-limit
 arguments. Functional raw-byte cases prove enforcement.
 
+For `core_http`, the ordering of `expected.http_requests`, effective wire entries, and
+`expected.core.calls` is shared: row `i` is the HTTP projection of core entry `i`. Only
+`body.messages[j].content` has the §14 segment grammar and expansion binding. This does not
+make marker objects meaningful in adapter requests or arbitrary decoded HTTP JSON.
+
 Semantic request headers are lowercased and include only content type, the fixture bearer
 authorization, and explicitly configured custom headers. Automatically generated client and
 framing headers are excluded. The adapter receives only input configuration and scripted
@@ -752,7 +769,7 @@ driver assertion can silently disappear. A skipped/unexecuted driver assertion i
 **normalization:** `roles-ordered-text`, `multi-part-text-concatenated`,
 `sampling-omitted-when-unset`, `sampling-supplied-fields`, `target-first-colon-model-with-colon`,
 `target-model-whitespace-stripped`, `target-empty-model-invalid`, `invalid-sampling-negative-seed`,
-`empty-messages` (to_be_observed), `unsupported-tool-role` (E), `unsupported-alias-target` (E),
+`empty-messages`, `unsupported-tool-role` (E), `unsupported-alias-target` (E),
 `unsupported-image-part` (E).
 
 **schema-admission:** `admitted-full-subset-valid-response`, `unknown-keyword-ignored` (E), `unsupported-ref` (E),

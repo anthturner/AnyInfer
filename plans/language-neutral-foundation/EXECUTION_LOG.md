@@ -1219,3 +1219,150 @@ with no fail/error or unexecuted row; all 96 fixture expectation blocks remain p
 M1.7. This establishes complete development execution, not a reference or released report.
 The driver owner receives the sole M1.6c.3/parent checkbox lease before the phase commit.
 Next is M1.7a's causal expectation-staging utility; no fixture expectation is changed yet.
+
+M1.6 was committed as `61aa4544af0ece70355a78eaf0842f1eea44e83f`; root verified a clean
+working tree. M1.7a inspection found an unreleased specification error: nested core call
+messages expand native-feedback markers, but outbound HTTP bodies compare the corresponding
+feedback literally. That would require another native validator to repeat Python's prose.
+M1.7a.1 closes only the core-HTTP expected message-content position, with causal entry binding,
+shared marker validation and literal adapter/other-JSON boundaries. The pure utility follows
+under M1.7a.2; expectation writes remain M1.7b.
+
+M1.7a.1 is accepted. Root inspected joined shell
+`ccfcf6be-9071-4ffd-a573-d94a9e07dd6a`: **459 passed, two platform skips in 74.43 seconds**,
+exit 0, with Ruff, strict typing on three changed support modules and all 23 Markdown
+links checks passing. Independent final review is clean. Before testing, root corrected
+invalid structural equality between HTTP multipart and flattened core text, then prevented
+noncandidate array concatenation and an early-return path that skipped later messages.
+The focused validator/coverage and 19-test transport gates also passed. Source remains
+uncommitted pending the coherent reconciliation phase; no fixture expectations were changed.
+Resume at M1.7a.2: pure native-fact reconciliation utility and independent tests, with writes
+still reserved for M1.7b.
+
+M1.7a.2's first focused matrix (`c90e92e2-df5f-4a88-aa1c-075a16426bac`) finished
+**13 passed, 10 failed** in 2.09 seconds. Root confirmed one source defect: an eligible,
+declared extension with unavailable capture was mislabeled as an authorization/domain error
+after its comparator returned error. Eligibility must be checked independently; authorized
+missing native evidence remains `MissingEvidenceError`. The source owner corrects only that
+boundary while the test owner fixes proven path/setup/category mistakes. The empty-message
+case actually enters the native adapter; shared section 2 explicitly leaves that behavior
+unobserved, so its test must retain the observation instead of assuming a construction
+failure. True invalid-sampling construction remains the zero-entry control. No SDK,
+specification behavior or fixture input is changed. The focused slot stays with the test
+owner for the same retained shell after source stability; acceptance is still pending.
+
+M1.7a.2 is accepted. Root inspected retained `c90e92e2...`: the corrected full matrix passed
+**22 tests in 3.48 seconds**, and the isolated same-case-ID kind guard passed in 0.13 seconds.
+Independent final review closed all findings. Root then ran
+`7c6555e7-c343-4473-bcfa-492f96107312`: **389 passed, one platform skip in 38.71 seconds**,
+exit 0, with Ruff and strict typing on both new modules passing. The two new private modules
+are explicitly staged in Git so actual loaded-module provenance sees tracked sources;
+there is no new commit or reference artifact. The first unchecked execution box is M1.7b:
+stage all 96 expected envelopes in an isolated complete specification copy, retain actual
+audit rows, classify/review against named requirements, and apply only accepted data later.
+
+M1.7b isolated copy `.tmp-tests/m17-stage-61aa454-02/specification` retained its audit at
+`m17b-audit.json`. Native authoring staged **85/96**, leaving eleven original documents
+pending after identical private-comparator failures. Shell
+`efc214f4-230b-4001-9b39-622a85e43aed` exited 0 because it collected the whole audit; this
+is not acceptance, and full selected validation/fresh 102-case observation did not run.
+Root inspected the source: `_messages_equal` requested native correction feedback for
+every user message at index > 0, including original retry calls. Root declined a proposed
+authoring workaround that forced earlier-call references: literal repeated messages are
+valid shared data. A narrow comparator fix now looks up feedback only for explicit typed
+repair-feedback segments, with independent retry/failover regressions before a fresh B03
+stage. SDK/input/spec behavior stays unchanged. Separately, metadata review verified the
+exact 60/36 split and requested two precision corrections: zero *repair* attempts, and
+*attempts* extraction before malformed-schema assessment. Canonical fixtures remain pending.
+
+The B02 comparator correction is accepted after root inspected **51 passing tests in
+2.42 seconds** in retained `c90e92e2...` and a clean bounded code review. Feedback lookup
+requires an exact singleton marker with boolean identity (`is True`), preserving numeric
+1/1.0 as malformed segments. Native retry/failover/failed-stream regressions retain full
+literal original messages without earlier-call authoring workarounds. Source is held and
+the same native oracle shell now owns a fresh B03 full staging run; B02 remains preserved.
+No canonical fixture or SDK changes have occurred. The first unchecked box remains M1.7b.
+
+Fresh B03 native staging completed in the same retained oracle shell
+`efc214f4-230b-4001-9b39-622a85e43aed`: **96 staged, zero failures** under
+`.tmp-tests/m17-stage-61aa454-03/specification`. The sibling `m17b-audit.json` records
+UNRELEASED/dirty-source status, code/input hashes, native comparison rows and a fresh
+102-case development observation with **93 pass, nine extension, zero fail/error/unexecuted**.
+Full selected validation returned no problems. Root inspected the retained audit and exit-0
+log; empty-message evidence is one operation/one original entry with `messages: []`, no
+assessments, and a successful result. Canonical data is still untouched. Independent reviewers
+now own disjoint 45-case and 51-case semantic cohorts, with a third verifier checking all
+96 raw hashes, ordered nonexpected invariants and audit coverage before any application.
+
+The 51-case schema/extraction/validation/transport cohort is clean; root inspected every
+recorded disposition. The independent all-96 invariant review also has zero findings:
+all raw before/after hashes, exact nonexpected types/member order, ordinary-JSON domain,
+encoding, six implementation hashes and fresh 102-case/104-input audit bindings match.
+The remaining 45-case semantic review found a real fixture stimulus gap in
+`streaming/first-token-mark-once-per-attempt`: the first `{"ok":false}` response satisfies
+its required-only schema, leaving the authored correction script unused. Root classified
+this as fixture data, preserving the named original/correction requirement with a narrow
+`properties.ok.const: true` correction instead of weakening the description or changing
+SDK behavior. B03 stays frozen as historical evidence; finish the remaining semantic
+review, serialize its required data corrections, and retain a fresh full staging audit
+before canonical expectation application. M1.7b remains the first unchecked box at HEAD
+`61aa4544af0ece70355a78eaf0842f1eea44e83f`.
+
+Root inspected the complete 45-case semantic table. Its remaining 43 cases are clean;
+the first-token stimulus gap and empty-list pending normative language are the only
+dispositions requiring edits. The empty-list adoption preserves observed Python behavior:
+normalization admits the empty list without a synthetic caller message, while schema
+injection follows section 5. It is not a promise of exactly one entry for every route.
+The data owner has a disjoint three-file brief for the single schema correction, durable
+empty-list description, and two normative placeholder replacements. The native owner is
+authorized to run a fresh B04 all-96 stage after those cheap checks pass, preserving B03.
+No canonical expected block has been applied; final M1.7b acceptance remains pending.
+
+The exact three-file stimulus/norm correction passed coverage, Markdown links and encoding
+checks; root inspected both fixture diffs and the two normative replacements. The fresh B04
+native stage in retained `efc214f4-230b-4001-9b39-622a85e43aed` then exited 0: all 96 staged,
+zero failures, selected validation empty, and a fresh 102-case/104-input observation with
+93 pass / nine extension / zero fail, error or unexecuted. Its disposable ordered invariant
+now also requires scalar type identity. Root inspected the audit and final log. The corrected
+first-token case has original/correction entries, two ordered start/first-token pairs,
+one repair and final `ok: true`; empty messages retains one original empty wire with zero
+assessments. B02/B03 remain frozen. Independent corrected-case and all-96 hash/order checks
+run before the guarded canonical expected/description application; no expected data has yet
+been applied to the canonical tree.
+
+B04 semantic closure is clean: both prior findings are resolved and the other 43 core
+cohort envelopes are byte-identical to B03. The all-96 independent invariant recheck has
+zero findings, with exactly two approved fixture deltas and all 104 raw hashes matching.
+Root accepted the guarded dryrun manifest, then authorized one snapshot-based application.
+All 96 canonical fixture writes match their approved proposed hashes; 59 further description
+updates complete the reviewed 60 mappings because empty messages was updated earlier.
+All 36 already-durable descriptions are unchanged. Application audit and original-byte
+backups remain under `.tmp-tests/m17-apply-61aa454-04/`. Coverage, Markdown and encoding
+checks passed, as did root Ruff and strict mypy across nine changed support/test modules.
+
+Root canonical joined gate `d55ecb4f-4084-408c-8a61-cc02f48e1690` finished **477 passed,
+12 failed, two platform skips in 59.94 seconds**. All canonical corpus execution/count
+assertions passed. The twelve failures are synthetic comparison/reconciliation tests that
+retain newly observed expected calls while changing request/message/schema/extension
+inputs, or still expect pending cancellation from checked-in data. The independent test
+owner has the two affected test files and a focused slot to create explicit fresh pending
+authoring setups; observed preservation controls and source/data remain held. Final
+repository acceptance and clean revision A are still pending; no reference output exists.
+
+The narrow synthetic authoring fix passed **51 tests in 3.27 seconds** in retained
+`c90e92e2-df5f-4a88-aa1c-075a16426bac`; root inspected the exact two-file diff and exit-0
+log. Deliberate pending fixtures are now deep-copied authoring inputs, while observed
+segment preservation and strict reconciliation provenance remain unchanged. The final
+postapply independent review has no open finding: every expected envelope, input/script
+value and member order is preserved, all 96 applied hashes match, and all 60 reviewed
+description strings exactly match the approved plain-text manifest/canonical values.
+The initial 17 artifact-table code-formatting differences were resolved only in the
+review table under the pre-application plain-prose disposition; no corpus/audit changed.
+
+M1.7b is accepted. Root inspected final shell `1898982c-52b7-49a0-b424-2ee4677c54dd`:
+**all 13 repository steps passed in 194.7 seconds**, exit 0. The canonical corpus has
+96 observed fixtures and covers all 102 obligations as 93 pass / nine eligible extensions,
+with no pending, fail, error or unexecuted row. Root now commits the reviewed implementation,
+driver, schema, specification and fixture inputs as revision A. Resume at M1.7c from that
+clean commit; no executable/normative input may change while the actual reference writer
+runs. The generated manifest will record the exact full A revision without a self-hash cycle.

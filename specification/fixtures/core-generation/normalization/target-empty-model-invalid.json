@@ -3,7 +3,7 @@
   "id": "normalization/target-empty-model-invalid",
   "family": "normalization",
   "profile": "core-generation",
-  "description": "Pending normalization case target-empty-model-invalid; the oracle records the native outcome.",
+  "description": "Rejects a target whose model part is empty after normalization.",
   "request": {
     "messages": [
       {
@@ -52,7 +52,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {
@@ -61,7 +61,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "invalid_request",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "configure"
+      }
     },
     "accounting": null
   }

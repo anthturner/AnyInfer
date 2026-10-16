@@ -8,6 +8,7 @@ import contextlib
 import json
 from collections.abc import AsyncIterator
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,8 +20,15 @@ from anyinfer.types.events import TextDelta
 from anyinfer.types.messages import user
 
 from .adapter import HarnessError
+from .projection import project_run
+from .proof_transport import _correction_fixture
 from .reference import _validator_module
-from .transport import _RecordingAdapter, compare_transport_fixture, run_transport_fixture
+from .transport import (
+    _core_http_messages_equal,
+    _RecordingAdapter,
+    compare_transport_fixture,
+    run_transport_fixture,
+)
 
 
 def _chunk(value: bytes) -> dict[str, str]:
@@ -320,6 +328,131 @@ async def test_transport_core_keeps_native_capture_and_pending_observation(tmp_p
     assert any("close_without_advance" in problem for problem in problems)
     refused = await run_transport_fixture(bad)
     assert isinstance(refused.error, HarnessError) and refused.error_stage == "harness"
+
+
+async def test_core_http_expands_only_causally_bound_outbound_message_markers(
+    tmp_path: Path,
+) -> None:
+    fixture = cast(dict[str, Any], _correction_fixture())
+    run = await run_transport_fixture(fixture)
+    assert run.core is not None and run.error is None
+    fixture["expected"] = {
+        "status": "observed",
+        "http_requests": deepcopy(list(run.http_requests)),
+        "wire_limits": [
+            {"timeout_s": wire.timeout_s, "max_response_bytes": wire.max_response_bytes}
+            for wire in run.requests
+        ],
+        "core": project_run(run.core),
+    }
+    expected_rows = fixture["expected"]["http_requests"]
+    assert isinstance(expected_rows, list) and len(expected_rows) == 2
+    first_messages = expected_rows[0]["body"]["messages"]
+    correction_messages = expected_rows[1]["body"]["messages"]
+    assert isinstance(first_messages, list) and isinstance(correction_messages, list)
+    first_messages[0]["content"] = [{"$schema_prompt": True}]
+    correction_messages[-1]["content"] = [
+        "Your previous response did not match the required JSON schema. Errors:\n",
+        {"$repair_feedback": True},
+        "\nRespond again with ONLY a corrected JSON value that satisfies the schema. No prose, no code fences.",
+    ]
+    core_calls = fixture["expected"]["core"]["calls"]
+    assert isinstance(core_calls, list) and len(core_calls) == 2
+    core_calls[0]["messages"][0]["text"] = ["", {"$schema_prompt": True}]
+    core_calls[1]["messages"][0]["text"] = ["", {"$schema_prompt": True}]
+    core_calls[1]["messages"][-1]["text"] = [
+        "Your previous response did not match the required JSON schema. Errors:",
+        "\n",
+        {"$repair_feedback": True},
+        "\nRespond again with ONLY a corrected JSON value that satisfies the schema. No prose, no code fences.",
+    ]
+    assert _validate(tmp_path, fixture, name="core-http-markers") == []
+    assert compare_transport_fixture(fixture, run)["verdict"] == "pass"
+
+    malformed = deepcopy(fixture)
+    malformed["expected"]["http_requests"][1]["body"]["messages"][-1]["content"] = [
+        {"$repair_feedback": False}
+    ]
+    assert compare_transport_fixture(malformed, run)["verdict"] == "error"
+
+    wrong_role = deepcopy(fixture)
+    wrong_role["expected"]["http_requests"][1]["body"]["messages"][-1]["role"] = "assistant"
+    assert compare_transport_fixture(wrong_role, run)["verdict"] == "fail"
+
+    assert compare_transport_fixture(fixture, replace(run, requests=()))["verdict"] == "error"
+
+
+async def test_transport_http_markers_do_not_expand_for_adapter_or_unrelated_body_data(
+    tmp_path: Path,
+) -> None:
+    adapter = _fixture()
+    adapter["expected"] = _expected_adapter()
+    adapter["expected"]["http_requests"][0]["body"]["messages"][0]["content"] = [
+        {"$repair_feedback": True}
+    ]
+    assert _validate(tmp_path, adapter, name="adapter-marker") == []
+    adapter_run = await run_transport_fixture(adapter)
+    assert compare_transport_fixture(adapter, adapter_run)["verdict"] == "fail"
+
+    core = _as_core(_fixture())
+    core["expected"] = _expected_core()
+    run = await run_transport_fixture(core)
+    assert run.core is not None
+    observed = list(deepcopy(run.http_requests))
+    observed[0]["body"]["opaque"] = "literal"
+    expected = deepcopy(core)
+    expected["expected"]["http_requests"] = deepcopy(observed)
+    expected["expected"]["http_requests"][0]["body"]["opaque"] = {"$schema_prompt": True}
+    assert compare_transport_fixture(expected, replace(run, http_requests=tuple(observed)))["verdict"] == "fail"
+
+
+async def test_core_http_literal_multipart_segments_remain_type_aware_literals(
+    tmp_path: Path,
+) -> None:
+    fixture = _as_core(_fixture())
+    fixture["input"]["operation"]["request"]["messages"] = [
+        {"role": "user", "text": ["hel", "lo"]}
+    ]
+    run = await run_transport_fixture(fixture)
+    assert run.core is not None and run.error is None
+    fixture["expected"] = {
+        "status": "observed",
+        "http_requests": deepcopy(list(run.http_requests)),
+        "wire_limits": [
+            {"timeout_s": wire.timeout_s, "max_response_bytes": wire.max_response_bytes}
+            for wire in run.requests
+        ],
+        "core": project_run(run.core),
+    }
+    assert _validate(tmp_path, fixture, name="core-http-literal-raw") == []
+    assert compare_transport_fixture(fixture, run)["verdict"] == "pass"
+
+    multipart = deepcopy(fixture)
+    multipart["expected"]["http_requests"][0]["body"]["messages"][0]["content"] = [
+        "h",
+        "ello",
+    ]
+    assert _validate(tmp_path, multipart, name="core-http-literal-multipart") == []
+    assert compare_transport_fixture(multipart, run)["verdict"] == "fail"
+
+
+async def test_literal_message_equality_checks_later_rows_after_equal_array() -> None:
+    fixture = _as_core(_fixture())
+    fixture["input"]["operation"]["request"]["messages"] = [
+        {"role": "user", "text": "first"},
+        {"role": "assistant", "text": "second"},
+    ]
+    run = await run_transport_fixture(fixture)
+    assert run.core is not None and run.error is None
+    entries = tuple(run.core.operations[0].entries)
+    actual = deepcopy(run.http_requests[0]["body"]["messages"])
+    wanted = deepcopy(actual)
+    actual[0]["content"] = ["first"]
+    wanted[0]["content"] = ["first"]
+    actual[1]["content"] = "mismatch"
+    assert not _core_http_messages_equal(
+        wanted, actual, run=run, entry=entries[0], ordinal=0
+    )
 
 
 @pytest.mark.parametrize(

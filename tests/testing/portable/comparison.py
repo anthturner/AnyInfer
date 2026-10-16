@@ -244,15 +244,29 @@ def _messages_equal(
             return False
         if expected_message.get("role") != actual_message.get("role"):
             return False
-        native = native_feedback_for_call(run, index) if expected_message.get("role") == "user" and index else None
+        expected_text = expected_message.get("text", "")
+        native = (
+            native_feedback_for_call(run, index)
+            if _has_repair_feedback_marker(expected_text)
+            else None
+        )
         try:
-            text = expand_segments(expected_message.get("text", ""), schema=schema, native_messages=native)
+            text = expand_segments(expected_text, schema=schema, native_messages=native)
         except (ValueDomainError, MissingEvidenceError):
             raise
         actual_text = actual_message.get("text")
         if not isinstance(actual_text, str) or text != actual_text:
             return False
     return True
+
+
+def _has_repair_feedback_marker(value: Any) -> bool:
+    return isinstance(value, list) and any(
+        isinstance(segment, Mapping)
+        and len(segment) == 1
+        and segment.get("$repair_feedback") is True
+        for segment in value
+    )
 
 
 def _request_sampling(fixture: Mapping[str, Any]) -> dict[str, Any]:

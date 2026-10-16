@@ -61,8 +61,22 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": null,
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "user",
+            "text": "fixture input"
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
       "repair_attempted": [],
@@ -70,7 +84,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "stream_protocol",
+        "retryable": true,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "stream"
+      }
     },
     "accounting": null
   }

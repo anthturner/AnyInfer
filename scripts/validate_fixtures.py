@@ -568,18 +568,16 @@ def _marker_positions(messages: list[Any], marker: str) -> list[tuple[int, int]]
     return positions
 
 
-def _expected_message_problems(document: Any) -> list[str]:
-    if not isinstance(document, dict):
-        return []
-    expected = document.get("expected")
-    calls = expected.get("calls") if isinstance(expected, dict) else None
+def _call_message_problems(
+    request: Any, calls: Any, *, label: str
+) -> list[str]:
     if not isinstance(calls, list):
         return []
     problems: list[str] = []
     for index, call in enumerate(calls):
         messages, error = _resolved_messages(calls, index)
         if error:
-            problems.append(f"expected.calls[{index}]: {error}")
+            problems.append(f"{label}[{index}]: {error}")
             continue
         if messages is None:
             continue
@@ -589,7 +587,7 @@ def _expected_message_problems(document: Any) -> list[str]:
         if role == "correction":
             if len(repair_positions) != 1:
                 problems.append(
-                    f"expected.calls[{index}]: correction needs exactly one $repair_feedback"
+                    f"{label}[{index}]: correction needs exactly one $repair_feedback"
                 )
             else:
                 message_index, segment_index = repair_positions[0]
@@ -612,18 +610,17 @@ def _expected_message_problems(document: Any) -> list[str]:
                     or after != _REPAIR_SUFFIX
                 ):
                     problems.append(
-                        f"expected.calls[{index}]: $repair_feedback is not in the exact final repair user template"
+                        f"{label}[{index}]: $repair_feedback is not in the exact final repair user template"
                     )
         elif repair_positions:
             problems.append(
-                f"expected.calls[{index}]: $repair_feedback is only valid for correction calls"
+                f"{label}[{index}]: $repair_feedback is only valid for correction calls"
             )
         if schema_positions:
-            request = document.get("request")
             if not isinstance(request, dict) or "schema" not in request:
-                problems.append(f"expected.calls[{index}]: $schema_prompt requires request.schema")
+                problems.append(f"{label}[{index}]: $schema_prompt requires request.schema")
             if len(schema_positions) != 1:
-                problems.append(f"expected.calls[{index}]: $schema_prompt may appear exactly once")
+                problems.append(f"{label}[{index}]: $schema_prompt may appear exactly once")
             else:
                 message_index, segment_index = schema_positions[0]
                 message = messages[message_index]
@@ -640,9 +637,83 @@ def _expected_message_problems(document: Any) -> list[str]:
                     or segment_index != len(text) - 1
                 ):
                     problems.append(
-                        f"expected.calls[{index}]: $schema_prompt must end the injected last system message"
+                        f"{label}[{index}]: $schema_prompt must end the injected last system message"
                     )
     return problems
+
+
+def _transport_expected_message_problems(document: dict[str, Any]) -> list[str]:
+    if document.get("kind") != "core_http":
+        return []
+    expected = document.get("expected")
+    input_data = document.get("input")
+    if not isinstance(expected, dict) or expected.get("status") != "observed":
+        return []
+    if not isinstance(input_data, dict):
+        return []
+    operation = input_data.get("operation")
+    core = expected.get("core")
+    http_requests = expected.get("http_requests")
+    if not isinstance(operation, dict) or not isinstance(core, dict):
+        return []
+    request = operation.get("request")
+    calls = core.get("calls")
+    problems = _call_message_problems(request, calls, label="expected.core.calls")
+    if not isinstance(calls, list) or not isinstance(http_requests, list):
+        return problems
+    if len(http_requests) != len(calls):
+        problems.append("expected.http_requests must align one-to-one with expected.core.calls")
+        return problems
+    for call_index, (row, call) in enumerate(zip(http_requests, calls, strict=True)):
+        messages, error = _resolved_messages(calls, call_index)
+        if error or messages is None or not isinstance(call, dict):
+            problems.append(
+                f"expected.http_requests[{call_index}]: cannot align with expected.core.calls[{call_index}]"
+            )
+            continue
+        body = row.get("body") if isinstance(row, dict) else None
+        body_messages = body.get("messages") if isinstance(body, dict) else None
+        if not isinstance(body_messages, list) or len(body_messages) != len(messages):
+            problems.append(
+                f"expected.http_requests[{call_index}].body.messages must align with expected.core.calls[{call_index}].messages"
+            )
+            continue
+        projected: list[dict[str, Any]] = []
+        aligned = True
+        for message_index, (body_message, core_message) in enumerate(
+            zip(body_messages, messages, strict=True)
+        ):
+            if not isinstance(body_message, dict) or not isinstance(core_message, dict):
+                aligned = False
+                break
+            if body_message.get("role") != core_message.get("role"):
+                problems.append(
+                    f"expected.http_requests[{call_index}].body.messages[{message_index}] role does not align with expected.core.calls[{call_index}]"
+                )
+                aligned = False
+                break
+            projected.append(
+                {"role": body_message.get("role"), "text": body_message.get("content")}
+            )
+        if aligned:
+            problems.extend(
+                _call_message_problems(
+                    request,
+                    [{"role": call.get("role"), "messages": projected}],
+                    label=f"expected.http_requests[{call_index}].body",
+                )
+            )
+    return problems
+
+
+def _expected_message_problems(document: Any) -> list[str]:
+    if not isinstance(document, dict):
+        return []
+    expected = document.get("expected")
+    if document.get("kind") == "core_http":
+        return _transport_expected_message_problems(document)
+    calls = expected.get("calls") if isinstance(expected, dict) else None
+    return _call_message_problems(document.get("request"), calls, label="expected.calls")
 
 
 def validate(

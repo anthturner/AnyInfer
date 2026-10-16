@@ -744,7 +744,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   Run the clean reference-observation oracle with Python declaring all eight extension feature
   names. Generated observation/manifest outputs may be output-only exceptions; executable inputs
   must not be dirty.
-  - [ ] M1.7a Add private `tests/testing/portable/reconcile.py` and
+  - [x] M1.7a Add private `tests/testing/portable/reconcile.py` and
     `test_reconcile.py` for staging expected data from actual `NativeRun`/`TransportRun`
     facts. Reuse the accepted projections/capture validation; do not copy development
     reports or implement another inference/validation policy. Markerize only causal schema
@@ -754,8 +754,31 @@ M1 and later use `src/python/` paths and therefore depend on it.
     nondeclaring portable baseline from shared section 14, with Python's honest native
     extension outcome/entries retained separately in the staging audit. Gate: actual-run
     positives, caller-text collision, marker roundtrip/missing-evidence, extension-baseline
-    and duplicate-member-order controls pass; strict typing and cold review are clean.
-  - [ ] M1.7b From the accepted M1.6 development driver, stage all 96 fixture expectations
+      and duplicate-member-order controls pass; strict typing and cold review are clean.
+    - [x] M1.7a.1 Close the outbound core-HTTP marker gap before staging expectations.
+      Admit the existing typed schema/feedback segments only at
+      `expected.http_requests[i].body.messages[j].content` for `core_http` fixtures;
+      bind expansion to the corresponding captured native entry and selected assessment.
+      Reuse the nested core-call marker semantics in the trusted validator. Adapter rows
+      and all other JSON positions remain literal. Gate: valid schema/repair marker rows,
+      wrong-role/missing-capture/malformed-marker negatives and literal-boundary controls
+      pass in validator and native comparator tests; cold review is clean.
+      > NOTE: Source inspection found that raw HTTP body comparison otherwise pins a second
+      > implementation to Python validation feedback prose. This is an unreleased
+      > specification error corrected using the existing native-feedback marker contract;
+      > no SDK behavior or fixture input changes. Literal multipart content remains literal.
+      > NOTE: Accepted after clean final cold review, Ruff, strict typing across three
+      > changed support modules, Markdown links, and the joined portable/asset/OpenAI gate:
+      > 459 passed with two platform skips in 74.43 seconds. Noncandidate arrays retain
+      > strict literal comparison and every later message is checked.
+    - [x] M1.7a.2 Implement and verify the pure causal reconciliation utility described by
+      M1.7a after the marker contract gate; keep actual fixture writes in M1.7b.
+      > NOTE: Accepted with clean final code review, the 22-test native matrix plus isolated
+      > same-case-ID guard proof, and the joined portable gate: 389 passed with one platform
+      > skip in 38.71 seconds. Ruff and strict typing across both new modules passed.
+      > Caller lookalikes remain literal; existing causal markers and structured member
+      > order survive. Extension baseline data remains separate from honest Python evidence.
+  - [x] M1.7b From the accepted M1.6 development driver, stage all 96 fixture expectations
     in an isolated complete selected specification tree, retain native audit observations,
     and review every changed expectation against its input and named requirement. Classify
     each mismatch as fixture error, specification error or Python bug before applying data;
@@ -763,8 +786,43 @@ M1 and later use `src/python/` paths and therefore depend on it.
     fixture expectation/authoring-metadata changes, retaining input/script/schema data and
     member order. Update canonical execution tests to accept observed pass as well as
     deliberately synthetic pending controls. Gate: no pending fixture, all 102 obligations
-    execute with zero fail/error and only the nine eligible Python extensions; strict
-    coverage and the complete repository gate pass before committing clean revision A.
+      execute with zero fail/error and only the nine eligible Python extensions; strict
+      coverage and the complete repository gate pass before committing clean revision A.
+      > NOTE: Read-only metadata inventory found 60 stale pending/oracle descriptions and
+      > 36 descriptions already stating durable intent. All 96 need full reviewed expected
+      > envelopes; only the 60 stale descriptions are cleanup candidates. Preserve each
+      > named behavior and the explicit no-image-fetch/no-invented-tool-ID constraints.
+      > NOTE: The first isolated run staged 85/96 fixtures; eleven retry/failover cases
+      > exposed a private comparator bug that requested repair feedback for every later
+      > user message. Correct only lookup for explicit typed repair-feedback segments,
+      > with native retry regressions; do not force `same_as_call_N` to hide a failure on
+      > valid literal messages. This changes no SDK or portable behavior. Retain the
+      > failed audit and rerun the complete stage from a fresh specification copy.
+      > NOTE: B03 staged all 96 expectations and passed independent raw-hash/member-order
+      > checks, but semantic review found a fixture stimulus gap in
+      > `streaming/first-token-mark-once-per-attempt`: its required-only `ok` schema accepts
+      > the first `false` response, so no correction runs. Preserve the named original and
+      > correction timing requirement by adding `properties.ok.const: true`, then retain a
+      > fresh full native stage and review its changed case. This is the narrowly reviewed
+      > input-data exception to expected/metadata-only application; no SDK behavior changes.
+      > NOTE: The completed 45-case review also closes the explicit empty-list observation
+      > placeholder: admit and preserve an empty list during normalization without inserting
+      > a caller message; schema-prompt injection still follows shared §5. Replace only §2's
+      > pending row and §17's pending catalog label, and use a durable fixture description.
+      > The observed unstructured case enters once; this does not promise one entry for all
+      > routes, retries or repair. B04 must restage all 96 corrected inputs before application.
+      > NOTE: B04 passed all-case semantic and raw-invariant review; its 96 expected envelopes
+      > and 60 reviewed description mappings are applied. The first canonical integration
+      > run passed 477 tests with two platform skips but exposed 12 synthetic-test setups
+      > that implicitly relied on checked-in pending data. Give those authoring controls
+      > explicit fresh pending expectations before input mutations; keep observed marker
+      > preservation controls and strict source provenance guards intact before the final gate.
+      > NOTE: Accepted after the 51-test authoring compatibility gate, clean final semantic
+      > and all-96 application/hash/order/metadata reviews, and all 13 repository checks in
+      > 194.7 seconds. Canonical data has 96 observed fixtures; all 102 obligations produce
+      > 93 passes and nine honest extensions with no pending, failed, error or unexecuted
+      > case. Commit these inputs as clean revision A, then resume at M1.7c without changing
+      > executable or normative inputs during reference production.
   - [ ] M1.7c From clean committed A, invoke the reviewed reference writer with the exact
     nonzero A revision and its canonical new-only manifest/environment paths. Inspect the
     complete native environment, input/import identities and reference outcome. Gate: both

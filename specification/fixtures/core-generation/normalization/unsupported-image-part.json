@@ -3,7 +3,7 @@
   "id": "normalization/unsupported-image-part",
   "family": "normalization",
   "profile": "core-generation",
-  "description": "Pending extension case unsupported-image-part; the oracle records the native outcome without fetching the example URL.",
+  "description": "Exercises an excluded non-text image part without fetching its example URL.",
   "request": {
     "messages": [
       {
@@ -62,7 +62,7 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
+    "status": "observed",
     "calls": [],
     "clock_advances_ms": [],
     "telemetry": {
@@ -71,7 +71,13 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "unsupported_input",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "generate"
+      }
     },
     "accounting": null
   },

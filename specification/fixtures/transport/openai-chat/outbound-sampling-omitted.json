@@ -44,6 +44,48 @@
     }
   ],
   "expected": {
-    "status": "to_be_observed"
+    "status": "observed",
+    "http_requests": [
+      {
+        "method": "POST",
+        "path": "/v1/chat/completions",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer fixture-token",
+          "x-fixture": "transport"
+        },
+        "body": {
+          "model": "fixture-model",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Hello."
+            }
+          ]
+        },
+        "stream": false
+      }
+    ],
+    "wire_limits": [
+      {
+        "timeout_s": 120,
+        "max_response_bytes": 1048576
+      }
+    ],
+    "adapter_outcome": {
+      "events": [
+        {
+          "text_delta": {
+            "text": "default"
+          }
+        },
+        {
+          "final": {
+            "finish_reason": "stop",
+            "usage": null
+          }
+        }
+      ]
+    }
   }
 }

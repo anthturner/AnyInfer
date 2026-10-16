@@ -104,16 +104,202 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "fixture input"
+          }
+        ]
+      },
+      {
+        "model": "alpha",
+        "role": "correction",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "fixture input"
+          },
+          {
+            "role": "assistant",
+            "text": "{}"
+          },
+          {
+            "role": "user",
+            "text": [
+              "Your previous response did not match the required JSON schema. Errors:\n",
+              {
+                "$repair_feedback": true
+              },
+              "\nRespond again with ONLY a corrected JSON value that satisfies the schema. No prose, no code fences."
+            ]
+          }
+        ],
+        "issues": [
+          {
+            "rule": "required",
+            "instance_path": [],
+            "schema_path": [
+              "required"
+            ],
+            "params": {
+              "property": "ok"
+            }
+          }
+        ]
+      },
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "fixture input"
+          }
+        ]
+      },
+      {
+        "model": "alpha",
+        "role": "correction",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "fixture input"
+          },
+          {
+            "role": "assistant",
+            "text": "{}"
+          },
+          {
+            "role": "user",
+            "text": [
+              "Your previous response did not match the required JSON schema. Errors:\n",
+              {
+                "$repair_feedback": true
+              },
+              "\nRespond again with ONLY a corrected JSON value that satisfies the schema. No prose, no code fences."
+            ]
+          }
+        ],
+        "issues": [
+          {
+            "rule": "required",
+            "instance_path": [],
+            "schema_path": [
+              "required"
+            ],
+            "params": {
+              "property": "ok"
+            }
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
-      "repair_attempted": [],
+      "repair_attempted": [
+        {
+          "attempt_number": 1
+        },
+        {
+          "attempt_number": 1
+        }
+      ],
       "parameter_dropped": []
     },
     "events": [],
     "outcome": {
-      "none": true
+      "result": {
+        "text": "{\"ok\":true}",
+        "structured": {
+          "ok": true
+        },
+        "target": {
+          "provider_id": "fixture",
+          "model": "alpha"
+        },
+        "finish_reason": "stop",
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null,
+          "cache_read_tokens": null,
+          "cache_write_tokens": null,
+          "reasoning_tokens": null
+        },
+        "timing": {
+          "first_token_ms": "non_null",
+          "total_ms": "present"
+        },
+        "structured_mechanism": "prompt",
+        "repair_attempts": 1,
+        "attempts": [
+          {
+            "target": "fixture:alpha",
+            "outcome": "retried",
+            "error": {
+              "category": "transport"
+            }
+          },
+          {
+            "target": "fixture:alpha",
+            "outcome": "ok"
+          }
+        ],
+        "warnings": []
+      }
     },
     "accounting": null
   }

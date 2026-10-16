@@ -3,7 +3,7 @@
   "id": "validation/malformed-schema-extraction-precedes-assessment",
   "family": "validation",
   "profile": "core-generation",
-  "description": "Pending validation case malformed-schema-extraction-precedes-assessment; the oracle records the native outcome.",
+  "description": "Attempts response extraction before assessing a malformed schema.",
   "request": {
     "messages": [
       {
@@ -55,8 +55,31 @@
     ]
   },
   "expected": {
-    "status": "to_be_observed",
-    "calls": [],
+    "status": "observed",
+    "calls": [
+      {
+        "model": "alpha",
+        "role": "original",
+        "mechanism": "prompt",
+        "timeout_s": 120.0,
+        "max_response_bytes": 1048576,
+        "messages": [
+          {
+            "role": "system",
+            "text": [
+              "",
+              {
+                "$schema_prompt": true
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "text": "Return the scripted JSON response."
+          }
+        ]
+      }
+    ],
     "clock_advances_ms": [],
     "telemetry": {
       "repair_attempted": [],
@@ -64,7 +87,21 @@
     },
     "events": [],
     "outcome": {
-      "none": true
+      "error": {
+        "category": "schema_violation",
+        "retryable": false,
+        "retry_after_s": null,
+        "http_status": null,
+        "phase": "validate",
+        "issues": [
+          {
+            "rule": "no_json_candidate",
+            "instance_path": null,
+            "schema_path": null,
+            "params": {}
+          }
+        ]
+      }
     },
     "accounting": null
   }
