@@ -961,12 +961,13 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > review. Frozen corpus bytes remain unchanged. The repository acceptance gate passed
   > all 13 steps in 200.9 seconds before the foundation checkpoint commit; resume at
   > the bounded plan's M2.3a invocation boundary.
-- [ ] M2.3 Async core: request normalization, routing with retry/backoff/health, repair loop,
+- [x] M2.3 Async core: request normalization, routing with retry/backoff/health, repair loop,
   streaming with `IAsyncEnumerable`, cancellation, the post-content guard, and the single
   adapter-invocation boundary (A4) through which every adapter entry passes. Own the internal
   test seam observing native timer creation/configuration/disposal and actual assessment
   linkage; C# must prove the same driver predicates without depending on Python instrumentation.
   **Gate:** `dotnet test src/csharp/AnyInfer.Tests` passes.
+> NOTE: Accepted after 155 native unit passes under SDK 8.0.425 with zero failures/skips, plus the focused Routing gate (30 passes), Lifecycle gate (14 passes), and clean source/test review closure. The current core checkpoint remains foundation `210cf0d` pending the root repository gate and commit; next is M2.4a.
 - [ ] M2.4 Fixture adapter and conformance driver in the `AnyInfer.Conformance` xunit project;
   verify frozen assets and exact inventory, then run core and available driver cases as explicit
   unreleased/subset development observations. Reject missing, duplicate, extra, wrong-release,
@@ -991,7 +992,12 @@ M1 and later use `src/python/` paths and therefore depend on it.
   in the C# report.
   Report a bounded native proof, not product parity. Packaging and publishing are a separate
   decision.
-  **Gate:** the compare script exits 0 and its output is pasted into the box report.
+    **Gate:** the compare script exits 0 and its output is pasted into the box report.
+    > NOTE: The user explicitly requires website documentation and CI/CD alignment as part
+    > of the C# implementation. The bounded plan's M2.Gd owns the site-wide claim/command
+    > audit and updates, complementing M2.Ga's native CI lane. M2.G remains incomplete until
+    > the website/docs build, documented examples, and delivery/workflow checks pass with
+    > truthful language and feature scope; proof does not imply a shipped C# package.
 
 ### M3: Operation accounting (separate plan)
 

@@ -32,7 +32,8 @@ expected data to execute a fixture. The comparator alone consumes expectations.
 
 Included: async buffered and streaming generation; normalized events/results/errors; routing,
 retry, health and repair; admitted schema subset and prompt injection; fixture and OpenAI chat
-transport adapters; the independent driver, six native proofs, and qualified-report comparison.
+transport adapters; the independent driver, six native proofs, qualified-report comparison,
+website documentation alignment, and the corresponding CI/CD audit and updates.
 
 Excluded: sync API, accounting, provider breadth, packaging, publishing, general JSON Schema,
 Python policy reuse, and any claim that C# is a supported product implementation.
@@ -230,7 +231,7 @@ verification both before execution and before output.
   > reviews are closed. The repository acceptance gate passed all 13 steps in 200.9 seconds,
   > exit 0, before the foundation checkpoint commit. Resume implementation at M2.3a.
 
-- [ ] **M2.3a — invocation boundary, capture, and native timeout lifecycle.** Owner: lifecycle
+- [x] **M2.3a — invocation boundary, capture, and native timeout lifecycle.** Owner: lifecycle
   worker; files limited to `AnyInfer/Internal/AdapterInvocationBoundary.cs`,
   `EntryTimeoutScope.cs`, operation/capture records, and lifecycle tests. Every entry has a fresh
   linked CTS that remains alive through iterator disposal/cleanup; observation records actual
@@ -240,8 +241,32 @@ verification both before execution and before output.
   `dotnet test AnyInfer.Tests --no-restore --filter FullyQualifiedName~Lifecycle` proves
   cancellation propagation, cleanup disposal, capture isolation, no global collector, and
   no adapter disposal by an individual entry. Actual client-owned closure is tested in M2.3b.
+  > NOTE: Source and independent tests have disjoint ownership. The pinned internal entry API
+  > is `InvokeAsync(adapter, wireRequest, operation, EntryRole, repairAssessment = null,
+  > cancellationToken = default)`, returning the lazy adapter event stream. `OperationContext`
+  > owns a fresh operation ID, entry ordinals and the latest actual entry/assessment; an optional
+  > `OperationCapture(capacity = 4096)` retains bounded evidence. `RecordAssessment` retains
+  > the actual assessment reference and `Complete` closes the context. There is no ambient
+  > collector, and capture overflow makes evidence unavailable without changing execution.
+  > `EntryContext` exposes operation/ordinal/role, the actual wire request, correction assessment,
+  > timeout scope, captured adapter events and native/terminal failure. `EntryTimeoutScope`
+  > retains its actual timeout and linked CTS objects/tokens, effective duration and lifecycle
+  > state. Capture exposes entries, assessments and ordered lifecycle observations with
+  > sequence, entry ordinal and name (`created`, `configured`, `entered`, `expired`,
+  > `cleanup_start`, `cleanup_end`, `exited`, `disposed`). Both CTS objects live through awaited
+  > enumerator cleanup; the boundary never abandons cleanup through `WaitAsync` or closes the
+  > shared adapter. An actual entry timeout maps to retryable `transport` with generate/stream
+  > phase and its native cancellation cause; caller cancellation takes precedence and propagates.
+  > The virtual health/backoff clock remains deferred to M2.3b. No build runs while a source
+  > snapshot is being edited; the focused Lifecycle gate waits for source and tests to be held.
+  > NOTE: Accepted after cold closure: optional capture retains bounded evidence and freezes on
+  > overflow or reuse without affecting execution; corrections retain the latest actual assessment
+  > from the immediate prior entry; terminal and prior failures preserve actual failure precedence.
+  > Linked native timeout and CTS lifetime extends through awaited cleanup, with disposal recorded
+  > only after actual CTS disposal. Lifecycle gate passed 14 tests under SDK 8.0.425; both cold
+  > source and independent-test reviews closed.
 
-- [ ] **M2.3b — core integration and routing through the boundary.** Owner: core worker; files
+- [x] **M2.3b — core integration and routing through the boundary.** Owner: core worker; files
   limited to `AnyInfer/Core/*.cs`, `AsyncClient.cs`, `GenerationStream.cs`, and routing tests.
   Implement buffered/streaming execution only through M2.3a's concrete boundary: target
   resolution, retry/backoff/health, repair, usage overlay, post-content behavior, and
@@ -250,11 +275,96 @@ verification both before execution and before output.
   targets, duplicate targets, health expiry, retries, repair-budget reset, event ordering, and
   stream close semantics, actual native admission of all excluded input forms with zero adapter
   entries, and client disposal closing each owned adapter exactly once.
+  > NOTE: Implementation is split into disjoint helper, orchestration and independent test
+  > slices. Helpers own `Providers/ProviderRegistration.cs` and `Core/ProviderRegistry.cs`,
+  > `RequestNormalizer.cs`, `RepairBuilder.cs`, `RouteState.cs`, `IOperationClock.cs`.
+  > Orchestration owns `AsyncClient.cs`, `GenerationStream.cs`, `Core/GenerationCore.cs`
+  > and the minimal bounded telemetry/repair additions in `Internal/OperationCapture.cs`.
+  > Independent tests own only `AnyInfer.Tests/RoutingTests.cs`. Earlier source/tests remain
+  > held. No shared build runs until both source slices are stable.
+  >
+  > Registration is immutable `ProviderRegistration(providerId, adapter,
+  > modelCapabilities = null, maxRepairAttempts = null)`, with copied ordinal model keys
+  > and `StructuredOutputProfile(Grammar = false, JsonSchema = false, JsonMode = false)`.
+  > Capability lookup is per resolved model and defaults to all false; the repair ceiling
+  > belongs to the provider. This keeps fixture model metadata honest and translation-only
+  > adapters unchanged. `ProviderRegistry.Resolve(rawTarget)` returns
+  > `ResolvedProvider(Target, Registration, Capabilities)` using frozen first-colon/model-trim
+  > rules lazily. The registry exposes distinct adapters by reference for client disposal.
+  >
+  > `RequestNormalizer.Normalize(request)` calls native admission once and returns
+  > `NormalizedRequest(Messages, Sampling, Schema, RepairBudget, TimeoutS,
+  > MaxResponseBytes, Stream)`: copied concatenated text, omitted empty stop, nonnegative
+  > repair budget and effective limits. `CreateWireRequest(normalized, resolved,
+  > messages = null)` selects mechanism from that model's flags and injects the schema once
+  > into the supplied original/correction messages. The bounded profile does not introduce
+  > a caller-forced mechanism override. `RepairBuilder.Build(originalMessages, rawResponse,
+  > actualAssessment)` returns `RepairPreparation(Assessment, ResponseText,
+  > OriginalMessages, Messages)` with copied containers and the exact native-message template;
+  > it never reassesses or reconstructs feedback from issues.
+  >
+  > `IOperationClock` exposes `double NowSeconds` and
+  > `ValueTask DelayAsync(double seconds, CancellationToken cancellationToken = default)`.
+  > `SystemOperationClock` uses native monotonic time and delay. `RouteState(clock)` owns
+  > thread-safe per-client health with `IsUnhealthy(target, ttl)`, `MarkFailed(target)`,
+  > `Clear(target)`, `SeedFailure(target, failedAtSeconds)` and static
+  > `BackoffSeconds(policy, attemptNumber, retryAfterS)`. It never controls entry timeouts.
+  >
+  > Public `AsyncClient(providers)` exposes `GenerateAsync(request, cancellationToken)`
+  > and `StreamAsync(request, cancellationToken)`. Internal overloads accept an explicit
+  > `OperationCapture`; an internal constructor accepts `IOperationClock`, and `Health`
+  > exposes that client's route state to native tests/driver. `GenerationStream.Result` is
+  > read-only/null until successful terminal publication; `Operation` is internally available
+  > after actual first advance. Buffering consumes exactly this stream. No operation, entry,
+  > timeout or adapter resource is created by a zero-advance close. Genuine caller cancellation
+  > remains native `OperationCanceledException`; the later driver identifies its own deliberate
+  > cancellation stimulus when projecting the normalized cancelled outcome.
+  >
+  > Capture gains bounded, operation-bound `Telemetry` and `Repairs` snapshots, recording only
+  > actual core emissions and actual `RepairPreparation` references. Telemetry data is
+  > `TelemetryObservation(Name, Parameter = null, Reason = null, AttemptNumber = null)`.
+  > Both share the existing capacity/freeze rules. Start events must correspond to actual
+  > boundary entry creation, not an invented ordinal; any pending native MoveNext is observed
+  > before iterator disposal. Usage synthesis, assessment and success wait for boundary cleanup.
+  > Client closure cancels/awaits active stream cleanup and disposes each distinct owned adapter
+  > once. The focused Routing gate waits for all three held snapshots; the whole unit gate
+  > remains M2.3c.
+  > NOTE: The first helper slice has clean source review and the first complete library draft
+  > compiled with zero warnings/errors under SDK 8.0.425. M2.3b is not accepted: cold review
+  > found whole-entry buffering, retry/health misclassification, cleanup-before-usage ordering,
+  > premature usage-total synthesis, missing clamp telemetry and incomplete client cleanup.
+  > One coherent source correction and corresponding independent live-stream/branch controls
+  > are in progress. No Routing runtime gate or corpus qualification has run yet.
+  > NOTE: The first correction compiled but its channel bridge retained an unbounded event
+  > queue and could skip awaiting the pump on early close. The coordinator therefore pins a
+  > direct per-entry async iterator with a small non-yield provider-error read helper: start the
+  > actual first read, publish the actual entry's start mark before awaiting that read, then
+  > forward events directly. A nested finally observes any pending read and awaits native
+  > disposal; no detached event pump remains. First-token state belongs to each entry, while
+  > the route-attempt content flag persists across corrections. Effective repair budget/clamp
+  > telemetry is evaluated once per reached target after health skips and before retries;
+  > local repair counts still reset for each route attempt. Focused regression controls cover
+  > these state/lifetime boundaries before the first Routing gate.
+  > NOTE: The first completed Routing filter is 29 passed / 1 failed under SDK 8.0.425.
+  > A test-only readiness deadlock was diagnosed and corrected without changing native
+  > backpressure. The remaining semantic failure loses an active iterator cleanup exception
+  > from client disposal. Source closure coordination and independent concurrent-close
+  > completion controls are being corrected; the focused gate must pass before this box or
+  > M2.3c is accepted. Resume at M2.3b on foundation commit `210cf0d` plus the held files.
+  > Concurrent client and stream close calls must await the same actual cleanup completion
+  > and retain its failure outcome. The gated cleanup control now checks every close caller
+  > remains pending before native release; repeated close cannot report completion while the
+  > entry CTS or adapter is still owned by an active cleanup. Deliberate close cancellation
+  > remains distinct from a real cleanup failure or an earlier completed read failure.
 
-- [ ] **M2.3c — phase boundary.** Owner: coordinator. Run the whole unit project only after
+> NOTE: Accepted after cold closure: direct per-entry backpressure and start/first-token marks, route-local repair with one reached-target clamp, retry/usage fidelity, and native cleanup with shared close-failure completion are in place. SDK 8.0.425 Routing gate passed 30 tests, zero failures/skips (2.3257s, retained `ebaaed44`); helper, orchestration, and independent test reviews closed.
+
+- [x] **M2.3c — phase boundary.** Owner: coordinator. Run the whole unit project only after
   M2.3a–b compile against the earlier concrete types. **Gate:** from `src/csharp`,
   `dotnet test AnyInfer.Tests --no-restore` passes; no conformance driver work begins on a
   failing core project.
+
+> NOTE: Accepted after the whole `AnyInfer.Tests` gate: SDK 8.0.425, 155 passed, zero failures/skips, exit 0. M2.3a–b source and independent reviews are closed; M2.4a is next.
 
 - [ ] **M2.4a — executable driver shell, closed release and fixture readers.** Owner: conformance
   reader worker; files limited to `AnyInfer.Conformance/Program.cs`, its `.csproj` minimal
@@ -379,6 +489,24 @@ verification both before execution and before output.
   The comparison permits only Python extension/C# pass for marked fixtures. **Gate:** every
   released case qualifies and comparison exits 0. No package, tag, publishing action, or
   supported-C# claim follows from this proof.
+
+- [ ] **M2.Gd — website documentation and delivery alignment.** Owner: documentation worker
+  after the coordinator pins the read-only site/CI audit's exact file list. The user's explicit
+  implementation requirement includes revisiting the published website documentation and
+  CI/CD. Review the root README, site landing/navigation, language and feature claims,
+  architecture/source layout, getting-started and reference surfaces, contributor/testing
+  commands, and documentation/release workflows. Update every affected restatement to the
+  verified C# implementation and its bounded scope; retain accurate Python coverage and avoid
+  presenting an unshipped C# package as available. Describe commands and examples that actually
+  execute. Keep Python-generated API references tied to Python, and add clear C# navigation or
+  documentation where needed. Audit docs publishing and release paths for the source layout
+  and native build checks, implementing the needed changes alongside M2.Ga's additive CI lane.
+  Do not change frozen specification/release bytes, add docs links to ephemeral plans, or infer
+  package publication from a proof. **Gate:** the exact affected-file/claim map is reconciled;
+  documented C# commands/examples execute; the existing site build, link/generated-document
+  checks and focused workflow tests pass; the complete workspace gate remains green. M2 is
+  incomplete until this website/docs and CI/CD work is accepted. The audit's concrete file list
+  and site commands are pinned here before authoring begins.
 
 ## 5. Failure, resume, and ownership rules
 

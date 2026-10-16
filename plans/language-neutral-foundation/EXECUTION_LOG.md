@@ -1553,3 +1553,139 @@ files, scoped build-output ignores and execution plans/log. Its exact resulting 
 recorded in the execution artifact, avoiding self-reference. Resume at M2.3a from that
 checkpoint. No async client, routing core, native transport or qualified C# report is claimed
 by this foundation gate.
+
+The accepted foundation is committed as `210cf0db6edfbc6831d9c468772e8f3f227dff15`.
+Root verified an empty tracked/untracked status immediately after that commit. M2.3a is
+now in progress with disjoint cheap source and independent lifecycle-test owners; shared
+builds wait for both snapshots to be held. The first unchecked box remains M2.3a. Resume
+from that commit plus its in-progress boundary/test files; M2.3b remains read-only preparation.
+
+The first M2.3a source snapshot compiled under SDK 8.0.425 with zero warnings/errors in
+root shell `4b38281f-92b2-4853-8174-2bbb6fd5b1e1`. The independent Lifecycle gate then
+passed 11 tests in retained shell `ebaaed44-d980-4bde-b6f4-ca336c5f40c3`; root inspected
+both logs. These are initial development checks, not acceptance. Cold review identified
+bounded capture/history retention, reused-capture isolation, post-completion mutation,
+latest-assessment correction binding and cleanup-overrides-iteration failure capture defects.
+The source owner and independent test owner are correcting those in disjoint files before
+one focused rerun. M2.3a remains unchecked; no core or conformance execution starts yet.
+
+M2.3a is accepted after the consolidated correction and cold closure. Root inspected the
+final retained Lifecycle gate in `ebaaed44-d980-4bde-b6f4-ca336c5f40c3`: SDK 8.0.425,
+14 passed, zero failed/skipped, exit 0. The strengthened suite proves native expiry during
+iteration and post-final cleanup, actual CTS disposal, caller cancellation, bounded optional
+and reused capture, current assessment reference identity across four entries, completed-context
+guards and dual iteration/cleanup failure fidelity. One intermediate failure was the internal
+argument name used for an already-working stale-assessment rejection; the originating API
+argument is now reported without changing guard behavior. Both bounded review artifacts close.
+
+Resume at M2.3b from committed foundation `210cf0d` plus the accepted uncommitted four
+Internal files and `LifecycleTests.cs`. Root is settling the small client/provider/clock and
+helper interfaces before disjoint core implementation. M2.3c's whole-unit gate follows that
+integration; there is no C# corpus execution or qualified report at this point. Frozen release
+SHA remains `16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391`.
+
+M2.3a's serialized plan lease is released and the box is checked. M2.3b is now in progress
+with three disjoint cheap owners: provider/normalization/repair/health helpers; client/stream
+orchestration plus bounded telemetry/repair capture; and independent Routing integration
+tests. The bounded plan pins their exact interfaces. Provider registration preserves per-model
+capability facts and deduplicates owned adapters by reference; buffering consumes the one
+stream implementation. Genuine caller cancellation remains native cancellation, and virtual
+time is confined to health/backoff. No build runs until both source owners report stable
+snapshots. The first unchecked box is M2.3b, with M2.3c still the whole-unit boundary.
+
+M2.3b remains unaccepted. The six helper files have clean bounded source review, including
+the native registration guard matching the frozen nonnegative provider repair ceiling domain.
+The first complete library draft compiled with zero warnings/errors in retained `c90e92e2`
+under SDK 8.0.425; root inspected that log. No Routing test run has occurred.
+
+Cold orchestration review identified six functional corrections: whole-entry buffering instead
+of live delivery, retried-versus-failed health/trail handling, cleanup failure before final-derived
+usage, result-only total synthesis, required clamp telemetry, and all-resource client closure.
+Root additionally requires removal of closed-unstarted streams from client retention. Source
+owner c708 and independent test owner 04f are implementing one disjoint correction wave. The
+tests also replace false setup controls and pin actual assessment/telemetry identity and order,
+correction protocol failure, native streaming readiness and final-only usage. Keep shared builds
+stopped until both snapshots are held; resume from M2.3b on foundation `210cf0d` plus the
+accepted invocation boundary and current uncommitted core files.
+
+The first functional correction compiled cleanly in root shell `4b38281f` under SDK 8.0.425
+but is not accepted. Rereview found entry-local first-token state and once-per-target clamp
+placement issues. Root inspection additionally found the channel bridge's unbounded queue,
+delayed/missing start mark on a blocked/failing first read, and unobserved pump cleanup on early
+close. The settled correction now uses a direct async entry iterator with guaranteed pending-read
+and native-disposal observation, preserving the single boundary. Source c708 and test 04f own
+that narrow correction in disjoint files; no Routing runtime has run. M2.3b remains the exact
+resume point, with the updated mechanism note in its checklist entry.
+
+The direct-iterator library snapshot now compiles with zero warnings/errors under SDK
+8.0.425 (root retained shell `4b38281f`, exit 0, 0.66 seconds; root inspected the log).
+Independent review closes the narrow Routing test controls for per-entry marks, one
+provider clamp across retries, start-before-blocked-read cancellation, and awaited gated
+native cleanup. Source rereview remains pending before the first focused Routing run.
+The frozen release and Python report raw hashes are unchanged. Resume remains M2.3b.
+
+Bounded direct-iterator source review is now clean and its artifact inspected. Root granted
+04f the sole focused Routing gate in retained shell `ebaaed44`, with all source and tests
+held. The gate records SDK and runs only `dotnet test AnyInfer.Tests --no-restore --filter
+FullyQualifiedName~Routing` from `src/csharp`; semantic failures must be reported without
+weakening assertions. M2.3b remains unchecked pending this first runtime result; M2.3c's whole
+unit gate follows only after focused closure.
+
+The first focused Routing gate is not a pass. After owned compile/setup corrections, its
+rerun stalled after discovery; root inspected the retained log and instructed the worker to
+stop the tracked process. The zero-backoff control now supplies a zero base, and the
+cleanup-after-final stimulus now emits the text its predicate requires. Source and semantic
+assertions remain held. A single no-build diagnostic rerun uses normal console logging and
+a 30-second blame-hang watchdog (no dump) to identify the blocked node; the watchdog supplies
+no execution evidence. Root also identified a likely test readiness signal placed after a
+native yield that direct consumer backpressure has not resumed. Await the diagnostic result
+before changing that stimulus; resume remains M2.3b on foundation `210cf0d`.
+
+Root inspected the diagnostic log and Sequence XML: 11 tests passed before the watchdog
+identified `First_public_events_are_delivered_while_native_entry_remains_unreleased` as
+incomplete. The adapter readiness signal followed its first yield, while the test awaited
+that signal before advancing the consumer; source-worker diagnosis independently agrees.
+The approved test-only change moves the readiness signal immediately before that actual
+native text yield, retaining the unreleased gate and every public-event/lifetime assertion.
+The owner has a serialized single-node gate followed, only if green, by the full Routing
+filter with a 30-second hang guard. Production source stays held; no phase acceptance yet.
+
+The readiness node passes (1/0/0 under SDK 8.0.425). The subsequent complete Routing
+filter finishes with 29 passed / 1 failed / 0 skipped, exit 1; root inspected the retained
+`ebaaed44` log. The sole semantic failure is
+`Client_close_continues_all_resource_cleanup_when_one_active_iterator_cleanup_throws`:
+client disposal returns without the actual active iterator cleanup exception. All other
+routing controls complete, including gated cleanup and live delivery. Source owner c708
+is correcting propagation/awaiting of in-flight and concurrent close completion while tests
+remain unchanged. The correction must keep cancellation distinct and preserve exact cleanup
+failure identity after all owned resources close. Resume remains M2.3b, not accepted.
+
+The disposal correction now has clean bounded source closure: client, stream and enumerator
+closes share actual completion tasks; a failure from an in-flight read during close is retained
+and propagated after cleanup, while earlier finished-read errors and cooperative close
+cancellation are not replayed as new cleanup failures. The independent gated test also
+requires all concurrent client/stream close callers to remain pending until native release.
+Root inspected the held source and granted only the two affected close nodes, then a full
+Routing rerun if green, with the same diagnostic hang guard. No box is accepted until those
+results are inspected; M2.3c's whole-unit gate still follows M2.3b.
+
+Root inspected the corrected close nodes (2 passed) and full Routing filter (30 passed,
+zero failed/skipped, exit 0) in retained `ebaaed44` under SDK 8.0.425. M2.3b focused
+acceptance is complete with both independent review closures. Root then ran the whole
+`AnyInfer.Tests` project in retained `4f04f68d`: 155 passed, zero failed/skipped, exit 0;
+the inspected log establishes M2.3c's native unit boundary. A serialized M2.3b plan lease
+is being returned before root records M2.3c/master acceptance. The complete repository
+gate now runs in `96c60dc9` with cache `.tmp-tests/m23-core-repository` before the core
+checkpoint commit. Source stays held; the next implementation box is M2.4a after the
+checkpoint. A cheap worker is preparing only its selected-root reader/adapter API map.
+
+M2.3c and master M2.3 are recorded complete. Root inspected the repository gate's final
+summary in `96c60dc9`: all 13 steps passed in 193.6 seconds, exit 0, including the full
+Python gate and website build. The separate native unit gate remains 155/0/0. Frozen release
+and Python report hashes remain unchanged. The reviewed invocation/routing core is ready
+for its checkpoint commit; resume implementation at M2.4a on that checkpoint.
+
+The user's website/docs and CI/CD requirement is now an explicit completion condition:
+M2.Gd in the bounded plan, linked from master M2.G, supplements the existing native CI lane.
+Site and delivery discovery must pin its concrete affected files before documentation
+authoring. The website must describe verified C# scope and executable commands accurately.
