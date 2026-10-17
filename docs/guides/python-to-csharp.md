@@ -15,11 +15,13 @@ does not claim provider or feature parity with Python.
 | `Text.text` | `Text.Value` |
 | `result.text` | `Generation.Text` |
 | async stream | `AsyncStream` and `StreamEvent` |
+| Python `Client` | .NET `Client` and `SyncStream` |
 | `AnyInferError` | typed .NET `Exception` subclasses |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
-client and stream lifetime.
+client and stream lifetime. C# also has `Client`/`SyncStream` for synchronous callers, using the
+.NET default task scheduler and `using`; it does not reproduce Python's loop facade.
 
 ## Shared configuration
 
@@ -36,6 +38,7 @@ subset, so port a schema only after checking its supported shape.
 ## What to use in an application
 
 Use the [Python SDK](python-sdk.md), sidecar, or CLI for supported application integration. The
-C# examples give .NET developers a concrete, source-linked async proof surface for porting
-generation code, while the package and integration remain prerelease proof work rather than a
-separate installation path.
+C# examples give .NET developers a concrete, source-linked async surface and synchronous facade
+over the same core for porting generation code. The package and integration remain prerelease
+proof work rather than a separate installation path, with no released NuGet package or full
+provider parity.

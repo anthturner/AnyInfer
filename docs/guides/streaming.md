@@ -41,10 +41,16 @@ frontend needs; the full event vocabulary is in the [API reference](../reference
             )
     ```
 
-=== "C# SDK proof"
+=== "C# async (prerelease)"
 
     ```csharp
     --8<-- "examples/csharp-sdk/StreamingExample.cs"
+    ```
+
+=== "C# sync facade (prerelease)"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/SyncStreamingExample.cs"
     ```
 
 ## Use the Context Manager

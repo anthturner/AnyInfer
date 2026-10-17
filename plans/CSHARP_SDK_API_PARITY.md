@@ -8,6 +8,7 @@ title: "C# SDK API parity inventory"
 > Baseline: `199c3f833e568334b629edd7d89f41a3b76efe2a`. Source inventory is static; no Python package imports.
 > Status: SDK.1 vocabulary, generation convenience calls and stream contracts passed the full workspace gate on 2026-10-17. The root checklist remains unchecked until each feature is complete across its assigned milestones; a renamed type alone is not completion. Passing the frozen 102-case profile is not full-library parity.
 > SDK.2's provider/settings pool, credential/error foundation and supported active configuration subset also passed the full 18-step gate: 222 native unit tests, 93 conformance tests, independent configured Python/C# execution, package-only consumption and executable C# documentation. Broader configuration policies, credential refresh/platform stores, provider breadth and operation APIs remain assigned to later milestones; this is not full completion of similarly named Python exports.
+> SDK.3's synchronous `Client` and `SyncStream` facade passed the final 18-step gate, including 238 native unit tests, 93 conformance tests, package-only async/sync consumption and eight source-linked offline C# examples. Its lifetime controls cover concurrent callers, bounded queues, original cancellation/errors and callback re-entry. All 235 root rows remain unchecked until their broader assigned milestones and final completeness audit pass.
 
 ## Root exports (235)
 

@@ -189,6 +189,11 @@ def test_external_consumer_uses_sdk1_public_vocabulary(tmp_path: Path) -> None:
     assert 'GenerateAsync(messages, target: "demo:model")' in source
     assert 'StreamAsync("hello", target: "demo:model")' in source
     assert "TextDelta delta" in source
+    assert 'Client.FromAdapters([new ProviderRegistration("sync-demo", syncAdapter)])' in source
+    assert 'client.Generate("hello", target: "sync-demo:model")' in source
+    assert 'client.Stream("hello", target: "sync-demo:model")' in source
+    assert "foreach (var item in stream)" in source
+    assert "synchronous adapter disposal failed" in source
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source
     assert "GenerationResult" not in source

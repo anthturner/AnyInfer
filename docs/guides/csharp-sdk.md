@@ -6,8 +6,8 @@ repository's native C# work, while the supported product SDK and published packa
 Python.
 
 The examples use `ProviderSettings` and the built-in OpenAI-compatible provider. They do not
-require an application-defined adapter. They are asynchronous, accept a cancellation token, and
-use `await using` for client lifetime.
+require an application-defined adapter. The async calls accept a cancellation token and use
+`await using`; the matching synchronous facade uses `using` and the .NET default task scheduler.
 
 ## Run the examples
 
@@ -43,6 +43,21 @@ and cancellation token so application code can supply its own configuration boun
 --8<-- "examples/csharp-sdk/GenerationExample.cs"
 ```
 
+## Use the synchronous facade
+
+`Client` drains the same core execution path through a synchronous facade. It is intended for a
+synchronous .NET caller; it does not create or depend on Python's event-loop facade.
+
+```csharp
+--8<-- "examples/csharp-sdk/SyncGenerationExample.cs"
+```
+
+`SyncStream` is enumerable, exposes `Result` after `StreamEnded`, and is disposed with `using`.
+
+```csharp
+--8<-- "examples/csharp-sdk/SyncStreamingExample.cs"
+```
+
 ## Stream, validate, and route
 
 The remaining examples are source-linked so the site stays aligned with the code the offline
@@ -55,7 +70,8 @@ verifier runs.
 
 ## Scope
 
-This proof covers async text generation through the OpenAI-compatible adapter, structured JSON
-validation and repair, configuration, routing, and reported token usage. It does not provide a
-released NuGet package, a synchronous API, provider parity, aggregate usage accounting, tool
-execution, embeddings, reranking, or production report publication.
+This proof covers asynchronous text generation and a synchronous facade over that same core,
+through the OpenAI-compatible adapter. It also covers structured JSON validation and repair,
+configuration, routing, and reported token usage. It does not provide a released NuGet package,
+provider parity, aggregate usage accounting, tool execution, embeddings, reranking, or production
+report publication.

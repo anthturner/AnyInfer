@@ -8,8 +8,9 @@ proof examples under `examples/csharp-sdk/`.
 
 The proof exists to check the shared contract from another runtime. It does not provide a
 supported AnyInfer C# SDK, a registry-published NuGet package, a production integration path,
-provider parity, a sync API, or usage-accounting support. The supported runtime, public SDK,
-installation guidance, and downloads remain Python surfaces.
+provider parity or aggregate usage-accounting support. The supported runtime, public SDK,
+installation guidance, and downloads remain Python surfaces. The bounded C# proof includes both
+async and synchronous facades for contributor verification.
 
 ## Run the proof locally
 

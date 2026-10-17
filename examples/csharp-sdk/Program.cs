@@ -25,6 +25,16 @@ static async Task VerifyAsync()
     Require(streamed.Text == "hello", "Streaming example returned unexpected text.");
     Require(streamingHandler.RequestCount == 1 && streamingHandler.DisposeCount == 1, "Streaming example did not close its transport once.");
 
+    var syncBufferedHandler = new CountingHandler();
+    var syncBuffered = SyncGenerationExample.Run(WithTransport(displayedSettings, syncBufferedHandler), target);
+    Require(syncBuffered.Text == "hello", "Synchronous buffered example returned unexpected text.");
+    Require(syncBufferedHandler.RequestCount == 1 && syncBufferedHandler.DisposeCount == 1, "Synchronous buffered example did not close its transport once.");
+
+    var syncStreamingHandler = new CountingHandler();
+    var syncStreamed = SyncStreamingExample.Run(WithTransport(displayedSettings, syncStreamingHandler), target);
+    Require(syncStreamed.Text == "hello", "Synchronous streaming example returned unexpected text.");
+    Require(syncStreamingHandler.RequestCount == 1 && syncStreamingHandler.DisposeCount == 1, "Synchronous streaming example did not close its transport once.");
+
     var structuredHandler = new CountingHandler(structured: true);
     var structured = await StructuredOutputExample.RunAsync(WithTransport(displayedSettings, structuredHandler), target);
     Require(structured.Text.Contains("answer", StringComparison.Ordinal), "Structured-output example returned unexpected text.");

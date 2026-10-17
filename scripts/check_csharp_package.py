@@ -213,6 +213,24 @@ var adapter = new DemoAdapter();
 if (adapter.DisposeCount != 1)
     throw new InvalidOperationException("adapter disposal failed");
 
+var syncAdapter = new DemoAdapter();
+{
+    using var client = Client.FromAdapters([new ProviderRegistration("sync-demo", syncAdapter)]);
+    var buffered = client.Generate("hello", target: "sync-demo:model");
+    if (buffered.Text != "buffered")
+        throw new InvalidOperationException("synchronous buffered result failed");
+    using var stream = client.Stream("hello", target: "sync-demo:model");
+    var text = "";
+    foreach (var item in stream)
+    {
+        if (item is TextDelta delta) text += delta.Text;
+    }
+    if (text != "streamed" || stream.Result.Text != "streamed")
+        throw new InvalidOperationException("synchronous stream result failed");
+}
+if (syncAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("synchronous adapter disposal failed");
+
 sealed class DemoAdapter : IProviderAdapter
 {
     private int _calls;

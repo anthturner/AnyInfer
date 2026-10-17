@@ -66,10 +66,16 @@ read.
         print(result.text)
     ```
 
-=== "C# SDK proof"
+=== "C# async (prerelease)"
 
     ```csharp
     --8<-- "examples/csharp-sdk/GenerationExample.cs"
+    ```
+
+=== "C# sync facade (prerelease)"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/SyncGenerationExample.cs"
     ```
 
 The highlighted line is the only one that changes when you point the same call at a

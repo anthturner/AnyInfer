@@ -287,7 +287,7 @@ public sealed class AsyncClient : IAsyncDisposable
                 : new Route([target], _defaultRoute.Retry, _defaultRoute.HealthGate, _defaultRoute.HealthTtlS);
         }
 
-        selectedRoute ??= _defaultRoute ?? throw new ArgumentException("Specify a target, route, or client default route.");
+        selectedRoute ??= _defaultRoute ?? throw new ConfigException("Specify a target, route, or client default route.");
 
         return new GenerationRequest(
             messages,

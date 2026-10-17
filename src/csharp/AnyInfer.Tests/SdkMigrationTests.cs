@@ -76,7 +76,7 @@ public sealed class SdkMigrationTests
             new ProviderRegistration("beta", selected),
         ]);
 
-        Assert.Throws<ArgumentException>(() => client.StreamAsync("prompt"));
+        Assert.Throws<ConfigException>(() => client.StreamAsync("prompt"));
         var result = await client.GenerateAsync("prompt", target: "alpha:model", route: new Route(["beta:model"]));
         Assert.Equal("route", result.Text);
         Assert.Empty(ignored.Requests);

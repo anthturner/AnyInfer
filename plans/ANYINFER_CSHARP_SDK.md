@@ -533,7 +533,7 @@ must report a real conflict rather than silently changing a dependent public sig
   > build, 222 native unit tests, 93 conformance tests, isolated NuGet consumption and six
   > executable example methods. Seven rendered C# blocks across six pages exactly match
   > their compiled source. Frozen release/report SHA-256 values remain unchanged.
-- [ ] **SDK.2 checkpoint:** update achieved syntax/docs, inventory limitations and exact
+- [x] **SDK.2 checkpoint:** update achieved syntax/docs, inventory limitations and exact
   execution evidence; root full workspace gate, commit explicit paths and repack clean
   revision. Update resume to SDK.3 only when SDK.2a–2d and these nested gates actually pass.
   > NOTE: Pull forward the implemented async portion of SDK.3b for this checkpoint:
@@ -544,15 +544,32 @@ must report a real conflict rather than silently changing a dependent public sig
   > Keep package consumption as a separate existing check. Python source distributions
   > carry only the displayed `.cs` files for docs rendering, not a .NET developer checkout.
   > SDK.3b stays open for sync syntax and complete first-milestone documentation.
+  > Committed explicit source paths as `b50459bc644cff95e9e50f97ba6dd61ae3e1ef46`.
+  > The clean-revision NuGet verifier then packed, inspected, restored, built and ran its
+  > isolated consumer successfully. Its package metadata binds that revision; no registry
+  > upload or replacement of the historical frozen reports occurred.
 
 ### SDK.3 — Sync facade and first SDK migration milestone
 
-- [ ] **SDK.3a** Add `Client` and `SyncStream` wrapping the async implementation with one
+- [x] **SDK.3a** Add `Client` and `SyncStream` wrapping the async implementation with one
   lifetime-owned execution context. Support concurrent callers and early stream disposal,
   propagate original exceptions/cancellation and prevent synchronization-context deadlocks.
   Reference `_client/sync_client.py`; do not port asyncio mechanics literally. Gate: bounded
   concurrency tests under a hostile synchronization context, early-close and lifetime checks.
-- [ ] **SDK.3b** Add public consumer examples and a Python-to-C# migration guide covering
+  > NOTE: Initial source/test/docs handoffs are held, not accepted. The first library-only
+  > compile stopped at a property-as-out compiler error. Cold reviews require correctly
+  > scoped callback ownership, buffered wire-mode preservation, cancellable queue/Collect
+  > waits, cancel-all-before-join cleanup and complete creation reservations before runtime.
+  > The corrected solution builds with zero warnings/errors. The first focused run passed
+  > 7/13 tests; remaining controls exposed incorrect timing-prefix/queue-capacity test
+  > assumptions and one existing async missing-route exception mismatch. Python returns
+  > ConfigError, so narrowly align the shared async refusal to ConfigException and migrate
+  > its old native oracle; do not add facade-only error translation. Cancellation broadcast
+  > must start lifetime and per-stream signals before awaiting any callback completion.
+  > Final acceptance: zero-warning SDK 8.0.425 solution build and 24/24 focused sync/migration
+  > tests passed. All cancellation signals are completed before token disposal; actual
+  > UnsafeRegister callbacks also refuse self-disposal without blocking external close.
+- [x] **SDK.3b** Add public consumer examples and a Python-to-C# migration guide covering
   construction, messages, generation/streaming, schemas, repair, routes, config, credentials,
   errors and disposal. Document implemented feature coverage, including JSON Schema subset
   until SDK.4. Add `docs/guides/csharp-sdk.md` and `docs/guides/python-to-csharp.md`, wire them
@@ -566,9 +583,87 @@ must report a real conflict rather than silently changing a dependent public sig
   native snippet execution pass;
   no examples require a custom provider adapter or internals access for a supported built-in
   flow. Preserve documented Python syntax, configuration and install behavior.
-- [ ] **SDK.3c** Review the complete first SDK milestone, run full workspace plus package
+  > NOTE: Eight tracked source methods execute offline. Root verified all 11 rendered C#
+  > blocks across six pages equal those exact source files; async/sync syntax and disposal
+  > mappings are discoverable in SDK, migration, task and language-labeled reference pages.
+- [x] **SDK.3c** Review the complete first SDK milestone, run full workspace plus package
   consumer, and checkpoint. Gate: SDK.1–3 boxes complete, all existing conformance preserved,
   baseline parity inventory updated; no blanket full-library parity claim.
+  > NOTE: Final root workspace gate passed all 18 steps in 99.2s, including 238 native unit
+  > tests, 93 conformance tests, strict docs rendering, package-only async/sync consumption
+  > and the eight offline example methods. Retained log: `f52eb067-c941-466b-a00b-73e43a98456b`.
+  > Bounded public/lifetime reviews are closed; frozen release/report digests are unchanged.
+
+#### SDK.3 implementation contract
+
+- Root accepted the native sync mechanism after the separate lifetime review at Traycer
+  `foundation-execution/csharp-sdk/sdk-three-sync-mechanism-review`. Add root public
+  `Client : IDisposable`, `SyncStream : IEnumerable<StreamEvent>, IDisposable`, and an
+  internal client-owned execution/lifetime helper if needed. Only these new wrapper files
+  belong to the initial source wave; async core/router behavior stays authoritative.
+- `Client` has the same settings/registry/resolver/route/repair constructor as AsyncClient,
+  static `FromAdapters(IEnumerable<ProviderRegistration>)`, and static
+  `FromConfig(AnyInferConfig, ProviderRegistry? = null, ResolverChain? = null)`. It owns one
+  AsyncClient for its entire lifetime. Add request, prompt and messages `Generate` and
+  `Stream` overloads mirroring AsyncClient's exact optional parameter order/names, with
+  synchronous Generation and SyncStream returns. Keep cancellation parameters. IDisposable
+  is the native equivalent of Python close/context management; no obsolete proof aliases.
+- All async execution and async cleanup dispatch on Task.Run/default TaskScheduler, then
+  wait through GetAwaiter().GetResult at the synchronous boundary. Never run an async client
+  per call, capture the caller's SynchronizationContext, duplicate routing, wrap native
+  exceptions in AggregateException, or pass the caller token to the Task.Run wrapper so it
+  can substitute its own cancellation before the real core runs.
+  Generate overloads dispatch their matching AsyncClient.GenerateAsync overloads: prompt
+  and messages use buffered wire mode, while explicit request.Stream remains authoritative
+  exactly as in the async API. Do not implement convenience Generate through Stream(true).
+- Preserve eager synchronous request/route validation: call inner StreamAsync before
+  publishing a SyncStream. Reserve creation/operation ownership under the Client gate
+  before doing caller enumeration, scheduling or publication; do not hold that gate over
+  caller callbacks or blocking waits. Close marks/snapshots reservations atomically, signals
+  cancellation outside locks and joins creation, active operations, streams and inner cleanup.
+  If closing wins before publication, dispose the newly returned inner stream and refuse
+  publication. No detached construction or late ownership adoption.
+  Keep a creation reservation registered until its late cleanup/completion has finished;
+  removing it before DisposeInner would let a concurrent close snapshot miss the join.
+- SyncStream starts one async pump over that actual inner stream, using a bounded Channel
+  of 256 events with FullMode.Wait. Every channel write is cancellation-aware. Cancel before
+  joining on early stream/client disposal so an unconsumed full queue cannot deadlock. The
+  pump finally closes the inner stream; disposal joins real cleanup and is idempotent.
+  Link pump iteration/writes to stream close, actual caller cancellation and client lifetime.
+  Client close signals every operation/stream before joining any, retaining cancellation
+  callback failures while unconditionally completing all pump/inner/resource cleanup.
+  Retain one consumer atomically (enumeration or Collect); Reset/second/concurrent consumers
+  are unsupported. C# foreach disposal on an early break closes the underlying stream.
+- Result is unavailable until the consumer receives StreamEnded, even if the producer has
+  already completed. Collect drains the same single-consumer path. Preserve queued events
+  before rethrowing an original terminal exception through ExceptionDispatchInfo; never
+  expose ChannelClosedException or a Task-generated AggregateException in its place.
+  Collect(token) must interrupt a blocked queue read and close/join on cancellation, not
+  merely check the token after an event arrives. Explicit stream/client disposal ends
+  subsequent MoveNext calls without leaking buffered events to the closed consumer.
+  Intentional close cancellation is suppressed by close, ordinary reads preserve original
+  failure identity, and actual cleanup failures propagate after all owned cleanup is joined.
+  Do not rethrow a previously observed generation error as an unrelated client-disposal fault.
+- Detect synchronous self-disposal from that client's active callback/execution context and
+  refuse it before blocking on its own reservation; external/concurrent disposal still joins.
+  A synchronous foreach consumer body after MoveNext returns is ordinary external caller
+  code: disposing the parent client there must work normally. Do not retain the callback
+  marker across returned consumer events or mistake consumer ownership for producer work.
+  Do not introduce a shutdown timeout that abandons owned async work. Keep original external
+  OCE identity and finish all other cleanup when one close/cancellation callback fails.
+- Runtime owner c708 owns new `Client.cs`, `SyncStream.cs` and optional
+  `Internal/SyncExecutionContext.cs`. Independent tests owner 04f owns new SyncClientTests.cs
+  only. Public-only tests cover hostile SynchronizationContext, overlapping callers/streams,
+  eager invalid arguments, result readiness, queued-prefix error identity, cancellation,
+  257-plus unconsumed events then close, readiness-gated close-versus-creation, early iterator
+  close/reuse, self-disposal refusal and exactly-once adapter disposal after all joins.
+  No wall-clock sleeps or manufactured hook booleans; use real adapter/caller readiness.
+- After the saved API handoff, c16 owns the package-consumer sync check plus tracked sync
+  documentation methods and guide/tab updates. Execute the exact added source in the same
+  offline example project; retain existing async methods and package/archive isolation.
+  The full workspace remains 18 steps because the existing native examples command expands.
+  Gate this wave with cold source/lifetime/test reviews, guarded solution/focused sync tests,
+  exact native example execution, full workspace, explicit commit and clean-revision pack.
 
 ### SDK.4 — Catalog, capability provenance, discovery and general schema support
 
@@ -583,6 +678,12 @@ must report a real conflict rather than silently changing a dependent public sig
   necessary. Add `SchemaSpec`, richer result validation and typed-result deserialization
   conveniences without a new wire contract. Gate: common-schema corpus plus malformed,
   recursive/ref, numeric, extraction/repair and remote-fetch refusal controls in both runtimes.
+  > NOTE: Source discovery found that the baseline Python validator does not configure a
+  > local-only reference policy. The observed jsonschema 4.26.0 default can retrieve external
+  > references through urllib before warning; the project dependency is jsonschema>=4.21,
+  > not a fixed 4.26.0 pin. Settle this behavioral difference before SDK.4b implementation.
+  > The local-only wording above is proposed policy, not existing Python parity evidence;
+  > no Python behavior change or automatic retrieval is authorized by this assumption.
 - [ ] **SDK.4c** Port model/token discovery, capability probes and configuration setup metadata
   incrementally from `capabilities/probes*`, `registry.py`, catalog APIs. Probe/network work
   remains explicit opt-in. Gate: fake/cassette discovery/probe conformance, no probing during
@@ -701,8 +802,14 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.2 checkpoint**, with SDK.2a–2d accepted by the full 18-step
-workspace gate; explicit source commit and clean-revision package qualification remain.
+Current resume point: **SDK.4a**. SDK.3a–3c passed the final 18-step workspace gate
+(238 native unit tests, 93 conformance tests, package-only async/sync consumer and eight
+offline documentation methods). Commit this accepted snapshot and qualify its clean-revision
+package before editing SDK.4 source. Catalog/capability discovery is read-only so far;
+the schema-reference policy difference recorded under SDK.4b remains open.
+SDK.2a–2d and its checkpoint passed the full
+18-step workspace gate and clean-revision package qualification at
+`b50459bc644cff95e9e50f97ba6dd61ae3e1ef46`.
 SDK.1 passed the full 17-step workspace gate on 2026-10-17
 (172 unit tests, 93 conformance tests including the all-102 development run, and an isolated
 NuGet consumer), was committed as `c40fbba1369866960599e193041d8ffc6b37f860`, and its clean
