@@ -2,7 +2,24 @@
   <PropertyGroup>
     <AssemblyName>AnyInfer</AssemblyName>
     <RootNamespace>AnyInfer</RootNamespace>
+    <PackageId>AnyInfer</PackageId>
+    <Authors>Anthony Turner</Authors>
+    <Description>A bounded .NET 8 inference core for application-owned provider adapters.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/anthturner/AnyInfer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryCommit Condition="'$(SourceRevisionId)' != ''">$(SourceRevisionId)</RepositoryCommit>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="" />
+    <None Include="../../../LICENSE" Pack="true" PackagePath="" />
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AnyInfer.Tests" />
     <InternalsVisibleTo Include="AnyInfer.Conformance" />

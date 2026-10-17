@@ -865,7 +865,7 @@ src/python/anyinfer/
   serve/                 # openai_codec.py responses_codec.py embeddings_codec.py
                          # app.py service.py __main__.py — see §22, ADR-009
 
-src/csharp/              # bounded core-generation proof; not a supported SDK or package
+src/csharp/              # bounded core-generation proof; not a supported SDK or registry package
   AnyInfer/               # native proof runtime
   AnyInfer.Conformance/   # corpus reader, comparison, and driver
   AnyInfer.Tests/         # native unit and lifecycle tests
@@ -877,9 +877,9 @@ docs/                    # provider guides, published site sources (§25)
 
 `src/python/` is the current implementation root. The language-neutral behavior contract and
 data-only corpus live under `specification/`. The bounded C# core-generation proof has a separate
-`src/csharp/` root: it executes the frozen shared corpus and compares its observations, but is not
-a supported implementation or release-ready product. Python remains the current product
-implementation.
+`src/csharp/` root: it executes the frozen shared corpus, compares its observations, and validates
+a local prerelease package, but is not a supported implementation or release-ready product.
+Python remains the current product implementation.
 
 **`context_request.py` stays a root module — pinned by contract, not by inertia.** The
 obvious homes are both closed. It cannot live under `types/`: it imports

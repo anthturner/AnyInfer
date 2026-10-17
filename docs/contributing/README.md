@@ -16,7 +16,8 @@ python workspace.py check                          # every gate CI runs
 Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI.
 The complete quality gate also runs the bounded C# core-generation proof, so install the SDK
 selected by `src/csharp/global.json` before running `workspace check`. This is contributor
-proof infrastructure, not a supported package or application integration path.
+proof infrastructure, not a supported package or application integration path. The full gate
+validates a local prerelease package without publishing it.
 
 For the exact proof boundary and native commands, see [C# core-generation proof](csharp-proof.md).
 
@@ -63,14 +64,14 @@ first). It keeps going after a failure so one invocation tells you everything th
 | `conformance` | The provider [conformance suite](conformance.md) and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
 | `docs-build` | `mkdocs build --strict`: the exact artifact the Pages deploy publishes |
-| `csharp` | Record the pinned SDK version, restore `src/csharp/AnyInfer.sln`, and test it without restoring again |
+| `csharp` | Record the pinned SDK version, restore and test `src/csharp/AnyInfer.sln`, then validate a local prerelease package without publishing it |
 
 The full code-change CI pipeline invokes these phases as
 `python workspace.py check --only=<phase>`. Docs-only changes deliberately skip jobs that do
 not apply to documentation, while a local `check` always runs every default phase. CI also runs
 the `test` phase across Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners
 can cover. The `csharp` phase uses the SDK pinned under `src/csharp/`; it executes the bounded
-proof and produces no package or canonical conformance report.
+proof, validates a local prerelease package, and produces no canonical conformance report or registry publication.
 
 `--skip=a,b` leaves phases out; `--only=a,b` runs just those; the two are mutually
 exclusive. `python workspace.py build docs` runs the same strict site build as the

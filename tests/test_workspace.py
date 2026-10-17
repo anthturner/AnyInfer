@@ -189,6 +189,10 @@ class TestVerbs:
             (["dotnet", "--version"], ROOT / "src" / "csharp"),
             (["dotnet", "restore", "AnyInfer.sln"], ROOT / "src" / "csharp"),
             (["dotnet", "test", "AnyInfer.sln", "--no-restore"], ROOT / "src" / "csharp"),
+            (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_package.py")],
+                ROOT,
+            ),
         ]
 
     def test_check_only_csharp_refuses_without_the_pinned_sdk(self, monkeypatch, capsys):
@@ -235,6 +239,12 @@ class TestVerbs:
         assert "actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0" in body
         assert "global-json-file: src/csharp/global.json" in body
         assert "python workspace.py check --only=csharp" in body
+        assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2" in body
+        assert ".tmp-tests/nuget/*.nupkg" in body
+        assert ".tmp-tests/nuget/*.snupkg" in body
+        assert "include-hidden-files: true" in body
+        assert "if-no-files-found: error" in body
+        assert "nuget push" not in body.lower()
         assert "setup-python" not in body
         assert "setup-uv" not in body
         assert "uv pip install" not in body
@@ -319,10 +329,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The ten default phases comprise sixteen steps — fourteen subprocesses plus the two
+        # The ten default phases comprise seventeen steps — fifteen subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
-        # (contracts and conformance have two steps each, docs-check three, C# three).
-        assert len(calls) == 16
+        # (contracts and conformance have two steps each, docs-check three, C# four).
+        assert len(calls) == 17
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

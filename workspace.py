@@ -992,6 +992,12 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                     "test C# proof solution",
                     lambda: _run_csharp("test", "AnyInfer.sln", "--no-restore"),
                 ),
+                (
+                    "validate C# NuGet proof package",
+                    lambda: python(
+                        str(ROOT / "scripts" / "check_csharp_package.py"), cwd=ROOT
+                    ),
+                ),
             ),
         ),
     ]

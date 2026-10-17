@@ -190,7 +190,7 @@ jobs:
         run: python workspace.py check --only=docs-build
 
   # This is a bounded native proof lane, not a Python package job: the checked-in
-  # global.json selects its SDK and the workspace phase owns version/restore/test checks.
+  # global.json selects its SDK and the workspace phase owns version/restore/test/package checks.
   native-csharp:
     name: native C# proof
     runs-on: ubuntu-latest
@@ -204,6 +204,15 @@ jobs:
           global-json-file: src/csharp/global.json
       - name: C# proof
         run: python workspace.py check --only=csharp
+      - name: retain C# NuGet proof packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: csharp-nuget-proof
+          path: |
+            .tmp-tests/nuget/*.nupkg
+            .tmp-tests/nuget/*.snupkg
+          include-hidden-files: true
+          if-no-files-found: error
 
   test:
     name: tests (${{ matrix.os }}, py${{ matrix.python-version }})

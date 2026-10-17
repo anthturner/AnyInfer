@@ -46,7 +46,7 @@ everything that is not Python.
 
 Contributors can also inspect the bounded [C# core-generation proof](contributing/csharp-proof.md).
 It verifies shared behavior inside this repository and does not add a supported C# SDK or
-installation path.
+installation path. Local prerelease package validation does not publish a package.
 
 ## Install
 

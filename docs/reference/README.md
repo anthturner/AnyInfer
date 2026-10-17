@@ -3,7 +3,8 @@
 Look things up.
 
 This reference documents the supported Python `anyinfer` API. The repository's bounded C#
-core-generation proof has no generated public API reference or supported package surface.
+core-generation proof has no generated public API reference or supported package surface; local
+prerelease package validation does not expand it.
 
 - **[SDK reference](api/README.md)**: the generated API reference: every public class,
   function, and event, from the docstrings.

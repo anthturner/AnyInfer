@@ -170,8 +170,8 @@ python workspace.py demo     # launch the demo app
 [Contributing](https://anyinfer.dev/contributing/).
 
 Contributors can also run the bounded [C# core-generation proof](https://anyinfer.dev/contributing/csharp-proof/).
-It is repository verification infrastructure, not an AnyInfer package, integration API, or
-release artifact.
+It is repository verification infrastructure, not a supported AnyInfer SDK, integration API,
+registry-published package, or release artifact.
 
 ## Compatibility surface
 
