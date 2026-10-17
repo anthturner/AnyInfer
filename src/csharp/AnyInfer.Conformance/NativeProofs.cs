@@ -21,12 +21,16 @@ internal static class NativeProofs
     private const string AssessmentCompleteness = "driver/assessment-completeness";
     private const string TimeoutEffectiveDefaultExplicit = "driver/timeout-effective-default-explicit";
     private const string TimeoutResetPerEntry = "driver/timeout-reset-per-entry";
+    private const string TimeoutCleanupDisposal = "driver/timeout-cleanup-disposal";
+    private const string HttpCorrectionByteBudgetReset = "driver/http-correction-byte-budget-reset";
 
     internal static bool IsSupported(string recipeRef) => recipeRef is
         ConcurrentOperations or
         AssessmentCompleteness or
         TimeoutEffectiveDefaultExplicit or
-        TimeoutResetPerEntry;
+        TimeoutResetPerEntry or
+        TimeoutCleanupDisposal or
+        HttpCorrectionByteBudgetReset;
 
     internal static async Task<NativeProofResult> RunAsync(
         string recipeRef,
@@ -46,6 +50,8 @@ internal static class NativeProofs
                 AssessmentCompleteness => await RunAssessmentCompletenessAsync(cancellationToken).ConfigureAwait(false),
                 TimeoutEffectiveDefaultExplicit => await ProofTimeouts.RunEffectiveDefaultExplicitAsync(cancellationToken).ConfigureAwait(false),
                 TimeoutResetPerEntry => await ProofTimeouts.RunResetPerEntryAsync(cancellationToken).ConfigureAwait(false),
+                TimeoutCleanupDisposal => await ProofTransport.RunTimeoutCleanupDisposalAsync(cancellationToken).ConfigureAwait(false),
+                HttpCorrectionByteBudgetReset => await ProofTransport.RunHttpCorrectionByteBudgetResetAsync(cancellationToken).ConfigureAwait(false),
                 _ => throw new ProofHarnessException("Supported recipe dispatch was incomplete."),
             };
         }
@@ -379,7 +385,7 @@ internal static class NativeProofs
         paths.Any(path => path is { Count: 2 } && path[0] is string first && path[1] is string second &&
             string.Equals(first, "outer", StringComparison.Ordinal) && string.Equals(second, "value", StringComparison.Ordinal));
 
-    private static bool HasCausalRepair(OperationCapture capture)
+    internal static bool HasCausalRepair(OperationCapture capture)
     {
         if (capture.Repairs.Count != 1 || capture.Entries.Count != 2 || capture.Assessments.Count < 1)
         {
@@ -403,7 +409,7 @@ internal static class NativeProofs
         first.Repairs.All(firstRepair => second.Repairs.All(secondRepair => !ReferenceEquals(firstRepair, secondRepair))) &&
         first.Lifecycle.All(firstObservation => second.Lifecycle.All(secondObservation => !ReferenceEquals(firstObservation, secondObservation)));
 
-    private static IReadOnlyList<Message> PreparedWireMessages(RepairPreparation preparation, WireRequest request)
+    internal static IReadOnlyList<Message> PreparedWireMessages(RepairPreparation preparation, WireRequest request)
     {
         var messages = preparation.Messages;
         if (request.Schema is not null && request.Mechanism is "prompt" or "json_mode")
@@ -414,10 +420,10 @@ internal static class NativeProofs
         return messages;
     }
 
-    private static string AdapterText(EntryContext entry) =>
+    internal static string AdapterText(EntryContext entry) =>
         string.Concat(entry.AdapterEvents.OfType<AdapterTextDelta>().Select(static item => item.Text));
 
-    private static bool MessageListsEqual(IReadOnlyList<Message> first, IReadOnlyList<Message> second) =>
+    internal static bool MessageListsEqual(IReadOnlyList<Message> first, IReadOnlyList<Message> second) =>
         first.Count == second.Count && first.Zip(second).All(pair => MessageEquals(pair.First, pair.Second));
 
     private static bool MessageEquals(Message first, Message second) =>

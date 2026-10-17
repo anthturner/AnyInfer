@@ -34,15 +34,14 @@ internal static class ReportWriter
             }
 
             if (inventoryCase.Kind != FixtureKind.Fixture ||
-                !fixtures.TryGetValue(inventoryCase.Id, out var fixture) ||
-                fixture.Input is not CoreFixtureInput coreInput)
+                !fixtures.TryGetValue(inventoryCase.Id, out var fixture))
             {
                 unavailable.Add(new JsonString(inventoryCase.Id));
                 counts.Unavailable++;
                 continue;
             }
 
-            cases.Add(await RunCoreCaseAsync(fixture, coreInput, counts, cancellationToken).ConfigureAwait(false));
+            cases.Add(await RunFixtureCaseAsync(fixture, counts, cancellationToken).ConfigureAwait(false));
         }
 
         return new JsonObject([
@@ -52,7 +51,7 @@ internal static class ReportWriter
                 new JsonProperty("id", new JsonString(assets.ReleaseId)),
                 new JsonProperty("sha256", new JsonString(assets.ReleaseSha256)),
             ])),
-            new JsonProperty("available_subset", new JsonString("core-fixtures-and-first-four-proofs")),
+            new JsonProperty("available_subset", new JsonString("all-released-cases")),
             new JsonProperty("cases", new JsonArray(cases)),
             new JsonProperty("unavailable", new JsonArray(unavailable)),
             new JsonProperty("counts", new JsonObject([
@@ -89,16 +88,23 @@ internal static class ReportWriter
         return Count(counts, "fail") != 0 || Count(counts, "error") != 0;
     }
 
-    private static async Task<JsonObject> RunCoreCaseAsync(
+    private static async Task<JsonObject> RunFixtureCaseAsync(
         FixtureDocument fixture,
-        CoreFixtureInput input,
         DevelopmentCounts counts,
         CancellationToken cancellationToken)
     {
         try
         {
-            var run = await NativeRunner.RunAsync(fixture.Case.Id, input, cancellationToken).ConfigureAwait(false);
-            var comparison = Comparison.Compare(fixture, run);
+            var comparison = fixture.Input switch
+            {
+                CoreFixtureInput coreInput => Comparison.Compare(
+                    fixture,
+                    await NativeRunner.RunAsync(fixture.Case.Id, coreInput, cancellationToken).ConfigureAwait(false)),
+                TransportFixtureInput transportInput => TransportComparison.Compare(
+                    fixture,
+                    await TransportRunner.RunAsync(fixture.Case.Id, transportInput, cancellationToken).ConfigureAwait(false)),
+                _ => throw new ObservationUnavailableException("fixture input kind is not executable"),
+            };
             switch (comparison.Verdict)
             {
                 case "pass":

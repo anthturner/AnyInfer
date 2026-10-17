@@ -995,6 +995,11 @@ M1 and later use `src/python/` paths and therefore depend on it.
   **Gate:** `dotnet test src/csharp/AnyInfer.Conformance` passes including the transport family
   and every named HTTP/limit driver proof requirement, then writes the first complete `report-v0`
   with `fail: 0` and `error: 0` against every mandatory inventory case.
+  > NOTE: Native execution is accepted through bounded M2.5a-c: 164 unit and 81
+  > conformance tests pass; canonical/copied selected-root development runs each have
+  > 102 unique passes, zero fail/error/unavailable. Repository gate: all 13 steps,
+  > 83.3s, exit 0 (8bd76aa8). This master box remains open for its final report-v0
+  > requirement, implemented/produced through M2.Ga-b with clean compiled provenance.
 - [ ] M2.G **Port gate.** `.\.venv\Scripts\python.exe scripts/compare_reports.py <python-report.json> <csharp-report.json>` exits 0:
   every exact, unique released case ID has the same verdict in both reports, no report has a
   `fail` or `error`, and the only exception is an explicitly marked case where Python reports

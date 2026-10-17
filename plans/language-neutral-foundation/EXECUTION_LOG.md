@@ -1957,3 +1957,138 @@ No source changed during the final focused, whole-project, standalone or reposit
 The HTTP preparation critique is accepted: defer SSE final until valid DONE, use
 ResponseHeadersRead/incremental pre-decode byte accounting and entry-owned timing, and pin
 one adapter-owned HttpClient/handler path with WireRequest.Stream as the sole effective mode.
+
+Accepted first-four-proof checkpoint is committed at
+`86f96f3b6d53cffb705661765cdd05a9644ba469`; root verified clean before M2.5 source grants.
+Adapter source and independent HTTP unit tests now have disjoint authors. The stable BCL
+handler constructor permits parallel Conformance HTTP-spy authoring without changing core APIs;
+its integration waits for M2.5a. Root accepted the input/consumption reuse map with a smaller
+original-input identity-preserving choice: NativeRun.Input becomes FixtureInput, preserving each
+actual CoreFixtureInput/TransportFixtureInput reference, while shared operation parsing and
+prepared native execution remain in NativeRunner. Per-run recording separately observes adapter
+entries and SendAsync exchanges, binding actual WireRequest references/limits without ambient
+state. No HTTP runtime result or M2.5 acceptance exists yet; website/docs and CI remain required.
+
+M2.5a held source/tests and the parallel HTTP spy have independent static reviews. Root
+accepted one bounded correction wave before runtime: default handler redirects are disabled;
+actual response-stream disposal IO is mapped while outer response cleanup remains awaited;
+HTTP script consumption uses a bound-response cursor separately from actual Send counts.
+Independent unit controls now require aggregate multi-chunk UTF-8 limits with no escaped final,
+exact omitted sampling and usage identity, real blocked-read cancellation/cleanup, original
+redirect status mapping, and actual disposal-IO identity. Source and test authors own disjoint
+files; no build/test/restore slot is granted until final held handoffs. These are static
+findings, not transport runtime results. Website/docs and native CI remain required M2.G gates.
+
+The first M2.5a build stopped on two test TaskCompletionSource receiver errors; its stale
+--no-build invocation found no tests and is explicitly not evidence. After .Task.WaitAsync
+mechanical corrections and explicit native-exit guards, SDK 8.0.425 build passed with zero
+warnings/errors (1.11s, retained 47924398); OpenAIChat ran nine tests: seven passed, two failed
+(0.8158s). Root inspected both: an ambiguous Single() split-point test selector must choose one
+safe UTF-8 boundary; actual synchronous HttpResponseMessage.Dispose re-disposes the stream and
+lets IO override the already-mapped async cleanup failure. Only that response-disposal IO
+mapping and the selector mechanics are authorized before the next focused rerun; all semantic
+cleanup and multi-chunk byte assertions remain. M2.5a remains unchecked.
+
+M2.5a is accepted: root inspected final focused log d745adcc (SDK 8.0.425, clean build,
+9/0/0 in 0.7232s) and root a1994df6 (whole unit 164/0/0; Conformance/harness build zero
+warnings/errors, 0.87s; exit 0). Adapter/test/harness bounded review artifacts close all
+reported findings. Runtime now covers actual aggregate bytes, no early final, sampling and
+usage identity, blocked-read OCE and cleanup, original redirect mapping and both synchronous
+and async cleanup IO. Default production redirect disabling is inspected source, separately
+from the injected-handler test. M2.5a is checked; M2.5b is next on checkpoint 86f96f3 plus
+the accepted uncommitted files. No complete transport/corpus qualification or report exists.
+
+M2.5b source authoring has three disjoint slices: c708 NativeRunner-only original-input
+identity-preserving extraction, c16 input-only TransportRunner/raw carrier, cab ProofTransport
+plus minimal final-two NativeProofs dispatch. Stable APIs precede comparison/report integration
+and independent tests; no process slot is granted. The accepted preparation artifact now records
+root-settled APIs/ownership and explicitly supersedes its earlier NativeOperationInput,
+HTTP-count-as-entry-count and borrowed-client proposals. All earlier 85 native fixture and
+first-four proof controls must remain; staged document counts change only in the test/writer
+integration wave. The next unchecked box is M2.5b on checkpoint 86f96f3 plus held changes.
+
+NativeRunner extraction has clean bounded source review; original input identity and prior
+consumption/mirror semantics are preserved by inspection. TransportRunner and the final-two
+proof source snapshots are held, with independent runner/proof reviews in progress. Root
+settled the shared comparison context/typed-message helper and assigned c708 the remaining
+transport projection/comparison and development writer dispatch. It uses the actual nested
+request/capture/wire/exchange identity and retains all other HTTP JSON as literal data. The
+integrated development subset literal becomes all-released-cases; expected accounting is
+102 executable rows/zero unavailable but no such runtime result exists yet. Independent tests
+follow these saved APIs. No process slot is active or granted during source integration.
+
+Cold M2.5b reviews require one consolidated source/test wave before runtime. Final proofs
+must require (not merely serialize) native-to-mapped-to-failed-trail identities; consume a
+schema-bearing real stream to prove zero derived usage/assessment/end after cleanup timeout;
+and bind actual source text through preparation/injected wire to the second HTTP body.
+Missing/surplus overflow evidence is guarded rather than SingleOrDefault throwing. Root
+also found missing RepairPreparation namespace and typed FixtureInput.Kind compile mechanics.
+Transport direct comparison now needs scoped usage-null and retry-after numeric rules.
+Root narrowed an overbroad review: frozen events arrays allow empty, and prefix events plus
+an actual terminal can project the exclusive terminal branch while retaining raw events;
+these are not automatically unavailable. Root cross-checked handler cursor/recording constructor
+and found HTTP ordinals are zero-based whereas native entries are one-based; the projection's
+index+1 check must use index. Three disjoint authors own this wave; tests wait exact updated
+proof keys. No shared process is running or granted, and M2.5b remains unchecked.
+
+The first coherent M2.5b build stopped before test execution (SDK 8.0.425, zero warnings,
+seven compiler diagnostics, 1.79s, retained ebaaed44). Root inspected all diagnostics: missing
+TransportComparison index-only diagnostic formatter, ProofTransport int-to-long Select method
+group, TransportTests EntryRole import, and a BigInteger Enumerable.Sum overload assumption.
+Only those mechanical fixes are assigned to their disjoint owners; proof/test semantics and
+frozen inputs remain held. The final source/proof/test reviews are closed, including actual
+caller-cancellation precedence. No integrated runtime result exists yet; rerun requires all
+three mechanical handoffs, then the same guarded build/Transport filter. M2.5b is unchecked.
+
+The compiler-corrected M2.5b filter built clean (SDK 8.0.425, 1.33s) then ran 14 tests:
+6 passed / 8 failed, exit 1, 3.3329s, retained ebaaed44. Root's compiled no-build CLI census
+650c2e76 wrote only .tmp-tests/m25b-first-diagnostic.json and exited 1: all 102 rows visited,
+99 pass / 1 fail / 2 error / zero unavailable. The two errors share NativeRunner.ReadRetry's
+incorrect requirement for omitted backoff fields; native RetryPolicy defaults must remain
+available. The cleanup proof's identity/suppression/disposal facts are true but its lifecycle
+oracle confuses the adapter's actual finally (during pending MoveNext) with the boundary's
+later Dispose marker. Root requires new actual native-cleanup readiness/scope snapshots before
+expiry, separately from the legitimate expired->boundary cleanup_start order; no core timeout
+behavior changes or mere predicate relaxation are authorized.
+
+The custom retry-after control exposed a separate response replay defect: the handler puts
+response headers on content.Headers, so the actual BCL response lacks RetryAfter. The source
+fix routes headers to their proper BCL collections; it does not synthesize provider fields.
+Two remaining test setups require exact input identity and actual SSE newlines. An actual DONE
+still must yield Final; valid empty portable events are tested only on an explicitly copied
+carrier, never claimed as native DONE behavior. Source/default/header/proof and test corrections
+have disjoint owners and no process slot. M2.5b remains unchecked; website/CI gates remain open.
+
+The consolidated correction is held and has bounded source/test closure: native retry defaults,
+proper BCL header replay, local response/content disposal if header replay fails before return,
+and actual native cleanup pre/post-expiry snapshots. The invalid-header independent control
+requires an unchanged harness exception, disposed unreturned response/content, no invented
+stream, and eventual handler closure. A stray expected-only test input name was corrected
+without changing the identity oracle. The sole guarded build/Transport filter is regranted
+to the independent test owner; no source, Git, or plan edits are allowed during that gate.
+No new runtime acceptance is claimed until its retained log is inspected.
+
+Root inspected the common-cause rerun: SDK 8.0.425, clean build in 1.33s, Transport
+14 passed / 1 failed in 3.3453s, exit 1 (retained ebaaed44). All eleven released transport
+fixtures and both final proof paths pass. The remaining custom retry numeric-control test
+changes its response to HTTP 429 but retains cloned expected http_status 503. Only that
+test oracle and an explicit actual-429 baseline assertion are authorized; the typed retry
+comparison and provider/header behavior stay held. The independent owner has the sole
+guarded rerun, with bounded fresh review of the two-field oracle correction.
+
+M2.5b is accepted after root inspected final retained ebaaed44: SDK 8.0.425,
+clean build (0.99s), 15 Transport passes / zero failures/skips (3.0130s), exit 0.
+Root cc11b834 then passed the complete unit project (164/0/0) and Conformance
+(81/0/0, 9.9800s). Canonical and copied selected-root standalone development
+executions both produced 102 unique pass rows, zero fail/error/unavailable, exit 0.
+These remain DEVELOPMENT/UNRELEASED observations under .tmp-tests, not report-v0.
+The M2.5c repository gate is running in 8bd76aa8 with the previously documented
+scoped fresh pytest cache; executable sources are held throughout. Native CI,
+compiled provenance, final qualification, and website/docs remain mandatory M2.G work.
+
+M2.5c repository acceptance passed all 13 steps in 83.3s, exit 0 (8bd76aa8).
+Frozen release/Python report SHA-256 values still match the sealed inputs. The bounded
+M2.5a-c boxes are complete; master M2.5 retains its final-report requirement until M2.Gb.
+Resume at M2.Ga from the forthcoming native HTTP checkpoint, then implement the additive
+native-csharp CI lane and final-writer/provenance/no-write guards before the clean
+compiled-code checkpoint. M2.Gb is production execution only; website/docs remain required.

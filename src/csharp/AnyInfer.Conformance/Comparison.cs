@@ -12,13 +12,26 @@ internal static class Comparison
     {
         ArgumentNullException.ThrowIfNull(fixture);
         ArgumentNullException.ThrowIfNull(run);
-        if (!string.Equals(fixture.Case.Id, run.CaseId, StringComparison.Ordinal))
+        if (fixture.Input is not CoreFixtureInput coreInput)
         {
-            return new DevelopmentComparison("error", EmptyObservation(), "fixture and native run identities differ");
+            return new DevelopmentComparison("error", EmptyObservation(), "fixture has no core comparison input");
+        }
+
+        return CompareCore(new CoreComparisonContext(fixture.Case.Id, fixture.Expected, coreInput.Request), run);
+    }
+
+    internal static DevelopmentComparison CompareCore(CoreComparisonContext context, NativeRun run)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(run);
+        if (!string.Equals(context.CaseId, run.CaseId, StringComparison.Ordinal))
+        {
+            return new DevelopmentComparison("error", EmptyObservation(), "core comparison and native run identities differ");
         }
 
         try
         {
+            ValidateContextBinding(context, run);
             var observation = Projection.Project(run);
             if (run.Mirror is not null)
             {
@@ -30,8 +43,8 @@ internal static class Comparison
                 }
             }
 
-            ValidateExpectedEnvelope(fixture.Expected);
-            var mismatch = CompareExpected(fixture, run, observation);
+            ValidateExpectedEnvelope(context.Expected);
+            var mismatch = CompareExpected(context, run, observation);
             return mismatch is null
                 ? new DevelopmentComparison("pass", observation)
                 : new DevelopmentComparison("fail", observation, mismatch);
@@ -46,9 +59,9 @@ internal static class Comparison
         }
     }
 
-    private static string? CompareExpected(FixtureDocument fixture, NativeRun run, JsonObject observation)
+    private static string? CompareExpected(CoreComparisonContext context, NativeRun run, JsonObject observation)
     {
-        var expected = fixture.Expected;
+        var expected = context.Expected;
         if (!TryProperty(expected, "status", out var status) || status is not JsonString { Value: "observed" })
         {
             return "expected status is not observed";
@@ -89,7 +102,7 @@ internal static class Comparison
             return "calls are missing";
         }
 
-        var callsMismatch = CompareCalls(fixture, run, expectedCalls, actualCalls);
+        var callsMismatch = CompareCalls(context, run, expectedCalls, actualCalls);
         if (callsMismatch is not null)
         {
             return callsMismatch;
@@ -111,10 +124,10 @@ internal static class Comparison
             return "outcome is missing";
         }
 
-        return CompareOutcome(fixture, expectedOutcome, actualOutcome);
+        return CompareOutcome(context, expectedOutcome, actualOutcome);
     }
 
-    private static string? CompareCalls(FixtureDocument fixture, NativeRun run, JsonValue expectedValue, JsonValue actualValue)
+    private static string? CompareCalls(CoreComparisonContext context, NativeRun run, JsonValue expectedValue, JsonValue actualValue)
     {
         if (expectedValue is not JsonArray expected || actualValue is not JsonArray actual || expected.Items.Count != actual.Items.Count)
         {
@@ -168,7 +181,7 @@ internal static class Comparison
                 return CallDetail(index, "messages");
             }
 
-            var messagesMismatch = CompareMessages(fixture, run, entries[index], index, expected, actual, expectedMessages, actualMessages);
+            var messagesMismatch = CompareMessages(context, run, index, expected, actual, expectedMessages, actualMessages);
             if (messagesMismatch is not null)
             {
                 return messagesMismatch;
@@ -194,9 +207,8 @@ internal static class Comparison
     }
 
     private static string? CompareMessages(
-        FixtureDocument fixture,
+        CoreComparisonContext context,
         NativeRun run,
-        AnyInfer.Internal.EntryContext entry,
         int index,
         JsonArray expectedCalls,
         JsonArray actualCalls,
@@ -242,7 +254,7 @@ internal static class Comparison
                 return CallDetail(index, "messages");
             }
 
-            var expanded = ExpandExpectedText(fixture, run, entry, index, messageIndex, expectedText);
+            var expanded = ExpandTypedCoreMessageContent(context, run, index, messageIndex, expectedText);
             if (!string.Equals(expanded, actualString.Value, StringComparison.Ordinal))
             {
                 return CallDetail(index, "messages");
@@ -252,8 +264,27 @@ internal static class Comparison
         return null;
     }
 
-    private static string ExpandExpectedText(FixtureDocument fixture, NativeRun run, AnyInfer.Internal.EntryContext entry, int callIndex, int messageIndex, JsonValue expected)
+    internal static string ExpandTypedCoreMessageContent(
+        CoreComparisonContext context,
+        NativeRun run,
+        int callIndex,
+        int messageIndex,
+        JsonValue expected)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(run);
+        ValidateContextBinding(context, run);
+        if (callIndex < 0 || callIndex >= run.Capture.Entries.Count)
+        {
+            throw new ObservationUnavailableException("typed core marker has no captured entry");
+        }
+
+        var entry = run.Capture.Entries[callIndex];
+        if (messageIndex < 0 || messageIndex >= entry.Request.Messages.Count)
+        {
+            throw new ObservationUnavailableException("typed core marker has no captured message");
+        }
+
         if (expected is JsonString literal)
         {
             return literal.Value;
@@ -285,8 +316,7 @@ internal static class Comparison
             if (property.Name == "$schema_prompt" && property.Value is JsonBoolean { Value: true })
             {
                 schemaMarkers++;
-                if (schemaMarkers > 1 || fixture.Input is not CoreFixtureInput { Request: var request } ||
-                    !request.TryGetValue("schema", out var schema) || schema is JsonNull ||
+                if (schemaMarkers > 1 || !context.OriginalRequest.TryGetValue("schema", out var schema) || schema is JsonNull ||
                     entry.Request.Schema is null ||
                     entry.Request.Mechanism is not ("prompt" or "json_mode") ||
                     messageIndex != LastMessageIndex(entry.Request.Messages, "system") ||
@@ -444,7 +474,7 @@ internal static class Comparison
         return null;
     }
 
-    private static string? CompareOutcome(FixtureDocument fixture, JsonValue expected, JsonValue actual)
+    private static string? CompareOutcome(CoreComparisonContext context, JsonValue expected, JsonValue actual)
     {
         if (expected is not JsonObject expectedObject || actual is not JsonObject actualObject ||
             expectedObject.Properties.Count != 1 || actualObject.Properties.Count != 1)
@@ -461,14 +491,14 @@ internal static class Comparison
 
         return expectedProperty.Name switch
         {
-            "result" => CompareResult(fixture, expectedProperty.Value, actualProperty.Value),
+            "result" => CompareResult(context, expectedProperty.Value, actualProperty.Value),
             "error" => CompareError(expectedProperty.Value, actualProperty.Value),
             "none" => JsonEquality.TypeAwareEquals(expectedProperty.Value, actualProperty.Value) ? null : "outcome.none differs",
             _ => "outcome has an unknown kind",
         };
     }
 
-    private static string? CompareResult(FixtureDocument fixture, JsonValue expected, JsonValue actual)
+    private static string? CompareResult(CoreComparisonContext context, JsonValue expected, JsonValue actual)
     {
         if (expected is not JsonObject expectedResult || actual is not JsonObject actualResult ||
             !HasExactMembers(expectedResult, ResultMembers) || !HasExactMembers(actualResult, ResultMembers))
@@ -496,7 +526,7 @@ internal static class Comparison
             }
         }
 
-        if (string.Equals(fixture.Case.Id, "extraction/duplicate-key-last-value-first-position", StringComparison.Ordinal) &&
+        if (string.Equals(context.CaseId, "extraction/duplicate-key-last-value-first-position", StringComparison.Ordinal) &&
             !RootMemberOrderMatches(expectedResult, actualResult))
         {
             return "result.structured root-member order differs";
@@ -583,7 +613,7 @@ internal static class Comparison
 
         return true;
     }
-    private static bool UsageEquals(JsonValue expected, JsonValue actual)
+    internal static bool UsageEquals(JsonValue expected, JsonValue actual)
     {
         if (expected is JsonNull)
         {
@@ -853,6 +883,33 @@ internal static class Comparison
         return false;
     }
 
+    private static void ValidateContextBinding(CoreComparisonContext context, NativeRun run)
+    {
+        var actualRequest = run.Input switch
+        {
+            CoreFixtureInput coreInput => coreInput.Request,
+            TransportFixtureInput transportInput => TransportOperationRequest(transportInput),
+            _ => throw new ObservationUnavailableException("native run has an unsupported core comparison input"),
+        };
+
+        if (!ReferenceEquals(context.OriginalRequest, actualRequest))
+        {
+            throw new ObservationUnavailableException("core comparison request is not the native run input");
+        }
+    }
+
+    private static JsonObject TransportOperationRequest(TransportFixtureInput input)
+    {
+        if (input.Input is not JsonObject transportInput ||
+            !transportInput.TryGetValue("operation", out var operationValue) || operationValue is not JsonObject operation ||
+            !operation.TryGetValue("request", out var requestValue) || requestValue is not JsonObject request)
+        {
+            throw new ObservationUnavailableException("transport core comparison has no original operation request");
+        }
+
+        return request;
+    }
+
     private static void ValidateExpectedEnvelope(JsonObject expected)
     {
         var allowed = new HashSet<string>(StringComparer.Ordinal)
@@ -868,5 +925,7 @@ internal static class Comparison
     private static JsonObject EmptyObservation() => new([]);
     private static string CallDetail(int index, string member) => "calls[" + index.ToString(CultureInfo.InvariantCulture) + "]." + member + " differs";
 }
+
+internal sealed record CoreComparisonContext(string CaseId, JsonObject Expected, JsonObject OriginalRequest);
 
 internal sealed record DevelopmentComparison(string Verdict, JsonObject Observation, string? Detail = null);

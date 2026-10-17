@@ -15,12 +15,16 @@ public sealed class NativeProofsTests
     private const string Assessment = "driver/assessment-completeness";
     private const string EffectiveLimits = "driver/timeout-effective-default-explicit";
     private const string Reset = "driver/timeout-reset-per-entry";
+    private const string CleanupDisposal = "driver/timeout-cleanup-disposal";
+    private const string HttpCorrectionBudget = "driver/http-correction-byte-budget-reset";
 
     [Theory]
     [InlineData(Concurrent)]
     [InlineData(Assessment)]
     [InlineData(EffectiveLimits)]
     [InlineData(Reset)]
+    [InlineData(CleanupDisposal)]
+    [InlineData(HttpCorrectionBudget)]
     public async Task Supported_recipe_dispatches_to_nonempty_ordinary_evidence(string recipeRef)
     {
         Assert.True(NativeProofs.IsSupported(recipeRef));

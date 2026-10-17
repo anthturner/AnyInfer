@@ -38,45 +38,56 @@ internal static class NativeRunner
         string consumeMode,
         CancellationToken cancellationToken)
     {
+        return await RunPreparedAsync(
+            caseId,
+            input,
+            consumeMode,
+            CreateSetup(input, consumeMode),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async Task<NativeRun> RunPreparedAsync(
+        string caseId,
+        FixtureInput input,
+        string consumeMode,
+        NativeExecutionSetup setup,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(caseId);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentException.ThrowIfNullOrWhiteSpace(consumeMode);
+        ArgumentNullException.ThrowIfNull(setup);
+
         var capture = new OperationCapture();
-        VirtualClock? clock = null;
-        FixtureAdapter? adapter = null;
         try
         {
-            var setup = CreateSetup(input, consumeMode);
-            clock = setup.Clock;
-            adapter = setup.Adapter;
             await using var client = setup.Client;
             if (consumeMode == Buffered)
             {
                 try
                 {
                     var result = await client.GenerateAsync(setup.Request, capture, cancellationToken).ConfigureAwait(false);
-                    return Complete(caseId, input, consumeMode, [], result, null, "buffered", false, capture, clock, adapter, null);
+                    return Complete(caseId, input, consumeMode, [], result, null, "buffered", false, capture, setup);
                 }
                 catch (AnyInferException exception)
                 {
-                    return Complete(caseId, input, consumeMode, [], null, exception, "buffered", false, capture, clock, adapter, null);
+                    return Complete(caseId, input, consumeMode, [], null, exception, "buffered", false, capture, setup);
                 }
             }
 
             return await ConsumeStreamAsync(caseId, input, consumeMode, setup, capture, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (AnyInferException exception)
         {
-            throw;
-        }
-        catch (AnyInferException exception) when (clock is not null && adapter is not null)
-        {
-            return Complete(caseId, input, consumeMode, [], null, exception, "construction", false, capture, clock, adapter, null);
+            return Complete(caseId, input, consumeMode, [], null, exception, "construction", false, capture, setup);
         }
     }
 
     private static async Task<NativeRun> ConsumeStreamAsync(
         string caseId,
-        CoreFixtureInput input,
+        FixtureInput input,
         string consumeMode,
-        Setup setup,
+        NativeExecutionSetup setup,
         OperationCapture capture,
         CancellationToken cancellationToken)
     {
@@ -85,7 +96,7 @@ internal static class NativeRunner
         if (consumeMode == NoAdvance)
         {
             await stream.DisposeAsync().ConfigureAwait(false);
-            return Complete(caseId, input, consumeMode, events, stream.Result, null, "close", false, capture, setup.Clock, setup.Adapter, null);
+            return Complete(caseId, input, consumeMode, events, stream.Result, null, "close", false, capture, setup);
         }
 
         var cancelAfter = CancellationCount(consumeMode);
@@ -110,21 +121,21 @@ internal static class NativeRunner
                 await stream.DisposeAsync().ConfigureAwait(false);
             }
 
-            return Complete(caseId, input, consumeMode, events, stream.Result, null, "stream", false, capture, setup.Clock, setup.Adapter, null);
+            return Complete(caseId, input, consumeMode, events, stream.Result, null, "stream", false, capture, setup);
         }
         catch (OperationCanceledException exception) when (deliberateCancellation && driverCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            return Complete(caseId, input, consumeMode, events, stream.Result, exception, "stream", true, capture, setup.Clock, setup.Adapter, null);
+            return Complete(caseId, input, consumeMode, events, stream.Result, exception, "stream", true, capture, setup);
         }
         catch (AnyInferException exception)
         {
-            return Complete(caseId, input, consumeMode, events, stream.Result, exception, "stream", false, capture, setup.Clock, setup.Adapter, null);
+            return Complete(caseId, input, consumeMode, events, stream.Result, exception, "stream", false, capture, setup);
         }
     }
 
     private static NativeRun Complete(
         string caseId,
-        CoreFixtureInput input,
+        FixtureInput input,
         string consumeMode,
         IReadOnlyList<GenerationEvent> events,
         GenerationResult? result,
@@ -132,9 +143,8 @@ internal static class NativeRunner
         string terminalStage,
         bool deliberateCancellation,
         OperationCapture capture,
-        VirtualClock clock,
-        FixtureAdapter adapter,
-        NativeRun? mirror) =>
+        NativeExecutionSetup setup,
+        NativeRun? mirror = null) =>
         new(
             caseId,
             input,
@@ -145,12 +155,12 @@ internal static class NativeRunner
             terminalStage,
             deliberateCancellation,
             capture,
-            clock,
-            adapter.CallCount,
-            adapter.RemainingEntries,
+            setup.Clock,
+            setup.AdapterCallCount(),
+            setup.RemainingEntries(),
             mirror);
 
-    private static Setup CreateSetup(CoreFixtureInput input, string consumeMode)
+    private static NativeExecutionSetup CreateSetup(CoreFixtureInput input, string consumeMode)
     {
         var clock = new VirtualClock(ReadClockSeconds(input.Clock));
         // A fresh, intentionally unreleased gate lets the fixture's own consumption mode
@@ -166,11 +176,11 @@ internal static class NativeRunner
             client.Health.SeedFailure(ParseTarget(RequireString(Require(value, "target"), "target")), ReadNumber(Require(value, "failed_at_ms"), "failed_at_ms") / 1000d);
         }
 
-        var request = ReadRequest(input.Request, input.Route, consumeMode);
-        return new Setup(client, clock, adapter, request);
+        var request = ReadOperationRequest(input.Request, input.Route, consumeMode);
+        return new NativeExecutionSetup(client, clock, request, () => adapter.CallCount, () => adapter.RemainingEntries);
     }
 
-    private static GenerationRequest ReadRequest(JsonObject request, JsonObject route, string consumeMode)
+    internal static GenerationRequest ReadOperationRequest(JsonObject request, JsonObject route, string consumeMode)
     {
         var messages = RequireArray(request, "messages").Items.Select(ReadMessage).ToArray();
         var schema = Optional(request, "schema") is JsonNull or null ? null : Optional(request, "schema");
@@ -226,10 +236,20 @@ internal static class NativeRunner
         return new Route(targets, retry, healthGate, ttl);
     }
 
-    private static RetryPolicy ReadRetry(JsonObject value) => new(
-        ReadInt32(Require(value, "max_attempts"), "max_attempts"),
-        ReadNumber(Require(value, "backoff_base_s"), "backoff_base_s"),
-        ReadNumber(Require(value, "backoff_max_s"), "backoff_max_s"));
+    private static RetryPolicy ReadRetry(JsonObject value)
+    {
+        var defaults = new RetryPolicy();
+        var maxAttempts = Optional(value, "max_attempts") is { } maxAttemptsValue
+            ? ReadInt32(maxAttemptsValue, "max_attempts")
+            : defaults.MaxAttempts;
+        var backoffBase = Optional(value, "backoff_base_s") is { } backoffBaseValue
+            ? ReadNumber(backoffBaseValue, "backoff_base_s")
+            : defaults.BackoffBaseS;
+        var backoffMaximum = Optional(value, "backoff_max_s") is { } backoffMaximumValue
+            ? ReadNumber(backoffMaximumValue, "backoff_max_s")
+            : defaults.BackoffMaxS;
+        return new RetryPolicy(maxAttempts, backoffBase, backoffMaximum);
+    }
 
     private static IReadOnlyDictionary<string, StructuredOutputProfile> ReadCapabilities(JsonObject adapter)
     {
@@ -344,13 +364,19 @@ internal static class NativeRunner
         ? null
         : ReadNumber(value, name);
 
-    private sealed record Setup(AsyncClient Client, VirtualClock Clock, FixtureAdapter Adapter, GenerationRequest Request);
 }
+
+internal sealed record NativeExecutionSetup(
+    AsyncClient Client,
+    VirtualClock Clock,
+    GenerationRequest Request,
+    Func<int> AdapterCallCount,
+    Func<int> RemainingEntries);
 
 /// <summary>Retains actual native execution facts for development-only projection and comparison.</summary>
 internal sealed record NativeRun(
     string CaseId,
-    CoreFixtureInput Input,
+    FixtureInput Input,
     string ConsumeMode,
     IReadOnlyList<GenerationEvent> Events,
     GenerationResult? Result,

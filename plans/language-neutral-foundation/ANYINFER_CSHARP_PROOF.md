@@ -645,7 +645,7 @@ verification both before execution and before output.
   > (`5aa52d46`), with the documented scoped fresh pytest-cache directory. No executable
   > source or assertion changed during these final gates.
 
-- [ ] **M2.5a — OpenAI chat transport adapter.** Owner: transport worker; files limited to
+- [x] **M2.5a — OpenAI chat transport adapter.** Owner: transport worker; files limited to
   `AnyInfer/Providers/OpenAIChatAdapter.cs`, transport helpers, and unit tests. Use `HttpClient`
   for native request encoding and streaming parse only. Do not read expected outcomes or place
   core policy in the adapter. **Gate:**
@@ -664,10 +664,29 @@ verification both before execution and before output.
   > Sentinel-only completion yields stop/null, while EOF or malformed input emits no final.
   > Keep caller cancellation and actual HTTP resource disposal within the entry iterator.
   > No source authoring starts before the accepted first-four-proof checkpoint is committed.
+  > NOTE: Authoring starts from clean `86f96f3b6d53cffb705661765cdd05a9644ba469`.
+  > Adapter source owns `OpenAIChatAdapter.cs` and optional `OpenAIChatProtocol.cs`;
+  > independent unit tests own `AnyInfer.Tests/OpenAIChatTests.cs`. The Conformance-only
+  > scripted HTTP recording harness may be authored in parallel against this stable BCL
+  > seam, in disjoint files, while its M2.5b integration/acceptance waits for M2.5a's gate.
+  > Buffered event order is text, usage, final with the retained usage; streaming finish
+  > and trailing usage do not permit final before the valid DONE sentinel.
 
-- [ ] **M2.5b — transport runner and final two native proofs.** Owner: transport proof worker;
-  files limited to `TransportRunner.cs`, `ProofTransport.cs`, `NativeProofs.cs` additions, and
-  proof tests. Implement `driver/timeout-cleanup-disposal` using a native adapter-final then
+  > NOTE: Accepted after root inspected SDK 8.0.425 retained gates: OpenAIChat 9/0/0
+  > (0.7232s, d745adcc), then whole unit 164/0/0 and Conformance harness compile with
+  > zero warnings/errors (0.87s, a1994df6), exit 0. Source and independent test reviews
+  > closed. Tests prove aggregate physical-chunk UTF-8 byte limits/no early final, exact
+  > sampling omission and usage identity, original redirect status mapping, blocked-read
+  > cancellation and actual response/stream cleanup. Production redirect disabling is
+  > source-inspected; synchronous and async cleanup IO both retain typed native causes.
+  > The first failed/stale-binary attempt is not evidence. Resume at M2.5b from committed
+  > checkpoint 86f96f3 plus the accepted held adapter/test/harness and plan files.
+
+- [x] **M2.5b — transport runner and final two native proofs.** Owner: transport proof worker;
+  files limited to `TransportRunner.cs`, `ScriptedHttpMessageHandler.cs`, transport projection
+  and comparison helpers, `ProofTransport.cs`, `NativeProofs.cs` additions, the minimal
+  `NativeRunner.cs` input/consumption extraction, and proof tests. Implement
+  `driver/timeout-cleanup-disposal` using a native adapter-final then
   blocked iterator cleanup whose actual entry timeout expires, and
   `driver/http-correction-byte-budget-reset` using original/correction raw bodies 78/74 under
   100 bytes, ordered linked capture/wire/HTTP evidence, and result `{age:7}` with repair 1.
@@ -675,8 +694,71 @@ verification both before execution and before output.
   stream-protocol error/no final; missing/surplus HTTP script is a harness error. **Gate:**
   `dotnet test AnyInfer.Conformance --no-restore --filter FullyQualifiedName~Transport`
   passes all six recipe dispatches and records nonempty ordinary evidence with exact recipe IDs.
+  > NOTE: The accepted integration map is
+  > `foundation-execution/csharp-http-integration-preparation`. Keep one raw-to-native
+  > `NativeRunner.ReadOperationRequest(request, route, consumeMode)` mapping and one actual
+  > consumption path. Generalize `NativeRun.Input` to the existing `FixtureInput` base so
+  > each run retains its original CoreFixtureInput or TransportFixtureInput reference;
+  > do not wrap/copy core input and break its established identity. A Conformance-only
+  > `NativeExecutionSetup` supplies actual client/clock/request plus adapter-neutral count
+  > callbacks to `RunPreparedAsync`. One owner serializes that extraction after M2.5a.
+  > Actual adapter-entry counts come from an explicit per-run recording adapter, separately
+  > from actual HTTP SendAsync counts. It binds each received WireRequest to the next
+  > recorded exchange; no ambient state or synthetic wire limit is used. Core HTTP advertises
+  > only prompt fallback (all native structured capabilities false), without a repair ceiling.
+  > Transport projection/comparison composes the existing native core observation and retains
+  > typed marker expansion only in core_http body.messages content. All other HTTP JSON stays
+  > literal. Script exhaustion or surplus remains a harness error.
 
-- [ ] **M2.5c — complete native execution.** Owner: conformance integration worker after M2.5a–b;
+  > NOTE: M2.5b authoring starts with disjoint ownership: c708 changes only NativeRunner.cs
+  > for the pinned extraction first; c16 adds TransportRunner.cs and its immutable raw carrier;
+  > cab adds ProofTransport.cs and the minimal NativeProofs exact final-two dispatch. Stable
+  > API handoffs precede comparison/report integration and independent Transport tests. No
+  > author changes library/core policy, frozen inputs, Git or plans; root grants each process
+  > gate after the relevant source/test snapshots are held.
+  > NOTE: The common comparison seam is CoreComparisonContext(CaseId, Expected,
+  > OriginalRequest) plus Comparison.CompareCore(context, NativeRun). The existing core
+  > Compare wrapper retains its entry point. Context request identity is bound to the actual
+  > core input or nested transport operation request. The shared typed-message expansion
+  > requires the actual captured entry/message and preserves existing schema/repair topology;
+  > only the core_http HTTP message-content path invokes it. c708 owns this Comparison
+  > extraction, new TransportProjection/TransportComparison, and minimal ReportWriter
+  > development dispatch after the saved runner carrier. Any existing Projection helper
+  > visibility change is minimal and preserves semantics. Independent tests retain all prior
+  > native controls and add transport/proof controls. Once integrated, available_subset is
+  > all-released-cases with derived 102 executable rows and zero unavailable; the output
+  > remains DEVELOPMENT/UNRELEASED under .tmp-tests and production reporting stays refused.
+  > NOTE: Transport review pins the direct outcome projection to terminal error when an
+  > actual terminal exists (prefix events stay raw), otherwise the actual events array,
+  > including an empty array permitted by the frozen schema. Expected both/neither branches
+  > are malformed. Typed usage/final.usage allow omission only of actual-null counters;
+  > only typed error.retry_after_s uses numeric-control equality. Other direct fields remain
+  > type-aware. HTTP exchange ordinals are zero-based [0,1]; native entry ordinals are
+  > one-based [1,2], bound by actual request references/index rather than equal numbers.
+  > Final-proof corrections require actual public-stream/schema suppression after cleanup
+  > failure, OCE/provider/sole-failed-attempt identity, source-text/preparation/injected-wire/
+  > second-body causality, and count-safe missing/surplus evidence handling before runtime.
+
+  > NOTE: The first compiled transport census is DEVELOPMENT only: 99 pass, one fail,
+  > two error, zero unavailable. Optional retry fields must use native RetryPolicy defaults;
+  > scripted response headers must reach the actual BCL response header collections. For
+  > the cleanup proof, the adapter finally begins during pending MoveNext before expiry,
+  > whereas the boundary cleanup_start marker records the later Dispose after that read
+  > faults. Observe native cleanup readiness with actual scope/token/reference and live
+  > before-expiry snapshots; then require expiry and the later boundary-disposal order.
+  > Do not relabel recorder events or loosen the proof without these native observations.
+  > Native DONE still yields Final; the schema's valid empty-events representation is a
+  > copied-carrier comparison test, not an invented native adapter execution outcome.
+  > NOTE: Accepted after bounded source/test closure and root-inspected SDK 8.0.425 gates:
+  > clean build, 15 focused Transport passes with zero failures/skips (3.0130s, retained
+  > ebaaed44). All eleven released transport fixtures and both final native proofs execute
+  > through actual C# adapters/captures. Header replay and unreturned-response disposal,
+  > optional native retry defaults, actual cleanup-before-expiry snapshots, numeric retry
+  > controls, and literal input identity are covered. The final custom 429 error oracle now
+  > retains its actual HTTP status rather than the original fixture's 503. Root whole-project
+  > and canonical/copied-root execution passed in cc11b834; M2.5c awaits the repository gate.
+
+- [x] **M2.5c — complete native execution.** Owner: conformance integration worker after M2.5a–b;
   files limited to conformance runner/report tests. Execute all 102 released cases, including
   actual excluded-feature admission before inference, all transport fixtures, fresh buffered
   mirrors, and every native proof. **Gate:**
@@ -684,6 +766,14 @@ verification both before execution and before output.
   `workspace check` remains green before a complete report candidate is permitted, with 102
   unique IDs, 102 pass, zero extension/fail/error. Normal conformance tests never publish;
   development/subset observations remain under `.tmp-tests`.
+  > NOTE: Accepted after root-inspected SDK 8.0.425 whole-project gates (cc11b834):
+  > AnyInfer.Tests 164/0/0; AnyInfer.Conformance 81/0/0 (9.9800s). Standalone canonical
+  > and copied selected-root executions each produced exactly 102 unique pass rows,
+  > zero fail/error/unavailable, under .tmp-tests with DEVELOPMENT/UNRELEASED status.
+  > The repository gate passed all 13 steps in 83.3s, exit 0 (8bd76aa8), with the
+  > documented scoped pytest cache. Frozen release and Python report hashes are unchanged.
+  > Final report/provenance, native CI, cross-language qualification and website/docs
+  > remain M2.G-owned; master M2.5 stays open until its final-report requirement is met.
 
 - [ ] **M2.Ga — clean compiled-code checkpoint and CI integration.** Owner: coordinator; no
   report output. Before implementation, re-read the current CI/workspace contract. The only
@@ -711,6 +801,22 @@ verification both before execution and before output.
   > NOTE: CI integration is deliberately deferred until the proof solution exists. The future
   > verified action pin and action input support are selected at implementation time, not guessed
   > in this plan.
+  > NOTE: Final-report/provenance code and no-write tests are authored in M2.Ga before
+  > its clean code checkpoint; M2.Gb executes that committed code only. Use dedicated
+  > AssemblyMetadata key AnyInferSourceRevision from full lowercase 40-hex SourceRevisionId.
+  > Publication anchors to the independently verified executable repository, never --root;
+  > selected roots are read-only inputs. Six passing driver rows use evidence =
+  > {recipe_ref, observations: actual proof evidence}; other passing rows use evidence:null.
+  > Validate the exact closed report-v0 shape before any canonical destination is created.
+  > Complete execution, provenance/clean-HEAD checks, second release verification, and final
+  > cancellation check precede a new-only owned same-directory staging file and no-replace
+  > atomic publication. Failures remove only that verified owned staging file.
+  > Dependency metadata merges resolved package entries from canonical driver and library
+  > assets, lowercases package IDs, rejects version conflicts, and sorts names by code point;
+  > project entries are excluded and runtime-library package dependencies must remain empty.
+  > Root verified setup-dotnet v6.0.0 at a98b56852c35b8e3190ac28c8c2271da59106c68
+  > from official tag/source; its action.yml declares global-json-file and node24. Use
+  > global-json-file:src/csharp/global.json with existing checkout/Python pins unchanged.
 
 - [ ] **M2.Gb — final native report production.** Owner: coordinator only. Keep no-write
   `FinalReport` xUnit tests for publication guards, but use the executable driver for production.
