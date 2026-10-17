@@ -169,9 +169,10 @@ python workspace.py demo     # launch the demo app
 `python workspace.py` with no arguments lists every verb. See
 [Contributing](https://anyinfer.dev/contributing/).
 
-Contributors can also run the bounded [C# core-generation proof](https://anyinfer.dev/contributing/csharp-proof/).
-It is repository verification infrastructure, not a supported AnyInfer SDK, integration API,
-registry-published package, or release artifact.
+Contributors can also run the bounded [C# core-generation proof](https://anyinfer.dev/contributing/csharp-proof/)
+and its [async SDK proof examples](https://anyinfer.dev/guides/csharp-sdk/). They are repository
+verification infrastructure, not a supported AnyInfer SDK, integration API, registry-published
+package, or release artifact.
 
 ## Compatibility surface
 

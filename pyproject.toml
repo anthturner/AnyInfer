@@ -108,8 +108,8 @@ packages = ["src/python/anyinfer", "src/python/anyinfer_demo"]
 
 [tool.hatch.build.targets.sdist]
 # The sdist is a Python source distribution: it can rebuild the wheel and carries supporting
-# tests, docs, and scripts. It is not a complete multi-language developer checkout; C# and
-# shard project manifests intentionally do not ship here.
+# tests, docs, and scripts. It is not a complete multi-language developer checkout; the
+# C# source files rendered by the documentation ship, while its projects and manifests do not.
 include = [
   "src/python/anyinfer",
   "src/python/anyinfer_demo",
@@ -119,6 +119,7 @@ include = [
   "scripts",
   "contracts",
   "fixtures",
+  "examples/csharp-sdk/*.cs",
   "mkdocs.yml",
   "workspace.py",
   "README.md",

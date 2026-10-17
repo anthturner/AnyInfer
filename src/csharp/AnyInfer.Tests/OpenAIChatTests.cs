@@ -129,7 +129,7 @@ public sealed class OpenAIChatTests
         var eof = new ScriptedHandler(Response(HttpStatusCode.OK, "text/event-stream", Sse("""{"choices":[{"delta":{"content":"partial"}}]}""")));
         await using var eofAdapter = Adapter(eof);
         var eofEvents = new List<AdapterEvent>();
-        var eofFailure = await Assert.ThrowsAsync<ProviderException>(async () =>
+        var eofFailure = await Assert.ThrowsAsync<StreamProtocolException>(async () =>
         {
             await foreach (var item in eofAdapter.GenerateAsync(Request(stream: true))) eofEvents.Add(item);
         });
@@ -144,7 +144,7 @@ public sealed class OpenAIChatTests
             "{not-json}")));
         await using var malformedAdapter = Adapter(malformed);
         var malformedEvents = new List<AdapterEvent>();
-        var malformedFailure = await Assert.ThrowsAsync<ProviderException>(async () =>
+        var malformedFailure = await Assert.ThrowsAsync<StreamProtocolException>(async () =>
         {
             await foreach (var item in malformedAdapter.GenerateAsync(Request(stream: true))) malformedEvents.Add(item);
         });
@@ -164,7 +164,7 @@ public sealed class OpenAIChatTests
         var overflow = new ScriptedHandler(Response(HttpStatusCode.OK, "text/event-stream", firstChunk, secondChunk));
         await using var overflowAdapter = Adapter(overflow);
         var overflowEvents = new List<AdapterEvent>();
-        var overflowFailure = await Assert.ThrowsAsync<ProviderException>(async () =>
+        var overflowFailure = await Assert.ThrowsAsync<StreamProtocolException>(async () =>
         {
             await foreach (var item in overflowAdapter.GenerateAsync(Request(stream: true, maxResponseBytes: 147))) overflowEvents.Add(item);
         });
@@ -180,7 +180,7 @@ public sealed class OpenAIChatTests
         var handler = new ScriptedHandler(Response(HttpStatusCode.ServiceUnavailable, "application/json", """{"error":{"message":"unavailable"}}"""));
         await using var adapter = Adapter(handler);
 
-        var failure = await Assert.ThrowsAsync<ProviderException>(() => Collect(adapter.GenerateAsync(Request(stream: true))));
+        var failure = await Assert.ThrowsAsync<ProviderUnavailableException>(() => Collect(adapter.GenerateAsync(Request(stream: true))));
 
         Assert.Equal("provider_unavailable", failure.Category);
         Assert.True(failure.Retryable);
@@ -219,7 +219,7 @@ public sealed class OpenAIChatTests
         var adapter = Adapter(handler);
         var events = new List<AdapterEvent>();
 
-        var failure = await Assert.ThrowsAsync<ProviderException>(async () =>
+        var failure = await Assert.ThrowsAsync<TransportException>(async () =>
         {
             await foreach (var item in adapter.GenerateAsync(Request(stream: true))) events.Add(item);
         });
@@ -249,7 +249,7 @@ public sealed class OpenAIChatTests
 
         Assert.True(await earlyEnumerator.MoveNextAsync());
         Assert.Equal("early", Assert.IsType<AdapterTextDelta>(earlyEnumerator.Current).Text);
-        var earlyFailure = await Assert.ThrowsAsync<ProviderException>(() => earlyEnumerator.DisposeAsync().AsTask());
+        var earlyFailure = await Assert.ThrowsAsync<TransportException>(() => earlyEnumerator.DisposeAsync().AsTask());
         Assert.Equal("transport", earlyFailure.Category);
         Assert.Equal("stream", earlyFailure.Phase);
         Assert.Same(earlyNative, earlyFailure.NativeInner);

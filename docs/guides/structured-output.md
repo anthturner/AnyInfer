@@ -3,30 +3,38 @@
 Pass a schema and `result.structured` comes back already validated against it, whichever
 [mechanism](../concepts/structured-output.md) the target supports:
 
-```python
-import anyinfer as ai
+=== "Python"
 
-REVIEW = {
-    "type": "object",
-    "properties": {
-        "sentiment": {"type": "string", "enum": ["positive", "neutral", "negative"]},
-        "score": {"type": "integer", "minimum": 1, "maximum": 5},
-        "themes": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["sentiment", "score", "themes"],
-    "additionalProperties": False,
-}
+    ```python
+    import anyinfer as ai
 
-result = client.generate(
-    "Analyze this review:\n" + review_text,
-    target="medium",
-    schema=REVIEW,
-    repair=ai.Repair(max_attempts=1),
-)
+    REVIEW = {
+        "type": "object",
+        "properties": {
+            "sentiment": {"type": "string", "enum": ["positive", "neutral", "negative"]},
+            "score": {"type": "integer", "minimum": 1, "maximum": 5},
+            "themes": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["sentiment", "score", "themes"],
+        "additionalProperties": False,
+    }
 
-analysis = result.structured  # already validated against REVIEW
-print(analysis["sentiment"], analysis["score"])
-```
+    result = client.generate(
+        "Analyze this review:\n" + review_text,
+        target="medium",
+        schema=REVIEW,
+        repair=ai.Repair(max_attempts=1),
+    )
+
+    analysis = result.structured  # already validated against REVIEW
+    print(analysis["sentiment"], analysis["score"])
+    ```
+
+=== "C# SDK proof"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/StructuredOutputExample.cs"
+    ```
 
 `repair=ai.Repair(max_attempts=1)` allows one corrective round trip against the same
 model before the call fails; see [repair](../concepts/structured-output.md#repair) for

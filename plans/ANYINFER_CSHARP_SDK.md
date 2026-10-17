@@ -73,7 +73,8 @@ an upstream contract claim without evidence, or pretending that unported feature
   `Client` is a facade with a lifetime-bound execution context and cannot fork orchestration.
 - Common call shapes need equivalent convenience overloads: prompt or messages, target or
   route, request objects, schema/repair/sampling, and per-call cancellation. Overload ambiguity
-  and explicit-vs-default precedence must have tests.
+  and explicit-vs-default precedence must have tests. A constructed route wins over target
+  when both are supplied, matching the actual Python client.
 
 ### SDK foundations
 
@@ -81,8 +82,10 @@ an upstream contract claim without evidence, or pretending that unported feature
   process, sidecar dependency, or official vendor SDK abstraction.
 - Provider descriptors and `ProviderSettings` own construction/configuration. The client
   owns cached adapter instances; aliases identify instances independently of engine IDs.
-  Custom adapters remain supported. Initial built-ins are deterministic fake and explicit
-  OpenAI-compatible chat; other existing Python providers follow the provider milestone.
+  Custom adapters remain supported. The first configured builtin is explicit
+  OpenAI-compatible chat, exercised with deterministic offline HTTP fixtures; other existing
+  Python providers follow the provider milestone. Python's core has no builtin `fake`
+  descriptor: its fake OpenAI server is testing infrastructure, not a provider identity.
 - Config stays JSON format version `1`, with its existing snake_case field spellings,
   precedence, size/UTF-8/type/duplicate rules and secret hygiene. Loading config is inert.
   Until a feature is implemented, a supplied active setting for it must fail with an
@@ -193,7 +196,7 @@ clearly label features still unavailable in C# and avoid showing future APIs as 
   event pattern in the same slice.
 - [x] **SDK.1c** Add prompt/message and target/route convenience overloads to `AsyncClient`
   over one request-normalization path; retain explicit request usage. Match Python's actual
-  defaults and explicit override precedence; validate conflicting target/route arguments.
+  defaults and explicit override precedence; validate argument shapes.
   `AsyncStream.Result` must throw an actionable `InvalidOperationException` until a successful
   terminal result exists, like Python's result property; internal observation can use a
   separate nullable accessor. Add `CollectAsync(CancellationToken)` to drain the same lazy
@@ -215,19 +218,28 @@ clearly label features still unavailable in C# and avoid showing future APIs as 
 
 ### SDK.2 — Provider settings, credentials and shared configuration
 
-- [ ] **SDK.2a** Introduce immutable `ProviderSettings`, `ProviderDescriptor`, public
+- [x] **SDK.2a** Introduce immutable `ProviderSettings`, `ProviderDescriptor`, public
   collision-safe `ProviderRegistry`, setup metadata, canonical provider/instance identity and
   lazy lifetime-owned adapter construction. Reference `_client/providers.py`, `registry.py`,
-  `providers/base.py`; keep low-level custom registration available. Add fake and existing
-  OpenAI-compatible built-ins through descriptors, with injectable handler tests. Gate:
+  `providers/base.py`; keep low-level custom registration available. Add the existing
+  OpenAI-compatible builtin through descriptors, with injectable fake HTTP handler tests. Gate:
   duplicate/alias/laziness/concurrency/disposal/unknown-provider tests and real fake HTTP calls.
-- [ ] **SDK.2b** Implement `Credentials` resolver interfaces/chain, env/literal/custom forms,
+  > NOTE: Initial settings/metadata/pool source and independent public tests are saved.
+  > Accepted after bounded source/lifetime reviews and the full 18-step workspace gate:
+  > SDK 8.0.425, 222 native unit tests and 93 conformance tests passed. Lazy construction,
+  > alias binding, cancellation/waiter ownership and disposal use actual native controls.
+- [x] **SDK.2b** Implement `Credentials` resolver interfaces/chain, env/literal/custom forms,
   redaction registry and bounded diagnostic snapshots. Reference `credentials/`, `redaction.py`,
   `errors.py`. Add structured C# configuration/credential/auth/rate-limit/transport/protocol
   error types with preserved native-inner/cancellation semantics. Gate: planted secrets never
   appear in errors, object string representations, telemetry or failed-config output; missing
   credentials cause no dispatch and external cancellation still propagates.
-- [ ] **SDK.2c** Add inert `AnyInferConfig` load/loads/dump/dumps equivalents under `Config`,
+  > NOTE: Corrected source review closed typed classification, Unicode scalar bounds,
+  > Python/.NET JSON redaction forms, exact schemes and meaningful safe snapshots.
+  > Independent native tests passed, including original cancellation/native-inner identity,
+  > scalar redaction bounds, error classification and safe diagnostic snapshots. Platform
+  > keyring integration and credential refresh remain explicitly outside this slice.
+- [x] **SDK.2c** Add inert `AnyInferConfig` load/loads/dump/dumps equivalents under `Config`,
   with shared format v1 JSON spelling and explicit unsupported-setting handling. Reference
   `config/__init__.py`, `config/`, schema and Python configuration tests. Implement providers,
   headers/options, default route/retry/repair and descriptor field validation first; handle
@@ -237,12 +249,301 @@ clearly label features still unavailable in C# and avoid showing future APIs as 
   real client path: load/loads/dump/dumps, client construction and unadvanced stream creation
   must leave all counts at zero. A positive actual iteration must increment those same spies,
   proving that the inertness test did not merely observe disconnected doubles.
-- [ ] **SDK.2d** Connect settings/config to `AsyncClient` defaults and instance pools. Keep
+  > Accepted with the supported active v1 subset and explicit refusal of unimplemented
+  > policies. Connected parse/serialize/client/stream controls and bounded file/error tests
+  > passed; no full Python configuration or connection-policy parity is claimed.
+- [x] **SDK.2d** Connect settings/config to `AsyncClient` defaults and instance pools. Keep
   file I/O outside client construction unless a caller explicitly invokes the config loader.
   Gate: one equivalent Python/C# configured generation app runs against local fake servers,
   including credential references, instance aliases, repair, fallback and cleanup.
   Include the positive iteration control for resolver/factory/transport counts and assert
   lazy cancellation/configuration failures occur before any unintended HTTP dispatch.
+  > The shared input-only configured generation app passed independently in Python and
+  > C#: two primary failures, fallback, invalid backup response, schema correction, final
+  > result/usage and owned resource cleanup. Both replay the same raw HTTP response bytes.
+
+#### SDK.2 implementation contract
+
+> NOTE: Python source inspection corrected two illustrative assumptions: no core `fake`
+> descriptor exists, and `default_route` serializes only a target list, never a retry block.
+> Use native fake HTTP fixtures and preserve the shared JSON shape. This changes no frozen
+> case, Python behavior or user scope. SDK.1 checkpoint: `c40fbba1369866960599e193041d8ffc6b37f860`.
+> A further source audit corrects SDK.1's both-arguments rejection: Python honours an explicit
+> Route over target. SDK.2 must migrate the convenience-call oracle and inherit client policy
+> for a target override; the earlier checkpoint's stricter provisional rule is not parity.
+
+The following contracts settle routine implementation choices for SDK.2. Source owners
+must report a real conflict rather than silently changing a dependent public signature.
+
+**Public construction and metadata (SDK.2a/2d)**
+
+- `ProviderSettings` lives in root `AnyInfer`, with constructor arguments in this order:
+  `string providerId, string? baseUrl = null, string? apiKey = null,
+  string? apiVersion = null, IReadOnlyDictionary<string,string>? headers = null,
+  JsonObject? options = null, double timeoutS = 120,
+  HttpMessageHandler? transport = null, string? alias = null`.
+  Provide matching readonly PascalCase properties, `InstanceId`, and `Of` with the same
+  arguments. Normalize provider/alias IDs by trim, invariant lowercase and underscore to
+  hyphen. Reject blank IDs/aliases and nonpositive/nonfinite timeout. Copy dictionaries;
+  tagged JSON values are already immutable. Safe `ToString` never includes credential,
+  header or option values. `Transport` is an explicit nonserialized test seam, like Python;
+  the caller owns it until a successfully constructed adapter adopts it. Never instantiate
+  a handler during parsing/client construction just to prove laziness.
+- In `AnyInfer.Providers`, `ProviderConfig` carries resolved adapter-facing settings:
+  `ProviderId` (the instance identity), `EngineId`, `BaseUrl`, resolved `ApiKey`, `ApiVersion`,
+  immutable `Headers`/`Options`, `TimeoutS`, `Transport`. Its public constructor accepts
+  `ProviderSettings settings, string engineId, string? resolvedApiKey,
+  JsonObject? resolvedOptions = null`; safe `ToString` excludes all values above.
+- `ProviderDescriptor(string id, string displayName,
+  Func<ProviderConfig,CancellationToken,ValueTask<IProviderAdapter>> factory,
+  IEnumerable<string>? aliases = null, ProviderSetupSpec? setup = null,
+  string? defaultBaseUrl = null, bool requiresBaseUrl = false,
+  IReadOnlyDictionary<string,StructuredOutputProfile>? modelCapabilities = null,
+  int? maxRepairAttempts = null)` defensively copies metadata. Public properties use
+  `Id`, `DisplayName`, `Factory`, `Aliases`, `Setup`, `DefaultBaseUrl`, `RequiresBaseUrl`,
+  `ModelCapabilities`, `MaxRepairAttempts`. Capabilities remain honest v0 subsets here;
+  broader provenance/operations follow SDK.4/6/8.
+- `SetupField(string key, string label, string kind = "text", bool required = false,
+  string? helpText = null, string? placeholder = null, string? envVar = null,
+  bool advanced = false, string? defaultValue = null, IEnumerable<string>? choices = null)` and
+  `ProviderSetupSpec(IEnumerable<SetupField>? fields = null,
+  string modelSelection = "manual-only")` are immutable declarative metadata. Reject
+  duplicate field keys, invalid kinds and contradictory required/advanced/default facts.
+  Use Python's actual kind spellings and choice invariants from registry.py, never `select`
+  as a new JSON/setup dialect; no callback runs for validation.
+  Secret setup options are resolved through the same central chain before factory use.
+- `ProviderRegistry(IEnumerable<ProviderDescriptor>? descriptors = null)` is a descriptor
+  registry, not a client pool. Expose `Register`, `Get`, `Has`, `Descriptors`,
+  `NormalizeProviderId`, and static `CreateDefault()`. Canonical IDs and aliases share one
+  collision namespace. Register atomically or fail without partial alias installation.
+  A client snapshots descriptors, so later registry mutation cannot alter existing clients.
+- The default registry initially contains only `openai-compat`, aliases
+  `openai-compatible`/`oai-compat`, no default URL, required `base_url`, optional secret
+  `api_key`, manual model selection, and no claimed structured capabilities/repair ceiling.
+  Supplied `api_version` or unsupported construction options fail clearly for this builtin;
+  custom descriptor factories may support their own declared settings. No provider-specific
+  `if` chain in the core or config parser. No catalog alias or other provider is invented.
+- The configured OpenAI-compatible path uses the provided API base exactly, appending only
+  `/chat/completions`; `/v1` belongs to the caller's base URL, not a heuristic. Existing
+  frozen fixtures already supply `/v1` and stay unchanged. Require an absolute HTTP(S) base
+  without userinfo/query/fragment in this bounded builtin. Optional API key means omit auth;
+  nonempty resolved key means bearer auth. Case-insensitive custom headers override defaults,
+  including Authorization and Content-Type, matching Python. Header/type validation happens
+  without logging values; real errors attribute `Provider` to the configured instance ID.
+  Preserve raw-byte caps, incremental SSE/DONE, narrow native exception mapping and cleanup.
+- Main public client constructor:
+  `AsyncClient(IEnumerable<ProviderSettings>? providers = null,
+  ProviderRegistry? registry = null, ResolverChain? resolver = null,
+  Route? route = null, Repair? repair = null)`.
+  `AsyncClient.FromAdapters(IEnumerable<ProviderRegistration> providers)` preserves the
+  public low-level custom-adapter entry point. Keep only the existing **two-argument**
+  internal registration/clock constructor for frozen execution; migrate all one-argument
+  registration callers, including the package consumer and public migration tests, to
+  `FromAdapters` in this checkpoint. Do not introduce ambiguous `new AsyncClient([])`
+  overloads. `AsyncClient.FromConfig(AnyInferConfig config, ProviderRegistry? registry = null,
+  ResolverChain? resolver = null)` forwards its providers/route/repair without I/O.
+- A constructed per-call Route wins, including when target is supplied. Otherwise a target
+  replaces only targets and inherits the client's Retry/HealthGate/HealthTtlS; otherwise use
+  the default route. Missing all three is a configuration error during StreamAsync call
+  construction, matching Python's eager request coercion. Explicit `Repair(0)` disables a
+  client repair default; nullable repair inherits.
+  Explicit typed request routes remain authoritative. Keep one normalized execution path.
+
+**Lazy pool and ownership (SDK.2a/2d)**
+
+- Rename internal `Core.ProviderRegistry` to `ProviderPool` to disambiguate the public
+  descriptor registry. Preserve a prebuilt-registration mode for frozen callers.
+- Configured instance IDs are normalized alias or provider ID. Reject duplicate instance
+  IDs and an instance alias that shadows any registered engine/descriptor alias. Same-engine
+  distinct instances have separate credentials, adapters and health identity. Explicit
+  `instance:model` keeps `ResolvedTarget.ViaAlias == null`; catalog provenance comes later.
+  Parse at the first colon and preserve the current explicit-target model trim/suffix.
+  Resolve descriptor spelling **before** indexing settings: without a distinct explicit
+  instance alias, the key is the canonical descriptor ID. Thus settings supplied as
+  `oai-compat` retain their base URL/credentials when targeted as `openai-compat`, and two
+  such spellings cannot configure the same engine twice. Preserve an explicit distinct
+  instance alias; an alias equal to its own canonical engine is the no-alias case.
+  ProviderSettings.InstanceId itself is the normalized declarative spelling, like Python;
+  the pool's canonical bound settings/ProviderConfig/ResolvedTarget carry execution identity.
+  This deliberately avoids Python's observed engine-alias settings-loss edge, rather than
+  duplicating that bug. Add a causal alias-spelled-settings/base-URL-survival test.
+  Reject reuse of one non-null Transport handler reference by multiple configured instances
+  at construction, before adopting any handler; no shared-handler lease is promised.
+- Descriptor lookup/default settings are inert. A known unconfigured engine can use default
+  settings lazily, like Python; a required missing base URL fails only when reached. Invalid
+  duplicate/collision metadata can fail during construction without invoking user factories.
+- Separate target resolution from adapter construction so deduplication and health skips
+  never create unused adapters. Await the adapter only for an actual selected attempt,
+  before `AdapterInvocationBoundary` creates a native entry. Missing credentials/config
+  produce no fabricated adapter call/capture entry/HTTP send.
+- Per-instance async gates serialize first construction. Do not share a `Lazy<Task>` bound
+  to the first caller's cancellation or detach background factory tasks. The gate owner
+  awaits the factory with linked caller/client-lifetime cancellation; failed/cancelled builds
+  are not cached. A waiting uncancelled caller can build after the owner releases. A
+  cooperative factory cancelled by client disposal must be joined; an adapter returned
+  despite cancellation is disposed without adoption. No semaphore disposal races.
+  A waiter's gate wait uses **its own** caller/client-lifetime token: cancelling that waiter
+  detaches only that wait and cannot cancel, adopt, dispose or poison another caller's
+  construction. Add readiness-gated tests for blocked owner plus cancelled waiter (owner
+  succeeds/cache remains), and cancelled owner plus uncancelled waiter (fresh build succeeds).
+- Client disposal first signals lifetime cancellation, closes/joins active streams/builds,
+  then disposes each adopted adapter exactly once by reference identity. Construction after
+  closing is rejected. Unused settings do not fabricate resources or assume ownership of
+  an unadopted external handler. A custom factory owns cleanup of resources it creates if
+  it throws before returning; the builtin cleans its own partial-construction failures.
+- Preserve timeout override presence through request normalization. Choose actual per-entry
+  `request.TimeoutS ?? settings.TimeoutS ?? 120` before the entry boundary is created.
+  Keep the existing 1 MiB default response cap and explicit request override; do not invent
+  a ProviderSettings response-cap field absent from Python. Retries and correction entries
+  get fresh existing per-entry limits. Frozen prebuilt mode keeps prior limits/error fields.
+
+**Credentials, redaction and errors (SDK.2b)**
+
+- `AnyInfer.Credentials.ICredentialResolver` exposes `bool Handles(string reference)` and
+  `ValueTask<string> ResolveAsync(string reference, CancellationToken cancellationToken = default)`.
+  `Handles` is a side-effect-free scheme query; resolution is async-first for native vaults.
+  `ResolverChain(IEnumerable<ICredentialResolver> resolvers)` exposes `Handles`, thread-safe
+  `Add(resolver, bool first = true)`, `ResolveAsync(string? reference, CancellationToken = default)`
+  returning `ValueTask<string?>`, and `CreateDefault()`. The chain centrally registers every
+  returned secret before factory/diagnostic use. Its default order is keyring, env, literal;
+  explicit custom resolvers can precede these. No assembly/plugin discovery in this slice.
+- `EnvResolver`, `LiteralResolver`, `KeyringResolver` implement that interface. Empty/blank
+  reference means null; trim the reference like Python. Missing/empty env and unhandled URI
+  schemes raise `CredentialException`; they never become a bearer token. Keyring recognizes
+  `credential://` but raises an actionable unavailable-in-this-build exception until SDK.11b.
+  Caller cancellation and existing `AnyInferException` propagate without remapping a native
+  cancellation into configuration/provider failure. No credential TTL/refresh API yet;
+  record it as outstanding parity work rather than claiming cache semantics implement it.
+- Root `RedactionRegistry` has `Register`, `Redact`, `Count`, `Clear`; root static `Redaction`
+  exposes process-global `Registry`, `RegisterSecret`, `Redact`. Thread-safe longest-first
+  exact replacement uses `[redacted]`, minimum length six Unicode scalar values,
+  raw/JSON escaped/percent/plus/
+  base64/colon-basic/base64url forms from Python `redaction.py`. Do not globally redact
+  generation text; sanitize library diagnostics/snapshots and secret-bearing object repr.
+- Preserve the existing base exception constructor/fields and `NativeInner` identity.
+  Make `ProviderException` extensible. Add `ConfigException`, `CredentialException`,
+  `AuthException`, `RateLimitException`, `ModelNotFoundException`, `ContextLengthException`,
+  `TransportException`, `StreamProtocolException`, `ProviderUnavailableException` and
+  `UnsupportedInputException` with shallow semantic inheritance. Config/credential default
+  to phase configure; provider subclasses preserve category/retry/status/phase facts.
+  A central internal classifier may map existing native categories, including timeout as a
+  transport subtype, without changing released JSON observations. Do not catch arbitrary
+  fatal/native exceptions or lose caller OCE identity to obtain a nicer class name.
+  Config/Credential constructors take `string message, string? provider = null,
+  string? detail = null, string? hint = null, Exception? nativeInner = null`.
+  Provider subtype constructors take `string message, string? provider = null,
+  string? phase = null, bool? retryable = null, double? retryAfterS = null,
+  int? httpStatus = null, string? detail = null, string? hint = null,
+  Exception? nativeInner = null`; omitted phase/retry use their Python semantic defaults.
+  Credential owner supplies `internal static ProviderException Create(...)` on ProviderException
+  with the existing full base-constructor signature for runtime/adapter classification;
+  its category/status/native-inner arguments remain authoritative, including timeout.
+- Library-created messages/details pass redaction; detail is bounded to 512 Unicode scalar values,
+  hints are redacted, exception ToString redacts the rendered native chain. `Snapshot()`
+  returns immutable `ErrorInfo(TypeName, Provider, Phase, Retryable, HttpStatus, Detail)`
+  using bounded/redacted `Detail ?? Message`; the legacy Detail property retains null when
+  absent. Provider/Phase/Category diagnostic fields are redacted while preserving nulls.
+  The snapshot carries no exception/credential object. An explicitly accessed NativeInner remains
+  the original native exception, not a claim that third-party exceptions can be rewritten.
+  Settings/ProviderConfig/AnyInferConfig ToString never dumps credentials, headers/options.
+
+**Configuration (SDK.2c)**
+
+- `AnyInfer.Config.AnyInferConfig(IEnumerable<ProviderSettings>? providers = null,
+  Route? route = null, Repair? repair = null, int formatVersion = 1)` exposes copied
+  `Providers`, `Route`, `Repair`, `FormatVersion`. Static `Loads(string text,
+  ProviderRegistry? registry = null, ResolverChain? resolver = null, string source = "<string>")`
+  and `Load(string path, ProviderRegistry? registry = null, ResolverChain? resolver = null)`;
+  instance `Dumps(bool comments = false)` and `Dump(string path, bool force = false)`.
+  Load is explicit caller-requested file I/O; client construction never opens a config path.
+- Strict UTF-8 and at most 1 MiB (bound file reads before whole-file allocation); JSON root
+  object; format_version absent defaults to integer 1, bool/float/other versions fail.
+  Preserve Python's ordinary JSON last-property-wins behavior, including duplicate object
+  keys; reject duplicate normalized **provider instances**, not a new JSON dialect.
+- Supported active root keys: `providers`, `default_route`, `repair`, `format_version`.
+  `_comment` and Python's five demo-owned keys are accepted and ignored without invented
+  type checks. Known unimplemented active blocks (`operation_routes`, `context`, `history`,
+  `cache`, `observers`, `arena`, `arenas`, `mcp`) raise actionable unsupported configuration
+  errors when supplied; unknown keys fail. Do not emit or silently apply future policies.
+- Provider `enabled` defaults true and must be bool; false skips the entire entry before
+  id/engine/setup/unknown-field processing, like Python. Active id must be nonblank.
+  Engine is adapter, legacy provider_id, or id; explicit adapter/provider_id conflicts fail;
+  alias must normalize equal to id. Use actual Python truthiness/empty/null rules from
+  `_parse_provider`, not guessed aliases. Resolve descriptor metadata only, never its factory.
+- `values`/`options` null normalize to empty objects. Allowed values keys are declared setup
+  fields plus base_url/api_key/api_version. Root direct fields override values, including
+  explicit null/empty suppression. Explicit options win over promoted non-direct setup
+  fields. Headers are string maps, timeout positive finite numeric (not bool). Unknown root
+  provider/values fields fail with a bounded path-only diagnostic, never dump input values.
+  Recognize but explicitly refuse supplied active limits/proxy/CA/mTLS policies in this
+  initial slice; default verify:true and null absent-equivalent connection values may remain
+  inert exactly as the Python loader normalizes them. Do not claim connection parity yet.
+- Validate credential-reference schemes using side-effect-free Handles only; never call
+  ResolveAsync. Builtin env/keyring references are syntactically accepted; an unknown scheme
+  needs an explicitly supplied handler or is rejected. Never inspect the environment during
+  parsing. An explicitly requested Dumps/Dump preserves literal credentials and references
+  verbatim, as Python does; safe repr/errors must not conflate serialization with logging.
+- default_route is null/empty array for none or an ordered nonempty-string list -> Route.
+  There is no JSON retry block. repair is null for absent or a closed object max_attempts
+  with Python's integer/nonnegative rules. Preserve presence of an explicit default repair
+  block. Runtime custom retry/health policy is passed to AsyncClient; Dumps must explicitly
+  refuse a programmatically supplied nondefault route policy instead of silently losing it.
+- Dumps emits canonical shared provider identity/adapter/direct/header/options/timeout fields,
+  two-space indented UTF-8 text ending newline; comments uses root _comment, never JSONC.
+  Dump uses CreateNew unless force and never creates parent directories. Classify known
+  JSON/UTF-8/config-file failures as bounded ConfigException, preserving native inner facts;
+  no broad exception catch over custom callbacks/cancellation/fatal failures.
+
+**Ownership and acceptance sequence**
+
+- [x] **SDK.2 foundation wave:** runtime owner c708 owns ProviderSettings, Providers metadata/
+  OpenAI adapter, Core pool/default integration and existing native callers; credential owner
+  c16 owns Credentials/, Redaction.cs, Errors.cs, and package consumer migration. Independent
+  tests owner 04f owns new ProviderSettingsTests/CredentialsTests plus its existing
+  SdkMigrationTests FromAdapters migration. No shared plan lease while another owner edits.
+  Gate: saved signatures agree, cold source/test reviews, guarded solution build and focused
+  settings/credential/migration tests, then all frozen conformance and package consumer.
+- [x] **SDK.2 configuration wave:** after the foundation handoff, c16 owns Config/; 04f owns
+  ConfigTests and connected configured-app/lifetime tests. Add language-neutral JSON input
+  controls separately from the frozen release corpus; native Python and C# each observe
+  actual parsed configuration/generation. Do not use expected data to drive either runtime.
+  Gate: shared subset round-trips, same connected spies prove zero parse/construct/unadvanced
+  work and positive actual HTTP dispatch, cancellation/disposal/secret negatives pass.
+  Use shared input-only `tests/fixtures/sdk-configuration-v1/configured-generation.json`
+  (configuration, request/schema and per-instance raw HTTP scripts; no expected verdict).
+  c16 owns that fixture and native Python `tests/test_sdk_configuration_parity.py`; 04f
+  consumes it independently in ConfigTests.cs. Both must observe the same configured
+  primary-failure/fallback/repair flow and resource closure without invoking the other runtime.
+  > NOTE: Config review confirmed Python defers declared choice/generic secret-option
+  > validation to use; only direct api_key reference admission belongs at parse time.
+  > The first compile-only solution check used SDK 8.0.425 and stopped at five compiler
+  > errors (nullable category and adapter yielding-catch/static context); no tests ran.
+  > Owners have exact correction briefs. File reads remain bounded before allocation,
+  > and arbitrary custom Handles faults must retain their original exception identity.
+  > The corrected source has clean bounded reviews; native execution is still pending.
+  > The first Python configured-app run stopped before generation on a test oracle:
+  > default `Repair(1)` serializes as a present empty object. Correct that oracle and replay
+  > real raw SSE response bytes for the streaming app in both runtimes before rerunning.
+  > Those stimulus/oracle changes are saved. Whole-solution compilation found three
+  > remaining direct-registration caller migrations; the exact internal-clock/public
+  > FromAdapters fixes are saved, pending the next guarded solution build.
+  > Final acceptance supersedes the intermediate failures above: the corrected solution
+  > and complete native tests passed. Root inspected the 96.0s full workspace log
+  > (`ab758585-c1eb-41eb-9cd4-79f666dd6ce9`): all 18 steps passed, including strict site
+  > build, 222 native unit tests, 93 conformance tests, isolated NuGet consumption and six
+  > executable example methods. Seven rendered C# blocks across six pages exactly match
+  > their compiled source. Frozen release/report SHA-256 values remain unchanged.
+- [ ] **SDK.2 checkpoint:** update achieved syntax/docs, inventory limitations and exact
+  execution evidence; root full workspace gate, commit explicit paths and repack clean
+  revision. Update resume to SDK.3 only when SDK.2a–2d and these nested gates actually pass.
+  > NOTE: Pull forward the implemented async portion of SDK.3b for this checkpoint:
+  > source-controlled public examples under `examples/csharp-sdk/`, included verbatim by
+  > MkDocs snippets in C# SDK/porting/reference pages and common-task language tabs. A
+  > dedicated net8 executable invokes those same methods against offline HTTP stimuli;
+  > append its execution to the SDK-pinned C# workspace phase (18 total workspace steps).
+  > Keep package consumption as a separate existing check. Python source distributions
+  > carry only the displayed `.cs` files for docs rendering, not a .NET developer checkout.
+  > SDK.3b stays open for sync syntax and complete first-milestone documentation.
 
 ### SDK.3 — Sync facade and first SDK migration milestone
 
@@ -400,9 +701,10 @@ clearly label features still unavailable in C# and avoid showing future APIs as 
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.2a–SDK.2d**, beginning with the provider/configuration/credential
-API and ownership contract. SDK.1 passed the full 17-step workspace gate on 2026-10-17
+Current resume point: **SDK.2 checkpoint**, with SDK.2a–2d accepted by the full 18-step
+workspace gate; explicit source commit and clean-revision package qualification remain.
+SDK.1 passed the full 17-step workspace gate on 2026-10-17
 (172 unit tests, 93 conformance tests including the all-102 development run, and an isolated
-NuGet consumer). Checkpoint the explicit SDK.1 paths, then repack from that committed
-revision before starting the next implementation wave. Keep source ownership disjoint
+NuGet consumer), was committed as `c40fbba1369866960599e193041d8ffc6b37f860`, and its clean
+revision package-only consumer passed. Keep source ownership disjoint
 and serialize compilation; publish no updated conformance report from a dirty working tree.

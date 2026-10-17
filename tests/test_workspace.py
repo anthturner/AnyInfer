@@ -193,6 +193,17 @@ class TestVerbs:
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_package.py")],
                 ROOT,
             ),
+            (
+                [
+                    "dotnet",
+                    "run",
+                    "--project",
+                    "../../examples/csharp-sdk/AnyInfer.Examples.csproj",
+                    "--configuration",
+                    "Release",
+                ],
+                ROOT / "src" / "csharp",
+            ),
         ]
 
     def test_check_only_csharp_refuses_without_the_pinned_sdk(self, monkeypatch, capsys):
@@ -329,10 +340,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The ten default phases comprise seventeen steps — fifteen subprocesses plus the two
+        # The ten default phases comprise eighteen steps — sixteen subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
-        # (contracts and conformance have two steps each, docs-check three, C# four).
-        assert len(calls) == 17
+        # (contracts and conformance have two steps each, docs-check three, C# five).
+        assert len(calls) == 18
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

@@ -9,7 +9,7 @@ internal sealed record NormalizedRequest(
     Sampling Sampling,
     JsonValue? Schema,
     int RepairBudget,
-    double TimeoutS,
+    double? TimeoutS,
     int MaxResponseBytes,
     bool Stream);
 
@@ -40,7 +40,7 @@ internal static class RequestNormalizer
             normalizedSampling,
             request.Schema,
             Math.Max(0, request.Repair?.MaxAttempts ?? 0),
-            request.TimeoutS ?? 120,
+            request.TimeoutS,
             request.MaxResponseBytes ?? 1_048_576,
             request.Stream);
     }
@@ -73,7 +73,7 @@ internal static class RequestNormalizer
             normalized.Schema,
             mechanism,
             normalized.Stream,
-            normalized.TimeoutS,
+            normalized.TimeoutS ?? resolved.Settings.TimeoutS,
             normalized.MaxResponseBytes);
     }
 

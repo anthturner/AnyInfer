@@ -261,7 +261,7 @@ internal static class NativeProofs
     }
 
     private static AsyncClient CreateClient(IProviderAdapter adapter) =>
-        new([new ProviderRegistration("proof", adapter)]);
+        AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
 
     private static GenerationRequest CreateRequest(string marker, JsonValue? schema, Repair? repair = null) =>
         new(

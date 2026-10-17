@@ -18,8 +18,8 @@ workspace check                            # the gate: everything, plus lint/typ
 
 `workspace check` also runs the bounded C# core-generation proof. It uses the SDK pinned by
 `src/csharp/global.json`, restores and tests `src/csharp/AnyInfer.sln`, then validates a local
-prerelease package without publishing it or writing a canonical report. The Python fast track
-remains `workspace test`.
+prerelease package without publishing it or writing a canonical report, then runs its offline
+async SDK proof examples. The Python fast track remains `workspace test`.
 
 [C# core-generation proof](csharp-proof.md) gives the exact native commands and explains why
 normal test runs do not produce a qualified report.

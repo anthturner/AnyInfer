@@ -44,9 +44,10 @@ AnyInfer provides a provider-independent inference runtime for Python applicatio
 span hosted providers and local models, as well as an OpenAI-compatible sidecar for
 everything that is not Python.
 
-Contributors can also inspect the bounded [C# core-generation proof](contributing/csharp-proof.md).
-It verifies shared behavior inside this repository and does not add a supported C# SDK or
-installation path. Local prerelease package validation does not publish a package.
+Contributors can also inspect the bounded [C# core-generation proof](contributing/csharp-proof.md)
+and its [async SDK proof examples](guides/csharp-sdk.md). They verify shared behavior inside this
+repository and do not add a supported C# SDK or installation path. Local prerelease package
+validation does not publish a package.
 
 ## Install
 

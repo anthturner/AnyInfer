@@ -778,7 +778,7 @@ public sealed class RoutingTests
     }
 
     private static AsyncClient Client(IEnumerable<ProviderRegistration> providers, IOperationClock? clock = null) =>
-        clock is null ? new AsyncClient(providers) : new AsyncClient(providers, clock);
+        clock is null ? AsyncClient.FromAdapters(providers) : new AsyncClient(providers, clock);
 
     private static AsyncClient Client(params ProviderRegistration[] providers) => Client((IEnumerable<ProviderRegistration>)providers);
 

@@ -196,7 +196,7 @@ using AnyInfer.Providers;
 
 var adapter = new DemoAdapter();
 {
-    await using var client = new AsyncClient([new ProviderRegistration("demo", adapter)]);
+    await using var client = AsyncClient.FromAdapters([new ProviderRegistration("demo", adapter)]);
     var messages = new[] { new Message("user", [new Text("hello")]) };
     var buffered = await client.GenerateAsync(messages, target: "demo:model");
     if (buffered.Text != "buffered")

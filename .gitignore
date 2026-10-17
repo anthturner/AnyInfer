@@ -44,3 +44,5 @@ Thumbs.db
 src/csharp/**/bin/
 src/csharp/**/obj/
 src/csharp/**/TestResults/
+examples/csharp-sdk/bin/
+examples/csharp-sdk/obj/

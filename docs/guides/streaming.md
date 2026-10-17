@@ -41,6 +41,12 @@ frontend needs; the full event vocabulary is in the [API reference](../reference
             )
     ```
 
+=== "C# SDK proof"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/StreamingExample.cs"
+    ```
+
 ## Use the Context Manager
 
 Leaving the block early cancels the in-flight request. Without it, an abandoned stream keeps

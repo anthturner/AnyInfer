@@ -185,9 +185,11 @@ def test_external_consumer_uses_sdk1_public_vocabulary(tmp_path: Path) -> None:
 
     source = (consumer / "Program.cs").read_text(encoding="utf-8")
     assert 'new Text("hello")' in source
+    assert 'AsyncClient.FromAdapters([new ProviderRegistration("demo", adapter)])' in source
     assert 'GenerateAsync(messages, target: "demo:model")' in source
     assert 'StreamAsync("hello", target: "demo:model")' in source
     assert "TextDelta delta" in source
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source
     assert "GenerationResult" not in source
+    assert "new AsyncClient(" not in source

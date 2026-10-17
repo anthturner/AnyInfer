@@ -90,6 +90,9 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight
   - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: .
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -127,6 +130,8 @@ nav:
       - Shared Configuration: reference/configuration.md
       - Surfaces:
           - Integrate the Python SDK: guides/python-sdk.md
+          - C# SDK (prerelease): guides/csharp-sdk.md
+          - Move from Python to C# SDK (prerelease): guides/python-to-csharp.md
           - Run a Prompt from the Shell: guides/cli.md
           - OpenAI-Compatible Sidecar: serve/README.md
           - Running the Sidecar as a Service: serve/running-as-a-service.md
@@ -203,6 +208,7 @@ nav:
       - OpenAI-Compatible: providers/openai-compat.md
   - Reference:
       - reference/README.md
+      - C# SDK (prerelease) Reference: reference/csharp-sdk.md
       - SDK Reference:
           - reference/api/README.md
           - Clients and Streams: reference/api/client.md

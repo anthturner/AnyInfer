@@ -86,7 +86,7 @@ internal static class ProofTimeouts
                 ProofStep.Success("{\"age\":7}"),
             ]);
             var capture = new OperationCapture();
-            await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
+            await using var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
             var schema = PersonSchema();
             var request = new GenerationRequest(
                 [new Message("user", [new Text("Give me a person.")])],
@@ -154,7 +154,7 @@ internal static class ProofTimeouts
     {
         var adapter = new ProofAdapter([ProofStep.Success("ok")]);
         var capture = new OperationCapture();
-        await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
         try
         {
             var result = await client.GenerateAsync(new GenerationRequest([new Message("user", [new Text("proof")])], new Route([$"proof:{model}"], new Retry(MaxAttempts: 1)), timeoutS: timeoutS, maxResponseBytes: maxResponseBytes), capture, cancellationToken).ConfigureAwait(false);
@@ -167,7 +167,7 @@ internal static class ProofTimeouts
     {
         var adapter = new ProofAdapter([ProofStep.WaitForCancellation()]);
         var capture = new OperationCapture();
-        await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
         var request = new GenerationRequest([new Message("user", [new Text("proof")])], new Route(["proof:timeout"], new Retry(MaxAttempts: 1)), timeoutS: 0.05, maxResponseBytes: 80);
         var execution = client.GenerateAsync(request, capture, cancellationToken);
         try { await adapter.Ready.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false); }

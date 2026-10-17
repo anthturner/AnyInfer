@@ -121,7 +121,7 @@ public sealed class TransportTests : IDisposable
         var overflowFixture = Fixture(assets, "transport/openai-chat/raw-byte-cap-multibyte-utf8");
         var overflow = await TransportRunner.RunAsync(overflowFixture.Case.Id, Assert.IsType<TransportFixtureInput>(overflowFixture.Input));
         Assert.Equal("pass", TransportComparison.Compare(overflowFixture, overflow).Verdict);
-        var error = Assert.IsType<ProviderException>(overflow.TerminalException);
+        var error = Assert.IsType<StreamProtocolException>(overflow.TerminalException);
         Assert.Equal("stream_protocol", error.Category);
         Assert.False(error.Retryable);
         Assert.Equal("stream", error.Phase);
@@ -152,7 +152,7 @@ public sealed class TransportTests : IDisposable
         Assert.Single(run.Exchanges);
         Assert.Single(core.Capture.Entries);
         Assert.Null(core.Result);
-        var terminal = Assert.IsType<ProviderException>(core.TerminalException);
+        var terminal = Assert.IsType<StreamProtocolException>(core.TerminalException);
         Assert.Equal("stream_protocol", terminal.Category);
         Assert.False(terminal.Retryable);
         Assert.Equal("stream", terminal.Phase);
@@ -218,7 +218,7 @@ public sealed class TransportTests : IDisposable
             ]),
         ]));
         var retryRun = await TransportRunner.RunAsync(errorFixture.Case.Id, retryInput);
-        var retryError = Assert.IsType<ProviderException>(retryRun.TerminalException);
+        var retryError = Assert.IsType<RateLimitException>(retryRun.TerminalException);
         Assert.Equal("rate_limit", retryError.Category);
         Assert.Equal(429, retryError.HttpStatus);
         Assert.True(retryError.RetryAfterS is 2d);
@@ -390,7 +390,7 @@ public sealed class TransportTests : IDisposable
         var run = await TransportRunner.RunAsync(fixture.Case.Id, protocolInput);
 
         Assert.Collection(run.DirectEvents, item => Assert.Equal("partial", Assert.IsType<AdapterTextDelta>(item).Text));
-        var error = Assert.IsType<ProviderException>(run.TerminalException);
+        var error = Assert.IsType<StreamProtocolException>(run.TerminalException);
         Assert.Equal("stream_protocol", error.Category);
         Assert.DoesNotContain(run.DirectEvents, static item => item is AdapterFinal);
         var projected = TransportProjection.Project(run);

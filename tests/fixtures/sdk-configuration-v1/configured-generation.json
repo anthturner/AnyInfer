@@ -1,0 +1,83 @@
+{
+  "_comment": "Input-only configured generation shared by the Python and C# SDK tests.",
+  "config": {
+    "_comment": "Configuration parsing must keep this inert comment.",
+    "format_version": 1,
+    "providers": [
+      {
+        "id": "primary",
+        "adapter": "openai-compat",
+        "base_url": "http://127.0.0.1:1/v1",
+        "api_key": "env://ANYINFER_SDK_CONFIG_TEST_KEY",
+        "headers": {
+          "X-App": "sdk-configuration-parity"
+        }
+      },
+      {
+        "id": "backup",
+        "adapter": "openai-compat",
+        "base_url": "http://127.0.0.1:1/v1",
+        "api_key": "env://ANYINFER_SDK_CONFIG_TEST_KEY",
+        "headers": {
+          "X-App": "sdk-configuration-parity"
+        }
+      }
+    ],
+    "default_route": [
+      "primary:model",
+      "backup:model"
+    ],
+    "repair": {
+      "max_attempts": 1
+    }
+  },
+  "request": {
+    "prompt": "Return the configured answer.",
+    "schema": {
+      "type": "object",
+      "required": [
+        "answer"
+      ],
+      "properties": {
+        "answer": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "scripts": {
+    "primary": [
+      {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body_utf8": "{\"error\":{\"message\":\"temporarily unavailable\"}}"
+      },
+      {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body_utf8": "{\"error\":{\"message\":\"temporarily unavailable\"}}"
+      }
+    ],
+    "backup": [
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body_utf8": "data: {\"choices\":[{\"delta\":{\"content\":\"not-json\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body_utf8": "data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"answer\\\":\\\"ok\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":4,\"total_tokens\":7}}\n\ndata: [DONE]\n\n"
+      }
+    ]
+  }
+}

@@ -22,7 +22,7 @@ internal static class ProofTransport
         {
             var capture = new OperationCapture();
             var adapter = new CleanupBlockingAdapter(capture);
-            var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
+            var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
             var publicEvents = new List<StreamEvent>();
             AnyInferException? terminal = null;
             try
@@ -171,7 +171,7 @@ internal static class ProofTransport
         var http = new OpenAIChatAdapter(new Uri("https://proof.invalid/v1"), "proof-token", handler: handler);
         var adapter = new RecordingHttpAdapter(http, handler);
         var capture = new OperationCapture();
-        await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
         Generation? result = null;
         AnyInferException? terminal = null;
         try

@@ -304,7 +304,7 @@ public sealed class NativeProofsTests
             ]
             """)));
         var capture = new OperationCapture();
-        await using var client = new AsyncClient([new ProviderRegistration("proof", FixtureAdapter.Create(script))]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", FixtureAdapter.Create(script))]);
         var schema = new JsonObject([
             new JsonProperty("type", new JsonString("object")),
             new JsonProperty("required", new JsonArray([new JsonString("age")])),

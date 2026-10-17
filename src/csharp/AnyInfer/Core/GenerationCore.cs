@@ -13,7 +13,7 @@ internal static class GenerationCore
     internal static async IAsyncEnumerable<StreamEvent> ExecuteAsync(
         NormalizedRequest request,
         Route route,
-        ProviderRegistry registry,
+        ProviderPool registry,
         RouteState health,
         IOperationClock clock,
         OperationCapture? capture,
@@ -30,7 +30,7 @@ internal static class GenerationCore
             foreach (var rawTarget in route.Targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var resolved = registry.Resolve(rawTarget);
+                var resolved = registry.ResolveMetadata(rawTarget);
                 if (!visitedTargets.Add(resolved.Target))
                 {
                     continue;
@@ -42,12 +42,14 @@ internal static class GenerationCore
                     continue;
                 }
 
+                var adapter = await registry.GetAdapterAsync(resolved, cancellationToken).ConfigureAwait(false);
+
                 var effectiveRepairs = EffectiveRepairBudget(request, resolved, operation, capture);
                 for (var attemptNumber = 1; attemptNumber <= Math.Max(1, route.Retry.MaxAttempts); attemptNumber++)
                 {
                     var routeState = new RouteAttemptState();
                     var current = CreateEntry(
-                        resolved.Registration.Adapter,
+                        adapter,
                         RequestNormalizer.CreateWireRequest(request, resolved),
                         operation,
                         stream,
@@ -118,7 +120,7 @@ internal static class GenerationCore
                             operation.OperationId,
                             new TelemetryObservation("repair_attempted", AttemptNumber: repairs));
                         current = CreateEntry(
-                            resolved.Registration.Adapter,
+                            adapter,
                             RequestNormalizer.CreateWireRequest(request, resolved, preparation.Messages),
                             operation,
                             stream,
@@ -226,10 +228,10 @@ internal static class GenerationCore
         OperationCapture? capture)
     {
         var requested = request.RepairBudget;
-        var ceiling = resolved.Registration.MaxRepairAttempts;
+        var ceiling = resolved.MaxRepairAttempts;
         if (ceiling is { } maximum && maximum < requested)
         {
-            var reason = $"{resolved.Registration.ProviderId} allows at most {maximum} schema-repair round trip(s); {requested} requested";
+            var reason = $"{resolved.Target.ProviderId} allows at most {maximum} schema-repair round trip(s); {requested} requested";
             capture?.RecordTelemetry(
                 operation.OperationId,
                 new TelemetryObservation("parameter_dropped", "repair.max_attempts", reason));

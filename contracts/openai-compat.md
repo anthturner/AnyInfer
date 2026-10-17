@@ -80,6 +80,32 @@ or document support, and an upstream rejection remains explicit.
   if that granularity is ever wanted.
 
 ## Watchlist
+
+### C# SDK settings binding audit — 2026-10-17
+
+The native C# settings milestone reuses the existing bounded chat dialect rather than
+adding a provider. Live documentation fetched on this date confirms
+[`POST /chat/completions`](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create),
+[`Authorization: Bearer` for the hosted API](https://developers.openai.com/api/reference/overview#authentication),
+and the usage chunk preceding the SSE `[DONE]` sentinel in that create reference. The
+[models reference](https://developers.openai.com/api/reference/resources/models/methods/list)
+and [changelog](https://developers.openai.com/api/docs/changelog) were also fetched; model
+discovery is not implemented by this C# milestone.
+
+For keyless compatible endpoints, the current upstream
+[llama-server option reference](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
+documents API-key authentication as unset by default. This supports omitting Authorization
+when no key is configured; it does not establish compatibility for every local engine.
+Configured HTTP headers and base-URL composition follow the existing Python adapter:
+case-insensitive explicit headers override defaults, and the configured API base receives
+the `/chat/completions` suffix without inserting another version component.
+
+**Unverified:** no authenticated hosted request or pinned local-engine binary was run for
+this settings audit. Native evidence is restricted to offline HTTP handlers/fixtures and
+the existing frozen core-generation profile; no new provider-wide certification is claimed.
+
+### Existing dialect watchlist
+
 - Servers vary on `response_format` json_schema support (capability probe territory)
 - Compatibility servers vary widely on `logprobs`, `seed`, and the two penalties: several
   presets already declare them in `ignored_parameters`. As with `response_format`, this

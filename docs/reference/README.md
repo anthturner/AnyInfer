@@ -2,12 +2,14 @@
 
 Look things up.
 
-This reference documents the supported Python `anyinfer` API. The repository's bounded C#
-core-generation proof has no generated public API reference or supported package surface; local
-prerelease package validation does not expand it.
+This reference documents the supported Python `anyinfer` API. The repository also contains a
+bounded prerelease C# SDK proof with a hand-written surface map; it has no generated reference,
+released package, or supported application integration path.
 
 - **[SDK reference](api/README.md)**: the generated API reference: every public class,
   function, and event, from the docstrings.
+- **[C# SDK proof reference](csharp-sdk.md)**: the bounded prerelease .NET surface and its
+  executable source examples.
 - **[Error catalog](errors.md)**: every exception, when it is raised, whether it retries,
   and the `hint` the user will see.
 - **[Conformance matrix](conformance-matrix.md)**: what each provider actually supports,

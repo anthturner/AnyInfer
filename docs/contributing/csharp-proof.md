@@ -3,7 +3,8 @@
 This repository contains a bounded native C# proof under `src/csharp/`. It independently reads
 the frozen shared `core-generation` corpus, executes the supported proof surface from fixture
 inputs, and compares the resulting observations afterward. Fixture expectations are comparison
-data; they do not drive native execution.
+data; they do not drive native execution. The repository also carries source-linked async SDK
+proof examples under `examples/csharp-sdk/`.
 
 The proof exists to check the shared contract from another runtime. It does not provide a
 supported AnyInfer C# SDK, a registry-published NuGet package, a production integration path,
@@ -20,11 +21,15 @@ cd src/csharp
 dotnet --version
 dotnet restore AnyInfer.sln
 dotnet test AnyInfer.sln --no-restore
+dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --configuration Release
 ```
 
 `workspace check` runs the same bounded phase after the repository's Python gates. The C# phase
 records the selected SDK version, restores the solution, runs the solution tests without a second
-restore, then validates a local prerelease package.
+restore, validates a local prerelease package, then runs the offline SDK proof examples.
+
+The [C# SDK proof guide](../guides/csharp-sdk.md) links its snippets directly to those source
+files. The examples are not an application installation path or a release promise.
 
 ## Validate the local prerelease package
 

@@ -13,25 +13,31 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly HttpClient _client;
     private readonly Uri _endpoint;
-    private readonly string _apiKey;
+    private readonly string? _apiKey;
+    private readonly string _providerId;
     private readonly IReadOnlyList<KeyValuePair<string, string>> _headers;
     private int _disposed;
 
     internal OpenAIChatAdapter(
         Uri baseUrl,
-        string apiKey,
+        string? apiKey,
         IReadOnlyDictionary<string, string>? headers = null,
-        HttpMessageHandler? handler = null)
+        HttpMessageHandler? handler = null,
+        string providerId = "openai-compat")
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
-        if (!baseUrl.IsAbsoluteUri)
+        if (!baseUrl.IsAbsoluteUri ||
+            baseUrl.Scheme is not ("http" or "https") ||
+            !string.IsNullOrEmpty(baseUrl.UserInfo) ||
+            !string.IsNullOrEmpty(baseUrl.Query) ||
+            !string.IsNullOrEmpty(baseUrl.Fragment))
         {
-            throw new ArgumentException("The OpenAI-compatible base URL must be absolute.", nameof(baseUrl));
+            throw new ArgumentException("The OpenAI-compatible base URL must be an absolute HTTP(S) URL without userinfo, query, or fragment.", nameof(baseUrl));
         }
 
-        ArgumentException.ThrowIfNullOrEmpty(apiKey);
         _endpoint = BuildEndpoint(baseUrl);
         _apiKey = apiKey;
+        _providerId = ProviderSettings.NormalizeId(providerId, nameof(providerId));
         _headers = (headers ?? new Dictionary<string, string>())
             .Select(static header => new KeyValuePair<string, string>(header.Key, header.Value))
             .ToArray();
@@ -43,6 +49,45 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
+    }
+
+    internal static IProviderAdapter Create(ProviderConfig config, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(config);
+        if (config.ApiVersion is not null || config.Options is { Properties.Count: > 0 })
+        {
+            throw new ConfigException(
+                "The OpenAI-compatible provider configuration is invalid.",
+                provider: config.ProviderId,
+                detail: "API versions and provider options are not supported by the OpenAI-compatible builtin.");
+        }
+
+        var baseUrl = config.BaseUrl ?? throw new ConfigException(
+            "The OpenAI-compatible provider configuration is incomplete.",
+            provider: config.ProviderId,
+            detail: "A base URL is required.");
+        try
+        {
+            ValidateHeaders(config.Headers);
+            return new OpenAIChatAdapter(new Uri(baseUrl, UriKind.Absolute), config.ApiKey, config.Headers, config.Transport, config.ProviderId);
+        }
+        catch (UriFormatException exception)
+        {
+            throw new ConfigException(
+                "The OpenAI-compatible provider configuration is invalid.",
+                config.ProviderId,
+                "The configured base URL is invalid.",
+                nativeInner: exception);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new ConfigException(
+                "The OpenAI-compatible provider configuration is invalid.",
+                config.ProviderId,
+                "The configured base URL or headers are invalid.",
+                nativeInner: exception);
+        }
     }
 
     public IAsyncEnumerable<AdapterEvent> GenerateAsync(
@@ -135,20 +180,52 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         {
             Content = content,
         };
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-        foreach (var header in _headers)
+        ApplyHeaders(message, content, _headers);
+
+        if (!string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization"))
         {
-            if (!message.Headers.TryAddWithoutValidation(header.Key, header.Value))
-            {
-                message.Dispose();
-                throw new ArgumentException("The configured HTTP header is invalid.", nameof(_headers));
-            }
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
         }
 
         return message;
     }
 
-    private static JsonObject CreatePayload(WireRequest request)
+    private static void ValidateHeaders(IReadOnlyDictionary<string, string> headers)
+    {
+        using var message = new HttpRequestMessage();
+        using var content = new ByteArrayContent([]);
+        ApplyHeaders(
+            message,
+            content,
+            headers.Select(static header => new KeyValuePair<string, string>(header.Key, header.Value)));
+    }
+
+    private static void ApplyHeaders(
+        HttpRequestMessage message,
+        HttpContent content,
+        IEnumerable<KeyValuePair<string, string>> headers)
+    {
+        foreach (var header in headers)
+        {
+            if (string.Equals(header.Key, "Authorization", StringComparison.OrdinalIgnoreCase))
+            {
+                message.Headers.Remove("Authorization");
+            }
+
+            if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+            {
+                content.Headers.Remove("Content-Type");
+            }
+
+            if (!message.Headers.TryAddWithoutValidation(header.Key, header.Value) &&
+                !content.Headers.TryAddWithoutValidation(header.Key, header.Value))
+            {
+                throw new ArgumentException("The configured HTTP header is invalid.", nameof(headers));
+            }
+        }
+    }
+
+    private JsonObject CreatePayload(WireRequest request)
     {
         var properties = new List<JsonProperty>
         {
@@ -167,18 +244,19 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         return new JsonObject(properties);
     }
 
-    private static JsonObject CreateMessage(Message message)
+    private JsonObject CreateMessage(Message message)
     {
         var content = new StringBuilder();
         foreach (var part in message.Content)
         {
             if (part is not Text textPart)
             {
-                throw new ProviderException(
-                    "The OpenAI-compatible chat adapter supports text message content only.",
-                    "unsupported_input",
-                    retryable: false,
-                    phase: "generate");
+            throw ProviderException.Create(
+                "The OpenAI-compatible chat adapter supports text message content only.",
+                "unsupported_input",
+                retryable: false,
+                phase: "generate",
+                provider: _providerId);
             }
 
             content.Append(textPart.Value);
@@ -228,7 +306,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private static IEnumerable<AdapterEvent> ReadBuffered(byte[] body)
+    private IEnumerable<AdapterEvent> ReadBuffered(byte[] body)
     {
         var root = ReadObject(body);
         var choice = FirstChoice(root);
@@ -249,7 +327,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         yield return new AdapterFinal(finishReason, usage);
     }
 
-    private static async IAsyncEnumerable<AdapterEvent> ReadSseAsync(
+    private async IAsyncEnumerable<AdapterEvent> ReadSseAsync(
         Stream stream,
         int maxResponseBytes,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -341,7 +419,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         throw ProtocolFailure("The OpenAI-compatible event stream ended without a DONE sentinel.");
     }
 
-    private static async Task<byte[]> ReadResponseBytesAsync(
+    private async Task<byte[]> ReadResponseBytesAsync(
         Stream stream,
         int maxResponseBytes,
         string phase,
@@ -383,7 +461,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private static async Task<Stream> OpenResponseStreamAsync(HttpContent content, CancellationToken cancellationToken)
+    private async Task<Stream> OpenResponseStreamAsync(HttpContent content, CancellationToken cancellationToken)
     {
         try
         {
@@ -399,7 +477,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private static async Task DisposeResponseStreamAsync(Stream stream, string phase)
+    private async Task DisposeResponseStreamAsync(Stream stream, string phase)
     {
         try
         {
@@ -415,7 +493,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private static void DisposeResponse(HttpResponseMessage? response, string phase)
+    private void DisposeResponse(HttpResponseMessage? response, string phase)
     {
         if (response is null)
         {
@@ -436,7 +514,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private static async Task<int> ReadChunkAsync(
+    private async Task<int> ReadChunkAsync(
         Stream stream,
         byte[] buffer,
         string phase,
@@ -456,7 +534,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private static ProviderException HttpFailure(HttpResponseMessage response, byte[] errorBytes)
+    private ProviderException HttpFailure(HttpResponseMessage response, byte[] errorBytes)
     {
         var (category, retryable) = response.StatusCode switch
         {
@@ -468,14 +546,14 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
             _ => ("invalid_request", false),
         };
         _ = errorBytes;
-        return new ProviderException(
+        return ProviderException.Create(
             $"The OpenAI-compatible service returned HTTP {(int)response.StatusCode}.",
             category,
             retryable,
             phase: "generate",
             retryAfterS: RetryAfter(response.Headers.RetryAfter),
             httpStatus: (int)response.StatusCode,
-            provider: "openai-compat");
+            provider: _providerId);
     }
 
     private static double? RetryAfter(RetryConditionHeaderValue? retryAfter)
@@ -493,13 +571,13 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         return null;
     }
 
-    private static ProviderException TransportFailure(string message, string phase, Exception exception) =>
-        new(message, "transport", retryable: true, phase, provider: "openai-compat", nativeInner: exception);
+    private ProviderException TransportFailure(string message, string phase, Exception exception) =>
+        ProviderException.Create(message, "transport", retryable: true, phase, provider: _providerId, nativeInner: exception);
 
-    private static ProviderException ProtocolFailure(string message) =>
-        new(message, "stream_protocol", retryable: false, phase: "stream", provider: "openai-compat");
+    private ProviderException ProtocolFailure(string message) =>
+        ProviderException.Create(message, "stream_protocol", retryable: false, phase: "stream", provider: _providerId);
 
-    private static JsonObject ReadObject(ReadOnlySpan<byte> bytes)
+    private JsonObject ReadObject(ReadOnlySpan<byte> bytes)
     {
         try
         {
@@ -508,17 +586,17 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
         catch (FormatException exception)
         {
-            throw new ProviderException(
+            throw ProviderException.Create(
                 "The OpenAI-compatible response contains invalid JSON.",
                 "stream_protocol",
                 retryable: false,
                 phase: "stream",
-                provider: "openai-compat",
+                provider: _providerId,
                 nativeInner: exception);
         }
     }
 
-    private static JsonObject FirstChoice(JsonObject root)
+    private JsonObject FirstChoice(JsonObject root)
     {
         if (!root.TryGetValue("choices", out var value) || value is not JsonArray { Items.Count: > 0 } choices ||
             choices.Items[0] is not JsonObject choice)
@@ -529,7 +607,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         return choice;
     }
 
-    private static JsonObject? OptionalFirstChoice(JsonObject root)
+    private JsonObject? OptionalFirstChoice(JsonObject root)
     {
         if (!root.TryGetValue("choices", out var value))
         {
@@ -550,10 +628,10 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
             ?? throw ProtocolFailure("The OpenAI-compatible event choice is invalid.");
     }
 
-    private static JsonObject RequiredObject(JsonObject source, string name) =>
+    private JsonObject RequiredObject(JsonObject source, string name) =>
         OptionalObject(source, name) ?? throw ProtocolFailure($"The OpenAI-compatible response is missing {name}.");
 
-    private static JsonObject? OptionalObject(JsonObject source, string name)
+    private JsonObject? OptionalObject(JsonObject source, string name)
     {
         if (!source.TryGetValue(name, out var value) || value is JsonNull)
         {
@@ -564,10 +642,10 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
             ?? throw ProtocolFailure($"The OpenAI-compatible response has invalid {name}.");
     }
 
-    private static string RequiredString(JsonObject source, string name) =>
+    private string RequiredString(JsonObject source, string name) =>
         OptionalString(source, name) ?? throw ProtocolFailure($"The OpenAI-compatible response is missing {name}.");
 
-    private static string? OptionalString(JsonObject source, string name)
+    private string? OptionalString(JsonObject source, string name)
     {
         if (!source.TryGetValue(name, out var value) || value is JsonNull)
         {
@@ -579,7 +657,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
             : throw ProtocolFailure($"The OpenAI-compatible response has invalid {name}.");
     }
 
-    private static Usage? OptionalUsage(JsonObject source)
+    private Usage? OptionalUsage(JsonObject source)
     {
         if (!source.TryGetValue("usage", out var value) || value is JsonNull)
         {
@@ -599,13 +677,13 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
             ReasoningTokens: NestedLong(usage, "completion_tokens_details", "reasoning_tokens"));
     }
 
-    private static long? NestedLong(JsonObject source, string objectName, string propertyName)
+    private long? NestedLong(JsonObject source, string objectName, string propertyName)
     {
         var nested = OptionalObject(source, objectName);
         return nested is null ? null : OptionalLong(nested, propertyName);
     }
 
-    private static long? OptionalLong(JsonObject source, string name)
+    private long? OptionalLong(JsonObject source, string name)
     {
         if (!source.TryGetValue(name, out var value) || value is JsonNull)
         {
@@ -620,7 +698,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         throw ProtocolFailure($"The OpenAI-compatible response has invalid {name}.");
     }
 
-    private static string DecodeLine(List<byte> line)
+    private string DecodeLine(List<byte> line)
     {
         try
         {
@@ -628,12 +706,12 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
         catch (DecoderFallbackException exception)
         {
-            throw new ProviderException(
+            throw ProviderException.Create(
                 "The OpenAI-compatible event stream is not valid UTF-8.",
                 "stream_protocol",
                 retryable: false,
                 phase: "stream",
-                provider: "openai-compat",
+                provider: _providerId,
                 nativeInner: exception);
         }
     }
@@ -641,10 +719,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
     private static Uri BuildEndpoint(Uri baseUrl)
     {
         var text = baseUrl.AbsoluteUri.TrimEnd('/');
-        var suffix = baseUrl.AbsolutePath.TrimEnd('/').EndsWith("/v1", StringComparison.OrdinalIgnoreCase)
-            ? "/chat/completions"
-            : "/v1/chat/completions";
-        return new Uri(text + suffix, UriKind.Absolute);
+        return new Uri(text + "/chat/completions", UriKind.Absolute);
     }
 
     private void ThrowIfDisposed()

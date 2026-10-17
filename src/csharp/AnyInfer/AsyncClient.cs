@@ -8,23 +8,47 @@ namespace AnyInfer;
 /// <summary>Owns provider adapters and creates lazy generation operations.</summary>
 public sealed class AsyncClient : IAsyncDisposable
 {
-    private readonly ProviderRegistry _registry;
+    private readonly ProviderPool _pool;
     private readonly IOperationClock _clock;
     private readonly RouteState _health;
+    private readonly Route? _defaultRoute;
+    private readonly Repair? _defaultRepair;
     private readonly object _gate = new();
     private readonly HashSet<AsyncStream> _activeStreams = [];
     private bool _disposed;
     private Task? _disposeTask;
 
-    /// <summary>Creates a client over immutable provider registrations.</summary>
-    public AsyncClient(IEnumerable<ProviderRegistration> providers)
-        : this(providers, new SystemOperationClock())
+    /// <summary>Creates a client over immutable provider settings and descriptor metadata.</summary>
+    public AsyncClient(
+        IEnumerable<ProviderSettings>? providers = null,
+        Providers.ProviderRegistry? registry = null,
+        Credentials.ResolverChain? resolver = null,
+        Route? route = null,
+        Repair? repair = null)
     {
+        _pool = new ProviderPool(providers, registry ?? Providers.ProviderRegistry.CreateDefault(), resolver ?? Credentials.ResolverChain.CreateDefault());
+        _clock = new SystemOperationClock();
+        _health = new RouteState(_clock);
+        _defaultRoute = route;
+        _defaultRepair = repair;
+    }
+
+    /// <summary>Creates a client over externally constructed adapters.</summary>
+    public static AsyncClient FromAdapters(IEnumerable<ProviderRegistration> providers) => new(providers, new SystemOperationClock());
+
+    /// <summary>Creates a client from inert parsed configuration without performing I/O or credential resolution.</summary>
+    public static AsyncClient FromConfig(
+        Config.AnyInferConfig config,
+        Providers.ProviderRegistry? registry = null,
+        Credentials.ResolverChain? resolver = null)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair);
     }
 
     internal AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock)
     {
-        _registry = new ProviderRegistry(providers);
+        _pool = new ProviderPool(providers);
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _health = new RouteState(_clock);
     }
@@ -122,10 +146,23 @@ public sealed class AsyncClient : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        var normalized = RequestNormalizer.Normalize(request);
+        ArgumentNullException.ThrowIfNull(request);
+        var effectiveRequest = request.Repair is null && _defaultRepair is not null
+            ? new GenerationRequest(
+                request.Messages,
+                request.Route,
+                request.Sampling,
+                _defaultRepair,
+                request.Schema,
+                request.SchemaMechanism,
+                request.TimeoutS,
+                request.MaxResponseBytes,
+                request.Stream)
+            : request;
+        var normalized = RequestNormalizer.Normalize(effectiveRequest);
         AsyncStream? stream = null;
         stream = new AsyncStream(
-            token => RunStreamAsync(normalized, request.Route, capture, stream!, token),
+            token => RunStreamAsync(normalized, effectiveRequest.Route, capture, stream!, token),
             cancellationToken,
             RemoveActiveStream);
         lock (_gate)
@@ -169,16 +206,13 @@ public sealed class AsyncClient : IAsyncDisposable
             }
         }
 
-        foreach (var adapter in _registry.Adapters)
+        try
         {
-            try
-            {
-                await adapter.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                failure ??= exception;
-            }
+            await _pool.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            failure ??= exception;
         }
 
         if (failure is not null)
@@ -198,7 +232,7 @@ public sealed class AsyncClient : IAsyncDisposable
             await foreach (var generationEvent in GenerationCore.ExecuteAsync(
                 normalized,
                 route,
-                _registry,
+                _pool,
                 _health,
                 _clock,
                 capture,
@@ -232,7 +266,7 @@ public sealed class AsyncClient : IAsyncDisposable
         }
     }
 
-    private static GenerationRequest CreateConvenienceRequest(
+    private GenerationRequest CreateConvenienceRequest(
         IEnumerable<Message> messages,
         string? target,
         Route? route,
@@ -245,16 +279,21 @@ public sealed class AsyncClient : IAsyncDisposable
         bool stream)
     {
         ArgumentNullException.ThrowIfNull(messages);
-        if ((target is null) == (route is null))
+        var selectedRoute = route;
+        if (selectedRoute is null && target is not null)
         {
-            throw new ArgumentException("Specify exactly one target or route.");
+            selectedRoute = _defaultRoute is null
+                ? new Route([target])
+                : new Route([target], _defaultRoute.Retry, _defaultRoute.HealthGate, _defaultRoute.HealthTtlS);
         }
+
+        selectedRoute ??= _defaultRoute ?? throw new ArgumentException("Specify a target, route, or client default route.");
 
         return new GenerationRequest(
             messages,
-            route ?? new Route([target!]),
+            selectedRoute,
             sampling,
-            repair,
+            repair ?? _defaultRepair,
             schema,
             schemaMechanism,
             timeoutS,

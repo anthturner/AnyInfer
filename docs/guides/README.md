@@ -60,6 +60,14 @@ runs against in-process fakes with no credentials.
 - [Add your own provider](custom-providers.md)
 - [Embed, store, and query a small corpus](vector-store.md)
 
+## C# SDK Proof
+
+The C# surface is a bounded prerelease proof for contributors. It is not an installation or
+release path, and it does not change the supported Python SDK surface.
+
+- [Explore the C# SDK proof](csharp-sdk.md)
+- [Move from Python to the C# SDK proof](python-to-csharp.md)
+
 ## Operations
 
 - [Run a model locally](local-inference.md)

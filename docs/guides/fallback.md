@@ -3,21 +3,29 @@
 A `Route` names the targets to try in order and the retry policy for each; the full
 semantics live in [routing](../concepts/routing.md).
 
-```python
-import anyinfer as ai
+=== "Python"
 
-route = ai.Route(
-    targets=(
-        "anthropic:claude-sonnet-4-5",  # preferred
-        "openai:gpt-5",  # if Anthropic is unavailable
-        "ollama:qwen3:8b",  # last resort, always local
-    ),
-    retry=ai.Retry(max_attempts=2),
-)
+    ```python
+    import anyinfer as ai
 
-result = client.generate(prompt, route=route)
-print("served by", result.target)
-```
+    route = ai.Route(
+        targets=(
+            "anthropic:claude-sonnet-4-5",  # preferred
+            "openai:gpt-5",  # if Anthropic is unavailable
+            "ollama:qwen3:8b",  # last resort, always local
+        ),
+        retry=ai.Retry(max_attempts=2),
+    )
+
+    result = client.generate(prompt, route=route)
+    print("served by", result.target)
+    ```
+
+=== "C# SDK proof"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/RoutingExample.cs"
+    ```
 
 ## Set a Default Route Once
 

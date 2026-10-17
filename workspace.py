@@ -998,6 +998,16 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                         str(ROOT / "scripts" / "check_csharp_package.py"), cwd=ROOT
                     ),
                 ),
+                (
+                    "run C# SDK examples",
+                    lambda: _run_csharp(
+                        "run",
+                        "--project",
+                        "../../examples/csharp-sdk/AnyInfer.Examples.csproj",
+                        "--configuration",
+                        "Release",
+                    ),
+                ),
             ),
         ),
     ]

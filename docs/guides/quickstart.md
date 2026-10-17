@@ -1,7 +1,8 @@
 # Quickstart
 
-From `pip install` to a working result. Every example on this page is executed in CI
-against the fake providers, so none of it can quietly rot.
+From `pip install` to a working Python result. Every Python example on this page is executed in
+CI against the fake providers, so none of it can quietly rot. The C# tab is a bounded prerelease
+proof example; its contributor commands are in the [C# SDK proof guide](csharp-sdk.md).
 
 ## Install
 
@@ -63,6 +64,12 @@ read.
         )
 
         print(result.text)
+    ```
+
+=== "C# SDK proof"
+
+    ```csharp
+    --8<-- "examples/csharp-sdk/GenerationExample.cs"
     ```
 
 The highlighted line is the only one that changes when you point the same call at a

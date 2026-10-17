@@ -47,7 +47,7 @@ public sealed class SdkMigrationTests
         var adapter = new ObservableAdapter((_, token) => Events(token,
             new AdapterTextDelta("ok"),
             new AdapterFinal("stop", new Usage(InputTokens: 2, OutputTokens: 1))));
-        await using var client = new AsyncClient([new ProviderRegistration("alpha", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("alpha", adapter)]);
 
         List<Message> messages = [Message.System("keep"), Message.User("original")];
         var streamed = client.StreamAsync(messages, target: "alpha:model", sampling: new Sampling(stop: ["END"]));
@@ -66,14 +66,21 @@ public sealed class SdkMigrationTests
     }
 
     [Fact]
-    public async Task Convenience_rejects_both_or_neither_target_and_route()
+    public async Task Convenience_route_wins_over_target_and_missing_route_still_refuses()
     {
-        var adapter = new ObservableAdapter((_, token) => Events(token, new AdapterFinal("stop")));
-        await using var client = new AsyncClient([new ProviderRegistration("alpha", adapter)]);
+        var ignored = new ObservableAdapter((_, token) => Events(token, new AdapterFinal("ignored")));
+        var selected = new ObservableAdapter((_, token) => Events(token, new AdapterTextDelta("route"), new AdapterFinal("stop")));
+        await using var client = AsyncClient.FromAdapters(
+        [
+            new ProviderRegistration("alpha", ignored),
+            new ProviderRegistration("beta", selected),
+        ]);
 
         Assert.Throws<ArgumentException>(() => client.StreamAsync("prompt"));
-        Assert.Throws<ArgumentException>(() => client.StreamAsync("prompt", "alpha:model", new Route(["alpha:model"])));
-        Assert.Empty(adapter.Requests);
+        var result = await client.GenerateAsync("prompt", target: "alpha:model", route: new Route(["beta:model"]));
+        Assert.Equal("route", result.Text);
+        Assert.Empty(ignored.Requests);
+        Assert.Single(selected.Requests);
     }
 
     [Fact]
@@ -82,7 +89,7 @@ public sealed class SdkMigrationTests
         var adapter = new ObservableAdapter((_, token) => Events(token,
             new AdapterTextDelta("timed"),
             new AdapterFinal("stop", new Usage(OutputTokens: 4))));
-        await using var client = new AsyncClient([new ProviderRegistration("alpha", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("alpha", adapter)]);
 
         var beforeIteration = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
         var stream = client.StreamAsync("prompt", target: "alpha:model");
@@ -108,7 +115,7 @@ public sealed class SdkMigrationTests
         var adapter = new ObservableAdapter((_, token) => Events(token,
             new AdapterTextDelta("zero-token-usage"),
             new AdapterFinal("stop", new Usage(OutputTokens: 0))));
-        await using var client = new AsyncClient([new ProviderRegistration("alpha", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("alpha", adapter)]);
 
         var stream = client.StreamAsync("prompt", target: "alpha:model");
         await Collect(stream);
@@ -130,7 +137,7 @@ public sealed class SdkMigrationTests
             ? Events(token, new AdapterTextDelta("{\"age\":\"wrong\"}"), new AdapterFinal("stop"))
             : Events(token, new AdapterTextDelta("{\"age\":7}"), new AdapterFinal("stop")));
         var schema = JsonReader.Read("{\"type\":\"object\",\"required\":[\"age\"],\"properties\":{\"age\":{\"type\":\"integer\"}}}");
-        await using var client = new AsyncClient(
+        await using var client = AsyncClient.FromAdapters(
         [
             new ProviderRegistration("first", failed),
             new ProviderRegistration("second", succeeded, maxRepairAttempts: 1),
@@ -164,7 +171,7 @@ public sealed class SdkMigrationTests
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cleaned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var adapter = new ObservableAdapter((_, token) => BlockAfterText(token, entered, cleaned));
-        await using var client = new AsyncClient([new ProviderRegistration("alpha", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("alpha", adapter)]);
         var stream = client.StreamAsync("prompt", target: "alpha:model");
 
         Assert.Throws<InvalidOperationException>(() => _ = stream.Result);
@@ -202,7 +209,7 @@ public sealed class SdkMigrationTests
     public async Task Collect_async_returns_terminal_generation_from_the_same_single_consumer_stream()
     {
         var adapter = new ObservableAdapter((_, token) => Events(token, new AdapterTextDelta("collected"), new AdapterFinal("stop")));
-        await using var client = new AsyncClient([new ProviderRegistration("alpha", adapter)]);
+        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("alpha", adapter)]);
         var stream = client.StreamAsync("prompt", target: "alpha:model");
 
         var result = await stream.CollectAsync();
