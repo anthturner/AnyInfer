@@ -366,7 +366,7 @@ verification both before execution and before output.
 
 > NOTE: Accepted after the whole `AnyInfer.Tests` gate: SDK 8.0.425, 155 passed, zero failures/skips, exit 0. M2.3a–b source and independent reviews are closed; M2.4a is next.
 
-- [ ] **M2.4a — executable driver shell, closed release and fixture readers.** Owner: conformance
+- [x] **M2.4a — executable driver shell, closed release and fixture readers.** Owner: conformance
   reader worker; files limited to `AnyInfer.Conformance/Program.cs`, its `.csproj` minimal
   `GenerateProgramFile=false` edit, `ReleaseAssetsReader.cs`, `FixtureReader.cs`,
   `FixtureAdapter.cs`, and reader tests. The initial M2.2a Conformance test scaffold retains the
@@ -381,8 +381,85 @@ verification both before execution and before output.
   alternate root and run `dotnet run --project AnyInfer.Conformance --no-restore -- --root
   <absolute-extracted-root> --release releases/core-generation-v0.json --verify`, proving it is
   used; missing root, unsafe release, and tampered selected data fail.
+  > NOTE: Resume this box from core checkpoint `731cd968e9ade4cc0f8b369ae3fc11675137eb17`
+  > (155 native tests and all 13 repository steps passed). Authoring has three disjoint owners:
+  > release/CLI owns `ReleaseAssetsReader.cs`, `Program.cs` and the minimal Conformance project
+  > entry-point setting; fixture source owns `FixtureReader.cs` and `FixtureAdapter.cs`;
+  > independent tests own `ReleaseAssetsTests.cs` and `ReleaseAssetsFixtureAdapterTests.cs`.
+  > Earlier core/library files are held. No build/test starts until both source snapshots are
+  > stable, and no worker changes Git, frozen inputs, reports or the shared plan without a lease.
+  >
+  > All new APIs are internal in `AnyInfer.Conformance`. `ReleaseAssetsReader.ReadAndVerify(
+  > string absoluteRoot, string relativeReleasePath)` returns `ReleaseAssets` with root/release
+  > paths, raw release SHA, release/profile/revision strings, read-only `Files` and ordered
+  > `Cases`, and `ReferenceBinding`. `ReleaseFile` retains its sealed relative path, SHA,
+  > selected full path and owned verified bytes (`ReadOnlyMemory<byte> Bytes`); later parsing
+  > uses this hashed snapshot. `InventoryCase` retains Id, FixtureKind (Fixture/DriverAssertion),
+  > RelativePath, Family, literal Extension, and RecipeRef. `ReferenceBinding` retains manifest
+  > and environment paths/hash plus reference and driver revisions/path. Derive the exact closed
+  > raw file set from inventory plus normative/schema/reference inputs; current 106/102/96
+  > counts are gate facts, not hard-coded cardinality policy. Preserve inventory order.
+  >
+  > The supplied root is the specification directory. Sealed keys retain their exact
+  > `specification/` prefix, resolving below that selected root after removing exactly that
+  > prefix; the CLI release argument is `releases/core-generation-v0.json`. Never fall back
+  > to the checkout. Reject unsafe/aliased paths and every reparse component, including the
+  > selected root and final file, using BCL attributes. Validate closed reader-owned release,
+  > inventory, reference-binding and fixture execution envelopes; retain original arbitrary
+  > schema/data and comparator expectations without interpreting their semantics here.
+  >
+  > `FixtureReader.ReadFixtures(ReleaseAssets)` returns ordered `FixtureDocument(Case, Input,
+  > Expected)`, where abstract `FixtureInput` has `CoreFixtureInput(Request, Route, Adapter)`
+  > as raw `JsonObject` fields plus optional raw `JsonObject Clock` (fourth constructor argument,
+  > default null), or `TransportFixtureInput(Kind, Input, Responses)` preserving raw
+  > typed values. Expected is a separate raw object consumed only by the later comparator.
+  > `FixtureAdapter.Create(JsonArray script, FixtureGates? gates = null)` returns a fresh
+  > internal adapter, with call/remaining-entry counts for driver controls. It accepts no
+  > FixtureDocument/expected data. Named `FixtureGates.WaitAsync(name, token)` / `Release(name)`
+  > are internal cancellation-aware test/runner controls; they add no public library API.
+  > Parse/emit actual script fields, lazy events and immediate/terminal/cleanup failures from
+  > the frozen schemas; exhausted script is a harness error, not a provider verdict. Adapter
+  > disposal is client-owned, and health/backoff virtual time remains runner-owned.
+  > Omitted script failure fields use category defaults: retryable for rate-limit, transport
+  > and provider-unavailable; phase `generate` for the allowed categories except
+  > `stream_protocol` (`stream`). Entry/terminal/cleanup location does not replace an omitted
+  > phase. Explicit fields, including false and null, remain literal. This corrects the
+  > coordinator's earlier transient terminal-phase instruction. Cancellation consumption
+  > controls require the exact ASCII positive-decimal suffix from the fixture schema.
+  >
+  > `Program.RunAsync(string[] args, TextWriter output, TextWriter error)` is the testable CLI
+  > seam. Help and successful verification return 0; argument/asset validation errors return 2
+  > with bounded category plus selected-relative path, without raw exception prose. Genuine
+  > cancellation/fatal failures propagate. Development/report production remains unavailable
+  > until later boxes. Verification invokes both the release reader and fixture reader, so
+  > self-consistent hashes
+  > cannot bypass closed executable-envelope checks. The optional fixture clock is retained
+  > for later native health/backoff execution; it is never inferred from observations.
+  > Tests may locate source fixtures to make an alternate extraction, but executable
+  > verification reads only its explicit selected root. The alternate-root subprocess
+  > uses `dotnet run --no-build --no-restore` while its test host is loaded; root also runs the
+  > normal CLI gates after tests exit, avoiding concurrent output rebuilding.
+  > NOTE: The first native reader gate compiled under SDK 8.0.425 and completed with
+  > 19 passes / 16 failures. A Windows-only internal separator conversion rejected valid
+  > sealed asset paths before their checks; canonical forward slashes must remain intact
+  > until the resolver combines individual segments. The root-normalization control must
+  > supply an absolute volume root, while drive-relative roots remain rejected. Case aliases
+  > retain the explicit `path_alias` diagnostic. CLI diagnostics preserve safe asset/fixture
+  > relative paths; manifest/map errors retain the selected release path. Unsafe or oversized
+  > diagnostic paths render as `.`. The initial failures were preserved until corrected.
+  > Root-relative and drive-relative Windows paths are separate rejection controls. CLI
+  > path formatting is shared by argument and asset errors and keeps each diagnostic on one
+  > line, including rejection of Unicode line/paragraph separators U+2028/U+2029.
+  > NOTE: Accepted after root inspected the final retained SDK 8.0.425 gate: 37 passed,
+  > zero failures/skips (10.7960s, `ebaaed44`). Cross-read raw JSON controls use compact,
+  > order-preserving writer output rather than container reference equality; actual adapter
+  > execution remains independently compared. Standalone help and verification against both
+  > canonical and copied selected roots passed in `269cf12d`. Source/test review findings
+  > are corrected; root directly checked the final shared single-line diagnostic guard and
+  > its executable Unicode controls. Frozen release/report hashes remain unchanged.
+  > Resume at M2.4b from committed core `731cd968` plus the accepted uncommitted reader files.
 
-- [ ] **M2.4b — native runner, projection, comparison, and development subset.** Owner:
+- [x] **M2.4b — native runner, projection, comparison, and development subset.** Owner:
   conformance runner worker; files limited to `NativeRunner.cs`, `Projection.cs`,
   `Comparison.cs`, `ReportWriter.cs`, `VirtualClock.cs`, the minimal `Program.cs` development
   dispatch, and tests. Execute without expected
@@ -393,6 +470,109 @@ verification both before execution and before output.
   fresh mirrors, typed marker scope, ordered objects, honest extension observation, and no
   report-v0 output. The executable alternate-root development run must use the same selected
   assets without checkout fallback.
+  > NOTE: Accepted preparation lives in `foundation-execution/csharp-development-preparation`
+  > and `csharp-comparison-preparation`. The subset is the 85 inventory-ordered core fixtures;
+  > 11 transport fixtures and six driver assertions remain explicitly unavailable. C# declares
+  > no extensions, so all nine eligible core fixtures execute native admission and compare to
+  > the portable unsupported-input baseline. Eligibility alone never grants extension status.
+  >
+  > Disjoint source ownership: native execution worker owns `NativeRunner.cs` and
+  > `VirtualClock.cs`; comparator worker owns `Projection.cs` and `Comparison.cs`; delivery
+  > worker owns `ReportWriter.cs` and the minimal `Program.cs` development dispatch. An
+  > independent worker then owns only `DevelopmentTests.cs`. No library/core, accepted reader,
+  > project/package, Python, frozen corpus or canonical report changes are authorized here.
+  > Source authoring is parallel; all shared compile/test/CLI processes stay serialized.
+  > The coordinator alone closes this whole-box gate and grants any shared-plan edit lease.
+  >
+  > Pin the execution API as `NativeRunner.RunAsync(string caseId, CoreFixtureInput input,
+  > CancellationToken cancellationToken = default) -> Task<NativeRun>`. It accepts neither
+  > FixtureDocument nor expected data. The execution worker owns the immutable internal record
+  > `NativeRun(CaseId, Input, ConsumeMode, Events, Result, TerminalException, TerminalStage,
+  > DeliberateCancellation, Capture, Clock, AdapterCallCount, RemainingScriptEntries, Mirror)`.
+  > Types are string, CoreFixtureInput, string, IReadOnlyList<GenerationEvent>, nullable
+  > GenerationResult, nullable Exception, string, bool, OperationCapture, VirtualClock, int,
+  > int, and nullable NativeRun respectively; Mirror defaults null. TerminalStage is actual
+  > construction/stream/buffered/close context. Retain actual native objects, not rendered
+  > substitutes. Core friend access already exists; do not introduce a new public API.
+  >
+  > Construct raw roles, text/image parts, targets, original schema, sampling, repair, retry,
+  > provider per-model capabilities/ceiling and health seeds from input only. Native admission,
+  > defaults, routing and repair stay in the library. `VirtualClock(double startSeconds)`
+  > implements IOperationClock with NowSeconds, read-only DelaysSeconds, and cancellation-aware
+  > DelayAsync; positive route delays advance it, zero delays do not. No virtual entry timeout.
+  > Buffered consumption uses GenerateAsync, with no invented public events. Stream consumption
+  > retains actual events and Stream.Result; no-advance and double-close use the actual stream.
+  > Cancellation suffixes use BigInteger comparison. Only an actual OCE caused by the fixture's
+  > own event-count cancellation is retained as DeliberateCancellation; external OCE and fatal
+  > runtime exceptions propagate. Known ordinary harness faults become development errors,
+  > never native outcomes. Remaining script entries are recorded, not universally rejected:
+  > lazy/native rejection can legitimately leave scripts unused.
+  >
+  > Only `streaming/buffered-equals-streamed` triggers a fresh buffered mirror after its primary
+  > stream, using a new adapter, client, clock and capture from the same raw input. Mirror
+  > operation/capture identity and observations stay separate. No execution choice reads expected.
+  > `Projection.Project(NativeRun) -> JsonObject` validates bounded available capture and actual
+  > entry/assessment/preparation/wire identity before projecting native facts. Missing/inconsistent
+  > evidence raises internal ObservationUnavailableException. Original/correction role comes
+  > from entry capture, never message matching. Preserve duplicate-member observation order.
+  > `Comparison.Compare(FixtureDocument, NativeRun) -> DevelopmentComparison` is the sole expected
+  > reader; its record is `(string Verdict, JsonObject Observation, string? Detail = null)`.
+  > Compare the frozen typed positions: selected native-feedback markers only in their causal
+  > message positions, earlier same-as-call references, adjacent-text coalescing, timing markers,
+  > omitted-null usage, schema equality for structured values, and numeric equality only for
+  > declared controls. No arbitrary marker interpretation or expected-derived observations.
+  >
+  > Delivery pins: `ReportWriter.RunDevelopmentAsync(ReleaseAssets, CancellationToken = default)
+  > -> Task<JsonObject>` runs only core inputs and compares afterward. `WriteDevelopmentAsync(
+  > ReleaseAssets, string? outputPath, CancellationToken = default) -> Task<string>` writes its
+  > DEVELOPMENT/UNRELEASED document and returns the full output path. The envelope has
+  > development_version as numeric JsonInteger `0`, status `DEVELOPMENT/UNRELEASED`, release_input (id/sha256),
+  > available_subset `core-fixtures`, ordered cases (id/verdict/detail/observation), unavailable
+  > inventory IDs, and derived counts (pass/fail/error/unavailable). It has no report_version,
+  > qualified implementation metadata, or extension verdict. Failures remain honest diagnostics.
+  > Output defaults to the executable repository's `.tmp-tests/csharp-development.json`;
+  > --output is accepted only with --development and must resolve under that same ignored tree.
+  > Relative --output paths are relative to that .tmp-tests root. Validate output before
+  > executing fixtures; create the default root if absent, but require a custom parent to
+  > already exist. Write compact order-preserving JSON, UTF-8 without BOM plus LF; check
+  > cancellation before writing. Known output argument/filesystem errors become controlled
+  > CLI exit 2. Production --write-report stays unavailable before any asset execution.
+  > Resolve containment by full path and reject reparse components; never create another output
+  > directory or canonical report. Program verifies selected assets first, dispatches development
+  > asynchronously, keeps --write-report unavailable, and returns nonzero for fail/error rows.
+  > No other native/transport/proof execution is implied by unavailable inventory rows.
+  > NOTE: Initial source review requires a fresh internal FixtureGates in every native run
+  > and retains the actual caught fixture-cancellation OCE, not only a flag. Projection must
+  > require that consistent native evidence before emitting cancelled. Comparator corrections
+  > bind actual operation/capture/source/preparation/wire provenance; require and compare the
+  > one fresh mirror; enforce full typed terminal envelopes and the duplicate-member-order
+  > predicate; keep byte limits type-aware; and project route delay seconds as milliseconds
+  > (integral milliseconds as JsonInteger). Independent tests preserve all these controls.
+  > Native build/test remains held until the consolidated sources and tests are stable.
+  > NOTE: First executable Development gate compiled cleanly under SDK 8.0.425 and ran
+  > 12 tests: four passed, eight failed, no skip/hang. Root's separate compiled diagnostic
+  > emitted only `.tmp-tests/m24b-first-diagnostic.json`, with 43 pass, 35 fail, seven error
+  > and 17 unavailable. This is an incomplete development observation, not qualification.
+  > The source correction preserves native unknown usage as six portable null counters,
+  > honors timing null markers and event/result attempt shapes, and validates repair wire
+  > injection after retained preparation. Independent test corrections fix core-only inventory
+  > filtering, actual assessment selection and effective immutable upsert stimuli. External
+  > OCE propagation remains required; expected byte equality is tested independently from
+  > input parsing. The next gate waits for these disjoint held corrections and review.
+
+  > NOTE: Accepted after bounded source/test closure and root-inspected retained gates:
+  > SDK 8.0.425 build passed with zero warnings/errors; Development passed 14 tests
+  > (4.7616s, `ebaaed44`), including all 85 core fixtures and typed-marker coincidence,
+  > mirror identity, usage, numeric category, duplicate order and causal provenance controls.
+  > Root's whole Conformance gate passed 51 tests (11.0299s, `bf68f944`). Standalone
+  > canonical and copied-root development executions both exited 0 (`1ff720a6`), each
+  > with 85 pass, zero fail/error and 17 explicitly unavailable transport/proof rows.
+  > Output is DEVELOPMENT/UNRELEASED only under `.tmp-tests`; no report-v0 or extension
+  > claim is made. Frozen release and Python report hashes remain unchanged. Resume at
+  > M2.4c from core `731cd968` plus the accepted uncommitted conformance implementation.
+  > Root's repository checkpoint rerun passed all 13 steps in 90.1 seconds (`5aa52d46`,
+  > exit 0). A local inaccessible pytest cache required a scoped cache-directory override
+  > under `.tmp-tests`; test selection, warning handling and source remained unchanged.
 
 - [ ] **M2.4c — first four native proof recipes.** Owner: native-proof worker; files limited to
   `NativeProofs.cs`, `ProofTimeouts.cs`, focused proof tests, and driver dispatch. Add these exact
@@ -406,6 +586,44 @@ verification both before execution and before output.
   `dotnet test AnyInfer.Conformance --no-restore --filter FullyQualifiedName~NativeProofs`
   distinguishes assertion failure from unavailable evidence and propagates cancellation/fatal
   execution.
+  > NOTE: Preparation and bounded critique are accepted in
+  > `foundation-execution/csharp-first-proofs-preparation` and its review sibling. No
+  > production-library or fixture-adapter seam changes are needed. Disjoint ownership is
+  > `NativeProofs.cs` (concurrency, assessment, exact dispatch and result record),
+  > `ProofTimeouts.cs` (the two native timeout recipes), `ReportWriter.cs` (development
+  > dispatch only), and independent `NativeProofsTests.cs` plus the minimal staged-count
+  > changes in `DevelopmentTests.cs`. No source authoring starts before the accepted
+  > M2.4a/b repository checkpoint is committed; heavy gates remain serialized.
+  >
+  > Pin `NativeProofResult(string Verdict, JsonObject Evidence, string? Detail = null)`
+  > and `NativeProofs.RunAsync(string recipeRef, CancellationToken = default)` returning
+  > `Task<NativeProofResult>`. Dispatch only the four exact inventory recipe refs; delegate
+  > timeout methods to `ProofTimeouts`. Check actual native objects and reference/lifecycle
+  > predicates before projecting nonempty ordinary JSON evidence. A complete observed
+  > predicate mismatch yields `fail` with actual evidence; missing/unavailable capture or
+  > instrumentation/harness faults yield `error`. Caller cancellation and fatal exceptions
+  > propagate. ReportWriter only maps this result into staged case rows, never implements
+  > proof policy or consumes expected data. The observer-only JsonObject proposal is replaced
+  > because it cannot carry a live predicate failure to the driver.
+  >
+  > Concurrency uses actual iterator-entry barriers on one client with separate captures,
+  > distinguishable native outcomes/assessments and actual overlap. After both finish, run a
+  > fresh schema-free operation on that client and verify no residual assessment while
+  > snapshots of the first captures remain unchanged. Assessment completeness uses native
+  > extraction, late malformed required, exhaustion, nested/dotted path and repair branches.
+  > Compare normal and real capacity/evidence-fault runs with the same native stimulus and
+  > outcome before proving unavailable observation is rejected; no synthetic finding replaces
+  > missing evidence. Testable guards stay internal to the proof files.
+  >
+  > Timeout evidence includes successful default `120` seconds / `1048576` bytes and
+  > explicit `7.25` / `4096` entries, then a real unreleased native gate under `0.05` seconds
+  > with actual expiry, typed transport mapping/trail and completed CTS disposal. Reset uses
+  > four actual `7.25` contexts in original/correction/restarted-original/correction order,
+  > with both correction assessment/preparation links and predecessor disposal before the
+  > next entry. Virtual time remains route-only; watchdogs detect hangs and never manufacture
+  > outcomes. After these four proofs execute, development output has 89 executable rows
+  > and 13 unavailable rows (11 transport and the last two proofs), still unqualified and
+  > confined to `.tmp-tests`; all 85 core fixture controls remain intact.
 
 - [ ] **M2.5a — OpenAI chat transport adapter.** Owner: transport worker; files limited to
   `AnyInfer/Providers/OpenAIChatAdapter.cs`, transport helpers, and unit tests. Use `HttpClient`
@@ -490,23 +708,33 @@ verification both before execution and before output.
   released case qualifies and comparison exits 0. No package, tag, publishing action, or
   supported-C# claim follows from this proof.
 
-- [ ] **M2.Gd — website documentation and delivery alignment.** Owner: documentation worker
-  after the coordinator pins the read-only site/CI audit's exact file list. The user's explicit
-  implementation requirement includes revisiting the published website documentation and
-  CI/CD. Review the root README, site landing/navigation, language and feature claims,
-  architecture/source layout, getting-started and reference surfaces, contributor/testing
-  commands, and documentation/release workflows. Update every affected restatement to the
-  verified C# implementation and its bounded scope; retain accurate Python coverage and avoid
-  presenting an unshipped C# package as available. Describe commands and examples that actually
-  execute. Keep Python-generated API references tied to Python, and add clear C# navigation or
-  documentation where needed. Audit docs publishing and release paths for the source layout
-  and native build checks, implementing the needed changes alongside M2.Ga's additive CI lane.
-  Do not change frozen specification/release bytes, add docs links to ephemeral plans, or infer
-  package publication from a proof. **Gate:** the exact affected-file/claim map is reconciled;
-  documented C# commands/examples execute; the existing site build, link/generated-document
-  checks and focused workflow tests pass; the complete workspace gate remains green. M2 is
-  incomplete until this website/docs and CI/CD work is accepted. The audit's concrete file list
-  and site commands are pinned here before authoring begins.
+- [ ] **M2.Gd — website documentation and delivery alignment.** Owner: documentation worker,
+  after M2.Ga has completed its shared contributor quality-gate edits. The accepted audit is
+  `foundation-execution/csharp-docs-ci-preparation/index.md`. Re-read the M2.Ga-owned
+  contributing files before authoring, then reconcile only this exact website/design/navigation
+  set: `README.md`, `docs/README.md`, `docs/index.md`, `docs/contributing/csharp-proof.md`
+  (new), `docs/contributing/README.md`, `docs/contributing/architecture.md`,
+  `docs/contributing/testing.md`, `docs/contributing/releasing.md`,
+  `docs/reference/README.md`, `mkdocs.yml`, and `DESIGN.md`. Add one contributor-oriented C#
+  proof page that states the bounded shared-corpus scope and records the verified native commands
+  from `src/csharp`: `dotnet --version`, `dotnet restore AnyInfer.sln`, and
+  `dotnet test AnyInfer.sln --no-restore`. Keep product, installation, public API, guide, and
+  download surfaces truthful: Python remains the supported runtime and the C# proof creates no
+  package, NuGet artifact, release asset, or normal report. Keep generated API reference
+  discovery Python-only and add the new page under Contributing navigation. The docs-site and
+  release workflows need no .NET/NuGet provisioning or report production; the only planned CI
+  change remains M2.Ga's additive `native-csharp` workspace/cwd lane. Do not change frozen
+  specification/release bytes or link published docs to ephemeral plans. **Gate:**
+  `python workspace.py check --only=docs-check` and
+  `python workspace.py check --only=docs-build` pass; focused workspace/workflow tests prove
+  the C# phase, `src/csharp` cwd/global SDK selection, the additive `native-csharp` dependency,
+  and unchanged Python aggregate policy; from `src/csharp`, the documented restore/test commands
+  pass; then the complete workspace gate passes. M2 is incomplete until this website/docs and
+  CI/CD work is accepted.
+
+  > NOTE: The documentation and delivery audit is accepted at clean proof checkpoint
+  > `731cd968e9ade4cc0f8b369ae3fc11675137eb17`; it found no required docs-site or release
+  > workflow .NET/NuGet/report-production change beyond M2.Ga's future native CI lane.
 
 ## 5. Failure, resume, and ownership rules
 

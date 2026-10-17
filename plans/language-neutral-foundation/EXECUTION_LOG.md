@@ -1689,3 +1689,194 @@ The user's website/docs and CI/CD requirement is now an explicit completion cond
 M2.Gd in the bounded plan, linked from master M2.G, supplements the existing native CI lane.
 Site and delivery discovery must pin its concrete affected files before documentation
 authoring. The website must describe verified C# scope and executable commands accurately.
+
+The invocation/routing checkpoint is `731cd968e9ade4cc0f8b369ae3fc11675137eb17`;
+root verified an empty tracked/untracked status immediately after committing. The only
+pre-commit cleanup after passing gates removed an extra blank line at OperationCapture EOF.
+M2.4a now resumes from this commit with three cheap, disjoint authors: release/CLI/project
+entry point; fixture input/script adapter; and independent selected-root/adapter tests.
+The bounded plan pins root-prefix mapping, cached verified bytes, derived closed-set counts,
+reparse rejection, input/expected separation, internal named gates and CLI exit behavior.
+All build/test/restore work is held until source snapshots are stable; then the focused
+ReleaseAssets and CLI/alternate-root gates run in the sole heavy slot.
+
+The website audit's 11-file prose/navigation/design set and exact docs gates are now
+pinned in M2.Gd. Existing Python install/API/download behavior stays accurate; the delivery
+audit found no need for .NET setup in docs publishing or C# packaging in Python releases.
+Native CI integration remains the required additive M2.Ga lane. M2.Gd is still unchecked.
+
+Initial M2.4a source and independent tests are authored, with runtime still held. Cold fixture
+review identified terminal failure ordering, omitted native error defaults and nested closed
+execution-envelope validation defects. Those are assigned as one source/test correction wave.
+Root also corrected its own input API pin to retain optional raw fixture Clock (present in the
+released health cases) and requires CLI verification to invoke the fixture reader as well as
+hash/inventory checks. Keep original schema/unsupported content/Expected semantics untouched.
+Resume M2.4a from `731cd968e9ade4cc0f8b369ae3fc11675137eb17`; no conformance gate has run.
+
+Release/CLI cold review adds a parallel owned correction: fully type the normative
+inventory/reference evidence envelopes, derive metadata from the same first-read verified
+bytes, preserve absolute volume roots, wire verification through FixtureReader, and retain
+the selected release path in diagnostics. Independent copied-root controls target those
+guards after refreshing only the necessary hashes. No compile/test grant is issued until
+both corrected source snapshots and the final independent tests are held for bounded review.
+
+Bounded fixture rereview closes the original groups. One consume-mode prefix check still
+admits invalid suffixes and is being made exact. Root rejected a proposed location-derived
+cleanup phase and corrected its earlier terminal transport instruction: omitted phases follow
+category-native defaults (`generate`, except stream-protocol `stream`); explicit fields stay
+literal. That decision is pinned in M2.4a so later workers do not infer phase from script
+location. Source and independent controls remain held; no runtime gate has run.
+
+The final fixture-source correction has clean bounded closure, including an actual-final
+emission guard so early disposal does not inject a future scripted cleanup failure. Final
+test review identified an explicit phase/assertion mismatch and a subprocess root-control
+that needed selected-only tampering; those plus a non-ASCII suffix negative are being fixed
+in the independent test files. Root has not started the conformance compile. Wait for those
+held tests and release/CLI source closure, then run the serialized M2.4a gates.
+
+The corrected fixture source and three test-control deltas now have clean bounded review.
+Release-reader rereview closes its earlier hash/snapshot/root/CLI groups but identifies a
+duplicate local declaration and required historical evidence maps accepting empty objects.
+The release owner is fixing only those points; independent tests rebind copied environment,
+manifest and release hashes to target the empty-evidence guards. No conformance build/test
+has run; the first process waits for these final source/test snapshots to be held.
+
+All final source/test snapshots are held and fixture/test reviews are clean. Root's first
+Conformance compile in `4b38281f` records SDK 8.0.425 and exits 1 on a test-only CS9007
+raw interpolated JSON literal in ReleaseAssetsFixtureAdapterTests.cs:115. The test owner has
+the sole compile slot for a syntax-only correction preserving its stimulus, with any further
+owned mechanical compiler diagnostics batched. No native test has executed; release evidence
+source rereview remains independent of that compiler check.
+
+Final release-source review is clean. Test-only literal/hex API corrections compile far
+enough to expose three remaining reader compatibility diagnostics (two invalid char patterns
+and a newer-than-net8 hex helper). Root inspected `ebaaed44` and transferred the sole slot
+to the source owner for those three mechanical fixes, then conditional first ReleaseAssets
+native execution. Test semantics and all source review closures remain held; no test has run
+yet and no M2.4a acceptance is implied.
+
+The first focused native ReleaseAssets execution in retained `c90e92e2` built successfully
+under SDK 8.0.425, then completed without a hang: 35 total, 19 passed, 16 failed, exit 1
+(4.6426s). Root confirmed a Windows separator conversion in ResolveSealedPath feeds
+backslashes into a resolver intentionally requiring canonical forward slashes. The source
+owner is removing only that internal conversion and correcting CLI path selection to retain
+safe asset/fixture-relative diagnostics. The independent test owner is correcting the
+volume-root stimulus (a lone Windows separator is drive-relative) and exact case-alias
+category. Other failures remain preserved until this earlier path cascade is removed.
+No new process grant or M2.4a acceptance is implied; resume from core `731cd968` plus held
+reader files. Website and CI/CD work remains required at M2.Ga/M2.Gd.
+
+The held path/test corrections have bounded closure; the review also distinguishes Windows
+root-relative `\\` from true drive-relative `D:relative`, both still rejected. One final
+CLI formatter gap permits U+2028/U+2029 line/paragraph separators despite the control-character
+guard. The source owner is sharing the safe formatter across argument/asset diagnostics and
+rejecting those separators, with direct independent CLI controls. No focused rerun has started.
+
+The corrected ReleaseAssets gate in `ebaaed44` completed under SDK 8.0.425: 37 total,
+36 passed, one failed, no skip/hang, exit 1 (10.7586s). Path resolution, selected-root
+CLI negatives, evidence, fixture envelopes and diagnostic separator controls now pass.
+The remaining expected-only mutation test uses record/container equality across fresh JSON
+reads, so it fails on independent collection identities. Root authorized exact compact JSON
+writer comparisons for Request/Route/Adapter and Expected inequality, preserving member
+order, numeric category and the independent adapter event behavior control. The same full
+focused filter is regranted once after that test-only oracle correction; no source change.
+
+M2.4a is accepted. Root inspected the retained `ebaaed44` log: SDK 8.0.425, 37 passed,
+zero failures/skips, exit 0 (10.7960s). Root separately ran standalone help and canonical
+verification, then copied-root verification in `269cf12d`; every command exited 0. Root
+checked the final diagnostic separator guard and cross-read compact JSON assertions directly;
+earlier independent source/test closures remain applicable. Release and Python report hashes
+are unchanged. The first unchecked box is M2.4b on core `731cd968` plus accepted reader files;
+read-only native-runner and comparator maps are being pinned before disjoint source briefs.
+
+M2.4b interfaces and output contract are pinned in the bounded plan. Three cheap source
+authors now own disjoint native execution/clock, projection/comparison, and development
+CLI/output files. Execution accepts only case ID and CoreFixtureInput; expected data is
+isolated in Comparison. The subset is 85 core cases, with 17 transport/proof IDs explicitly
+unavailable and no extension declaration. The single mirror case gets entirely fresh native
+resources. Output remains DEVELOPMENT/UNRELEASED under the executable repository .tmp-tests.
+Independent DevelopmentTests follow the held source handoffs. All processes are held until
+the coherent snapshots are ready; M2.4b is the first unchecked box, on `731cd968` plus the
+accepted uncommitted reader files. No C# report or qualification is claimed.
+
+All M2.4b source slices are authored, with native execution and comparator cold reviews
+identifying focused corrections before first compile. Execution now supplies fresh script
+gates and retains the actual deliberate-cancellation OCE. Comparator correction covers
+mandatory/equivalent fresh mirror evidence, operation/assessment/preparation provenance,
+consistent cancellation, complete terminal envelopes, duplicate-member order, type-aware byte
+limits and clock units. Delivery correction validates output before running fixtures, preserves
+JSON member order, handles known output errors, and keeps production unavailable. Independent
+DevelopmentTests and the intentional old CLI mode adaptations are being authored. Processes
+remain held; M2.4b is incomplete and no development result has run yet.
+
+The consolidated projection correction has bounded source closure after restoring the
+primary/mirror entry-point methods and the original-role assessment guard. The first native
+build in `ebaaed44` used SDK 8.0.425 and exited 1 on one test-only missing AnyInfer.Core
+namespace for RepairPreparation; no Development test executed. That mechanical fix is held.
+Independent test review also found masking in copied-capture mutations, so the test owner is
+binding fresh entries/replacement assessments correctly and adding a consistent-copy positive
+control before the targeted stale/duplicate/original-role negatives. The sole build/filter
+slot is regranted after that held test delta. No source or assertion weakening is authorized.
+
+The isolated test delta has clean bounded review. The second build still stops before runtime:
+one Projection path-select switch needs explicit JsonValue result typing, and test expected
+mutations incorrectly use a mutable indexer on the immutable JsonObject. The two disjoint
+owners are batching only those mechanical compile fixes, preserving typed values and intended
+mutations. The same build followed conditionally by the Development filter is regranted once
+both snapshots are held; no Development test has yet executed.
+
+First Development runtime is semantic-red: SDK 8.0.425 build 0 warnings/errors, then
+12 tests (four pass/eight fail), no skip/hang. The all-85 aggregate was blocked by a test
+ordering assumption that included transport IDs. Root ran one compiled CLI diagnostic in
+`bd6c95d5`, exit 1, writing only `.tmp-tests/m24b-first-diagnostic.json`:43pass/35fail/7error,
+17 unavailable. All42 non-pass rows group into usage projection/omission, timing null marker,
+attempt record shape, and repair-preparation vs injected-wire comparison. Source fixes are
+scoped to Projection/Comparison; no core behavior changes. Independent tests correct the
+core path filter, exact invalid assessment reference, external OCE expectation, immutable
+upsert helper and byte-vs-timeout comparison stimulus; all85pass/nonpass detail assertions
+remain intact. No gate rerun is granted until these coherent snapshots and review are held.
+
+The common-cause source and independent test corrections are held with bounded review.
+One diagnostic build stopped before tests on a missing AnyInfer.Core import for the new
+repair helper; review had also found its missing actual-wire comparison argument. After
+the worker released the slot, root applied exactly those two mechanical changes and inspected
+the call directly. The same build then Development filter is regranted in `ebaaed44`, with
+results `.tmp-tests/m24b-development-common-causes-corrected-final`. No assertion or native
+core behavior changed, and M2.4b remains unchecked pending the corrected 85-case result.
+
+Root inspected the next retained runtime summary: SDK 8.0.425 build 0 warnings/errors;
+Development 10passed/3failed, no skip/hang (4.1795s). The complete aggregate now executes:
+78/85 core cases pass, seven fail only at correction-message comparison. The expected
+feedback marker already supplies the fixed template around the selected bullet lines, while
+the comparator expanded a second full template. The other failed negative control exposes
+a missing mirror CaseId match. The source owner is correcting those narrow fields and binding
+markers to actual injection/repair message positions; independent tests add a caller-literal
+coincidence control so string equality cannot authorize an out-of-scope schema marker. Source
+and test files remain disjoint; no native library change is required or authorized.
+
+M2.4b is accepted after clean bounded marker/mirror closure. Root inspected the retained
+SDK 8.0.425 build (zero warnings/errors) and Development gate: 14 passed, zero failures/skips,
+4.7616s in `ebaaed44`. Root's whole Conformance gate `bf68f944` passed 51 tests in 11.0299s.
+Standalone compiled CLI runs in `1ff720a6` against canonical and copied selected roots both
+exited 0 and produced 85 pass, zero fail/error, 17 unavailable. The two ignored outputs are
+`.tmp-tests/m24b-accepted-canonical.json` and `m24b-accepted-selected-copy.json`, explicitly
+DEVELOPMENT/UNRELEASED without report-v0 metadata. Frozen release/report SHA-256 values remain
+unchanged. First unchecked box is M2.4c; its read-only proof preparation is underway. The
+repository acceptance gate precedes the next source checkpoint. Website/docs and CI/CD remain
+mandatory at M2.Ga/M2.Gd; no qualified C# report or supported-product claim exists.
+
+The repository checkpoint gate in `5aa52d46` exited 1: four pytest phases completed their
+tests but failed cache finalization because Windows denied access to `.pytest_cache/v/cache`.
+Lint, types, contracts, fixtures, changelog, docstring/link checks and strict docs build passed.
+Root confirmed the local cache subtree is inaccessible; a contained move also received access
+denied and changed nothing. The same full gate is rerunning with pytest's `cache_dir` directed
+to ignored `.tmp-tests/m24b-gate-pytest-cache` through a scoped `PYTEST_ADDOPTS` override.
+No test selection, warning policy, source or assertions changed. The failed gate remains
+retained; no checkpoint commit is permitted until the rerun passes.
+
+Root inspected the rerun in `5aa52d46`: all 13 repository steps passed in 90.1 seconds,
+exit 0, with only the scoped fresh-cache directory override above. The accepted M2.4a/b
+reader/development source, project entry point, tests and plan/log are ready for their explicit
+path checkpoint commit. M2.4c is the first unchecked box; its native proof API, disjoint
+ownership, fail/error distinction and required residual-state/cap controls are now pinned in
+the proof plan. No native proof source has been authored yet.

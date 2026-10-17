@@ -3,6 +3,7 @@
     <AssemblyName>AnyInfer.Conformance</AssemblyName>
     <RootNamespace>AnyInfer.Conformance</RootNamespace>
     <OutputType>Exe</OutputType>
+    <GenerateProgramFile>false</GenerateProgramFile>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
