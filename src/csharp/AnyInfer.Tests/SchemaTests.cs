@@ -425,20 +425,20 @@ public sealed class SchemaTests
         var schema = JsonReader.Read("{\"type\":\"object\"}");
         var original = new[]
         {
-            new Message("system", [new TextPart("first")]),
-            new Message("user", [new TextPart("literal $repair_feedback text")]),
-            new Message("system", [new TextPart("last")]),
+            new Message("system", [new Text("first")]),
+            new Message("user", [new Text("literal $repair_feedback text")]),
+            new Message("system", [new Text("last")]),
         };
         var injected = SchemaPromptRenderer.InjectPrompt(original, schema);
 
         Assert.NotSame(original, injected);
         Assert.Equal(3, injected.Count);
         Assert.Single(original[2].Content);
-        var last = Assert.IsType<TextPart>(injected[2].Content[1]);
-        Assert.StartsWith("\n\nRespond with ONLY", last.Text, StringComparison.Ordinal);
-        Assert.Equal("literal $repair_feedback text", Assert.IsType<TextPart>(injected[1].Content[0]).Text);
+        var last = Assert.IsType<Text>(injected[2].Content[1]);
+        Assert.StartsWith("\n\nRespond with ONLY", last.Value, StringComparison.Ordinal);
+        Assert.Equal("literal $repair_feedback text", Assert.IsType<Text>(injected[1].Content[0]).Value);
 
-        var withoutSystem = SchemaPromptRenderer.InjectPrompt([new Message("user", [new TextPart("caller literal prompt")])], schema);
+        var withoutSystem = SchemaPromptRenderer.InjectPrompt([new Message("user", [new Text("caller literal prompt")])], schema);
         Assert.Equal("system", withoutSystem[0].Role);
         Assert.Equal("user", withoutSystem[1].Role);
         Assert.Single(SchemaPromptRenderer.InjectPrompt([], schema));

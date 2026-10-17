@@ -1,17 +1,18 @@
 using AnyInfer.Json;
+using System.Collections.ObjectModel;
 
 namespace AnyInfer;
 
 public abstract record ContentPart;
 
-public sealed record TextPart : ContentPart
+public sealed record Text : ContentPart
 {
-    public TextPart(string text)
+    public Text(string text)
     {
-        Text = text ?? throw new ArgumentNullException(nameof(text));
+        Value = text ?? throw new ArgumentNullException(nameof(text));
     }
 
-    public string Text { get; }
+    public string Value { get; }
 }
 
 public sealed record UnsupportedContentPart : ContentPart
@@ -39,19 +40,30 @@ public sealed record Message
     public string Role { get; }
 
     public IReadOnlyList<ContentPart> Content { get; }
+
+    public static Message User(string text) => new("user", [new Text(text)]);
+
+    public static Message System(string text) => new("system", [new Text(text)]);
+
+    public static Message Assistant(string text) => new("assistant", [new Text(text)]);
 }
 
-public sealed record Target
+public sealed record ResolvedTarget
 {
-    public Target(string providerId, string model)
+    public ResolvedTarget(string providerId, string model, string? viaAlias = null)
     {
         ProviderId = providerId ?? throw new ArgumentNullException(nameof(providerId));
         Model = model ?? throw new ArgumentNullException(nameof(model));
+        ViaAlias = viaAlias;
     }
 
     public string ProviderId { get; }
 
     public string Model { get; }
+
+    public string? ViaAlias { get; }
+
+    public override string ToString() => $"{ProviderId}:{Model}";
 }
 
 public sealed record Sampling
@@ -83,27 +95,27 @@ public sealed record Sampling
     public double? FrequencyPenalty { get; }
 }
 
-public sealed record RepairOptions(int MaxAttempts = 1);
+public sealed record Repair(int MaxAttempts = 1);
 
-public sealed record RetryPolicy(int MaxAttempts = 2, double BackoffBaseS = 0.5, double BackoffMaxS = 30);
+public sealed record Retry(int MaxAttempts = 2, double BackoffBaseS = 0.5, double BackoffMaxS = 30);
 
 public sealed record Route
 {
     public Route(
         IEnumerable<string> targets,
-        RetryPolicy? retry = null,
+        Retry? retry = null,
         bool healthGate = true,
         double healthTtlS = 30)
     {
         ArgumentNullException.ThrowIfNull(targets);
         Targets = Array.AsReadOnly(targets.Select(static target => target ?? throw new ArgumentException("Route targets cannot be null.")).ToArray());
-        Retry = retry ?? new RetryPolicy();
+        Retry = retry ?? new Retry();
         HealthGate = healthGate;
         HealthTtlS = healthTtlS;
     }
 
     public IReadOnlyList<string> Targets { get; }
-    public RetryPolicy Retry { get; }
+    public Retry Retry { get; }
     public bool HealthGate { get; }
     public double HealthTtlS { get; }
 }
@@ -116,18 +128,40 @@ public sealed record Usage(
     long? CacheWriteTokens = null,
     long? ReasoningTokens = null);
 
-public sealed record GenerationTiming(double? FirstTokenMs = null, double? TotalMs = null);
+public sealed record Timing
+{
+    public Timing(
+        double startedAt = 0,
+        double? firstTokenMs = null,
+        double totalMs = 0,
+        double? outputTokensPerS = null,
+        IEnumerable<KeyValuePair<string, double>>? phases = null)
+    {
+        StartedAt = startedAt;
+        FirstTokenMs = firstTokenMs;
+        TotalMs = totalMs;
+        OutputTokensPerS = outputTokensPerS;
+        Phases = new ReadOnlyDictionary<string, double>(
+            (phases ?? []).ToDictionary(static phase => phase.Key, static phase => phase.Value, StringComparer.Ordinal));
+    }
+
+    public double StartedAt { get; }
+    public double? FirstTokenMs { get; }
+    public double TotalMs { get; }
+    public double? OutputTokensPerS { get; }
+    public IReadOnlyDictionary<string, double> Phases { get; }
+}
 
 public sealed record AttemptRecord
 {
-    public AttemptRecord(Target? target, string outcome, AnyInferException? error = null)
+    public AttemptRecord(ResolvedTarget? target, string outcome, AnyInferException? error = null)
     {
         Target = target;
         Outcome = outcome ?? throw new ArgumentNullException(nameof(outcome));
         Error = error;
     }
 
-    public Target? Target { get; }
+    public ResolvedTarget? Target { get; }
 
     public string Outcome { get; }
 
@@ -140,7 +174,7 @@ public sealed record GenerationRequest
         IEnumerable<Message> messages,
         Route route,
         Sampling? sampling = null,
-        RepairOptions? repair = null,
+        Repair? repair = null,
         JsonValue? schema = null,
         string? schemaMechanism = null,
         double? timeoutS = null,
@@ -162,7 +196,7 @@ public sealed record GenerationRequest
     public IReadOnlyList<Message> Messages { get; }
     public Route Route { get; }
     public Sampling? Sampling { get; }
-    public RepairOptions? Repair { get; }
+    public Repair? Repair { get; }
     public JsonValue? Schema { get; }
     public string? SchemaMechanism { get; }
     public double? TimeoutS { get; }
@@ -170,15 +204,15 @@ public sealed record GenerationRequest
     public bool Stream { get; }
 }
 
-public sealed record GenerationResult
+public sealed record Generation
 {
-    public GenerationResult(
+    public Generation(
         string text,
         JsonValue? structured = null,
-        Target? target = null,
+        ResolvedTarget? target = null,
         string? finishReason = null,
         Usage? usage = null,
-        GenerationTiming? timing = null,
+        Timing? timing = null,
         string? structuredMechanism = null,
         int repairAttempts = 0,
         IEnumerable<AttemptRecord>? attempts = null,
@@ -198,10 +232,10 @@ public sealed record GenerationResult
 
     public string Text { get; }
     public JsonValue? Structured { get; }
-    public Target? Target { get; }
+    public ResolvedTarget? Target { get; }
     public string? FinishReason { get; }
     public Usage? Usage { get; }
-    public GenerationTiming? Timing { get; }
+    public Timing? Timing { get; }
     public string? StructuredMechanism { get; }
     public int RepairAttempts { get; }
     public IReadOnlyList<AttemptRecord> Attempts { get; }

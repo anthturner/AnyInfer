@@ -12,7 +12,7 @@ public sealed class AsyncClient : IAsyncDisposable
     private readonly IOperationClock _clock;
     private readonly RouteState _health;
     private readonly object _gate = new();
-    private readonly HashSet<GenerationStream> _activeStreams = [];
+    private readonly HashSet<AsyncStream> _activeStreams = [];
     private bool _disposed;
     private Task? _disposeTask;
 
@@ -32,10 +32,42 @@ public sealed class AsyncClient : IAsyncDisposable
     internal RouteState Health => _health;
 
     /// <summary>Consumes this client's single streaming execution path to its terminal result.</summary>
-    public Task<GenerationResult> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default) =>
+    public Task<Generation> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default) =>
         GenerateAsync(request, capture: null, cancellationToken: cancellationToken);
 
-    internal async Task<GenerationResult> GenerateAsync(
+    /// <summary>Generates from one user prompt through the normal request path.</summary>
+    public Task<Generation> GenerateAsync(
+        string prompt,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        Json.JsonValue? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        CancellationToken cancellationToken = default) =>
+        GenerateAsync(
+            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false),
+            cancellationToken);
+
+    /// <summary>Generates from immutable caller messages through the normal request path.</summary>
+    public Task<Generation> GenerateAsync(
+        IEnumerable<Message> messages,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        Json.JsonValue? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        CancellationToken cancellationToken = default) =>
+        GenerateAsync(
+            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false),
+            cancellationToken);
+
+    internal async Task<Generation> GenerateAsync(
         GenerationRequest request,
         OperationCapture? capture,
         CancellationToken cancellationToken = default)
@@ -45,22 +77,54 @@ public sealed class AsyncClient : IAsyncDisposable
         {
         }
 
-        return stream.Result ?? throw new InvalidOperationException("Generation completed without a terminal result.");
+        return stream.Result;
     }
 
     /// <summary>Creates a lazy single-consumer generation stream.</summary>
-    public GenerationStream StreamAsync(GenerationRequest request, CancellationToken cancellationToken = default) =>
+    public AsyncStream StreamAsync(GenerationRequest request, CancellationToken cancellationToken = default) =>
         StreamAsync(request, capture: null, cancellationToken: cancellationToken);
 
-    internal GenerationStream StreamAsync(
+    /// <summary>Creates a streaming generation operation from one user prompt.</summary>
+    public AsyncStream StreamAsync(
+        string prompt,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        Json.JsonValue? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        CancellationToken cancellationToken = default) =>
+        StreamAsync(
+            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true),
+            cancellationToken);
+
+    /// <summary>Creates a streaming generation operation from immutable caller messages.</summary>
+    public AsyncStream StreamAsync(
+        IEnumerable<Message> messages,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        Json.JsonValue? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        CancellationToken cancellationToken = default) =>
+        StreamAsync(
+            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true),
+            cancellationToken);
+
+    internal AsyncStream StreamAsync(
         GenerationRequest request,
         OperationCapture? capture,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
         var normalized = RequestNormalizer.Normalize(request);
-        GenerationStream? stream = null;
-        stream = new GenerationStream(
+        AsyncStream? stream = null;
+        stream = new AsyncStream(
             token => RunStreamAsync(normalized, request.Route, capture, stream!, token),
             cancellationToken,
             RemoveActiveStream);
@@ -89,7 +153,7 @@ public sealed class AsyncClient : IAsyncDisposable
         }
     }
 
-    private async Task DisposeCoreAsync(GenerationStream[] streams)
+    private async Task DisposeCoreAsync(AsyncStream[] streams)
     {
         await Task.Yield();
         Exception? failure = null;
@@ -122,11 +186,11 @@ public sealed class AsyncClient : IAsyncDisposable
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         }
     }
-    private async IAsyncEnumerable<GenerationEvent> RunStreamAsync(
+    private async IAsyncEnumerable<StreamEvent> RunStreamAsync(
         NormalizedRequest normalized,
         Route route,
         OperationCapture? capture,
-        GenerationStream stream,
+        AsyncStream stream,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         try
@@ -150,7 +214,7 @@ public sealed class AsyncClient : IAsyncDisposable
         }
     }
 
-    private void RemoveActiveStream(GenerationStream stream)
+    private void RemoveActiveStream(AsyncStream stream)
     {
         lock (_gate)
         {
@@ -166,5 +230,35 @@ public sealed class AsyncClient : IAsyncDisposable
                 throw new ObjectDisposedException(nameof(AsyncClient));
             }
         }
+    }
+
+    private static GenerationRequest CreateConvenienceRequest(
+        IEnumerable<Message> messages,
+        string? target,
+        Route? route,
+        Sampling? sampling,
+        Repair? repair,
+        Json.JsonValue? schema,
+        string? schemaMechanism,
+        double? timeoutS,
+        int? maxResponseBytes,
+        bool stream)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        if ((target is null) == (route is null))
+        {
+            throw new ArgumentException("Specify exactly one target or route.");
+        }
+
+        return new GenerationRequest(
+            messages,
+            route ?? new Route([target!]),
+            sampling,
+            repair,
+            schema,
+            schemaMechanism,
+            timeoutS,
+            maxResponseBytes,
+            stream);
     }
 }

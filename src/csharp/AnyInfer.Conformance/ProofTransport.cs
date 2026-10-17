@@ -23,14 +23,14 @@ internal static class ProofTransport
             var capture = new OperationCapture();
             var adapter = new CleanupBlockingAdapter(capture);
             var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
-            var publicEvents = new List<GenerationEvent>();
+            var publicEvents = new List<StreamEvent>();
             AnyInferException? terminal = null;
             try
             {
                 await using var stream = client.StreamAsync(
                     new GenerationRequest(
-                        [new Message("user", [new TextPart("cleanup")])],
-                        new Route(["proof:model"], new RetryPolicy(MaxAttempts: 1)),
+                        [new Message("user", [new Text("cleanup")])],
+                        new Route(["proof:model"], new Retry(MaxAttempts: 1)),
                         schema: PersonSchema(),
                         timeoutS: 0.05,
                         maxResponseBytes: 80),
@@ -102,7 +102,7 @@ internal static class ProofTransport
                 entry.Timeout.IsExpired && entry.Timeout.IsDisposed && entry.NativeFailure is OperationCanceledException &&
                 mapped is { Category: "transport", Retryable: true, Phase: "generate" } &&
                 ReferenceEquals(entry.NativeFailure, mapped.NativeInner) && attempts.Count == 1 && attempts[0].Outcome == "failed" && ReferenceEquals(mapped, attempts[0].Error) && adapter.IsDisposed &&
-                capture.Assessments.Count == 0 && publicEvents.All(static item => item is not UsageEvent and not StreamEndedEvent) &&
+                capture.Assessments.Count == 0 && publicEvents.All(static item => item is not UsageUpdate and not StreamEnded) &&
                 nativeCleanup.FinalCaptured && !nativeCleanup.ExpiredBefore && !nativeCleanup.DisposedBefore && !nativeCleanup.TokenRequestedBefore && nativeCleanup.LastLifecycleBefore == "entered" &&
                 nativeCleanup.ExpiredAfter && !nativeCleanup.DisposedAfter && nativeCleanup.TokenRequestedAfter && nativeCleanup.LastLifecycleAfter == "expired" &&
                 names.SequenceEqual(requiredLifecycle, StringComparer.Ordinal);
@@ -172,15 +172,15 @@ internal static class ProofTransport
         var adapter = new RecordingHttpAdapter(http, handler);
         var capture = new OperationCapture();
         await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
-        GenerationResult? result = null;
+        Generation? result = null;
         AnyInferException? terminal = null;
         try
         {
             result = await client.GenerateAsync(
                 new GenerationRequest(
-                    [new Message("user", [new TextPart("Return age.")])],
-                    new Route(["proof:model"], new RetryPolicy(MaxAttempts: 1)),
-                    repair: new RepairOptions(1),
+                    [new Message("user", [new Text("Return age.")])],
+                    new Route(["proof:model"], new Retry(MaxAttempts: 1)),
+                    repair: new Repair(1),
                     schema: PersonSchema(),
                     maxResponseBytes: 100),
                 capture,
@@ -203,7 +203,7 @@ internal static class ProofTransport
         var handler = new ScriptedHttpMessageHandler(Responses(Chunks(stream ? "text/event-stream" : "application/json", chunks)));
         var http = new OpenAIChatAdapter(new Uri("https://proof.invalid/v1"), "proof-token", handler: handler);
         var adapter = new RecordingHttpAdapter(http, handler);
-        var wire = new WireRequest("model", [new Message("user", [new TextPart("overflow")])], new Sampling(), stream: stream, maxResponseBytes: 80);
+        var wire = new WireRequest("model", [new Message("user", [new Text("overflow")])], new Sampling(), stream: stream, maxResponseBytes: 80);
         var events = new List<AdapterEvent>();
         ProviderException? error = null;
         try
@@ -234,8 +234,8 @@ internal static class ProofTransport
     }
 
     private static async Task ConsumePublicAsync(
-        GenerationStream stream,
-        ICollection<GenerationEvent> events,
+        AsyncStream stream,
+        ICollection<StreamEvent> events,
         CancellationToken cancellationToken)
     {
         await foreach (var item in stream.WithCancellation(cancellationToken).ConfigureAwait(false))
@@ -273,14 +273,14 @@ internal static class ProofTransport
         return bodyMessages.Items.Zip(messages).All(pair => pair.First is JsonObject body &&
             body.TryGetValue("role", out var role) && role is JsonString { Value: var actualRole } && actualRole == pair.Second.Role &&
             body.TryGetValue("content", out var content) && content is JsonString { Value: var actualContent } &&
-            actualContent == string.Concat(pair.Second.Content.OfType<TextPart>().Select(static part => part.Text)));
+            actualContent == string.Concat(pair.Second.Content.OfType<Text>().Select(static part => part.Value)));
     }
     private static int RawCodePoints(RecordedHttpExchange exchange) => Encoding.UTF8.GetString(exchange.ConfiguredRawChunks.SelectMany(static chunk => chunk.ToArray()).ToArray()).EnumerateRunes().Count();
 
     private static JsonObject Entry(EntryContext entry) => Obj(P("ordinal", N(entry.Ordinal)), P("role", S(entry.Role.ToString().ToLowerInvariant())), P("timeout_context_id", S(entry.Timeout.ContextId.ToString("D"))), P("timeout_s", D(entry.Request.TimeoutS)), P("max_response_bytes", N(entry.Request.MaxResponseBytes)), P("expired", B(entry.Timeout.IsExpired)), P("disposed", B(entry.Timeout.IsDisposed)), P("native_failure", entry.NativeFailure is null ? JsonNull.Instance : S(entry.NativeFailure.GetType().Name)), P("terminal_failure", entry.TerminalFailure is null ? JsonNull.Instance : S(entry.TerminalFailure.GetType().Name)));
     private static JsonObject CleanupObservation(CleanupNativeObservation value) => Obj(P("final_captured", B(value.FinalCaptured)), P("expired_before", B(value.ExpiredBefore)), P("disposed_before", B(value.DisposedBefore)), P("token_requested_before", B(value.TokenRequestedBefore)), P("last_lifecycle_before", value.LastLifecycleBefore is null ? JsonNull.Instance : S(value.LastLifecycleBefore)), P("expired_after", B(value.ExpiredAfter)), P("disposed_after", B(value.DisposedAfter)), P("token_requested_after", B(value.TokenRequestedAfter)), P("last_lifecycle_after", value.LastLifecycleAfter is null ? JsonNull.Instance : S(value.LastLifecycleAfter)));
     private static JsonObject Assessment(NativeAssessment assessment) => Obj(P("id", S(assessment.AssessmentId.ToString("D"))), P("source_entry", N(assessment.SourceEntryOrdinal)), P("valid", B(assessment.IsValid)));
-    private static JsonObject Repair(RepairPreparation repair) => Obj(P("assessment_id", S(repair.Assessment.AssessmentId.ToString("D"))), P("response", S(repair.ResponseText)), P("messages", new JsonArray(repair.Messages.Select(static message => S(string.Concat(message.Content.OfType<TextPart>().Select(static part => part.Text)))))));
+    private static JsonObject Repair(RepairPreparation repair) => Obj(P("assessment_id", S(repair.Assessment.AssessmentId.ToString("D"))), P("response", S(repair.ResponseText)), P("messages", new JsonArray(repair.Messages.Select(static message => S(string.Concat(message.Content.OfType<Text>().Select(static part => part.Value)))))));
     private static JsonObject Attempt(AttemptRecord attempt) => Obj(P("outcome", S(attempt.Outcome)), P("error", attempt.Error is null ? JsonNull.Instance : S(attempt.Error.Category)));
     private static JsonArray Lifecycle(IReadOnlyList<LifecycleObservation> items) => new(items.Select(static item => Obj(P("sequence", N(item.Sequence)), P("entry", N(item.EntryOrdinal)), P("name", S(item.Name)))));
     private static JsonObject Obj(params JsonProperty[] properties) => new(properties);
@@ -299,7 +299,7 @@ internal static class ProofTransport
     private static byte[] Pad(string body, int length) { var bytes = Encoding.UTF8.GetBytes(body); if (bytes.Length > length) throw new TransportHarnessException("proof HTTP body exceeded its required raw length"); return Encoding.UTF8.GetBytes(body + new string(' ', length - bytes.Length)); }
     private static IReadOnlyList<byte[]> Split(byte[] bytes, int size) => Enumerable.Range(0, (bytes.Length + size - 1) / size).Select(index => bytes.Skip(index * size).Take(size).ToArray()).ToArray();
 
-    private sealed record CorrectionRun(GenerationResult? Result, AnyInferException? Terminal, OperationCapture Capture, ScriptedHttpMessageHandler Handler);
+    private sealed record CorrectionRun(Generation? Result, AnyInferException? Terminal, OperationCapture Capture, ScriptedHttpMessageHandler Handler);
     private sealed record OverflowRun(IReadOnlyList<AdapterEvent> Events, ProviderException? Error, RecordedHttpExchange? Exchange, bool HandlerDisposed);
 
     private sealed class CleanupBlockingAdapter : IProviderAdapter

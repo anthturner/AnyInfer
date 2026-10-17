@@ -197,20 +197,17 @@ using AnyInfer.Providers;
 var adapter = new DemoAdapter();
 {
     await using var client = new AsyncClient([new ProviderRegistration("demo", adapter)]);
-    var request = new GenerationRequest(
-        [new Message("user", [new TextPart("hello")])],
-        new Route(["demo:model"]));
-    var buffered = await client.GenerateAsync(request);
+    var messages = new[] { new Message("user", [new Text("hello")]) };
+    var buffered = await client.GenerateAsync(messages, target: "demo:model");
     if (buffered.Text != "buffered")
         throw new InvalidOperationException("buffered result failed");
-    await using var stream = client.StreamAsync(
-        new GenerationRequest(request.Messages, request.Route, stream: true));
+    await using var stream = client.StreamAsync("hello", target: "demo:model");
     var text = "";
     await foreach (var item in stream)
     {
-        if (item is TextDeltaEvent delta) text += delta.Text;
+        if (item is TextDelta delta) text += delta.Text;
     }
-    if (text != "streamed" || stream.Result?.Text != "streamed")
+    if (text != "streamed" || stream.Result.Text != "streamed")
         throw new InvalidOperationException("stream result failed");
 }
 if (adapter.DisposeCount != 1)

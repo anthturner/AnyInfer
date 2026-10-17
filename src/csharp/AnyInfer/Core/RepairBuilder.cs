@@ -46,8 +46,8 @@ internal static class RepairBuilder
         var copiedOriginal = originalMessages.Select(static message => new Message(message.Role, message.Content)).ToArray();
         var repaired = copiedOriginal
             .Concat([
-                new Message("assistant", [new TextPart(rawResponse)]),
-                new Message("user", [new TextPart(Feedback(actualAssessment))]),
+                new Message("assistant", [new Text(rawResponse)]),
+                new Message("user", [new Text(Feedback(actualAssessment))]),
             ])
             .ToArray();
         return new RepairPreparation(actualAssessment, rawResponse, copiedOriginal, repaired);

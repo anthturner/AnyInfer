@@ -60,7 +60,7 @@ public sealed class DevelopmentTests : IDisposable
         Assert.NotEmpty(deliberate.Capture.Entries);
         Assert.All(deliberate.Capture.Entries, static entry => Assert.True(entry.Timeout.IsDisposed));
         Assert.Null(deliberate.Result);
-        Assert.DoesNotContain(deliberate.Events, static item => item is StreamEndedEvent);
+        Assert.DoesNotContain(deliberate.Events, static item => item is StreamEnded);
         Assert.Equal("pass", Comparison.Compare(fixture, deliberate).Verdict);
 
         using var external = new CancellationTokenSource();

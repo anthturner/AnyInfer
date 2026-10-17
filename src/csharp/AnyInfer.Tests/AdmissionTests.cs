@@ -99,7 +99,7 @@ public sealed class AdmissionTests
     public void Request_admission_keeps_empty_messages_text_parts_and_lazy_target_shapes()
     {
         var empty = Request([], new Route([" ", "provider:", ":model"]));
-        var text = Request([new Message("user", [new TextPart("literal")])], new Route(["provider:model"]));
+        var text = Request([new Message("user", [new Text("literal")])], new Route(["provider:model"]));
 
         RequestAdmission.Validate(empty);
         RequestAdmission.Validate(text);
@@ -110,7 +110,7 @@ public sealed class AdmissionTests
     {
         var original = new JsonObject([new JsonProperty("url", new JsonString("https://example.invalid"))]);
         var part = new UnsupportedContentPart("image", original);
-        var role = Assert.Throws<ProviderException>(() => RequestAdmission.Validate(Request([new Message("tool", [new TextPart("x")])])));
+        var role = Assert.Throws<ProviderException>(() => RequestAdmission.Validate(Request([new Message("tool", [new Text("x")])])));
         var content = Assert.Throws<ProviderException>(() => RequestAdmission.Validate(Request([new Message("user", [part])])));
 
         AssertUnsupported(role);
@@ -140,7 +140,7 @@ public sealed class AdmissionTests
 
         foreach (var sample in samples)
         {
-            var request = Request([new Message("tool", [new TextPart("would otherwise be unsupported")])], sampling: sample);
+            var request = Request([new Message("tool", [new Text("would otherwise be unsupported")])], sampling: sample);
             var error = Assert.Throws<ProviderException>(() => RequestAdmission.Validate(request));
 
             Assert.Equal("invalid_request", error.Category);
@@ -160,7 +160,7 @@ public sealed class AdmissionTests
 
         foreach (var sample in samples)
         {
-            var request = Request([new Message("tool", [new TextPart("would otherwise be unsupported")])], sampling: sample);
+            var request = Request([new Message("tool", [new Text("would otherwise be unsupported")])], sampling: sample);
             var error = Assert.Throws<ProviderException>(() => RequestAdmission.Validate(request));
 
             Assert.Equal("invalid_request", error.Category);
@@ -176,7 +176,7 @@ public sealed class AdmissionTests
 
         foreach (var role in new[] { "system", "user", "assistant" })
         {
-            RequestAdmission.Validate(Request([new Message(role, [new TextPart("literal")])], sampling: sampling));
+            RequestAdmission.Validate(Request([new Message(role, [new Text("literal")])], sampling: sampling));
         }
     }
 

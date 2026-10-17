@@ -2,7 +2,7 @@ using AnyInfer.Providers;
 
 namespace AnyInfer.Core;
 
-internal sealed record ResolvedProvider(Target Target, ProviderRegistration Registration, StructuredOutputProfile Capabilities);
+internal sealed record ResolvedProvider(ResolvedTarget Target, ProviderRegistration Registration, StructuredOutputProfile Capabilities);
 
 internal sealed class ProviderRegistry
 {
@@ -69,7 +69,7 @@ internal sealed class ProviderRegistry
         var capabilities = registration.ModelCapabilities.TryGetValue(model, out var profile)
             ? profile
             : new StructuredOutputProfile();
-        return new ResolvedProvider(new Target(providerId, model), registration, capabilities);
+        return new ResolvedProvider(new ResolvedTarget(providerId, model), registration, capabilities);
     }
 
     private static ProviderException ConfigureError(string detail) =>

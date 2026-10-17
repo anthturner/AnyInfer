@@ -45,7 +45,7 @@ public sealed class PublicModelTests
     public void Containers_defensively_copy_callers()
     {
         var properties = new List<JsonProperty> { new("a", JsonNull.Instance) };
-        var parts = new List<ContentPart> { new TextPart("hello") };
+        var parts = new List<ContentPart> { new Text("hello") };
         var objectValue = new JsonObject(properties);
         var message = new Message("user", parts);
         properties.Add(new JsonProperty("b", JsonNull.Instance));
@@ -60,8 +60,8 @@ public sealed class PublicModelTests
     {
         var stop = new List<string> { "stop-one", "stop-two" };
         var targets = new List<string> { "fixture:alpha", "fixture:beta" };
-        var messages = new List<Message> { new("user", [new TextPart("first")]) };
-        var wireMessages = new List<Message> { new("system", [new TextPart("wire")]) };
+        var messages = new List<Message> { new("user", [new Text("first")]) };
+        var wireMessages = new List<Message> { new("system", [new Text("wire")]) };
         var sampling = new Sampling(stop: stop);
         var route = new Route(targets);
         var request = new GenerationRequest(messages, route, sampling: sampling);
@@ -74,8 +74,8 @@ public sealed class PublicModelTests
 
         Assert.Equal(new[] { "stop-one", "stop-two" }, sampling.Stop);
         Assert.Equal(new[] { "fixture:alpha", "fixture:beta" }, route.Targets);
-        Assert.Equal("first", Assert.IsType<TextPart>(Assert.Single(request.Messages[0].Content)).Text);
-        Assert.Equal("wire", Assert.IsType<TextPart>(Assert.Single(wire.Messages[0].Content)).Text);
+        Assert.Equal("first", Assert.IsType<Text>(Assert.Single(request.Messages[0].Content)).Value);
+        Assert.Equal("wire", Assert.IsType<Text>(Assert.Single(wire.Messages[0].Content)).Value);
     }
 
     [Fact]
@@ -118,12 +118,12 @@ public sealed class PublicModelTests
     [Fact]
     public void Result_retains_usage_timing_attempts_and_warnings()
     {
-        var target = new Target("fixture", "model");
+        var target = new ResolvedTarget("fixture", "model");
         var providerError = new ProviderException("offline", "transport", true, "stream", 0.5, 503, "fixture", "bounded", "retry");
         var attemptItems = new List<AttemptRecord> { new(target, "failed", providerError) };
         var warnings = new List<string> { "adapter warning" };
-        var result = new GenerationResult("done", target: target, finishReason: "stop",
-            usage: new Usage(1, 2, 3, 4, 5, 6), timing: new GenerationTiming(7, 8),
+        var result = new Generation("done", target: target, finishReason: "stop",
+            usage: new Usage(1, 2, 3, 4, 5, 6), timing: new Timing(startedAt: 7, firstTokenMs: 8, totalMs: 9),
             structuredMechanism: "prompt", repairAttempts: 1, attempts: attemptItems, warnings: warnings);
         attemptItems.Clear();
         warnings.Clear();
@@ -131,13 +131,14 @@ public sealed class PublicModelTests
         Assert.Equal("fixture", result.Target!.ProviderId);
         Assert.Equal("model", result.Target.Model);
         Assert.Equal(6, result.Usage!.ReasoningTokens);
-        Assert.Equal(7, result.Timing!.FirstTokenMs);
+        Assert.Equal(7, result.Timing!.StartedAt);
+        Assert.Equal(8, result.Timing.FirstTokenMs);
         Assert.Equal("prompt", result.StructuredMechanism);
         Assert.Equal(1, result.RepairAttempts);
         Assert.Single(result.Attempts);
         Assert.Single(result.Warnings);
         Assert.Equal("transport", result.Attempts[0].Error!.Category);
-        Assert.IsType<AttemptFailedEvent>(new AttemptFailedEvent(result.Attempts[0]));
+        Assert.IsType<AttemptFailed>(new AttemptFailed(result.Attempts[0]));
     }
 
     [Fact]
@@ -149,7 +150,7 @@ public sealed class PublicModelTests
         var schemaError = new SchemaViolationException("bad age", issues, provider: "fixture");
         issues.Clear();
         issueSegments.Clear();
-        var attempt = new AttemptRecord(new Target("fixture", "model"), "failed", schemaError);
+        var attempt = new AttemptRecord(new ResolvedTarget("fixture", "model"), "failed", schemaError);
         var trail = new List<AttemptRecord> { attempt };
         var allFailed = new AllTargetsFailedException("all failed", trail);
         trail.Clear();

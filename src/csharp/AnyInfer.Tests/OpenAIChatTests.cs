@@ -302,7 +302,7 @@ public sealed class OpenAIChatTests
     private static OpenAIChatAdapter Adapter(ScriptedHandler handler) => new(new Uri("https://fixture.invalid/v1"), "fixture-token", new Dictionary<string, string> { ["x-fixture"] = "transport" }, handler);
 
     private static WireRequest Request(bool stream, Sampling? sampling = null, int maxResponseBytes = 1_048_576) =>
-        new("fixture-model", [new Message("user", [new TextPart("Hel"), new TextPart("lo.")])], sampling ?? new Sampling(), stream: stream, timeoutS: 120, maxResponseBytes: maxResponseBytes);
+        new("fixture-model", [new Message("user", [new Text("Hel"), new Text("lo.")])], sampling ?? new Sampling(), stream: stream, timeoutS: 120, maxResponseBytes: maxResponseBytes);
 
     private static async Task<List<AdapterEvent>> Collect(IAsyncEnumerable<AdapterEvent> source)
     {

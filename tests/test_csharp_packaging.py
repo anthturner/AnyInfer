@@ -177,3 +177,17 @@ def test_main_preserves_preexisting_output_run_directory(tmp_path: Path, monkeyp
     copied_pins = list(output.glob("run-*/global.json"))
     assert len(copied_pins) == 1
     assert copied_pins[0].read_bytes() == (ROOT / "src" / "csharp" / "global.json").read_bytes()
+
+
+def test_external_consumer_uses_sdk1_public_vocabulary(tmp_path: Path) -> None:
+    consumer = tmp_path / "consumer"
+    CHECKER.write_consumer(consumer, tmp_path / "feed", tmp_path / "cache", CHECKER.package_version())
+
+    source = (consumer / "Program.cs").read_text(encoding="utf-8")
+    assert 'new Text("hello")' in source
+    assert 'GenerateAsync(messages, target: "demo:model")' in source
+    assert 'StreamAsync("hello", target: "demo:model")' in source
+    assert "TextDelta delta" in source
+    assert "TextPart" not in source
+    assert "TextDeltaEvent" not in source
+    assert "GenerationResult" not in source

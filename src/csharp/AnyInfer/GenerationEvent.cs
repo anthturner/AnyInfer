@@ -1,15 +1,13 @@
 namespace AnyInfer;
 
-public abstract record GenerationEvent;
+public abstract record StreamEvent;
 
-public sealed record AttemptStartedEvent(int EntryOrdinal, string Role) : GenerationEvent;
+public sealed record TimingMark(string Name, double AtMs) : StreamEvent;
 
-public sealed record FirstTokenEvent(int EntryOrdinal) : GenerationEvent;
+public sealed record TextDelta(string Text) : StreamEvent;
 
-public sealed record TextDeltaEvent(string Text) : GenerationEvent;
+public sealed record UsageUpdate(Usage Usage) : StreamEvent;
 
-public sealed record UsageEvent(Usage Usage) : GenerationEvent;
+public sealed record AttemptFailed(AttemptRecord Record) : StreamEvent;
 
-public sealed record AttemptFailedEvent(AttemptRecord Attempt) : GenerationEvent;
-
-public sealed record StreamEndedEvent(GenerationResult Result) : GenerationEvent;
+public sealed record StreamEnded(Generation Result) : StreamEvent;

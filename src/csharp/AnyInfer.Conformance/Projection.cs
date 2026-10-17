@@ -192,12 +192,12 @@ internal static class Projection
             var text = new StringBuilder();
             foreach (var part in message.Content)
             {
-                if (part is not TextPart textPart)
+                if (part is not Text textPart)
                 {
                     throw Unavailable("entered wire message contains non-text content");
                 }
 
-                text.Append(textPart.Text);
+                text.Append(textPart.Value);
             }
 
             projected.Add(new JsonObject([
@@ -239,20 +239,17 @@ internal static class Projection
         }));
     }
 
-    private static IReadOnlyList<JsonValue> ProjectEvents(IReadOnlyList<GenerationEvent> events)
+    private static IReadOnlyList<JsonValue> ProjectEvents(IReadOnlyList<StreamEvent> events)
     {
         var projected = new List<JsonValue>();
         foreach (var generationEvent in events)
         {
             switch (generationEvent)
             {
-                case AttemptStartedEvent:
-                    projected.Add(new JsonObject([Property("timing_mark", String("attempt_start"))]));
+                case TimingMark mark when mark.Name is "attempt_start" or "first_token":
+                    projected.Add(new JsonObject([Property("timing_mark", String(mark.Name))]));
                     break;
-                case FirstTokenEvent:
-                    projected.Add(new JsonObject([Property("timing_mark", String("first_token"))]));
-                    break;
-                case TextDeltaEvent text:
+                case TextDelta text:
                     if (projected.LastOrDefault() is JsonObject { } previous &&
                         previous.TryGetValue("text", out var previousText) && previousText is JsonString value)
                     {
@@ -264,13 +261,13 @@ internal static class Projection
                     }
 
                     break;
-                case UsageEvent usage:
+                case UsageUpdate usage:
                     projected.Add(new JsonObject([Property("usage_update", ProjectUsage(usage.Usage, includeNulls: true))]));
                     break;
-                case AttemptFailedEvent failed:
-                    projected.Add(new JsonObject([Property("attempt_failed", ProjectAttempt(failed.Attempt, includeTarget: false, fullError: false))]));
+                case AttemptFailed failed:
+                    projected.Add(new JsonObject([Property("attempt_failed", ProjectAttempt(failed.Record, includeTarget: false, fullError: false))]));
                     break;
-                case StreamEndedEvent:
+                case StreamEnded:
                     projected.Add(new JsonObject([Property("stream_ended", new JsonBoolean(true))]));
                     break;
                 default:
@@ -322,7 +319,7 @@ internal static class Projection
         {
             if (run.TerminalException is not OperationCanceledException ||
                 run.Result is not null ||
-                run.Events.Any(static item => item is StreamEndedEvent))
+                run.Events.Any(static item => item is StreamEnded))
             {
                 throw Unavailable("deliberate cancellation facts are inconsistent");
             }
@@ -379,7 +376,7 @@ internal static class Projection
     {
         return string.Concat(entry.AdapterEvents.OfType<AdapterTextDelta>().Select(static item => item.Text));
     }
-    private static JsonObject ProjectResult(GenerationResult result)
+    private static JsonObject ProjectResult(Generation result)
     {
         return new JsonObject([
             Property("text", String(result.Text)),
@@ -395,14 +392,14 @@ internal static class Projection
         ]);
     }
 
-    private static JsonObject ProjectTarget(Target target) => new([
+    private static JsonObject ProjectTarget(ResolvedTarget target) => new([
         Property("provider_id", String(target.ProviderId)),
         Property("model", String(target.Model)),
     ]);
 
-    private static JsonObject ProjectTiming(GenerationTiming? timing) => new([
+    private static JsonObject ProjectTiming(Timing? timing) => new([
         Property("first_token_ms", timing?.FirstTokenMs is null ? JsonNull.Instance : Number(timing.FirstTokenMs.Value)),
-        Property("total_ms", timing?.TotalMs is null ? JsonNull.Instance : Number(timing.TotalMs.Value)),
+        Property("total_ms", timing is null ? JsonNull.Instance : Number(timing.TotalMs)),
     ]);
 
     private static JsonObject ProjectAttempt(AttemptRecord attempt, bool includeTarget, bool fullError)

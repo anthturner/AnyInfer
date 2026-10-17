@@ -172,7 +172,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         var content = new StringBuilder();
         foreach (var part in message.Content)
         {
-            if (part is not TextPart textPart)
+            if (part is not Text textPart)
             {
                 throw new ProviderException(
                     "The OpenAI-compatible chat adapter supports text message content only.",
@@ -181,7 +181,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
                     phase: "generate");
             }
 
-            content.Append(textPart.Text);
+            content.Append(textPart.Value);
         }
 
         return new JsonObject([

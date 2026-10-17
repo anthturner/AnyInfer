@@ -23,7 +23,7 @@ internal static class RequestNormalizer
         var messages = request.Messages
             .Select(static message => new Message(
                 message.Role,
-                [new TextPart(string.Concat(message.Content.Cast<TextPart>().Select(static part => part.Text)))]))
+                [new Text(string.Concat(message.Content.Cast<Text>().Select(static part => part.Value)))]))
             .ToArray();
         var sourceSampling = request.Sampling;
         var normalizedSampling = new Sampling(

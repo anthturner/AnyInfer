@@ -661,7 +661,7 @@ public sealed class ReleaseAssetsTests : IDisposable
         {
             await foreach (var item in adapter.GenerateAsync(new AnyInfer.Providers.WireRequest(
                 "alpha",
-                [new AnyInfer.Message("user", [new AnyInfer.TextPart("fixture input")])],
+                [new AnyInfer.Message("user", [new AnyInfer.Text("fixture input")])],
                 new AnyInfer.Sampling())))
             {
                 events.Add(item switch

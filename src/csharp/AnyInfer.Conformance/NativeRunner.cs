@@ -91,12 +91,12 @@ internal static class NativeRunner
         OperationCapture capture,
         CancellationToken cancellationToken)
     {
-        var events = new List<GenerationEvent>();
+        var events = new List<StreamEvent>();
         await using var stream = setup.Client.StreamAsync(setup.Request, capture, cancellationToken);
         if (consumeMode == NoAdvance)
         {
             await stream.DisposeAsync().ConfigureAwait(false);
-            return Complete(caseId, input, consumeMode, events, stream.Result, null, "close", false, capture, setup);
+            return Complete(caseId, input, consumeMode, events, stream.ObservedResult, null, "close", false, capture, setup);
         }
 
         var cancelAfter = CancellationCount(consumeMode);
@@ -121,15 +121,15 @@ internal static class NativeRunner
                 await stream.DisposeAsync().ConfigureAwait(false);
             }
 
-            return Complete(caseId, input, consumeMode, events, stream.Result, null, "stream", false, capture, setup);
+            return Complete(caseId, input, consumeMode, events, stream.ObservedResult, null, "stream", false, capture, setup);
         }
         catch (OperationCanceledException exception) when (deliberateCancellation && driverCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            return Complete(caseId, input, consumeMode, events, stream.Result, exception, "stream", true, capture, setup);
+            return Complete(caseId, input, consumeMode, events, stream.ObservedResult, exception, "stream", true, capture, setup);
         }
         catch (AnyInferException exception)
         {
-            return Complete(caseId, input, consumeMode, events, stream.Result, exception, "stream", false, capture, setup);
+            return Complete(caseId, input, consumeMode, events, stream.ObservedResult, exception, "stream", false, capture, setup);
         }
     }
 
@@ -137,8 +137,8 @@ internal static class NativeRunner
         string caseId,
         FixtureInput input,
         string consumeMode,
-        IReadOnlyList<GenerationEvent> events,
-        GenerationResult? result,
+        IReadOnlyList<StreamEvent> events,
+        Generation? result,
         Exception? terminalException,
         string terminalStage,
         bool deliberateCancellation,
@@ -186,7 +186,7 @@ internal static class NativeRunner
         var schema = Optional(request, "schema") is JsonNull or null ? null : Optional(request, "schema");
         var sampling = Optional(request, "sampling") is { } samplingValue ? ReadSampling(RequireObject(samplingValue, "sampling")) : null;
         var repair = Optional(request, "repair") is { } repairValue
-            ? new RepairOptions(ReadInt32(Require(RequireObject(repairValue, "repair"), "max_attempts"), "max_attempts"))
+            ? new Repair(ReadInt32(Require(RequireObject(repairValue, "repair"), "max_attempts"), "max_attempts"))
             : null;
         var timeout = ReadNullableNumber(Optional(request, "timeout_s"), "timeout_s");
         var maxBytes = ReadNullableInt32(Optional(request, "max_response_bytes"), "max_response_bytes");
@@ -199,7 +199,7 @@ internal static class NativeRunner
         var role = RequireString(Require(message, "role"), "role");
         if (message.TryGetValue("text", out var text))
         {
-            return new Message(role, [new TextPart(ReadText(text, "text"))]);
+            return new Message(role, [new Text(ReadText(text, "text"))]);
         }
 
         var parts = RequireArray(message, "parts").Items.Select(partValue =>
@@ -208,7 +208,7 @@ internal static class NativeRunner
             var kind = RequireString(Require(part, "kind"), "kind");
             if (string.Equals(kind, "text", StringComparison.Ordinal))
             {
-                return (ContentPart)new TextPart(RequireString(Require(part, "text"), "text"));
+                return (ContentPart)new Text(RequireString(Require(part, "text"), "text"));
             }
 
             return new UnsupportedContentPart(kind, part);
@@ -236,9 +236,9 @@ internal static class NativeRunner
         return new Route(targets, retry, healthGate, ttl);
     }
 
-    private static RetryPolicy ReadRetry(JsonObject value)
+    private static Retry ReadRetry(JsonObject value)
     {
-        var defaults = new RetryPolicy();
+        var defaults = new Retry();
         var maxAttempts = Optional(value, "max_attempts") is { } maxAttemptsValue
             ? ReadInt32(maxAttemptsValue, "max_attempts")
             : defaults.MaxAttempts;
@@ -248,7 +248,7 @@ internal static class NativeRunner
         var backoffMaximum = Optional(value, "backoff_max_s") is { } backoffMaximumValue
             ? ReadNumber(backoffMaximumValue, "backoff_max_s")
             : defaults.BackoffMaxS;
-        return new RetryPolicy(maxAttempts, backoffBase, backoffMaximum);
+        return new Retry(maxAttempts, backoffBase, backoffMaximum);
     }
 
     private static IReadOnlyDictionary<string, StructuredOutputProfile> ReadCapabilities(JsonObject adapter)
@@ -270,15 +270,15 @@ internal static class NativeRunner
         ? 0
         : ReadNumber(Require(clock, "start_ms"), "start_ms") / 1000d;
 
-    private static Target ParseTarget(string raw)
+    private static ResolvedTarget ParseTarget(string raw)
     {
         var colon = raw.IndexOf(':');
         if (colon < 0)
         {
-            return new Target(raw, string.Empty);
+            return new ResolvedTarget(raw, string.Empty);
         }
 
-        return new Target(raw[..colon], raw[(colon + 1)..].Trim());
+        return new ResolvedTarget(raw[..colon], raw[(colon + 1)..].Trim());
     }
 
     private static string ConsumeMode(JsonObject request) => Optional(request, "consume") is JsonString text ? text.Value : Buffered;
@@ -378,8 +378,8 @@ internal sealed record NativeRun(
     string CaseId,
     FixtureInput Input,
     string ConsumeMode,
-    IReadOnlyList<GenerationEvent> Events,
-    GenerationResult? Result,
+    IReadOnlyList<StreamEvent> Events,
+    Generation? Result,
     Exception? TerminalException,
     string TerminalStage,
     bool DeliberateCancellation,

@@ -258,6 +258,6 @@ public sealed class ReleaseAssetsFixtureAdapterTests
 
     private static WireRequest Request() => new(
         "fixture-model",
-        [new Message("user", [new TextPart("fixture request")])],
+        [new Message("user", [new Text("fixture request")])],
         new Sampling());
 }

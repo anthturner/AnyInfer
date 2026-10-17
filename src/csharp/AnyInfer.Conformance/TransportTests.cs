@@ -97,7 +97,7 @@ public sealed class TransportTests : IDisposable
         Assert.Same(repair.Assessment, core.Capture.Entries[1].RepairAssessment);
         Assert.Equal(core.Capture.Entries[0].Ordinal, repair.Assessment.SourceEntryOrdinal);
         Assert.Contains(core.Capture.Assessments, assessment => ReferenceEquals(assessment, repair.Assessment));
-        var result = Assert.IsType<GenerationResult>(core.Result);
+        var result = Assert.IsType<Generation>(core.Result);
         Assert.Equal("{\"age\":7}", result.Text);
         Assert.Equal(1, result.RepairAttempts);
         Assert.Equal(new BigInteger(7), Assert.IsType<JsonInteger>(Assert.IsType<JsonObject>(result.Structured).Properties.Single(static property => property.Name == "age").Value).Value);
@@ -156,14 +156,14 @@ public sealed class TransportTests : IDisposable
         Assert.Equal("stream_protocol", terminal.Category);
         Assert.False(terminal.Retryable);
         Assert.Equal("stream", terminal.Phase);
-        var failure = Assert.IsType<AttemptFailedEvent>(core.Events.Last());
-        Assert.Same(terminal, failure.Attempt.Error);
+        var failure = Assert.IsType<AttemptFailed>(core.Events.Last());
+        Assert.Same(terminal, failure.Record.Error);
         Assert.Same(terminal, Assert.Single(core.Capture.Entries).TerminalFailure);
-        var partial = Assert.Single(core.Events.OfType<TextDeltaEvent>());
+        var partial = Assert.Single(core.Events.OfType<TextDelta>());
         Assert.Equal("partial", partial.Text);
         var orderedEvents = core.Events.ToArray();
         Assert.True(Array.IndexOf(orderedEvents, partial) < Array.IndexOf(orderedEvents, failure));
-        Assert.DoesNotContain(core.Events, static item => item is StreamEndedEvent);
+        Assert.DoesNotContain(core.Events, static item => item is StreamEnded);
     }
 
     [Fact]
@@ -287,7 +287,7 @@ public sealed class TransportTests : IDisposable
         Assert.Equal(1, handler.RemainingResponses);
         Assert.Empty(handler.Exchanges);
 
-        var wire = new WireRequest("fixture-model", [new Message("user", [new TextPart("bound")])], new Sampling());
+        var wire = new WireRequest("fixture-model", [new Message("user", [new Text("bound")])], new Sampling());
         handler.BindPendingWire(wire);
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://fixture.invalid/v1/chat/completions")
         {
@@ -315,7 +315,7 @@ public sealed class TransportTests : IDisposable
         var handler = new ScriptedHttpMessageHandler(responses);
         var inner = new OpenAIChatAdapter(new Uri("https://fixture.invalid/v1"), "fixture-token", handler: handler);
         var adapter = new RecordingHttpAdapter(inner, handler);
-        var wire = new WireRequest("fixture-model", [new Message("user", [new TextPart("header")])], new Sampling());
+        var wire = new WireRequest("fixture-model", [new Message("user", [new Text("header")])], new Sampling());
 
         try
         {
@@ -452,8 +452,8 @@ public sealed class TransportTests : IDisposable
         Assert.Equal("failed", StringProperty(attempt, "outcome"));
         Assert.Equal("transport", StringProperty(attempt, "error"));
         var publicEvents = ArrayProperty(evidence, "public_events").Items.Select(static item => Assert.IsType<JsonString>(item).Value).ToArray();
-        Assert.DoesNotContain(nameof(UsageEvent), publicEvents);
-        Assert.DoesNotContain(nameof(StreamEndedEvent), publicEvents);
+        Assert.DoesNotContain(nameof(UsageUpdate), publicEvents);
+        Assert.DoesNotContain(nameof(StreamEnded), publicEvents);
         Assert.Equal(
             ["created", "configured", "entered", "expired", "cleanup_start", "cleanup_end", "exited", "disposed"],
             ArrayProperty(evidence, "lifecycle").Items.Select(static item => StringProperty(Assert.IsType<JsonObject>(item), "name")));

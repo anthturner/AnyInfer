@@ -404,7 +404,7 @@ public sealed class LifecycleTests
     }
 
     private static WireRequest Request(string model = "fixture:model", double timeoutS = 120, int maxResponseBytes = 1_048_576) =>
-        new(model, [new Message("user", [new TextPart("native lifecycle")])], new Sampling(), stream: false, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes);
+        new(model, [new Message("user", [new Text("native lifecycle")])], new Sampling(), stream: false, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes);
 
     private static async Task<List<AdapterEvent>> CollectAsync(IAsyncEnumerable<AdapterEvent> stream)
     {

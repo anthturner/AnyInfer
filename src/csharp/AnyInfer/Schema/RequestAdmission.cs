@@ -16,7 +16,7 @@ public static class RequestAdmission
                 ThrowUnsupported("The message role is outside the v0 profile.");
             }
 
-            if (message.Content.Any(static part => part is not TextPart))
+            if (message.Content.Any(static part => part is not Text))
             {
                 ThrowUnsupported("Non-text message content is outside the v0 profile.");
             }

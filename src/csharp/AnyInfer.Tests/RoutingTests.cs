@@ -20,8 +20,8 @@ public sealed class RoutingTests
         var request = Request(
             messages:
             [
-                new Message("system", [new TextPart("keep")]),
-                new Message("user", [new TextPart("hel"), new TextPart("lo")]),
+                new Message("system", [new Text("keep")]),
+                new Message("user", [new Text("hel"), new Text("lo")]),
             ],
             sampling: new Sampling(temperature: 0.25, stop: []),
             timeoutS: null,
@@ -36,7 +36,7 @@ public sealed class RoutingTests
         Assert.Equal(1_048_576, wire.MaxResponseBytes);
         Assert.Null(wire.Sampling.Stop);
         Assert.Equal(2, wire.Messages.Count);
-        Assert.Equal("hello", Assert.IsType<TextPart>(wire.Messages[1].Content[0]).Text);
+        Assert.Equal("hello", Assert.IsType<Text>(wire.Messages[1].Content[0]).Value);
         Assert.Equal(2, result.Usage!.InputTokens);
         Assert.Equal(3, result.Usage.OutputTokens);
     }
@@ -77,7 +77,7 @@ public sealed class RoutingTests
             [new ProviderRegistration("first", failing), new ProviderRegistration("second", succeeding)],
             clock);
         var capture = new OperationCapture();
-        var request = Request(route: new Route(["first:model", "second:model"], new RetryPolicy(MaxAttempts: 2, BackoffBaseS: 0.5, BackoffMaxS: 1)));
+        var request = Request(route: new Route(["first:model", "second:model"], new Retry(MaxAttempts: 2, BackoffBaseS: 0.5, BackoffMaxS: 1)));
 
         var result = await client.GenerateAsync(request, capture);
 
@@ -86,9 +86,9 @@ public sealed class RoutingTests
         Assert.Single(succeeding.Requests);
         Assert.Equal([1d], clock.Delays);
         Assert.DoesNotContain(clock.Delays, static delay => delay == 0);
-        Assert.True(client.Health.IsUnhealthy(new Target("first", "model"), request.Route.HealthTtlS));
+        Assert.True(client.Health.IsUnhealthy(new ResolvedTarget("first", "model"), request.Route.HealthTtlS));
         clock.Advance(request.Route.HealthTtlS);
-        Assert.False(client.Health.IsUnhealthy(new Target("first", "model"), request.Route.HealthTtlS));
+        Assert.False(client.Health.IsUnhealthy(new ResolvedTarget("first", "model"), request.Route.HealthTtlS));
     }
 
     [Fact]
@@ -100,20 +100,20 @@ public sealed class RoutingTests
             : Events(token, new AdapterTextDelta("ok"), new AdapterFinal("stop")));
         var clock = new VirtualClock();
         AsyncClient? client = null;
-        clock.OnDelay = _ => Assert.False(client!.Health.IsUnhealthy(new Target("alpha", "model"), 30));
+        clock.OnDelay = _ => Assert.False(client!.Health.IsUnhealthy(new ResolvedTarget("alpha", "model"), 30));
         client = Client([new ProviderRegistration("alpha", adapter)], clock);
         await using (client)
         {
-            var stream = client.StreamAsync(Request(stream: true, route: new Route(["alpha:model"], new RetryPolicy(MaxAttempts: 2, BackoffBaseS: 1, BackoffMaxS: 1))));
+            var stream = client.StreamAsync(Request(stream: true, route: new Route(["alpha:model"], new Retry(MaxAttempts: 2, BackoffBaseS: 1, BackoffMaxS: 1))));
             var events = await Collect(stream);
             Assert.NotNull(stream.Result);
             var result = stream.Result!;
             Assert.Equal(["retried", "ok"], result.Attempts.Select(item => item.Outcome));
             Assert.Same(retryable, result.Attempts[0].Error);
-            Assert.False(client.Health.IsUnhealthy(new Target("alpha", "model"), 30));
-            var firstStart = events.FindIndex(static item => item is AttemptStartedEvent attempt && attempt.EntryOrdinal == 1);
-            var failure = events.FindIndex(item => item is AttemptFailedEvent failed && ReferenceEquals(failed.Attempt.Error, retryable));
-            var secondStart = events.FindIndex(static item => item is AttemptStartedEvent attempt && attempt.EntryOrdinal == 2);
+            Assert.False(client.Health.IsUnhealthy(new ResolvedTarget("alpha", "model"), 30));
+            var firstStart = events.FindIndex(static item => item is TimingMark attempt && attempt.Name == "attempt_start");
+            var failure = events.FindIndex(item => item is AttemptFailed failed && ReferenceEquals(failed.Record.Error, retryable));
+            var secondStart = events.FindIndex(firstStart + 1, item => item is TimingMark attempt && attempt.Name == "attempt_start");
             Assert.True(firstStart >= 0 && failure > firstStart && secondStart > failure);
         }
     }
@@ -121,9 +121,9 @@ public sealed class RoutingTests
     [Fact]
     public void Uncapped_retry_after_is_a_floor_and_zero_delay_is_not_a_backoff()
     {
-        var uncapped = new RetryPolicy(MaxAttempts: 2, BackoffBaseS: 0.5, BackoffMaxS: 5);
+        var uncapped = new Retry(MaxAttempts: 2, BackoffBaseS: 0.5, BackoffMaxS: 5);
         Assert.Equal(2, RouteState.BackoffSeconds(uncapped, 1, retryAfterS: 2));
-        var zeroBase = new RetryPolicy(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 5);
+        var zeroBase = new Retry(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 5);
         Assert.Equal(0, RouteState.BackoffSeconds(zeroBase, 1, retryAfterS: 0));
     }
 
@@ -136,7 +136,7 @@ public sealed class RoutingTests
             : Events(token, new AdapterTextDelta("cleared"), new AdapterFinal("stop")));
         var clock = new VirtualClock();
         await using var client = Client([new ProviderRegistration("alpha", adapter)], clock);
-        var target = new Target("alpha", "model");
+        var target = new ResolvedTarget("alpha", "model");
         client.Health.SeedFailure(target, 0);
         clock.Advance(30);
         Assert.False(client.Health.IsUnhealthy(target, 30));
@@ -158,7 +158,7 @@ public sealed class RoutingTests
         await using var client = Client(new ProviderRegistration("alpha", adapter, maxRepairAttempts: 1));
         var capture = new OperationCapture();
 
-        var stream = client.StreamAsync(Request(schema: schema, repair: new RepairOptions(1)), capture);
+        var stream = client.StreamAsync(Request(schema: schema, repair: new Repair(1)), capture);
         var events = await Collect(stream);
         Assert.NotNull(stream.Result);
         var result = stream.Result!;
@@ -179,15 +179,17 @@ public sealed class RoutingTests
         Assert.Equal([1, 2], capture.Assessments.Select(item => item.SourceEntryOrdinal));
         Assert.NotNull(stream.Operation);
         Assert.Same(capture.Assessments[1], stream.Operation!.LastAssessment);
-        Assert.Equal([1, 2], events.OfType<AttemptStartedEvent>().Select(item => item.EntryOrdinal));
-        Assert.Equal([1, 2], events.OfType<FirstTokenEvent>().Select(item => item.EntryOrdinal));
-        foreach (var ordinal in new[] { 1, 2 })
-        {
-            var start = events.FindIndex(item => item is AttemptStartedEvent attempt && attempt.EntryOrdinal == ordinal);
-            var first = events.FindIndex(item => item is FirstTokenEvent token && token.EntryOrdinal == ordinal);
-            Assert.True(start >= 0 && first > start);
-            Assert.IsType<TextDeltaEvent>(events[first + 1]);
-        }
+        Assert.Equal(
+            ["attempt_start", "first_token", "attempt_start", "first_token"],
+            events.OfType<TimingMark>().Select(item => item.Name));
+        var timing = events
+            .Select((item, index) => (item, index))
+            .Where(static item => item.item is TimingMark)
+            .Select(static item => item.index)
+            .ToArray();
+        Assert.True(timing[0] < timing[1] && timing[2] < timing[3]);
+        Assert.IsType<TextDelta>(events[timing[1] + 1]);
+        Assert.IsType<TextDelta>(events[timing[3] + 1]);
         var repairTelemetry = Assert.Single(capture.Telemetry);
         Assert.Equal("repair_attempted", repairTelemetry.Name);
         Assert.Equal(1, repairTelemetry.AttemptNumber);
@@ -200,16 +202,16 @@ public sealed class RoutingTests
         var schema = JsonReader.Read("{\"type\":\"object\",\"required\":[\"age\"],\"properties\":{\"age\":{\"type\":\"integer\"}}}");
         var messages = new[]
         {
-            new Message("system", [new TextPart("first system")]),
-            new Message("user", [new TextPart(literal)]),
-            new Message("system", [new TextPart("last system")]),
+            new Message("system", [new Text("first system")]),
+            new Message("user", [new Text(literal)]),
+            new Message("system", [new Text("last system")]),
         };
         var adapter = new ScriptAdapter((call, token) => call == 1
             ? Events(token, new AdapterTextDelta("{\"age\":\"bad\"}"), new AdapterFinal("stop"))
             : Events(token, new AdapterTextDelta("{\"age\":7}"), new AdapterFinal("stop")));
         await using var client = Client(new ProviderRegistration("alpha", adapter));
 
-        await client.GenerateAsync(Request(messages: messages, schema: schema, repair: new RepairOptions(1)));
+        await client.GenerateAsync(Request(messages: messages, schema: schema, repair: new Repair(1)));
 
         Assert.Equal(2, adapter.Requests.Count);
         var originalWire = adapter.Requests[0];
@@ -231,7 +233,7 @@ public sealed class RoutingTests
         var capture = new OperationCapture();
 
         var failure = await Assert.ThrowsAsync<SchemaViolationException>(() =>
-            client.GenerateAsync(Request(schema: schema, repair: new RepairOptions(8)), capture));
+            client.GenerateAsync(Request(schema: schema, repair: new Repair(8)), capture));
 
         Assert.Equal(2, invalid.Requests.Count);
         Assert.Single(capture.Repairs);
@@ -254,7 +256,7 @@ public sealed class RoutingTests
         var schema = JsonReader.Read("{\"type\":\"object\",\"required\":[\"age\"]}");
         var adapter = new ScriptAdapter(static (_, token) => Events(token, new AdapterTextDelta("{}"), new AdapterFinal("stop")));
         await using var client = Client(new ProviderRegistration("alpha", adapter));
-        var repair = budget is null ? null : new RepairOptions(budget.Value);
+        var repair = budget is null ? null : new Repair(budget.Value);
 
         await Assert.ThrowsAsync<SchemaViolationException>(() => client.GenerateAsync(Request(schema: schema, repair: repair)));
 
@@ -277,7 +279,7 @@ public sealed class RoutingTests
         await using var client = Client(new ProviderRegistration("alpha", adapter, maxRepairAttempts: 1));
         var capture = new OperationCapture();
 
-        var result = await client.GenerateAsync(Request(schema: schema, repair: new RepairOptions(3)), capture);
+        var result = await client.GenerateAsync(Request(schema: schema, repair: new Repair(3)), capture);
 
         Assert.Equal("{\"age\":7}", result.Text);
         Assert.Equal(1, result.RepairAttempts);
@@ -306,7 +308,7 @@ public sealed class RoutingTests
         var protocolAdapter = new ScriptAdapter((_, token) => DeltasThenThrow(token, protocol));
         await using var protocolClient = Client(new ProviderRegistration("alpha", protocolAdapter));
         var protocolStream = protocolClient.StreamAsync(Request(stream: true));
-        var publicEvents = new List<GenerationEvent>();
+        var publicEvents = new List<StreamEvent>();
         var observed = await Assert.ThrowsAsync<ProviderException>(async () =>
         {
             await foreach (var item in protocolStream)
@@ -316,16 +318,16 @@ public sealed class RoutingTests
         });
         Assert.Same(protocol, observed);
         Assert.Single(protocolAdapter.Requests);
-        Assert.Null(protocolStream.Result);
-        Assert.DoesNotContain(publicEvents, static item => item is StreamEndedEvent);
-        Assert.Contains(publicEvents, static item => item is AttemptFailedEvent);
+        Assert.Null(protocolStream.ObservedResult);
+        Assert.DoesNotContain(publicEvents, static item => item is StreamEnded);
+        Assert.Contains(publicEvents, static item => item is AttemptFailed);
 
         var retryable = new ProviderException("cut", "transport", true, "stream");
         var transportAdapter = new ScriptAdapter((call, token) => call == 1
             ? DeltasThenThrow(token, retryable)
             : Events(token, new AdapterTextDelta("recovered"), new AdapterFinal("stop")));
         await using var transportClient = Client(new ProviderRegistration("alpha", transportAdapter));
-        var recovered = await transportClient.GenerateAsync(Request(route: new Route(["alpha:model"], new RetryPolicy(MaxAttempts: 2))));
+        var recovered = await transportClient.GenerateAsync(Request(route: new Route(["alpha:model"], new Retry(MaxAttempts: 2))));
         Assert.Equal("recovered", recovered.Text);
         Assert.Equal(2, transportAdapter.Requests.Count);
     }
@@ -343,9 +345,9 @@ public sealed class RoutingTests
         await using var client = Client([new ProviderRegistration("alpha", primary), new ProviderRegistration("beta", fallback)], clock);
         var stream = client.StreamAsync(Request(
             schema: schema,
-            repair: new RepairOptions(1),
-            route: new Route(["alpha:model", "beta:model"], new RetryPolicy(MaxAttempts: 2))));
-        var events = new List<GenerationEvent>();
+            repair: new Repair(1),
+            route: new Route(["alpha:model", "beta:model"], new Retry(MaxAttempts: 2))));
+        var events = new List<StreamEvent>();
 
         var observed = await Assert.ThrowsAsync<ProviderException>(async () =>
         {
@@ -359,15 +361,15 @@ public sealed class RoutingTests
         Assert.Equal(2, primary.Requests.Count);
         Assert.Empty(fallback.Requests);
         Assert.Empty(clock.Delays);
-        Assert.False(client.Health.IsUnhealthy(new Target("alpha", "model"), 30));
-        var correctionText = events.FindIndex(static item => item is TextDeltaEvent delta && delta.Text == "partial");
-        var terminalFailure = events.FindIndex(item => item is AttemptFailedEvent failed && ReferenceEquals(failed.Attempt.Error, protocol));
+        Assert.False(client.Health.IsUnhealthy(new ResolvedTarget("alpha", "model"), 30));
+        var correctionText = events.FindIndex(static item => item is TextDelta delta && delta.Text == "partial");
+        var terminalFailure = events.FindIndex(item => item is AttemptFailed failed && ReferenceEquals(failed.Record.Error, protocol));
         Assert.True(correctionText >= 0);
         Assert.True(terminalFailure > correctionText);
         Assert.Equal(events.Count - 1, terminalFailure);
-        Assert.IsType<AttemptFailedEvent>(events[terminalFailure]);
-        Assert.DoesNotContain(events, static item => item is StreamEndedEvent);
-        Assert.Null(stream.Result);
+        Assert.IsType<AttemptFailed>(events[terminalFailure]);
+        Assert.DoesNotContain(events, static item => item is StreamEnded);
+        Assert.Null(stream.ObservedResult);
     }
 
     [Fact]
@@ -381,7 +383,7 @@ public sealed class RoutingTests
                 new AdapterUsage(new Usage(OutputTokens: 4, CacheReadTokens: 5)),
                 new AdapterFinal("stop", new Usage(ReasoningTokens: 6, TotalTokens: 500))));
         await using var client = Client(new ProviderRegistration("alpha", adapter));
-        var stream = client.StreamAsync(Request(stream: true, route: new Route(["alpha:model"], new RetryPolicy(MaxAttempts: 2))));
+        var stream = client.StreamAsync(Request(stream: true, route: new Route(["alpha:model"], new Retry(MaxAttempts: 2))));
 
         var events = await Collect(stream);
         Assert.NotNull(stream.Result);
@@ -393,9 +395,9 @@ public sealed class RoutingTests
         Assert.Equal(5, result.Usage.CacheReadTokens);
         Assert.Equal(6, result.Usage.ReasoningTokens);
         Assert.Equal(500, result.Usage.TotalTokens);
-        Assert.Contains(events, static item => item is AttemptFailedEvent);
-        Assert.IsType<StreamEndedEvent>(events[^1]);
-        var usageEvents = events.OfType<UsageEvent>().ToArray();
+        Assert.Contains(events, static item => item is AttemptFailed);
+        Assert.IsType<StreamEnded>(events[^1]);
+        var usageEvents = events.OfType<UsageUpdate>().ToArray();
         Assert.Equal(3, usageEvents.Length);
         Assert.Equal(99, usageEvents[0].Usage.InputTokens);
         Assert.Equal(2, usageEvents[1].Usage.InputTokens);
@@ -416,12 +418,12 @@ public sealed class RoutingTests
         var result = stream.Result!;
 
         Assert.Collection(events,
-            item => Assert.IsType<AttemptStartedEvent>(item),
-            item => Assert.IsType<FirstTokenEvent>(item),
-            item => Assert.IsType<TextDeltaEvent>(item),
-            item => Assert.IsType<UsageEvent>(item),
-            item => Assert.IsType<StreamEndedEvent>(item));
-        var synthetic = Assert.IsType<UsageEvent>(events[3]).Usage;
+            item => Assert.IsType<TimingMark>(item),
+            item => Assert.IsType<TimingMark>(item),
+            item => Assert.IsType<TextDelta>(item),
+            item => Assert.IsType<UsageUpdate>(item),
+            item => Assert.IsType<StreamEnded>(item));
+        var synthetic = Assert.IsType<UsageUpdate>(events[3]).Usage;
         Assert.Equal(2, synthetic.InputTokens);
         Assert.Equal(3, synthetic.OutputTokens);
         Assert.Null(synthetic.TotalTokens);
@@ -438,7 +440,7 @@ public sealed class RoutingTests
         Assert.Equal(5, staleResult.Usage!.InputTokens);
         Assert.Equal(2, staleResult.Usage.OutputTokens);
         Assert.Equal(7, staleResult.Usage.TotalTokens);
-        Assert.Single(staleEvents.OfType<UsageEvent>());
+        Assert.Single(staleEvents.OfType<UsageUpdate>());
     }
 
     [Fact]
@@ -454,7 +456,7 @@ public sealed class RoutingTests
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var pending = Collect(stream, item =>
         {
-            if (item is AttemptStartedEvent)
+            if (item is TimingMark)
             {
                 started.TrySetResult();
             }
@@ -467,7 +469,7 @@ public sealed class RoutingTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
         await cleaned.Task;
         Assert.Single(adapter.Requests);
-        Assert.Null(stream.Result);
+        Assert.Null(stream.ObservedResult);
 
         var closingEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var closingCleaned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -497,25 +499,25 @@ public sealed class RoutingTests
         await firstNativeText.Task;
         Assert.True(firstMove.IsCompleted);
         Assert.True(await firstMove);
-        Assert.IsType<AttemptStartedEvent>(enumerator.Current);
+        Assert.IsType<TimingMark>(enumerator.Current);
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.IsType<FirstTokenEvent>(enumerator.Current);
+        Assert.IsType<TimingMark>(enumerator.Current);
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal("first", Assert.IsType<TextDeltaEvent>(enumerator.Current).Text);
+        Assert.Equal("first", Assert.IsType<TextDelta>(enumerator.Current).Text);
         var entry = Assert.Single(capture.Entries);
         Assert.False(entry.Timeout.IsDisposed);
         Assert.Empty(capture.Assessments);
-        Assert.Null(stream.Result);
+        Assert.Null(stream.ObservedResult);
 
         release.TrySetResult();
-        var remaining = new List<GenerationEvent>();
+        var remaining = new List<StreamEvent>();
         while (await enumerator.MoveNextAsync())
         {
             remaining.Add(enumerator.Current);
         }
 
-        Assert.Contains(remaining, static item => item is TextDeltaEvent delta && delta.Text == "second");
-        Assert.IsType<StreamEndedEvent>(remaining[^1]);
+        Assert.Contains(remaining, static item => item is TextDelta delta && delta.Text == "second");
+        Assert.IsType<StreamEnded>(remaining[^1]);
         Assert.Equal("firstsecond", stream.Result!.Text);
     }
 
@@ -589,7 +591,7 @@ public sealed class RoutingTests
         var stream = client.StreamAsync(
             Request(schema: JsonReader.Read("{\"type\":\"object\"}"), stream: true),
             capture);
-        var publicEvents = new List<GenerationEvent>();
+        var publicEvents = new List<StreamEvent>();
 
         var observed = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
@@ -600,13 +602,13 @@ public sealed class RoutingTests
         });
 
         Assert.Same(cleanup, observed);
-        Assert.Null(stream.Result);
+        Assert.Null(stream.ObservedResult);
         Assert.Empty(capture.Assessments);
         Assert.Empty(capture.Repairs);
         var entry = Assert.Single(capture.Entries);
         Assert.Same(cleanup, entry.NativeFailure);
         Assert.Same(cleanup, entry.TerminalFailure);
-        Assert.DoesNotContain(publicEvents, static item => item is UsageEvent or StreamEndedEvent);
+        Assert.DoesNotContain(publicEvents, static item => item is UsageUpdate or StreamEnded);
         Assert.Equal(1, capture.Lifecycle.Count(item => item.Name == "cleanup_start"));
         Assert.Equal(1, capture.Lifecycle.Count(item => item.Name == "cleanup_end"));
     }
@@ -617,8 +619,8 @@ public sealed class RoutingTests
         var cleanup = new ProviderException("cleanup transport", "transport", true, "stream");
         var adapter = new ScriptAdapter((_, token) => FinalThenCleanupFailure(token, cleanup));
         await using var client = Client(new ProviderRegistration("alpha", adapter));
-        var stream = client.StreamAsync(Request(stream: true, route: new Route(["alpha:model"], new RetryPolicy(MaxAttempts: 1))));
-        var events = new List<GenerationEvent>();
+        var stream = client.StreamAsync(Request(stream: true, route: new Route(["alpha:model"], new Retry(MaxAttempts: 1))));
+        var events = new List<StreamEvent>();
 
         var failure = await Assert.ThrowsAsync<AllTargetsFailedException>(async () =>
         {
@@ -630,10 +632,10 @@ public sealed class RoutingTests
 
         var attempt = Assert.Single(failure.Attempts);
         Assert.Same(cleanup, attempt.Error);
-        Assert.Contains(events, static item => item is TextDeltaEvent);
-        Assert.Contains(events, static item => item is AttemptFailedEvent);
-        Assert.DoesNotContain(events, static item => item is UsageEvent or StreamEndedEvent);
-        Assert.Null(stream.Result);
+        Assert.Contains(events, static item => item is TextDelta);
+        Assert.Contains(events, static item => item is AttemptFailed);
+        Assert.DoesNotContain(events, static item => item is UsageUpdate or StreamEnded);
+        Assert.Null(stream.ObservedResult);
         Assert.Single(adapter.Requests);
     }
 
@@ -651,11 +653,11 @@ public sealed class RoutingTests
         await using (var untouched = stream.GetAsyncEnumerator())
         {
             Assert.Empty(adapter.Requests);
-            Assert.Null(stream.Result);
+            Assert.Null(stream.ObservedResult);
             Assert.Null(stream.Operation);
         }
 
-        Assert.Null(stream.Result);
+        Assert.Null(stream.ObservedResult);
         Assert.Null(stream.Operation);
         var zeroCapture = new OperationCapture();
         var zero = client.StreamAsync(request, zeroCapture);
@@ -670,11 +672,11 @@ public sealed class RoutingTests
         var live = client.StreamAsync(request);
         var events = await Collect(live);
         Assert.Collection(events,
-            item => Assert.IsType<AttemptStartedEvent>(item),
-            item => Assert.IsType<FirstTokenEvent>(item),
-            item => Assert.IsType<TextDeltaEvent>(item),
-            item => Assert.IsType<UsageEvent>(item),
-            item => Assert.IsType<StreamEndedEvent>(item));
+            item => Assert.IsType<TimingMark>(item),
+            item => Assert.IsType<TimingMark>(item),
+            item => Assert.IsType<TextDelta>(item),
+            item => Assert.IsType<UsageUpdate>(item),
+            item => Assert.IsType<StreamEnded>(item));
         Assert.NotNull(live.Result);
         Assert.NotNull(live.Operation);
 
@@ -706,7 +708,7 @@ public sealed class RoutingTests
         await using var client = Client(new ProviderRegistration("alpha", adapter));
         var excluded = new GenerationRequest[]
         {
-            Request(messages: [new Message("tool", [new TextPart("raw")])]),
+            Request(messages: [new Message("tool", [new Text("raw")])]),
             Request(route: new Route(["alias"])) ,
             Request(schema: JsonReader.Read("{\"unknown\":true}")),
             Request(schema: JsonReader.Read("{\"$ref\":\"#/x\"}")),
@@ -784,19 +786,19 @@ public sealed class RoutingTests
         IEnumerable<Message>? messages = null,
         Route? route = null,
         Sampling? sampling = null,
-        RepairOptions? repair = null,
+        Repair? repair = null,
         JsonValue? schema = null,
         double? timeoutS = 12.5,
         int? maxResponseBytes = 91,
         bool stream = false) =>
-        new(messages ?? [new Message("user", [new TextPart("routing")])], route ?? new Route(["alpha:model"]), sampling, repair, schema, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: stream);
+        new(messages ?? [new Message("user", [new Text("routing")])], route ?? new Route(["alpha:model"]), sampling, repair, schema, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: stream);
 
-    private static async Task<List<GenerationEvent>> Collect(GenerationStream stream)
+    private static async Task<List<StreamEvent>> Collect(AsyncStream stream)
         => await Collect(stream, static _ => { });
 
-    private static async Task<List<GenerationEvent>> Collect(GenerationStream stream, Action<GenerationEvent> observe)
+    private static async Task<List<StreamEvent>> Collect(AsyncStream stream, Action<StreamEvent> observe)
     {
-        var result = new List<GenerationEvent>();
+        var result = new List<StreamEvent>();
         await foreach (var item in stream)
         {
             observe(item);
@@ -938,7 +940,7 @@ public sealed class RoutingTests
         }
     }
 
-    private static string Render(Message message) => string.Concat(message.Content.OfType<TextPart>().Select(static part => part.Text));
+    private static string Render(Message message) => string.Concat(message.Content.OfType<Text>().Select(static part => part.Value));
 
     private sealed class ScriptAdapter : IProviderAdapter
     {

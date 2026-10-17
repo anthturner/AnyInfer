@@ -197,7 +197,7 @@ internal static class TransportRunner
         var role = RequireString(Require(message, "role"), "role");
         if (message.TryGetValue("text", out var text))
         {
-            return new Message(role, [new TextPart(ReadText(text, "text"))]);
+            return new Message(role, [new Text(ReadText(text, "text"))]);
         }
 
         return new Message(role, RequireArray(message, "parts").Items.Select(ReadPart));
@@ -208,7 +208,7 @@ internal static class TransportRunner
         var part = RequireObject(value, "part");
         var kind = RequireString(Require(part, "kind"), "kind");
         return part.TryGetValue("text", out var text)
-            ? new TextPart(RequireString(text, "text"))
+            ? new Text(RequireString(text, "text"))
             : new UnsupportedContentPart(kind, part);
     }
 

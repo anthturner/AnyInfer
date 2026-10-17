@@ -89,10 +89,10 @@ internal static class ProofTimeouts
             await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
             var schema = PersonSchema();
             var request = new GenerationRequest(
-                [new Message("user", [new TextPart("Give me a person.")])],
-                new Route(["proof:reset"], new RetryPolicy(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
-                repair: new RepairOptions(1), schema: schema, timeoutS: 7.25, maxResponseBytes: 4096);
-            GenerationResult? result = null;
+                [new Message("user", [new Text("Give me a person.")])],
+                new Route(["proof:reset"], new Retry(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
+                repair: new Repair(1), schema: schema, timeoutS: 7.25, maxResponseBytes: 4096);
+            Generation? result = null;
             AnyInferException? terminal = null;
             try { result = await client.GenerateAsync(request, capture, cancellationToken).ConfigureAwait(false); }
             catch (AnyInferException exception) { terminal = exception; }
@@ -157,7 +157,7 @@ internal static class ProofTimeouts
         await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
         try
         {
-            var result = await client.GenerateAsync(new GenerationRequest([new Message("user", [new TextPart("proof")])], new Route([$"proof:{model}"], new RetryPolicy(MaxAttempts: 1)), timeoutS: timeoutS, maxResponseBytes: maxResponseBytes), capture, cancellationToken).ConfigureAwait(false);
+            var result = await client.GenerateAsync(new GenerationRequest([new Message("user", [new Text("proof")])], new Route([$"proof:{model}"], new Retry(MaxAttempts: 1)), timeoutS: timeoutS, maxResponseBytes: maxResponseBytes), capture, cancellationToken).ConfigureAwait(false);
             return new SuccessfulRun(result, null, capture);
         }
         catch (AllTargetsFailedException terminal) { return new SuccessfulRun(null, terminal, capture); }
@@ -168,7 +168,7 @@ internal static class ProofTimeouts
         var adapter = new ProofAdapter([ProofStep.WaitForCancellation()]);
         var capture = new OperationCapture();
         await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)]);
-        var request = new GenerationRequest([new Message("user", [new TextPart("proof")])], new Route(["proof:timeout"], new RetryPolicy(MaxAttempts: 1)), timeoutS: 0.05, maxResponseBytes: 80);
+        var request = new GenerationRequest([new Message("user", [new Text("proof")])], new Route(["proof:timeout"], new Retry(MaxAttempts: 1)), timeoutS: 0.05, maxResponseBytes: 80);
         var execution = client.GenerateAsync(request, capture, cancellationToken);
         try { await adapter.Ready.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false); }
         catch (TimeoutException exception) { throw new ProofHarnessException("Timeout proof adapter did not enter its native iterator gate.", exception); }
@@ -199,7 +199,7 @@ internal static class ProofTimeouts
     private static string AdapterText(EntryContext entry) => string.Concat(entry.AdapterEvents.OfType<AdapterTextDelta>().Select(static value => value.Text));
     private static bool MessagesEqual(IReadOnlyList<Message> actual, IReadOnlyList<Message> expected) => actual.Count == expected.Count && actual.Zip(expected, static (left, right) =>
         string.Equals(left.Role, right.Role, StringComparison.Ordinal) && left.Content.Count == right.Content.Count &&
-        left.Content.Zip(right.Content, static (leftPart, rightPart) => leftPart is TextPart leftText && rightPart is TextPart rightText && string.Equals(leftText.Text, rightText.Text, StringComparison.Ordinal)).All(static equal => equal)).All(static equal => equal);
+        left.Content.Zip(right.Content, static (leftPart, rightPart) => leftPart is Text leftText && rightPart is Text rightText && string.Equals(leftText.Value, rightText.Value, StringComparison.Ordinal)).All(static equal => equal)).All(static equal => equal);
     private static bool HasInteger(JsonObject value, string name, int expected) => value.TryGetValue(name, out var actual) && actual is JsonInteger integer && integer.Value == new BigInteger(expected);
 
     private static JsonObject EntryEvidence(EntryContext entry) => new([
@@ -211,9 +211,9 @@ internal static class ProofTimeouts
     private static JsonObject AssessmentEvidence(NativeAssessment assessment) => new([new JsonProperty("assessment_id", new JsonString(assessment.AssessmentId.ToString("D"))), new JsonProperty("source_entry_ordinal", new JsonInteger(assessment.SourceEntryOrdinal)), new JsonProperty("kind", new JsonString(assessment.Kind)), new JsonProperty("valid", new JsonBoolean(assessment.IsValid))]);
     private static JsonObject RepairEvidence(RepairPreparation repair) => new([new JsonProperty("assessment_id", new JsonString(repair.Assessment.AssessmentId.ToString("D"))), new JsonProperty("response_text", new JsonString(repair.ResponseText)), new JsonProperty("message_count", new JsonInteger(repair.Messages.Count))]);
     private static JsonArray RepairWireEvidence(OperationCapture capture) => new(capture.Repairs.Select(repair => new JsonObject([new JsonProperty("assessment_id", new JsonString(repair.Assessment.AssessmentId.ToString("D"))), new JsonProperty("response_text", new JsonString(repair.ResponseText)), new JsonProperty("messages", new JsonArray(repair.Messages.Select(MessageEvidence)))])));
-    private static JsonObject MessageEvidence(Message message) => new([new JsonProperty("role", new JsonString(message.Role)), new JsonProperty("text", new JsonString(string.Concat(message.Content.OfType<TextPart>().Select(static part => part.Text))))]);
+    private static JsonObject MessageEvidence(Message message) => new([new JsonProperty("role", new JsonString(message.Role)), new JsonProperty("text", new JsonString(string.Concat(message.Content.OfType<Text>().Select(static part => part.Value))))]);
     private static JsonArray LifecycleEvidence(OperationCapture capture) => new(capture.Lifecycle.Select(item => new JsonObject([new JsonProperty("sequence", new JsonInteger(item.Sequence)), new JsonProperty("entry_ordinal", new JsonInteger(item.EntryOrdinal)), new JsonProperty("name", new JsonString(item.Name))])));
-    private static JsonObject RunEvidence(GenerationResult? result, Exception? terminal) => new([new JsonProperty("result_text", result is null ? JsonNull.Instance : new JsonString(result.Text)), new JsonProperty("structured", result?.Structured ?? JsonNull.Instance), new JsonProperty("repair_attempts", result is null ? JsonNull.Instance : new JsonInteger(result.RepairAttempts)), new JsonProperty("terminal_type", terminal is null ? JsonNull.Instance : new JsonString(terminal.GetType().Name))]);
+    private static JsonObject RunEvidence(Generation? result, Exception? terminal) => new([new JsonProperty("result_text", result is null ? JsonNull.Instance : new JsonString(result.Text)), new JsonProperty("structured", result?.Structured ?? JsonNull.Instance), new JsonProperty("repair_attempts", result is null ? JsonNull.Instance : new JsonInteger(result.RepairAttempts)), new JsonProperty("terminal_type", terminal is null ? JsonNull.Instance : new JsonString(terminal.GetType().Name))]);
     private static JsonArray AttemptsEvidence(AllTargetsFailedException terminal) => new(terminal.Attempts.Select(attempt => new JsonObject([new JsonProperty("outcome", new JsonString(attempt.Outcome)), new JsonProperty("error_category", attempt.Error is null ? JsonNull.Instance : new JsonString(attempt.Error.Category)), new JsonProperty("error_phase", attempt.Error?.Phase is null ? JsonNull.Instance : new JsonString(attempt.Error.Phase))])));
     private static JsonObject TimeoutMappingEvidence(TimeoutMappingObservation observation) => new([new JsonProperty("native_to_provider", new JsonBoolean(observation.IsNativeToProvider)), new JsonProperty("provider_to_attempt", new JsonBoolean(observation.IsProviderToAttempt))]);
 
@@ -228,8 +228,8 @@ internal static class ProofTimeouts
     private static JsonValue Number(double value) => new JsonNumber(value);
     private static JsonObject PersonSchema() => new([new JsonProperty("type", new JsonString("object")), new JsonProperty("properties", new JsonObject([new JsonProperty("age", new JsonObject([new JsonProperty("type", new JsonString("integer"))]))])), new JsonProperty("required", new JsonArray([new JsonString("age")]))]);
 
-    private sealed record SuccessfulRun(GenerationResult? Result, AllTargetsFailedException? Terminal, OperationCapture Capture);
-    private sealed record TimeoutRun(GenerationResult? Result, AllTargetsFailedException? Terminal, OperationCapture Capture);
+    private sealed record SuccessfulRun(Generation? Result, AllTargetsFailedException? Terminal, OperationCapture Capture);
+    private sealed record TimeoutRun(Generation? Result, AllTargetsFailedException? Terminal, OperationCapture Capture);
     internal sealed record TimeoutMappingObservation(bool IsNativeToProvider, bool IsProviderToAttempt);
     private enum LifecycleStatus { Exact, WrongOrder, Missing }
     private sealed class ProofHarnessException(string message, Exception? inner = null) : Exception(message, inner);

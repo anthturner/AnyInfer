@@ -4,14 +4,14 @@ internal sealed class RouteState
 {
     private readonly IOperationClock _clock;
     private readonly object _gate = new();
-    private readonly Dictionary<Target, double> _failedAt = [];
+    private readonly Dictionary<ResolvedTarget, double> _failedAt = [];
 
     internal RouteState(IOperationClock clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     }
 
-    internal bool IsUnhealthy(Target target, double healthTtlS)
+    internal bool IsUnhealthy(ResolvedTarget target, double healthTtlS)
     {
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
@@ -31,7 +31,7 @@ internal sealed class RouteState
         }
     }
 
-    internal void MarkFailed(Target target)
+    internal void MarkFailed(ResolvedTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
@@ -40,7 +40,7 @@ internal sealed class RouteState
         }
     }
 
-    internal void Clear(Target target)
+    internal void Clear(ResolvedTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
@@ -49,7 +49,7 @@ internal sealed class RouteState
         }
     }
 
-    internal void SeedFailure(Target target, double failedAtSeconds)
+    internal void SeedFailure(ResolvedTarget target, double failedAtSeconds)
     {
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
@@ -58,7 +58,7 @@ internal sealed class RouteState
         }
     }
 
-    internal static double BackoffSeconds(RetryPolicy policy, int attemptNumber, double? retryAfterS)
+    internal static double BackoffSeconds(Retry policy, int attemptNumber, double? retryAfterS)
     {
         ArgumentNullException.ThrowIfNull(policy);
         if (attemptNumber < 1)

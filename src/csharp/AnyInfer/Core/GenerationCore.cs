@@ -10,21 +10,20 @@ namespace AnyInfer.Core;
 
 internal static class GenerationCore
 {
-    internal static async IAsyncEnumerable<GenerationEvent> ExecuteAsync(
+    internal static async IAsyncEnumerable<StreamEvent> ExecuteAsync(
         NormalizedRequest request,
         Route route,
         ProviderRegistry registry,
         RouteState health,
         IOperationClock clock,
         OperationCapture? capture,
-        GenerationStream stream,
+        AsyncStream stream,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var operation = new OperationContext(capture);
         stream.BeginOperation(operation);
         var attempts = new List<AttemptRecord>();
-        var visitedTargets = new HashSet<Target>();
-        var stopwatch = Stopwatch.StartNew();
+        var visitedTargets = new HashSet<ResolvedTarget>();
 
         try
         {
@@ -46,7 +45,7 @@ internal static class GenerationCore
                 var effectiveRepairs = EffectiveRepairBudget(request, resolved, operation, capture);
                 for (var attemptNumber = 1; attemptNumber <= Math.Max(1, route.Retry.MaxAttempts); attemptNumber++)
                 {
-                    var routeState = new RouteAttemptState(stopwatch);
+                    var routeState = new RouteAttemptState();
                     var current = CreateEntry(
                         resolved.Registration.Adapter,
                         RequestNormalizer.CreateWireRequest(request, resolved),
@@ -72,7 +71,7 @@ internal static class GenerationCore
                             route.Retry,
                             routeState.ContentEmitted,
                             health);
-                        yield return new AttemptFailedEvent(disposition.Attempt);
+                        yield return new AttemptFailed(disposition.Attempt);
                         if (current.Error.Category == "stream_protocol" && routeState.ContentEmitted)
                         {
                             throw current.Error;
@@ -151,7 +150,7 @@ internal static class GenerationCore
                             route.Retry,
                             routeState.ContentEmitted,
                             health);
-                        yield return new AttemptFailedEvent(disposition.Attempt);
+                        yield return new AttemptFailed(disposition.Attempt);
                         if (current.Error.Category == "stream_protocol" && routeState.ContentEmitted)
                         {
                             throw current.Error;
@@ -179,19 +178,25 @@ internal static class GenerationCore
                     var structured = request.Schema is null ? null : operation.LastAssessment?.Structured;
                     attempts.Add(new AttemptRecord(resolved.Target, "ok"));
                     health.Clear(resolved.Target);
-                    var result = new GenerationResult(
+                    var totalMilliseconds = current.TotalMilliseconds;
+                    var firstTokenMilliseconds = current.FirstTokenMilliseconds;
+                    var result = new Generation(
                         current.Text,
                         structured,
                         resolved.Target,
                         current.FinishReason,
                         NormalizeWinningUsage(current.Usage),
-                        new GenerationTiming(routeState.FirstTokenMilliseconds, stopwatch.Elapsed.TotalMilliseconds),
+                        new Timing(
+                            current.StartedAt,
+                            firstTokenMilliseconds,
+                            totalMilliseconds,
+                            OutputTokensPerSecond(current.Usage, firstTokenMilliseconds, totalMilliseconds)),
                         current.Entry.Request.Mechanism,
                         repairs,
                         attempts,
                         []);
                     stream.PublishSuccess(result);
-                    yield return new StreamEndedEvent(result);
+                    yield return new StreamEnded(result);
                     yield break;
                 }
             }
@@ -208,7 +213,7 @@ internal static class GenerationCore
         IProviderAdapter adapter,
         WireRequest wireRequest,
         OperationContext operation,
-        GenerationStream stream,
+        AsyncStream stream,
         EntryRole role,
         NativeAssessment? assessment,
         RouteAttemptState routeState,
@@ -236,10 +241,10 @@ internal static class GenerationCore
 
     private static FailureDisposition RecordFailure(
         ProviderException failure,
-        Target target,
+        ResolvedTarget target,
         List<AttemptRecord> attempts,
         int attemptNumber,
-        RetryPolicy policy,
+        Retry policy,
         bool contentEmitted,
         RouteState health)
     {
@@ -255,14 +260,14 @@ internal static class GenerationCore
         return new FailureDisposition(attempt, shouldRetry);
     }
 
-    private static bool CanRetry(ProviderException error, int attempt, RetryPolicy policy) =>
+    private static bool CanRetry(ProviderException error, int attempt, Retry policy) =>
         error.Retryable && error.Category is not ("auth" or "context_length") && attempt < Math.Max(1, policy.MaxAttempts);
 
     private static bool ShouldMarkUnhealthy(ProviderException error) =>
         error.Category is "transport" or "provider_unavailable";
 
     private static async ValueTask DelayAsync(
-        RetryPolicy policy,
+        Retry policy,
         int attemptNumber,
         ProviderException error,
         IOperationClock clock,
@@ -307,18 +312,21 @@ internal static class GenerationCore
             usage.ReasoningTokens);
     }
 
+    private static double? OutputTokensPerSecond(Usage? usage, double? firstTokenMs, double totalMs)
+    {
+        if (usage?.OutputTokens is not { } tokens || tokens <= 0 || firstTokenMs is null || totalMs <= firstTokenMs.Value)
+        {
+            return null;
+        }
+
+        return tokens / ((totalMs - firstTokenMs.Value) / 1000d);
+    }
+
     private sealed record FailureDisposition(AttemptRecord Attempt, bool ShouldRetry);
 
     private sealed class RouteAttemptState
     {
-        internal RouteAttemptState(Stopwatch stopwatch)
-        {
-            Stopwatch = stopwatch;
-        }
-
-        internal Stopwatch Stopwatch { get; }
         internal bool ContentEmitted { get; set; }
-        internal double? FirstTokenMilliseconds { get; set; }
     }
 
     private sealed class EntrySession
@@ -339,6 +347,9 @@ internal static class GenerationCore
         private bool _sawAdapterUsage;
         private bool _firstContent;
         private bool _clean;
+        private readonly Stopwatch _entryStopwatch = Stopwatch.StartNew();
+        private readonly double _startedAt = System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+        private double? _firstTokenMilliseconds;
 
         internal EntrySession(
             IProviderAdapter adapter,
@@ -365,8 +376,11 @@ internal static class GenerationCore
         internal string Text => _text.ToString();
         internal Usage? Usage => _usage;
         internal string? FinishReason => _finishReason;
+        internal double StartedAt => _startedAt;
+        internal double? FirstTokenMilliseconds => _firstTokenMilliseconds;
+        internal double TotalMilliseconds => _entryStopwatch.Elapsed.TotalMilliseconds;
 
-        internal async IAsyncEnumerable<GenerationEvent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+        internal async IAsyncEnumerable<StreamEvent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
         {
             IAsyncEnumerator<AdapterEvent>? enumerator = null;
             Task<ReadStep>? pending = null;
@@ -377,7 +391,7 @@ internal static class GenerationCore
                     .GetAsyncEnumerator(_cancellationToken);
                 pending = ReadStepAsync(enumerator);
                 _entry = _operation.LastEntry ?? throw new InvalidOperationException("The boundary did not create an entry.");
-                yield return new AttemptStartedEvent(_entry.Ordinal, _role.ToString().ToLowerInvariant());
+                yield return new TimingMark("attempt_start", 0);
 
                 while (true)
                 {
@@ -440,11 +454,11 @@ internal static class GenerationCore
             }
         }
 
-        internal IEnumerable<GenerationEvent> FinalUsageEvents()
+        internal IEnumerable<StreamEvent> FinalUsageEvents()
         {
             if (_clean && !_sawAdapterUsage && _usage is not null)
             {
-                yield return new UsageEvent(_usage);
+                yield return new UsageUpdate(_usage);
             }
         }
 
@@ -461,7 +475,7 @@ internal static class GenerationCore
             }
         }
 
-        private IEnumerable<GenerationEvent> Project(AdapterEvent adapterEvent)
+        private IEnumerable<StreamEvent> Project(AdapterEvent adapterEvent)
         {
             switch (adapterEvent)
             {
@@ -470,17 +484,18 @@ internal static class GenerationCore
                     {
                         _firstContent = true;
                         _routeState.ContentEmitted = true;
-                        _routeState.FirstTokenMilliseconds ??= _routeState.Stopwatch.Elapsed.TotalMilliseconds;
-                        yield return new FirstTokenEvent(Entry.Ordinal);
+                        var firstTokenMilliseconds = _entryStopwatch.Elapsed.TotalMilliseconds;
+                        _firstTokenMilliseconds = firstTokenMilliseconds;
+                        yield return new TimingMark("first_token", firstTokenMilliseconds);
                     }
 
                     _text.Append(textDelta.Text);
-                    yield return new TextDeltaEvent(textDelta.Text);
+                    yield return new TextDelta(textDelta.Text);
                     break;
                 case AdapterUsage usage:
                     _sawAdapterUsage = true;
                     _usage = OverlayUsage(_usage, usage.Usage);
-                    yield return new UsageEvent(usage.Usage);
+                    yield return new UsageUpdate(usage.Usage);
                     break;
                 case AdapterFinal final:
                     _finishReason = final.FinishReason;

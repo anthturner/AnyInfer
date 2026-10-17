@@ -410,8 +410,8 @@ internal static class Comparison
 
     private static string MessageText(Message message)
     {
-        return string.Concat(message.Content.Select(part => part is TextPart text
-            ? text.Text
+        return string.Concat(message.Content.Select(part => part is Text text
+            ? text.Value
             : throw new ObservationUnavailableException("captured marker message has non-text content")));
     }
 

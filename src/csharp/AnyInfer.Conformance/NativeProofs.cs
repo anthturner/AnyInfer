@@ -254,7 +254,7 @@ internal static class NativeProofs
         await using var client = CreateClient(adapter);
         var outcome = await RunNativeAsync(
             client,
-            CreateRequest(name, schema, new RepairOptions(repairAttempts)),
+            CreateRequest(name, schema, new Repair(repairAttempts)),
             capture,
             cancellationToken).ConfigureAwait(false);
         return new AssessmentCase(capture, outcome);
@@ -263,10 +263,10 @@ internal static class NativeProofs
     private static AsyncClient CreateClient(IProviderAdapter adapter) =>
         new([new ProviderRegistration("proof", adapter)]);
 
-    private static GenerationRequest CreateRequest(string marker, JsonValue? schema, RepairOptions? repair = null) =>
+    private static GenerationRequest CreateRequest(string marker, JsonValue? schema, Repair? repair = null) =>
         new(
-            [new Message("user", [new TextPart(marker)])],
-            new Route(["proof:model"], new RetryPolicy(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
+            [new Message("user", [new Text(marker)])],
+            new Route(["proof:model"], new Retry(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
             repair: repair,
             schema: schema,
             stream: false);
@@ -466,7 +466,7 @@ internal static class NativeProofs
     private static JsonInteger Number(int value) => new(value);
     private static JsonNumber Number(double value) => new(value);
 
-    private static bool ResultsEqual(GenerationResult? first, GenerationResult? second)
+    private static bool ResultsEqual(Generation? first, Generation? second)
     {
         if (first is null || second is null)
         {
@@ -515,18 +515,18 @@ internal static class NativeProofs
             string.Equals(pair.First.Outcome, pair.Second.Outcome, StringComparison.Ordinal) &&
             ErrorsEqual(pair.First.Error, pair.Second.Error));
 
-    private static bool TimingPresenceEqual(GenerationTiming? first, GenerationTiming? second) =>
+    private static bool TimingPresenceEqual(Timing? first, Timing? second) =>
         first is null
             ? second is null
-            : second is not null && first.FirstTokenMs.HasValue == second.FirstTokenMs.HasValue && first.TotalMs.HasValue == second.TotalMs.HasValue;
+            : second is not null && first.FirstTokenMs.HasValue == second.FirstTokenMs.HasValue;
 
-    private static JsonObject ResultJson(GenerationResult result) => Object(
+    private static JsonObject ResultJson(Generation result) => Object(
         Property("text", Text(result.Text)),
         Property("structured", result.Structured ?? JsonNull.Instance),
         Property("target", result.Target is null ? JsonNull.Instance : Object(Property("provider", Text(result.Target.ProviderId)), Property("model", Text(result.Target.Model)))),
         Property("finish_reason", result.FinishReason is null ? JsonNull.Instance : Text(result.FinishReason)),
         Property("usage", UsageJson(result.Usage)),
-        Property("timing_presence", Object(Property("first_token", Bool(result.Timing?.FirstTokenMs is not null)), Property("total", Bool(result.Timing?.TotalMs is not null)))),
+        Property("timing_presence", Object(Property("first_token", Bool(result.Timing?.FirstTokenMs is not null)), Property("total", Bool(result.Timing is not null)))),
         Property("structured_mechanism", result.StructuredMechanism is null ? JsonNull.Instance : Text(result.StructuredMechanism)),
         Property("repair_attempts", Number(result.RepairAttempts)),
         Property("attempts", new JsonArray(result.Attempts.Select(AttemptJson))),
@@ -568,9 +568,9 @@ internal static class NativeProofs
 
     private sealed record AssessmentCase(OperationCapture Capture, NativeOutcome Outcome);
 
-    private sealed record NativeOutcome(GenerationResult? Result, AnyInferException? Error)
+    private sealed record NativeOutcome(Generation? Result, AnyInferException? Error)
     {
-        internal static NativeOutcome Success(GenerationResult result) => new(result, null);
+        internal static NativeOutcome Success(Generation result) => new(result, null);
         internal static NativeOutcome Failure(AnyInferException exception) => new(null, exception);
 
         internal bool SemanticallyEquals(NativeOutcome other) =>
@@ -794,12 +794,12 @@ internal static class NativeProofs
             throw new ProofHarnessException("Proof request does not contain exactly one caller user message.");
         }
 
-        if (callers[0].Content.Any(static part => part is not TextPart))
+        if (callers[0].Content.Any(static part => part is not AnyInfer.Text))
         {
             throw new ProofHarnessException("Proof caller message contains non-text content.");
         }
 
-        return string.Concat(callers[0].Content.Cast<TextPart>().Select(static text => text.Text));
+        return string.Concat(callers[0].Content.Cast<AnyInfer.Text>().Select(static text => text.Value));
     }
 
     private static TaskCompletionSource<bool> NewSignal() =>

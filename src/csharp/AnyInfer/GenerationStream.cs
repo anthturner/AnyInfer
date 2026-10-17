@@ -3,12 +3,12 @@ using AnyInfer.Internal;
 namespace AnyInfer;
 
 /// <summary>Represents one lazy generation operation and its ordered public events.</summary>
-public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsyncDisposable
+public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposable
 {
-    private readonly Func<CancellationToken, IAsyncEnumerable<GenerationEvent>> _factory;
+    private readonly Func<CancellationToken, IAsyncEnumerable<StreamEvent>> _factory;
     private readonly CancellationTokenSource _closeSource = new();
     private readonly object _gate = new();
-    private readonly Action<GenerationStream>? _onClosed;
+    private readonly Action<AsyncStream>? _onClosed;
     private StreamEnumerator? _enumerator;
     private Task? _disposeTask;
     private bool _claimed;
@@ -16,13 +16,13 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
     private bool _succeeded;
     private bool _consumerClosing;
     private int _closeNotified;
-    private GenerationResult? _result;
+    private Generation? _result;
     private OperationContext? _operation;
 
-    internal GenerationStream(
-        Func<CancellationToken, IAsyncEnumerable<GenerationEvent>> factory,
+    internal AsyncStream(
+        Func<CancellationToken, IAsyncEnumerable<StreamEvent>> factory,
         CancellationToken callerCancellation,
-        Action<GenerationStream>? onClosed = null)
+        Action<AsyncStream>? onClosed = null)
     {
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         CallerCancellation = callerCancellation;
@@ -32,7 +32,19 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
     internal CancellationToken CallerCancellation { get; }
 
     /// <summary>Gets the winning result after successful terminal completion.</summary>
-    public GenerationResult? Result
+    public Generation Result
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _result ?? throw new InvalidOperationException(
+                    "The stream has no successful terminal generation. Consume it to completion first.");
+            }
+        }
+    }
+
+    internal Generation? ObservedResult
     {
         get
         {
@@ -41,6 +53,16 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
                 return _result;
             }
         }
+    }
+
+    /// <summary>Consumes this stream once and returns its successful terminal generation.</summary>
+    public async Task<Generation> CollectAsync(CancellationToken cancellationToken = default)
+    {
+        await foreach (var _ in this.WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+        }
+
+        return Result;
     }
 
     internal bool IsClosing
@@ -74,7 +96,7 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
     }
 
     /// <inheritdoc />
-    public IAsyncEnumerator<GenerationEvent> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    public IAsyncEnumerator<StreamEvent> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
@@ -85,7 +107,7 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
 
             if (_claimed)
             {
-                throw new InvalidOperationException("A GenerationStream has a single consumer.");
+                throw new InvalidOperationException("A AsyncStream has a single consumer.");
             }
 
             _claimed = true;
@@ -127,7 +149,7 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
         }
     }
 
-    internal void PublishSuccess(GenerationResult result)
+    internal void PublishSuccess(Generation result)
     {
         ArgumentNullException.ThrowIfNull(result);
         lock (_gate)
@@ -178,16 +200,16 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
         }
     }
 
-    private static async IAsyncEnumerable<GenerationEvent> Empty()
+    private static async IAsyncEnumerable<StreamEvent> Empty()
     {
         await Task.CompletedTask.ConfigureAwait(false);
         yield break;
     }
 
-    private sealed class StreamEnumerator : IAsyncEnumerator<GenerationEvent>
+    private sealed class StreamEnumerator : IAsyncEnumerator<StreamEvent>
     {
-        private readonly GenerationStream _owner;
-        private readonly IAsyncEnumerator<GenerationEvent> _inner;
+        private readonly AsyncStream _owner;
+        private readonly IAsyncEnumerator<StreamEvent> _inner;
         private readonly CancellationTokenSource _linked;
         private readonly SemaphoreSlim _moveGate = new(1, 1);
         private readonly object _disposeGate = new();
@@ -195,14 +217,14 @@ public sealed class GenerationStream : IAsyncEnumerable<GenerationEvent>, IAsync
         private Exception? _closeTimeMoveFailure;
         private int _disposed;
 
-        internal StreamEnumerator(GenerationStream owner, IAsyncEnumerator<GenerationEvent> inner, CancellationTokenSource linked)
+        internal StreamEnumerator(AsyncStream owner, IAsyncEnumerator<StreamEvent> inner, CancellationTokenSource linked)
         {
             _owner = owner;
             _inner = inner;
             _linked = linked;
         }
 
-        public GenerationEvent Current => _inner.Current;
+        public StreamEvent Current => _inner.Current;
 
         public async ValueTask<bool> MoveNextAsync()
         {

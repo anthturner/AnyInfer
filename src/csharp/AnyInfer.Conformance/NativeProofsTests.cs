@@ -261,7 +261,7 @@ public sealed class NativeProofsTests
             preparation.Assessment,
             preparation.ResponseText,
             preparation.OriginalMessages,
-            [new Message("user", [new TextPart("rewritten repair prompt")])]);
+            [new Message("user", [new Text("rewritten repair prompt")])]);
         Assert.False(NativeProofs.HasCausalRepairForTest(CopyRepairCapture(capture, rewrittenWire)));
     }
 
@@ -315,9 +315,9 @@ public sealed class NativeProofsTests
             ])),
         ]);
         var request = new GenerationRequest(
-            [new Message("user", [new TextPart("repair proof")])],
-            new Route(["proof:model"], new RetryPolicy(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
-            repair: new RepairOptions(1),
+            [new Message("user", [new Text("repair proof")])],
+            new Route(["proof:model"], new Retry(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
+            repair: new Repair(1),
             schema: schema,
             stream: false);
 

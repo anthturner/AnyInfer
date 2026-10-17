@@ -21,13 +21,13 @@ public static class SchemaPromptRenderer
         {
             if (string.Equals(messages[index].Role, "system", StringComparison.Ordinal))
             {
-                var content = messages[index].Content.Concat([new TextPart("\n\n" + instruction)]).ToArray();
+                var content = messages[index].Content.Concat([new Text("\n\n" + instruction)]).ToArray();
                 messages[index] = new Message(messages[index].Role, content);
                 return Array.AsReadOnly(messages.ToArray());
             }
         }
 
-        messages.Insert(0, new Message("system", [new TextPart(instruction)]));
+        messages.Insert(0, new Message("system", [new Text(instruction)]));
         return Array.AsReadOnly(messages.ToArray());
     }
 }
