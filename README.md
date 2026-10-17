@@ -169,6 +169,10 @@ python workspace.py demo     # launch the demo app
 `python workspace.py` with no arguments lists every verb. See
 [Contributing](https://anyinfer.dev/contributing/).
 
+Contributors can also run the bounded [C# core-generation proof](https://anyinfer.dev/contributing/csharp-proof/).
+It is repository verification infrastructure, not an AnyInfer package, integration API, or
+release artifact.
+
 ## Compatibility surface
 
 Provider breadth is compatibility inventory, not the product thesis. AnyInfer ships 20

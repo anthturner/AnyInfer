@@ -36,6 +36,7 @@ def recorded(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
         return 0
 
     monkeypatch.setattr(workspace, "run", fake_run)
+    monkeypatch.setattr(workspace.shutil, "which", lambda name: f"/tools/{name}")
     monkeypatch.setattr(
         workspace, "_check_docstrings", lambda: commands.append(["<docstrings>"]) or 0
     )
@@ -167,10 +168,34 @@ class TestVerbs:
             recorded.index(["<docstrings>"]),
             recorded.index(["<doc-links>"]),
             position("mkdocs", "build"),
+            position("dotnet", "--version"),
         ]
         assert positions == sorted(positions), "phases must run in the documented order"
         # The formatter is the one gate that stays opt-in.
         assert not any(len(cmd) > 1 and cmd[1] == "format" for cmd in recorded)
+
+    def test_check_only_csharp_runs_the_pinned_solution_from_its_own_root(self, monkeypatch):
+        calls: list[tuple[list[str], Path | None]] = []
+
+        def capture(command, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append((list(command), kwargs.get("cwd")))
+            return 0
+
+        monkeypatch.setattr(workspace, "run", capture)
+        monkeypatch.setattr(workspace.shutil, "which", lambda name: f"/tools/{name}")
+
+        assert workspace.main(["check", "--only=csharp"]) == 0
+        assert calls == [
+            (["dotnet", "--version"], ROOT / "src" / "csharp"),
+            (["dotnet", "restore", "AnyInfer.sln"], ROOT / "src" / "csharp"),
+            (["dotnet", "test", "AnyInfer.sln", "--no-restore"], ROOT / "src" / "csharp"),
+        ]
+
+    def test_check_only_csharp_refuses_without_the_pinned_sdk(self, monkeypatch, capsys):
+        monkeypatch.setattr(workspace.shutil, "which", lambda name: None)
+
+        assert workspace.main(["check", "--only=csharp"]) == 1
+        assert "src/csharp/global.json" in capsys.readouterr().out
 
     def test_check_covers_every_gate_ci_enforces(self, recorded):
         """`check` is the whole pipeline: no CI job may run a gate it cannot reproduce.
@@ -198,6 +223,27 @@ class TestVerbs:
         assert "(.id | tostring) != $keep" in workflow
         assert "gh api --method DELETE" in workflow
         assert "artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}" in workflow
+
+    def test_native_csharp_ci_lane_uses_the_workspace_phase_and_aggregate_policy(self):
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+        native = re.search(r"^  native-csharp:\n(?P<body>.*?)(?=^  [\w-]+:|\Z)", workflow, re.M | re.S)
+        assert native is not None
+        body = native.group("body")
+        assert "needs: [changes]" in body
+        assert "if: needs.changes.outputs.docs_only != 'true'" in body
+        assert "actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0" in body
+        assert "global-json-file: src/csharp/global.json" in body
+        assert "python workspace.py check --only=csharp" in body
+        assert "setup-python" not in body
+        assert "setup-uv" not in body
+        assert "uv pip install" not in body
+        aggregate = re.search(
+            r"^  ci-ok:\n(?P<body>.*?)(?=^  [\w-]+:|\Z)", workflow, re.M | re.S
+        )
+        assert aggregate is not None
+        assert "native-csharp" in aggregate.group("body")
+        assert "success|skipped" in workflow
 
     def test_claude_action_jobs_can_request_oidc_tokens(self):
         """Every Claude action job must expose GitHub's OIDC environment variables."""
@@ -264,6 +310,7 @@ class TestVerbs:
             return 0 if "mypy" not in command[0] else 1
 
         monkeypatch.setattr(workspace, "run", failing_run)
+        monkeypatch.setattr(workspace.shutil, "which", lambda name: f"/tools/{name}")
         monkeypatch.setattr(
             workspace, "_check_docstrings", lambda: calls.append("docstrings") or 0
         )
@@ -272,10 +319,10 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The nine default phases comprise thirteen steps — eleven subprocesses plus the two
+        # The ten default phases comprise sixteen steps — fourteen subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
-        # (contracts and conformance have two steps each, docs-check three).
-        assert len(calls) == 13
+        # (contracts and conformance have two steps each, docs-check three, C# three).
+        assert len(calls) == 16
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0
@@ -530,6 +577,21 @@ class TestShadowing:
 
 
 class TestProcessHelpers:
+    def test_run_defaults_to_the_repository_root(self, monkeypatch):
+        observed: dict[str, object] = {}
+
+        class Completed:
+            returncode = 0
+
+        def capture(command, *, cwd, env, check):  # type: ignore[no-untyped-def]
+            observed.update(command=command, cwd=cwd, env=env, check=check)
+            return Completed()
+
+        monkeypatch.setattr(workspace.subprocess, "run", capture)
+
+        assert workspace.run(["example"]) == 0
+        assert observed["cwd"] == ROOT
+
     def test_missing_tool_gives_an_actionable_error(self, monkeypatch, capsys):
         def missing(command, cwd=None, env=None, check=False):  # type: ignore[no-untyped-def]
             raise FileNotFoundError(command[0])

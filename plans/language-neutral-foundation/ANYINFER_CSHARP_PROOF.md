@@ -808,15 +808,37 @@ verification both before execution and before output.
   > selected roots are read-only inputs. Six passing driver rows use evidence =
   > {recipe_ref, observations: actual proof evidence}; other passing rows use evidence:null.
   > Validate the exact closed report-v0 shape before any canonical destination is created.
-  > Complete execution, provenance/clean-HEAD checks, second release verification, and final
-  > cancellation check precede a new-only owned same-directory staging file and no-replace
-  > atomic publication. Failures remove only that verified owned staging file.
+  > Complete execution, the late test hook, provenance/clean-HEAD checks, second release
+  > verification, and cancellation checks precede any same-directory staging file. Then
+  > write/flush/close a CreateNew stage and publish by immediate no-replace move, checking
+  > cancellation and expected regular-file content first. No callback or Git-clean probe
+  > runs after staging starts: the writer's own untracked stage would dirty that probe.
+  > NOTE: BCL-only .NET 8 cannot prove post-close file identity after a path replacement.
+  > On an exceptional post-stage failure, retain an ambiguous private stage instead of
+  > deleting by pathname; canonical output stays untouched. This supersedes unconditional
+  > staging cleanup and the earlier proposed hook-after-staging test seam. No interop or
+  > dependency is added. Standard Git cleanliness excludes ignored build/cache outputs;
+  > loaded assemblies and resolved assets have independent path/content/metadata checks.
+  > Production publication is enabled only by the executable Main path. Internal RunAsync
+  > used by normal tests always refuses report publication, including from a clean build
+  > whose embedded revisions match HEAD. A narrow internal final-move operation substitute
+  > supports sandbox failure tests; production uses File.Move without overwrite and accepts
+  > no injected observer or operation from CLI. This is not a post-stage generic test hook.
   > Dependency metadata merges resolved package entries from canonical driver and library
   > assets, lowercases package IDs, rejects version conflicts, and sorts names by code point;
   > project entries are excluded and runtime-library package dependencies must remain empty.
   > Root verified setup-dotnet v6.0.0 at a98b56852c35b8e3190ac28c8c2271da59106c68
   > from official tag/source; its action.yml declares global-json-file and node24. Use
   > global-json-file:src/csharp/global.json with existing checkout/Python pins unchanged.
+  > NOTE: Source/provenance/publication/CI reviews are closed. FinalReport passed 12/0/0
+  > (3.1652s), and the corrected causal Unicode argument-diagnostic reader gate passed
+  > 37/0/0 (9.6651s), SDK 8.0.425, retained ebaaed44. Root's complete workspace gate
+  > passed all 16 steps in 91.5s (0171327f), including 164 unit and 93 Conformance tests,
+  > docs checks/build, and the exact documented SDK/restore/test solution commands.
+  > Commit this held code/docs/CI checkpoint next, then rebuild/test with its full revision
+  > before production. This box remains open until that clean compiled binding is observed.
+  > Native Windows reparse creation was unavailable under privilege error 1314; the narrow
+  > capability branch is not passing native reparse evidence. Supported hosts retain the test.
 
 - [ ] **M2.Gb — final native report production.** Owner: coordinator only. Keep no-write
   `FinalReport` xUnit tests for publication guards, but use the executable driver for production.
@@ -846,7 +868,7 @@ verification both before execution and before output.
   released case qualifies and comparison exits 0. No package, tag, publishing action, or
   supported-C# claim follows from this proof.
 
-- [ ] **M2.Gd — website documentation and delivery alignment.** Owner: documentation worker,
+- [x] **M2.Gd — website documentation and delivery alignment.** Owner: documentation worker,
   after M2.Ga has completed its shared contributor quality-gate edits. The accepted audit is
   `foundation-execution/csharp-docs-ci-preparation/index.md`. Re-read the M2.Ga-owned
   contributing files before authoring, then reconcile only this exact website/design/navigation
@@ -873,6 +895,17 @@ verification both before execution and before output.
   > NOTE: The documentation and delivery audit is accepted at clean proof checkpoint
   > `731cd968e9ade4cc0f8b369ae3fc11675137eb17`; it found no required docs-site or release
   > workflow .NET/NuGet/report-production change beyond M2.Ga's future native CI lane.
+  > NOTE: Website authoring begins after M2.Ga's shared contributor quality-guide edits
+  > have closed independent review and focused workspace checks, while the disjoint final
+  > report guards/tests finish. This safe parallel authoring puts durable docs in the
+  > forthcoming clean code checkpoint; no publication runs against a dirty docs tree.
+  > M2.Gd stays unchecked until its docs/native/workspace gates pass. The detailed page
+  > must not claim final report qualification before M2.Gb-c complete.
+  > NOTE: Accepted after eleven-file documentation review and the docs-only CI wording
+  > correction. Root docs-check/strict build passed in 3f1743c3; the final combined
+  > workspace gate passed all 16 steps in 91.5s (0171327f), including documentation,
+  > workspace/workflow controls, and documented native restore/solution tests. Product,
+  > download, installation, and generated public API surfaces remain Python-owned.
 
 ## 5. Failure, resume, and ownership rules
 

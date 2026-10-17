@@ -189,6 +189,22 @@ jobs:
       - name: site build (strict)
         run: python workspace.py check --only=docs-build
 
+  # This is a bounded native proof lane, not a Python package job: the checked-in
+  # global.json selects its SDK and the workspace phase owns version/restore/test checks.
+  native-csharp:
+    name: native C# proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: src/csharp/global.json
+      - name: C# proof
+        run: python workspace.py check --only=csharp
+
   test:
     name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
@@ -333,7 +349,7 @@ jobs:
     name: ci-ok
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [changes, gates, test, test-extra, test-macos]
+    needs: [changes, gates, native-csharp, test, test-extra, test-macos]
     if: always()
     steps:
       - name: verify every upstream job succeeded or was deliberately skipped

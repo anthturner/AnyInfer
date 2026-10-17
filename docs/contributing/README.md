@@ -14,6 +14,11 @@ python workspace.py check                          # every gate CI runs
 ```
 
 Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI.
+The complete quality gate also runs the bounded C# core-generation proof, so install the SDK
+selected by `src/csharp/global.json` before running `workspace check`. This is contributor
+proof infrastructure, not a supported package or application integration path.
+
+For the exact proof boundary and native commands, see [C# core-generation proof](csharp-proof.md).
 
 ## The Task Runner
 
@@ -44,25 +49,28 @@ one `--help`.
 
 ## The Quality Gates
 
-`python workspace.py check` runs the gates as named, ordered phases (fastest feedback
-first), and every phase runs in CI and must pass. It keeps going after a failure so one invocation
-tells you everything that is broken:
+`python workspace.py check` runs every default gate as named, ordered phases (fastest feedback
+first). It keeps going after a failure so one invocation tells you everything that is broken:
 
 | Phase | Runs |
 |---|---|
 | `lint` | `ruff check src tests workspace.py` (`--fix` applies fixes) |
 | `types` | `mypy` (strict) |
 | `contracts` | `lint-imports`: the architecture contracts |
+| `fixtures` | Portable fixture and inventory schema validation |
 | `changelog` | `scripts/validate_changelog.py`: [changelog](changelog.md) shape, and that released sections have not been rewritten |
 | `test` | `pytest -q`, the full suite, headless |
 | `conformance` | The provider [conformance suite](conformance.md) and the serve invariants |
 | `docs-check` | Docstring coverage, doc links, and the runnable doc examples |
 | `docs-build` | `mkdocs build --strict`: the exact artifact the Pages deploy publishes |
+| `csharp` | Record the pinned SDK version, restore `src/csharp/AnyInfer.sln`, and test it without restoring again |
 
-That table is the whole pipeline: every step of every CI job is one of these phases,
-invoked as `python workspace.py check --only=<phase>`. A green `check` therefore means what
-a green CI run means, with one exception: CI also runs the `test` phase across
-Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners can cover.
+The full code-change CI pipeline invokes these phases as
+`python workspace.py check --only=<phase>`. Docs-only changes deliberately skip jobs that do
+not apply to documentation, while a local `check` always runs every default phase. CI also runs
+the `test` phase across Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners
+can cover. The `csharp` phase uses the SDK pinned under `src/csharp/`; it executes the bounded
+proof and produces no package or canonical conformance report.
 
 `--skip=a,b` leaves phases out; `--only=a,b` runs just those; the two are mutually
 exclusive. `python workspace.py build docs` runs the same strict site build as the

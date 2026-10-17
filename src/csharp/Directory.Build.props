@@ -6,5 +6,9 @@
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Version>0.1.0-proof</Version>
+    <SourceRevisionId Condition="'$(SourceRevisionId)' == ''"></SourceRevisionId>
   </PropertyGroup>
+  <ItemGroup Condition="'$(SourceRevisionId)' != ''">
+    <AssemblyMetadata Include="AnyInferSourceRevision" Value="$(SourceRevisionId)" />
+  </ItemGroup>
 </Project>

@@ -16,6 +16,14 @@ flowchart TD
 ```
 </div>
 
+## C# Core-Generation Proof
+
+`src/csharp/` contains a bounded contributor proof of the shared core-generation contract. It
+reads the frozen corpus as input, performs native execution without using expected results, and
+compares the resulting observations afterward. It does not change the Python runtime architecture
+above or provide a supported C# SDK, provider surface, sync facade, or accounting implementation.
+See [C# core-generation proof](csharp-proof.md) for the local commands and publication boundary.
+
 ## The Load-Bearing Rules
 
 **1. The primitive is `GenerationRequest → typed event stream`.**

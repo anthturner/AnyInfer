@@ -47,6 +47,8 @@ standalone builds on the [downloads page](downloads.md).
 
 - [Contributor guide](contributing/README.md): setup, the quality gates, and what CI
   checks.
+- [C# core-generation proof](contributing/csharp-proof.md): the bounded native proof for
+  contributors; it is not an SDK or product integration path.
 - [Architecture](contributing/architecture.md): the load-bearing rules.
 - [Writing a provider adapter](contributing/writing-an-adapter.md) and
   [the conformance suite](contributing/conformance.md).

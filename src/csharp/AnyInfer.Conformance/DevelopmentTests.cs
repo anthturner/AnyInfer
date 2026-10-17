@@ -424,7 +424,7 @@ public sealed class DevelopmentTests : IDisposable
     }
 
     [Fact]
-    public async Task Development_cli_uses_only_the_selected_root_and_keeps_report_mode_unavailable()
+    public async Task Development_cli_uses_only_the_selected_root_and_refuses_unproven_report_mode()
     {
         var root = Path.Combine(Path.GetTempPath(), "anyinfer-development-cli-" + Guid.NewGuid().ToString("N"));
         CopyDirectory(FindSourceSpecificationRoot(), root);
@@ -434,7 +434,7 @@ public sealed class DevelopmentTests : IDisposable
 
         Assert.Equal(2, await Program.RunAsync(["--root", root, "--write-report"], output, error));
         Assert.Equal(string.Empty, output.ToString());
-        Assert.Equal("error unavailable releases/core-generation-v0.json" + Environment.NewLine, error.ToString());
+        Assert.Equal("error provenance ." + Environment.NewLine, error.ToString());
 
         File.AppendAllText(Path.Combine(root, "README.md"), "tampered\n", new UTF8Encoding(false));
         output.GetStringBuilder().Clear();

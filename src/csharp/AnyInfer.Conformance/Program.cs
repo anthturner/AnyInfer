@@ -7,10 +7,19 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        return await RunAsync(args, Console.Out, Console.Error).ConfigureAwait(false);
+        return await RunCoreAsync(args, Console.Out, Console.Error, publicationEnabled: true).ConfigureAwait(false);
     }
 
     internal static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error)
+    {
+        return await RunCoreAsync(args, output, error, publicationEnabled: false).ConfigureAwait(false);
+    }
+
+    private static async Task<int> RunCoreAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        bool publicationEnabled)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(output);
@@ -18,7 +27,7 @@ internal static class Program
 
         if (args.Length == 1 && string.Equals(args[0], "--help", StringComparison.Ordinal))
         {
-            output.WriteLine("Usage: AnyInfer.Conformance --root <absolute-specification-root> [--release <relative-release>] (--verify | --development [--output <path>])");
+            output.WriteLine("Usage: AnyInfer.Conformance --root <absolute-specification-root> [--release <relative-release>] (--verify | --development [--output <path>] | --write-report)");
             return 0;
         }
 
@@ -27,12 +36,26 @@ internal static class Program
         {
             var options = Parse(args);
             diagnosticPath = DiagnosticPath(options.ReleasePath);
+            var assets = ReleaseAssetsReader.ReadAndVerify(options.RootPath!, options.ReleasePath);
             if (options.WriteReport)
             {
-                throw new AssetValidationException("unavailable", diagnosticPath, "Requested mode is not available.");
-            }
+                if (options.Verify || options.Development || options.OutputPath is not null)
+                {
+                    throw new AssetValidationException("arguments", diagnosticPath, "Invalid command line.");
+                }
 
-            var assets = ReleaseAssetsReader.ReadAndVerify(options.RootPath!, options.ReleasePath);
+                if (!publicationEnabled)
+                {
+                    throw new FinalReportProvenanceException("Production report publication is unavailable.");
+                }
+
+                var repositoryRoot = FinalReportProvenance.RepositoryRootFromExecutable();
+                var expectedRevision = FinalReportProvenance.CurrentRevision(repositoryRoot);
+                var provenance = FinalReportProvenance.Capture(repositoryRoot, expectedRevision);
+                var written = await FinalReportWriter.WriteAsync(assets, provenance, CancellationToken.None).ConfigureAwait(false);
+                output.WriteLine(string.Format(CultureInfo.InvariantCulture, "report {0}", written));
+                return 0;
+            }
 
             if (options.Development)
             {
@@ -80,6 +103,11 @@ internal static class Program
             error.WriteLine(string.Format(CultureInfo.InvariantCulture, "error {0} {1}", exception.Category, SafeExceptionDiagnosticPath(exception.RelativePath)));
             return 2;
         }
+        catch (FinalReportProvenanceException)
+        {
+            error.WriteLine("error provenance .");
+            return 2;
+        }
     }
 
     private static Options Parse(IReadOnlyList<string> args)
@@ -122,7 +150,9 @@ internal static class Program
             throw new AssetValidationException("arguments", DiagnosticPath(release), "An absolute root is required.");
         }
 
-        if ((verify && development) || (output is not null && !development))
+        if ((verify && development) ||
+            (writeReport && (verify || development || output is not null)) ||
+            (!writeReport && output is not null && !development))
         {
             throw new AssetValidationException("arguments", DiagnosticPath(release), "Invalid command line.");
         }

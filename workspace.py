@@ -263,14 +263,16 @@ def run(
     env: dict[str, str] | None = None,
     check: bool = True,
     quiet: bool = False,
+    cwd: Path | None = None,
 ) -> int:
-    """Run a command from the repository root, echoing it first.
+    """Run a command from the repository root by default, echoing it first.
 
     Args:
         command: argv of the command to run.
         env: Extra environment variables overlaid on the current environment.
         check: Raise :class:`StepError` on a non-zero exit.
         quiet: Suppress the echoed command line.
+        cwd: Working directory; defaults to the repository root.
 
     Returns:
         The command's exit code.
@@ -285,7 +287,12 @@ def run(
     # non-ASCII (the conformance matrix symbols, em-dashes in test ids).
     merged = {"PYTHONIOENCODING": "utf-8", **os.environ, **(env or {})}
     try:
-        completed = subprocess.run(command, cwd=ROOT, env=merged, check=False)
+        completed = subprocess.run(
+            command,
+            cwd=ROOT if cwd is None else cwd,
+            env=merged,
+            check=False,
+        )
     except FileNotFoundError as error:
         raise StepError(
             f"{command[0]!r} is not installed — run `workspace setup` to install the "
@@ -510,11 +517,11 @@ GATE_ORDER = (
     "conformance",
     "docs-check",
     "docs-build",
+    "csharp",
 )
 """Every phase ``check`` knows, in execution order: fastest feedback first (static
 analysis, then the type checker, architecture contracts, portable fixtures, and the changelog),
-the suite after the cheap gates, and the documentation gates last because they partly
-re-run suite tests.
+the suite after the cheap gates, then the documentation gates and bounded C# proof.
 
 The set is exhaustive by design: every gate CI enforces is one of these phases, so a green
 ``check`` and a green CI run mean the same thing. Adding a gate to the pipeline means
@@ -828,6 +835,15 @@ def _build_docs_site() -> int:
     return tool("mkdocs", "build", "--strict")
 
 
+def _run_csharp(*args: str) -> int:
+    """Run a C# proof command with the SDK selected by its local ``global.json``."""
+    if shutil.which("dotnet") is None:
+        raise StepError(
+            "dotnet SDK is not installed — install the SDK selected by src/csharp/global.json"
+        )
+    return run(["dotnet", *args], cwd=ROOT / "src" / "csharp")
+
+
 def _gate_phases(*, fix: bool) -> dict[str, Phase]:
     """The gate phases, keyed by the names ``--skip``/``--only`` accept.
 
@@ -960,6 +976,24 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
             "the strict site build the Pages deploy publishes",
             (("mkdocs build --strict", _build_docs_site),),
         ),
+        Phase(
+            "csharp",
+            "the bounded C# core-generation proof",
+            (
+                (
+                    "dotnet SDK version",
+                    lambda: _run_csharp("--version"),
+                ),
+                (
+                    "restore C# proof solution",
+                    lambda: _run_csharp("restore", "AnyInfer.sln"),
+                ),
+                (
+                    "test C# proof solution",
+                    lambda: _run_csharp("test", "AnyInfer.sln", "--no-restore"),
+                ),
+            ),
+        ),
     ]
     return {phase.name: phase for phase in phases}
 
@@ -1002,7 +1036,7 @@ def _check_arguments(p: argparse.ArgumentParser) -> object:
 @verb(
     "check",
     "Run every CI gate: lint, types, contracts, fixtures, test, conformance, docs-check, "
-    "docs-build.",
+    "docs-build, csharp.",
     group="Quality",
     arguments=_check_arguments,
 )
@@ -1013,8 +1047,8 @@ def cmd_check(args: argparse.Namespace) -> int:
     phases, so a green run here is a green run there (modulo the interpreter and OS
     matrix, which only the runners can cover).
 
-    Phases, in run order — fastest feedback first, and the suite before the doc gates
-    that partly re-run it:
+    Phases, in run order — fastest feedback first, then the suite, doc gates that partly
+    re-run it, and the bounded C# proof:
 
       lint         ruff static analysis (--fix applies fixes)
       format       ruff formatting — OPT-IN via --only=format, never a default gate
@@ -1025,6 +1059,7 @@ def cmd_check(args: argparse.Namespace) -> int:
       conformance  provider conformance + the serve invariants (ADR-009)
       docs-check   docstring coverage, doc links, runnable doc examples
       docs-build   the strict site build the Pages deploy publishes
+      csharp       the bounded C# core-generation proof
 
     Select phases with --skip=a,b or --only=a,b (mutually exclusive). Every selected
     phase runs even after one fails, so a single invocation tells you everything that is

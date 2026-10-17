@@ -227,6 +227,7 @@ nav:
       - Glossary: reference/glossary.md
   - Contributing:
       - contributing/README.md
+      - C# Core-Generation Proof: contributing/csharp-proof.md
       - Architecture: contributing/architecture.md
       - Coding Agents and Workstreams: contributing/automation.md
       - Branding and Visual Assets: contributing/branding.md

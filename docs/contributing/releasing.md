@@ -82,6 +82,10 @@ merge per fix, and each pull request spends the CI matrix again.
 
 ## What a Release Is
 
+The bounded C# core-generation proof is repository verification infrastructure. Its test output
+and any coordinator-controlled conformance evidence are not NuGet packages, GitHub Release
+assets, or PyPI distributions, and the release workflow does not build or publish them.
+
 The [release workflow](https://github.com/anthturner/AnyInfer/blob/main/.github/workflows/release.yml)
 runs on every merge to `main`:
 

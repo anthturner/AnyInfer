@@ -387,7 +387,7 @@ public sealed class ReleaseAssetsTests : IDisposable
     }
 
     [Fact]
-    public async Task Program_run_async_accepts_help_and_selected_verify_but_refuses_missing_unsafe_and_unavailable_modes()
+    public async Task Program_run_async_accepts_help_and_selected_verify_but_refuses_missing_unsafe_and_unproven_report_modes()
     {
         var helpOutput = new StringWriter();
         var helpError = new StringWriter();
@@ -404,26 +404,26 @@ public sealed class ReleaseAssetsTests : IDisposable
 
         await AssertCliFailure(["--verify"], "arguments");
         await AssertCliFailure(["--root", root, "--release", "../outside.json", "--verify"], "path");
-        await AssertCliFailure(["--root", root, "--write-report"], "unavailable");
+        await AssertCliFailure(["--root", root, "--write-report"], "provenance");
     }
 
     [Theory]
     [InlineData("\u2028")]
     [InlineData("\u2029")]
-    public async Task Program_unavailable_mode_never_emits_unicode_line_separators_from_release_arguments(string separator)
+    public async Task Program_argument_diagnostics_never_emit_unicode_line_separators_from_release_arguments(string separator)
     {
         var root = CopySpecificationRoot();
         var output = new StringWriter();
         var error = new StringWriter();
 
         var exitCode = await Program.RunAsync(
-            ["--root", root, "--release", "releases/core-generation-v0" + separator + ".json", "--write-report"],
+            ["--root", root, "--release", "releases/core-generation-v0" + separator + ".json", "--write-report", "--development"],
             output,
             error);
 
         Assert.Equal(2, exitCode);
         Assert.Equal(string.Empty, output.ToString());
-        Assert.Equal("error unavailable ." + Environment.NewLine, error.ToString());
+        Assert.Equal("error arguments ." + Environment.NewLine, error.ToString());
     }
 
     [Fact]

@@ -2092,3 +2092,104 @@ M2.5a-c boxes are complete; master M2.5 retains its final-report requirement unt
 Resume at M2.Ga from the forthcoming native HTTP checkpoint, then implement the additive
 native-csharp CI lane and final-writer/provenance/no-write guards before the clean
 compiled-code checkpoint. M2.Gb is production execution only; website/docs remain required.
+
+The complete native HTTP/corpus checkpoint is committed as
+268362dd7274554ccae27507713e4c567cfc8e60; the tree was clean immediately afterward.
+M2.Ga authoring now has disjoint owners: c16 workspace/CI plus the two quality-gate
+contributor pages; c708 build metadata, final provenance/writer and minimal CLI/development
+reuse; 04f independent FinalReport tests plus minimal existing CLI expectation updates after
+the saved API handoff. No process slot is granted during authoring. Root accepted final-report
+preparation critique and pinned executable-repository output, exact report evidence, new-only
+staging/publication, actual compiled revision/path and deterministic resolved dependency rules.
+Website's remaining nine files and shared contributor reconciliation stay sequential M2.Gd work.
+
+The M2.Ga workspace/CI slice is held and assigned fresh bounded review. Root's first
+focused tests/test_workspace.py run found one stale oracle: the continue-after-failure
+control still expects thirteen steps, while the additive three-command C# phase correctly
+produces sixteen. The owner may update that explicit count/comment and mock SDK discovery
+in this standalone test; its deliberate mypy failure and continue-all-step behavior remain.
+The guarded command stopped before ruff and invoked no C# build/test. Final-report source
+and independent tests are still authoring; no shared C# runtime slot is granted.
+
+The continuation-test correction passed its focused node; ruff passed workspace.py and
+tests/test_workspace.py. Fresh bounded CI/workspace review is clean in
+csharp-ci-integration-review: exact commands/cwd, missing-SDK behavior, pinned additive
+native-csharp lane, docs-only skip and unchanged Python aggregate policy. The C# workspace
+lane itself remains unrun while final writer/provenance source and independent tests are
+being authored against the saved immutable-facts/Build/Validate/Publish APIs.
+
+First final-report source/test reviews are static, not runtime acceptance. Root authorized
+one consolidated source/test correction: normal Git cleanliness must ignore standard ignored
+build/cache output; actual copied/canonical library content and expected layout must agree;
+dependency metadata must come from the selected net8.0 target/catalog; malformed assets and
+duplicate revision metadata need controlled errors. The report validator must bind release
+hash and all implementation values and close case/evidence objects. Independent tests must
+isolate these guards and fix unsupported JsonObject indexer mechanics.
+
+Publication sequencing is now settled before the runtime gate: hook and final provenance/
+release/cancellation checks precede any stage. This avoids the writer's own untracked stage
+invalidating clean-source recapture. BCL-only post-close ownership cannot be proved; a late
+ambiguous stage is retained on failure, never deleted by pathname. No canonical target is
+overwritten. The source/test owners have this single correction wave; no shared process,
+production report, new dependency or interop is authorized.
+
+Bounded publication rereview closes corrected staging order/ownership and report-shape groups.
+One residual prepared-byte boundary is assigned: the publisher must bind well-typed report
+source/driver revisions, runtime, OS, and exact canonical dependency map to the verified
+provenance facts, rather than accepting any matching forty-hex strings. Independent tests
+mutate only those values on a valid baseline and must reach this guard before hook/staging.
+The provenance rereview and consolidated independent test snapshot remain pending; no
+final-report runtime or production publication has run.
+
+Provenance rereview closes standard Git cleanliness, layout/canonical-copy content,
+selected-target package catalog, and controlled metadata/JSON errors. A shared residual
+canonical dependency identity rule is assigned with the prepared-byte value-binding fix;
+both source locations must agree. Website authoring now proceeds in the exact eleven-file
+M2.Gd set after the shared CI contributor edits were accepted. Its files are disjoint from
+the report source/tests and will join the forthcoming clean code checkpoint. Docs and
+production qualification remain unaccepted until their named gates; no process slot is active.
+
+Root's first M2.Ga compile-only inspection stopped before tests: SDK 8.0.425,
+0 warnings/11 errors (2.50s, ebaaed44). Nullable metadata flow and independent test
+lookup/namespace/analyzer mechanics were corrected without changing predicates. Root also
+found that a clean fully bound build could let normal Program.RunAsync tests publish;
+publication is now Main-only, with the internal test helper always refusing report mode.
+Source/test rereviews close this and the narrow final-move filesystem fault seam.
+
+The corrected root d086b9a0 gate compiled cleanly (1.61s) and ran FinalReport tests:
+11 pass/1 fail, 3.2923s, exit 1. The sole failure is the Windows host refusing native
+symlink creation (privilege-not-held1314), before the reparse predicate. Only that exact
+capability boundary may be handled; no broad IO/assertion suppression or elevation.
+Missing-directory and all other no-write/metadata/sandbox publication tests pass. The
+same focused gate is regranted after the narrow test correction; no production report exists.
+
+Website docs-check and strict docs-build passed in root3f1743c3: all three docs-check
+steps and the strict site build (14.4s), exit0. The eleven-file review found one wording
+P2 about docs-only CI skips; its minimal contributor paragraph correction is held for
+bounded closure and the final full workspace gate. M2.Ga/Gd remain unchecked pending
+native runtime, documented commands, final gate and clean compiled checkpoint.
+
+Root inspected the corrected FinalReport gate in ebaaed44: SDK 8.0.425, clean build
+(1.02s), 12 passed/zero failures/skips (3.1652s), exit 0. The exact Windows 1314
+capability branch is reviewed; it is unavailable reparse evidence on this host, not proof
+of successful native link creation. Documentation wording closure is also clean.
+
+The combined 16-step workspace gate c7d3dff9 passed every Python, documentation and
+SDK/restore step, plus all 164 unit tests. Conformance stopped at 91 pass/2 fail:
+both Unicode CLI tests expected a path error, but a nonexistent selected release correctly
+reports the safe fixed label `missing release_path`. The test no longer reached initial
+argument diagnostic sanitization. Root authorized only the theory stimulus/oracle fix:
+mutually exclusive `--write-report --development` must reject before reader invocation as
+exactly `error arguments .` for U+2028/U+2029. All source stays held. The focused reader
+gate and complete workspace gate must pass before the clean code checkpoint.
+
+The causal argument-diagnostics correction has clean independent review. Root inspected
+ebaaed44: SDK 8.0.425, clean build (1.14s), ReleaseAssets 37 passed/zero failures/skips
+(9.6651s), exit 0. Root then ran the full workspace gate in 0171327f with the scoped
+fresh pytest cache: all 16 steps passed in 91.5s, exit 0. This includes all Python gates,
+strict website build, SDK 8.0.425, solution restore, 164 native unit tests and 93 Conformance
+tests. No executable source changed during these gates. Frozen release/Python report
+hashes and retrieval tag still match. M2.Gd is accepted; the complete code/docs/CI
+checkpoint is ready to commit. M2.Ga still requires the clean committed revision bound
+rebuild/test; M2.Gb-c then produce and qualify that revision's report. No canonical C#
+report has been written. Resume from M2.Ga's clean compiled-binding step.
