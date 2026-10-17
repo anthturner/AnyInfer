@@ -8,6 +8,10 @@ title: Language-neutral foundation execution record
 The [master plan](ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md) owns the checklist. Resume its
 first unchecked box; this log records evidence and handoffs rather than a competing plan.
 
+**M0–M2 complete.** The C# report from clean code revision
+`7f3bc6931c5bb656b08cc9b3e5fed11478a1c0fa` qualifies and compares with Python. The next
+master box is M3 planning, outside this execution authorization; stop before starting it.
+
 ## Authorization and preserved baseline — 2026-10-15
 
 The user authorized the upstream reset, plan overlay, relevant PR/issue integration, complete
@@ -2193,3 +2197,48 @@ hashes and retrieval tag still match. M2.Gd is accepted; the complete code/docs/
 checkpoint is ready to commit. M2.Ga still requires the clean committed revision bound
 rebuild/test; M2.Gb-c then produce and qualify that revision's report. No canonical C#
 report has been written. Resume from M2.Ga's clean compiled-binding step.
+
+## M2 final compiled report and port qualification
+
+The complete code, website/docs, native CI and report-guard checkpoint is committed as
+`7f3bc6931c5bb656b08cc9b3e5fed11478a1c0fa` (23 files). Root verified the checkout clean
+before execution. From `src/csharp`, retained root shell `640e854f-aa5f-4d6d-870b-a59e51f0f32c`
+recorded SDK 8.0.425, rebuilt using that full `-p:SourceRevisionId`, and ran serially:
+
+1. `dotnet test AnyInfer.Tests --no-restore -p:SourceRevisionId=$csharpProofRevision`
+   with the 45-second blame/no-dump watchdog: 164 passed, zero failures/skips.
+2. `dotnet test AnyInfer.Conformance --no-restore -p:SourceRevisionId=$csharpProofRevision`
+   with the same watchdog: 93 passed, zero failures/skips. Normal tests did not publish.
+3. `dotnet run --project AnyInfer.Conformance --no-restore -p:SourceRevisionId=$csharpProofRevision -- --root D:/projects/AnyInfer/specification --release releases/core-generation-v0.json --verify`: exit 0.
+4. The same executable command with `--write-report`: exit 0, new-only output
+   `specification/reports/csharp-7f3bc69.json`. Only that report was untracked afterward;
+   no tracked source/input changed and no canonical staging file remained.
+
+Report SHA-256 is `be85ea3a5d896383befd0736b347e3b4cbebbd8b3215b0f63122f939098ef2bc`.
+Source and driver revisions are both the full clean code checkpoint above. Runtime is
+`.NET 8.0.31`, OS is `Microsoft Windows 10.0.26200`, dependency metadata records the 15
+actual resolved driver/test package versions, and the runtime library has zero package
+dependencies. All 102 exact unique inventory IDs pass; fail/error/extension counts are zero,
+the extension declaration is empty, all six driver evidence wrappers are present, and the
+96 ordinary fixture rows have null evidence.
+
+Root invoked the existing independent Python `load_release_assets` and
+`validate_qualified_report` APIs and asserted the exact IDs/counts/revision binding; exit 0.
+Then `.venv/Scripts/python.exe scripts/compare_reports.py specification/reports/python-a186458.json specification/reports/csharp-7f3bc69.json`
+exited 0 with this exact output:
+
+```text
+qualified comparable reports: release=core-generation-v0 sha256=16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391 cases=102
+allowed reference-extension-to-other-pass IDs: normalization/unsupported-alias-target, normalization/unsupported-image-part, normalization/unsupported-tool-role, schema-admission/unknown-keyword-ignored, schema-admission/unsupported-anyof, schema-admission/unsupported-boolean-subschema, schema-admission/unsupported-dialect-draft7, schema-admission/unsupported-dialect-null, schema-admission/unsupported-ref
+```
+
+Frozen release SHA remains `16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391`;
+Python report SHA remains `40c2fd77818e2a78a2fc92cd65dbeee67343a68bd8fb5276d8cee787f43dfd4a`;
+the corpus tag still targets `4208172c432ba03166e4422c4e69ac18d24eab0e`. M2.Ga-d and
+master M2.5/M2.G are accepted. Website/docs, strict build and additive native-csharp CI
+integration are included in the verified 16-step workspace gate (91.5s, 0171327f).
+Remote CI has not been run here. Windows symlink creation lacked privilege, so its narrow
+capability branch remains unavailable native evidence; missing-directory and all other
+publication/provenance controls ran. The following record commit adds the generated report
+and completed checklists; it is not the source revision that executed the proof. No push,
+new tag, package publication, or M3 work follows. Authorized M0–M2 execution is complete.

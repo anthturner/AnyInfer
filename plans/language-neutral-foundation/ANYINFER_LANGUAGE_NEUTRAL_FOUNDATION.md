@@ -17,6 +17,12 @@ decisions retain their named gates.
 **Python evidence baseline:** `13b9e65acfb01038464069ca5fa80f50a9df035c` on `develop`.
 Recheck `git rev-parse HEAD` and `anyinfer.__file__` before executing any box.
 
+> NOTE: Authorized M0–M2 execution is complete. The native C# report from clean code
+> revision 7f3bc6931c5bb656b08cc9b3e5fed11478a1c0fa qualifies against the frozen release
+> and compares with Python at 102 cases, with only the nine permitted extension/pass
+> differences. Website/docs and native CI are accepted. Stop here: M3 planning requires
+> its own user-approved plan, and package publication remains a separate decision.
+
 Deviations are recorded in place with a `> NOTE:` line under the affected box, giving the
 reason and the new resume point. Historical rationale, audits, and superseded contract
 drafts live under [evidence/](evidence/README.md); they inform milestone 3 and later but
@@ -986,7 +992,7 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > qualified assembly/environment metadata and report-v0 production remain M2.G-owned.
   > Release/Python report hashes are unchanged. Native HTTP and the last two proofs are
   > M2.5; website/docs and CI/CD remain mandatory before M2.G completion.
-- [ ] M2.5 OpenAI-compatible chat-completions adapter over `HttpClient`; run the transport fixtures
+- [x] M2.5 OpenAI-compatible chat-completions adapter over `HttpClient`; run the transport fixtures
   through a native mocked transport that asserts method/path/headers/JSON/default stream mode,
   associated effective wire limits, response status/headers/raw chunks, buffered and streamed
   results/errors, and the schema/repair envelope. The adapter must not read expected outcomes to
@@ -1000,7 +1006,10 @@ M1 and later use `src/python/` paths and therefore depend on it.
   > 102 unique passes, zero fail/error/unavailable. Repository gate: all 13 steps,
   > 83.3s, exit 0 (8bd76aa8). This master box remains open for its final report-v0
   > requirement, implemented/produced through M2.Ga-b with clean compiled provenance.
-- [ ] M2.G **Port gate.** `.\.venv\Scripts\python.exe scripts/compare_reports.py <python-report.json> <csharp-report.json>` exits 0:
+  > NOTE: The final report requirement is accepted at specification/reports/csharp-7f3bc69.json:
+  > 102 unique passes, zero extension/fail/error, actual clean compiled source/driver binding
+  > 7f3bc6931c5bb656b08cc9b3e5fed11478a1c0fa. Bound native tests passed 164 unit/93 Conformance.
+- [x] M2.G **Port gate.** `.\.venv\Scripts\python.exe scripts/compare_reports.py <python-report.json> <csharp-report.json>` exits 0:
   every exact, unique released case ID has the same verdict in both reports, no report has a
   `fail` or `error`, and the only exception is an explicitly marked case where Python reports
   its declared `extension` and C# reports `pass`. Differences and unsupported features are listed
@@ -1013,6 +1022,12 @@ M1 and later use `src/python/` paths and therefore depend on it.
     > audit and updates, complementing M2.Ga's native CI lane. M2.G remains incomplete until
     > the website/docs build, documented examples, and delivery/workflow checks pass with
     > truthful language and feature scope; proof does not imply a shipped C# package.
+    > NOTE: Accepted: the Python qualified-report validator and comparison exited 0 for
+    > python-a186458.json and csharp-7f3bc69.json against core-generation-v0 (102 cases).
+    > The exact allowed nine-case asymmetry is recorded in EXECUTION_LOG.md. All 16
+    > workspace steps passed in 91.5s, including the new C# phase, 164 unit and 93
+    > Conformance tests, docs examples, link checks and strict site build. Bounded M2.Ga-d
+    > are complete; no package, push, tag, or M3 work was performed.
 
 ### M3: Operation accounting (separate plan)
 

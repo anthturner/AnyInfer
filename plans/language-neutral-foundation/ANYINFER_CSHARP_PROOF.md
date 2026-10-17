@@ -7,6 +7,10 @@ proof plan authorized by the existing M0–M2 execution request. Read the frozen
 complete only after its named gate passes. The coordinator alone records M2.1's
 **proceed / narrow / stop** decision, commits, tags, or writes a final report.
 
+**Status: complete.** All M2 boxes passed. The qualified report is
+`specification/reports/csharp-7f3bc69.json`, produced by clean compiled revision
+`7f3bc6931c5bb656b08cc9b3e5fed11478a1c0fa`. M3 and package publication remain separate.
+
 ## 1. Frozen inputs and decision boundary
 
 | Item | Immutable identity / required use |
@@ -775,7 +779,7 @@ verification both before execution and before output.
   > Final report/provenance, native CI, cross-language qualification and website/docs
   > remain M2.G-owned; master M2.5 stays open until its final-report requirement is met.
 
-- [ ] **M2.Ga — clean compiled-code checkpoint and CI integration.** Owner: coordinator; no
+- [x] **M2.Ga — clean compiled-code checkpoint and CI integration.** Owner: coordinator; no
   report output. Before implementation, re-read the current CI/workspace contract. The only
   CI integration files are `workspace.py`, `tests/test_workspace.py`,
   `docs/contributing/README.md`, `docs/contributing/testing.md`, and
@@ -839,8 +843,13 @@ verification both before execution and before output.
   > before production. This box remains open until that clean compiled binding is observed.
   > Native Windows reparse creation was unavailable under privilege error 1314; the narrow
   > capability branch is not passing native reparse evidence. Supported hosts retain the test.
+  > NOTE: Accepted at committed code/docs/CI checkpoint
+  > 7f3bc6931c5bb656b08cc9b3e5fed11478a1c0fa, verified clean. Root 640e854f rebuilt both
+  > projects with that full SourceRevisionId, then passed 164 unit and 93 Conformance tests,
+  > selected-release verification and production provenance guards. No normal test published;
+  > only the subsequent explicit Main --write-report invocation created the new report.
 
-- [ ] **M2.Gb — final native report production.** Owner: coordinator only. Keep no-write
+- [x] **M2.Gb — final native report production.** Owner: coordinator only. Keep no-write
   `FinalReport` xUnit tests for publication guards, but use the executable driver for production.
   From the clean M2.Ga checkpoint, run from `src/csharp` with a task-specific variable set from
   `git rev-parse HEAD`: `dotnet run --project AnyInfer.Conformance --no-restore
@@ -855,8 +864,16 @@ verification both before execution and before output.
   complete evidence. Do not add report-v0 fields or reuse the Python reference lock/sidecar.
   **Gate:** final report has exact 102 unique IDs, 102 pass, zero extension/fail/error, and
   wrong/stale/foreign assembly path or revision negatives fail before publication.
+  > NOTE: Accepted: root 640e854f exited 0 and created only
+  > specification/reports/csharp-7f3bc69.json, SHA-256
+  > be85ea3a5d896383befd0736b347e3b4cbebbd8b3215b0f63122f939098ef2bc.
+  > It binds source/driver 7f3bc6931c5bb656b08cc9b3e5fed11478a1c0fa, .NET 8.0.31,
+  > Microsoft Windows 10.0.26200, and actual resolved driver/test packages. The library
+  > has no runtime packages. All 102 unique inventory rows pass, with six wrapped native
+  > proof evidence objects, null ordinary-fixture evidence, no extensions/failures/errors,
+  > and no staging leftovers. Frozen release/Python report bytes remain unchanged.
 
-- [ ] **M2.Gc — cross-language qualification.** Owner: coordinator. From `src/csharp`, run
+- [x] **M2.Gc — cross-language qualification.** Owner: coordinator. From `src/csharp`, run
   `dotnet test AnyInfer.Tests --no-restore`,
   `dotnet test AnyInfer.Conformance --no-restore`, and
   `dotnet run --project AnyInfer.Conformance --no-restore -p:SourceRevisionId=$csharpProofRevision
@@ -867,6 +884,11 @@ verification both before execution and before output.
   The comparison permits only Python extension/C# pass for marked fixtures. **Gate:** every
   released case qualifies and comparison exits 0. No package, tag, publishing action, or
   supported-C# claim follows from this proof.
+  > NOTE: Accepted after the bound native suites/verify and independent Python
+  > validate_qualified_report passed. scripts/compare_reports.py exited 0 for the frozen
+  > Python report and csharp-7f3bc69.json: release core-generation-v0, matching release SHA,
+  > 102 cases. Only the nine declared Python-extension/C#-pass differences are admitted;
+  > the exact comparison output is retained in EXECUTION_LOG.md. M0–M2 execution is complete.
 
 - [x] **M2.Gd — website documentation and delivery alignment.** Owner: documentation worker,
   after M2.Ga has completed its shared contributor quality-gate edits. The accepted audit is
