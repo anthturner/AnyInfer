@@ -370,22 +370,32 @@ public sealed class DevelopmentTests : IDisposable
 
         Assert.Equal(BigInteger.Zero, Assert.IsType<JsonInteger>(document.Properties.Single(static property => property.Name == "development_version").Value).Value);
         Assert.Equal("DEVELOPMENT/UNRELEASED", Assert.IsType<JsonString>(document.Properties.Single(static property => property.Name == "status").Value).Value);
+        Assert.Equal("core-fixtures-and-first-four-proofs", Assert.IsType<JsonString>(document.Properties.Single(static property => property.Name == "available_subset").Value).Value);
         Assert.DoesNotContain(document.Properties, static property => property.Name is "report_version" or "extensions" or "implementation");
 
         var cases = Assert.IsType<JsonArray>(document.Properties.Single(static property => property.Name == "cases").Value);
         var unavailable = Assert.IsType<JsonArray>(document.Properties.Single(static property => property.Name == "unavailable").Value);
-        Assert.Equal(85, cases.Items.Count);
-        Assert.Equal(17, unavailable.Items.Count);
+        Assert.Equal(89, cases.Items.Count);
+        Assert.Equal(13, unavailable.Items.Count);
         Assert.Equal(
-            assets.Cases.Where(static item => item.Kind == FixtureKind.Fixture &&
-                item.RelativePath?.StartsWith("specification/fixtures/core-generation/", StringComparison.Ordinal) == true)
+            assets.Cases.Where(static item =>
+                (item.Kind == FixtureKind.Fixture &&
+                    item.RelativePath?.StartsWith("specification/fixtures/core-generation/", StringComparison.Ordinal) == true) ||
+                (item.Kind == FixtureKind.DriverAssertion && item.RecipeRef is not null && NativeProofs.IsSupported(item.RecipeRef)))
                 .Select(static item => item.Id),
             cases.Items.Select(static item => Assert.IsType<JsonString>(Assert.IsType<JsonObject>(item).Properties.Single(static property => property.Name == "id").Value).Value));
         Assert.Equal(
-            assets.Cases.Where(static item => item.Kind != FixtureKind.Fixture ||
-                item.RelativePath?.StartsWith("specification/fixtures/core-generation/", StringComparison.Ordinal) != true)
+            assets.Cases.Where(static item => !(
+                (item.Kind == FixtureKind.Fixture &&
+                    item.RelativePath?.StartsWith("specification/fixtures/core-generation/", StringComparison.Ordinal) == true) ||
+                (item.Kind == FixtureKind.DriverAssertion && item.RecipeRef is not null && NativeProofs.IsSupported(item.RecipeRef))))
                 .Select(static item => item.Id),
             unavailable.Items.Select(static item => Assert.IsType<JsonString>(item).Value));
+        var counts = Assert.IsType<JsonObject>(document.Properties.Single(static property => property.Name == "counts").Value);
+        Assert.Equal(new BigInteger(89), Assert.IsType<JsonInteger>(counts.Properties.Single(static property => property.Name == "pass").Value).Value);
+        Assert.Equal(BigInteger.Zero, Assert.IsType<JsonInteger>(counts.Properties.Single(static property => property.Name == "fail").Value).Value);
+        Assert.Equal(BigInteger.Zero, Assert.IsType<JsonInteger>(counts.Properties.Single(static property => property.Name == "error").Value).Value);
+        Assert.Equal(new BigInteger(13), Assert.IsType<JsonInteger>(counts.Properties.Single(static property => property.Name == "unavailable").Value).Value);
         var nonPassing = cases.Items
             .Select(static item => Assert.IsType<JsonObject>(item))
             .Select(static item =>

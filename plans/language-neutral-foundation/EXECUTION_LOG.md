@@ -1880,3 +1880,80 @@ reader/development source, project entry point, tests and plan/log are ready for
 path checkpoint commit. M2.4c is the first unchecked box; its native proof API, disjoint
 ownership, fail/error distinction and required residual-state/cap controls are now pinned in
 the proof plan. No native proof source has been authored yet.
+
+Accepted readers/development checkpoint is committed as
+`5deed7715ed9ff74afd2ee841fd3f15c2cb6f528` (15 explicit paths); root verified a clean checkout
+before the next source grant. M2.4c now has three disjoint cheap authors: NativeProofs.cs
+owns concurrency/assessment/result/exact dispatch; ProofTimeouts.cs owns real timer and reset
+recipes; ReportWriter.cs adds only the staged driver branch. Independent NativeProofsTests.cs
+and minimal DevelopmentTests staged-count changes wait for stable source handoffs. No build or
+test slot is granted yet. Root corrected its transient guessed markdown recipe fragments:
+verified inventory recipe_ref values equal the literal driver IDs exactly. M2.4c remains open.
+
+The three M2.4c source slices are held without any build/test: NativeProofs.cs has actual
+concurrency/assessment recipes and the exact result/dispatch API; ProofTimeouts.cs has the
+real default/explicit expiry and four-entry reset recipes; ReportWriter.cs has staged
+inventory dispatch. Root's bounded writer review aligned all three pass/fail/error verdicts
+and preserves nonempty recipe-matched evidence/detail. Independent reviewers now inspect
+the disjoint proof collectors, while NativeProofsTests.cs and the minimal 89/13 development
+aggregate adaptations are authored. No proof runtime pass exists yet; the first unchecked
+box remains M2.4c on checkpoint `5deed7715ed9ff74afd2ee841fd3f15c2cb6f528`.
+
+Initial M2.4c build in `ebaaed44` stopped under SDK 8.0.425 with zero warnings and two
+ProofTimeouts-owned errors (missing RepairPreparation namespace and a ProofStep property/factory
+name collision). No proof test ran. Cold review and root source inspection identified one
+consolidated correction wave: narrow proof-harness error mapping; actual concurrent outcome
+and reference isolation with full retained snapshots; source-response/preparation/injected-wire
+causality; retained normal/cap/fault native outcome comparisons; timeout OCE-to-provider-to-trail
+object identity; distinct actual CTS references; structured winning outcome and repair count.
+Complete observed wrong counts/order/outcome yield fail; truly missing instrumentation yields
+error. Tests strengthen actual facts/lifecycle/finite JSON checks, retaining caller/fatal paths.
+Root also checked two concrete setup mistakes before runtime: schema injection makes concurrent
+wire messages System+User, so the proof marker must select the actual caller User rather than
+Single() over all messages; native core records three reset assessments at ordinals [1,3,4],
+including the valid winner, while only [1,3] supply the two repairs. Three disjoint authors own
+these source/test corrections; no process is granted until stable handoffs and bounded reviews.
+
+The consolidated M2.4c source and test corrections now have bounded closure. Root applied
+only two remaining short-circuit prefixes on concurrent assessment lookups after review found
+that the earlier count guard still left eagerly evaluated indexing. The timeout collector
+review confirms actual exception/CTS/repair-wire identity and the corrected [1,3,4] assessments.
+Independent tests obtain a real native repair capture through existing FixtureAdapter/AsyncClient
+APIs, prove a consistent copied baseline, then isolate stale response and rewritten prepared-wire
+negatives; no additional production or proof factory API was added. Outcomes, lifecycle order,
+full normal/cap/fault semantic equality and finite JSON checks are asserted. The sole regranted
+`ebaaed44` slot now runs build then conditional NativeProofs filter against these held snapshots;
+runtime result is pending, and M2.4c remains unchecked.
+
+The next build stopped on three case-sensitive RetryPolicy named arguments in ProofTimeouts.
+Root verified Models.cs's declared MaxAttempts/BackoffBaseS/BackoffMaxS names and changed only
+those call sites. The regranted SDK 8.0.425 build passed with zero warnings/errors (1.37s).
+Its NativeProofs gate completed with 12 passes / one test-oracle failure, no skip/hang (0.9409s,
+`ebaaed44`). All four actual recipes and their lifecycle/causality controls passed. Root inspected
+the failing empty-capture helper test: disjoint retained-object sets are empty even for the same
+empty container, while required native shape is separately rejected. Tests now replace this weak
+negative with actual independent/shared-object captures. Root also identified wrapper-identity
+assertions on fresh read-only collection snapshots; the same test-only wave compares ordered
+native element identities instead. Source remains held; M2.4c is not accepted until the corrected
+whole filter and staged executable gates pass.
+
+M2.4c and master M2.4 are accepted. Root inspected the final `ebaaed44` SDK 8.0.425 build
+(zero warnings/errors, 1.32s), NativeProofs 13/0/0 (0.8533s) and Development 14/0/0 (4.3859s).
+Root's `65d878f7` whole Conformance gate passed 64 tests (10.4515s), then both canonical and
+copied selected-root standalone executions exited 0 with 89 pass, zero fail/error and 13
+unavailable. Their only outputs are DEVELOPMENT/UNRELEASED ignored
+`.tmp-tests/m24c-accepted-canonical.json` and `m24c-accepted-selected-copy.json`.
+Native runtime is .NET 8.0.31. The compiled source snapshot is checkpoint `5deed771` plus the
+reviewed proof/dispatch/test delta; complete qualified assembly/environment metadata is still
+M2.G, not inferred from this staged evidence. Independent source and final test-oracle reviews
+are closed; release SHA 16122cca... and Python report SHA 40c2fd77... are unchanged. The next
+source box is M2.5a. Root runs the repository checkpoint gate with a scoped fresh pytest cache
+before committing the accepted proof sources; transport preparation is under bounded critique.
+
+Root inspected the M2.4 checkpoint repository gate in `5aa52d46`: all 13 steps passed in
+87.3 seconds, exit 0, using only the documented scoped fresh pytest cache under `.tmp-tests`.
+The accepted eight proof/dispatch/test/plan paths are ready for their explicit-path commit.
+No source changed during the final focused, whole-project, standalone or repository gates.
+The HTTP preparation critique is accepted: defer SSE final until valid DONE, use
+ResponseHeadersRead/incremental pre-decode byte accounting and entry-owned timing, and pin
+one adapter-owned HttpClient/handler path with WireRequest.Stream as the sole effective mode.

@@ -574,7 +574,7 @@ verification both before execution and before output.
   > exit 0). A local inaccessible pytest cache required a scoped cache-directory override
   > under `.tmp-tests`; test selection, warning handling and source remained unchanged.
 
-- [ ] **M2.4c — first four native proof recipes.** Owner: native-proof worker; files limited to
+- [x] **M2.4c — first four native proof recipes.** Owner: native-proof worker; files limited to
   `NativeProofs.cs`, `ProofTimeouts.cs`, focused proof tests, and driver dispatch. Add these exact
   inventory IDs: `driver/concurrent-operations-independent`,
   `driver/assessment-completeness`, `driver/timeout-effective-default-explicit`, and
@@ -624,6 +624,26 @@ verification both before execution and before output.
   > outcomes. After these four proofs execute, development output has 89 executable rows
   > and 13 unavailable rows (11 transport and the last two proofs), still unqualified and
   > confined to `.tmp-tests`; all 85 core fixture controls remain intact.
+  > NOTE: Source authoring begins from clean committed checkpoint
+  > `5deed7715ed9ff74afd2ee841fd3f15c2cb6f528`. `recipe_ref` is the literal `driver/...` ID
+  > in the verified inventory. Add `NativeProofs.IsSupported(string recipeRef)` for the
+  > staged writer branch; it supports exactly these four IDs. The staged `available_subset`
+  > literal becomes `core-fixtures-and-first-four-proofs`. The independent test owner retains
+  > the full core-fixture loop and only updates aggregate staged-count/envelope assertions.
+  > NOTE: Accepted after source/test review closure and root-inspected SDK 8.0.425 gates:
+  > clean build, NativeProofs 13/0/0 (0.8533s), Development 14/0/0 (4.3859s), retained
+  > `ebaaed44`; whole Conformance 64/0/0 (10.4515s), plus canonical/copied-root standalone
+  > development executions, retained `65d878f7`. Each executable output has 89 pass,
+  > zero fail/error and 13 unavailable, with no report-v0 claim. Actual native expiry,
+  > exception/attempt identities, four CTS contexts, assessments [1,3,4], repair-wire
+  > causality and cap/fault outcome preservation are covered. Empty-set and collection
+  > snapshot test oracles now use real captures and ordered native element identities.
+  > Frozen release and Python report hashes remain unchanged. Resume at M2.5a from
+  > `5deed7715ed9ff74afd2ee841fd3f15c2cb6f528` plus these accepted proof files until
+  > the repository checkpoint gate and commit complete.
+  > The root repository checkpoint gate passed all 13 steps in 87.3 seconds, exit 0
+  > (`5aa52d46`), with the documented scoped fresh pytest-cache directory. No executable
+  > source or assertion changed during these final gates.
 
 - [ ] **M2.5a — OpenAI chat transport adapter.** Owner: transport worker; files limited to
   `AnyInfer/Providers/OpenAIChatAdapter.cs`, transport helpers, and unit tests. Use `HttpClient`
@@ -632,6 +652,18 @@ verification both before execution and before output.
   `dotnet test AnyInfer.Tests --no-restore --filter FullyQualifiedName~OpenAIChat`
   proves method/path, semantic headers, default stream mode, payload, effective wire limits,
   status/error mapping, SSE chunks, and disposal.
+  > NOTE: Accepted transport preparation and critique are recorded in
+  > `foundation-execution/csharp-http-preparation` and its review sibling. Pin an internal
+  > `OpenAIChatAdapter(Uri baseUrl, string apiKey, IReadOnlyDictionary<string, string>? headers = null,
+  > HttpMessageHandler? handler = null)` that always creates and owns its HttpClient and
+  > optional injected handler; no borrowed-client path or public configuration carrier.
+  > Configure the owned client with infinite timeout so the actual entry scope owns timing.
+  > `WireRequest.Stream` is the sole effective mode; the frozen config has no stream_default.
+  > Send with ResponseHeadersRead and count every response byte incrementally before decoding.
+  > For SSE, retain finish/usage until a valid `[DONE]`; only then emit the final event.
+  > Sentinel-only completion yields stop/null, while EOF or malformed input emits no final.
+  > Keep caller cancellation and actual HTTP resource disposal within the entry iterator.
+  > No source authoring starts before the accepted first-four-proof checkpoint is committed.
 
 - [ ] **M2.5b — transport runner and final two native proofs.** Owner: transport proof worker;
   files limited to `TransportRunner.cs`, `ProofTransport.cs`, `NativeProofs.cs` additions, and

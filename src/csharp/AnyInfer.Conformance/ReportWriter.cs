@@ -25,6 +25,14 @@ internal static class ReportWriter
         foreach (var inventoryCase in assets.Cases)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (inventoryCase.Kind == FixtureKind.DriverAssertion &&
+                inventoryCase.RecipeRef is not null &&
+                NativeProofs.IsSupported(inventoryCase.RecipeRef))
+            {
+                cases.Add(await RunProofCaseAsync(inventoryCase, counts, cancellationToken).ConfigureAwait(false));
+                continue;
+            }
+
             if (inventoryCase.Kind != FixtureKind.Fixture ||
                 !fixtures.TryGetValue(inventoryCase.Id, out var fixture) ||
                 fixture.Input is not CoreFixtureInput coreInput)
@@ -44,7 +52,7 @@ internal static class ReportWriter
                 new JsonProperty("id", new JsonString(assets.ReleaseId)),
                 new JsonProperty("sha256", new JsonString(assets.ReleaseSha256)),
             ])),
-            new JsonProperty("available_subset", new JsonString("core-fixtures")),
+            new JsonProperty("available_subset", new JsonString("core-fixtures-and-first-four-proofs")),
             new JsonProperty("cases", new JsonArray(cases)),
             new JsonProperty("unavailable", new JsonArray(unavailable)),
             new JsonProperty("counts", new JsonObject([
@@ -127,6 +135,69 @@ internal static class ReportWriter
         catch (OverflowException exception)
         {
             return HarnessErrorCase(fixture.Case.Id, exception, counts);
+        }
+    }
+
+    private static async Task<JsonObject> RunProofCaseAsync(
+        InventoryCase inventoryCase,
+        DevelopmentCounts counts,
+        CancellationToken cancellationToken)
+    {
+        var recipeRef = inventoryCase.RecipeRef
+            ?? throw new InvalidOperationException("Supported driver assertion has no recipe reference.");
+        try
+        {
+            var proof = await NativeProofs.RunAsync(recipeRef, cancellationToken).ConfigureAwait(false);
+            ValidateProofResult(recipeRef, proof);
+            switch (proof.Verdict)
+            {
+                case "pass":
+                    counts.Pass++;
+                    break;
+                case "fail":
+                    counts.Fail++;
+                    break;
+                case "error":
+                    counts.Error++;
+                    break;
+                default:
+                    throw new InvalidOperationException("Native proof returned an unsupported verdict.");
+            }
+
+            return CaseDocument(inventoryCase.Id, proof.Verdict, proof.Detail, proof.Evidence);
+        }
+        catch (ObservationUnavailableException exception)
+        {
+            return HarnessErrorCase(inventoryCase.Id, exception, counts);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return HarnessErrorCase(inventoryCase.Id, exception, counts);
+        }
+        catch (ArgumentException exception)
+        {
+            return HarnessErrorCase(inventoryCase.Id, exception, counts);
+        }
+        catch (FormatException exception)
+        {
+            return HarnessErrorCase(inventoryCase.Id, exception, counts);
+        }
+        catch (OverflowException exception)
+        {
+            return HarnessErrorCase(inventoryCase.Id, exception, counts);
+        }
+    }
+
+    private static void ValidateProofResult(string recipeRef, NativeProofResult proof)
+    {
+        ArgumentNullException.ThrowIfNull(proof);
+        if (proof.Verdict is not ("pass" or "fail" or "error") ||
+            proof.Evidence.Properties.Count == 0 ||
+            !proof.Evidence.TryGetValue("recipe_ref", out var evidenceRecipeRef) ||
+            evidenceRecipeRef is not JsonString { Value: var value } ||
+            !string.Equals(value, recipeRef, StringComparison.Ordinal))
+        {
+            throw new ObservationUnavailableException("Native proof result lacks required verdict or evidence facts.");
         }
     }
 

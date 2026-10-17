@@ -967,8 +967,8 @@ M1 and later use `src/python/` paths and therefore depend on it.
   test seam observing native timer creation/configuration/disposal and actual assessment
   linkage; C# must prove the same driver predicates without depending on Python instrumentation.
   **Gate:** `dotnet test src/csharp/AnyInfer.Tests` passes.
-> NOTE: Accepted after 155 native unit passes under SDK 8.0.425 with zero failures/skips, plus the focused Routing gate (30 passes), Lifecycle gate (14 passes), and clean source/test review closure. The current core checkpoint remains foundation `210cf0d` pending the root repository gate and commit; next is M2.4a.
-- [ ] M2.4 Fixture adapter and conformance driver in the `AnyInfer.Conformance` xunit project;
+> NOTE: Accepted after 155 native unit passes under SDK 8.0.425 with zero failures/skips, plus the focused Routing gate (30 passes), Lifecycle gate (14 passes), and clean source/test review closure. The accepted core is committed at `731cd968e9ade4cc0f8b369ae3fc11675137eb17`; M2.4 supplies the independent driver.
+- [x] M2.4 Fixture adapter and conformance driver in the `AnyInfer.Conformance` xunit project;
   verify frozen assets and exact inventory, then run core and available driver cases as explicit
   unreleased/subset development observations. Reject missing, duplicate, extra, wrong-release,
   wrong-hash, stale-count, or improperly exempted extension cases whenever a complete report is
@@ -976,6 +976,16 @@ M1 and later use `src/python/` paths and therefore depend on it.
   HTTP execution.
   **Gate:** `dotnet test src/csharp/AnyInfer.Conformance` passes and writes only the documented
   subset DEVELOPMENT observation with its own source/environment binding.
+  > NOTE: Accepted after the bounded plan's M2.4a-c gates: reader/development checkpoint
+  > `5deed7715ed9ff74afd2ee841fd3f15c2cb6f528` plus reviewed first-four-proof sources;
+  > SDK 8.0.425 / .NET 8.0.31. Root inspected 64 whole Conformance passes, 13 focused
+  > proof passes, and 14 Development passes. Standalone canonical/copied selected-root
+  > executions each produce 89 pass, zero fail/error, 13 explicitly unavailable, under
+  > ignored `.tmp-tests/m24c-accepted-*.json` with DEVELOPMENT/UNRELEASED status. Build,
+  > source snapshot, environment and command binding remain in the retained execution log;
+  > qualified assembly/environment metadata and report-v0 production remain M2.G-owned.
+  > Release/Python report hashes are unchanged. Native HTTP and the last two proofs are
+  > M2.5; website/docs and CI/CD remain mandatory before M2.G completion.
 - [ ] M2.5 OpenAI-compatible chat-completions adapter over `HttpClient`; run the transport fixtures
   through a native mocked transport that asserts method/path/headers/JSON/default stream mode,
   associated effective wire limits, response status/headers/raw chunks, buffered and streamed
