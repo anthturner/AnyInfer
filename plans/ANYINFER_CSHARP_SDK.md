@@ -687,7 +687,7 @@ must report a real conflict rather than silently changing a dependent public sig
   > The 15 rendered C# blocks match executed source; frozen manifest/reports are unchanged.
   > Source checkpoint `aca24ddf2097ca9a33ff33039a2285f0b0b0bdb7` is committed and its
   > clean-revision isolated package proof passes at `.tmp-tests/nuget/run-7xx9guja/`.
-- [ ] **SDK.4b** Select/test a native general JSON Schema implementation against Python's
+- [x] **SDK.4b** Select/test a native general JSON Schema implementation against Python's
   modern dialects and schema coercion/ref/format/error behavior. C# resolves internal and
   caller-registered schema references by default; external URL/file retrieval requires
   explicit opt-in. Preserve frozen v0 validation exactly through an explicit profile boundary where
@@ -729,6 +729,11 @@ must report a real conflict rather than silently changing a dependent public sig
   > rendered C# source blocks match executed files; released hashes stay unchanged. Native
   > decimal comparison limits are controlled and documented. Source commit and clean-revision
   > package proof remain the final checkpoint before this box is checked.
+  > Final acceptance supersedes the intermediate holds: source
+  > `dbf82a949fca6ee7321b921233c0cda198b3a506` is committed and the clean-revision archive,
+  > exact four-package/license/hash validation and isolated consumer restore/build/run
+  > pass at `.tmp-tests/nuget/run-cgy2od91/`. Frozen assets and Python behavior are unchanged.
+  > This checks only the user-approved modern/native scope; Draft 3/4 remain SDK.11c.
 - [ ] **SDK.4c** Port model/token discovery, capability probes and configuration setup metadata
   incrementally from `capabilities/probes*`, `registry.py`, catalog APIs. Probe/network work
   remains explicit opt-in. Gate: fake/cassette discovery/probe conformance, no probing during
@@ -851,11 +856,11 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.4b**. SDK.4a is complete at source checkpoint
-`aca24ddf2097ca9a33ff33039a2285f0b0b0bdb7`: 18/18 workspace steps, 304 native unit tests,
-93 conformance tests including all 102 frozen cases, exact source-linked docs/examples and
-the clean-revision isolated package consumer pass. General schema dependency/API
-qualification is next; no later milestone or root-export completion is implied.
+Current resume point: **SDK.4c**. SDK.4b is complete at source checkpoint
+`dbf82a949fca6ee7321b921233c0cda198b3a506`: 18/18 workspace steps, 343 native unit tests,
+93 conformance tests including all 102 frozen cases, 39 focused schema tests, exact
+source-linked docs/examples and clean-revision package consumption. Capability probes and
+remaining model/token metadata are next; no later milestone/root-export completion is implied.
 
 SDK.4a's complete ownership, reviews and gate chronology are retained in
 `ANYINFER_CSHARP_SDK_CATALOG.md`; that child plan is complete. The final workspace log is
@@ -863,10 +868,12 @@ root command `4f5ead1c-4a73-4190-9ba0-d3746b62ed2c` (18 steps, 106.7s); the clea
 package proof is `.tmp-tests/nuget/run-7xx9guja/`. All 235 root inventory rows remain
 unchecked until their full assigned semantics and final audit pass.
 
-SDK.4b's C# explicit-retrieval default, modern-first dialect scope and documented native
-numeric/regex semantics are user-approved. Dependency selection and the exact opt-in API
-remain under qualification. Preserve Python behavior and the frozen v0 profile; track
-legacy Draft 3/4 explicitly in SDK.11c. Keep ownership disjoint and serialize shared gates.
+SDK.4b's complete contract, source ownership and gate chronology are retained in
+`ANYINFER_CSHARP_SDK_SCHEMA.md`; that child plan is complete. The final workspace log is
+`cb367dce-c8f6-471c-843a-43376e1d8a69` (18 steps, 114.6s); the clean-source package proof is
+`.tmp-tests/nuget/run-cgy2od91/`. The explicit-retrieval default, four modern dialects and
+documented native numeric/regex limits are accepted. Preserve Python/frozen behavior;
+legacy Draft 3/4 remain SDK.11c. Keep ownership disjoint and serialize shared gates.
 
 Earlier clean qualified checkpoints: SDK.3 `04dfa37231f26f5c72b7215afd747c47de4e6d19`,
 SDK.2 `b50459bc644cff95e9e50f97ba6dd61ae3e1ef46`, and SDK.1

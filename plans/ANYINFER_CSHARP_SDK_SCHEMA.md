@@ -476,7 +476,7 @@ implicit model instantiation, schema inference, event, retry or accounting chang
   > compared all 15 included C# blocks across six rendered guide pages with the exact source
   > files; every block matches. Typed sample and external consumer explicitly map lowercase
   > answer to normal C# properties. No hand-copied snippet or plan link was introduced.
-- [ ] **SIG.5** Root final checkpoint: inspect reviews/diff; zero-warning solution; focused
+- [x] **SIG.5** Root final checkpoint: inspect reviews/diff; zero-warning solution; focused
   modern schema/Python/package tests; complete native conformance including unchanged all102;
   full workspace check once; unchanged frozen digests; update achieved inventory limitations
   without ticking broad root exports. Commit explicit paths and run clean-revision isolated
@@ -492,21 +492,20 @@ implicit model instantiation, schema inference, event, retry or accounting chang
   > at `.tmp-tests/nuget/run-dj9uqmc8/`. Exact rendered-source and frozen hash checks also
   > pass. Root is committing explicit source paths, then qualifying the clean revision;
   > do not mark this final box complete before that proof.
+  > Accepted source checkpoint: `dbf82a949fca6ee7321b921233c0cda198b3a506`.
+  > Working tree was clean before and after fresh package/symbol inspection and isolated
+  > local-feed/private-cache restore/build/run at `.tmp-tests/nuget/run-cgy2od91/`.
+  > The consumer builds with zero warnings/errors and package metadata names this exact
+  > committed revision. SDK.4b is complete for the approved modern/native scope; parent
+  > resume is SDK.4c. Legacy Draft 3/4 and broader parity remain explicit outstanding work.
 
 ## Resume/evidence
 
-Current resume is SIG.5 final checkpoint, still based on uncommitted changes after
-`c2bed9e6137305aa91cda07444dd9c71a3b728b9`. SIG.1–SIG.4 gates are accepted as recorded above.
-Workspace01 passed 16/18 steps; 93 native conformance tests and the frozen 102-case check,
-Python, docs and examples pass. Its failures were a raw-schema test helper, generated
-consumer quoting, and a lifecycle test registration-lifetime race. The first two are fixed
-and actual package execution passes. The callback test now creates its delay before the
-throwing registration so readiness pins that callback through cancellation dispatch;
-production lifetime linkage remains unchanged. Cold review and the complete native suite
-pass. The final full workspace rerun passed all 18 steps in 114.6s; commit and qualify a
-clean-revision package next.
-SDK.4b is not committed or broadly accepted yet. Prototype files remain ignored; they
-qualify mechanisms but do not replace production gates.
+This child plan is complete at source `dbf82a949fca6ee7321b921233c0cda198b3a506`.
+All SIG.0–SIG.5 gates pass. Final workspace02 passed 18/18 in 114.6s; the clean-source
+package proof is `.tmp-tests/nuget/run-cgy2od91/`. Resume parent SDK.4c capability probes
+and metadata. No full-library parity or legacy Draft 3/4 completion is implied. Prototype
+files remain ignored; they qualify mechanisms but do not replace production gates.
 Root scratch transcripts: `.tmp-tests/schema-qualification/shared/` JSONL files.
 Durable interpretation/reviews are in Traycer `csharp-sdk/sdk-four-schema-{qualification,
 design,design-review}` and `foundation-execution/csharp-sdk/sdk-four-schema-mechanism-review`.
