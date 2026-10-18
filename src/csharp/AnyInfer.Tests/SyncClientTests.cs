@@ -35,17 +35,28 @@ public sealed class SyncClientTests
     }
 
     [Fact]
-    public void Result_is_not_ready_until_the_consumer_observes_StreamEnded_and_stream_is_single_consumer()
+    public async Task Result_is_not_ready_before_terminal_commit_and_stream_is_single_consumer()
     {
-        using var client = Client.FromAdapters([new ProviderRegistration("fake", new ScriptAdapter((_, token) => Events(token, new AdapterTextDelta("ok"), new AdapterFinal("stop"))))]);
+        var terminalHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseTerminal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var client = Client.FromAdapters([new ProviderRegistration("fake", new ScriptAdapter((_, token) => HeldTerminalEvents(token, terminalHeld, releaseTerminal)))]);
         using var stream = client.Stream("hello", target: "fake:model");
         Assert.Throws<InvalidOperationException>(() => _ = stream.Result);
 
         using var enumerator = stream.GetEnumerator();
         MoveThroughTimingPrefix(enumerator);
         Assert.IsType<TextDelta>(enumerator.Current);
-        Assert.Throws<InvalidOperationException>(() => _ = stream.Result);
-        Assert.Throws<InvalidOperationException>(() => stream.GetEnumerator());
+        await terminalHeld.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => _ = stream.Result);
+            Assert.Throws<InvalidOperationException>(() => stream.GetEnumerator());
+        }
+        finally
+        {
+            releaseTerminal.TrySetResult();
+        }
+
         while (enumerator.MoveNext()) { }
 
         Assert.Equal("ok", stream.Result.Text);
@@ -345,6 +356,18 @@ public sealed class SyncClientTests
             yield return item;
             await Task.Yield();
         }
+    }
+
+    private static async IAsyncEnumerable<AdapterEvent> HeldTerminalEvents(
+        [EnumeratorCancellation] CancellationToken token,
+        TaskCompletionSource terminalHeld,
+        TaskCompletionSource releaseTerminal)
+    {
+        yield return new AdapterTextDelta("ok");
+        terminalHeld.TrySetResult();
+        await releaseTerminal.Task.WaitAsync(token);
+        token.ThrowIfCancellationRequested();
+        yield return new AdapterFinal("stop");
     }
 
     private static void MoveThroughTimingPrefix(IEnumerator<StreamEvent> enumerator)

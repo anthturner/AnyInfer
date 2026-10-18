@@ -52,7 +52,7 @@ internal sealed class ManifestBuilder
     internal void NoteCapabilities(TargetMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        var capabilities = _capabilitiesFor(metadata)
+        var capabilities = (metadata.ResolvedCapabilities ?? _capabilitiesFor(metadata))
             ?? throw new InvalidOperationException("Capability lookup returned null.");
         lock (_gate)
         {

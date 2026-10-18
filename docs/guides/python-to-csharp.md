@@ -24,6 +24,7 @@ does not claim provider or feature parity with Python.
 | telemetry observer | `IObserver` supplied to or subscribed on `AsyncClient` / `Client` |
 | result manifest | `AsyncStream.Manifest`, `SyncStream.Manifest`, or `Generation.Manifest` |
 | `ProviderSetupSpec` metadata | `ProviderSetupSpec`, `SetupField`, `HostShorthand`, and `AnyOf` |
+| explicit pricing, budgets, and ledger snapshots | `PricingCalculator`, `Budget(...)`, `SpendLedger`, and `SpendStore` |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
@@ -94,6 +95,23 @@ one after completion. They do not calculate account totals or create automatic p
 
 ```csharp
 --8<-- "examples/csharp-sdk/ManifestExample.cs"
+```
+
+## Explicit accounting helpers
+
+`AsyncClient.Budget(...)` and `Client.Budget(...)` calculate a planning budget without choosing a
+route winner, resolving credentials, constructing an adapter, or sending a request. Pricing applies
+only when its provenance is catalog, discovered, probed, or caller override; default facts leave a
+calculated cost unknown, while a trusted zero price is free. The current request extractor counts
+text, reports other content as unpriced, and has no offered-tools input.
+
+`SpendLedger`, `SpendStore`, and `RateLimiter` are explicit caller-owned helpers. They do not make
+client admission decisions, persist automatically, pace client transport, or represent a provider
+invoice or all-wire total. Dispose every standalone limiter lease, and serialize store updates when
+you need transactional read-modify-write behavior.
+
+```csharp
+--8<-- "examples/csharp-sdk/AccountingExample.cs"
 ```
 
 ## What to use in an application

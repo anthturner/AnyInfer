@@ -20,6 +20,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     private bool _closed;
     private bool _succeeded;
     private bool _consumerClosing;
+    private int _closeRequested;
     private int _closeNotified;
     private Generation? _result;
     private OperationContext? _operation;
@@ -123,6 +124,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
 
     internal void NoteConsumerClosing()
     {
+        Volatile.Write(ref _closeRequested, 1);
         lock (_gate)
         {
             _consumerClosing = true;
@@ -160,7 +162,8 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
                 _syncClient,
                 CallerCancellation,
                 cancellationToken,
-                _closeToken);
+                _closeToken,
+                IsCloseRequested);
             _publicLease = lease;
             using var context = AsyncExecutionContext.Push(_client, _syncClient);
             using var identity = CancellationIdentityContext.Push(lease.Token, CallerCancellation);
@@ -190,6 +193,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
 
     internal Task<Exception?> BeginCloseAsync()
     {
+        Volatile.Write(ref _closeRequested, 1);
         lock (_gate)
         {
             _closed = true;
@@ -198,6 +202,10 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     }
 
     internal bool IsOwnedPublicExecution => _telemetry is not null && ReferenceEquals(StreamExecutionContext.Current, this);
+
+    internal CancellationToken? CancelledParentToken => _publicLease?.CancelledParentToken;
+
+    private bool IsCloseRequested() => Volatile.Read(ref _closeRequested) != 0;
 
     internal void BeginOperation(OperationContext operation)
     {
@@ -513,6 +521,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
             }
 
             disposalFailure ??= signalFailure;
+            _owner.NotifyClosed();
             if (disposalFailure is not null)
             {
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(disposalFailure).Throw();
@@ -531,6 +540,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         }
 
         private bool ShouldRetainCloseFailure(Exception exception) =>
-            _owner.IsClosing && !(exception is OperationCanceledException && Token.IsCancellationRequested);
+            _owner.IsClosing && !(exception is OperationCanceledException cancellation
+                && (Token.IsCancellationRequested || _lease?.IsOwnedParentCancellation(cancellation) == true));
     }
 }

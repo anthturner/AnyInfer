@@ -1,4 +1,4 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -7,6 +7,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnyInfer.Tests", "AnyInfer.Tests\AnyInfer.Tests.csproj", "{A3509D4A-21F3-4233-A09C-71EBEC8A6102}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnyInfer.Conformance", "AnyInfer.Conformance\AnyInfer.Conformance.csproj", "{302A454C-B26B-40DC-A24D-C0D3EF6DAF03}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnyInfer.Accounting", "AnyInfer.Accounting\AnyInfer.Accounting.csproj", "{9794FDA3-9860-46DB-9882-FFC81E55ACA5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,5 +28,9 @@ Global
 		{302A454C-B26B-40DC-A24D-C0D3EF6DAF03}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{302A454C-B26B-40DC-A24D-C0D3EF6DAF03}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{302A454C-B26B-40DC-A24D-C0D3EF6DAF03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9794FDA3-9860-46DB-9882-FFC81E55ACA5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9794FDA3-9860-46DB-9882-FFC81E55ACA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9794FDA3-9860-46DB-9882-FFC81E55ACA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9794FDA3-9860-46DB-9882-FFC81E55ACA5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

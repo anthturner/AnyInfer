@@ -16,6 +16,8 @@ supported public SDK and its generated Python API reference remains under
 | `AnyInferConfig` | Restricted version 1 configuration reader and writer. |
 | `Catalog`, `ResolvedTarget`, `PricingTable` | Pure target resolution and catalog-derived price facts. |
 | `ModelCapabilities` | Provenance-bearing model facts; unknown values remain unknown. |
+| `PricingCalculator`, `ContextBudget`, `SpendLedger`, `SpendStore` | Explicit winning-request pricing, planning, and caller-owned accounting helpers. |
+| `RateLimits`, `RateLimiter` | Standalone pacing configuration and caller-disposed leases. |
 | `ModelsAsync`, `HealthAsync` / `Models`, `Health` | Explicit asynchronous or synchronous lifecycle calls for one provider instance. |
 | `ProbeAsync` / `Probe`, `ProbeReport` | Explicit ordered generation-capability measurements and their provenance-bearing report. |
 | `ProviderSetupSpec`, `SetupField`, `HostShorthand` | Inert declarative setup metadata for application-owned configuration surfaces. |
@@ -24,9 +26,11 @@ supported public SDK and its generated Python API reference remains under
 
 The proof currently demonstrates text generation through the OpenAI-compatible adapter,
 structured JSON validation, repair, configuration, routing, reported token usage, explicit
-capability probes, payload-free telemetry, immutable manifests, and setup metadata. It has no
-released NuGet package, provider-parity guarantee, aggregate usage accounting, tool execution,
-embedding, or reranking surface.
+capability probes, payload-free telemetry, immutable manifests, setup metadata, bounded
+winning-request pricing, explicit budgeting, caller-owned ledger and store helpers, and standalone
+pacing. It has no released NuGet package, provider-parity guarantee, provider invoice or all-wire
+accounting, automatic spend admission, transport pacing, tool execution, embedding, or reranking
+surface.
 
 Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12. Draft 3 and Draft 4
 remain deferred. Numeric and regular-expression behavior is native to .NET, regular-expression

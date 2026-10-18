@@ -150,6 +150,34 @@ static async Task VerifyAsync()
         && manifestHandler.DisposeCount == 1,
         "Manifest example did not preserve partial, terminal, or embedded-schema facts.");
 
+    var accountingDirectory = Path.Combine(Path.GetTempPath(), $"anyinfer-accounting-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(accountingDirectory);
+    try
+    {
+        var accountingHandler = new CountingHandler();
+        var accounting = await AccountingExample.RunAsync(
+            WithTransport(displayedSettings, accountingHandler),
+            target,
+            Path.Combine(accountingDirectory, "spend.json"));
+        Require(accounting.PricedUsage.CostUsd?.CompareTo(EDecimal.FromString("0.004")) == 0
+            && accounting.UnknownCost is null
+            && accounting.FreeUsage.CostUsd?.CompareTo(EDecimal.Zero) == 0
+            && accounting.RequestEstimate.UnpricedParts == 1
+            && accounting.Generation.Text == "hello"
+            && accounting.Totals.Requests == 1
+            && accounting.Totals.UnknownRequests == 1
+            && accounting.StoreWasAbsent
+            && accounting.StoreWritten
+            && accounting.Persisted["total"] == accounting.Totals
+            && accountingHandler.RequestCount == 1
+            && accountingHandler.DisposeCount == 1,
+            "Accounting example did not preserve explicit pricing, storage, or caller ownership facts.");
+    }
+    finally
+    {
+        Directory.Delete(accountingDirectory, recursive: true);
+    }
+
     var structuredHandler = new CountingHandler(structured: true);
     var structured = await StructuredOutputExample.RunAsync(WithTransport(displayedSettings, structuredHandler), target);
     Require(structured.Answer == "ok", "Structured-output example returned unexpected text.");

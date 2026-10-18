@@ -36,8 +36,10 @@ public sealed class Client : IDisposable
         SchemaValidationOptions? schemaValidation = null,
         IEnumerable<IObserver>? observers = null,
         bool manifests = true,
-        bool manifestPayloads = false)
-        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads))
+        bool manifestPayloads = false,
+        ITokenEstimator? estimator = null,
+        SpendLedger? ledger = null)
+        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger))
     {
     }
 
@@ -49,8 +51,10 @@ public sealed class Client : IDisposable
         SchemaValidationOptions? schemaValidation = null,
         IEnumerable<IObserver>? observers = null,
         bool manifests = true,
-        bool manifestPayloads = false) =>
-        new(AsyncClient.FromAdapters(providers, schemaValidation, observers, manifests, manifestPayloads));
+        bool manifestPayloads = false,
+        ITokenEstimator? estimator = null,
+        SpendLedger? ledger = null) =>
+        new(AsyncClient.FromAdapters(providers, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger));
 
     /// <summary>Creates a synchronous client from inert parsed configuration.</summary>
     public static Client FromConfig(
@@ -63,8 +67,10 @@ public sealed class Client : IDisposable
         SchemaValidationOptions? schemaValidation = null,
         IEnumerable<IObserver>? observers = null,
         bool manifests = true,
-        bool manifestPayloads = false) =>
-        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads));
+        bool manifestPayloads = false,
+        ITokenEstimator? estimator = null,
+        SpendLedger? ledger = null) =>
+        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger));
 
     /// <summary>Gets the immutable catalog used by pure target resolution.</summary>
     public global::AnyInfer.Catalog.Catalog Catalog => _inner.Catalog;
@@ -74,6 +80,44 @@ public sealed class Client : IDisposable
 
     /// <summary>Gets assembled immutable capability facts without constructing an adapter.</summary>
     public ModelCapabilities Capabilities(string target) => _inner.Capabilities(target);
+
+    /// <summary>Gets completed spend recorded by this client's optional caller-owned ledger.</summary>
+    public SpendTotals Spend()
+    {
+        ThrowIfClosing();
+        return _inner.Spend();
+    }
+
+    /// <summary>Builds a pure context budget for one explicit target without selecting or constructing an adapter.</summary>
+    public ContextBudget Budget(GenerationRequest request, string target, long? outputReserveTokens = null)
+    {
+        ThrowIfClosing();
+        return _inner.Budget(request, target, outputReserveTokens);
+    }
+
+    /// <summary>Builds a pure context budget for one prompt and explicit target.</summary>
+    public ContextBudget Budget(
+        string prompt,
+        string target,
+        SchemaSpec? schema = null,
+        Sampling? sampling = null,
+        long? outputReserveTokens = null)
+    {
+        ThrowIfClosing();
+        return _inner.Budget(prompt, target, schema, sampling, outputReserveTokens);
+    }
+
+    /// <summary>Builds a pure context budget for caller messages and an explicit target.</summary>
+    public ContextBudget Budget(
+        IEnumerable<Message> messages,
+        string target,
+        SchemaSpec? schema = null,
+        Sampling? sampling = null,
+        long? outputReserveTokens = null)
+    {
+        ThrowIfClosing();
+        return _inner.Budget(messages, target, schema, sampling, outputReserveTokens);
+    }
 
     /// <summary>Subscribes an observer for synchronous telemetry notifications.</summary>
     public void Subscribe(IObserver observer, bool payloads = false) => _inner.Subscribe(observer, payloads);

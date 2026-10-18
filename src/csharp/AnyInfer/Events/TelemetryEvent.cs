@@ -164,7 +164,7 @@ public sealed record CachePlanned(string RequestId, ResolvedTarget Target, strin
 /// <summary>Records client-side rate-limit waiting.</summary>
 public sealed record RateLimitWaited(string RequestId,string ProviderId,double WaitedS,string Reason,ResolvedTarget? Target=null) : TelemetryEvent;
 /// <summary>Records provider-reported rate-limit state.</summary>
-public sealed record RateLimitObserved(string ProviderId,int? RequestsRemaining=null,int? TokensRemaining=null,double? ResetsInS=null) : TelemetryEvent;
+public sealed record RateLimitObserved(string ProviderId,long? RequestsRemaining=null,long? TokensRemaining=null,double? ResetsInS=null) : TelemetryEvent;
 /// <summary>Records supervised-server lifecycle state.</summary>
 public sealed record ServerLifecycle(string ServerId,string State,string Detail="") : TelemetryEvent;
 /// <summary>Records aggregate model-download progress.</summary>

@@ -26,6 +26,8 @@ public sealed class AsyncClient : IAsyncDisposable
     private readonly EventDispatcher _dispatcher;
     private readonly bool _manifests;
     private readonly bool _manifestPayloads;
+    private readonly ITokenEstimator? _estimator;
+    private readonly SpendLedger? _ledger;
     private readonly object _gate = new();
     private readonly HashSet<AsyncStream> _activeStreams = [];
     private readonly HashSet<LifecycleReservation> _lifecycleOperations = [];
@@ -47,7 +49,9 @@ public sealed class AsyncClient : IAsyncDisposable
         SchemaValidationOptions? schemaValidation = null,
         IEnumerable<IObserver>? observers = null,
         bool manifests = true,
-        bool manifestPayloads = false)
+        bool manifestPayloads = false,
+        ITokenEstimator? estimator = null,
+        SpendLedger? ledger = null)
     {
         var descriptors = registry ?? Providers.ProviderRegistry.CreateDefault();
         _pool = new ProviderPool(providers, descriptors, resolver ?? Credentials.ResolverChain.CreateDefault());
@@ -63,6 +67,9 @@ public sealed class AsyncClient : IAsyncDisposable
         _dispatcher = new EventDispatcher(observers);
         _manifests = manifests;
         _manifestPayloads = manifestPayloads;
+        _estimator = estimator;
+        _ledger = ledger;
+        if (ledger is not null) _dispatcher.Subscribe(ledger);
     }
 
     /// <summary>Creates a client over externally constructed adapters.</summary>
@@ -71,8 +78,10 @@ public sealed class AsyncClient : IAsyncDisposable
         SchemaValidationOptions? schemaValidation = null,
         IEnumerable<IObserver>? observers = null,
         bool manifests = true,
-        bool manifestPayloads = false) =>
-        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation, observers, manifests, manifestPayloads);
+        bool manifestPayloads = false,
+        ITokenEstimator? estimator = null,
+        SpendLedger? ledger = null) =>
+        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger);
 
     /// <summary>Creates a client from inert parsed configuration without performing I/O or credential resolution.</summary>
     public static AsyncClient FromConfig(
@@ -85,14 +94,16 @@ public sealed class AsyncClient : IAsyncDisposable
         SchemaValidationOptions? schemaValidation = null,
         IEnumerable<IObserver>? observers = null,
         bool manifests = true,
-        bool manifestPayloads = false)
+        bool manifestPayloads = false,
+        ITokenEstimator? estimator = null,
+        SpendLedger? ledger = null)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads);
+        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger);
     }
 
     internal AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock)
-        : this(providers, clock, publicSdk: false, schemaValidation: null, observers: null, manifests: false, manifestPayloads: false)
+        : this(providers, clock, publicSdk: false, schemaValidation: null, observers: null, manifests: false, manifestPayloads: false, estimator: null, ledger: null)
     {
     }
 
@@ -103,7 +114,9 @@ public sealed class AsyncClient : IAsyncDisposable
         SchemaValidationOptions? schemaValidation,
         IEnumerable<IObserver>? observers,
         bool manifests,
-        bool manifestPayloads)
+        bool manifestPayloads,
+        ITokenEstimator? estimator,
+        SpendLedger? ledger)
     {
         _pool = new ProviderPool(providers);
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -121,6 +134,9 @@ public sealed class AsyncClient : IAsyncDisposable
         _dispatcher = new EventDispatcher(observers);
         _manifests = manifests;
         _manifestPayloads = manifestPayloads;
+        _estimator = estimator;
+        _ledger = ledger;
+        if (ledger is not null) _dispatcher.Subscribe(ledger);
     }
 
     internal RouteState Health => _health;
@@ -136,6 +152,49 @@ public sealed class AsyncClient : IAsyncDisposable
     {
         var resolved = _targetResolver.Resolve(target, TargetResolutionProfile.PublicSdk);
         return _capabilities.CapabilitiesFor(resolved.Descriptor, resolved.Target.ProviderId, resolved.Target.Model, _pool.EffectiveLocality(resolved));
+    }
+
+    /// <summary>Gets completed spend recorded by this client's optional caller-owned ledger.</summary>
+    public SpendTotals Spend() => _ledger?.Totals() ?? new SpendTotals();
+
+    /// <summary>Builds a pure context budget for one explicit target without selecting or constructing an adapter.</summary>
+    public ContextBudget Budget(GenerationRequest request, string target, long? outputReserveTokens = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(target);
+        var metadata = _targetResolver.Resolve(target, _resolutionProfile);
+        var capabilities = metadata.ResolvedCapabilities ?? _capabilities.CapabilitiesFor(
+            metadata.Descriptor,
+            metadata.Target.ProviderId,
+            metadata.Target.Model,
+            _pool.EffectiveLocality(metadata));
+        return ContextBudgeting.BuildContextBudget(
+            request,
+            capabilities,
+            _estimator,
+            metadata.Descriptor?.TokenCalibration,
+            outputReserveTokens);
+    }
+
+    /// <summary>Builds a pure context budget for one prompt and explicit target.</summary>
+    public ContextBudget Budget(
+        string prompt,
+        string target,
+        SchemaSpec? schema = null,
+        Sampling? sampling = null,
+        long? outputReserveTokens = null) =>
+        Budget(new GenerationRequest([Message.User(prompt)], new Route([target]), sampling, schema: schema), target, outputReserveTokens);
+
+    /// <summary>Builds a pure context budget for caller messages and an explicit target.</summary>
+    public ContextBudget Budget(
+        IEnumerable<Message> messages,
+        string target,
+        SchemaSpec? schema = null,
+        Sampling? sampling = null,
+        long? outputReserveTokens = null)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        return Budget(new GenerationRequest(messages, new Route([target]), sampling, schema: schema), target, outputReserveTokens);
     }
 
     /// <summary>Subscribes an observer for synchronous telemetry notifications.</summary>
@@ -308,7 +367,7 @@ public sealed class AsyncClient : IAsyncDisposable
             SyncExecutionContext.CurrentClient,
             token => RunStreamAsync(normalized, effectiveRequest.Route, capture, stream!, token),
             cancellationToken,
-            RemoveActiveStream,
+            OnStreamClosed,
             telemetry);
         lock (_gate)
         {
@@ -414,6 +473,16 @@ public sealed class AsyncClient : IAsyncDisposable
         finally
         {
             RemoveActiveStream(stream);
+        }
+    }
+
+    private void OnStreamClosed(AsyncStream stream)
+    {
+        RemoveActiveStream(stream);
+        var requestId = stream.Telemetry?.RequestId;
+        if (requestId is not null)
+        {
+            _ledger?.Release(requestId);
         }
     }
 

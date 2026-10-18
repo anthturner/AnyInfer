@@ -218,9 +218,9 @@ def stage_schema_dependencies(feed: Path, assets_path: Path | None = None) -> No
         package = package_folder / name.lower() / version / filename
         if not package.is_file():
             raise RuntimeError(f"qualified dependency archive is missing: {name}/{version}")
-        actual_hash = base64.b64encode(
-            hashlib.sha512(package.read_bytes()).digest()
-        ).decode("ascii")
+        actual_hash = base64.b64encode(hashlib.sha512(package.read_bytes()).digest()).decode(
+            "ascii"
+        )
         if actual_hash != expected_hash:
             raise RuntimeError(f"qualified dependency archive hash drifted: {name}/{version}")
         package_id, package_version = _read_dependency_metadata(package, expected_license)
@@ -241,7 +241,9 @@ def validate_package(
     with zipfile.ZipFile(package) as archive:
         names = _names(archive)
         allowed = _container_records(names, nuspec=nuspec_name) | {
-            "lib/net8.0/AnyInfer.dll", "README.md", "LICENSE",
+            "lib/net8.0/AnyInfer.dll",
+            "README.md",
+            "LICENSE",
         }
         if names != allowed:
             raise RuntimeError("package payload contains an unexpected member")
@@ -302,7 +304,9 @@ def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> Non
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
   <ItemGroup><PackageReference Include="AnyInfer" Version="{version}" /></ItemGroup>
 </Project>
-''', encoding="utf-8")
+''',
+        encoding="utf-8",
+    )
     (consumer / "Program.cs").write_text(
         '''using AnyInfer;
 using AnyInfer.Capabilities;
@@ -311,6 +315,7 @@ using AnyInfer.Events;
 using AnyInfer.Json;
 using AnyInfer.Manifest;
 using AnyInfer.Providers;
+using AnyInfer.Routing;
 using AnyInfer.Schema;
 using PeterO.Numbers;
 
@@ -391,6 +396,53 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
 }
 if (factoryCalls != 0)
     throw new InvalidOperationException("pure catalog queries constructed an adapter");
+
+var trustedAccounting = new ModelCapabilities(
+    pricing: new Sourced<Pricing>(
+        new Pricing(EDecimal.FromString("2"), EDecimal.FromString("4")),
+        Provenance.Catalog));
+var defaultAccounting = new ModelCapabilities(
+    pricing: new Sourced<Pricing>(
+        new Pricing(EDecimal.FromString("2"), EDecimal.FromString("4")),
+        Provenance.Default));
+var freeAccounting = new ModelCapabilities(
+    pricing: new Sourced<Pricing>(
+        new Pricing(EDecimal.Zero, EDecimal.Zero),
+        Provenance.Catalog));
+var quotedUsage = new Usage(InputTokens: 1000, OutputTokens: 500);
+var pricedUsage = PricingCalculator.WithCost(quotedUsage, trustedAccounting);
+var unknownCost = PricingCalculator.ComputeCost(quotedUsage, defaultAccounting);
+var freeUsage = PricingCalculator.WithCost(quotedUsage, freeAccounting);
+if (pricedUsage.CostUsd?.CompareTo(EDecimal.FromString("0.004")) != 0
+    || unknownCost is not null
+    || freeUsage.CostUsd?.CompareTo(EDecimal.Zero) != 0)
+    throw new InvalidOperationException("public pricing provenance behavior failed");
+
+var accountingAdapter = new AccountingAdapter();
+var accountingLedger = new SpendLedger();
+{
+    await using var client = AsyncClient.FromAdapters(
+        [new ProviderRegistration("accounting-demo", accountingAdapter)],
+        ledger: accountingLedger);
+    var budget = client.Budget("accounting", "accounting-demo:model", outputReserveTokens: 32);
+    var generation = await client.GenerateAsync("accounting", target: "accounting-demo:model");
+    var spend = client.Spend();
+    if (budget.OutputReserveTokens != 32
+        || generation.Usage?.InputTokens != 1
+        || spend.Requests != 1
+        || spend.UnknownRequests != 1)
+        throw new InvalidOperationException("public client budget or caller-owned ledger failed");
+}
+if (accountingAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("accounting adapter disposal failed");
+
+var limiter = new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false));
+await using (var firstLease = await limiter.AcquireAsync())
+{
+}
+await using (var secondLease = await limiter.AcquireAsync())
+{
+}
 
 var setup = new ProviderSetupSpec(
     fields:
@@ -622,6 +674,28 @@ sealed class DemoAdapter : IProviderAdapter
     }
 }
 
+sealed class AccountingAdapter : IProviderAdapter
+{
+    public int DisposeCount { get; private set; }
+
+    public async IAsyncEnumerable<AdapterEvent> GenerateAsync(
+        WireRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        yield return new AdapterTextDelta("accounting");
+        yield return new AdapterFinal("stop", new Usage(InputTokens: 1, OutputTokens: 1));
+        await Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
+    }
+}
+
 sealed class CollectingObserver : IObserver, IDisposable
 {
     public List<TelemetryEvent> Events { get; } = [];
@@ -754,7 +828,9 @@ sealed class ProbeAdapter : IProviderAdapter
         return ValueTask.CompletedTask;
     }
 }
-''', encoding="utf-8")
+''',
+        encoding="utf-8",
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

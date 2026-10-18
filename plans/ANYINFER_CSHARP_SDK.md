@@ -777,6 +777,14 @@ must report a real conflict rather than silently changing a dependent public sig
   `SpendLedger`, `SpendStore`, `SpendPolicy`, pacing and reservation concurrency from current
   Python modules/tests. Gate: native Python/C# accounting corpus and concurrent reservation,
   cancellation/release, precision/unknown-price controls; never infer unknown spend as zero.
+  > NOTE: Execute `ANYINFER_CSHARP_SDK_ACCOUNTING.md` from ACCT.7. The complete gate passes
+  > all 19 steps in 127.8s, including 532 native unit tests, 93 conformance tests and
+  > 42/42 shared accounting cases plus two native-only controls, with zero warnings.
+  > Shared builtin HTTP controls pass in both runtimes; clean-revision acceptance remains.
+  > Python final usage and
+  > ledger charges are winning-entry/completed-request only; failed retries and discarded
+  > repair responses remain separate attempt facts. Pure policy/limiter foundations and
+  > explicit accounting helpers precede SDK.5c automatic admission/transport wiring.
 - [ ] **SDK.5c** Connect shared timeout, cache/spend/rate/context policies to the native
   request path without duplicating provider orchestration. Gate: precise policy precedence,
   pre-dispatch refusal, retry/repair budget and ledger/manifest consistency tests.

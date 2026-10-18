@@ -30,6 +30,7 @@ public static partial class JsonWriter
     private static readonly WritePolicy ModernPolicy = new(false, false, true, NumberFormat.Existing, null, Compact: true, SpaceAfterComma: false, SpaceAfterColon: false);
     private static readonly WritePolicy ModernCanonicalPolicy = new(true, true, true, NumberFormat.Existing, 2, Compact: false, SpaceAfterComma: false, SpaceAfterColon: true);
     private static readonly WritePolicy ManifestCanonicalPolicy = new(true, true, true, NumberFormat.Python, null, Compact: true, SpaceAfterComma: false, SpaceAfterColon: false);
+    private static readonly WritePolicy AccountingPolicy = new(false, true, true, NumberFormat.Python, null, Compact: true, SpaceAfterComma: true, SpaceAfterColon: true);
 
     public static string Write(JsonValue value)
         => WriteCore(value, DefaultPolicy);
@@ -47,6 +48,10 @@ public static partial class JsonWriter
     /// <summary>Writes a scalar-sorted ASCII manifest representation with Python-compatible separators.</summary>
     internal static string WriteManifest(JsonValue value, int? indent = 2) =>
         WriteCore(value, ManifestCanonicalPolicy with { Indent = indent, Compact = indent is null, SpaceAfterComma = indent is null, SpaceAfterColon = true });
+
+    /// <summary>Writes insertion-ordered ASCII accounting JSON with Python-compatible formatting.</summary>
+    internal static string WriteAccounting(JsonValue value, int? indent = null) =>
+        WriteCore(value, AccountingPolicy with { Indent = indent, Compact = indent is null, SpaceAfterComma = indent is null, SpaceAfterColon = true });
 
     private static string WriteCore(JsonValue value, WritePolicy policy)
     {

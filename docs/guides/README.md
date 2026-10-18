@@ -67,9 +67,11 @@ release path, and it does not change the supported Python SDK surface.
 
 Its source-linked examples cover generation, routing, configuration, pure catalog and capability
 queries, explicit model discovery, health and capability probes for a configured instance,
-payload-free typed telemetry, immutable manifests, declarative provider setup metadata, and modern
-JSON Schema validation with typed deserialization. They do not imply provider parity, released
-NuGet distribution, aggregate accounting, or a supported application integration path.
+payload-free typed telemetry, immutable manifests, declarative provider setup metadata, bounded
+winning-request pricing, explicit budgeting, caller-owned ledger/store helpers, standalone pacing,
+and modern JSON Schema validation with typed deserialization. They do not imply provider parity,
+released NuGet distribution, provider invoice or all-wire accounting, automatic admission or
+transport pacing, or a supported application integration path.
 
 - [Explore the C# SDK proof](csharp-sdk.md)
 - [Move from Python to the C# SDK proof](python-to-csharp.md)

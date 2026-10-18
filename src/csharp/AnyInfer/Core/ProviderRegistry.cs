@@ -1,5 +1,6 @@
 using AnyInfer.Providers;
 using AnyInfer.Credentials;
+using AnyInfer.Capabilities;
 using System.Runtime.ExceptionServices;
 
 namespace AnyInfer.Core;
@@ -19,7 +20,8 @@ internal sealed record TargetMetadata(
     ProviderRegistration? Registration,
     ProviderSettings Settings,
     StructuredOutputProfile Capabilities,
-    int? MaxRepairAttempts);
+    int? MaxRepairAttempts,
+    ModelCapabilities? ResolvedCapabilities = null);
 
 /// <summary>Client-owned lazy adapter pool. Descriptor lookup remains public registry work.</summary>
 internal sealed class ProviderPool : IAsyncDisposable
@@ -169,16 +171,25 @@ internal sealed class ProviderPool : IAsyncDisposable
         return baseUrl is null || (Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) && uri.IsLoopback) ? ProviderLocality.Local : ProviderLocality.Remote;
     }
 
-    internal async ValueTask<IProviderAdapter> GetAdapterAsync(ResolvedProvider resolved, CancellationToken callerToken)
+    internal async ValueTask<IProviderAdapter> GetAdapterAsync(
+        ResolvedProvider resolved,
+        CancellationToken callerToken,
+        Func<CancellationToken?>? cancelledParentToken = null,
+        CancellationToken callerIdentity = default)
     {
         ArgumentNullException.ThrowIfNull(resolved);
-        return await GetAdapterAsync(resolved.State, callerToken).ConfigureAwait(false);
+        return await GetAdapterAsync(
+            resolved.State,
+            callerToken,
+            callerIdentity,
+            cancelledParentToken).ConfigureAwait(false);
     }
 
     internal async ValueTask<IProviderAdapter> GetAdapterAsync(
         InstanceState state,
         CancellationToken callerToken,
-        CancellationToken callerIdentity = default)
+        CancellationToken callerIdentity = default,
+        Func<CancellationToken?>? cancelledParentToken = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ThrowIfClosing();
@@ -192,19 +203,21 @@ internal sealed class ProviderPool : IAsyncDisposable
         {
             await state.Gate.WaitAsync(linked.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (callerIdentity.IsCancellationRequested)
+        catch (OperationCanceledException) when (HasOwnedCancellation(callerIdentity, cancelledParentToken))
         {
-            throw new OperationCanceledException(callerIdentity);
+            ThrowPoolOwnedCancellation(callerIdentity, linked.Token, cancelledParentToken);
+            throw;
         }
         try
         {
             ThrowIfClosing();
+            ThrowPoolOwnedCancellation(callerIdentity, linked.Token, cancelledParentToken);
             if (state.Adapter is not null)
             {
                 return state.Adapter;
             }
 
-            var build = BuildAsync(state, _resolver!, linked.Token, callerIdentity);
+            var build = BuildAsync(state, _resolver!, linked.Token, callerIdentity, cancelledParentToken);
             TrackBuild(build);
             IProviderAdapter adapter;
             try
@@ -216,10 +229,10 @@ internal sealed class ProviderPool : IAsyncDisposable
                 UntrackBuild(build);
             }
 
-            if (linked.IsCancellationRequested)
+            if (HasOwnedCancellation(callerIdentity, cancelledParentToken) || linked.IsCancellationRequested)
             {
                 await adapter.DisposeAsync().ConfigureAwait(false);
-                ThrowPoolOwnedCancellation(callerIdentity, linked.Token);
+                ThrowPoolOwnedCancellation(callerIdentity, linked.Token, cancelledParentToken);
             }
 
             var closing = false;
@@ -385,7 +398,8 @@ internal sealed class ProviderPool : IAsyncDisposable
         InstanceState state,
         ResolverChain resolver,
         CancellationToken cancellationToken,
-        CancellationToken callerIdentity = default)
+        CancellationToken callerIdentity = default,
+        Func<CancellationToken?>? cancelledParentToken = null)
     {
         var descriptor = state.Descriptor ?? throw new InvalidOperationException("Prebuilt registrations do not require a factory.");
         var settings = state.Settings;
@@ -398,22 +412,41 @@ internal sealed class ProviderPool : IAsyncDisposable
             ? ProviderSettings.Of(settings.ProviderId, descriptor.DefaultBaseUrl, settings.ApiKey, settings.ApiVersion, settings.Headers, settings.Options, settings.TimeoutS, settings.Transport, settings.Alias)
             : settings;
         var resolvedKey = await resolver.ResolveAsync(boundSettings.ApiKey, cancellationToken).ConfigureAwait(false);
-        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
+        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
         var apiKeyField = descriptor.Setup.Fields.SingleOrDefault(static field => field.Key == "api_key");
         if (apiKeyField is { Required: true } && string.IsNullOrWhiteSpace(resolvedKey))
         {
             throw ConfigurationError(settings.InstanceId, "The required setup field 'api_key' is missing.");
         }
 
-        var resolvedOptions = await ResolveOptionsAsync(descriptor, boundSettings, resolver, cancellationToken, callerIdentity).ConfigureAwait(false);
-        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
+        var resolvedOptions = await ResolveOptionsAsync(
+            descriptor,
+            boundSettings,
+            resolver,
+            cancellationToken,
+            callerIdentity,
+            cancelledParentToken).ConfigureAwait(false);
+        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
         var config = new ProviderConfig(boundSettings, descriptor.Id, resolvedKey, resolvedOptions);
-        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
+        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
         return await descriptor.Factory(config, cancellationToken).ConfigureAwait(false);
     }
 
-    private static void ThrowPoolOwnedCancellation(CancellationToken callerIdentity, CancellationToken linkedToken)
+    private static bool HasOwnedCancellation(
+        CancellationToken callerIdentity,
+        Func<CancellationToken?>? cancelledParentToken) =>
+        cancelledParentToken?.Invoke() is not null || callerIdentity.IsCancellationRequested;
+
+    private static void ThrowPoolOwnedCancellation(
+        CancellationToken callerIdentity,
+        CancellationToken linkedToken,
+        Func<CancellationToken?>? cancelledParentToken = null)
     {
+        if (cancelledParentToken?.Invoke() is { } parent)
+        {
+            throw new OperationCanceledException(parent);
+        }
+
         if (callerIdentity.IsCancellationRequested)
         {
             throw new OperationCanceledException(callerIdentity);
@@ -427,7 +460,8 @@ internal sealed class ProviderPool : IAsyncDisposable
         ProviderSettings settings,
         ResolverChain resolver,
         CancellationToken cancellationToken,
-        CancellationToken callerIdentity = default)
+        CancellationToken callerIdentity = default,
+        Func<CancellationToken?>? cancelledParentToken = null)
     {
         var options = settings.Options?.Properties.ToDictionary(
             static property => property.Name,
@@ -472,7 +506,7 @@ internal sealed class ProviderPool : IAsyncDisposable
             if (field.Kind == "secret")
             {
                 var resolved = await resolver.ResolveAsync(text.Value, cancellationToken).ConfigureAwait(false);
-                ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
+                ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
                 if (resolved is null)
                 {
                     if (field.Required)

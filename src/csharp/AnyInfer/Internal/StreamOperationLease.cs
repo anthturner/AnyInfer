@@ -11,6 +11,7 @@ internal sealed class StreamOperationLease : IAsyncDisposable
     private readonly CancellationToken _callerIdentity;
     private readonly CancellationToken _iteratorCancellation;
     private readonly CancellationToken _closeCancellation;
+    private readonly Func<bool> _closeRequested;
     private readonly CancellationTokenSource _source = new();
     private readonly CancellationTokenRegistration[] _registrations;
     private readonly object _gate = new();
@@ -23,7 +24,8 @@ internal sealed class StreamOperationLease : IAsyncDisposable
         Client? syncOwner,
         CancellationToken callerIdentity,
         CancellationToken iteratorCancellation,
-        CancellationToken closeCancellation)
+        CancellationToken closeCancellation,
+        Func<bool> closeRequested)
     {
         _stream = stream ?? throw new ArgumentNullException(nameof(stream));
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
@@ -31,6 +33,7 @@ internal sealed class StreamOperationLease : IAsyncDisposable
         _callerIdentity = callerIdentity;
         _iteratorCancellation = iteratorCancellation;
         _closeCancellation = closeCancellation;
+        _closeRequested = closeRequested ?? throw new ArgumentNullException(nameof(closeRequested));
         Token = _source.Token;
         _registrations =
         [
@@ -44,19 +47,41 @@ internal sealed class StreamOperationLease : IAsyncDisposable
 
     internal Task<Exception?> SignalCancelAsync() => PublishSignal();
 
+    /// <summary>Gets the first cancelled parent token in the stream operation's cancellation priority.</summary>
+    internal CancellationToken? CancelledParentToken
+    {
+        get
+        {
+            if (_callerIdentity.IsCancellationRequested)
+            {
+                return _callerIdentity;
+            }
+
+            if (_iteratorCancellation.IsCancellationRequested)
+            {
+                return _iteratorCancellation;
+            }
+
+            return _closeCancellation.IsCancellationRequested || _closeRequested() ? _closeCancellation : null;
+        }
+    }
+
+    /// <summary>Returns whether an exception carries any parent cancellation owned by this lease.</summary>
+    internal bool IsOwnedParentCancellation(OperationCanceledException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        var token = exception.CancellationToken;
+        return (_callerIdentity.IsCancellationRequested && token == _callerIdentity)
+            || (_iteratorCancellation.IsCancellationRequested && token == _iteratorCancellation)
+            || ((_closeCancellation.IsCancellationRequested || _closeRequested()) && token == _closeCancellation);
+    }
+
     internal void ThrowIfParentCancelled()
     {
-        if (_callerIdentity.IsCancellationRequested)
+        if (CancelledParentToken is { } cancelled)
         {
-            throw new OperationCanceledException(_callerIdentity);
+            throw new OperationCanceledException(cancelled);
         }
-
-        if (_iteratorCancellation.IsCancellationRequested)
-        {
-            throw new OperationCanceledException(_iteratorCancellation);
-        }
-
-        _closeCancellation.ThrowIfCancellationRequested();
     }
 
     public async ValueTask DisposeAsync()

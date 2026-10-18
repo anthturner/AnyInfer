@@ -17,8 +17,9 @@ build environment:
 dotnet pack AnyInfer/AnyInfer.csproj -c Release -p:SourceRevisionId=<40-character-git-revision>
 ```
 
-The package targets `net8.0`, carries the qualified `JsonSchema.Net` `8.0.5` runtime dependency
-for modern JSON Schema validation, and includes a portable symbol package. The proof supports
+The package targets `net8.0`, carries the qualified `JsonSchema.Net` `8.0.5` and `PeterO.Numbers`
+`1.8.2` runtime dependencies for modern JSON Schema validation and exact public accounting values,
+and includes a portable symbol package. The proof supports
 Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12; legacy Draft 3 and Draft 4 remain deferred.
 Modern schema input and generated values can retain arbitrary-size integers, but the pinned native
 validator compares numeric values for `const`, `enum`, and `uniqueItems` through .NET `decimal`.
@@ -35,11 +36,14 @@ dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --config
 ```
 
 The examples demonstrate settings, buffered generation, streaming, structured output,
-configuration, fallback, explicit capability probes, declarative setup metadata, and the
-synchronous `Client`/`SyncStream` facade. Their source is linked from the documentation site.
+configuration, fallback, explicit capability probes, declarative setup metadata, bounded
+winning-request pricing, explicit budgeting, caller-owned ledger/store helpers, standalone pacing,
+and the synchronous `Client`/`SyncStream` facade. Their source is linked from the documentation site.
 Capability probes can send up to four requests by default; the raw tool declaration used by that
 measurement does not provide normal tool execution. The examples are a bounded proof surface, not
-a released NuGet package or a provider-parity promise.
+a released NuGet package or a provider-parity promise. Accounting values do not represent provider
+invoices or all-wire totals, and the helpers do not activate automatic admission, transport pacing,
+or transactional cross-process store updates.
 
 ## Use a custom adapter
 

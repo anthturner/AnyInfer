@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using AnyInfer.Capabilities;
 using AnyInfer.Events;
 using AnyInfer.Internal;
 using AnyInfer.Json;
@@ -61,7 +62,17 @@ internal static class GenerationCore
                 }
 
                 var resolved = registry.Materialize(metadata);
-                var adapter = await registry.GetAdapterAsync(resolved, cancellationToken).ConfigureAwait(false);
+                Func<CancellationToken?>? cancelledParentToken = resolutionProfile == TargetResolutionProfile.PublicSdk
+                    ? () => stream.CancelledParentToken
+                    : null;
+                var callerIdentity = resolutionProfile == TargetResolutionProfile.PublicSdk
+                    ? stream.CallerCancellation
+                    : default;
+                var adapter = await registry.GetAdapterAsync(
+                    resolved,
+                    cancellationToken,
+                    cancelledParentToken,
+                    callerIdentity).ConfigureAwait(false);
                 telemetry?.NoteCapabilities(metadata);
 
                 var effectiveRepairs = EffectiveRepairBudget(request, resolved, operation, capture, telemetry);
@@ -241,12 +252,19 @@ internal static class GenerationCore
                     health.Clear(resolved.Target);
                     var totalMilliseconds = current.TotalMilliseconds;
                     var firstTokenMilliseconds = current.FirstTokenMilliseconds;
+                    var publicSdk = request.SchemaProfile == SchemaExecutionProfile.ModernSdk;
+                    var winningUsage = NormalizeWinningUsage(current.Usage, publicSdk);
+                    if (publicSdk && winningUsage is not null)
+                    {
+                        winningUsage = PricingCalculator.WithCost(winningUsage, metadata.ResolvedCapabilities);
+                    }
+
                     var result = new Generation(
                         current.Text,
                         structured,
                         resolved.Target,
                         current.FinishReason,
-                        NormalizeWinningUsage(current.Usage, request.SchemaProfile == SchemaExecutionProfile.ModernSdk),
+                        winningUsage,
                         new Timing(
                             current.StartedAt,
                             firstTokenMilliseconds,

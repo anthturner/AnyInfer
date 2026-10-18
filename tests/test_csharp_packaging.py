@@ -118,7 +118,9 @@ def test_validate_package_rejects_metadata_drift(tmp_path: Path) -> None:
         CHECKER.validate_package(package, symbols, REVISION)
 
 
-@pytest.mark.parametrize("unexpected", ["lib/net8.0/Other.dll", "runtimes/win-x64/native/other.dll"])
+@pytest.mark.parametrize(
+    "unexpected", ["lib/net8.0/Other.dll", "runtimes/win-x64/native/other.dll"]
+)
 def test_validate_package_rejects_unexpected_payload(tmp_path: Path, unexpected: str) -> None:
     package, symbols = _paths(tmp_path)
     _package(package, unexpected=unexpected)
@@ -182,7 +184,9 @@ def test_default_output_is_the_declared_ci_artifact_directory() -> None:
     assert options.output == ROOT / ".tmp-tests" / "nuget"
 
 
-def test_main_preserves_preexisting_output_run_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_preserves_preexisting_output_run_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     output = tmp_path / "artifacts"
     sentinel = output / "run" / "keep.txt"
     sentinel.parent.mkdir(parents=True)
@@ -193,7 +197,9 @@ def test_main_preserves_preexisting_output_run_directory(tmp_path: Path, monkeyp
         if command[:2] == ["dotnet", "pack"]:
             packages = Path(command[command.index("-o") + 1])
             packages.mkdir(parents=True)
-            _package(packages / f"AnyInfer.{version}.nupkg", dependency_group=QUALIFIED_DEPENDENCY_GROUP)
+            _package(
+                packages / f"AnyInfer.{version}.nupkg", dependency_group=QUALIFIED_DEPENDENCY_GROUP
+            )
             _symbols(packages / f"AnyInfer.{version}.snupkg")
 
     monkeypatch.setattr(CHECKER, "run", fake_run)
@@ -208,11 +214,11 @@ def test_main_preserves_preexisting_output_run_directory(tmp_path: Path, monkeyp
 
 
 def _dependency_package(path: Path, package_id: str, version: str, license_text: str) -> str:
-    nuspec = f'''<?xml version="1.0"?>
+    nuspec = f"""<?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata><id>{package_id}</id><version>{version}</version>
   <license type="expression">{license_text}</license></metadata>
-</package>'''
+</package>"""
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(f"{package_id}.nuspec", nuspec)
     return base64.b64encode(hashlib.sha512(path.read_bytes()).digest()).decode("ascii")
@@ -227,7 +233,11 @@ def test_stage_schema_dependencies_requires_exact_resolved_graph_and_verified_ar
     for name, (version, _, license_text) in CHECKER.QUALIFIED_DEPENDENCIES.items():
         package = package_folder / name.lower() / version / f"{name.lower()}.{version}.nupkg"
         package.parent.mkdir(parents=True)
-        expected_hashes[name] = (version, _dependency_package(package, name, version, license_text), license_text)
+        expected_hashes[name] = (
+            version,
+            _dependency_package(package, name, version, license_text),
+            license_text,
+        )
         target[f"{name}/{version}"] = {"type": "package", "dependencies": {}}
     target["JsonSchema.Net/8.0.5"] = {
         "type": "package",
@@ -240,7 +250,9 @@ def test_stage_schema_dependencies_requires_exact_resolved_graph_and_verified_ar
     target["PeterO.Numbers/1.8.2"] = {"type": "package", "dependencies": {}}
     assets = tmp_path / "project.assets.json"
     assets.write_text(
-        json.dumps({"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}),
+        json.dumps(
+            {"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr(CHECKER, "QUALIFIED_DEPENDENCIES", expected_hashes)
@@ -262,12 +274,18 @@ def test_stage_schema_dependencies_rejects_unqualified_graph_before_archive_copy
     for name, (version, _, license_text) in CHECKER.QUALIFIED_DEPENDENCIES.items():
         package = package_folder / name.lower() / version / f"{name.lower()}.{version}.nupkg"
         package.parent.mkdir(parents=True)
-        expected_hashes[name] = (version, _dependency_package(package, name, version, license_text), license_text)
+        expected_hashes[name] = (
+            version,
+            _dependency_package(package, name, version, license_text),
+            license_text,
+        )
         target[f"{name}/{version}"] = {"type": "package", "dependencies": {}}
     target["JsonSchema.Net/8.0.5"] = {"type": "package", "dependencies": {}}
     assets = tmp_path / "project.assets.json"
     assets.write_text(
-        json.dumps({"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}),
+        json.dumps(
+            {"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr(CHECKER, "QUALIFIED_DEPENDENCIES", expected_hashes)
@@ -320,7 +338,9 @@ def test_stage_schema_dependencies_rejects_archive_identity_drift(
     target["PeterO.Numbers/1.8.2"] = {"type": "package", "dependencies": {}}
     assets = tmp_path / "project.assets.json"
     assets.write_text(
-        json.dumps({"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}),
+        json.dumps(
+            {"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr(CHECKER, "QUALIFIED_DEPENDENCIES", expected_hashes)
@@ -329,9 +349,13 @@ def test_stage_schema_dependencies_rejects_archive_identity_drift(
         CHECKER.stage_schema_dependencies(tmp_path / "feed", assets)
 
 
-def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecycle_vocabulary(tmp_path: Path) -> None:
+def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecycle_vocabulary(
+    tmp_path: Path,
+) -> None:
     consumer = tmp_path / "consumer"
-    CHECKER.write_consumer(consumer, tmp_path / "feed", tmp_path / "cache", CHECKER.package_version())
+    CHECKER.write_consumer(
+        consumer, tmp_path / "feed", tmp_path / "cache", CHECKER.package_version()
+    )
 
     source = (consumer / "Program.cs").read_text(encoding="utf-8")
     assert 'new Text("hello")' in source
@@ -347,25 +371,35 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source
     assert "GenerationResult" not in source
-    assert 'new AsyncClient([settings], registry, catalog: catalog,' in source
-    assert 'new Client([settings], registry, catalog: catalog,' in source
+    assert "new AsyncClient([settings], registry, catalog: catalog," in source
+    assert "new Client([settings], registry, catalog: catalog," in source
     assert "using AnyInfer.Capabilities;" in source
+    assert "using AnyInfer.Routing;" in source
     assert "using AnyInfer.Catalog;" in source
     assert "using AnyInfer.Schema;" in source
     assert 'ProviderSettings.Of("demo", alias: "demo-instance")' in source
-    assert 'new global::AnyInfer.Catalog.Catalog(' in source
-    assert 'new PricingTable(' in source
+    assert "new global::AnyInfer.Catalog.Catalog(" in source
+    assert "new PricingTable(" in source
     assert 'new PricingEntry(\n            "demo-model",\n            new Pricing(' in source
     assert 'EDecimal.FromString("3.25")' in source
-    assert 'new Sourced<Pricing>(\n                new Pricing(' in source
+    assert "new Sourced<Pricing>(\n                new Pricing(" in source
     assert 'EDecimal.FromString("5.75")' in source
-    assert 'new ProviderSetupSpec(' in source
+    assert "new ProviderSetupSpec(" in source
     assert 'new HostShorthand("https", 443)' in source
     assert 'anyOf: [["api_key", "access_token"]]' in source
     assert 'client.Resolve("tier")' in source
     assert 'client.Capabilities("tier")' in source
     assert 'pricingTable.Lookup("demo-instance", "demo-model")' in source
-    assert 'factoryCalls != 0' in source
+    assert "factoryCalls != 0" in source
+    assert "new SpendLedger()" in source
+    assert "PricingCalculator.WithCost(quotedUsage, trustedAccounting)" in source
+    assert "PricingCalculator.ComputeCost(quotedUsage, defaultAccounting)" in source
+    assert (
+        'client.Budget("accounting", "accounting-demo:model", outputReserveTokens: 32)' in source
+    )
+    assert "var spend = client.Spend();" in source
+    assert "new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false))" in source
+    assert "sealed class AccountingAdapter : IProviderAdapter" in source
     assert "SchemaSpec.FromJson" in source
     assert "SchemaValidator.ValidateAsync" in source
     assert ".DeserializeStructured<SchemaAnswer>()" in source
@@ -373,13 +407,13 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert '"https://json-schema.org/draft/2020-12/schema"' in source
     assert '"$defs"' in source
     assert '"$ref":"#/$defs/answer"' in source
-    assert 'sealed class SchemaAdapter : IProviderAdapter' in source
+    assert "sealed class SchemaAdapter : IProviderAdapter" in source
     assert 'new ProviderRegistration("schema-demo", schemaAdapter)' in source
-    assert 'schema: schema' in source
+    assert "schema: schema" in source
     assert "using AnyInfer.Events;" in source
     assert "using AnyInfer.Manifest;" in source
     assert 'new ProviderRegistration("telemetry-demo", telemetryAdapter)' in source
-    assert 'manifest: false' in source
+    assert "manifest: false" in source
     assert "var partial = stream.Manifest" in source
     assert "RunManifest.FromJson(serialized)" in source
     assert "ManifestUtilities.JsonSchema()" in source
@@ -391,26 +425,38 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'request.Schema is null || request.SchemaName != "response"' in source
     assert "schemaAdapter.SchemaRequests != 1" in source
     assert "schemaAdapter.DisposeCount != 1" in source
-    assert 'AsyncClient.FromAdapters(\n        [new ProviderRegistration("lifecycle-demo", lifecycleAdapter)])' in source
+    assert (
+        'AsyncClient.FromAdapters(\n        [new ProviderRegistration("lifecycle-demo", lifecycleAdapter)])'
+        in source
+    )
     assert 'await client.ModelsAsync("lifecycle-demo")' in source
     assert 'await client.HealthAsync("lifecycle-demo")' in source
     assert 'client.Capabilities("lifecycle-demo:lifecycle-model")' in source
-    assert 'Client.FromAdapters(\n        [new ProviderRegistration("sync-lifecycle-demo", syncLifecycleAdapter)])' in source
+    assert (
+        'Client.FromAdapters(\n        [new ProviderRegistration("sync-lifecycle-demo", syncLifecycleAdapter)])'
+        in source
+    )
     assert 'client.Models("sync-lifecycle-demo")' in source
     assert 'client.Health("sync-lifecycle-demo")' in source
     assert 'client.Capabilities("sync-lifecycle-demo:lifecycle-model")' in source
-    assert 'sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle' in source
-    assert 'new Sourced<int>(2048, Provenance.Discovered)' in source
-    assert 'lifecycleAdapter.DisposeCount != 1' in source
-    assert 'syncLifecycleAdapter.DisposeCount != 1' in source
-    assert 'AsyncClient.FromAdapters(\n        [new ProviderRegistration("probe-demo", probeAdapter)])' in source
+    assert "sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle" in source
+    assert "new Sourced<int>(2048, Provenance.Discovered)" in source
+    assert "lifecycleAdapter.DisposeCount != 1" in source
+    assert "syncLifecycleAdapter.DisposeCount != 1" in source
+    assert (
+        'AsyncClient.FromAdapters(\n        [new ProviderRegistration("probe-demo", probeAdapter)])'
+        in source
+    )
     assert 'await client.ProbeAsync("probe-demo:model")' in source
     assert 'client.Capabilities("probe-demo:model")' in source
-    assert 'Client.FromAdapters(\n        [new ProviderRegistration("sync-probe-demo", syncProbeAdapter)])' in source
-    assert 'client.Probe("sync-probe-demo:model", record: false)' in source
-    assert 'sealed class ProbeAdapter : IProviderAdapter' in source
     assert (
-        'new AdapterToolCallDelta(\n'
+        'Client.FromAdapters(\n        [new ProviderRegistration("sync-probe-demo", syncProbeAdapter)])'
+        in source
+    )
+    assert 'client.Probe("sync-probe-demo:model", record: false)' in source
+    assert "sealed class ProbeAdapter : IProviderAdapter" in source
+    assert (
+        "new AdapterToolCallDelta(\n"
         '                    0, "probe-call", "record_colour", """{"colour":"blue"}""")'
     ) in source
     assert 'new AdapterTextDelta("""{"colour":"blue"}""")' in source

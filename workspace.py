@@ -132,7 +132,7 @@ def _warn_if_shadowed() -> str | None:
 
 
 # Paths every quality gate operates on, matching .github/workflows/ci.yml.
-LINT_PATHS = ("src/python", "tests", "workspace.py")
+LINT_PATHS = ("src/python", "tests", "workspace.py", "scripts/check_csharp_accounting.py")
 
 # Build outputs and tool caches. Directories are removed wholesale; the glob patterns are
 # swept recursively. Nothing here is ever a source file.
@@ -993,10 +993,12 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                     lambda: _run_csharp("test", "AnyInfer.sln", "--no-restore"),
                 ),
                 (
+                    "validate C# accounting observations",
+                    lambda: python(str(ROOT / "scripts" / "check_csharp_accounting.py"), cwd=ROOT),
+                ),
+                (
                     "validate C# NuGet proof package",
-                    lambda: python(
-                        str(ROOT / "scripts" / "check_csharp_package.py"), cwd=ROOT
-                    ),
+                    lambda: python(str(ROOT / "scripts" / "check_csharp_package.py"), cwd=ROOT),
                 ),
                 (
                     "run C# SDK examples",

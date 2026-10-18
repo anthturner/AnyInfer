@@ -13,6 +13,17 @@ internal static class AccountingDecimal
 
     internal static EDecimal Add(EDecimal left, EDecimal right) => left.Add(right, Context);
 
+    internal static EDecimal Subtract(EDecimal left, EDecimal right) => left.Subtract(right, Context);
+
+    internal static EDecimal Multiply(EDecimal left, EDecimal right) => left.Multiply(right, Context);
+
+    internal static EDecimal Divide(EDecimal left, EDecimal right) => left.Divide(right, Context);
+
+    internal static int Compare(EDecimal left, EDecimal right) =>
+        left.CompareToSignal(right, Context).CompareTo(EDecimal.Zero);
+
+    internal static string Format(EDecimal value) => value.ToString();
+
     internal static EDecimal Price(EDecimal rate, long tokens) =>
         EDecimal.FromInt64(tokens).Divide(EDecimal.FromInt32(1_000_000), Context).Multiply(rate, Context);
 

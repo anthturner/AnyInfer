@@ -61,18 +61,20 @@ internal sealed class TargetMetadataResolver
             return metadata;
         }
 
-        var features = _capabilities.CapabilitiesFor(
+        var capabilities = _capabilities.CapabilitiesFor(
             metadata.Descriptor,
             metadata.Target.ProviderId,
             metadata.Target.Model,
-            _pool.EffectiveLocality(metadata)).Features;
+            _pool.EffectiveLocality(metadata));
+        var features = capabilities.Features;
         if (features.Value == Feature.None && features.Provenance == Provenance.Default)
         {
-            return metadata;
+            return metadata with { ResolvedCapabilities = capabilities };
         }
 
         return metadata with
         {
+            ResolvedCapabilities = capabilities,
             Capabilities = new StructuredOutputProfile(
                 features.Value.HasFlag(Feature.Grammar),
                 features.Value.HasFlag(Feature.JsonSchema),

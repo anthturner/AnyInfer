@@ -1,0 +1,43 @@
+{
+  "_comment": "Input-only public OpenAI-compatible accounting stimuli; assertions live in each runtime's tests.",
+  "instances": [
+    {
+      "id": "primary",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_ACCOUNTING_TEST_KEY",
+      "headers": {"X-Accounting": "primary"},
+      "timeout_s": 0.25,
+      "pricing": {"input_per_1m": "1000000", "output_per_1m": "2000000"}
+    },
+    {
+      "id": "secondary",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_ACCOUNTING_TEST_KEY",
+      "headers": {"X-Accounting": "secondary"},
+      "timeout_s": 0.25,
+      "pricing": {"input_per_1m": "3000000", "output_per_1m": "4000000"}
+    }
+  ],
+  "capability_overrides": [
+    {"target": "primary:model", "features": ["JSON_SCHEMA"]},
+    {"target": "secondary:model", "features": ["JSON_SCHEMA"]}
+  ],
+  "request": {
+    "messages": [{"role": "user", "content": "Return a compact JSON answer."}],
+    "schema": {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
+    "repair": {"max_attempts": 1},
+    "retry": {"max_attempts": 2, "backoff_base_s": 0.0},
+    "success_target": "primary:model",
+    "fallback_route": ["primary:model", "secondary:model"]
+  },
+  "calls": [
+    {"id": "success", "instance": "primary", "status": 200, "headers": {"content-type": "application/json"}, "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"ok\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":3,\"total_tokens\":5}}"},
+    {"id": "repair-discarded", "instance": "primary", "status": 200, "headers": {"content-type": "application/json"}, "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"not json\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":90,\"completion_tokens\":90,\"total_tokens\":180}}"},
+    {"id": "repair-winner", "instance": "primary", "status": 200, "headers": {"content-type": "application/json"}, "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"fixed\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":3,\"total_tokens\":5}}"},
+    {"id": "primary-503", "instance": "primary", "status": 503, "headers": {"content-type": "application/json"}, "body_utf8": "{\"error\":{\"message\":\"synthetic unavailable\"}}"},
+    {"id": "primary-503-again", "instance": "primary", "status": 503, "headers": {"content-type": "application/json"}, "body_utf8": "{\"error\":{\"message\":\"synthetic unavailable again\"}}"},
+    {"id": "secondary-winner", "instance": "secondary", "status": 200, "headers": {"content-type": "application/json"}, "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"fallback\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1,\"total_tokens\":2}}"}
+  ]
+}

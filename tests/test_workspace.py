@@ -135,6 +135,7 @@ class TestVerbs:
     def test_check_only_lint_covers_the_runner_itself(self, recorded):
         workspace.main(["check", "--only=lint"])
         assert "workspace.py" in recorded[0]
+        assert "scripts/check_csharp_accounting.py" in recorded[0]
 
     def test_check_fix_reaches_the_lint_phase(self, recorded):
         workspace.main(["check", "--only=lint", "--fix"])
@@ -190,6 +191,10 @@ class TestVerbs:
             (["dotnet", "restore", "AnyInfer.sln"], ROOT / "src" / "csharp"),
             (["dotnet", "test", "AnyInfer.sln", "--no-restore"], ROOT / "src" / "csharp"),
             (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_accounting.py")],
+                ROOT,
+            ),
+            (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_package.py")],
                 ROOT,
             ),
@@ -242,7 +247,9 @@ class TestVerbs:
     def test_native_csharp_ci_lane_uses_the_workspace_phase_and_aggregate_policy(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-        native = re.search(r"^  native-csharp:\n(?P<body>.*?)(?=^  [\w-]+:|\Z)", workflow, re.M | re.S)
+        native = re.search(
+            r"^  native-csharp:\n(?P<body>.*?)(?=^  [\w-]+:|\Z)", workflow, re.M | re.S
+        )
         assert native is not None
         body = native.group("body")
         assert "needs: [changes]" in body
@@ -259,9 +266,7 @@ class TestVerbs:
         assert "setup-python" not in body
         assert "setup-uv" not in body
         assert "uv pip install" not in body
-        aggregate = re.search(
-            r"^  ci-ok:\n(?P<body>.*?)(?=^  [\w-]+:|\Z)", workflow, re.M | re.S
-        )
+        aggregate = re.search(r"^  ci-ok:\n(?P<body>.*?)(?=^  [\w-]+:|\Z)", workflow, re.M | re.S)
         assert aggregate is not None
         assert "native-csharp" in aggregate.group("body")
         assert "success|skipped" in workflow
@@ -287,8 +292,7 @@ class TestVerbs:
                     for line in job_prefix
                 )
                 assert grants_oidc, (
-                    f"{path.name} job {job_header} uses claude-code-action without "
-                    "id-token: write"
+                    f"{path.name} job {job_header} uses claude-code-action without id-token: write"
                 )
                 checked.append(f"{path.name}:{job_header}")
 
@@ -342,8 +346,8 @@ class TestVerbs:
         assert "FAIL" in output and "PASS" in output
         # The ten default phases comprise eighteen steps — sixteen subprocesses plus the two
         # in-process docs gates; every one must have been attempted despite the failure
-        # (contracts and conformance have two steps each, docs-check three, C# five).
-        assert len(calls) == 18
+        # (contracts and conformance have two steps each, docs-check three, C# six).
+        assert len(calls) == 19
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0
@@ -705,9 +709,9 @@ class TestShardParity:
 
     def test_every_shard_suite_is_collected(self):
         """A shard's tests must be gated, not merely present in the tree."""
-        testpaths = tomllib.loads(
-            (workspace.ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        )["tool"]["pytest"]["ini_options"]["testpaths"]
+        testpaths = tomllib.loads((workspace.ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+            "tool"
+        ]["pytest"]["ini_options"]["testpaths"]
 
         for shard in workspace.SHARDS:
             suite = f"{shard}/tests"

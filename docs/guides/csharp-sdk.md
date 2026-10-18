@@ -69,6 +69,23 @@ total.
 --8<-- "examples/csharp-sdk/CatalogExample.cs"
 ```
 
+## Calculate explicit accounting facts
+
+Pricing uses only trusted catalog, discovered, probed, or caller-override provenance. A
+default price leaves calculated cost unknown; a trusted zero price remains a known free result.
+`Budget` is a pure planning calculation for one explicit target. The request estimator currently
+counts text only: nontext parts are reported as unpriced, and there is no offered-tools input yet.
+
+The ledger, store, and limiter below are caller-selected helpers. They do not create default disk
+output, refuse a request, pace client transport, or provide a provider invoice or all-wire total.
+The caller owns the store path and explicitly acquires and disposes each standalone limiter lease.
+Store accumulation is atomic for replacement readability, but it is not transactional read-modify-write
+coordination across threads or processes.
+
+```csharp
+--8<-- "examples/csharp-sdk/AccountingExample.cs"
+```
+
 ## List models and check health
 
 Discovery and health are explicit I/O operations for one configured instance. The async and
@@ -132,10 +149,11 @@ verifier runs.
 
 This proof covers asynchronous text generation and a synchronous facade over that same core,
 through the OpenAI-compatible adapter. It also covers structured JSON validation and repair,
-configuration, routing, reported token usage, explicit capability probes, payload-free typed
-telemetry, immutable manifests, and declarative setup metadata. It does not provide a released
-NuGet package, provider parity, aggregate usage accounting, tool execution, embeddings,
-reranking, or production report publication.
+configuration, routing, reported token usage, bounded winning-request pricing, explicit budgets,
+caller-owned ledger and store helpers, standalone pacing, explicit capability probes, payload-free
+typed telemetry, immutable manifests, and declarative setup metadata. It does not provide a
+released NuGet package, provider parity, provider invoice or all-wire totals, automatic spend
+admission, transport pacing, tool execution, embeddings, reranking, or production report publication.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with

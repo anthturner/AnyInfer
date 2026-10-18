@@ -1,0 +1,32 @@
+namespace AnyInfer.Capabilities;
+
+/// <summary>Represents a conservative token estimate and an independent lower bound.</summary>
+public sealed record TokenEstimate
+{
+    /// <summary>Initializes one token estimate without imposing a synthetic nonnegative domain.</summary>
+    public TokenEstimate(long tokens, long floor)
+    {
+        Tokens = tokens;
+        Floor = floor;
+    }
+
+    /// <summary>Gets the conservative planning count.</summary>
+    public long Tokens { get; }
+
+    /// <summary>Gets the defensible lower-bound count.</summary>
+    public long Floor { get; }
+
+    /// <summary>Adds planning and lower-bound counts with native checked range semantics.</summary>
+    public TokenEstimate Add(TokenEstimate other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return new TokenEstimate(checked(Tokens + other.Tokens), checked(Floor + other.Floor));
+    }
+
+    /// <summary>Adds two estimates componentwise with native checked range semantics.</summary>
+    public static TokenEstimate operator +(TokenEstimate left, TokenEstimate right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        return left.Add(right);
+    }
+}

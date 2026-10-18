@@ -179,7 +179,7 @@ public sealed record Usage
     public Usage Normalized() =>
         TotalTokens is not null || InputTokens is null || OutputTokens is null
             ? this
-            : this with { TotalTokens = InputTokens + OutputTokens };
+            : this with { TotalTokens = checked(InputTokens.Value + OutputTokens.Value) };
 
     /// <summary>Overlays later-known values from <paramref name="other"/>.</summary>
     public Usage Merge(Usage other)
