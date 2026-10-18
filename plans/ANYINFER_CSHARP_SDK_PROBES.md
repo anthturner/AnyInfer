@@ -329,7 +329,7 @@ integration belongs to the separate runtime owner; no compiler gate on an incomp
   > Rendered verification now passes: all 19 C# blocks across six guide pages equal the
   > 12 compiled source files. Offline examples and the isolated consumer pass in the
   > workspace run as well. No dependency or payload allowance was broadened.
-- [ ] **PRB.6** Run full workspace/package/frozen gates, reconcile parent/inventory scope,
+- [x] **PRB.6** Run full workspace/package/frozen gates, reconcile parent/inventory scope,
   commit explicit paths and qualify clean revision. Gate: clean native/package evidence,
   remaining SDK.5/6/7/11 dependencies explicit and no release/publication claim.
   > NOTE: First complete run passed 17/18 steps, including 93 conformance tests, strict
@@ -366,11 +366,15 @@ integration belongs to the separate runtime owner; no compiler gate on an incomp
   > close-linearized lifecycle/probe checkpoints with no residual static finding. Root
   > inspected both final closures against the passing snapshot; proceed to source commit
   > and clean-revision package qualification.
+  > Final acceptance supersedes the intermediate holds: source
+  > `0fd3fb47cd08295537674aa23571dffcc9482888` is committed and its clean-revision
+  > isolated archive/restore/build/run passes at `.tmp-tests/nuget/run-m3_ozrcb/`.
+  > Parent SDK.4c is checked; full tools, accounting/tokenizers and other operations stay
+  > assigned to their later milestones. No registry upload or version bump occurred.
 
 ## 6. Resume log
 
-Resume PRB.6 at explicit source commit and clean-revision
-package qualification. The complete workspace passes all 18 steps, including 386 unit
-and 93 conformance cases. Repeated parallel native runs, independent Python replay,
-examples, rendered source, released hashes and working-tree package consumption pass.
-Check SDK.4c only after the clean revision qualifies. No publication is authorized.
+Complete. Resume SDK.5a in the parent plan. Source
+`0fd3fb47cd08295537674aa23571dffcc9482888` has the passing full workspace and clean-revision
+package proof above. Released hashes and Python behavior remain unchanged. No publication
+is authorized.

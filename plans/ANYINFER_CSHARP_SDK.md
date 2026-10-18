@@ -734,7 +734,7 @@ must report a real conflict rather than silently changing a dependent public sig
   > exact four-package/license/hash validation and isolated consumer restore/build/run
   > pass at `.tmp-tests/nuget/run-cgy2od91/`. Frozen assets and Python behavior are unchanged.
   > This checks only the user-approved modern/native scope; Draft 3/4 remain SDK.11c.
-- [ ] **SDK.4c** Port model/token discovery, capability probes and configuration setup metadata
+- [x] **SDK.4c** Port model/token discovery, capability probes and configuration setup metadata
   incrementally from `capabilities/probes*`, `registry.py`, catalog APIs. Probe/network work
   remains explicit opt-in. Gate: fake/cassette discovery/probe conformance, no probing during
   ordinary config parse, full workspace/package validation.
@@ -750,6 +750,10 @@ must report a real conflict rather than silently changing a dependent public sig
   > review closure, commit and clean-revision package proof precede checking this box.
   > Final independent source/lifetime reviews are closed; the clean-revision package
   > checkpoint is the remaining acceptance step.
+  > Final acceptance: source `0fd3fb47cd08295537674aa23571dffcc9482888` is committed;
+  > the clean-revision archive, exact dependency/license/hash graph and isolated consumer
+  > restore/build/run pass at `.tmp-tests/nuget/run-m3_ozrcb/`. SDK.4c is complete for
+  > generation probes/setup; the stated SDK.5/6/7/11 dependencies remain unfinished.
 
 ### SDK.5 — Events, manifest, accounting and request policies
 
@@ -868,11 +872,18 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.4c**. SDK.4b is complete at source checkpoint
-`dbf82a949fca6ee7321b921233c0cda198b3a506`: 18/18 workspace steps, 343 native unit tests,
-93 conformance tests including all 102 frozen cases, 39 focused schema tests, exact
-source-linked docs/examples and clean-revision package consumption. Capability probes and
-remaining model/token metadata are next; no later milestone/root-export completion is implied.
+Current resume point: **SDK.5a**. SDK.4c is complete at source checkpoint
+`0fd3fb47cd08295537674aa23571dffcc9482888`: 18/18 workspace steps, 386 native unit tests,
+93 conformance tests including all 102 frozen cases, exact 19 source-linked C# blocks,
+compiled offline examples and clean-revision package consumption. Typed observers/manifest,
+then accounting/request policies, are next; no later milestone/root-export completion is implied.
+
+SDK.4c's complete ownership, reviews and gate chronology are in
+`ANYINFER_CSHARP_SDK_PROBES.md`. The final workspace log is
+`d7e0fd10-6c0b-4222-8d64-56ddf5530746` (18 steps, 117.8s); the clean-source package proof
+is `.tmp-tests/nuget/run-m3_ozrcb/`. Generation probes retain Python's four-feature default
+and usage overlays. Raw tool translation does not complete normal generation tools/loops;
+tokenizer/accounting and embedding/rerank remain in their stated later milestones.
 
 SDK.4a's complete ownership, reviews and gate chronology are retained in
 `ANYINFER_CSHARP_SDK_CATALOG.md`; that child plan is complete. The final workspace log is
