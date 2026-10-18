@@ -770,17 +770,22 @@ must report a real conflict rather than silently changing a dependent public sig
   > docs, executable examples and isolated package consumption. The exact source revision's
   > five-archive/license/hash package closure and fresh consumer restore/build/run pass at
   > `.tmp-tests/sdk-five-clean-package/run-ybv82fp9/` with zero compiler warnings. All 102
-  > frozen observations and released hashes remain unchanged. SDK.5b/5c remain unfinished.
-- [ ] **SDK.5b** Define a separate shared accounting profile (the previously deferred M3),
+  > frozen observations and released hashes remain unchanged. Accounting/request policies
+  > are qualified separately below.
+- [x] **SDK.5b** Define a separate shared accounting profile (the previously deferred M3),
   preserving unknown usage, failed/cancelled attempts, repairs and aggregate operation cost.
   Port `Usage` merge/normalization, pricing/estimation, token-estimator interfaces, budgets,
   `SpendLedger`, `SpendStore`, `SpendPolicy`, pacing and reservation concurrency from current
   Python modules/tests. Gate: native Python/C# accounting corpus and concurrent reservation,
   cancellation/release, precision/unknown-price controls; never infer unknown spend as zero.
-  > NOTE: Execute `ANYINFER_CSHARP_SDK_ACCOUNTING.md` from ACCT.7. The complete gate passes
+  > Acceptance: `ANYINFER_CSHARP_SDK_ACCOUNTING.md` is complete at source checkpoint
+  > cc989e84069f09cb985e4f82fa40514f1aad5ffe. The complete gate passes
   > all 19 steps in 127.8s, including 532 native unit tests, 93 conformance tests and
   > 42/42 shared accounting cases plus two native-only controls, with zero warnings.
-  > Shared builtin HTTP controls pass in both runtimes; clean-revision acceptance remains.
+  > Shared builtin HTTP controls pass in both runtimes. Clean-revision observations record
+  > source_dirty=false at .tmp-tests/sdk-five-accounting-clean-observations/run-le4vrqx5/;
+  > isolated package/dependency proof and fresh consumer pass with zero warnings at
+  > .tmp-tests/sdk-five-accounting-clean-package/run-3ffa5_3w/. No version/publication change.
   > Python final usage and
   > ledger charges are winning-entry/completed-request only; failed retries and discarded
   > repair responses remain separate attempt facts. Pure policy/limiter foundations and
@@ -890,12 +895,20 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.5b**. SDK.5a is complete at source checkpoint
+Current resume point: **SDK.5c**. SDK.5b is complete at source checkpoint
+`cc989e84069f09cb985e4f82fa40514f1aad5ffe`: all 19 workspace steps in 127.8s,
+532 native unit tests, 93 conformance tests, 42 shared accounting observations plus two
+separate native-only controls, strict docs, compiled examples and clean-revision package
+consumption. `ANYINFER_CSHARP_SDK_ACCOUNTING.md` records the exact gates and scope.
+Resume by settling the request-policy contract and the actual cache/tool input prerequisite;
+automatic admission and transport pacing remain unfinished, with no later/root parity claim.
+
+SDK.5a is complete at source checkpoint
 `68d2cc06914aaa8539eb3cc5ee8d20acdbd2a906`, recorded by acceptance commit
 `417d53fd1cfe07ccc81f669e4e8d1093fe88d912`: all 18 workspace steps, 474 native unit tests,
 93 conformance tests including all 102 frozen cases, 50 combined sync/lifecycle/HTTP controls,
 compiled offline examples, strict documentation and clean-revision package consumption.
-Accounting and request policies are next; no later milestone/root-export completion is implied.
+Request policies are next; no later milestone/root-export completion is implied.
 
 SDK.5a's contract, ownership, reviews and gates are in `ANYINFER_CSHARP_SDK_EVENTS.md`.
 The final full workspace log is `3943a70f-811b-4b78-a40f-18029754dd6a` (18 steps, 108.1s);

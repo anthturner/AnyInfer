@@ -574,12 +574,22 @@ Root ticks accepted boxes after re-reading this plan and evidence; deviations ge
   > released hashes are unchanged. The source checkpoint is the commit containing this
   > checked milestone; ACCT.7 records its exact hash and clean-revision proof next.
 
-- [ ] **ACCT.7 — Clean-revision proof and handoff.** Root qualifies package/archive/
+- [x] **ACCT.7 — Clean-revision proof and handoff.** Root qualifies package/archive/
   dependency closure and fresh consumer from ACCT.6's exact clean source commit; does
   not publish or change version. Record commands/logs/counts and native profile limits;
   tick parent SDK.5b only after its gates actually pass. SDK.5c and broad root parity
   inventory stay unchecked. Gate: clean-revision consumer passes and exact SDK.5c resume
   point is written here and in the parent, with no active policy silently enabled.
+  > NOTE: Source checkpoint cc989e84069f09cb985e4f82fa40514f1aad5ffe is clean. Root ran
+  > scripts/check_csharp_accounting.py --output-root .tmp-tests/sdk-five-accounting-clean-observations
+  > followed by scripts/check_csharp_package.py --output .tmp-tests/sdk-five-accounting-clean-package.
+  > Shell 70a0cd5a-77c3-4d6f-9b62-4e342e1939e5 exits 0. The fresh stamped Python/native
+  > observations both record that exact revision and source_dirty=false, match 42/42
+  > shared cases and qualify both separate native-only controls at run-le4vrqx5/report.json.
+  > The isolated package run-3ffa5_3w restores/builds/runs its fresh consumer with zero
+  > warnings against the generated AnyInfer package and five pinned dependency archives;
+  > version/license/hash checks pass. No version bump or publication. Parent SDK.5b closes;
+  > resume SDK.5c's request-policy contract and cache/tool prerequisite boundary next.
 
 ## 6. Required adversarial vectors
 
@@ -615,16 +625,21 @@ Keep these causal; input fixture authors do not write expected values to fit out
 
 ## 7. Resume and evidence
 
-Current resume: **ACCT.7**. ACCT.0–6 are complete for their bounded gates.
+This child is complete: **ACCT.0–7**. Resume the parent at **SDK.5c**; first settle its
+request-policy contract and the actual cache/tool input prerequisite before implementation.
+Accepted source checkpoint: cc989e84069f09cb985e4f82fa40514f1aad5ffe.
 The complete workspace gate passes all 19 steps in 127.8s under shell
 f61da215-3fee-4581-ba54-5edb82b5538b, including 532 native unit tests, 93 conformance
 tests, 42 shared accounting observations and two native-only controls, strict docs,
 compiled examples and isolated package consumption. Compiler builds have zero warnings.
-Shared-input builtin HTTP controls also pass in both runtimes. Clean-revision proof is next.
+Shared-input builtin HTTP controls also pass in both runtimes. Clean-revision proof passes
+under shell 70a0cd5a-77c3-4d6f-9b62-4e342e1939e5; evidence is under
+.tmp-tests/sdk-five-accounting-clean-observations/run-le4vrqx5/ and
+.tmp-tests/sdk-five-accounting-clean-package/run-3ffa5_3w/.
 The winning-entry, tool-producer dependency and limiter clock/injection questions are
 resolved in sections 2–4. Text codec is selected from actual observations and both cold
-reviews are closed. Final accounting acceptance awaits clean-revision proof; no later
-policy activation or publication is implied.
+reviews are closed. Accounting's bounded foundation is accepted; no later policy activation,
+provider-invoice/all-wire billing claim or publication is implied.
 > NOTE: Cold math/protocol review identified the existing unchecked Usage.Normalized
 > sum. Its minimal Models.cs change, direct tests and public winning-result overflow
 > control were explicitly assigned; the pure checked change and direct controls now pass.
