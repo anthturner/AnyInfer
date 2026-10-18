@@ -39,6 +39,50 @@ internal sealed class CapabilityStore
         }
     }
 
+    internal ModelCapabilities? MergeProbe(
+        ProviderDescriptor? descriptor,
+        string instanceId,
+        string model,
+        ProviderLocality locality,
+        StructuredOutputProfile legacyProfile,
+        IEnumerable<FeatureProbe> probes,
+        bool record)
+    {
+        ArgumentNullException.ThrowIfNull(instanceId);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(legacyProfile);
+        ArgumentNullException.ThrowIfNull(probes);
+        var snapshot = probes.ToArray();
+        lock (_gate)
+        {
+            var known = CapabilitiesFor(descriptor, instanceId, model, locality).Features;
+            if (known.Value == Feature.None && known.Provenance == Provenance.Default)
+            {
+                var legacy = Feature.None;
+                if (legacyProfile.Grammar) legacy |= Feature.Grammar;
+                if (legacyProfile.JsonSchema) legacy |= Feature.JsonSchema;
+                if (legacyProfile.JsonMode) legacy |= Feature.JsonMode;
+                known = new Sourced<Feature>(legacy, Provenance.Default);
+            }
+
+            var probed = CapabilityProbes.ProbedFeatures(known, snapshot);
+            if (probed is null)
+            {
+                return null;
+            }
+
+            var measured = new ModelCapabilities(features: probed);
+            if (record)
+            {
+                var layer = _probed.TryGetValue(instanceId, out var existing)
+                    ? existing
+                    : _probed[instanceId] = new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal);
+                layer[model] = measured;
+            }
+
+            return measured;
+        }
+    }
     internal bool? DiscoveredHasModel(string instanceId, string model)
     {
         lock (_gate) return _discovered.TryGetValue(instanceId, out var layer) ? layer.ContainsKey(model) : null;

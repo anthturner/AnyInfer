@@ -210,21 +210,37 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
     {
         ArgumentNullException.ThrowIfNull(request);
         ThrowIfDisposed();
+        if (request.UsesModernSchema && string.Equals(request.Mechanism, "grammar", StringComparison.Ordinal))
+        {
+            throw new UnsupportedInputException(
+                "The OpenAI-compatible adapter does not support grammar structured output.",
+                provider: _providerId,
+                phase: "generate");
+        }
 
         using var message = CreateRequest(request);
         HttpResponseMessage? response = null;
         Stream? responseStream = null;
         try
         {
-            response = await SendAsync(message, "generate", cancellationToken).ConfigureAwait(false);
-            responseStream = await OpenResponseStreamAsync(response.Content, "generate", cancellationToken).ConfigureAwait(false);
+            response = await SendAsync(
+                message,
+                "generate",
+                cancellationToken,
+                request.UsesModernSchema).ConfigureAwait(false);
+            responseStream = await OpenResponseStreamAsync(
+                response.Content,
+                "generate",
+                cancellationToken,
+                request.UsesModernSchema).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 var errorBytes = await ReadResponseBytesAsync(
                     responseStream,
                     request.MaxResponseBytes,
                     "generate",
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    request.UsesModernSchema).ConfigureAwait(false);
                 throw HttpFailure(response, errorBytes, "generate");
             }
 
@@ -233,7 +249,9 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 await foreach (var adapterEvent in ReadSseAsync(
                     responseStream,
                     request.MaxResponseBytes,
-                    cancellationToken).ConfigureAwait(false))
+                    request.Tools.Count > 0,
+                    cancellationToken,
+                    request.UsesModernSchema).ConfigureAwait(false))
                 {
                     yield return adapterEvent;
                 }
@@ -245,8 +263,9 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 responseStream,
                 request.MaxResponseBytes,
                 "generate",
-                cancellationToken).ConfigureAwait(false);
-            foreach (var adapterEvent in ReadBuffered(body))
+                cancellationToken,
+                request.UsesModernSchema).ConfigureAwait(false);
+            foreach (var adapterEvent in ReadBuffered(body, request.Tools.Count > 0))
             {
                 yield return adapterEvent;
             }
@@ -271,7 +290,9 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 
     private HttpRequestMessage CreateRequest(WireRequest request)
     {
-        var payload = request.UsesModernSchema ? JsonWriter.WriteModern(CreatePayload(request)) : JsonWriter.Write(CreatePayload(request));
+        var payload = request.UsesModernSchema || request.Tools.Count > 0
+            ? JsonWriter.WriteModern(CreatePayload(request))
+            : JsonWriter.Write(CreatePayload(request));
         var content = new ByteArrayContent(Encoding.UTF8.GetBytes(payload));
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
@@ -369,6 +390,11 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 ])));
             }
         }
+        if (request.Tools.Count > 0)
+        {
+            properties.Add(new JsonProperty("tools", new JsonArray(request.Tools.Select(CreateTool))));
+            properties.Add(new JsonProperty("tool_choice", CreateToolChoice(request.ToolChoice)));
+        }
         if (request.Stream)
         {
             properties.Add(new JsonProperty("stream", new JsonBoolean(true)));
@@ -379,6 +405,26 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 
         return new JsonObject(properties);
     }
+
+    private static JsonObject CreateTool(ToolSpec tool) =>
+        new([
+            new JsonProperty("type", new JsonString("function")),
+            new JsonProperty("function", new JsonObject([
+                new JsonProperty("name", new JsonString(tool.Name)),
+                new JsonProperty("description", new JsonString(tool.Description)),
+                new JsonProperty("parameters", tool.Parameters),
+            ])),
+        ]);
+
+    private static JsonValue CreateToolChoice(string choice) =>
+        choice is "auto" or "none" or "required"
+            ? new JsonString(choice)
+            : new JsonObject([
+                new JsonProperty("type", new JsonString("function")),
+                new JsonProperty("function", new JsonObject([
+                    new JsonProperty("name", new JsonString(choice)),
+                ])),
+            ]);
 
     private JsonObject CreateMessage(Message message)
     {
@@ -442,7 +488,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         }
     }
 
-    private IEnumerable<AdapterEvent> ReadBuffered(byte[] body)
+    private IEnumerable<AdapterEvent> ReadBuffered(byte[] body, bool toolsEnabled)
     {
         var root = ReadObject(body);
         var choice = FirstChoice(root);
@@ -453,6 +499,14 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         if (content.Length > 0)
         {
             yield return new AdapterTextDelta(content);
+        }
+
+        if (toolsEnabled)
+        {
+            foreach (var toolDelta in ReadToolDeltas(RequiredObject(choice, "message")))
+            {
+                yield return toolDelta;
+            }
         }
 
         if (usage is not null)
@@ -466,7 +520,9 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
     private async IAsyncEnumerable<AdapterEvent> ReadSseAsync(
         Stream stream,
         int maxResponseBytes,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        bool toolsEnabled,
+        [EnumeratorCancellation] CancellationToken cancellationToken,
+        bool mapModernCancellation)
     {
         var buffer = new byte[4096];
         var line = new List<byte>();
@@ -477,7 +533,12 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 
         while (true)
         {
-            var count = await ReadChunkAsync(stream, buffer, "stream", cancellationToken).ConfigureAwait(false);
+            var count = await ReadChunkAsync(
+                stream,
+                buffer,
+                "stream",
+                cancellationToken,
+                mapModernCancellation).ConfigureAwait(false);
             if (count == 0)
             {
                 break;
@@ -540,6 +601,14 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                         yield return new AdapterTextDelta(content);
                     }
 
+                    if (toolsEnabled && delta is not null)
+                    {
+                        foreach (var toolDelta in ReadToolDeltas(delta))
+                        {
+                            yield return toolDelta;
+                        }
+                    }
+
                     finishReason ??= OptionalString(choice, "finish_reason");
                 }
 
@@ -555,18 +624,75 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         throw ProtocolFailure("The OpenAI-compatible event stream ended without a DONE sentinel.");
     }
 
+    private IEnumerable<AdapterToolCallDelta> ReadToolDeltas(JsonObject container)
+    {
+        if (!container.TryGetValue("tool_calls", out var value) || value is not JsonArray calls)
+        {
+            yield break;
+        }
+
+        for (var position = 0; position < calls.Items.Count; position++)
+        {
+            if (calls.Items[position] is not JsonObject call)
+            {
+                continue;
+            }
+
+            var index = position;
+            if (call.TryGetValue("index", out var rawIndex))
+            {
+                if (rawIndex is JsonBoolean boolean)
+                {
+                    index = boolean.Value ? 1 : 0;
+                }
+                else if (rawIndex is JsonInteger { Value: var candidate })
+                {
+                    if (candidate < int.MinValue || candidate > int.MaxValue)
+                    {
+                        throw new StreamProtocolException(
+                            "The OpenAI-compatible response has an unsupported tool-call index.",
+                            provider: _providerId,
+                            phase: "stream",
+                            detail: "The tool-call index is outside the native signed 32-bit range.");
+                    }
+
+                    index = (int)candidate;
+                }
+            }
+
+            string? name = null;
+            var arguments = string.Empty;
+            if (call.TryGetValue("function", out var rawFunction) && rawFunction is JsonObject function)
+            {
+                name = OptionalToolString(function, "name");
+                arguments = OptionalToolString(function, "arguments") ?? string.Empty;
+            }
+
+            yield return new AdapterToolCallDelta(index, OptionalToolString(call, "id"), name, arguments);
+        }
+    }
+
+    private static string? OptionalToolString(JsonObject source, string name) =>
+        source.TryGetValue(name, out var value) && value is JsonString text ? text.Value : null;
+
     private async Task<byte[]> ReadResponseBytesAsync(
         Stream stream,
         int maxResponseBytes,
         string phase,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool mapModernCancellation = false)
     {
         var buffer = new byte[4096];
         var body = new MemoryStream();
         long total = 0;
         while (true)
         {
-            var read = await ReadChunkAsync(stream, buffer, phase, cancellationToken).ConfigureAwait(false);
+            var read = await ReadChunkAsync(
+                stream,
+                buffer,
+                phase,
+                cancellationToken,
+                mapModernCancellation).ConfigureAwait(false);
             if (read == 0)
             {
                 return body.ToArray();
@@ -604,7 +730,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
     private async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage message,
         string phase,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool mapModernCancellation = false)
     {
         try
         {
@@ -617,12 +744,17 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         {
             throw TransportFailure("The OpenAI-compatible request could not be sent.", phase, exception);
         }
+        catch (OperationCanceledException) when (mapModernCancellation && cancellationToken.IsCancellationRequested)
+        {
+            throw CancellationFor(cancellationToken);
+        }
     }
 
     private async Task<Stream> OpenResponseStreamAsync(
         HttpContent content,
         string phase,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool mapModernCancellation = false)
     {
         try
         {
@@ -635,6 +767,10 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         catch (IOException exception)
         {
             throw TransportFailure("The OpenAI-compatible response could not be opened.", phase, exception);
+        }
+        catch (OperationCanceledException) when (mapModernCancellation && cancellationToken.IsCancellationRequested)
+        {
+            throw CancellationFor(cancellationToken);
         }
     }
 
@@ -679,7 +815,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         Stream stream,
         byte[] buffer,
         string phase,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool mapModernCancellation = false)
     {
         try
         {
@@ -693,6 +830,17 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         {
             throw TransportFailure("The OpenAI-compatible response could not be read.", phase, exception);
         }
+        catch (OperationCanceledException) when (mapModernCancellation && cancellationToken.IsCancellationRequested)
+        {
+            throw CancellationFor(cancellationToken);
+        }
+    }
+
+    private static OperationCanceledException CancellationFor(CancellationToken effectiveToken)
+    {
+        var original = CancellationIdentityContext.Resolve(effectiveToken);
+        return new OperationCanceledException(
+            original.IsCancellationRequested ? original : effectiveToken);
     }
 
     private ProviderException HttpFailure(HttpResponseMessage response, byte[] errorBytes, string phase)

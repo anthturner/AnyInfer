@@ -343,6 +343,9 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'new PricingTable(' in source
     assert 'new PricingEntry("demo-model", new Pricing(3.25m, 4.5m)' in source
     assert 'new Sourced<Pricing>(new Pricing(5.75m, 6.25m), Provenance.Catalog)' in source
+    assert 'new ProviderSetupSpec(' in source
+    assert 'new HostShorthand("https", 443)' in source
+    assert 'anyOf: [["api_key", "access_token"]]' in source
     assert 'client.Resolve("tier")' in source
     assert 'client.Capabilities("tier")' in source
     assert 'pricingTable.Lookup("demo-instance", "demo-model")' in source
@@ -372,3 +375,16 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'new Sourced<int>(2048, Provenance.Discovered)' in source
     assert 'lifecycleAdapter.DisposeCount != 1' in source
     assert 'syncLifecycleAdapter.DisposeCount != 1' in source
+    assert 'AsyncClient.FromAdapters(\n        [new ProviderRegistration("probe-demo", probeAdapter)])' in source
+    assert 'await client.ProbeAsync("probe-demo:model")' in source
+    assert 'client.Capabilities("probe-demo:model")' in source
+    assert 'Client.FromAdapters(\n        [new ProviderRegistration("sync-probe-demo", syncProbeAdapter)])' in source
+    assert 'client.Probe("sync-probe-demo:model", record: false)' in source
+    assert 'sealed class ProbeAdapter : IProviderAdapter' in source
+    assert (
+        'new AdapterToolCallDelta(\n'
+        '                    0, "probe-call", "record_colour", """{"colour":"blue"}""")'
+    ) in source
+    assert 'new AdapterTextDelta("""{"colour":"blue"}""")' in source
+    assert 'new AdapterTextDelta("""{"anything":true}""")' in source
+    assert 'request.SchemaName == "capability_probe"' in source

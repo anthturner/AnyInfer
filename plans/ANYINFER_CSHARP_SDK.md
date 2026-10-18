@@ -738,6 +738,18 @@ must report a real conflict rather than silently changing a dependent public sig
   incrementally from `capabilities/probes*`, `registry.py`, catalog APIs. Probe/network work
   remains explicit opt-in. Gate: fake/cassette discovery/probe conformance, no probing during
   ordinary config parse, full workspace/package validation.
+  > NOTE: Execution detail is in `ANYINFER_CSHARP_SDK_PROBES.md`. Python's four-feature
+  > default includes TOOLS, so pull forward only the raw tool declaration/wire/delta
+  > prerequisite from SDK.7a before publishing generation probes; do not reduce defaults.
+  > Full rich generation/tool loops remain SDK.7, tokenizer/accounting SDK.5/11 and
+  > embedding/rerank probes SDK.6. Setup metadata completes independently of execution.
+  > Working-tree acceptance gates pass: all 18 workspace steps in 117.8s, 386 native
+  > unit/93 conformance tests, three additional parallel native runs, exact 19 rendered
+  > C# blocks and isolated package consumption. Required close/concurrency corrections
+  > preserve source exception identity and prevent post-close publication. Final source
+  > review closure, commit and clean-revision package proof precede checking this box.
+  > Final independent source/lifetime reviews are closed; the clean-revision package
+  > checkpoint is the remaining acceptance step.
 
 ### SDK.5 — Events, manifest, accounting and request policies
 

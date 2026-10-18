@@ -73,6 +73,14 @@ public sealed class Client : IDisposable
     public Health Health(string providerId, CancellationToken cancellationToken = default) =>
         RunOperation(token => _inner.HealthAsync(providerId, token), cancellationToken);
 
+    /// <summary>Runs ordered raw generation capability probes against one resolved target.</summary>
+    public ProbeReport Probe(
+        string target,
+        IEnumerable<Feature>? features = null,
+        double timeoutS = 30,
+        bool record = true,
+        CancellationToken cancellationToken = default) =>
+        RunOperation(token => _inner.ProbeAsync(target, features, timeoutS, record, token), cancellationToken);
     /// <summary>Generates a terminal result from an explicit request.</summary>
     public Generation Generate(GenerationRequest request, CancellationToken cancellationToken = default) =>
         RunOperation(token => _inner.GenerateAsync(request, token), cancellationToken);

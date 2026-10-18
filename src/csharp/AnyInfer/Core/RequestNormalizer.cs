@@ -52,7 +52,9 @@ internal static class RequestNormalizer
     internal static WireRequest CreateWireRequest(
         NormalizedRequest normalized,
         ResolvedProvider resolved,
-        IReadOnlyList<Message>? messages = null)
+        IReadOnlyList<Message>? messages = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto")
     {
         ArgumentNullException.ThrowIfNull(normalized);
         ArgumentNullException.ThrowIfNull(resolved);
@@ -80,7 +82,9 @@ internal static class RequestNormalizer
             normalized.TimeoutS ?? resolved.Settings.TimeoutS,
             normalized.MaxResponseBytes,
             normalized.Schema?.Name ?? "response",
-            normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk);
+            normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk,
+            tools,
+            toolChoice);
     }
 
     private static string SelectMechanism(StructuredOutputProfile capabilities) =>

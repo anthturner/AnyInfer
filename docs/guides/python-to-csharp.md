@@ -20,6 +20,8 @@ does not claim provider or feature parity with Python.
 | `AnyInferError` | typed .NET `Exception` subclasses |
 | `client.models(...)`, `client.health(...)` | `ModelsAsync` / `HealthAsync`, or `Models` / `Health` |
 | catalog and capability queries | `Catalog`, `Resolve(...)`, and `Capabilities(...)` |
+| `client.probe(...)` | `ProbeAsync(...)` or `Probe(...)`, returning `ProbeReport` |
+| `ProviderSetupSpec` metadata | `ProviderSetupSpec`, `SetupField`, `HostShorthand`, and `AnyOf` |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
@@ -57,6 +59,24 @@ explicit instance I/O calls. The executable examples show both the async and syn
 
 ```csharp
 --8<-- "examples/csharp-sdk/LifecycleExample.cs"
+```
+
+## Capability probes and setup metadata
+
+Probe calls are explicit and may spend up to four requests by default. The async and sync
+facades return an immutable `ProbeReport`; `record: false` returns evidence without storing a
+new measured capability record. The raw tool declaration used by the tools probe is a transport
+translation detail, not a normal C# tool-execution API.
+
+```csharp
+--8<-- "examples/csharp-sdk/ProbeExample.cs"
+```
+
+Provider setup metadata is inert. It describes fields, host shorthand, and alternatives for an
+application-owned setup surface without resolving a secret or constructing an adapter.
+
+```csharp
+--8<-- "examples/csharp-sdk/SetupExample.cs"
 ```
 
 ## What to use in an application

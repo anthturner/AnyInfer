@@ -443,7 +443,7 @@ internal sealed class ProviderPool : IAsyncDisposable
             }
 
             options.TryGetValue(field.Key, out var value);
-            if (value is null && field.DefaultValue is not null)
+            if (value is null && field.DefaultValue.Length != 0)
             {
                 value = new AnyInfer.Json.JsonString(field.DefaultValue);
                 options.Add(field.Key, value);

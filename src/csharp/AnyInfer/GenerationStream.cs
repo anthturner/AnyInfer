@@ -9,6 +9,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     private readonly Client? _syncClient;
     private readonly Func<CancellationToken, IAsyncEnumerable<StreamEvent>> _factory;
     private readonly CancellationTokenSource _closeSource = new();
+    private readonly CancellationToken _closeToken;
     private readonly object _gate = new();
     private readonly Action<AsyncStream>? _onClosed;
     private StreamEnumerator? _enumerator;
@@ -32,6 +33,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _syncClient = syncClient;
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        _closeToken = _closeSource.Token;
         CallerCancellation = callerCancellation;
         _onClosed = onClosed;
     }
@@ -65,10 +67,17 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     /// <summary>Consumes this stream once and returns its successful terminal generation.</summary>
     public async Task<Generation> CollectAsync(CancellationToken cancellationToken = default)
     {
+        bool beganBeforeClose;
+        lock (_gate)
+        {
+            beganBeforeClose = !_closed;
+        }
+
         await foreach (var _ in this.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
         }
 
+        ThrowIfCollectedCloseInterrupted(beganBeforeClose);
         return Result;
     }
 
@@ -229,6 +238,24 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         }
     }
 
+    private void ThrowIfCollectedCloseInterrupted(bool beganBeforeClose)
+    {
+        CancellationToken cancellation;
+        lock (_gate)
+        {
+            if (!beganBeforeClose || !_closed || _result is not null)
+            {
+                return;
+            }
+
+            cancellation = CallerCancellation.IsCancellationRequested
+                ? CallerCancellation
+                : _closeToken;
+        }
+
+        throw new OperationCanceledException(cancellation);
+    }
+
     private void NotifyClosed()
     {
         if (Interlocked.Exchange(ref _closeNotified, 1) == 0)
@@ -334,7 +361,6 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
             {
                 _moveGate.Release();
                 _linked.Dispose();
-                _moveGate.Dispose();
                 _owner.PublishFailure();
             }
 

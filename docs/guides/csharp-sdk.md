@@ -79,6 +79,27 @@ source-linked methods.
 --8<-- "examples/csharp-sdk/LifecycleExample.cs"
 ```
 
+## Measure generation capabilities
+
+Probing is explicit I/O: the default selection sends up to four small requests in the fixed
+JSON Schema, JSON mode, raw tool-call, and streaming order. The returned immutable report
+records what the endpoint actually established at `Probed` provenance. The tool declaration
+exists only for this raw probe translation; normal tool execution and tool loops are not part
+of this proof.
+
+```csharp
+--8<-- "examples/csharp-sdk/ProbeExample.cs"
+```
+
+## Describe provider setup
+
+`ProviderSetupSpec` and its fields are declarative metadata for an application's setup UI.
+Creating this metadata does not resolve credentials or construct a provider.
+
+```csharp
+--8<-- "examples/csharp-sdk/SetupExample.cs"
+```
+
 ## Stream, validate, and route
 
 The remaining examples are source-linked so the site stays aligned with the code the offline
@@ -93,9 +114,9 @@ verifier runs.
 
 This proof covers asynchronous text generation and a synchronous facade over that same core,
 through the OpenAI-compatible adapter. It also covers structured JSON validation and repair,
-configuration, routing, and reported token usage. It does not provide a released NuGet package,
-provider parity, aggregate usage accounting, tool execution, embeddings, reranking, or production
-report publication.
+configuration, routing, reported token usage, explicit capability probes, and declarative setup
+metadata. It does not provide a released NuGet package, provider parity, aggregate usage
+accounting, tool execution, embeddings, reranking, or production report publication.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with

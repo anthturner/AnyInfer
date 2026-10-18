@@ -17,9 +17,12 @@ supported public SDK and its generated Python API reference remains under
 | `Catalog`, `ResolvedTarget`, `PricingTable` | Pure target resolution and catalog-derived price facts. |
 | `ModelCapabilities` | Provenance-bearing model facts; unknown values remain unknown. |
 | `ModelsAsync`, `HealthAsync` / `Models`, `Health` | Explicit asynchronous or synchronous lifecycle calls for one provider instance. |
+| `ProbeAsync` / `Probe`, `ProbeReport` | Explicit ordered generation-capability measurements and their provenance-bearing report. |
+| `ProviderSetupSpec`, `SetupField`, `HostShorthand` | Inert declarative setup metadata for application-owned configuration surfaces. |
 
 The proof currently demonstrates text generation through the OpenAI-compatible adapter,
-structured JSON validation, repair, configuration, routing, and reported token usage. It has no
+structured JSON validation, repair, configuration, routing, reported token usage, explicit
+capability probes, and setup metadata. It has no
 released NuGet package, provider-parity guarantee, aggregate usage accounting, tool execution,
 embedding, or reranking surface.
 

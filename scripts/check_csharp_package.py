@@ -373,6 +373,22 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
 if (factoryCalls != 0)
     throw new InvalidOperationException("pure catalog queries constructed an adapter");
 
+var setup = new ProviderSetupSpec(
+    fields:
+    [
+        new SetupField("base_url", "API base URL", kind: "endpoint", required: true),
+        new SetupField("api_key", "API key", kind: "secret", envVar: "ANYINFER_API_KEY"),
+        new SetupField("access_token", "Access token", kind: "secret"),
+    ],
+    hostShorthand: new HostShorthand("https", 443),
+    anyOf: [["api_key", "access_token"]],
+    requirementNote: "Supply one credential.");
+if (setup.HostShorthand?.Expand("offline.example") != "https://offline.example:443"
+    || setup.AnyOf.Count != 1
+    || setup.UnsatisfiedGroups(
+        new Dictionary<string, string> { ["api_key"] = "configured" }).Count != 0)
+    throw new InvalidOperationException("public setup metadata snapshot failed");
+
 var schema = SchemaSpec.FromJson("""
     {"$schema":"https://json-schema.org/draft/2020-12/schema","$defs":{"answer":{"type":"string"}},"type":"object","properties":{"answer":{"$ref":"#/$defs/answer"}},"required":["answer"]}
     """);
@@ -430,6 +446,41 @@ var syncLifecycleAdapter = new LifecycleAdapter();
 }
 if (syncLifecycleAdapter.DisposeCount != 1)
     throw new InvalidOperationException("synchronous lifecycle adapter disposal failed");
+
+var probeAdapter = new ProbeAdapter();
+{
+    await using var client = AsyncClient.FromAdapters(
+        [new ProviderRegistration("probe-demo", probeAdapter)]);
+    var report = await client.ProbeAsync("probe-demo:model");
+    var stored = client.Capabilities("probe-demo:model");
+    if (report.Requests != 4
+        || report.Probes.Count != 4
+        || report.Probes.Any(static probe => probe.Outcome != ProbeOutcome.Supported)
+        || report.Capabilities?.Features?.Provenance != Provenance.Probed
+        || stored.Features?.Provenance != Provenance.Probed
+        || probeAdapter.Calls != 4)
+        throw new InvalidOperationException(
+            "asynchronous public probe report or stored capability failed");
+}
+if (probeAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("asynchronous probe adapter disposal failed");
+
+var syncProbeAdapter = new ProbeAdapter();
+{
+    using var client = Client.FromAdapters(
+        [new ProviderRegistration("sync-probe-demo", syncProbeAdapter)]);
+    var report = client.Probe("sync-probe-demo:model", record: false);
+    var stored = client.Capabilities("sync-probe-demo:model");
+    if (report.Requests != 4
+        || report.Probes.Count != 4
+        || report.Probes.Any(static probe => probe.Outcome != ProbeOutcome.Supported)
+        || report.Capabilities?.Features?.Provenance != Provenance.Probed
+        || stored.Features?.Provenance == Provenance.Probed
+        || syncProbeAdapter.Calls != 4)
+        throw new InvalidOperationException("synchronous record-false probe report failed");
+}
+if (syncProbeAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("synchronous probe adapter disposal failed");
 
 var adapter = new DemoAdapter();
 {
@@ -553,6 +604,57 @@ sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle
         cancellationToken.ThrowIfCancellationRequested();
         HealthCalls++;
         return ValueTask.FromResult(new Health(true));
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
+    }
+}
+
+sealed class ProbeAdapter : IProviderAdapter
+{
+    public int Calls { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    public async IAsyncEnumerable<AdapterEvent> GenerateAsync(
+        WireRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request.Sampling.MaxOutputTokens != 64 || request.Sampling.Temperature != 0)
+            throw new InvalidOperationException("probe request lost forced sampling controls");
+
+        Calls++;
+        switch (Calls)
+        {
+            case 1 when request.Mechanism == "json_schema"
+                && request.Schema is not null
+                && request.SchemaName == "capability_probe":
+                yield return new AdapterTextDelta("""{"colour":"blue"}""");
+                break;
+            case 2 when request.Mechanism == "json_mode":
+                yield return new AdapterTextDelta("""{"anything":true}""");
+                break;
+            case 3 when request.Tools.Count == 1
+                && request.Tools[0].Name == "record_colour"
+                && request.ToolChoice == "required":
+                yield return new AdapterToolCallDelta(
+                    0, "probe-call", "record_colour", """{"colour":"blue"}""");
+                break;
+            case 4 when request.Stream:
+                yield return new AdapterTextDelta("one, ");
+                yield return new AdapterTextDelta("two");
+                break;
+            default:
+                throw new InvalidOperationException(
+                    "probe call order or forced wire request was incorrect");
+        }
+
+        yield return new AdapterFinal("stop");
+        await Task.CompletedTask;
     }
 
     public ValueTask DisposeAsync()

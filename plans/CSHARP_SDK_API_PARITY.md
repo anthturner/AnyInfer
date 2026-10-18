@@ -353,3 +353,11 @@ The following grouped inventory follows subsystem `__all__` declarations and API
 ## Verification record
 
 Root exports parsed as a literal AST list: 235 entries, 235 unique, zero duplicates. Static comparison procedure: parse `src/python/anyinfer/__init__.py`, locate assignment to `__all__`, read each string constant, and compare as a set against the `Python export` table cells in this document. No import of `anyinfer` was performed. The `__all__` declaration is literal (not computed).
+
+SDK.4c's working snapshot adds explicit async/sync generation probes, immutable
+FeatureProbe/ProbeReport helpers and complete declarative setup metadata. Its four default
+measurements include real raw tool translation; this does not complete normal generation
+tool calls or tool loops. Token counting/accounting remains SDK.5/11, embedding/rerank
+probes SDK.6, and rich tool behavior SDK.7. All root rows remain unchecked until their
+full assigned semantics and the final audit pass. Source checkpoint and clean-revision
+qualification are recorded in the parent/child execution plans.

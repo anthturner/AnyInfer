@@ -35,9 +35,11 @@ dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --config
 ```
 
 The examples demonstrate settings, buffered generation, streaming, structured output,
-configuration, fallback, and the synchronous `Client`/`SyncStream` facade. Their source is linked
-from the documentation site. They are a bounded proof surface, not a released NuGet package or a
-provider-parity promise.
+configuration, fallback, explicit capability probes, declarative setup metadata, and the
+synchronous `Client`/`SyncStream` facade. Their source is linked from the documentation site.
+Capability probes can send up to four requests by default; the raw tool declaration used by that
+measurement does not provide normal tool execution. The examples are a bounded proof surface, not
+a released NuGet package or a provider-parity promise.
 
 ## Use a custom adapter
 

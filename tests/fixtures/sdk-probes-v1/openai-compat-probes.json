@@ -1,0 +1,122 @@
+{
+  "_comment": "Input-only OpenAI-compatible probe traffic shared by the Python and C# SDK tests.",
+  "instances": [
+    {
+      "id": "primary",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_SDK_PROBE_TEST_KEY",
+      "headers": {"X-Probe": "primary"},
+      "timeout_s": 0.25
+    },
+    {
+      "id": "secondary",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_SDK_PROBE_TEST_KEY",
+      "headers": {"X-Probe": "secondary"},
+      "timeout_s": 0.25
+    },
+    {
+      "id": "empty",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_SDK_PROBE_TEST_KEY",
+      "headers": {"X-Probe": "empty"},
+      "timeout_s": 0.25
+    },
+    {
+      "id": "inconclusive",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_SDK_PROBE_TEST_KEY",
+      "headers": {"X-Probe": "inconclusive"},
+      "timeout_s": 0.25
+    },
+    {
+      "id": "record-false",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_SDK_PROBE_TEST_KEY",
+      "headers": {"X-Probe": "record-false"},
+      "timeout_s": 0.25
+    }
+  ],
+  "selectors": {
+    "default_target": "primary:model",
+    "rejection_target": "secondary:model",
+    "empty_target": "empty:model",
+    "inconclusive_target": "inconclusive:model",
+    "record_false_target": "record-false:model",
+    "empty_features": [],
+    "duplicate_features": ["JSON_MODE", "JSON_MODE"]
+  },
+  "calls": [
+    {
+      "instance": "primary",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"colour\\\":\\\"blue\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1}}"
+    },
+    {
+      "instance": "primary",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"anything\\\":true}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"completion_tokens\":2}}"
+    },
+    {
+      "instance": "primary",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"probe-call\",\"type\":\"function\",\"function\":{\"name\":\"record_colour\",\"arguments\":\"{\\\"colour\\\":\\\"blue\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":3}}"
+    },
+    {
+      "instance": "primary",
+      "status": 200,
+      "headers": {"content-type": "text/event-stream"},
+      "body_utf8": "data: {\"choices\":[{\"delta\":{\"content\":\"one, \"}}]}\n\ndata: {\"usage\":{\"prompt_tokens\":5}}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"two\"},\"finish_reason\":\"stop\"}]}\n\ndata: {\"usage\":{\"completion_tokens\":8,\"total_tokens\":13}}\n\ndata: [DONE]\n\n"
+    },
+    {
+      "instance": "secondary",
+      "status": 400,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"error\":{\"message\":\"response_format is not supported\"}}"
+    },
+    {
+      "instance": "inconclusive",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"blue without JSON\"},\"finish_reason\":\"stop\"}]}"
+    },
+    {
+      "instance": "inconclusive",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"colour\\\":\\\"blue\\\"}\"},\"finish_reason\":\"stop\"}]}"
+    },
+    {
+      "instance": "record-false",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"colour\\\":\\\"blue\\\"}\"},\"finish_reason\":\"stop\"}]}"
+    },
+    {
+      "instance": "record-false",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"colour\\\":\\\"blue\\\"}\"},\"finish_reason\":\"stop\"}]}"
+    },
+    {
+      "instance": "primary",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"first\\\":true}\"},\"finish_reason\":\"stop\"}]}"
+    },
+    {
+      "instance": "primary",
+      "status": 200,
+      "headers": {"content-type": "application/json"},
+      "body_utf8": "{\"choices\":[{\"message\":{\"content\":\"{\\\"second\\\":true}\"},\"finish_reason\":\"stop\"}]}"
+    }
+  ]
+}

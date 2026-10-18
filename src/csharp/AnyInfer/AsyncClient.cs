@@ -49,7 +49,7 @@ public sealed class AsyncClient : IAsyncDisposable
         _defaultRepair = repair;
         _catalog = catalog ?? AnyInfer.Catalog.Catalog.LoadDefault();
         _capabilities = new CapabilityStore(pricingTable, capabilityOverrides);
-        _targetResolver = new TargetMetadataResolver(_catalog, _pool.DescriptorSnapshot, () => _pool.Bindings, _pool);
+        _targetResolver = new TargetMetadataResolver(_catalog, _pool.DescriptorSnapshot, () => _pool.Bindings, _pool, _capabilities);
         _resolutionProfile = TargetResolutionProfile.PublicSdk;
         _schemaValidation = schemaValidation;
     }
@@ -88,7 +88,8 @@ public sealed class AsyncClient : IAsyncDisposable
             _catalog,
             publicSdk ? new Providers.ProviderRegistry([]) : null,
             () => _pool.Bindings,
-            _pool);
+            _pool,
+            _capabilities);
         _resolutionProfile = publicSdk ? TargetResolutionProfile.PublicSdk : TargetResolutionProfile.FrozenV0;
         _schemaValidation = schemaValidation;
     }
@@ -126,6 +127,17 @@ public sealed class AsyncClient : IAsyncDisposable
     public Task<Health> HealthAsync(string providerId, CancellationToken cancellationToken = default) =>
         HealthCoreAsync(providerId, cancellationToken, CancellationIdentityContext.Resolve(cancellationToken));
 
+    /// <summary>Runs ordered raw generation capability probes against one resolved target.</summary>
+    public Task<ProbeReport> ProbeAsync(
+        string target,
+        IEnumerable<Feature>? features = null,
+        double timeoutS = 30,
+        bool record = true,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return ProbeCoreAsync(target, features, timeoutS, record, cancellationToken, CancellationIdentityContext.Resolve(cancellationToken));
+    }
     /// <summary>Consumes this client's single streaming execution path to its terminal result.</summary>
     public Task<Generation> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default) =>
         GenerateAsync(request, capture: null, cancellationToken: cancellationToken);
@@ -168,11 +180,7 @@ public sealed class AsyncClient : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         await using var stream = StreamAsync(request, capture, cancellationToken);
-        await foreach (var _ in stream.WithCancellation(cancellationToken).ConfigureAwait(false))
-        {
-        }
-
-        return stream.Result;
+        return await stream.CollectAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Creates a lazy single-consumer generation stream.</summary>
@@ -299,6 +307,10 @@ public sealed class AsyncClient : IAsyncDisposable
         try
         {
             await Task.WhenAll(operations.Select(static operation => operation.Completion)).ConfigureAwait(false);
+            foreach (var operation in operations)
+            {
+                failure ??= operation.ChildSignalFailure;
+            }
             await _pool.DisposeAsync().ConfigureAwait(false);
         }
         catch (Exception exception)
@@ -345,6 +357,135 @@ public sealed class AsyncClient : IAsyncDisposable
         }
     }
 
+    private async Task<ProbeReport> ProbeCoreAsync(
+        string target,
+        IEnumerable<Feature>? suppliedFeatures,
+        double timeoutS,
+        bool record,
+        CancellationToken cancellationToken,
+        CancellationToken callerIdentity)
+    {
+        var reservation = ReserveLifecycle(cancellationToken, callerIdentity);
+        using var context = AsyncExecutionContext.Push(this, reservation.SyncOwner);
+        using var identity = CancellationIdentityContext.Push(reservation.Token, reservation.CallerIdentity);
+        try
+        {
+            var metadata = _targetResolver.Resolve(target, _resolutionProfile);
+            var features = (suppliedFeatures ?? CapabilityProbes.DefaultProbeFeatures).ToArray();
+            ProbeFeatureLease.ValidateTimeout(timeoutS);
+            foreach (var feature in features)
+            {
+                if (!CapabilityProbes.ProbeableFeatures.Contains(feature))
+                {
+                    throw new ConfigException(
+                        $"Feature '{feature}' cannot be probed.",
+                        metadata.Target.ProviderId,
+                        detail: $"'{feature}' is not a generation probe feature.",
+                        hint: "Choose JsonSchema, JsonMode, Grammar, Tools, or Streaming.");
+                }
+            }
+
+            if (metadata.Descriptor is { } descriptor && !descriptor.Operations.Contains(InferenceOperation.Generation))
+            {
+                throw new ConfigException(
+                    "The selected provider does not declare generation support.",
+                    metadata.Target.ProviderId,
+                    hint: "Configure a provider descriptor that declares generation support.");
+            }
+
+            var resolved = _pool.Materialize(metadata);
+            var adapter = await _pool.GetAdapterAsync(resolved.State, reservation.Token, reservation.CallerIdentity).ConfigureAwait(false);
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+
+            var probes = new List<FeatureProbe>(features.Length);
+            Usage? usage = null;
+            foreach (var feature in features)
+            {
+                await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+                var result = await CapabilityProbeRunner.RunAsync(
+                    adapter,
+                    resolved,
+                    feature,
+                    timeoutS,
+                    this,
+                    reservation.SyncOwner,
+                    reservation.Token,
+                    reservation.CallerIdentity,
+                    reservation.RecordChildSignalFailure).ConfigureAwait(false);
+                reservation.ThrowIfCallerCancelled();
+                probes.Add(result.Probe);
+                usage = OverlayProbeUsage(usage, result.Usage);
+            }
+
+            usage = NormalizeProbeUsage(usage);
+            ModelCapabilities? measured;
+            var closed = false;
+            lock (_gate)
+            {
+                closed = _disposed;
+                if (!closed)
+                {
+                    reservation.ThrowIfCallerCancelled();
+                    measured = _capabilities.MergeProbe(
+                        metadata.Descriptor,
+                        resolved.Target.ProviderId,
+                        resolved.Target.Model,
+                        _pool.EffectiveLocality(metadata),
+                        metadata.Capabilities,
+                        probes,
+                        record);
+                }
+                else
+                {
+                    measured = null!;
+                }
+            }
+
+            if (closed)
+            {
+                await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            }
+
+            return new ProbeReport(resolved.Target, probes, measured, features.Length, usage);
+        }
+        finally
+        {
+            await CompleteLifecycleAsync(reservation).ConfigureAwait(false);
+        }
+    }
+
+    private static Usage? OverlayProbeUsage(Usage? existing, Usage? overlay)
+    {
+        if (overlay is null)
+        {
+            return existing;
+        }
+
+        return new Usage(
+            overlay.InputTokens ?? existing?.InputTokens,
+            overlay.OutputTokens ?? existing?.OutputTokens,
+            overlay.TotalTokens ?? existing?.TotalTokens,
+            overlay.CacheReadTokens ?? existing?.CacheReadTokens,
+            overlay.CacheWriteTokens ?? existing?.CacheWriteTokens,
+            overlay.ReasoningTokens ?? existing?.ReasoningTokens);
+    }
+
+    private static Usage? NormalizeProbeUsage(Usage? usage)
+    {
+        if (usage is null || usage.TotalTokens is not null || usage.InputTokens is null || usage.OutputTokens is null)
+        {
+            return usage;
+        }
+
+        return new Usage(
+            usage.InputTokens,
+            usage.OutputTokens,
+            checked(usage.InputTokens.Value + usage.OutputTokens.Value),
+            usage.CacheReadTokens,
+            usage.CacheWriteTokens,
+            usage.ReasoningTokens);
+    }
     private async Task<IReadOnlyList<DiscoveredModel>> ModelsCoreAsync(
         string providerId,
         InferenceOperation? operation,
@@ -358,16 +499,27 @@ public sealed class AsyncClient : IAsyncDisposable
         {
             var state = _pool.ResolveLifecycleInstance(providerId);
             var adapter = await _pool.GetAdapterAsync(state, reservation.Token, reservation.CallerIdentity).ConfigureAwait(false);
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
             if (adapter is not IProviderLifecycle lifecycle)
             {
                 throw new UnsupportedInputException("Model discovery is not supported by this provider.", state.InstanceId, "discover");
             }
 
             var listed = await lifecycle.ListModelsAsync(reservation.Token).ConfigureAwait(false);
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
             reservation.ThrowIfCallerCancelled();
             var snapshot = Array.AsReadOnly((listed ?? throw new InvalidOperationException("A provider returned no model listing.")).ToArray());
-            _capabilities.RecordDiscovery(state.InstanceId, snapshot);
-            reservation.ThrowIfCallerCancelled();
+            lock (_gate)
+            {
+                if (!_disposed)
+                {
+                    reservation.ThrowIfCallerCancelled();
+                    _capabilities.RecordDiscovery(state.InstanceId, snapshot);
+                    return Array.AsReadOnly(FilterModels(snapshot, state, operation, adapter).ToArray());
+                }
+            }
+
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
             return Array.AsReadOnly(FilterModels(snapshot, state, operation, adapter).ToArray());
         }
         finally
@@ -388,13 +540,24 @@ public sealed class AsyncClient : IAsyncDisposable
         {
             var state = _pool.ResolveLifecycleInstance(providerId);
             var adapter = await _pool.GetAdapterAsync(state, reservation.Token, reservation.CallerIdentity).ConfigureAwait(false);
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
             if (adapter is not IProviderLifecycle lifecycle)
             {
                 throw new UnsupportedInputException("Health discovery is not supported by this provider.", state.InstanceId, "discover");
             }
 
             var health = await lifecycle.HealthAsync(reservation.Token).ConfigureAwait(false);
-            reservation.ThrowIfCallerCancelled();
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            lock (_gate)
+            {
+                if (!_disposed)
+                {
+                    reservation.ThrowIfCallerCancelled();
+                    return health ?? throw new InvalidOperationException("A provider returned no health observation.");
+                }
+            }
+
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
             return health ?? throw new InvalidOperationException("A provider returned no health observation.");
         }
         finally
@@ -482,6 +645,7 @@ public sealed class AsyncClient : IAsyncDisposable
         private readonly object _gate = new();
         private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task<Exception?>? _signal;
+        private Exception? _childSignalFailure;
         private bool _completed;
 
         internal LifecycleReservation(
@@ -502,11 +666,47 @@ public sealed class AsyncClient : IAsyncDisposable
         internal CancellationToken CallerIdentity { get; }
         internal CancellationToken Token => _linked.Token;
         internal Task Completion => _completion.Task;
+        internal Exception? ChildSignalFailure
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _childSignalFailure;
+                }
+            }
+        }
+
+        internal void RecordChildSignalFailure(Exception failure)
+        {
+            ArgumentNullException.ThrowIfNull(failure);
+            lock (_gate)
+            {
+                _childSignalFailure ??= failure;
+            }
+        }
 
         internal void ThrowIfCallerCancelled()
         {
             CallerIdentity.ThrowIfCancellationRequested();
             Token.ThrowIfCancellationRequested();
+        }
+
+        internal async Task ThrowIfClientCloseWonAsync()
+        {
+            bool closed;
+            lock (_owner._gate)
+            {
+                closed = _owner._disposed;
+            }
+
+            if (!closed)
+            {
+                return;
+            }
+
+            await SignalCancelAsync().ConfigureAwait(false);
+            ThrowIfCallerCancelled();
         }
 
         internal Task<Exception?> SignalCancelAsync()

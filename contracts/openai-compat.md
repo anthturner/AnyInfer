@@ -32,6 +32,10 @@ substitution already established for the embeddings section below.
 - The C# SDK’s modern-schema path projects only its internally selected JSON Schema and
   JSON mode mechanisms to those forms. Offline native tests cover that projection; frozen C#
   requests do not add the response-format field.
+- The C# SDK projects raw function tools only when its raw wire request has a nonempty tool
+  snapshot. Offline native tests cover function-tool and choice projection plus buffered and SSE
+  raw tool-delta decoding; empty-tool snapshots, including existing frozen and default requests,
+  continue to omit and ignore tool fields.
 - `logprobs: true` plus optional `top_logprobs: <int>` (added 2026-08-25). The pair is
   load-bearing: `top_logprobs` alone is rejected upstream, and `logprobs: true` alone
   returns the chosen token's own probability with no alternatives — which is why the

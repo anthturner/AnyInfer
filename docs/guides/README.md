@@ -66,8 +66,9 @@ The C# surface is a bounded prerelease proof for contributors. It is not an inst
 release path, and it does not change the supported Python SDK surface.
 
 Its source-linked examples cover generation, routing, configuration, pure catalog and capability
-queries, explicit model discovery and health for a configured instance, and modern JSON Schema
-validation with typed deserialization. They do not imply provider parity, released NuGet
+queries, explicit model discovery, health and capability probes for a configured instance,
+declarative provider setup metadata, and modern JSON Schema validation with typed deserialization.
+They do not imply provider parity, released NuGet
 distribution, or a supported application integration path.
 
 - [Explore the C# SDK proof](csharp-sdk.md)

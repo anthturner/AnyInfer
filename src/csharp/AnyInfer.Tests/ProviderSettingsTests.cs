@@ -94,6 +94,29 @@ public sealed class ProviderSettingsTests
     }
 
     [Fact]
+    public async Task Unadvanced_post_close_streams_keep_collect_and_result_in_the_unready_state_while_manual_enumeration_is_empty()
+    {
+        var adapter = new RecordingAdapter();
+        var client = AsyncClient.FromAdapters([new ProviderRegistration("fake", adapter)]);
+        var collect = client.StreamAsync("collect", target: "fake:model");
+        var manual = client.StreamAsync("manual", target: "fake:model");
+        var result = client.StreamAsync("result", target: "fake:model");
+
+        await client.DisposeAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => collect.CollectAsync());
+
+        await using (var enumerator = manual.GetAsyncEnumerator())
+        {
+            Assert.False(await enumerator.MoveNextAsync());
+        }
+
+        Assert.Throws<InvalidOperationException>(() => _ = result.Result);
+        Assert.Equal(0, adapter.GenerateCalls);
+        Assert.Equal(1, adapter.DisposeCalls);
+    }
+
+    [Fact]
     public async Task Concurrent_waiter_cancellation_does_not_cancel_the_single_owner_factory()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

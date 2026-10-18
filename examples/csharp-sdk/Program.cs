@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using AnyInfer;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
@@ -79,6 +80,30 @@ static async Task VerifyAsync()
         && syncLifecycleHandler.EmptyModelBodies == 2
         && syncLifecycleHandler.DisposeCount == 1,
         "Synchronous lifecycle example did not preserve discovery facts or transport ownership.");
+
+    var setup = SetupExample.Create();
+    Require(setup.HostShorthand?.Expand("offline.example") == "https://offline.example:443"
+        && setup.AnyOf.Count == 1
+        && setup.RequirementNote.Length != 0,
+        "Setup example did not retain declarative metadata.");
+
+    var asyncProbeHandler = new CountingHandler(probes: true);
+    var asyncProbe = await ProbeExample.RunAsync(WithTransport(displayedSettings, asyncProbeHandler), target);
+    Require(asyncProbe.Requests == 4
+        && asyncProbe.Probes.All(static item => item.Outcome == ProbeOutcome.Supported)
+        && asyncProbe.Capabilities?.Features?.Provenance == Provenance.Probed
+        && asyncProbeHandler.ProbeRequestCount == 4
+        && asyncProbeHandler.DisposeCount == 1,
+        "Asynchronous probe example did not retain ordered measured facts or transport ownership.");
+
+    var syncProbeHandler = new CountingHandler(probes: true);
+    var syncProbe = ProbeExample.Run(WithTransport(displayedSettings, syncProbeHandler), target);
+    Require(syncProbe.Requests == 4
+        && syncProbe.Probes.All(static item => item.Outcome == ProbeOutcome.Supported)
+        && syncProbe.Capabilities?.Features?.Provenance == Provenance.Probed
+        && syncProbeHandler.ProbeRequestCount == 4
+        && syncProbeHandler.DisposeCount == 1,
+        "Synchronous probe example did not retain ordered measured facts or transport ownership.");
 
     var bufferedHandler = new CountingHandler();
     var buffered = await GenerationExample.RunAsync(WithTransport(displayedSettings, bufferedHandler), target);
@@ -176,11 +201,15 @@ static void Require(bool condition, string message)
     }
 }
 
-sealed class CountingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, bool structured = false) : HttpMessageHandler
+sealed class CountingHandler(
+    HttpStatusCode statusCode = HttpStatusCode.OK,
+    bool structured = false,
+    bool probes = false) : HttpMessageHandler
 {
     public int RequestCount { get; private set; }
     public int ModelRequestCount { get; private set; }
     public int EmptyModelBodies { get; private set; }
+    public int ProbeRequestCount { get; private set; }
     public int DisposeCount { get; private set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -205,7 +234,24 @@ sealed class CountingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, bool
             };
         }
 
-        var stream = request.Content is not null && (await request.Content.ReadAsStringAsync(cancellationToken)).Contains("\"stream\":true", StringComparison.Ordinal);
+        var requestBody = request.Content is null
+            ? ""
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        if (probes)
+        {
+            if (request.Method != HttpMethod.Post
+                || request.RequestUri?.AbsolutePath != "/v1/chat/completions"
+                || !string.IsNullOrEmpty(request.RequestUri?.Query)
+                || request.Content?.Headers.ContentType?.MediaType != "application/json"
+                || request.Headers.Authorization is not null)
+            {
+                throw new InvalidOperationException("Probe request used unexpected HTTP transport fields.");
+            }
+
+            return ProbeResponse(requestBody);
+        }
+
+        var stream = requestBody.Contains("\"stream\":true", StringComparison.Ordinal);
         if (statusCode != HttpStatusCode.OK)
         {
             return new HttpResponseMessage(statusCode)
@@ -230,6 +276,83 @@ sealed class CountingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, bool
         return new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+    }
+
+    private HttpResponseMessage ProbeResponse(string requestBody)
+    {
+        using var document = JsonDocument.Parse(requestBody);
+        var root = document.RootElement;
+        if (root.GetProperty("model").GetString() != "demo"
+            || root.GetProperty("max_tokens").GetInt32() != 64
+            || root.GetProperty("temperature").GetDouble() != 0)
+        {
+            throw new InvalidOperationException("Probe request lost its forced sampling controls.");
+        }
+
+        ProbeRequestCount++;
+        return ProbeRequestCount switch
+        {
+            1 => JsonProbeResponse(root, "json_schema"),
+            2 => JsonProbeResponse(root, "json_object"),
+            3 => ToolProbeResponse(root),
+            4 => StreamingProbeResponse(root),
+            _ => throw new InvalidOperationException("Probe example made an unexpected request."),
+        };
+    }
+
+    private static HttpResponseMessage JsonProbeResponse(JsonElement request, string format)
+    {
+        var responseFormat = request.GetProperty("response_format");
+        if (responseFormat.GetProperty("type").GetString() != format)
+        {
+            throw new InvalidOperationException("Probe response format did not match its selected feature.");
+        }
+
+        if (format == "json_schema"
+            && responseFormat.GetProperty("json_schema").GetProperty("name").GetString()
+                != "capability_probe")
+        {
+            throw new InvalidOperationException("Schema probe did not retain its named probe schema.");
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"choices":[{"message":{"content":"{\"colour\":\"blue\"}"},"finish_reason":"stop"}]}""", Encoding.UTF8, "application/json"),
+        };
+    }
+
+    private static HttpResponseMessage ToolProbeResponse(JsonElement request)
+    {
+        if (request.GetProperty("tool_choice").GetString() != "required"
+            || request.GetProperty("tools")[0].GetProperty("function").GetProperty("name").GetString()
+                != "record_colour")
+        {
+            throw new InvalidOperationException("Tool probe did not retain its forced raw tool declaration.");
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"choices":[{"message":{"tool_calls":[{"id":"probe-call","type":"function","function":{"name":"record_colour","arguments":"{\"colour\":\"blue\"}"}}]},"finish_reason":"tool_calls"}]}""", Encoding.UTF8, "application/json"),
+        };
+    }
+
+    private static HttpResponseMessage StreamingProbeResponse(JsonElement request)
+    {
+        if (!request.GetProperty("stream").GetBoolean()
+            || !request.GetProperty("stream_options").GetProperty("include_usage").GetBoolean())
+        {
+            throw new InvalidOperationException("Streaming probe did not retain stream controls.");
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"one, \"}}]}\n\n"
+                + "data: {\"choices\":[{\"delta\":{\"content\":\"two\"},\"finish_reason\":\"stop\"}]}\n\n"
+                + "data: [DONE]\n\n",
+                Encoding.UTF8,
+                "text/event-stream"),
         };
     }
 
