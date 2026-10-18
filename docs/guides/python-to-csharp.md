@@ -21,6 +21,8 @@ does not claim provider or feature parity with Python.
 | `client.models(...)`, `client.health(...)` | `ModelsAsync` / `HealthAsync`, or `Models` / `Health` |
 | catalog and capability queries | `Catalog`, `Resolve(...)`, and `Capabilities(...)` |
 | `client.probe(...)` | `ProbeAsync(...)` or `Probe(...)`, returning `ProbeReport` |
+| telemetry observer | `IObserver` supplied to or subscribed on `AsyncClient` / `Client` |
+| result manifest | `AsyncStream.Manifest`, `SyncStream.Manifest`, or `Generation.Manifest` |
 | `ProviderSetupSpec` metadata | `ProviderSetupSpec`, `SetupField`, `HostShorthand`, and `AnyOf` |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
@@ -77,6 +79,21 @@ application-owned setup surface without resolving a secret or constructing an ad
 
 ```csharp
 --8<-- "examples/csharp-sdk/SetupExample.cs"
+```
+
+## Telemetry and manifests
+
+C# observers receive typed events synchronously. They are payload-free unless a subscription
+explicitly requests payloads, and caller-owned sinks are disposed by the caller. Manifests are
+immutable call records: a stream exposes an incomplete one before it is consumed and a terminal
+one after completion. They do not calculate account totals or create automatic pricing.
+
+```csharp
+--8<-- "examples/csharp-sdk/TelemetryExample.cs"
+```
+
+```csharp
+--8<-- "examples/csharp-sdk/ManifestExample.cs"
 ```
 
 ## What to use in an application

@@ -244,7 +244,12 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 throw HttpFailure(response, errorBytes, "generate");
             }
 
-            if (request.Stream)
+            if (request.Stream &&
+                (!request.UsesModernSchema ||
+                 string.Equals(
+                     response.Content.Headers.ContentType?.MediaType,
+                     "text/event-stream",
+                     StringComparison.OrdinalIgnoreCase)))
             {
                 await foreach (var adapterEvent in ReadSseAsync(
                     responseStream,
@@ -262,7 +267,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             var body = await ReadResponseBytesAsync(
                 responseStream,
                 request.MaxResponseBytes,
-                "generate",
+                request.Stream ? "stream" : "generate",
                 cancellationToken,
                 request.UsesModernSchema).ConfigureAwait(false);
             foreach (var adapterEvent in ReadBuffered(body, request.Tools.Count > 0))

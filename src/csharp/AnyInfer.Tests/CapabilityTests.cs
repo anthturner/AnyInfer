@@ -1,5 +1,6 @@
 using AnyInfer.Capabilities;
 using Xunit;
+using PeterO.Numbers;
 
 namespace AnyInfer.Tests;
 
@@ -41,11 +42,11 @@ public sealed class CapabilityTests
     [Fact]
     public void Capability_constructors_copy_mutable_collections_and_overlay_equal_provenance()
     {
-        var tools = new Dictionary<string, decimal> { ["web_search"] = 0.025m };
+        var tools = new Dictionary<string, EDecimal> { ["web_search"] = EDecimal.FromString("0.025") };
         var dimensions = new List<int> { 256, 1024 };
         var intents = new List<EmbeddingInputIntent> { EmbeddingInputIntent.Query };
         var operations = new HashSet<InferenceOperation> { InferenceOperation.Generation, InferenceOperation.Embedding };
-        var pricing = new Pricing(1.25m, 10m, perServerToolUse: tools);
+        var pricing = new Pricing(EDecimal.FromString("1.25"), EDecimal.FromString("10"), perServerToolUse: tools);
         var baseline = new ModelCapabilities(
             contextWindow: new Sourced<int>(4096, Provenance.Catalog),
             features: new Sourced<Feature>(Feature.Streaming, Provenance.Catalog),
@@ -54,12 +55,12 @@ public sealed class CapabilityTests
             operations: new Sourced<IReadOnlySet<InferenceOperation>>(operations, Provenance.Catalog),
             embedding: new EmbeddingCapabilities(768, dimensions, inputIntents: intents, normalized: false));
 
-        tools["web_search"] = 9m;
+        tools["web_search"] = EDecimal.FromString("9");
         dimensions.Add(1536);
         intents.Add(EmbeddingInputIntent.Document);
         operations.Add(InferenceOperation.Rerank);
 
-        Assert.Equal(0.025m, baseline.Pricing!.Value.PerServerToolUse["web_search"]);
+        Assert.Equal(EDecimal.FromString("0.025"), baseline.Pricing!.Value.PerServerToolUse["web_search"]);
         Assert.Equal([256, 1024], baseline.Embedding!.DimensionChoices);
         Assert.Equal([EmbeddingInputIntent.Query], baseline.Embedding.InputIntents);
         Assert.DoesNotContain(InferenceOperation.Rerank, baseline.Operations!.Value);
@@ -67,7 +68,7 @@ public sealed class CapabilityTests
         var sameOperationsReversed = new ModelCapabilities(
             contextWindow: new Sourced<int>(4096, Provenance.Catalog),
             features: new Sourced<Feature>(Feature.Streaming, Provenance.Catalog),
-            pricing: new Sourced<Pricing>(new Pricing(1.25m, 10m, perServerToolUse: new Dictionary<string, decimal> { ["web_search"] = 0.025m }), Provenance.Catalog),
+            pricing: new Sourced<Pricing>(new Pricing(EDecimal.FromString("1.25"), EDecimal.FromString("10"), perServerToolUse: new Dictionary<string, EDecimal> { ["web_search"] = EDecimal.FromString("0.025") }), Provenance.Catalog),
             local: new LocalModelInfo(artifactSizeBytes: 0, parameterSize: "0B"),
             operations: new Sourced<IReadOnlySet<InferenceOperation>>(
                 new HashSet<InferenceOperation> { InferenceOperation.Embedding, InferenceOperation.Generation }, Provenance.Catalog),
@@ -135,7 +136,7 @@ public sealed class CapabilityTests
             contextWindow: new Sourced<int>(8192, Provenance.Probed),
             maxOutputTokens: new Sourced<int>(2048, Provenance.Catalog),
             features: new Sourced<Feature>(Feature.Streaming | Feature.JsonSchema, Provenance.Probed),
-            pricing: new Sourced<Pricing>(new Pricing(1m, 2m), Provenance.Catalog),
+            pricing: new Sourced<Pricing>(new Pricing(EDecimal.FromString("1"), EDecimal.FromString("2")), Provenance.Catalog),
             defaultTemperature: new Sourced<double>(0.2, Provenance.Catalog),
             local: new LocalModelInfo(artifactSizeBytes: 1),
             operations: new Sourced<IReadOnlySet<InferenceOperation>>(
@@ -174,35 +175,35 @@ public sealed class CapabilityTests
     [Fact]
     public void Pricing_retains_decimal_unknown_and_real_zero_rate_distinctions()
     {
-        var unknownRates = new Pricing(1.25m, 10.5m, currency: "EUR", perServerToolUse: new Dictionary<string, decimal> { ["web_search"] = 0m });
-        Assert.Equal(1.25m, unknownRates.InputPer1M);
-        Assert.Equal(10.5m, unknownRates.OutputPer1M);
+        var unknownRates = new Pricing(EDecimal.FromString("1.25"), EDecimal.FromString("10.5"), currency: "EUR", perServerToolUse: new Dictionary<string, EDecimal> { ["web_search"] = EDecimal.FromString("0") });
+        Assert.Equal(EDecimal.FromString("1.25"), unknownRates.InputPer1M);
+        Assert.Equal(EDecimal.FromString("10.5"), unknownRates.OutputPer1M);
         Assert.Null(unknownRates.CacheReadPer1M);
         Assert.Null(unknownRates.CacheWritePer1M);
         Assert.Null(unknownRates.PerSearchUnit);
-        Assert.Equal(0m, unknownRates.PerServerToolUse["web_search"]);
+        Assert.Equal(EDecimal.FromString("0"), unknownRates.PerServerToolUse["web_search"]);
         Assert.Equal("EUR", unknownRates.Currency);
         Assert.False(unknownRates.PerServerToolUse.ContainsKey("code_execution"));
 
-        var reverseMap = new Dictionary<string, decimal>
+        var reverseMap = new Dictionary<string, EDecimal>
         {
-            ["tool_b"] = 2m,
-            ["tool_a"] = 1m,
+            ["tool_b"] = EDecimal.FromString("2"),
+            ["tool_a"] = EDecimal.FromString("1"),
         };
-        var forwardMap = new Dictionary<string, decimal>
+        var forwardMap = new Dictionary<string, EDecimal>
         {
-            ["tool_a"] = 1m,
-            ["tool_b"] = 2m,
+            ["tool_a"] = EDecimal.FromString("1"),
+            ["tool_b"] = EDecimal.FromString("2"),
         };
-        var reverse = new Pricing(1m, 2m, perServerToolUse: reverseMap);
-        var forward = new Pricing(1m, 2m, perServerToolUse: forwardMap);
+        var reverse = new Pricing(EDecimal.FromString("1"), EDecimal.FromString("2"), perServerToolUse: reverseMap);
+        var forward = new Pricing(EDecimal.FromString("1"), EDecimal.FromString("2"), perServerToolUse: forwardMap);
         Assert.Equal(forward, reverse);
         Assert.Equal(forward.GetHashCode(), reverse.GetHashCode());
 
-        var genuineFree = new Pricing(0m, 0m, cacheReadPer1M: 0m, cacheWritePer1M: 0m, perSearchUnit: 0m);
-        Assert.Equal(0m, genuineFree.InputPer1M);
-        Assert.Equal(0m, genuineFree.CacheReadPer1M);
-        Assert.Equal(0m, genuineFree.PerSearchUnit);
+        var genuineFree = new Pricing(EDecimal.FromString("0"), EDecimal.FromString("0"), cacheReadPer1M: EDecimal.FromString("0"), cacheWritePer1M: EDecimal.FromString("0"), perSearchUnit: EDecimal.FromString("0"));
+        Assert.Equal(EDecimal.FromString("0"), genuineFree.InputPer1M);
+        Assert.Equal(EDecimal.FromString("0"), genuineFree.CacheReadPer1M);
+        Assert.Equal(EDecimal.FromString("0"), genuineFree.PerSearchUnit);
     }
 
     [Fact]

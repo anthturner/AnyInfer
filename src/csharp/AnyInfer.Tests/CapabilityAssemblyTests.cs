@@ -1,6 +1,7 @@
 using AnyInfer.Capabilities;
 using AnyInfer.Providers;
 using Xunit;
+using PeterO.Numbers;
 
 namespace AnyInfer.Tests;
 
@@ -45,7 +46,7 @@ public sealed class CapabilityAssemblyTests
     {
         var pricing = new PricingTable(new Dictionary<string, IReadOnlyList<PricingEntry>>
         {
-            ["primary"] = [new PricingEntry("model", new Pricing(1m, 2m), "2026-01-01", "https://example.invalid")],
+            ["primary"] = [new PricingEntry("model", new Pricing(EDecimal.FromString("1"), EDecimal.FromString("2")), "2026-01-01", "https://example.invalid")],
         });
         var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>
         {
@@ -69,13 +70,13 @@ public sealed class CapabilityAssemblyTests
         Assert.Equal(0, assembled.ContextWindow!.Value);
         Assert.Equal(Provenance.Override, assembled.ContextWindow.Provenance);
         Assert.Equal(Feature.JsonSchema, assembled.Features.Value);
-        Assert.Equal(1m, assembled.Pricing!.Value.InputPer1M);
+        Assert.Equal(EDecimal.FromString("1"), assembled.Pricing!.Value.InputPer1M);
         Assert.Equal(Provenance.Catalog, assembled.Pricing.Provenance);
         Assert.Null(assembled.Embedding);
 
         var unknownLocal = new CapabilityStore(new PricingTable(new Dictionary<string, IReadOnlyList<PricingEntry>>()))
             .CapabilitiesFor(descriptor, "local", "unknown", ProviderLocality.Local);
-        Assert.Equal(0m, unknownLocal.Pricing!.Value.InputPer1M);
+        Assert.Equal(EDecimal.FromString("0"), unknownLocal.Pricing!.Value.InputPer1M);
         Assert.Equal(Provenance.Catalog, unknownLocal.Pricing.Provenance);
         Assert.Equal(Feature.JsonSchema, unknownLocal.Features.Value);
         Assert.Equal(Provenance.Default, unknownLocal.Features.Provenance);

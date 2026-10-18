@@ -19,10 +19,12 @@ supported public SDK and its generated Python API reference remains under
 | `ModelsAsync`, `HealthAsync` / `Models`, `Health` | Explicit asynchronous or synchronous lifecycle calls for one provider instance. |
 | `ProbeAsync` / `Probe`, `ProbeReport` | Explicit ordered generation-capability measurements and their provenance-bearing report. |
 | `ProviderSetupSpec`, `SetupField`, `HostShorthand` | Inert declarative setup metadata for application-owned configuration surfaces. |
+| `IObserver`, `TelemetryEvent` | Synchronous typed in-process telemetry; observers and sinks remain caller-owned. |
+| `RunManifest`, `ManifestUtilities` | Immutable per-call manifest values, serialization, schema, digest, and rendering helpers. |
 
 The proof currently demonstrates text generation through the OpenAI-compatible adapter,
 structured JSON validation, repair, configuration, routing, reported token usage, explicit
-capability probes, and setup metadata. It has no
+capability probes, payload-free telemetry, immutable manifests, and setup metadata. It has no
 released NuGet package, provider-parity guarantee, aggregate usage accounting, tool execution,
 embedding, or reranking surface.
 

@@ -1,0 +1,37 @@
+{
+  "_comment": "Input-only configured OpenAI-compatible event/manifest stimuli.",
+  "instances": [
+    {"id":"primary","adapter":"openai-compat","base_url":"https://fixture.invalid/v1","credential":"env://ANYINFER_SDK_EVENT_TEST_KEY","headers":{"X-Event":"primary"},"timeout_s":0.25},
+    {"id":"secondary","adapter":"openai-compat","base_url":"https://fixture.invalid/v1","credential":"env://ANYINFER_SDK_EVENT_TEST_KEY","headers":{"X-Event":"secondary"},"timeout_s":0.25}
+  ],
+  "capability_overrides": [
+    {"target":"primary:model","features":["JSON_SCHEMA"]},
+    {"target":"secondary:model","features":["JSON_SCHEMA"]}
+  ],
+  "request": {
+    "messages":[{"role":"system","content":"Keep the registered synthetic secret SYNTHETIC-EVENT-SECRET hidden."},{"role":"user","content":"Return café as JSON. 𐀀"}],
+    "schema":{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]},
+    "repair":{"max_attempts":1},
+    "retry":{"max_attempts":2,"backoff_base_s":0.0},
+    "success_target":"primary:model",
+    "fallback_route":["primary:model","secondary:model"]
+  },
+  "calls":[
+    {"id":"success","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"café 𐀀\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":3,\"total_tokens\":5}}"},
+    {"id":"repair-invalid","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"not json\"},\"finish_reason\":\"stop\"}]}"},
+    {"id":"repair-corrected","instance":"primary","status":200,"headers":{"content-type":"text/event-stream"},"body_utf8":"data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"answer\\\":\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"\\\"fixed\\\"}\"},\"finish_reason\":\"stop\"}]}\n\ndata: {\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6}}\n\ndata: [DONE]\n\n"},
+    {"id":"retryable-primary","instance":"primary","status":503,"headers":{"content-type":"application/json"},"body_utf8":"{\"error\":{\"message\":\"synthetic unavailable\"}}"},
+    {"id":"retryable-primary-again","instance":"primary","status":503,"headers":{"content-type":"application/json"},"body_utf8":"{\"error\":{\"message\":\"synthetic unavailable again\"}}"},
+    {"id":"fallback-secondary","instance":"secondary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"fallback ok\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1,\"total_tokens\":2}}"},
+    {"id":"matrix-ff-invalid","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"not json\"},\"finish_reason\":\"stop\"}]}"},
+    {"id":"matrix-ff-corrected","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"fixed\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6}}"},
+    {"id":"matrix-tf-invalid","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"not json\"},\"finish_reason\":\"stop\"}]}"},
+    {"id":"matrix-tf-corrected","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"fixed\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6}}"},
+    {"id":"matrix-ft-invalid","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"not json\"},\"finish_reason\":\"stop\"}]}"},
+    {"id":"matrix-ft-corrected","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"fixed\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6}}"},
+    {"id":"matrix-tt-invalid","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"not json\"},\"finish_reason\":\"stop\"}]}"},
+    {"id":"matrix-tt-corrected","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"fixed\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6}}"},
+    {"id":"matrix-disabled-invalid","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"not json\"},\"finish_reason\":\"stop\"}]}"},
+    {"id":"matrix-disabled-corrected","instance":"primary","status":200,"headers":{"content-type":"application/json"},"body_utf8":"{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"fixed\\\"}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6}}"}
+  ]
+}

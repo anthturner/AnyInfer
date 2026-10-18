@@ -2,6 +2,7 @@ using System.Collections;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using AnyInfer.Internal;
+using AnyInfer.Manifest;
 
 namespace AnyInfer;
 
@@ -23,6 +24,7 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
     private TaskCompletionSource<Exception?>? _signalCompletion;
     private Generation? _observedResult;
     private ExceptionDispatchInfo? _failure;
+    private bool _parentCloseFailureObserved;
 
     internal SyncStream(Client client, AsyncStream inner, CancellationToken lifetime, Action<SyncStream> onClosed)
     {
@@ -33,11 +35,16 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
         _pump = Task.Run(PumpAsync);
     }
 
-    /// <summary>Gets the terminal generation after a consumer has observed <see cref="StreamEnded"/>.</summary>
+    /// <summary>Gets the terminal generation after completion has committed.</summary>
     public Generation Result
     {
         get
         {
+            if (_inner.Telemetry is not null)
+            {
+                return _inner.Result;
+            }
+
             lock (_gate)
             {
                 return _observedResult ?? throw new InvalidOperationException(
@@ -45,6 +52,9 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
             }
         }
     }
+
+    /// <summary>Gets the partial or terminal manifest when manifest capture is enabled.</summary>
+    public RunManifest? Manifest => _inner.Manifest;
 
     /// <summary>Drains this stream once and returns its terminal generation.</summary>
     public Generation Collect(CancellationToken cancellationToken = default)
@@ -82,8 +92,21 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
     /// <inheritdoc />
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    /// <inheritdoc />
-    public void Dispose() => CloseAsync().GetAwaiter().GetResult();
+    /// <summary>
+    /// Closes this stream. A Public SDK callback running for this same stream must return before
+    /// disposing it; dispose from outside that callback instead. If the owning client already
+    /// reported this Public SDK stream's close failure, later disposal completes without reporting it again.
+    /// </summary>
+    public void Dispose()
+    {
+        ThrowIfOwnedSelfClose();
+        if (ParentCloseFailureObserved())
+        {
+            return;
+        }
+
+        CloseAsync().GetAwaiter().GetResult();
+    }
 
     internal Task<Exception?> SignalCloseAsync()
     {
@@ -121,6 +144,7 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
 
     internal Task CloseAsync()
     {
+        ThrowIfOwnedSelfClose();
         lock (_gate)
         {
             if (_closeTask is null)
@@ -129,6 +153,35 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
             }
 
             return _closeTask;
+        }
+    }
+
+    internal void MarkParentCloseFailureObserved()
+    {
+        if (_inner.Telemetry is null)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            _parentCloseFailureObserved = true;
+        }
+    }
+
+    private bool ParentCloseFailureObserved()
+    {
+        lock (_gate)
+        {
+            return _parentCloseFailureObserved;
+        }
+    }
+
+    private void ThrowIfOwnedSelfClose()
+    {
+        if (_inner.IsOwnedPublicExecution)
+        {
+            throw new InvalidOperationException("A public stream cannot be closed from its own callback. Dispose it after the callback returns.");
         }
     }
 

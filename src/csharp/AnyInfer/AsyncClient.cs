@@ -5,6 +5,8 @@ using AnyInfer.Providers;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
 using AnyInfer.Schema;
+using AnyInfer.Events;
+using AnyInfer.Manifest;
 
 namespace AnyInfer;
 
@@ -21,6 +23,9 @@ public sealed class AsyncClient : IAsyncDisposable
     private readonly TargetMetadataResolver _targetResolver;
     private readonly TargetResolutionProfile _resolutionProfile;
     private readonly SchemaValidationOptions? _schemaValidation;
+    private readonly EventDispatcher _dispatcher;
+    private readonly bool _manifests;
+    private readonly bool _manifestPayloads;
     private readonly object _gate = new();
     private readonly HashSet<AsyncStream> _activeStreams = [];
     private readonly HashSet<LifecycleReservation> _lifecycleOperations = [];
@@ -39,7 +44,10 @@ public sealed class AsyncClient : IAsyncDisposable
         AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
-        SchemaValidationOptions? schemaValidation = null)
+        SchemaValidationOptions? schemaValidation = null,
+        IEnumerable<IObserver>? observers = null,
+        bool manifests = true,
+        bool manifestPayloads = false)
     {
         var descriptors = registry ?? Providers.ProviderRegistry.CreateDefault();
         _pool = new ProviderPool(providers, descriptors, resolver ?? Credentials.ResolverChain.CreateDefault());
@@ -52,11 +60,19 @@ public sealed class AsyncClient : IAsyncDisposable
         _targetResolver = new TargetMetadataResolver(_catalog, _pool.DescriptorSnapshot, () => _pool.Bindings, _pool, _capabilities);
         _resolutionProfile = TargetResolutionProfile.PublicSdk;
         _schemaValidation = schemaValidation;
+        _dispatcher = new EventDispatcher(observers);
+        _manifests = manifests;
+        _manifestPayloads = manifestPayloads;
     }
 
     /// <summary>Creates a client over externally constructed adapters.</summary>
-    public static AsyncClient FromAdapters(IEnumerable<ProviderRegistration> providers, SchemaValidationOptions? schemaValidation = null) =>
-        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation);
+    public static AsyncClient FromAdapters(
+        IEnumerable<ProviderRegistration> providers,
+        SchemaValidationOptions? schemaValidation = null,
+        IEnumerable<IObserver>? observers = null,
+        bool manifests = true,
+        bool manifestPayloads = false) =>
+        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation, observers, manifests, manifestPayloads);
 
     /// <summary>Creates a client from inert parsed configuration without performing I/O or credential resolution.</summary>
     public static AsyncClient FromConfig(
@@ -66,18 +82,28 @@ public sealed class AsyncClient : IAsyncDisposable
         AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
-        SchemaValidationOptions? schemaValidation = null)
+        SchemaValidationOptions? schemaValidation = null,
+        IEnumerable<IObserver>? observers = null,
+        bool manifests = true,
+        bool manifestPayloads = false)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation);
+        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads);
     }
 
     internal AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock)
-        : this(providers, clock, publicSdk: false, schemaValidation: null)
+        : this(providers, clock, publicSdk: false, schemaValidation: null, observers: null, manifests: false, manifestPayloads: false)
     {
     }
 
-    private AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock, bool publicSdk, SchemaValidationOptions? schemaValidation)
+    private AsyncClient(
+        IEnumerable<ProviderRegistration> providers,
+        IOperationClock clock,
+        bool publicSdk,
+        SchemaValidationOptions? schemaValidation,
+        IEnumerable<IObserver>? observers,
+        bool manifests,
+        bool manifestPayloads)
     {
         _pool = new ProviderPool(providers);
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -92,6 +118,9 @@ public sealed class AsyncClient : IAsyncDisposable
             _capabilities);
         _resolutionProfile = publicSdk ? TargetResolutionProfile.PublicSdk : TargetResolutionProfile.FrozenV0;
         _schemaValidation = schemaValidation;
+        _dispatcher = new EventDispatcher(observers);
+        _manifests = manifests;
+        _manifestPayloads = manifestPayloads;
     }
 
     internal RouteState Health => _health;
@@ -108,6 +137,12 @@ public sealed class AsyncClient : IAsyncDisposable
         var resolved = _targetResolver.Resolve(target, TargetResolutionProfile.PublicSdk);
         return _capabilities.CapabilitiesFor(resolved.Descriptor, resolved.Target.ProviderId, resolved.Target.Model, _pool.EffectiveLocality(resolved));
     }
+
+    /// <summary>Subscribes an observer for synchronous telemetry notifications.</summary>
+    public void Subscribe(IObserver observer, bool payloads = false) => _dispatcher.Subscribe(observer, payloads);
+
+    /// <summary>Removes every reference-identical observer subscription.</summary>
+    public void Unsubscribe(IObserver observer) => _dispatcher.Unsubscribe(observer);
 
     /// <summary>Lists models for one selected provider instance and optionally filters by operation.</summary>
     public Task<IReadOnlyList<DiscoveredModel>> ModelsAsync(
@@ -139,8 +174,8 @@ public sealed class AsyncClient : IAsyncDisposable
         return ProbeCoreAsync(target, features, timeoutS, record, cancellationToken, CancellationIdentityContext.Resolve(cancellationToken));
     }
     /// <summary>Consumes this client's single streaming execution path to its terminal result.</summary>
-    public Task<Generation> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default) =>
-        GenerateAsync(request, capture: null, cancellationToken: cancellationToken);
+    public Task<Generation> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        GenerateAsync(request, capture: null, cancellationToken: cancellationToken, manifest: manifest);
 
     /// <summary>Generates from one user prompt through the normal request path.</summary>
     public Task<Generation> GenerateAsync(
@@ -153,10 +188,12 @@ public sealed class AsyncClient : IAsyncDisposable
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
         GenerateAsync(
             CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false),
-            cancellationToken);
+            cancellationToken,
+            manifest);
 
     /// <summary>Generates from immutable caller messages through the normal request path.</summary>
     public Task<Generation> GenerateAsync(
@@ -169,23 +206,26 @@ public sealed class AsyncClient : IAsyncDisposable
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
         GenerateAsync(
             CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false),
-            cancellationToken);
+            cancellationToken,
+            manifest);
 
     internal async Task<Generation> GenerateAsync(
         GenerationRequest request,
         OperationCapture? capture,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool? manifest = null)
     {
-        await using var stream = StreamAsync(request, capture, cancellationToken);
+        await using var stream = StreamAsync(request, capture, cancellationToken, manifest);
         return await stream.CollectAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Creates a lazy single-consumer generation stream.</summary>
-    public AsyncStream StreamAsync(GenerationRequest request, CancellationToken cancellationToken = default) =>
-        StreamAsync(request, capture: null, cancellationToken: cancellationToken);
+    public AsyncStream StreamAsync(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        StreamAsync(request, capture: null, cancellationToken: cancellationToken, manifest: manifest);
 
     /// <summary>Creates a streaming generation operation from one user prompt.</summary>
     public AsyncStream StreamAsync(
@@ -198,10 +238,12 @@ public sealed class AsyncClient : IAsyncDisposable
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
         StreamAsync(
             CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true),
-            cancellationToken);
+            cancellationToken,
+            manifest);
 
     /// <summary>Creates a streaming generation operation from immutable caller messages.</summary>
     public AsyncStream StreamAsync(
@@ -214,15 +256,18 @@ public sealed class AsyncClient : IAsyncDisposable
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
         StreamAsync(
             CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true),
-            cancellationToken);
+            cancellationToken,
+            manifest);
 
     internal AsyncStream StreamAsync(
         GenerationRequest request,
         OperationCapture? capture,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool? manifest = null)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(request);
@@ -243,13 +288,28 @@ public sealed class AsyncClient : IAsyncDisposable
             _resolutionProfile == TargetResolutionProfile.PublicSdk,
             _resolutionProfile == TargetResolutionProfile.PublicSdk ? SchemaExecutionProfile.ModernSdk : SchemaExecutionProfile.FrozenV0,
             _schemaValidation);
+        var enableManifest = _resolutionProfile == TargetResolutionProfile.PublicSdk && (manifest ?? _manifests);
+        var requestId = Guid.NewGuid().ToString("D");
+        ManifestBuilder? builder = enableManifest
+            ? new ManifestBuilder(
+                requestId,
+                normalized,
+                effectiveRequest.Route,
+                metadata => _capabilities.CapabilitiesFor(metadata.Descriptor, metadata.Target.ProviderId, metadata.Target.Model, _pool.EffectiveLocality(metadata)),
+                _manifestPayloads,
+                AnyInferVersion.Value)
+            : null;
+        RequestTelemetry? telemetry = _resolutionProfile == TargetResolutionProfile.PublicSdk
+            ? new RequestTelemetry(normalized, effectiveRequest.Route, _dispatcher, builder, requestId)
+            : null;
         AsyncStream? stream = null;
         stream = new AsyncStream(
             this,
             SyncExecutionContext.CurrentClient,
             token => RunStreamAsync(normalized, effectiveRequest.Route, capture, stream!, token),
             cancellationToken,
-            RemoveActiveStream);
+            RemoveActiveStream,
+            telemetry);
         lock (_gate)
         {
             ThrowIfDisposed();

@@ -91,6 +91,24 @@ of this proof.
 --8<-- "examples/csharp-sdk/ProbeExample.cs"
 ```
 
+## Observe telemetry and manifests
+
+Telemetry is an in-memory, synchronous observer callback by default. The observer in this
+example receives payload-free typed events; callers explicitly own and dispose any sink they
+choose to add. Inline callbacks run on the generation path.
+
+```csharp
+--8<-- "examples/csharp-sdk/TelemetryExample.cs"
+```
+
+Manifest capture is separate from observer payload delivery. A stream exposes an incomplete
+manifest before consumption and the committed terminal manifest after completion. The helper
+also provides schema, digest, JSON, and rendered forms for the immutable public value.
+
+```csharp
+--8<-- "examples/csharp-sdk/ManifestExample.cs"
+```
+
 ## Describe provider setup
 
 `ProviderSetupSpec` and its fields are declarative metadata for an application's setup UI.
@@ -114,9 +132,10 @@ verifier runs.
 
 This proof covers asynchronous text generation and a synchronous facade over that same core,
 through the OpenAI-compatible adapter. It also covers structured JSON validation and repair,
-configuration, routing, reported token usage, explicit capability probes, and declarative setup
-metadata. It does not provide a released NuGet package, provider parity, aggregate usage
-accounting, tool execution, embeddings, reranking, or production report publication.
+configuration, routing, reported token usage, explicit capability probes, payload-free typed
+telemetry, immutable manifests, and declarative setup metadata. It does not provide a released
+NuGet package, provider parity, aggregate usage accounting, tool execution, embeddings,
+reranking, or production report publication.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with

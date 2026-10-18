@@ -761,6 +761,10 @@ must report a real conflict rather than silently changing a dependent public sig
   as explicit opt-in, immutable `RunManifest` projections and versioned serialization from
   `events/`, `manifest.py` and `manifest/` if present. Gate: observer and manifest facts agree,
   redaction/privacy tests pass and default execution performs no telemetry I/O.
+  > NOTE: Detailed execution begins in `ANYINFER_CSHARP_SDK_EVENTS.md`. Native decimal
+  > values and manifest JSON formatting are independently qualified before source work;
+  > only the minimum Usage/Pricing value prerequisite is pulled forward from SDK.5b.
+  > Accounting, ledgers and request policies remain unchecked until their own gates pass.
 - [ ] **SDK.5b** Define a separate shared accounting profile (the previously deferred M3),
   preserving unknown usage, failed/cancelled attempts, repairs and aggregate operation cost.
   Port `Usage` merge/normalization, pricing/estimation, token-estimator interfaces, budgets,

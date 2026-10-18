@@ -1,0 +1,451 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "anyinfer_version": {
+      "type": "string"
+    },
+    "attempts": {
+      "items": {
+        "properties": {
+          "attempt_number": {
+            "type": "integer"
+          },
+          "error": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "first_token_ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "paced_s": {
+            "type": "object"
+          },
+          "queued_ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "retry_delay_s": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "retry_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "type": "string"
+          },
+          "total_ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "cache": {
+      "properties": {
+        "estimated_cacheable_tokens": {
+          "type": "integer"
+        },
+        "mark_count": {
+          "type": "integer"
+        },
+        "mechanism": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy_mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "read_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "write_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "capability": {
+      "properties": {
+        "facts": {
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "provenance": {
+                "type": "string"
+              },
+              "value": {}
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "context": {
+      "properties": {
+        "reductions": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "dropped": {
+      "items": {
+        "properties": {
+          "parameter": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "embedding_space": {
+      "properties": {
+        "compatibility_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dimensions": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "input_intent_aware": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string"
+        },
+        "model_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "normalized": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "provider_id": {
+          "type": "string"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "format": {
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "operation": {
+      "enum": [
+        "generation",
+        "embedding",
+        "rerank"
+      ]
+    },
+    "payloads": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "request": {
+      "properties": {
+        "char_count": {
+          "type": "integer"
+        },
+        "estimated_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "message_count": {
+          "type": "integer"
+        },
+        "metadata_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reasoning": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "repair_budget": {
+          "type": "integer"
+        },
+        "role_counts": {
+          "type": "object"
+        },
+        "sampling": {
+          "type": "object"
+        },
+        "schema_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_present": {
+          "type": "boolean"
+        },
+        "timeout_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "tool_choice": {
+          "type": "string"
+        },
+        "tool_names": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "route": {
+      "properties": {
+        "considered": {
+          "items": {
+            "properties": {
+              "outcome": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "target": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "requested": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resolved": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "structured": {
+      "properties": {
+        "chosen": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ladder": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "repair_attempts": {
+          "type": "integer"
+        },
+        "repairs": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "requested": {
+          "type": "boolean"
+        },
+        "used": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "validated": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "timing": {
+      "properties": {
+        "first_token_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "output_tokens_per_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "phases": {
+          "type": "object"
+        },
+        "total_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "usage": {
+      "properties": {
+        "cache_read_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cache_write_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cost_usd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "estimated_fields": {
+          "type": "object"
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reasoning_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "search_units": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "total_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "format",
+    "request_id",
+    "request",
+    "route",
+    "usage",
+    "timing"
+  ],
+  "title": "AnyInfer run manifest",
+  "type": "object"
+}

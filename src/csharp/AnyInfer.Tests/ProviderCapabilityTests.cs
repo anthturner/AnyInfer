@@ -4,6 +4,7 @@ using AnyInfer.Catalog;
 using AnyInfer.Config;
 using AnyInfer.Providers;
 using Xunit;
+using PeterO.Numbers;
 
 namespace AnyInfer.Tests;
 
@@ -55,8 +56,8 @@ public sealed class ProviderCapabilityTests
         var catalog = CatalogWithAliases(("alias-a", "primary", "model"), ("alias-b", "primary", "model"));
         var table = new PricingTable(new Dictionary<string, IReadOnlyList<PricingEntry>>
         {
-            ["primary"] = [new PricingEntry("model", new Pricing(2m, 3m), "2026-01-01", "https://example.invalid/primary")],
-            ["engine"] = [new PricingEntry("model", new Pricing(99m, 99m), "2026-01-01", "https://example.invalid/engine")],
+            ["primary"] = [new PricingEntry("model", new Pricing(EDecimal.FromString("2"), EDecimal.FromString("3")), "2026-01-01", "https://example.invalid/primary")],
+            ["engine"] = [new PricingEntry("model", new Pricing(EDecimal.FromString("99"), EDecimal.FromString("99")), "2026-01-01", "https://example.invalid/engine")],
         });
         var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>
         {
@@ -96,7 +97,7 @@ public sealed class ProviderCapabilityTests
             Assert.Equal(0, capabilities.ContextWindow!.Value);
             Assert.Equal(Provenance.Override, capabilities.ContextWindow.Provenance);
             Assert.Equal(Feature.JsonSchema, capabilities.Features.Value);
-            Assert.Equal(2m, capabilities.Pricing!.Value.InputPer1M);
+            Assert.Equal(EDecimal.FromString("2"), capabilities.Pricing!.Value.InputPer1M);
             Assert.Equal(Provenance.Catalog, capabilities.Pricing.Provenance);
             Assert.Equal(0, factoryCalls);
 
@@ -119,8 +120,8 @@ public sealed class ProviderCapabilityTests
 
         await using var local = new AsyncClient([ProviderSettings.Of("engine", alias: "primary")], registry, catalog: catalog, pricingTable: new PricingTable(new Dictionary<string, IReadOnlyList<PricingEntry>>()));
         var localFacts = local.Capabilities("tier");
-        Assert.Equal(0m, localFacts.Pricing!.Value.InputPer1M);
-        Assert.Equal(0m, localFacts.Pricing.Value.OutputPer1M);
+        Assert.Equal(EDecimal.FromString("0"), localFacts.Pricing!.Value.InputPer1M);
+        Assert.Equal(EDecimal.FromString("0"), localFacts.Pricing.Value.OutputPer1M);
         Assert.Equal(Provenance.Catalog, localFacts.Pricing.Provenance);
 
         await using var remote = new AsyncClient([ProviderSettings.Of("engine", baseUrl: "https://remote.example/v1", alias: "primary")], registry, catalog: catalog, pricingTable: new PricingTable(new Dictionary<string, IReadOnlyList<PricingEntry>>()));

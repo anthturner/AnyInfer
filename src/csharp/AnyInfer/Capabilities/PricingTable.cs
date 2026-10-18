@@ -1,8 +1,8 @@
 using AnyInfer.Json;
 using AnyInfer.Catalog;
+using AnyInfer.Internal;
+using PeterO.Numbers;
 using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Numerics;
 using System.Reflection;
 
 namespace AnyInfer.Capabilities;
@@ -77,8 +77,8 @@ public sealed class PricingTable
     }
 
     private static bool IsVersionOne(JsonValue value) => value is JsonInteger integer && integer.Value == 1 || value is JsonNumber number && number.Value == 1 || value is JsonBoolean { Value: true };
-    private static decimal DecimalValue(JsonObject row, string name) => OptionalDecimal(row, name) ?? throw new ConfigException($"Pricing row requires '{name}'.");
-    private static decimal? OptionalDecimal(JsonObject row, string name)
+    private static EDecimal DecimalValue(JsonObject row, string name) => OptionalDecimal(row, name) ?? throw new ConfigException($"Pricing row requires '{name}'.");
+    private static EDecimal? OptionalDecimal(JsonObject row, string name)
     {
         if (!row.TryGetValue(name, out var value) || value is JsonNull) return null;
         return DecimalValue(value);
@@ -114,28 +114,28 @@ public sealed class PricingTable
         return parsed;
     }
 
-    private static IReadOnlyDictionary<string, decimal> ResolveToolRates(IReadOnlyDictionary<string, ToolRate>? rates, string model)
+    private static IReadOnlyDictionary<string, EDecimal> ResolveToolRates(IReadOnlyDictionary<string, ToolRate>? rates, string model)
     {
-        if (rates is null) return new Dictionary<string, decimal>(StringComparer.Ordinal);
-        var result = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        if (rates is null) return new Dictionary<string, EDecimal>(StringComparer.Ordinal);
+        var result = new Dictionary<string, EDecimal>(StringComparer.Ordinal);
         foreach (var (kind, rate) in rates)
         {
             var value = rate.Resolve(model);
-            if (value is not null) result.Add(kind, value.Value);
+            if (value is not null) result.Add(kind, value);
         }
         return result;
     }
 
-    private sealed record ToolRate(decimal? Flat, IReadOnlyDictionary<string, decimal> ByModel)
+    private sealed record ToolRate(EDecimal? Flat, IReadOnlyDictionary<string, EDecimal> ByModel)
     {
         internal static ToolRate Parse(JsonObject entry)
         {
-            if (ScalarText(entry, "billed_as") == "tokens") return new ToolRate(0m, new Dictionary<string, decimal>());
-            if (entry.TryGetValue("per_use", out var rawFlat)) return new ToolRate(DecimalValue(rawFlat), new Dictionary<string, decimal>());
+            if (ScalarText(entry, "billed_as") == "tokens") return new ToolRate(EDecimal.Zero, new Dictionary<string, EDecimal>());
+            if (entry.TryGetValue("per_use", out var rawFlat)) return new ToolRate(DecimalValue(rawFlat), new Dictionary<string, EDecimal>());
             if (!entry.TryGetValue("per_use_by_model", out var raw) || raw is not JsonObject models || models.Properties.Count == 0) throw new ConfigException("Pricing server-tool rate is incomplete.");
             return new ToolRate(null, models.Properties.ToDictionary(static item => item.Name, static item => DecimalValue(item.Value), StringComparer.Ordinal));
         }
-        internal decimal? Resolve(string model)
+        internal EDecimal? Resolve(string model)
         {
             if (Flat is not null) return Flat;
             var match = ByModel.Keys.Where(candidate => model == candidate || model.StartsWith(candidate, StringComparison.Ordinal)).OrderByDescending(static candidate => candidate.Length).FirstOrDefault();
@@ -143,57 +143,24 @@ public sealed class PricingTable
         }
     }
 
-    private static decimal DecimalValue(JsonValue value)
+    private static EDecimal DecimalValue(JsonValue value)
     {
-        if (value is not JsonString text || !decimal.TryParse(text.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) || parsed < 0)
+        if (value is not JsonString text)
         {
             throw new ConfigException("Pricing rate must be a non-negative decimal string.");
         }
-        if (!IsExactDecimal(text.Value, parsed))
+
+        EDecimal parsed;
+        try
         {
-            throw new ConfigException("Pricing rate exceeds the supported decimal precision.");
+            parsed = EDecimal.FromString(text.Value);
         }
+        catch (FormatException exception)
+        {
+            throw new ConfigException("Pricing rate must be a non-negative decimal string.", nativeInner: exception);
+        }
+
+        if (AccountingDecimal.IsNegativeCatalogRate(parsed)) throw new ConfigException("Pricing rate must be a non-negative decimal string.");
         return parsed;
-    }
-
-    private static bool IsExactDecimal(string text, decimal value)
-    {
-        var source = text.Trim();
-        var negative = source.StartsWith("-", StringComparison.Ordinal);
-        if (negative || source.StartsWith("+", StringComparison.Ordinal)) source = source[1..];
-        var exponent = 0;
-        var marker = source.IndexOfAny(['e', 'E']);
-        if (marker >= 0)
-        {
-            if (!int.TryParse(source[(marker + 1)..], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out exponent)) return false;
-            source = source[..marker];
-        }
-        var point = source.IndexOf('.');
-        var fractional = point < 0 ? 0 : source.Length - point - 1;
-        var digits = source.Replace(".", "", StringComparison.Ordinal);
-        if (digits.Length == 0 || !digits.All(char.IsAsciiDigit)) return false;
-        var sourceValue = BigInteger.Parse((negative ? "-" : "") + digits, CultureInfo.InvariantCulture);
-        var sourceScale = (long)fractional - exponent;
-        var bits = decimal.GetBits(value);
-        var decimalValue = new BigInteger((uint)bits[0]) | (new BigInteger((uint)bits[1]) << 32) | (new BigInteger((uint)bits[2]) << 64);
-        if ((bits[3] & unchecked((int)0x80000000)) != 0) decimalValue = -decimalValue;
-        var decimalScale = (long)((bits[3] >> 16) & 0x7f);
-        if (sourceValue.IsZero || decimalValue.IsZero)
-        {
-            return sourceValue.IsZero && decimalValue.IsZero;
-        }
-
-        NormalizeDecimal(ref sourceValue, ref sourceScale);
-        NormalizeDecimal(ref decimalValue, ref decimalScale);
-        return sourceValue == decimalValue && sourceScale == decimalScale;
-    }
-
-    private static void NormalizeDecimal(ref BigInteger coefficient, ref long scale)
-    {
-        while (coefficient % 10 == 0)
-        {
-            coefficient /= 10;
-            scale--;
-        }
     }
 }

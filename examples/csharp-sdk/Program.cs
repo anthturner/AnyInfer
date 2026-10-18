@@ -6,7 +6,10 @@ using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
 using AnyInfer.Config;
 using AnyInfer.Examples;
+using AnyInfer.Events;
+using AnyInfer.Manifest;
 using AnyInfer.Providers;
+using PeterO.Numbers;
 
 await VerifyAsync();
 
@@ -42,7 +45,7 @@ static async Task VerifyAsync()
     {
         ["demo-instance"] =
         [
-            new PricingEntry("demo-model", new Pricing(3.25m, 4.5m), "2026-10-17", "offline example"),
+            new PricingEntry("demo-model", new Pricing(EDecimal.FromString("3.25"), EDecimal.FromString("4.5")), "2026-10-17", "offline example"),
         ],
     });
     var catalogObservation = CatalogExample.Inspect(
@@ -53,7 +56,8 @@ static async Task VerifyAsync()
     Require(catalogObservation.Target.ProviderId == "demo-instance"
         && catalogObservation.Target.Model == "demo-model"
         && catalogObservation.Target.ViaAlias == "tier"
-        && catalogObservation.Pricing is { Value.InputPer1M: 3.25m, Provenance: Provenance.Catalog },
+        && catalogObservation.Pricing is { Provenance: Provenance.Catalog }
+        && catalogObservation.Pricing.Value.InputPer1M.CompareTo(EDecimal.FromString("3.25")) == 0,
         "Catalog example did not expose the expected public facts.");
     Require(pureFactoryCalls == 0, "Catalog example constructed an adapter for a pure query.");
 
@@ -124,6 +128,27 @@ static async Task VerifyAsync()
     var syncStreamed = SyncStreamingExample.Run(WithTransport(displayedSettings, syncStreamingHandler), target);
     Require(syncStreamed.Text == "hello", "Synchronous streaming example returned unexpected text.");
     Require(syncStreamingHandler.RequestCount == 1 && syncStreamingHandler.DisposeCount == 1, "Synchronous streaming example did not close its transport once.");
+
+    var telemetryHandler = new CountingHandler();
+    var telemetry = await TelemetryExample.RunAsync(WithTransport(displayedSettings, telemetryHandler), target);
+    Require(telemetry.Generation.Text == "hello"
+        && telemetry.Events.OfType<RequestStarted>().Single().PromptText is null
+        && telemetry.Events.OfType<RequestCompleted>().Single().ResponseText is null
+        && telemetryHandler.RequestCount == 1
+        && telemetryHandler.DisposeCount == 1,
+        "Telemetry example did not retain payload-free public event facts or transport ownership.");
+
+    var manifestHandler = new CountingHandler();
+    var manifest = await ManifestExample.RunAsync(WithTransport(displayedSettings, manifestHandler), target);
+    var schema = ManifestUtilities.JsonSchema();
+    Require(!manifest.Partial.Complete
+        && manifest.Terminal.Complete
+        && manifest.Generation.Manifest == manifest.Terminal
+        && ManifestUtilities.SchemaDigest(schema).StartsWith("sha256:", StringComparison.Ordinal)
+        && ManifestUtilities.Render(manifest.Terminal).Length != 0
+        && manifestHandler.RequestCount == 1
+        && manifestHandler.DisposeCount == 1,
+        "Manifest example did not preserve partial, terminal, or embedded-schema facts.");
 
     var structuredHandler = new CountingHandler(structured: true);
     var structured = await StructuredOutputExample.RunAsync(WithTransport(displayedSettings, structuredHandler), target);
@@ -237,6 +262,15 @@ sealed class CountingHandler(
         var requestBody = request.Content is null
             ? ""
             : await request.Content.ReadAsStringAsync(cancellationToken);
+        if (request.Method != HttpMethod.Post
+            || request.RequestUri?.AbsolutePath != "/v1/chat/completions"
+            || !string.IsNullOrEmpty(request.RequestUri?.Query)
+            || request.Content?.Headers.ContentType?.MediaType != "application/json"
+            || request.Headers.Authorization is not null)
+        {
+            throw new InvalidOperationException("Generation request used unexpected HTTP transport fields.");
+        }
+
         if (probes)
         {
             if (request.Method != HttpMethod.Post
@@ -252,6 +286,23 @@ sealed class CountingHandler(
         }
 
         var stream = requestBody.Contains("\"stream\":true", StringComparison.Ordinal);
+        using var document = JsonDocument.Parse(requestBody);
+        if (document.RootElement.GetProperty("model").GetString() != "demo")
+        {
+            throw new InvalidOperationException("Generation request did not retain the selected model.");
+        }
+
+        if (structured
+            && (document.RootElement.TryGetProperty("response_format", out _)
+                || !document.RootElement.GetProperty("messages")
+                    .EnumerateArray()
+                    .Any(static message => message.GetProperty("role").GetString() == "system"
+                        && message.GetProperty("content").GetString()?.StartsWith(
+                            "Respond with ONLY a JSON value matching this JSON Schema. No prose. Schema:\n",
+                            StringComparison.Ordinal) == true)))
+        {
+            throw new InvalidOperationException("Structured example did not use prompt-based schema enforcement.");
+        }
         if (statusCode != HttpStatusCode.OK)
         {
             return new HttpResponseMessage(statusCode)

@@ -25,24 +25,35 @@ NUSPEC_NAMESPACES = {
     "{http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd}",
 }
 CORE_PROPERTIES = re.compile(r"package/services/metadata/core-properties/[0-9a-fA-F-]+\.psmdcp")
-SCHEMA_DEPENDENCIES = {
+QUALIFIED_DEPENDENCIES = {
     "JsonSchema.Net": (
         "8.0.5",
         "EdVVe5ButZXkUIEgbah16Dm8soiwzs6OxsJBMTdoLNbjQPtkBAsH0uaF8BFnuYDWKDq9Zh6chUHSvbaSqq2VFA==",
+        "MIT",
     ),
     "JsonPointer.Net": (
         "6.0.1",
         "i7602ZUaqhhD3oapQvTjI1ZLbY2OhD71dt7JznEbtThyB56oU8SSpfj1ai8v1F4jvFl7k2BnYO1ULB1a5jPvUg==",
+        "MIT",
     ),
     "Json.More.Net": (
         "2.2.0",
         "8U88Wu/98+fPS1jlvCQWtADilO3zCi9To1wQvt/UXJK+i7f5hK8s31vhCSfI5U8Wr5aHyMh0h4WuCiRH48daeQ==",
+        "MIT",
     ),
     "Humanizer.Core": (
         "2.14.1",
         "yzqGU/HKNLZ9Uvr6kvSc3wYV/S5O/IvklIUW5WF7MuivGLY8wS5IZnLPkt7D1KW8Et2Enl0I3Lzg2vGWM24Xsw==",
+        "MIT",
+    ),
+    "PeterO.Numbers": (
+        "1.8.2",
+        "Rc5avnwd9v5DuyBrLi8J87vV9dyJ/BdgSOhNfLzxzjYGEO0Gc/X+AzWwty3VxNOnjEjk7r6NZBt0MSR1sdhHRg==",
+        "CC0-1.0",
     ),
 }
+
+DIRECT_DEPENDENCIES = {"JsonSchema.Net": "8.0.5", "PeterO.Numbers": "1.8.2"}
 
 
 def run(command: list[str], *, cwd: Path) -> None:
@@ -126,23 +137,22 @@ def _text(metadata: ElementTree.Element, namespace: str, name: str) -> str:
 def _validate_dependencies(metadata: ElementTree.Element, namespace: str) -> None:
     dependencies = metadata.find(namespace + "dependencies")
     if dependencies is None or len(dependencies) != 1:
-        raise RuntimeError("nuspec must declare the exact schema dependency")
+        raise RuntimeError("nuspec must declare the exact qualified direct dependency set")
     group = dependencies[0]
     if group.tag != namespace + "group" or group.get("targetFramework") != "net8.0":
         raise RuntimeError("nuspec dependency metadata is malformed")
     children = list(group)
-    if len(children) != 1:
-        raise RuntimeError("nuspec must declare exactly one direct dependency")
-    dependency = children[0]
-    if (
-        dependency.tag != namespace + "dependency"
-        or dependency.get("id") != "JsonSchema.Net"
-        or dependency.get("version") != "[8.0.5]"
-    ):
-        raise RuntimeError("nuspec schema dependency is not the qualified exact range")
+    declared = {
+        (child.get("id"), child.get("version"))
+        for child in children
+        if child.tag == namespace + "dependency"
+    }
+    expected = {(name, f"[{version}]") for name, version in DIRECT_DEPENDENCIES.items()}
+    if len(children) != len(expected) or declared != expected:
+        raise RuntimeError("nuspec dependency declarations are not the qualified exact ranges")
 
 
-def _read_dependency_metadata(package: Path) -> tuple[str, str]:
+def _read_dependency_metadata(package: Path, expected_license: str) -> tuple[str, str]:
     with zipfile.ZipFile(package) as archive:
         names = [entry for entry in archive.namelist() if entry.endswith(".nuspec")]
         if len(names) != 1:
@@ -155,9 +165,9 @@ def _read_dependency_metadata(package: Path) -> tuple[str, str]:
         if (
             license_node is None
             or license_node.get("type") != "expression"
-            or license_node.text != "MIT"
+            or license_node.text != expected_license
         ):
-            raise RuntimeError("dependency package license is not MIT")
+            raise RuntimeError("dependency package license is not qualified")
         return _text(metadata, namespace, "id"), _text(metadata, namespace, "version")
 
 
@@ -169,7 +179,7 @@ def _schema_dependency_closure(assets: dict[str, object]) -> None:
     if len(candidates) != 1 or not isinstance(candidates[0], dict):
         raise RuntimeError("root restore assets must contain one net8.0 target")
     target = candidates[0]
-    pending = ["JsonSchema.Net/8.0.5"]
+    pending = [f"{name}/{version}" for name, version in DIRECT_DEPENDENCIES.items()]
     closure: set[str] = set()
     while pending:
         identity = pending.pop()
@@ -183,13 +193,13 @@ def _schema_dependency_closure(assets: dict[str, object]) -> None:
         if not isinstance(dependencies, dict):
             raise RuntimeError(f"dependency metadata is malformed for {identity}")
         pending.extend(f"{name}/{version}" for name, version in dependencies.items())
-    expected = {f"{name}/{version}" for name, (version, _) in SCHEMA_DEPENDENCIES.items()}
+    expected = {f"{name}/{version}" for name, (version, _, _) in QUALIFIED_DEPENDENCIES.items()}
     if closure != expected:
-        raise RuntimeError("resolved schema dependency graph is not the qualified exact graph")
+        raise RuntimeError("resolved dependency graph is not the qualified exact graph")
 
 
 def stage_schema_dependencies(feed: Path, assets_path: Path | None = None) -> None:
-    """Copy only hash- and license-verified schema dependencies from the root restore."""
+    """Copy only hash- and license-verified qualified dependencies from the root restore."""
     assets_path = assets_path or PROJECT.parent / "obj" / "project.assets.json"
     try:
         assets = json.loads(assets_path.read_text(encoding="utf-8"))
@@ -203,7 +213,7 @@ def stage_schema_dependencies(feed: Path, assets_path: Path | None = None) -> No
         raise RuntimeError("root restore must identify one controlled package folder")
     package_folder = Path(next(iter(folders))).resolve()
     feed.mkdir(parents=True, exist_ok=True)
-    for name, (version, expected_hash) in SCHEMA_DEPENDENCIES.items():
+    for name, (version, expected_hash, expected_license) in QUALIFIED_DEPENDENCIES.items():
         filename = f"{name.lower()}.{version}.nupkg"
         package = package_folder / name.lower() / version / filename
         if not package.is_file():
@@ -213,7 +223,7 @@ def stage_schema_dependencies(feed: Path, assets_path: Path | None = None) -> No
         ).decode("ascii")
         if actual_hash != expected_hash:
             raise RuntimeError(f"qualified dependency archive hash drifted: {name}/{version}")
-        package_id, package_version = _read_dependency_metadata(package)
+        package_id, package_version = _read_dependency_metadata(package, expected_license)
         if package_id != name or package_version != version:
             raise RuntimeError(f"qualified dependency archive metadata drifted: {name}/{version}")
         shutil.copy2(package, feed / filename)
@@ -297,9 +307,12 @@ def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> Non
         '''using AnyInfer;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
+using AnyInfer.Events;
 using AnyInfer.Json;
+using AnyInfer.Manifest;
 using AnyInfer.Providers;
 using AnyInfer.Schema;
+using PeterO.Numbers;
 
 var factoryCalls = 0;
 var descriptor = new ProviderDescriptor(
@@ -324,7 +337,11 @@ var pricingTable = new PricingTable(new Dictionary<string, IReadOnlyList<Pricing
 {
     ["demo-instance"] =
     [
-        new PricingEntry("demo-model", new Pricing(3.25m, 4.5m), "2026-10-17", "package proof"),
+        new PricingEntry(
+            "demo-model",
+            new Pricing(EDecimal.FromString("3.25"), EDecimal.FromString("4.5")),
+            "2026-10-17",
+            "package proof"),
     ],
 });
 var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>
@@ -332,7 +349,9 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
     ["demo-instance"] = new Dictionary<string, ModelCapabilities>
     {
         ["demo-model"] = new ModelCapabilities(
-            pricing: new Sourced<Pricing>(new Pricing(5.75m, 6.25m), Provenance.Catalog)),
+            pricing: new Sourced<Pricing>(
+                new Pricing(EDecimal.FromString("5.75"), EDecimal.FromString("6.25")),
+                Provenance.Catalog)),
     },
 };
 {
@@ -347,10 +366,10 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
         || resolved.ViaAlias != "tier"
         || !ReferenceEquals(client.Catalog, catalog)
         || capabilityPricing is null
-        || capabilityPricing.Value.InputPer1M != 5.75m
+        || capabilityPricing.Value.InputPer1M.CompareTo(EDecimal.FromString("5.75")) != 0
         || capabilityPricing.Provenance != Provenance.Override
         || quoted is null
-        || quoted.Value.InputPer1M != 3.25m
+        || quoted.Value.InputPer1M.CompareTo(EDecimal.FromString("3.25")) != 0
         || quoted.Provenance != Provenance.Catalog)
         throw new InvalidOperationException(
             "asynchronous pure catalog or capability query failed");
@@ -365,7 +384,7 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
         || resolved.ViaAlias != "tier"
         || !ReferenceEquals(client.Catalog, catalog)
         || capabilityPricing is null
-        || capabilityPricing.Value.OutputPer1M != 6.25m
+        || capabilityPricing.Value.OutputPer1M.CompareTo(EDecimal.FromString("6.25")) != 0
         || capabilityPricing.Provenance != Provenance.Override)
         throw new InvalidOperationException(
             "synchronous pure catalog or capability query failed");
@@ -519,6 +538,68 @@ var syncAdapter = new DemoAdapter();
 if (syncAdapter.DisposeCount != 1)
     throw new InvalidOperationException("synchronous adapter disposal failed");
 
+var telemetryAdapter = new DemoAdapter();
+var asyncObserver = new CollectingObserver();
+{
+    await using var client = AsyncClient.FromAdapters(
+        [new ProviderRegistration("telemetry-demo", telemetryAdapter)],
+        observers: [asyncObserver]);
+    var disabled = await client.GenerateAsync(
+        "disabled", target: "telemetry-demo:model", manifest: false);
+    await using var stream = client.StreamAsync("hello", target: "telemetry-demo:model");
+    var partial = stream.Manifest
+        ?? throw new InvalidOperationException("missing partial manifest");
+    await stream.CollectAsync();
+    var terminal = stream.Result.Manifest
+        ?? throw new InvalidOperationException("missing terminal manifest");
+    var serialized = terminal.ToJson();
+    var restored = RunManifest.FromJson(serialized);
+    if (disabled.Manifest is not null
+        || partial.Complete
+        || !terminal.Complete
+        || stream.Result.Manifest != terminal
+        || restored.ToJson() != serialized
+        || !ManifestUtilities.SchemaDigest(ManifestUtilities.JsonSchema())
+            .StartsWith("sha256:")
+        || ManifestUtilities.Render(terminal).Length == 0
+        || asyncObserver.Events.OfType<RequestStarted>()
+            .Any(static item => item.PromptText is not null)
+        || asyncObserver.Events.OfType<RequestCompleted>()
+            .Any(static item => item.ResponseText is not null))
+        throw new InvalidOperationException("async telemetry or manifest public contract failed");
+}
+if (telemetryAdapter.DisposeCount != 1 || asyncObserver.DisposeCount != 0)
+    throw new InvalidOperationException("async telemetry ownership or adapter disposal failed");
+asyncObserver.Dispose();
+
+var syncTelemetryAdapter = new DemoAdapter();
+var syncObserver = new CollectingObserver();
+{
+    using var client = Client.FromAdapters(
+        [new ProviderRegistration("sync-telemetry-demo", syncTelemetryAdapter)],
+        observers: [syncObserver]);
+    var disabled = client.Generate(
+        "disabled", target: "sync-telemetry-demo:model", manifest: false);
+    using var stream = client.Stream("hello", target: "sync-telemetry-demo:model");
+    var partial = stream.Manifest
+        ?? throw new InvalidOperationException("missing sync partial manifest");
+    foreach (var _ in stream)
+    {
+    }
+    var terminal = stream.Result.Manifest
+        ?? throw new InvalidOperationException("missing sync terminal manifest");
+    if (disabled.Manifest is not null
+        || partial.Complete
+        || !terminal.Complete
+        || stream.Result.Manifest != terminal
+        || syncObserver.Events.OfType<RequestCompleted>()
+            .Any(static item => item.ResponseText is not null))
+        throw new InvalidOperationException("sync telemetry or manifest public contract failed");
+}
+if (syncTelemetryAdapter.DisposeCount != 1 || syncObserver.DisposeCount != 0)
+    throw new InvalidOperationException("sync telemetry ownership or adapter disposal failed");
+syncObserver.Dispose();
+
 sealed class DemoAdapter : IProviderAdapter
 {
     private int _calls;
@@ -539,6 +620,16 @@ sealed class DemoAdapter : IProviderAdapter
         DisposeCount++;
         return ValueTask.CompletedTask;
     }
+}
+
+sealed class CollectingObserver : IObserver, IDisposable
+{
+    public List<TelemetryEvent> Events { get; } = [];
+    public int DisposeCount { get; private set; }
+
+    public void OnEvent(TelemetryEvent telemetryEvent) => Events.Add(telemetryEvent);
+
+    public void Dispose() => DisposeCount++;
 }
 
 sealed record SchemaAnswer(

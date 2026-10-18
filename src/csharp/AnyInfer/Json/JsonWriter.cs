@@ -9,34 +9,54 @@ public static partial class JsonWriter
 {
     private static readonly BigInteger IntegerLimit = BigInteger.One << 63;
 
-    public static string Write(JsonValue value)
+    private enum NumberFormat
     {
-        ArgumentNullException.ThrowIfNull(value);
-        var builder = new StringBuilder();
-        Append(value, builder, canonical: false, depth: 0, allowLargeIntegers: false);
-        return builder.ToString();
+        Existing,
+        Python,
     }
+
+    private readonly record struct WritePolicy(
+        bool SortKeys,
+        bool AsciiOnly,
+        bool AllowLargeIntegers,
+        NumberFormat NumberFormat,
+        int? Indent,
+        bool Compact,
+        bool SpaceAfterComma,
+        bool SpaceAfterColon);
+
+    private static readonly WritePolicy DefaultPolicy = new(false, false, false, NumberFormat.Existing, null, Compact: true, SpaceAfterComma: false, SpaceAfterColon: false);
+    private static readonly WritePolicy CanonicalPolicy = new(true, true, false, NumberFormat.Existing, 2, Compact: false, SpaceAfterComma: false, SpaceAfterColon: true);
+    private static readonly WritePolicy ModernPolicy = new(false, false, true, NumberFormat.Existing, null, Compact: true, SpaceAfterComma: false, SpaceAfterColon: false);
+    private static readonly WritePolicy ModernCanonicalPolicy = new(true, true, true, NumberFormat.Existing, 2, Compact: false, SpaceAfterComma: false, SpaceAfterColon: true);
+    private static readonly WritePolicy ManifestCanonicalPolicy = new(true, true, true, NumberFormat.Python, null, Compact: true, SpaceAfterComma: false, SpaceAfterColon: false);
+
+    public static string Write(JsonValue value)
+        => WriteCore(value, DefaultPolicy);
 
     public static string WriteCanonical(JsonValue value)
+        => WriteCore(value, CanonicalPolicy);
+
+    internal static string WriteModern(JsonValue value) => WriteCore(value, ModernPolicy);
+
+    internal static string WriteCanonicalModern(JsonValue value) => WriteCore(value, ModernCanonicalPolicy);
+
+    /// <summary>Writes a compact, scalar-sorted ASCII manifest representation.</summary>
+    internal static string WriteManifestCanonical(JsonValue value) => WriteCore(value, ManifestCanonicalPolicy);
+
+    /// <summary>Writes a scalar-sorted ASCII manifest representation with Python-compatible separators.</summary>
+    internal static string WriteManifest(JsonValue value, int? indent = 2) =>
+        WriteCore(value, ManifestCanonicalPolicy with { Indent = indent, Compact = indent is null, SpaceAfterComma = indent is null, SpaceAfterColon = true });
+
+    private static string WriteCore(JsonValue value, WritePolicy policy)
     {
         ArgumentNullException.ThrowIfNull(value);
         var builder = new StringBuilder();
-        Append(value, builder, canonical: true, depth: 0, allowLargeIntegers: false);
+        Append(value, builder, policy, depth: 0);
         return builder.ToString();
     }
 
-    internal static string WriteModern(JsonValue value) => WriteCore(value, canonical: false, allowLargeIntegers: true);
-
-    internal static string WriteCanonicalModern(JsonValue value) => WriteCore(value, canonical: true, allowLargeIntegers: true);
-
-    private static string WriteCore(JsonValue value, bool canonical, bool allowLargeIntegers)
-    {
-        ArgumentNullException.ThrowIfNull(value);
-        var builder = new StringBuilder();
-        Append(value, builder, canonical, depth: 0, allowLargeIntegers);
-        return builder.ToString();
-    }
-    private static void Append(JsonValue value, StringBuilder builder, bool canonical, int depth, bool allowLargeIntegers)
+    private static void Append(JsonValue value, StringBuilder builder, WritePolicy policy, int depth)
     {
         switch (value)
         {
@@ -47,7 +67,7 @@ public static partial class JsonWriter
                 builder.Append(boolean.Value ? "true" : "false");
                 return;
             case JsonInteger integer:
-                if (!allowLargeIntegers && BigInteger.Abs(integer.Value) > IntegerLimit)
+                if (!policy.AllowLargeIntegers && BigInteger.Abs(integer.Value) > IntegerLimit)
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), "JSON integer is outside the portable v0 range.");
                 }
@@ -55,23 +75,23 @@ public static partial class JsonWriter
                 builder.Append(integer.Value.ToString(CultureInfo.InvariantCulture));
                 return;
             case JsonNumber number:
-                builder.Append(FormatNumber(number, canonical));
+                builder.Append(policy.NumberFormat == NumberFormat.Python ? FormatPythonNumber(number) : FormatNumber(number, policy.SortKeys));
                 return;
             case JsonString text:
-                AppendString(text.Value, builder, canonical);
+                AppendString(text.Value, builder, policy.AsciiOnly);
                 return;
             case JsonArray array:
-                AppendArray(array, builder, canonical, depth, allowLargeIntegers);
+                AppendArray(array, builder, policy, depth);
                 return;
             case JsonObject obj:
-                AppendObject(obj, builder, canonical, depth, allowLargeIntegers);
+                AppendObject(obj, builder, policy, depth);
                 return;
             default:
                 throw new ArgumentOutOfRangeException(nameof(value), "Unknown JSON value.");
         }
     }
 
-    private static void AppendArray(JsonArray array, StringBuilder builder, bool canonical, int depth, bool allowLargeIntegers)
+    private static void AppendArray(JsonArray array, StringBuilder builder, WritePolicy policy, int depth)
     {
         if (array.Items.Count == 0)
         {
@@ -82,32 +102,36 @@ public static partial class JsonWriter
         builder.Append('[');
         for (var index = 0; index < array.Items.Count; index++)
         {
-            if (canonical)
-            {
-                if (index > 0)
-                {
-                    builder.Append(',');
-                }
-
-                builder.Append('\n').Append(' ', (depth + 1) * 2);
-            }
-            else if (index > 0)
+            if (!policy.Compact && index > 0)
             {
                 builder.Append(',');
             }
+            else if (policy.Compact && index > 0)
+            {
+                builder.Append(',');
+                if (policy.SpaceAfterComma)
+                {
+                    builder.Append(' ');
+                }
+            }
 
-            Append(array.Items[index], builder, canonical, depth + 1, allowLargeIntegers);
+            if (!policy.Compact)
+            {
+                AppendIndent(builder, depth + 1, policy.Indent);
+            }
+
+            Append(array.Items[index], builder, policy, depth + 1);
         }
 
-        if (canonical)
+        if (!policy.Compact)
         {
-            builder.Append('\n').Append(' ', depth * 2);
+            AppendIndent(builder, depth, policy.Indent);
         }
 
         builder.Append(']');
     }
 
-    private static void AppendObject(JsonObject value, StringBuilder builder, bool canonical, int depth, bool allowLargeIntegers)
+    private static void AppendObject(JsonObject value, StringBuilder builder, WritePolicy policy, int depth)
     {
         if (value.Properties.Count == 0)
         {
@@ -115,7 +139,7 @@ public static partial class JsonWriter
             return;
         }
 
-        IEnumerable<JsonProperty> properties = canonical
+        IEnumerable<JsonProperty> properties = policy.SortKeys
             ? value.Properties.OrderBy(static item => item.Name, Comparer<string>.Create(JsonEquality.CompareCodePoints))
             : value.Properties;
         builder.Append('{');
@@ -125,28 +149,41 @@ public static partial class JsonWriter
             if (!first)
             {
                 builder.Append(',');
+                if (policy.Compact && policy.SpaceAfterComma)
+                {
+                    builder.Append(' ');
+                }
             }
 
-            if (canonical)
+            if (!policy.Compact)
             {
-                builder.Append('\n').Append(' ', (depth + 1) * 2);
+                AppendIndent(builder, depth + 1, policy.Indent);
             }
 
-            AppendString(property.Name, builder, canonical);
-            builder.Append(canonical ? ": " : ":");
-            Append(property.Value, builder, canonical, depth + 1, allowLargeIntegers);
+            AppendString(property.Name, builder, policy.AsciiOnly);
+            builder.Append(policy.SpaceAfterColon ? ": " : ":");
+            Append(property.Value, builder, policy, depth + 1);
             first = false;
         }
 
-        if (canonical)
+        if (!policy.Compact)
         {
-            builder.Append('\n').Append(' ', depth * 2);
+            AppendIndent(builder, depth, policy.Indent);
         }
 
         builder.Append('}');
     }
 
-    private static void AppendString(string value, StringBuilder builder, bool canonical)
+    private static void AppendIndent(StringBuilder builder, int depth, int? indent)
+    {
+        builder.Append('\n');
+        if (indent is > 0)
+        {
+            builder.Append(' ', depth * indent.Value);
+        }
+    }
+
+    private static void AppendString(string value, StringBuilder builder, bool asciiOnly)
     {
         ArgumentNullException.ThrowIfNull(value);
         builder.Append('"');
@@ -160,7 +197,7 @@ public static partial class JsonWriter
                     throw new ArgumentException("JSON strings cannot contain an unpaired surrogate.", nameof(value));
                 }
 
-                if (canonical)
+                if (asciiOnly)
                 {
                     AppendUnicodeEscape(character, builder);
                     AppendUnicodeEscape(value[++index], builder);
@@ -187,7 +224,7 @@ public static partial class JsonWriter
                 case '\n': builder.Append("\\n"); break;
                 case '\f': builder.Append("\\f"); break;
                 case '\r': builder.Append("\\r"); break;
-                case var _ when character < 0x20 || (canonical && character >= 0x7f):
+                case var _ when character < 0x20 || (asciiOnly && character >= 0x7f):
                     AppendUnicodeEscape(character, builder);
                     break;
                 default:
@@ -219,6 +256,86 @@ public static partial class JsonWriter
         var text = number.IsNegativeZero ? "-0.0" : number.Value.ToString("R", CultureInfo.InvariantCulture);
         text = NormalizeExponent(text);
         return text.IndexOfAny(['.', 'e']) >= 0 ? text : text + ".0";
+    }
+
+    private static string FormatPythonNumber(JsonNumber number)
+    {
+        if (!double.IsFinite(number.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(number), "JSON numbers must be finite.");
+        }
+
+        var value = number.Value;
+        if (value == 0d)
+        {
+            return number.IsNegativeZero ? "-0.0" : "0.0";
+        }
+
+        var roundTrip = value.ToString("R", CultureInfo.InvariantCulture);
+        var marker = roundTrip.IndexOfAny(['E', 'e']);
+        if (marker < 0)
+        {
+            return PythonFixedOrScientific(roundTrip);
+        }
+
+        var mantissa = roundTrip[..marker];
+        var exponent = int.Parse(roundTrip[(marker + 1)..], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+        if (exponent is >= -4 and < 16)
+        {
+            return PythonFixedFromScientific(mantissa, exponent);
+        }
+
+        var trimmed = mantissa.EndsWith(".0", StringComparison.Ordinal) ? mantissa[..^2] : mantissa;
+        return trimmed + "e" + (exponent >= 0 ? "+" : "-") + Math.Abs(exponent).ToString("00", CultureInfo.InvariantCulture);
+    }
+
+    private static string PythonFixedOrScientific(string fixedText)
+    {
+        var negative = fixedText.StartsWith("-", StringComparison.Ordinal);
+        var unsigned = negative ? fixedText[1..] : fixedText;
+        var point = unsigned.IndexOf('.');
+        var wholeLength = point < 0 ? unsigned.Length : point;
+        var digits = unsigned.Replace(".", string.Empty, StringComparison.Ordinal);
+        var firstNonzero = digits.IndexOfAny("123456789".ToCharArray());
+        if (firstNonzero < 0)
+        {
+            return negative ? "-0.0" : "0.0";
+        }
+
+        var exponent = wholeLength - firstNonzero - 1;
+        if (exponent is >= -4 and < 16)
+        {
+            return fixedText.IndexOf('.') >= 0 ? fixedText : fixedText + ".0";
+        }
+
+        var significant = digits[firstNonzero..].TrimEnd('0');
+        var mantissa = significant.Length == 1 ? significant : significant[0] + "." + significant[1..];
+        return (negative ? "-" : string.Empty) + mantissa + "e" + (exponent >= 0 ? "+" : "-") + Math.Abs(exponent).ToString("00", CultureInfo.InvariantCulture);
+    }
+
+    private static string PythonFixedFromScientific(string mantissa, int exponent)
+    {
+        var negative = mantissa.StartsWith("-", StringComparison.Ordinal);
+        var unsigned = negative ? mantissa[1..] : mantissa;
+        var point = unsigned.IndexOf('.');
+        var wholeLength = point < 0 ? unsigned.Length : point;
+        var digits = unsigned.Replace(".", string.Empty, StringComparison.Ordinal);
+        var decimalIndex = wholeLength + exponent;
+        string result;
+        if (decimalIndex <= 0)
+        {
+            result = "0." + new string('0', -decimalIndex) + digits;
+        }
+        else if (decimalIndex >= digits.Length)
+        {
+            result = digits + new string('0', decimalIndex - digits.Length) + ".0";
+        }
+        else
+        {
+            result = digits[..decimalIndex] + "." + digits[decimalIndex..];
+        }
+
+        return negative ? "-" + result : result;
     }
 
     private static bool IsVerifiedLexeme(string lexeme, double value)

@@ -108,6 +108,9 @@ when no key is configured; it does not establish compatibility for every local e
 Configured HTTP headers and base-URL composition follow the existing Python adapter:
 case-insensitive explicit headers override defaults, and the configured API base receives
 the `/chat/completions` suffix without inserting another version component.
+For `stream: true`, the Python adapter and current native public SDK decode
+`text/event-stream` replies as SSE and reuse buffered completion decoding for other response
+media types; the frozen native proof profile retains its original SSE interpretation.
 
 **Unverified:** no authenticated hosted request or pinned local-engine binary was run for
 this settings audit. Native evidence is restricted to offline HTTP handlers/fixtures and

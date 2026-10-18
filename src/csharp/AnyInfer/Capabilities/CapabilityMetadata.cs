@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using AnyInfer.Internal;
+using PeterO.Numbers;
 
 namespace AnyInfer.Capabilities;
 
@@ -93,13 +95,13 @@ public sealed record Pricing
     /// <param name="perSearchUnit">Known price per billed search unit, or <see langword="null"/> when unknown.</param>
     /// <param name="perServerToolUse">Known provider-tool prices, copied with ordinal string keys.</param>
     public Pricing(
-        decimal inputPer1M,
-        decimal outputPer1M,
-        decimal? cacheReadPer1M = null,
-        decimal? cacheWritePer1M = null,
+        EDecimal inputPer1M,
+        EDecimal outputPer1M,
+        EDecimal? cacheReadPer1M = null,
+        EDecimal? cacheWritePer1M = null,
         string currency = "USD",
-        decimal? perSearchUnit = null,
-        IReadOnlyDictionary<string, decimal>? perServerToolUse = null)
+        EDecimal? perSearchUnit = null,
+        IReadOnlyDictionary<string, EDecimal>? perServerToolUse = null)
     {
         InputPer1M = inputPer1M;
         OutputPer1M = outputPer1M;
@@ -107,54 +109,67 @@ public sealed record Pricing
         CacheWritePer1M = cacheWritePer1M;
         Currency = currency ?? throw new ArgumentNullException(nameof(currency));
         PerSearchUnit = perSearchUnit;
-        PerServerToolUse = new ReadOnlyDictionary<string, decimal>(
+        PerServerToolUse = new ReadOnlyDictionary<string, EDecimal>(
             perServerToolUse is null
-                ? new Dictionary<string, decimal>(StringComparer.Ordinal)
-                : new Dictionary<string, decimal>(perServerToolUse, StringComparer.Ordinal));
+                ? new Dictionary<string, EDecimal>(StringComparer.Ordinal)
+                : new Dictionary<string, EDecimal>(perServerToolUse, StringComparer.Ordinal));
     }
 
     /// <summary>Gets the price per one million input tokens.</summary>
-    public decimal InputPer1M { get; }
+    public EDecimal InputPer1M { get; }
     /// <summary>Gets the price per one million output tokens.</summary>
-    public decimal OutputPer1M { get; }
+    public EDecimal OutputPer1M { get; }
     /// <summary>Gets the cache-read price per one million tokens, or <see langword="null"/> when unknown.</summary>
-    public decimal? CacheReadPer1M { get; }
+    public EDecimal? CacheReadPer1M { get; }
     /// <summary>Gets the cache-write price per one million tokens, or <see langword="null"/> when unknown.</summary>
-    public decimal? CacheWritePer1M { get; }
+    public EDecimal? CacheWritePer1M { get; }
     /// <summary>Gets the currency code for every amount in this record.</summary>
     public string Currency { get; }
     /// <summary>Gets the price per billed search unit, or <see langword="null"/> when unknown.</summary>
-    public decimal? PerSearchUnit { get; }
+    public EDecimal? PerSearchUnit { get; }
     /// <summary>Gets an immutable snapshot of known prices per provider-run tool invocation.</summary>
-    public IReadOnlyDictionary<string, decimal> PerServerToolUse { get; }
+    public IReadOnlyDictionary<string, EDecimal> PerServerToolUse { get; }
 
     /// <summary>Compares all pricing values and tool-price pairs independent of map insertion order.</summary>
     public bool Equals(Pricing? other)
     {
         return ReferenceEquals(this, other) ||
             other is not null &&
-            InputPer1M == other.InputPer1M &&
-            OutputPer1M == other.OutputPer1M &&
-            CacheReadPer1M == other.CacheReadPer1M &&
-            CacheWritePer1M == other.CacheWritePer1M &&
+            AccountingDecimal.NumericEquals(InputPer1M, other.InputPer1M) &&
+            NullableEquals(CacheReadPer1M, other.CacheReadPer1M) &&
+            NullableEquals(CacheWritePer1M, other.CacheWritePer1M) &&
+            AccountingDecimal.NumericEquals(OutputPer1M, other.OutputPer1M) &&
             string.Equals(Currency, other.Currency, StringComparison.Ordinal) &&
-            PerSearchUnit == other.PerSearchUnit &&
-            CapabilityValueEquality.DictionaryEquals(PerServerToolUse, other.PerServerToolUse);
+            NullableEquals(PerSearchUnit, other.PerSearchUnit) &&
+            ToolRatesEqual(PerServerToolUse, other.PerServerToolUse);
     }
 
     /// <summary>Returns a hash code consistent with value-based map equality.</summary>
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        hash.Add(InputPer1M);
-        hash.Add(OutputPer1M);
-        hash.Add(CacheReadPer1M);
-        hash.Add(CacheWritePer1M);
+        hash.Add(AccountingDecimal.NumericHashCode(InputPer1M));
+        hash.Add(AccountingDecimal.NumericHashCode(OutputPer1M));
+        hash.Add(NullableHashCode(CacheReadPer1M));
+        hash.Add(NullableHashCode(CacheWritePer1M));
         hash.Add(Currency, StringComparer.Ordinal);
-        hash.Add(PerSearchUnit);
-        CapabilityValueEquality.AddDictionaryHash(ref hash, PerServerToolUse);
+        hash.Add(NullableHashCode(PerSearchUnit));
+        foreach (var (key, value) in PerServerToolUse.OrderBy(static item => item.Key, StringComparer.Ordinal))
+        {
+            hash.Add(key, StringComparer.Ordinal);
+            hash.Add(AccountingDecimal.NumericHashCode(value));
+        }
         return hash.ToHashCode();
     }
+
+    private static bool NullableEquals(EDecimal? left, EDecimal? right) =>
+        left is null ? right is null : right is not null && AccountingDecimal.NumericEquals(left, right);
+
+    private static int NullableHashCode(EDecimal? value) =>
+        value is null ? 0 : AccountingDecimal.NumericHashCode(value);
+
+    private static bool ToolRatesEqual(IReadOnlyDictionary<string, EDecimal> left, IReadOnlyDictionary<string, EDecimal> right) =>
+        left.Count == right.Count && left.All(item => right.TryGetValue(item.Key, out var value) && AccountingDecimal.NumericEquals(item.Value, value));
 }
 
 /// <summary>Describes a provider envelope's token accounting calibration.</summary>

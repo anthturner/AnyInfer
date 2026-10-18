@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using AnyInfer.Events;
 using AnyInfer.Internal;
 using AnyInfer.Json;
 using AnyInfer.Providers;
@@ -24,19 +25,34 @@ internal static class GenerationCore
     {
         var operation = new OperationContext(capture);
         stream.BeginOperation(operation);
+        var telemetry = stream.Telemetry;
         var attempts = new List<AttemptRecord>();
         var visitedTargets = new HashSet<(string ProviderId, string Model)>();
+        PendingFallback? pendingFallback = null;
 
         try
         {
             foreach (var rawTarget in route.Targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (pendingFallback is { } pending)
+                {
+                    telemetry?.Emit(new FallbackTriggered(
+                        telemetry.RequestId,
+                        pending.Target,
+                        rawTarget,
+                        pending.Error));
+                    pendingFallback = null;
+                }
+
                 var metadata = targetResolver.Resolve(rawTarget, resolutionProfile);
                 if (!visitedTargets.Add((metadata.Target.ProviderId, metadata.Target.Model)))
                 {
                     continue;
                 }
+
+                telemetry?.Emit(new TargetResolved(telemetry.RequestId, metadata.Target));
 
                 if (route.HealthGate && health.IsUnhealthy(metadata.Target, route.HealthTtlS))
                 {
@@ -46,20 +62,25 @@ internal static class GenerationCore
 
                 var resolved = registry.Materialize(metadata);
                 var adapter = await registry.GetAdapterAsync(resolved, cancellationToken).ConfigureAwait(false);
+                telemetry?.NoteCapabilities(metadata);
 
-                var effectiveRepairs = EffectiveRepairBudget(request, resolved, operation, capture);
+                var effectiveRepairs = EffectiveRepairBudget(request, resolved, operation, capture, telemetry);
                 for (var attemptNumber = 1; attemptNumber <= Math.Max(1, route.Retry.MaxAttempts); attemptNumber++)
                 {
                     var routeState = new RouteAttemptState();
+                    telemetry?.Emit(new AttemptStarted(telemetry.RequestId, resolved.Target, attemptNumber));
                     var current = CreateEntry(
                         adapter,
                         RequestNormalizer.CreateWireRequest(request, resolved),
                         operation,
                         stream,
+                        resolved.Target,
                         EntryRole.Original,
                         null,
                         routeState,
-                        cancellationToken);
+                        cancellationToken,
+                        telemetry,
+                        request.SchemaProfile == SchemaExecutionProfile.ModernSdk);
 
                     await foreach (var generationEvent in current.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
@@ -84,10 +105,13 @@ internal static class GenerationCore
 
                         if (disposition.ShouldRetry)
                         {
-                            await DelayAsync(route.Retry, attemptNumber, current.Error, clock, cancellationToken).ConfigureAwait(false);
+                            var delay = RouteState.BackoffSeconds(route.Retry, attemptNumber, current.Error.RetryAfterS);
+                            telemetry?.Emit(new RetryScheduled(telemetry.RequestId, resolved.Target, attemptNumber, delay, current.Error.Snapshot()));
+                            await DelayAsync(delay, clock, cancellationToken).ConfigureAwait(false);
                             continue;
                         }
 
+                        pendingFallback = new PendingFallback(resolved.Target, current.Error.Snapshot());
                         break;
                     }
 
@@ -132,6 +156,14 @@ internal static class GenerationCore
                         }
 
                         repairs++;
+                        telemetry?.NoteRepairText(current.Text);
+                        telemetry?.Emit(new RepairAttempted(
+                            telemetry.RequestId,
+                            resolved.Target,
+                            repairs,
+                            current.Entry.Request.Mechanism,
+                            assessment.Messages,
+                            telemetry.WantsPayloads ? current.Text : null));
                         var preparation = RepairBuilder.Build(request.Messages, current.Text, assessment);
                         capture?.RecordRepair(operation.OperationId, preparation);
                         capture?.RecordTelemetry(
@@ -142,10 +174,13 @@ internal static class GenerationCore
                             RequestNormalizer.CreateWireRequest(request, resolved, preparation.Messages),
                             operation,
                             stream,
+                            resolved.Target,
                             EntryRole.Correction,
                             assessment,
                             routeState,
-                            cancellationToken);
+                            cancellationToken,
+                            telemetry,
+                            request.SchemaProfile == SchemaExecutionProfile.ModernSdk);
 
                         await foreach (var generationEvent in current.ReadAsync(cancellationToken).ConfigureAwait(false))
                         {
@@ -178,8 +213,14 @@ internal static class GenerationCore
 
                         if (disposition.ShouldRetry)
                         {
-                            await DelayAsync(route.Retry, attemptNumber, current.Error, clock, cancellationToken).ConfigureAwait(false);
+                            var delay = RouteState.BackoffSeconds(route.Retry, attemptNumber, current.Error.RetryAfterS);
+                            telemetry?.Emit(new RetryScheduled(telemetry.RequestId, resolved.Target, attemptNumber, delay, current.Error.Snapshot()));
+                            await DelayAsync(delay, clock, cancellationToken).ConfigureAwait(false);
                             restartOriginal = true;
+                        }
+                        else
+                        {
+                            pendingFallback = new PendingFallback(resolved.Target, current.Error.Snapshot());
                         }
 
                         break;
@@ -205,7 +246,7 @@ internal static class GenerationCore
                         structured,
                         resolved.Target,
                         current.FinishReason,
-                        NormalizeWinningUsage(current.Usage),
+                        NormalizeWinningUsage(current.Usage, request.SchemaProfile == SchemaExecutionProfile.ModernSdk),
                         new Timing(
                             current.StartedAt,
                             firstTokenMilliseconds,
@@ -215,8 +256,19 @@ internal static class GenerationCore
                         repairs,
                         attempts,
                         []);
-                    stream.PublishSuccess(result);
-                    yield return new StreamEnded(result);
+                    telemetry?.Emit(new AttemptCompleted(
+                        telemetry.RequestId,
+                        resolved.Target,
+                        result.Usage ?? new Usage(),
+                        result.Timing ?? new Timing(),
+                        result.FinishReason ?? ""));
+                    var committed = stream.CommitSuccess(result, cancellationToken);
+                    if (committed is null)
+                    {
+                        yield break;
+                    }
+
+                    yield return new StreamEnded(committed);
                     yield break;
                 }
             }
@@ -234,16 +286,20 @@ internal static class GenerationCore
         WireRequest wireRequest,
         OperationContext operation,
         AsyncStream stream,
+        ResolvedTarget target,
         EntryRole role,
         NativeAssessment? assessment,
         RouteAttemptState routeState,
-        CancellationToken cancellationToken) =>
-        new(adapter, wireRequest, operation, role, assessment, routeState, cancellationToken, () => stream.IsClosing);
+        CancellationToken cancellationToken,
+        RequestTelemetry? telemetry,
+        bool publicSdk) =>
+        new(adapter, wireRequest, operation, target, role, assessment, routeState, cancellationToken, () => stream.IsClosing, telemetry, publicSdk);
     private static int EffectiveRepairBudget(
         NormalizedRequest request,
         ResolvedProvider resolved,
         OperationContext operation,
-        OperationCapture? capture)
+        OperationCapture? capture,
+        RequestTelemetry? telemetry)
     {
         var requested = request.RepairBudget;
         var ceiling = resolved.MaxRepairAttempts;
@@ -253,6 +309,7 @@ internal static class GenerationCore
             capture?.RecordTelemetry(
                 operation.OperationId,
                 new TelemetryObservation("parameter_dropped", "repair.max_attempts", reason));
+            telemetry?.Emit(new ParameterDropped(telemetry.RequestId, resolved.Target, "repair.max_attempts", reason));
             return maximum;
         }
 
@@ -287,24 +344,26 @@ internal static class GenerationCore
         error.Category is "transport" or "provider_unavailable";
 
     private static async ValueTask DelayAsync(
-        Retry policy,
-        int attemptNumber,
-        ProviderException error,
+        double delay,
         IOperationClock clock,
         CancellationToken cancellationToken)
     {
-        var delay = RouteState.BackoffSeconds(policy, attemptNumber, error.RetryAfterS);
         if (delay > 0)
         {
             await clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private static Usage? OverlayUsage(Usage? existing, Usage? overlay)
+    private static Usage? OverlayUsage(Usage? existing, Usage? overlay, bool publicSdk)
     {
         if (overlay is null)
         {
             return existing;
+        }
+
+        if (publicSdk)
+        {
+            return existing is null ? overlay : existing.Merge(overlay);
         }
 
         return new Usage(
@@ -316,8 +375,13 @@ internal static class GenerationCore
             overlay.ReasoningTokens ?? existing?.ReasoningTokens);
     }
 
-    private static Usage? NormalizeWinningUsage(Usage? usage)
+    private static Usage? NormalizeWinningUsage(Usage? usage, bool publicSdk)
     {
+        if (publicSdk)
+        {
+            return usage?.Normalized();
+        }
+
         if (usage is null || usage.TotalTokens is not null || usage.InputTokens is null || usage.OutputTokens is null)
         {
             return usage;
@@ -343,6 +407,7 @@ internal static class GenerationCore
     }
 
     private sealed record FailureDisposition(AttemptRecord Attempt, bool ShouldRetry);
+    private sealed record PendingFallback(ResolvedTarget Target, ErrorInfo Error);
 
     private sealed class RouteAttemptState
     {
@@ -354,11 +419,14 @@ internal static class GenerationCore
         private readonly IProviderAdapter _adapter;
         private readonly WireRequest _request;
         private readonly OperationContext _operation;
+        private readonly ResolvedTarget _target;
         private readonly EntryRole _role;
         private readonly NativeAssessment? _assessment;
         private readonly RouteAttemptState _routeState;
         private readonly CancellationToken _cancellationToken;
         private readonly Func<bool> _suppressCloseCancellation;
+        private readonly RequestTelemetry? _telemetry;
+        private readonly bool _publicSdk;
         private readonly StringBuilder _text = new();
         private EntryContext? _entry;
         private ProviderException? _error;
@@ -375,20 +443,26 @@ internal static class GenerationCore
             IProviderAdapter adapter,
             WireRequest request,
             OperationContext operation,
+            ResolvedTarget target,
             EntryRole role,
             NativeAssessment? assessment,
             RouteAttemptState routeState,
             CancellationToken cancellationToken,
-            Func<bool> suppressCloseCancellation)
+            Func<bool> suppressCloseCancellation,
+            RequestTelemetry? telemetry,
+            bool publicSdk)
         {
             _adapter = adapter;
             _request = request;
             _operation = operation;
+            _target = target;
             _role = role;
             _assessment = assessment;
             _routeState = routeState;
             _cancellationToken = cancellationToken;
             _suppressCloseCancellation = suppressCloseCancellation;
+            _telemetry = telemetry;
+            _publicSdk = publicSdk;
         }
 
         internal EntryContext Entry => _entry ?? throw new InvalidOperationException("The entry did not begin.");
@@ -506,6 +580,7 @@ internal static class GenerationCore
                         _routeState.ContentEmitted = true;
                         var firstTokenMilliseconds = _entryStopwatch.Elapsed.TotalMilliseconds;
                         _firstTokenMilliseconds = firstTokenMilliseconds;
+                        _telemetry?.Emit(new FirstToken(_telemetry.RequestId, _target, firstTokenMilliseconds));
                         yield return new TimingMark("first_token", firstTokenMilliseconds);
                     }
 
@@ -514,12 +589,12 @@ internal static class GenerationCore
                     break;
                 case AdapterUsage usage:
                     _sawAdapterUsage = true;
-                    _usage = OverlayUsage(_usage, usage.Usage);
+                    _usage = OverlayUsage(_usage, usage.Usage, _publicSdk);
                     yield return new UsageUpdate(usage.Usage);
                     break;
                 case AdapterFinal final:
                     _finishReason = final.FinishReason;
-                    _usage = OverlayUsage(_usage, final.Usage);
+                    _usage = OverlayUsage(_usage, final.Usage, _publicSdk);
                     break;
             }
         }

@@ -6,6 +6,7 @@ using AnyInfer.Internal;
 using AnyInfer.Json;
 using AnyInfer.Providers;
 using AnyInfer.Schema;
+using AnyInfer.Events;
 using System.Runtime.ExceptionServices;
 
 namespace AnyInfer;
@@ -32,15 +33,24 @@ public sealed class Client : IDisposable
         global::AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
-        SchemaValidationOptions? schemaValidation = null)
-        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation))
+        SchemaValidationOptions? schemaValidation = null,
+        IEnumerable<IObserver>? observers = null,
+        bool manifests = true,
+        bool manifestPayloads = false)
+        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads))
     {
     }
 
     private Client(AsyncClient inner) => _inner = inner ?? throw new ArgumentNullException(nameof(inner));
 
     /// <summary>Creates a synchronous client over externally constructed adapters.</summary>
-    public static Client FromAdapters(IEnumerable<ProviderRegistration> providers, SchemaValidationOptions? schemaValidation = null) => new(AsyncClient.FromAdapters(providers, schemaValidation));
+    public static Client FromAdapters(
+        IEnumerable<ProviderRegistration> providers,
+        SchemaValidationOptions? schemaValidation = null,
+        IEnumerable<IObserver>? observers = null,
+        bool manifests = true,
+        bool manifestPayloads = false) =>
+        new(AsyncClient.FromAdapters(providers, schemaValidation, observers, manifests, manifestPayloads));
 
     /// <summary>Creates a synchronous client from inert parsed configuration.</summary>
     public static Client FromConfig(
@@ -50,8 +60,11 @@ public sealed class Client : IDisposable
         global::AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
-        SchemaValidationOptions? schemaValidation = null) =>
-        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation));
+        SchemaValidationOptions? schemaValidation = null,
+        IEnumerable<IObserver>? observers = null,
+        bool manifests = true,
+        bool manifestPayloads = false) =>
+        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads));
 
     /// <summary>Gets the immutable catalog used by pure target resolution.</summary>
     public global::AnyInfer.Catalog.Catalog Catalog => _inner.Catalog;
@@ -61,6 +74,12 @@ public sealed class Client : IDisposable
 
     /// <summary>Gets assembled immutable capability facts without constructing an adapter.</summary>
     public ModelCapabilities Capabilities(string target) => _inner.Capabilities(target);
+
+    /// <summary>Subscribes an observer for synchronous telemetry notifications.</summary>
+    public void Subscribe(IObserver observer, bool payloads = false) => _inner.Subscribe(observer, payloads);
+
+    /// <summary>Removes every reference-identical observer subscription.</summary>
+    public void Unsubscribe(IObserver observer) => _inner.Unsubscribe(observer);
 
     /// <summary>Lists models for one selected provider instance and optionally filters by operation.</summary>
     public IReadOnlyList<DiscoveredModel> Models(
@@ -82,36 +101,36 @@ public sealed class Client : IDisposable
         CancellationToken cancellationToken = default) =>
         RunOperation(token => _inner.ProbeAsync(target, features, timeoutS, record, token), cancellationToken);
     /// <summary>Generates a terminal result from an explicit request.</summary>
-    public Generation Generate(GenerationRequest request, CancellationToken cancellationToken = default) =>
-        RunOperation(token => _inner.GenerateAsync(request, token), cancellationToken);
+    public Generation Generate(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        RunOperation(token => _inner.GenerateAsync(request, token, manifest), cancellationToken);
 
     /// <summary>Generates a terminal result from one user prompt.</summary>
     public Generation Generate(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
         Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
-        int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
-        RunOperation(token => _inner.GenerateAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token), cancellationToken);
+        int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        RunOperation(token => _inner.GenerateAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest), cancellationToken);
 
     /// <summary>Generates a terminal result from caller messages.</summary>
     public Generation Generate(IEnumerable<Message> messages, string? target = null, Route? route = null,
         Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
-        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
-        RunOperation(token => _inner.GenerateAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token), cancellationToken);
+        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        RunOperation(token => _inner.GenerateAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest), cancellationToken);
 
     /// <summary>Creates an eager-pump synchronous stream from an explicit request.</summary>
-    public SyncStream Stream(GenerationRequest request, CancellationToken cancellationToken = default) =>
-        CreateStream(() => _inner.StreamAsync(request, cancellationToken));
+    public SyncStream Stream(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        CreateStream(() => _inner.StreamAsync(request, cancellationToken, manifest));
 
     /// <summary>Creates an eager-pump synchronous stream from one user prompt.</summary>
     public SyncStream Stream(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
         Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
-        int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
-        CreateStream(() => _inner.StreamAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken));
+        int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        CreateStream(() => _inner.StreamAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest));
 
     /// <summary>Creates an eager-pump synchronous stream from caller messages.</summary>
     public SyncStream Stream(IEnumerable<Message> messages, string? target = null, Route? route = null,
         Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
-        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
-        CreateStream(() => _inner.StreamAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken));
+        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
+        CreateStream(() => _inner.StreamAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest));
 
     /// <inheritdoc />
     public void Dispose()
@@ -261,7 +280,11 @@ public sealed class Client : IDisposable
             }
             catch (Exception exception)
             {
-                failure ??= exception;
+                if (failure is null)
+                {
+                    failure = exception;
+                    stream.MarkParentCloseFailureObserved();
+                }
             }
         }
 

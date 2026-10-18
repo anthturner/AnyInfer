@@ -28,6 +28,9 @@ internal static class AdapterInvocationBoundary
 
         var entry = operation.BeginEntry(request, role, repairAssessment);
         await using var timeout = new EntryTimeoutScope(entry, cancellationToken);
+        using IDisposable? identity = request.UsesModernSchema
+            ? CancellationIdentityContext.Push(timeout.Token, CancellationIdentityContext.Resolve(cancellationToken))
+            : null;
         IAsyncEnumerator<AdapterEvent>? enumerator = null;
         try
         {

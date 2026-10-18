@@ -1,4 +1,5 @@
 using AnyInfer.Providers;
+using PeterO.Numbers;
 
 namespace AnyInfer.Capabilities;
 
@@ -17,7 +18,7 @@ internal static class CapabilityAssembler
         if (price is not null && price.Outranks(result.Pricing)) result = ReplacePricing(result, price);
         if (discovered is not null && discovered.TryGetValue(model, out var found)) result = result.Overlay(found);
         if (probed is not null && probed.TryGetValue(model, out var measured)) result = result.Overlay(measured);
-        if (locality == ProviderLocality.Local && result.Pricing is null) result = ReplacePricing(result, new Sourced<Pricing>(new Pricing(0m, 0m), Provenance.Catalog));
+        if (locality == ProviderLocality.Local && result.Pricing is null) result = ReplacePricing(result, new Sourced<Pricing>(new Pricing(EDecimal.Zero, EDecimal.Zero), Provenance.Catalog));
         if (overrides is not null && overrides.TryGetValue(model, out var configured)) result = ApplyOverride(result, configured);
         return result;
     }
