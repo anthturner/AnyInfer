@@ -355,7 +355,7 @@ call sites or assigns a bounded disjoint lease. No independently invented parall
   > 6 pages), package/schema Python controls (25/25), touched Ruff checks, and isolated
   > local-feed package consumer all succeeded with zero compiler warnings and the exact
   > five-archive closure. Clean-revision package proof remains EVT.5.
-- [ ] **EVT.5** Close independent contract/lifetime reviews and run the full workspace gate.
+- [x] **EVT.5** Close independent contract/lifetime reviews and run the full workspace gate.
   Gate: all required steps, frozen 102 observations/hashes, native concurrency/cancellation,
   Python baseline, docs and isolated package checks pass. Only repeat gates when changed
   source/failure justifies it; one heavy gate at a time. Commit finished explicit paths,
@@ -364,20 +364,24 @@ call sites or assigns a bounded disjoint lease. No independently invented parall
   > NOTE: The final coherent workspace run passes all 18 steps in 108.1s: 474 native unit
   > tests, 93 frozen conformance tests, Python/core/frontend checks, strict documentation,
   > compiled examples and isolated package consumption. Compiler warnings are zero and
-  > the three frozen release/report hashes remain unchanged. Source commit and subsequent
-  > clean-revision package proof are the remaining acceptance steps.
+  > the three frozen release/report hashes remain unchanged. Source is committed as
+  > `68d2cc06914aaa8539eb3cc5ee8d20acdbd2a906`; its clean-revision package, exact five-archive
+  > dependency/license/hash closure and isolated consumer restore/build/run pass at
+  > `.tmp-tests/sdk-five-clean-package/run-ybv82fp9/` with zero warnings. SDK.5a is accepted;
+  > SDK.5b/5c accounting and policies remain unfinished.
 
 ## 5. Resume and evidence
 
-Current resume point: EVT.5 explicit-path source commit and clean-revision package
-acceptance. The coherent 50-case sync/lifecycle/HTTP gate and final full workspace gate
-pass; source is frozen for commit.
+This child plan is complete. Resume the parent at SDK.5b from accepted source checkpoint
+`68d2cc06914aaa8539eb3cc5ee8d20acdbd2a906`. No accounting, ledger or policy completion is
+implied by the minimum EDecimal/Usage prerequisite included here.
 > NOTE: Crash recovery continues from HEAD `1affab3ed9baf147907f464c178e752534d361d2`
 > with the SDK.5 working tree intact. The dedicated lifecycle/HTTP gate compiled and
 > initially passed 19/22 before the modern entry-token identity and buffered-stream-response
 > corrections. The expanded corrected run now passes 31/31 using
 > `dotnet test AnyInfer.Tests/AnyInfer.Tests.csproj --no-restore --filter "EventLifecycleTests|OpenAIEventTests" --blame-hang-timeout 60s`
-> from `src/csharp`. The corrected full gate now passes 18/18; no SDK.5 commit exists yet.
+> from `src/csharp`. The expanded 50-case sync/lifecycle/HTTP gate and corrected full
+> 18-step gate pass; source and clean-revision package acceptance are recorded above.
 No SDK.5 production edits existed at plan creation; EVT.0 is now closed.
 Native monetary qualification and independent manifest prototype are under
 ignored `.tmp-tests/accounting-qualification/` and `.tmp-tests/manifest-qualification/`.

@@ -757,7 +757,7 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ### SDK.5 — Events, manifest, accounting and request policies
 
-- [ ] **SDK.5a** Port payload-private typed observer events and dispatch, logging/JSONL sinks
+- [x] **SDK.5a** Port payload-private typed observer events and dispatch, logging/JSONL sinks
   as explicit opt-in, immutable `RunManifest` projections and versioned serialization from
   `events/`, `manifest.py` and `manifest/` if present. Gate: observer and manifest facts agree,
   redaction/privacy tests pass and default execution performs no telemetry I/O.
@@ -765,6 +765,12 @@ must report a real conflict rather than silently changing a dependent public sig
   > values and manifest JSON formatting are independently qualified before source work;
   > only the minimum Usage/Pricing value prerequisite is pulled forward from SDK.5b.
   > Accounting, ledgers and request policies remain unchecked until their own gates pass.
+  > Acceptance: source `68d2cc06914aaa8539eb3cc5ee8d20acdbd2a906` passes all 18 workspace
+  > steps in 108.1s, including 474 native unit tests, 93 frozen conformance tests, strict
+  > docs, executable examples and isolated package consumption. The exact source revision's
+  > five-archive/license/hash package closure and fresh consumer restore/build/run pass at
+  > `.tmp-tests/sdk-five-clean-package/run-ybv82fp9/` with zero compiler warnings. All 102
+  > frozen observations and released hashes remain unchanged. SDK.5b/5c remain unfinished.
 - [ ] **SDK.5b** Define a separate shared accounting profile (the previously deferred M3),
   preserving unknown usage, failed/cancelled attempts, repairs and aggregate operation cost.
   Port `Usage` merge/normalization, pricing/estimation, token-estimator interfaces, budgets,

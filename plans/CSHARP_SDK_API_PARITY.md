@@ -14,6 +14,14 @@ title: "C# SDK API parity inventory"
 
 ## Root exports (235)
 
+SDK.5a's typed observers, opt-in sinks and generation manifests are accepted at source
+`68d2cc06914aaa8539eb3cc5ee8d20acdbd2a906`: all 18 workspace steps, 474 native unit tests,
+93 frozen conformance tests, compiled documentation/examples and clean-revision isolated
+package consumption pass. The minimum EDecimal/Pricing/Usage value foundation is present;
+automatic accounting, ledgers and policies remain SDK.5b/5c. Complete event DTOs do not
+claim later operation/tool/context/local/batch producers. All 235 root rows remain
+unchecked until their broader assigned milestones and the final completeness audit pass.
+
 This checklist is generated from the literal `__all__` in `src/python/anyinfer/__init__.py`; source module is taken from root `ImportFrom` AST aliases. All are unchecked until implemented and reconciled. `SDK.11c` is the final completeness audit, not an unassigned feature bucket.
 
 | Done | Python export | Source module | Assigned C# milestone |
