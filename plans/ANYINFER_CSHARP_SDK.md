@@ -667,7 +667,7 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ### SDK.4 — Catalog, capability provenance, discovery and general schema support
 
-- [ ] **SDK.4a** Port `Sourced`, provenance ranks, `ModelCapabilities`/operation capabilities,
+- [x] **SDK.4a** Port `Sourced`, provenance ranks, `ModelCapabilities`/operation capabilities,
   catalog/default assets, alias resolution and model discovery/health lifecycle using
   `types/capabilities.py`, `catalog/`, `capabilities/`, `providers/base.py`. Reuse shared data
   assets through build inputs without importing Python runtime code. Gate: alias resolution,
@@ -682,6 +682,11 @@ must report a real conflict rather than silently changing a dependent public sig
   > are closed; resume CAT.4b implementation.
   > SDK.4a remains unchecked until
   > the complete catalog, assembly, lifecycle, documentation and checkpoint gates pass.
+  > Final acceptance supersedes the intermediate holds: all 18 workspace steps pass in
+  > 106.7s, including 304 native unit/93 conformance tests and all 102 frozen cases.
+  > The 15 rendered C# blocks match executed source; frozen manifest/reports are unchanged.
+  > Source checkpoint `aca24ddf2097ca9a33ff33039a2285f0b0b0bdb7` is committed and its
+  > clean-revision isolated package proof passes at `.tmp-tests/nuget/run-7xx9guja/`.
 - [ ] **SDK.4b** Select/test a native general JSON Schema implementation against Python's
   supported dialect and schema coercion/ref/format/error behavior. C# resolves internal and
   caller-registered schema references by default; external URL/file retrieval requires
@@ -820,29 +825,23 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.4a**. SDK.3a–3c passed the final 18-step workspace gate
-(238 native unit tests, 93 conformance tests, package-only async/sync consumer and eight
-offline documentation methods). Accepted source checkpoint:
-`04dfa37231f26f5c72b7215afd747c47de4e6d19`. Its clean-revision package verifier passed
-archive inspection and fresh local-feed async/sync consumption. CAT.1 pure capability types
-passed cold review, a zero-warning solution build and all 7 focused native tests. CAT.2 passed
-its expanded Python/native/package gates. CAT.3 capability assembly, pure client queries
-and reached catalog-target integration passed reviewed native/package gates (274 unit tests,
-93 conformance tests including all 102 cases, and the isolated public API consumer).
-CAT.4a/CAT.4b source, mechanism and causal reviews are closed. All 30 focused lifecycle
-tests and the full 304-unit/93-conformance native regression pass, preserving all 102 frozen
-cases. The Python lifecycle bridge, exact offline examples/rendered snippets and dirty-tree
-package consumer pass. Resume CAT.4c/CAT.5 full workspace and clean checkpoint qualification
-in the child checklist.
-The full 18-step workspace gate now passes in 106.7s, including the fresh package consumer;
-resume CAT.5's source commit and clean-revision qualification before checking SDK.4a.
-SDK.4b's C# explicit-retrieval default
-is user-approved; dependency selection and exact opt-in API remain open.
-SDK.2a–2d and its checkpoint passed the full
-18-step workspace gate and clean-revision package qualification at
-`b50459bc644cff95e9e50f97ba6dd61ae3e1ef46`.
-SDK.1 passed the full 17-step workspace gate on 2026-10-17
-(172 unit tests, 93 conformance tests including the all-102 development run, and an isolated
-NuGet consumer), was committed as `c40fbba1369866960599e193041d8ffc6b37f860`, and its clean
-revision package-only consumer passed. Keep source ownership disjoint
-and serialize compilation; publish no updated conformance report from a dirty working tree.
+Current resume point: **SDK.4b**. SDK.4a is complete at source checkpoint
+`aca24ddf2097ca9a33ff33039a2285f0b0b0bdb7`: 18/18 workspace steps, 304 native unit tests,
+93 conformance tests including all 102 frozen cases, exact source-linked docs/examples and
+the clean-revision isolated package consumer pass. General schema dependency/API
+qualification is next; no later milestone or root-export completion is implied.
+
+SDK.4a's complete ownership, reviews and gate chronology are retained in
+`ANYINFER_CSHARP_SDK_CATALOG.md`; that child plan is complete. The final workspace log is
+root command `4f5ead1c-4a73-4190-9ba0-d3746b62ed2c` (18 steps, 106.7s); the clean source
+package proof is `.tmp-tests/nuget/run-7xx9guja/`. All 235 root inventory rows remain
+unchecked until their full assigned semantics and final audit pass.
+
+SDK.4b's C# explicit-retrieval default is user-approved; dependency selection and the exact
+opt-in API remain open. Preserve Python behavior and the frozen v0 profile while qualifying
+the broader native validator. Keep ownership disjoint and serialize shared builds/gates.
+
+Earlier clean qualified checkpoints: SDK.3 `04dfa37231f26f5c72b7215afd747c47de4e6d19`,
+SDK.2 `b50459bc644cff95e9e50f97ba6dd61ae3e1ef46`, and SDK.1
+`c40fbba1369866960599e193041d8ffc6b37f860`. Publish no updated conformance report from a
+dirty working tree.

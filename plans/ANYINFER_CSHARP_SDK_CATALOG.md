@@ -585,7 +585,7 @@ No source implementation starts until the contract critique below is closed.
     > and actual prebuilt discovery facts. This is dirty-tree development evidence, not a
     > clean-revision checkpoint. Expanded native lifetime tests/reviews and full regression
     > remain required before accepting CAT.4.
-- [ ] **CAT.5 — Docs and checkpoint.** c16 updates the C# SDK/porting/reference/task guides
+- [x] **CAT.5 — Docs and checkpoint.** c16 updates the C# SDK/porting/reference/task guides
   and exact compiled offline examples for implemented catalog/capability/lifecycle APIs.
   Root reconciles inventory status and both execution plans after reviews. Gate: strict
   docs build, exact displayed-source execution, full workspace, unchanged frozen assets,
@@ -606,16 +606,17 @@ No source implementation starts until the contract critique below is closed.
   > qualification remain pending; CAT.5 is not accepted yet.
   > Full workspace, fresh dirty-tree package and frozen-asset hash verification now pass.
   > Only the explicit source commit and clean-revision package qualification remain.
+  > Final acceptance: source checkpoint `aca24ddf2097ca9a33ff33039a2285f0b0b0bdb7`
+  > is committed with a clean tree. Fresh archive inspection and isolated local-feed
+  > restore/build/run pass at `.tmp-tests/nuget/run-7xx9guja/`, using that exact revision,
+  > with zero warnings/errors. This completes CAT.5 and parent SDK.4a; all 235 root
+  > inventory rows remain unchecked for their broader assigned/final-audit contracts.
 
 ## Resume
 
-Current resume point: CAT.4c/CAT.5 full workspace and checkpoint qualification. All source,
-lifetime/protocol/causal reviews are closed; the solution builds without warnings, all 30
-focused lifecycle tests and the full 304-unit/93-conformance regression pass. The frozen
-manifest and published reports are unchanged. Python lifecycle bridge, focused
-packaging checks, exact offline examples, strict docs/rendered-source comparison and the
-dirty-tree isolated package consumer pass. All 18 workspace steps passed; resume CAT.5
-source commit/clean-revision qualification. Accepted source checkpoint remains SDK.3 at
-`04dfa37231f26f5c72b7215afd747c47de4e6d19`, with the clean-revision NuGet consumer passing.
-SDK.4b's user-approved explicit external retrieval in C# remains separate from these
-metadata steps; dependency selection and the exact opt-in API are still open in the main plan.
+This child plan is complete. Accepted source checkpoint:
+`aca24ddf2097ca9a33ff33039a2285f0b0b0bdb7`, qualified by the clean-revision package
+consumer at `.tmp-tests/nuget/run-7xx9guja/`. All 18 workspace steps, 30 focused lifecycle
+tests, 304 native unit tests, 93 conformance tests and exact docs/source checks pass; frozen
+manifest/reports are unchanged. Resume the main plan at SDK.4b. Its user-approved explicit
+external retrieval policy is separate; dependency and exact opt-in API qualification remain.
