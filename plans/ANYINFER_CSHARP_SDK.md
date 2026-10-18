@@ -882,11 +882,19 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.5a**. SDK.4c is complete at source checkpoint
-`0fd3fb47cd08295537674aa23571dffcc9482888`: 18/18 workspace steps, 386 native unit tests,
-93 conformance tests including all 102 frozen cases, exact 19 source-linked C# blocks,
-compiled offline examples and clean-revision package consumption. Typed observers/manifest,
-then accounting/request policies, are next; no later milestone/root-export completion is implied.
+Current resume point: **SDK.5b**. SDK.5a is complete at source checkpoint
+`68d2cc06914aaa8539eb3cc5ee8d20acdbd2a906`, recorded by acceptance commit
+`417d53fd1cfe07ccc81f669e4e8d1093fe88d912`: all 18 workspace steps, 474 native unit tests,
+93 conformance tests including all 102 frozen cases, 50 combined sync/lifecycle/HTTP controls,
+compiled offline examples, strict documentation and clean-revision package consumption.
+Accounting and request policies are next; no later milestone/root-export completion is implied.
+
+SDK.5a's contract, ownership, reviews and gates are in `ANYINFER_CSHARP_SDK_EVENTS.md`.
+The final full workspace log is `3943a70f-811b-4b78-a40f-18029754dd6a` (18 steps, 108.1s);
+the clean source package proof is `.tmp-tests/sdk-five-clean-package/run-ybv82fp9/`.
+The three frozen release/report hashes remain unchanged. Preserve the accepted distinction
+between owned caller-cancellation checkpoints and source OCE identity, and between a client-
+reported stream-close failure and other stream failures that remain independently observable.
 
 SDK.4c's complete ownership, reviews and gate chronology are in
 `ANYINFER_CSHARP_SDK_PROBES.md`. The final workspace log is
