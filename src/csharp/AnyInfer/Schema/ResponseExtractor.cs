@@ -23,6 +23,12 @@ public sealed record ExtractionResult
 public static class ResponseExtractor
 {
     public static ExtractionResult Extract(string text)
+        => ExtractCore(text, JsonReader.Read);
+
+    internal static ExtractionResult ExtractModern(string text)
+        => ExtractCore(text, JsonReader.ReadModern);
+
+    private static ExtractionResult ExtractCore(string text, Func<string, JsonValue> read)
     {
         ArgumentNullException.ThrowIfNull(text);
         var trimmed = TrimAscii(text);
@@ -33,7 +39,7 @@ public static class ResponseExtractor
 
         try
         {
-            return new ExtractionResult(JsonReader.Read(trimmed), null);
+            return new ExtractionResult(read(trimmed), null);
         }
         catch (FormatException)
         {
@@ -45,7 +51,7 @@ public static class ResponseExtractor
 
             try
             {
-                return new ExtractionResult(JsonReader.Read(candidate), null);
+                return new ExtractionResult(read(candidate), null);
             }
             catch (FormatException exception)
             {

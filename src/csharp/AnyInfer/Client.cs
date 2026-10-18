@@ -5,6 +5,7 @@ using AnyInfer.Credentials;
 using AnyInfer.Internal;
 using AnyInfer.Json;
 using AnyInfer.Providers;
+using AnyInfer.Schema;
 using System.Runtime.ExceptionServices;
 
 namespace AnyInfer;
@@ -30,15 +31,16 @@ public sealed class Client : IDisposable
         Repair? repair = null,
         global::AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null)
-        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides))
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
+        SchemaValidationOptions? schemaValidation = null)
+        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation))
     {
     }
 
     private Client(AsyncClient inner) => _inner = inner ?? throw new ArgumentNullException(nameof(inner));
 
     /// <summary>Creates a synchronous client over externally constructed adapters.</summary>
-    public static Client FromAdapters(IEnumerable<ProviderRegistration> providers) => new(AsyncClient.FromAdapters(providers));
+    public static Client FromAdapters(IEnumerable<ProviderRegistration> providers, SchemaValidationOptions? schemaValidation = null) => new(AsyncClient.FromAdapters(providers, schemaValidation));
 
     /// <summary>Creates a synchronous client from inert parsed configuration.</summary>
     public static Client FromConfig(
@@ -47,8 +49,9 @@ public sealed class Client : IDisposable
         ResolverChain? resolver = null,
         global::AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null) =>
-        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides));
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
+        SchemaValidationOptions? schemaValidation = null) =>
+        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation));
 
     /// <summary>Gets the immutable catalog used by pure target resolution.</summary>
     public global::AnyInfer.Catalog.Catalog Catalog => _inner.Catalog;
@@ -76,13 +79,13 @@ public sealed class Client : IDisposable
 
     /// <summary>Generates a terminal result from one user prompt.</summary>
     public Generation Generate(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
-        Repair? repair = null, JsonValue? schema = null, string? schemaMechanism = null, double? timeoutS = null,
+        Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
         int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
         RunOperation(token => _inner.GenerateAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token), cancellationToken);
 
     /// <summary>Generates a terminal result from caller messages.</summary>
     public Generation Generate(IEnumerable<Message> messages, string? target = null, Route? route = null,
-        Sampling? sampling = null, Repair? repair = null, JsonValue? schema = null, string? schemaMechanism = null,
+        Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
         double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
         RunOperation(token => _inner.GenerateAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token), cancellationToken);
 
@@ -92,13 +95,13 @@ public sealed class Client : IDisposable
 
     /// <summary>Creates an eager-pump synchronous stream from one user prompt.</summary>
     public SyncStream Stream(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
-        Repair? repair = null, JsonValue? schema = null, string? schemaMechanism = null, double? timeoutS = null,
+        Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
         int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
         CreateStream(() => _inner.StreamAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken));
 
     /// <summary>Creates an eager-pump synchronous stream from caller messages.</summary>
     public SyncStream Stream(IEnumerable<Message> messages, string? target = null, Route? route = null,
-        Sampling? sampling = null, Repair? repair = null, JsonValue? schema = null, string? schemaMechanism = null,
+        Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
         double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default) =>
         CreateStream(() => _inner.StreamAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken));
 

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -22,6 +25,24 @@ NUSPEC_NAMESPACES = {
     "{http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd}",
 }
 CORE_PROPERTIES = re.compile(r"package/services/metadata/core-properties/[0-9a-fA-F-]+\.psmdcp")
+SCHEMA_DEPENDENCIES = {
+    "JsonSchema.Net": (
+        "8.0.5",
+        "EdVVe5ButZXkUIEgbah16Dm8soiwzs6OxsJBMTdoLNbjQPtkBAsH0uaF8BFnuYDWKDq9Zh6chUHSvbaSqq2VFA==",
+    ),
+    "JsonPointer.Net": (
+        "6.0.1",
+        "i7602ZUaqhhD3oapQvTjI1ZLbY2OhD71dt7JznEbtThyB56oU8SSpfj1ai8v1F4jvFl7k2BnYO1ULB1a5jPvUg==",
+    ),
+    "Json.More.Net": (
+        "2.2.0",
+        "8U88Wu/98+fPS1jlvCQWtADilO3zCi9To1wQvt/UXJK+i7f5hK8s31vhCSfI5U8Wr5aHyMh0h4WuCiRH48daeQ==",
+    ),
+    "Humanizer.Core": (
+        "2.14.1",
+        "yzqGU/HKNLZ9Uvr6kvSc3wYV/S5O/IvklIUW5WF7MuivGLY8wS5IZnLPkt7D1KW8Et2Enl0I3Lzg2vGWM24Xsw==",
+    ),
+}
 
 
 def run(command: list[str], *, cwd: Path) -> None:
@@ -104,16 +125,98 @@ def _text(metadata: ElementTree.Element, namespace: str, name: str) -> str:
 
 def _validate_dependencies(metadata: ElementTree.Element, namespace: str) -> None:
     dependencies = metadata.find(namespace + "dependencies")
-    if dependencies is None:
-        return
-    for child in dependencies:
+    if dependencies is None or len(dependencies) != 1:
+        raise RuntimeError("nuspec must declare the exact schema dependency")
+    group = dependencies[0]
+    if group.tag != namespace + "group" or group.get("targetFramework") != "net8.0":
+        raise RuntimeError("nuspec dependency metadata is malformed")
+    children = list(group)
+    if len(children) != 1:
+        raise RuntimeError("nuspec must declare exactly one direct dependency")
+    dependency = children[0]
+    if (
+        dependency.tag != namespace + "dependency"
+        or dependency.get("id") != "JsonSchema.Net"
+        or dependency.get("version") != "[8.0.5]"
+    ):
+        raise RuntimeError("nuspec schema dependency is not the qualified exact range")
+
+
+def _read_dependency_metadata(package: Path) -> tuple[str, str]:
+    with zipfile.ZipFile(package) as archive:
+        names = [entry for entry in archive.namelist() if entry.endswith(".nuspec")]
+        if len(names) != 1:
+            raise RuntimeError("dependency package must contain exactly one nuspec")
+        root, namespace = _read_nuspec(archive, names[0])
+        metadata = root.find(namespace + "metadata")
+        if metadata is None:
+            raise RuntimeError("dependency package nuspec metadata is missing")
+        license_node = metadata.find(namespace + "license")
         if (
-            child.tag != namespace + "group"
-            or child.get("targetFramework") not in (None, "net8.0")
+            license_node is None
+            or license_node.get("type") != "expression"
+            or license_node.text != "MIT"
         ):
-            raise RuntimeError("nuspec dependency metadata is malformed")
-        if list(child):
-            raise RuntimeError("core package must not declare runtime dependencies")
+            raise RuntimeError("dependency package license is not MIT")
+        return _text(metadata, namespace, "id"), _text(metadata, namespace, "version")
+
+
+def _schema_dependency_closure(assets: dict[str, object]) -> None:
+    targets = assets.get("targets")
+    if not isinstance(targets, dict):
+        raise RuntimeError("root restore assets do not contain targets")
+    candidates = [value for key, value in targets.items() if key.startswith("net8.0")]
+    if len(candidates) != 1 or not isinstance(candidates[0], dict):
+        raise RuntimeError("root restore assets must contain one net8.0 target")
+    target = candidates[0]
+    pending = ["JsonSchema.Net/8.0.5"]
+    closure: set[str] = set()
+    while pending:
+        identity = pending.pop()
+        if identity in closure:
+            continue
+        entry = target.get(identity)
+        if not isinstance(entry, dict) or entry.get("type") != "package":
+            raise RuntimeError(f"root restore is missing qualified dependency {identity}")
+        closure.add(identity)
+        dependencies = entry.get("dependencies", {})
+        if not isinstance(dependencies, dict):
+            raise RuntimeError(f"dependency metadata is malformed for {identity}")
+        pending.extend(f"{name}/{version}" for name, version in dependencies.items())
+    expected = {f"{name}/{version}" for name, (version, _) in SCHEMA_DEPENDENCIES.items()}
+    if closure != expected:
+        raise RuntimeError("resolved schema dependency graph is not the qualified exact graph")
+
+
+def stage_schema_dependencies(feed: Path, assets_path: Path | None = None) -> None:
+    """Copy only hash- and license-verified schema dependencies from the root restore."""
+    assets_path = assets_path or PROJECT.parent / "obj" / "project.assets.json"
+    try:
+        assets = json.loads(assets_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exception:
+        raise RuntimeError("root restore provenance is unavailable") from exception
+    if not isinstance(assets, dict):
+        raise RuntimeError("root restore provenance is malformed")
+    _schema_dependency_closure(assets)
+    folders = assets.get("packageFolders")
+    if not isinstance(folders, dict) or len(folders) != 1:
+        raise RuntimeError("root restore must identify one controlled package folder")
+    package_folder = Path(next(iter(folders))).resolve()
+    feed.mkdir(parents=True, exist_ok=True)
+    for name, (version, expected_hash) in SCHEMA_DEPENDENCIES.items():
+        filename = f"{name.lower()}.{version}.nupkg"
+        package = package_folder / name.lower() / version / filename
+        if not package.is_file():
+            raise RuntimeError(f"qualified dependency archive is missing: {name}/{version}")
+        actual_hash = base64.b64encode(
+            hashlib.sha512(package.read_bytes()).digest()
+        ).decode("ascii")
+        if actual_hash != expected_hash:
+            raise RuntimeError(f"qualified dependency archive hash drifted: {name}/{version}")
+        package_id, package_version = _read_dependency_metadata(package)
+        if package_id != name or package_version != version:
+            raise RuntimeError(f"qualified dependency archive metadata drifted: {name}/{version}")
+        shutil.copy2(package, feed / filename)
 
 
 def validate_package(
@@ -191,10 +294,12 @@ def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> Non
 </Project>
 ''', encoding="utf-8")
     (consumer / "Program.cs").write_text(
-        """using AnyInfer;
+        '''using AnyInfer;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
+using AnyInfer.Json;
 using AnyInfer.Providers;
+using AnyInfer.Schema;
 
 var factoryCalls = 0;
 var descriptor = new ProviderDescriptor(
@@ -267,6 +372,28 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
 }
 if (factoryCalls != 0)
     throw new InvalidOperationException("pure catalog queries constructed an adapter");
+
+var schema = SchemaSpec.FromJson("""
+    {"$schema":"https://json-schema.org/draft/2020-12/schema","$defs":{"answer":{"type":"string"}},"type":"object","properties":{"answer":{"$ref":"#/$defs/answer"}},"required":["answer"]}
+    """);
+var validation = await SchemaValidator.ValidateAsync(
+    JsonReader.Read("""{"answer":"schema"}"""), schema);
+if (!validation.IsValid)
+    throw new InvalidOperationException("standalone modern schema validation failed");
+
+var schemaAdapter = new SchemaAdapter();
+{
+    await using var client = AsyncClient.FromAdapters(
+        [new ProviderRegistration("schema-demo", schemaAdapter)]);
+    var generation = await client.GenerateAsync(
+        "Return a schema object.", target: "schema-demo:model", schema: schema);
+    var typed = generation.DeserializeStructured<SchemaAnswer>();
+    if (typed?.Answer != "schema" || schemaAdapter.SchemaRequests != 1)
+        throw new InvalidOperationException(
+            "client schema request or typed structured result failed");
+}
+if (schemaAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("schema adapter disposal failed");
 
 var lifecycleAdapter = new LifecycleAdapter();
 {
@@ -363,6 +490,35 @@ sealed class DemoAdapter : IProviderAdapter
     }
 }
 
+sealed record SchemaAnswer(
+    [property: System.Text.Json.Serialization.JsonPropertyName("answer")] string Answer);
+
+sealed class SchemaAdapter : IProviderAdapter
+{
+    public int SchemaRequests { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    public async IAsyncEnumerable<AdapterEvent> GenerateAsync(
+        WireRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request.Schema is null || request.SchemaName != "response")
+            throw new InvalidOperationException("SchemaSpec was not forwarded to the adapter.");
+        SchemaRequests++;
+        yield return new AdapterTextDelta("""{"answer":"schema"}""");
+        yield return new AdapterFinal("stop");
+        await Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
+    }
+}
+
 sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle
 {
     public int ModelCalls { get; private set; }
@@ -405,7 +561,7 @@ sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle
         return ValueTask.CompletedTask;
     }
 }
-""", encoding="utf-8")
+''', encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -435,6 +591,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     package, symbols = package_paths(packages, version)
     validate_package(package, symbols, revision, version)
+    stage_schema_dependencies(packages)
     write_consumer(consumer, packages, cache, version)
     run(
         ["dotnet", "restore", "--configfile", "NuGet.Config", "--packages", str(cache)],

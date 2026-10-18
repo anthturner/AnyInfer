@@ -791,7 +791,7 @@ public sealed class RoutingTests
         double? timeoutS = 12.5,
         int? maxResponseBytes = 91,
         bool stream = false) =>
-        new(messages ?? [new Message("user", [new Text("routing")])], route ?? new Route(["alpha:model"]), sampling, repair, schema, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: stream);
+        new(messages ?? [new Message("user", [new Text("routing")])], route ?? new Route(["alpha:model"]), sampling, repair, schema is null ? null : new SchemaSpec(schema, "response"), timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: stream);
 
     private static async Task<List<StreamEvent>> Collect(AsyncStream stream)
         => await Collect(stream, static _ => { });

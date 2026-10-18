@@ -5,6 +5,7 @@ using AnyInfer.Core;
 using AnyInfer.Internal;
 using AnyInfer.Json;
 using AnyInfer.Providers;
+using AnyInfer.Schema;
 using Xunit;
 
 namespace AnyInfer.Conformance;
@@ -304,7 +305,7 @@ public sealed class NativeProofsTests
             ]
             """)));
         var capture = new OperationCapture();
-        await using var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", FixtureAdapter.Create(script))]);
+        await using var client = new AsyncClient([new ProviderRegistration("proof", FixtureAdapter.Create(script))], new VirtualClock(0));
         var schema = new JsonObject([
             new JsonProperty("type", new JsonString("object")),
             new JsonProperty("required", new JsonArray([new JsonString("age")])),
@@ -318,7 +319,7 @@ public sealed class NativeProofsTests
             [new Message("user", [new Text("repair proof")])],
             new Route(["proof:model"], new Retry(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
             repair: new Repair(1),
-            schema: schema,
+            schema: new SchemaSpec(schema, "response"),
             stream: false);
 
         var result = await client.GenerateAsync(request, capture);

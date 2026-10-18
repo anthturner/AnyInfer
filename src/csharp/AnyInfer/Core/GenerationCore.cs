@@ -100,11 +100,26 @@ internal static class GenerationCore
                     var restartOriginal = false;
                     while (request.Schema is not null)
                     {
-                        var assessment = SchemaValidator.AssessResponse(
-                            request.Schema,
-                            current.Text,
-                            operation.OperationId,
-                            current.Entry.Ordinal);
+                        var assessment = request.SchemaProfile == SchemaExecutionProfile.FrozenV0
+                            ? FrozenSchemaValidator.AssessResponse(
+                                request.Schema.JsonSchema,
+                                current.Text,
+                                operation.OperationId,
+                                current.Entry.Ordinal)
+                            : await SchemaValidator.AssessResponseAsync(
+                                request.Schema,
+                                current.Text,
+                                operation.OperationId,
+                                current.Entry.Ordinal,
+                                request.SchemaValidation,
+                                resolved.Target.ProviderId,
+                                cancellationToken).ConfigureAwait(false);
+                        var callerCancellation = CancellationIdentityContext.Resolve(cancellationToken);
+                        if (callerCancellation.IsCancellationRequested)
+                        {
+                            throw new OperationCanceledException(callerCancellation);
+                        }
+                        cancellationToken.ThrowIfCancellationRequested();
                         operation.RecordAssessment(assessment);
                         if (assessment.IsValid)
                         {

@@ -17,6 +17,9 @@
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" Version="[8.0.5]" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="../README.md" Pack="true" PackagePath="" />
     <None Include="../../../LICENSE" Pack="true" PackagePath="" />
     <EmbeddedResource Include="../../python/anyinfer/catalog/default.json" LogicalName="AnyInfer.Catalog.default.json" />

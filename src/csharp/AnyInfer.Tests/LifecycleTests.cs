@@ -203,7 +203,7 @@ public sealed class LifecycleTests
         var first = operation.LastEntry!;
         Assert.True(first.Timeout.IsDisposed);
 
-        var assessment = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, first.Ordinal);
+        var assessment = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, first.Ordinal);
         operation.RecordAssessment(assessment);
         await CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(timeoutS: 7.25), operation, EntryRole.Correction, assessment));
         var correction = operation.LastEntry!;
@@ -211,7 +211,7 @@ public sealed class LifecycleTests
         await CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(timeoutS: 7.25), operation, EntryRole.Original));
         var restarted = operation.LastEntry!;
         Assert.True(restarted.Timeout.IsDisposed);
-        var latestAssessment = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"name\"]}"), JsonReader.Read("{}"), operation.OperationId, restarted.Ordinal);
+        var latestAssessment = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"name\"]}"), JsonReader.Read("{}"), operation.OperationId, restarted.Ordinal);
         operation.RecordAssessment(latestAssessment);
         await CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(timeoutS: 7.25), operation, EntryRole.Correction, latestAssessment));
         var finalCorrection = operation.LastEntry!;
@@ -270,7 +270,7 @@ public sealed class LifecycleTests
         var adapter = new TestAdapter(static (_, token) => YieldAsync(token, new AdapterFinal("stop")));
         await CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(), operation, EntryRole.Original));
         var entry = operation.LastEntry!;
-        var assessment = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, entry.Ordinal);
+        var assessment = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, entry.Ordinal);
         operation.Complete();
         operation.Complete();
 
@@ -290,8 +290,8 @@ public sealed class LifecycleTests
         var adapter = new TestAdapter(static (_, token) => YieldAsync(token, new AdapterFinal("stop")));
         await CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(), operation, EntryRole.Original));
         var firstEntry = operation.LastEntry!;
-        var firstAssessment = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, firstEntry.Ordinal);
-        var equalProjection = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, firstEntry.Ordinal);
+        var firstAssessment = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, firstEntry.Ordinal);
+        var equalProjection = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation.OperationId, firstEntry.Ordinal);
 
         var missing = await Assert.ThrowsAsync<ArgumentNullException>(() =>
             CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(), operation, EntryRole.Correction)));
@@ -307,9 +307,9 @@ public sealed class LifecycleTests
         await CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(), operation, EntryRole.Correction, firstAssessment));
         await CollectAsync(AdapterInvocationBoundary.InvokeAsync(adapter, Request(), operation, EntryRole.Original));
         var thirdEntry = operation.LastEntry!;
-        var latestAssessment = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"name\"]}"), JsonReader.Read("{}"), operation.OperationId, thirdEntry.Ordinal);
+        var latestAssessment = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"name\"]}"), JsonReader.Read("{}"), operation.OperationId, thirdEntry.Ordinal);
         var foreignOperation = new OperationContext();
-        var foreignAssessment = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"name\"]}"), JsonReader.Read("{}"), foreignOperation.OperationId, 1);
+        var foreignAssessment = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"name\"]}"), JsonReader.Read("{}"), foreignOperation.OperationId, 1);
 
         var oldSourceRecord = Assert.Throws<ArgumentException>(() => operation.RecordAssessment(firstAssessment));
         Assert.Equal("assessment", oldSourceRecord.ParamName);

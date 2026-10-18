@@ -10,6 +10,7 @@ supported public SDK and its generated Python API reference remains under
 | `Client`, `SyncStream` | Disposable synchronous generation and enumerable stream facade. |
 | `ProviderSettings` | Provider setup including an `env://` credential reference. |
 | `Route`, `Retry`, `Repair` | Routing, retry, and structured-output repair controls. |
+| `SchemaSpec`, `SchemaValidator`, `SchemaValidationOptions` | Modern schema specification, validation, and explicit resource controls. |
 | `Generation`, `Timing`, `Usage` | Buffered result, timing, and reported token usage. |
 | `AsyncStream`, `StreamEvent` | Streaming result and typed events. |
 | `AnyInferConfig` | Restricted version 1 configuration reader and writer. |
@@ -21,5 +22,12 @@ The proof currently demonstrates text generation through the OpenAI-compatible a
 structured JSON validation, repair, configuration, routing, and reported token usage. It has no
 released NuGet package, provider-parity guarantee, aggregate usage accounting, tool execution,
 embedding, or reranking surface.
+
+Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12. Draft 3 and Draft 4
+remain deferred. Numeric and regular-expression behavior is native to .NET, regular-expression
+timeouts apply per match, and external resources require an explicit retrieval callback.
+Modern schema input and generated values retain arbitrary-size integers, while native `const`,
+`enum`, and `uniqueItems` numeric comparisons use .NET `decimal`. Values outside that comparison
+range, such as `1e70`, raise a controlled schema-evaluation exception.
 
 See the executable [C# SDK proof guide](../guides/csharp-sdk.md) for the exact source examples.

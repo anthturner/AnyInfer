@@ -261,14 +261,14 @@ internal static class NativeProofs
     }
 
     private static AsyncClient CreateClient(IProviderAdapter adapter) =>
-        AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
+        new AsyncClient([new ProviderRegistration("proof", adapter)], new VirtualClock(0));
 
     private static GenerationRequest CreateRequest(string marker, JsonValue? schema, Repair? repair = null) =>
         new(
             [new Message("user", [new Text(marker)])],
             new Route(["proof:model"], new Retry(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
             repair: repair,
-            schema: schema,
+            schema: schema is null ? null : new SchemaSpec(schema, "response"),
             stream: false);
 
     private static async Task<NativeOutcome> RunNativeAsync(

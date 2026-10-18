@@ -102,7 +102,7 @@ static async Task VerifyAsync()
 
     var structuredHandler = new CountingHandler(structured: true);
     var structured = await StructuredOutputExample.RunAsync(WithTransport(displayedSettings, structuredHandler), target);
-    Require(structured.Text.Contains("answer", StringComparison.Ordinal), "Structured-output example returned unexpected text.");
+    Require(structured.Answer == "ok", "Structured-output example returned unexpected text.");
     Require(structuredHandler.RequestCount == 1 && structuredHandler.DisposeCount == 1, "Structured-output example did not close its transport once.");
 
     var configurationHandler = new CountingHandler();

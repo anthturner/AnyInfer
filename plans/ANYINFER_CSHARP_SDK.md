@@ -688,7 +688,7 @@ must report a real conflict rather than silently changing a dependent public sig
   > Source checkpoint `aca24ddf2097ca9a33ff33039a2285f0b0b0bdb7` is committed and its
   > clean-revision isolated package proof passes at `.tmp-tests/nuget/run-7xx9guja/`.
 - [ ] **SDK.4b** Select/test a native general JSON Schema implementation against Python's
-  supported dialect and schema coercion/ref/format/error behavior. C# resolves internal and
+  modern dialects and schema coercion/ref/format/error behavior. C# resolves internal and
   caller-registered schema references by default; external URL/file retrieval requires
   explicit opt-in. Preserve frozen v0 validation exactly through an explicit profile boundary where
   necessary. Add `SchemaSpec`, richer result validation and typed-result deserialization
@@ -707,6 +707,28 @@ must report a real conflict rather than silently changing a dependent public sig
   > Inspect versioned licenses/transitive dependencies and actual semantic fixes before
   > selection; no dependency has been added. Research is retained in Traycer
   > `csharp-sdk/sdk-four-schema-research`.
+  > NOTE: After isolated native/Python probes exposed the dependency and semantic tradeoffs,
+  > the user selected modern drafts first: Draft 6, 7, 2019-09 and 2020-12. Draft 3/4 remain
+  > explicitly deferred and unfinished parity work for SDK.11c; do not claim their support.
+  > The user also selected qualified native numeric/regex semantics with documented limits,
+  > rather than reproducing Python floating arithmetic and regex syntax. Frozen v0 remains
+  > exact. JsonSchema.Net 8.0.5 is the small MIT candidate being qualified; registry isolation,
+  > full schema meta-validation, reference retrieval and diagnostics must pass before
+  > production selection. No production dependency has yet been added.
+  > The executable source/test/package ownership and remaining qualification gates are in
+  > `ANYINFER_CSHARP_SDK_SCHEMA.md`. Requested/canonical resource aliases are proven in the
+  > isolated bridge. Native regex handlers have no timeout; a bounded per-build extension
+  > must be qualified or its limitation explicitly settled before production handoff.
+  > Final qualification is accepted in that child plan: JsonSchema.Net 8.0.5 and its
+  > four-package MIT graph are selected. Fresh owned compiled-metadata preprocessing
+  > preserves native handlers and bounds regex matches without global mutation; all ten
+  > final probe observations and independent contract/lifetime reviews pass. Begin SIG.1;
+  > SDK.4b remains unchecked until production source/tests/docs/package gates pass.
+  > Production gates now pass: 39 focused schema cases, 24 independent Python bridge cases,
+  > 343 native unit/93 conformance tests and all 18 workspace steps in 114.6s. All 15
+  > rendered C# source blocks match executed files; released hashes stay unchanged. Native
+  > decimal comparison limits are controlled and documented. Source commit and clean-revision
+  > package proof remain the final checkpoint before this box is checked.
 - [ ] **SDK.4c** Port model/token discovery, capability probes and configuration setup metadata
   incrementally from `capabilities/probes*`, `registry.py`, catalog APIs. Probe/network work
   remains explicit opt-in. Gate: fake/cassette discovery/probe conformance, no probing during
@@ -806,6 +828,10 @@ must report a real conflict rather than silently changing a dependent public sig
   platform-specific APIs. Add precise language-equivalent mappings for reflection/decorators,
   paths, exceptions and Python-only runtime constructs. Gate: no unassigned/deferred SDK item
   silently counted as implemented; remaining genuine platform exclusions are user-visible.
+  > NOTE: Explicit remaining schema work includes legacy Draft 3/4, deferred by the user
+  > during SDK.4b qualification. Modern-schema support must not tick those semantics or
+  > imply Python-identical numeric/regex behavior; the user approved documented native
+  > differences for those semantics while preserving frozen v0.
 
 ### SDK.12 — SDK qualification and delivery
 
@@ -837,9 +863,10 @@ root command `4f5ead1c-4a73-4190-9ba0-d3746b62ed2c` (18 steps, 106.7s); the clea
 package proof is `.tmp-tests/nuget/run-7xx9guja/`. All 235 root inventory rows remain
 unchecked until their full assigned semantics and final audit pass.
 
-SDK.4b's C# explicit-retrieval default is user-approved; dependency selection and the exact
-opt-in API remain open. Preserve Python behavior and the frozen v0 profile while qualifying
-the broader native validator. Keep ownership disjoint and serialize shared builds/gates.
+SDK.4b's C# explicit-retrieval default, modern-first dialect scope and documented native
+numeric/regex semantics are user-approved. Dependency selection and the exact opt-in API
+remain under qualification. Preserve Python behavior and the frozen v0 profile; track
+legacy Draft 3/4 explicitly in SDK.11c. Keep ownership disjoint and serialize shared gates.
 
 Earlier clean qualified checkpoints: SDK.3 `04dfa37231f26f5c72b7215afd747c47de4e6d19`,
 SDK.2 `b50459bc644cff95e9e50f97ba6dd61ae3e1ef46`, and SDK.1

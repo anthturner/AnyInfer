@@ -4,6 +4,7 @@ using System.Runtime.ExceptionServices;
 using AnyInfer.Providers;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
+using AnyInfer.Schema;
 
 namespace AnyInfer;
 
@@ -19,6 +20,7 @@ public sealed class AsyncClient : IAsyncDisposable
     private readonly CapabilityStore _capabilities;
     private readonly TargetMetadataResolver _targetResolver;
     private readonly TargetResolutionProfile _resolutionProfile;
+    private readonly SchemaValidationOptions? _schemaValidation;
     private readonly object _gate = new();
     private readonly HashSet<AsyncStream> _activeStreams = [];
     private readonly HashSet<LifecycleReservation> _lifecycleOperations = [];
@@ -36,7 +38,8 @@ public sealed class AsyncClient : IAsyncDisposable
         Repair? repair = null,
         AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null)
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
+        SchemaValidationOptions? schemaValidation = null)
     {
         var descriptors = registry ?? Providers.ProviderRegistry.CreateDefault();
         _pool = new ProviderPool(providers, descriptors, resolver ?? Credentials.ResolverChain.CreateDefault());
@@ -48,11 +51,12 @@ public sealed class AsyncClient : IAsyncDisposable
         _capabilities = new CapabilityStore(pricingTable, capabilityOverrides);
         _targetResolver = new TargetMetadataResolver(_catalog, _pool.DescriptorSnapshot, () => _pool.Bindings, _pool);
         _resolutionProfile = TargetResolutionProfile.PublicSdk;
+        _schemaValidation = schemaValidation;
     }
 
     /// <summary>Creates a client over externally constructed adapters.</summary>
-    public static AsyncClient FromAdapters(IEnumerable<ProviderRegistration> providers) =>
-        new(providers, new SystemOperationClock(), publicSdk: true);
+    public static AsyncClient FromAdapters(IEnumerable<ProviderRegistration> providers, SchemaValidationOptions? schemaValidation = null) =>
+        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation);
 
     /// <summary>Creates a client from inert parsed configuration without performing I/O or credential resolution.</summary>
     public static AsyncClient FromConfig(
@@ -61,18 +65,19 @@ public sealed class AsyncClient : IAsyncDisposable
         Credentials.ResolverChain? resolver = null,
         AnyInfer.Catalog.Catalog? catalog = null,
         PricingTable? pricingTable = null,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null)
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null,
+        SchemaValidationOptions? schemaValidation = null)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides);
+        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation);
     }
 
     internal AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock)
-        : this(providers, clock, publicSdk: false)
+        : this(providers, clock, publicSdk: false, schemaValidation: null)
     {
     }
 
-    private AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock, bool publicSdk)
+    private AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock, bool publicSdk, SchemaValidationOptions? schemaValidation)
     {
         _pool = new ProviderPool(providers);
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -85,6 +90,7 @@ public sealed class AsyncClient : IAsyncDisposable
             () => _pool.Bindings,
             _pool);
         _resolutionProfile = publicSdk ? TargetResolutionProfile.PublicSdk : TargetResolutionProfile.FrozenV0;
+        _schemaValidation = schemaValidation;
     }
 
     internal RouteState Health => _health;
@@ -131,7 +137,7 @@ public sealed class AsyncClient : IAsyncDisposable
         Route? route = null,
         Sampling? sampling = null,
         Repair? repair = null,
-        Json.JsonValue? schema = null,
+        SchemaSpec? schema = null,
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
@@ -147,7 +153,7 @@ public sealed class AsyncClient : IAsyncDisposable
         Route? route = null,
         Sampling? sampling = null,
         Repair? repair = null,
-        Json.JsonValue? schema = null,
+        SchemaSpec? schema = null,
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
@@ -180,7 +186,7 @@ public sealed class AsyncClient : IAsyncDisposable
         Route? route = null,
         Sampling? sampling = null,
         Repair? repair = null,
-        Json.JsonValue? schema = null,
+        SchemaSpec? schema = null,
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
@@ -196,7 +202,7 @@ public sealed class AsyncClient : IAsyncDisposable
         Route? route = null,
         Sampling? sampling = null,
         Repair? repair = null,
-        Json.JsonValue? schema = null,
+        SchemaSpec? schema = null,
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
@@ -224,7 +230,11 @@ public sealed class AsyncClient : IAsyncDisposable
                 request.MaxResponseBytes,
                 request.Stream)
             : request;
-        var normalized = RequestNormalizer.Normalize(effectiveRequest, _resolutionProfile == TargetResolutionProfile.PublicSdk);
+        var normalized = RequestNormalizer.Normalize(
+            effectiveRequest,
+            _resolutionProfile == TargetResolutionProfile.PublicSdk,
+            _resolutionProfile == TargetResolutionProfile.PublicSdk ? SchemaExecutionProfile.ModernSdk : SchemaExecutionProfile.FrozenV0,
+            _schemaValidation);
         AsyncStream? stream = null;
         stream = new AsyncStream(
             this,
@@ -562,7 +572,7 @@ public sealed class AsyncClient : IAsyncDisposable
         Route? route,
         Sampling? sampling,
         Repair? repair,
-        Json.JsonValue? schema,
+        SchemaSpec? schema,
         string? schemaMechanism,
         double? timeoutS,
         int? maxResponseBytes,

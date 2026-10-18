@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib.util
+import json
 import zipfile
 from pathlib import Path
 
@@ -69,9 +72,16 @@ def _paths(tmp_path: Path) -> tuple[Path, Path]:
     )
 
 
+SCHEMA_DEPENDENCY_GROUP = (
+    '<dependencies><group targetFramework="net8.0">'
+    '<dependency id="JsonSchema.Net" version="[8.0.5]" />'
+    "</group></dependencies>"
+)
+
+
 def test_validate_package_accepts_closed_payload(tmp_path: Path) -> None:
     package, symbols = _paths(tmp_path)
-    _package(package)
+    _package(package, dependency_group=SCHEMA_DEPENDENCY_GROUP)
     _symbols(symbols)
 
     CHECKER.validate_package(package, symbols, REVISION)
@@ -79,7 +89,11 @@ def test_validate_package_accepts_closed_payload(tmp_path: Path) -> None:
 
 def test_validate_package_accepts_sdk_2012_nuspec_namespace(tmp_path: Path) -> None:
     package, symbols = _paths(tmp_path)
-    _package(package, namespace="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd")
+    _package(
+        package,
+        namespace="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd",
+        dependency_group=SCHEMA_DEPENDENCY_GROUP,
+    )
     _symbols(symbols)
 
     CHECKER.validate_package(package, symbols, REVISION)
@@ -113,15 +127,25 @@ def test_validate_package_rejects_unexpected_payload(tmp_path: Path, unexpected:
         CHECKER.validate_package(package, symbols, REVISION)
 
 
-def test_validate_package_allows_empty_net8_dependency_group(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "dependency_group",
+    [
+        "",
+        '<dependencies><group targetFramework="net8.0" /></dependencies>',
+        '<dependencies><group targetFramework="net8.0"><dependency id="JsonSchema.Net" version="8.0.5" /></group></dependencies>',
+        '<dependencies><group targetFramework="net8.0"><dependency id="JsonSchema.Net" version="[8.0.5]" /><dependency id="extra" version="1" /></group></dependencies>',
+        '<dependencies><group targetFramework="net7.0"><dependency id="JsonSchema.Net" version="[8.0.5]" /></group></dependencies>',
+    ],
+)
+def test_validate_package_rejects_schema_dependency_drift(
+    tmp_path: Path, dependency_group: str
+) -> None:
     package, symbols = _paths(tmp_path)
-    _package(
-        package,
-        dependency_group='<dependencies><group targetFramework="net8.0" /></dependencies>',
-    )
+    _package(package, dependency_group=dependency_group)
     _symbols(symbols)
 
-    CHECKER.validate_package(package, symbols, REVISION)
+    with pytest.raises(RuntimeError, match="dependency"):
+        CHECKER.validate_package(package, symbols, REVISION)
 
 
 @pytest.mark.parametrize(
@@ -131,7 +155,7 @@ def test_validate_package_allows_empty_net8_dependency_group(tmp_path: Path) -> 
         (
             "expression",
             '<dependencies><group targetFramework="net8.0"><dependency id="x" version="1" /></group></dependencies>',
-            "runtime dependencies",
+            "dependency",
         ),
     ],
 )
@@ -166,17 +190,129 @@ def test_main_preserves_preexisting_output_run_directory(tmp_path: Path, monkeyp
         if command[:2] == ["dotnet", "pack"]:
             packages = Path(command[command.index("-o") + 1])
             packages.mkdir(parents=True)
-            _package(packages / f"AnyInfer.{version}.nupkg")
+            _package(packages / f"AnyInfer.{version}.nupkg", dependency_group=SCHEMA_DEPENDENCY_GROUP)
             _symbols(packages / f"AnyInfer.{version}.snupkg")
 
     monkeypatch.setattr(CHECKER, "run", fake_run)
     monkeypatch.setattr(CHECKER, "git_revision", lambda: REVISION)
+    monkeypatch.setattr(CHECKER, "stage_schema_dependencies", lambda feed: None)
 
     assert CHECKER.main(["--output", str(output)]) == 0
     assert sentinel.read_text(encoding="utf-8") == "keep"
     copied_pins = list(output.glob("run-*/global.json"))
     assert len(copied_pins) == 1
     assert copied_pins[0].read_bytes() == (ROOT / "src" / "csharp" / "global.json").read_bytes()
+
+
+def _dependency_package(path: Path, package_id: str, version: str, license_text: str = "MIT") -> str:
+    nuspec = f'''<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata><id>{package_id}</id><version>{version}</version>
+  <license type="expression">{license_text}</license></metadata>
+</package>'''
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(f"{package_id}.nuspec", nuspec)
+    return base64.b64encode(hashlib.sha512(path.read_bytes()).digest()).decode("ascii")
+
+
+def test_stage_schema_dependencies_requires_exact_resolved_graph_and_verified_archives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package_folder = tmp_path / "cache"
+    expected_hashes: dict[str, tuple[str, str]] = {}
+    target: dict[str, object] = {}
+    for name, (version, _) in CHECKER.SCHEMA_DEPENDENCIES.items():
+        package = package_folder / name.lower() / version / f"{name.lower()}.{version}.nupkg"
+        package.parent.mkdir(parents=True)
+        expected_hashes[name] = (version, _dependency_package(package, name, version))
+        target[f"{name}/{version}"] = {"type": "package", "dependencies": {}}
+    target["JsonSchema.Net/8.0.5"] = {
+        "type": "package",
+        "dependencies": {
+            "JsonPointer.Net": "6.0.1",
+            "Json.More.Net": "2.2.0",
+            "Humanizer.Core": "2.14.1",
+        },
+    }
+    assets = tmp_path / "project.assets.json"
+    assets.write_text(
+        json.dumps({"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(CHECKER, "SCHEMA_DEPENDENCIES", expected_hashes)
+    feed = tmp_path / "feed"
+
+    CHECKER.stage_schema_dependencies(feed, assets)
+
+    assert sorted(item.name for item in feed.glob("*.nupkg")) == sorted(
+        f"{name.lower()}.{version}.nupkg" for name, (version, _) in expected_hashes.items()
+    )
+
+
+def test_stage_schema_dependencies_rejects_unqualified_graph_before_archive_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package_folder = tmp_path / "cache"
+    expected_hashes: dict[str, tuple[str, str]] = {}
+    target: dict[str, object] = {}
+    for name, (version, _) in CHECKER.SCHEMA_DEPENDENCIES.items():
+        package = package_folder / name.lower() / version / f"{name.lower()}.{version}.nupkg"
+        package.parent.mkdir(parents=True)
+        expected_hashes[name] = (version, _dependency_package(package, name, version, "Apache-2.0"))
+        target[f"{name}/{version}"] = {"type": "package", "dependencies": {}}
+    target["JsonSchema.Net/8.0.5"] = {"type": "package", "dependencies": {}}
+    assets = tmp_path / "project.assets.json"
+    assets.write_text(
+        json.dumps({"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(CHECKER, "SCHEMA_DEPENDENCIES", expected_hashes)
+
+    with pytest.raises(RuntimeError, match="graph"):
+        CHECKER.stage_schema_dependencies(tmp_path / "feed", assets)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        ("hash", "hash"),
+        ("license", "license"),
+    ],
+)
+def test_stage_schema_dependencies_rejects_archive_identity_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutate: str, message: str
+) -> None:
+    package_folder = tmp_path / "cache"
+    expected_hashes: dict[str, tuple[str, str]] = {}
+    target: dict[str, object] = {}
+    for name, (version, _) in CHECKER.SCHEMA_DEPENDENCIES.items():
+        package = package_folder / name.lower() / version / f"{name.lower()}.{version}.nupkg"
+        package.parent.mkdir(parents=True)
+        actual_hash = _dependency_package(
+            package,
+            name,
+            version,
+            "Apache-2.0" if mutate == "license" and name == "Json.More.Net" else "MIT",
+        )
+        expected_hashes[name] = (version, "different" if mutate == "hash" and name == "Json.More.Net" else actual_hash)
+        target[f"{name}/{version}"] = {"type": "package", "dependencies": {}}
+    target["JsonSchema.Net/8.0.5"] = {
+        "type": "package",
+        "dependencies": {
+            "JsonPointer.Net": "6.0.1",
+            "Json.More.Net": "2.2.0",
+            "Humanizer.Core": "2.14.1",
+        },
+    }
+    assets = tmp_path / "project.assets.json"
+    assets.write_text(
+        json.dumps({"packageFolders": {str(package_folder) + "/": {}}, "targets": {"net8.0": target}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(CHECKER, "SCHEMA_DEPENDENCIES", expected_hashes)
+
+    with pytest.raises(RuntimeError, match=message):
+        CHECKER.stage_schema_dependencies(tmp_path / "feed", assets)
 
 
 def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecycle_vocabulary(tmp_path: Path) -> None:
@@ -201,6 +337,7 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'new Client([settings], registry, catalog: catalog,' in source
     assert "using AnyInfer.Capabilities;" in source
     assert "using AnyInfer.Catalog;" in source
+    assert "using AnyInfer.Schema;" in source
     assert 'ProviderSettings.Of("demo", alias: "demo-instance")' in source
     assert 'new global::AnyInfer.Catalog.Catalog(' in source
     assert 'new PricingTable(' in source
@@ -210,6 +347,19 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'client.Capabilities("tier")' in source
     assert 'pricingTable.Lookup("demo-instance", "demo-model")' in source
     assert 'factoryCalls != 0' in source
+    assert "SchemaSpec.FromJson" in source
+    assert "SchemaValidator.ValidateAsync" in source
+    assert ".DeserializeStructured<SchemaAnswer>()" in source
+    assert 'JsonPropertyName("answer")' in source
+    assert '"https://json-schema.org/draft/2020-12/schema"' in source
+    assert '"$defs"' in source
+    assert '"$ref":"#/$defs/answer"' in source
+    assert 'sealed class SchemaAdapter : IProviderAdapter' in source
+    assert 'new ProviderRegistration("schema-demo", schemaAdapter)' in source
+    assert 'schema: schema' in source
+    assert 'request.Schema is null || request.SchemaName != "response"' in source
+    assert "schemaAdapter.SchemaRequests != 1" in source
+    assert "schemaAdapter.DisposeCount != 1" in source
     assert 'AsyncClient.FromAdapters(\n        [new ProviderRegistration("lifecycle-demo", lifecycleAdapter)])' in source
     assert 'await client.ModelsAsync("lifecycle-demo")' in source
     assert 'await client.HealthAsync("lifecycle-demo")' in source

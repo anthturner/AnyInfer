@@ -537,9 +537,10 @@ public sealed class ProviderLifecycleTests
             models: [],
             list: async token =>
             {
+                var delay = Task.Delay(Timeout.InfiniteTimeSpan, token);
                 using var registration = token.Register(() => throw sentinel);
                 Signal();
-                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                await delay;
                 return [];
             },
             health: token => BlockHealth(token, Signal),

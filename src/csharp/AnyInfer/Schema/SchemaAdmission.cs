@@ -29,8 +29,9 @@ public static class SchemaAdmission
     };
 
     /// <summary>Validates the profile-admitted schema subset; a null reference means no schema.</summary>
-    public static void Validate(JsonValue? schema)
+    public static void Validate(SchemaSpec? specification)
     {
+        var schema = specification?.JsonSchema;
         if (schema is null)
         {
             return;

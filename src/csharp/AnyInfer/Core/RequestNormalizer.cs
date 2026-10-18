@@ -7,18 +7,20 @@ namespace AnyInfer.Core;
 internal sealed record NormalizedRequest(
     IReadOnlyList<Message> Messages,
     Sampling Sampling,
-    JsonValue? Schema,
+    SchemaSpec? Schema,
     int RepairBudget,
     double? TimeoutS,
     int MaxResponseBytes,
-    bool Stream);
+    bool Stream,
+    SchemaExecutionProfile SchemaProfile,
+    SchemaValidationOptions? SchemaValidation);
 
 internal static class RequestNormalizer
 {
-    internal static NormalizedRequest Normalize(GenerationRequest request, bool allowTargetAliases = false)
+    internal static NormalizedRequest Normalize(GenerationRequest request, bool allowTargetAliases = false, SchemaExecutionProfile schemaProfile = SchemaExecutionProfile.FrozenV0, SchemaValidationOptions? schemaValidation = null)
     {
         ArgumentNullException.ThrowIfNull(request);
-        RequestAdmission.Validate(request, allowTargetAliases);
+        RequestAdmission.Validate(request, allowTargetAliases, schemaProfile);
 
         var messages = request.Messages
             .Select(static message => new Message(
@@ -42,7 +44,9 @@ internal static class RequestNormalizer
             Math.Max(0, request.Repair?.MaxAttempts ?? 0),
             request.TimeoutS,
             request.MaxResponseBytes ?? 1_048_576,
-            request.Stream);
+            request.Stream,
+            schemaProfile,
+            schemaValidation);
     }
 
     internal static WireRequest CreateWireRequest(
@@ -62,7 +66,7 @@ internal static class RequestNormalizer
             mechanism = SelectMechanism(resolved.Capabilities);
             if (mechanism is "prompt" or "json_mode")
             {
-                wireMessages = SchemaPromptRenderer.InjectPrompt(wireMessages, schema).ToArray();
+                wireMessages = (normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk ? SchemaPromptRenderer.InjectPromptModern(wireMessages, schema.JsonSchema) : SchemaPromptRenderer.InjectPrompt(wireMessages, schema.JsonSchema)).ToArray();
             }
         }
 
@@ -70,11 +74,13 @@ internal static class RequestNormalizer
             resolved.Target.Model,
             wireMessages,
             normalized.Sampling,
-            normalized.Schema,
+            normalized.Schema?.JsonSchema,
             mechanism,
             normalized.Stream,
             normalized.TimeoutS ?? resolved.Settings.TimeoutS,
-            normalized.MaxResponseBytes);
+            normalized.MaxResponseBytes,
+            normalized.Schema?.Name ?? "response",
+            normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk);
     }
 
     private static string SelectMechanism(StructuredOutputProfile capabilities) =>

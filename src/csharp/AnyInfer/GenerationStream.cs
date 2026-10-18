@@ -123,6 +123,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
                 cancellationToken,
                 _closeSource.Token);
             using var context = AsyncExecutionContext.Push(_client, _syncClient);
+            using var identity = CancellationIdentityContext.Push(linked.Token, CallerCancellation);
             _enumerator = new StreamEnumerator(this, _factory(linked.Token).GetAsyncEnumerator(linked.Token), linked);
             return _enumerator;
         }
@@ -273,6 +274,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
                 }
 
                 using var context = AsyncExecutionContext.Push(_owner._client, _owner._syncClient);
+                using var identity = CancellationIdentityContext.Push(_linked.Token, _owner.CallerCancellation);
                 return await _inner.MoveNextAsync().ConfigureAwait(false);
             }
             catch (Exception exception)

@@ -260,6 +260,33 @@ public sealed class SchemaViolationException : AnyInferException
     public IReadOnlyList<Issue> Issues { get; }
 }
 
+/// <summary>Represents a terminal failure while resolving a schema resource.</summary>
+public sealed class SchemaReferenceException : AnyInferException
+{
+    /// <summary>Initializes a schema-resource resolution failure.</summary>
+    public SchemaReferenceException(string message, Uri resourceUri, string? fragment = null, string? provider = null, Exception? nativeInner = null)
+        : base(message, "schema_reference", false, "validate", null, null, provider, null, "Register the resource or provide an explicit schema retriever.", nativeInner)
+    {
+        ResourceUri = new UriBuilder(resourceUri ?? throw new ArgumentNullException(nameof(resourceUri))) { Fragment = string.Empty }.Uri;
+        Fragment = fragment;
+    }
+
+    /// <summary>Gets the fragment-free resource URI.</summary>
+    public Uri ResourceUri { get; }
+    /// <summary>Gets the unresolved fragment when supplied.</summary>
+    public string? Fragment { get; }
+}
+
+/// <summary>Represents a terminal native schema evaluation failure, including regex timeout or unsupported numeric evaluation.</summary>
+public sealed class SchemaEvaluationException : AnyInferException
+{
+    /// <summary>Initializes a terminal native schema-evaluation failure.</summary>
+    public SchemaEvaluationException(string message, string? provider = null, Exception? nativeInner = null)
+        : base(message, "schema_evaluation", false, "validate", null, null, provider, null, "Use a simpler schema or a representable numeric range, or increase the configured regex timeout.", nativeInner)
+    {
+    }
+}
+
 /// <summary>Represents an exhausted ordered set of target attempts.</summary>
 public sealed class AllTargetsFailedException : AnyInferException
 {

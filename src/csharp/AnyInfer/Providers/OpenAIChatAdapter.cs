@@ -271,7 +271,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 
     private HttpRequestMessage CreateRequest(WireRequest request)
     {
-        var payload = JsonWriter.Write(CreatePayload(request));
+        var payload = request.UsesModernSchema ? JsonWriter.WriteModern(CreatePayload(request)) : JsonWriter.Write(CreatePayload(request));
         var content = new ByteArrayContent(Encoding.UTF8.GetBytes(payload));
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
@@ -349,6 +349,26 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             new("messages", new JsonArray(request.Messages.Select(CreateMessage))),
         };
         AddSampling(properties, request.Sampling);
+        if (request.UsesModernSchema)
+        {
+            if (request.Mechanism == "json_schema" && request.Schema is not null)
+            {
+                properties.Add(new JsonProperty("response_format", new JsonObject([
+                    new JsonProperty("type", new JsonString("json_schema")),
+                    new JsonProperty("json_schema", new JsonObject([
+                        new JsonProperty("name", new JsonString(request.SchemaName)),
+                        new JsonProperty("schema", request.Schema),
+                        new JsonProperty("strict", new JsonBoolean(false)),
+                    ])),
+                ])));
+            }
+            else if (request.Mechanism == "json_mode")
+            {
+                properties.Add(new JsonProperty("response_format", new JsonObject([
+                    new JsonProperty("type", new JsonString("json_object")),
+                ])));
+            }
+        }
         if (request.Stream)
         {
             properties.Add(new JsonProperty("stream", new JsonBoolean(true)));

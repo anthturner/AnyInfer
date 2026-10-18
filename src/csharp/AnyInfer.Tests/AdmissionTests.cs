@@ -11,8 +11,8 @@ public sealed class AdmissionTests
     public void Schema_admission_allows_absent_empty_and_exact_draft_schemas()
     {
         SchemaAdmission.Validate(null);
-        SchemaAdmission.Validate(new JsonObject([]));
-        SchemaAdmission.Validate(JsonReader.Read("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\"}"));
+        SchemaAdmission.Validate(new SchemaSpec(new JsonObject([]), "response"));
+        SchemaAdmission.Validate(new SchemaSpec(JsonReader.Read("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\"}"), "response"));
     }
 
     [Theory]
@@ -33,7 +33,7 @@ public sealed class AdmissionTests
     [InlineData("{\"unknown\":true}")]
     public void Schema_admission_refuses_each_excluded_boundary(string source)
     {
-        var error = Assert.Throws<ProviderException>(() => SchemaAdmission.Validate(JsonReader.Read(source)));
+        var error = Assert.Throws<ProviderException>(() => SchemaAdmission.Validate(new SchemaSpec(JsonReader.Read(source), "response")));
 
         AssertUnsupported(error);
     }
@@ -46,7 +46,7 @@ public sealed class AdmissionTests
              "const":{"items":false},"default":{"unknown":true},"examples":[{"format":"literal"}]}
             """);
 
-        SchemaAdmission.Validate(schema);
+        SchemaAdmission.Validate(new SchemaSpec(schema, "response"));
     }
 
     [Theory]
@@ -59,16 +59,16 @@ public sealed class AdmissionTests
     public void Malformed_admitted_keywords_remain_late_schema_assessment(string source)
     {
         var schema = JsonReader.Read(source);
-        SchemaAdmission.Validate(schema);
+        SchemaAdmission.Validate(new SchemaSpec(schema, "response"));
 
-        var assessment = SchemaValidator.Assess(schema, JsonNull.Instance, Guid.NewGuid(), 0);
+        var assessment = FrozenSchemaValidator.Assess(schema, JsonNull.Instance, Guid.NewGuid(), 0);
         Assert.Equal("invalid_schema", Assert.Single(assessment.Issues).Rule);
     }
 
     [Fact]
     public void Explicit_excluded_forms_take_precedence_over_malformed_admitted_values()
     {
-        var error = Assert.Throws<ProviderException>(() => SchemaAdmission.Validate(JsonReader.Read("{\"type\":17,\"$ref\":\"#/x\"}")));
+        var error = Assert.Throws<ProviderException>(() => SchemaAdmission.Validate(new SchemaSpec(JsonReader.Read("{\"type\":17,\"$ref\":\"#/x\"}"), "response")));
 
         AssertUnsupported(error);
     }
@@ -82,7 +82,7 @@ public sealed class AdmissionTests
         AssertUnsupported(Assert.Throws<ProviderException>(() => RequestAdmission.Validate(excluded)));
         RequestAdmission.Validate(malformed);
 
-        var assessment = SchemaValidator.Assess(malformed.Schema!, JsonNull.Instance, Guid.NewGuid(), 0);
+        var assessment = FrozenSchemaValidator.Assess(malformed.Schema!.JsonSchema, JsonNull.Instance, Guid.NewGuid(), 0);
         Assert.Equal("invalid_schema", Assert.Single(assessment.Issues).Rule);
     }
 
@@ -92,7 +92,7 @@ public sealed class AdmissionTests
     [InlineData("{\"items\":{\"anyOf\":[]}}")]
     public void Schema_admission_recurses_only_into_actual_child_schema_positions(string source)
     {
-        AssertUnsupported(Assert.Throws<ProviderException>(() => SchemaAdmission.Validate(JsonReader.Read(source))));
+        AssertUnsupported(Assert.Throws<ProviderException>(() => SchemaAdmission.Validate(new SchemaSpec(JsonReader.Read(source), "response"))));
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class AdmissionTests
         Route? route = null,
         Sampling? sampling = null,
         JsonValue? schema = null) =>
-        new(messages, route ?? new Route(["provider:model"]), sampling: sampling, schema: schema);
+        new(messages, route ?? new Route(["provider:model"]), sampling: sampling, schema: schema is null ? null : new SchemaSpec(schema, "response"));
 
     private static void AssertUnsupported(ProviderException error)
     {

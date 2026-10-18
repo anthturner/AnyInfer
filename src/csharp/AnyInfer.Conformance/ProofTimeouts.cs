@@ -86,12 +86,12 @@ internal static class ProofTimeouts
                 ProofStep.Success("{\"age\":7}"),
             ]);
             var capture = new OperationCapture();
-            await using var client = AsyncClient.FromAdapters([new ProviderRegistration("proof", adapter)]);
+            await using var client = new AsyncClient([new ProviderRegistration("proof", adapter)], new VirtualClock(0));
             var schema = PersonSchema();
             var request = new GenerationRequest(
                 [new Message("user", [new Text("Give me a person.")])],
                 new Route(["proof:reset"], new Retry(MaxAttempts: 2, BackoffBaseS: 0, BackoffMaxS: 0)),
-                repair: new Repair(1), schema: schema, timeoutS: 7.25, maxResponseBytes: 4096);
+                repair: new Repair(1), schema: new SchemaSpec(schema, "response"), timeoutS: 7.25, maxResponseBytes: 4096);
             Generation? result = null;
             AnyInferException? terminal = null;
             try { result = await client.GenerateAsync(request, capture, cancellationToken).ConfigureAwait(false); }

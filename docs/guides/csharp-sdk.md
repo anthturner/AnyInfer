@@ -96,3 +96,13 @@ through the OpenAI-compatible adapter. It also covers structured JSON validation
 configuration, routing, and reported token usage. It does not provide a released NuGet package,
 provider parity, aggregate usage accounting, tool execution, embeddings, reranking, or production
 report publication.
+
+For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
+Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with
+a timeout for each regular-expression match. Registered schema resources are explicit, and external
+resource retrieval requires an explicit opt-in retriever.
+
+Modern schemas and generated values retain arbitrary-size integers at the input boundary. Numeric
+comparisons in `const`, `enum`, and `uniqueItems` use the pinned native validator's .NET `decimal`
+domain, so a value outside that range, such as `1e70`, produces a controlled schema-evaluation
+exception.

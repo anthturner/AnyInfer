@@ -26,9 +26,10 @@ public sealed record NativeAssessment
         string kind,
         JsonValue? structured,
         IEnumerable<NativeFinding> allFindings,
-        IEnumerable<NativeFinding> selectedFindings)
+        IEnumerable<NativeFinding> selectedFindings,
+        bool? isValid = null)
     {
-        if (kind is not ("extraction" or "validation"))
+        if (kind is not ("extraction" or "validation" or "invalid_schema"))
         {
             throw new ArgumentOutOfRangeException(nameof(kind));
         }
@@ -68,7 +69,7 @@ public sealed record NativeAssessment
         SelectedFindings = Array.AsReadOnly(selected);
         Issues = Array.AsReadOnly(selected.Select(static item => item.Issue).ToArray());
         Messages = Array.AsReadOnly(selected.Select(static item => item.Message).ToArray());
-        IsValid = all.Length == 0;
+        IsValid = isValid ?? all.Length == 0;
     }
 
     public Guid AssessmentId { get; }

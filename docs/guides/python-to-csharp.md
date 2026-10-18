@@ -12,6 +12,7 @@ does not claim provider or feature parity with Python.
 | `Target` string | `target` string passed to each async call |
 | `Route` and `Retry` | `Route` and `Retry` |
 | `Repair(max_attempts=...)` | `Repair(MaxAttempts: ...)` |
+| JSON Schema mapping | `SchemaSpec` and typed `Generation.DeserializeStructured<T>()` |
 | `Text.text` | `Text.Value` |
 | `result.text` | `Generation.Text` |
 | async stream | `AsyncStream` and `StreamEvent` |
@@ -31,7 +32,14 @@ client and stream lifetime. C# also has `Client`/`SyncStream` for synchronous ca
 client. Version 1 actively supports `providers`, `default_route`, and `repair`; unsupported
 active policies are refused. Credential references remain references while configuration is read;
 resolution belongs to the selected provider's first use. The schema mechanism is a bounded proof
-subset, so port a schema only after checking its supported shape.
+subset, so port a schema only after checking its supported shape. The C# proof evaluates Draft 6,
+Draft 7, Draft 2019-09, and Draft 2020-12; Draft 3 and Draft 4 remain deferred. Native numeric
+and regular-expression behavior applies, with a timeout per regular-expression match. Registered
+resources are explicit and external schema retrieval requires an explicit retriever.
+
+Modern C# schema input and generated values retain arbitrary-size integers. The native validator's
+numeric comparisons for `const`, `enum`, and `uniqueItems` use .NET `decimal`, so a value outside
+that range, such as `1e70`, raises a controlled schema-evaluation exception.
 
 ```csharp
 --8<-- "examples/csharp-sdk/ConfigurationExample.cs"

@@ -13,7 +13,7 @@ public static partial class JsonWriter
     {
         ArgumentNullException.ThrowIfNull(value);
         var builder = new StringBuilder();
-        Append(value, builder, canonical: false, depth: 0);
+        Append(value, builder, canonical: false, depth: 0, allowLargeIntegers: false);
         return builder.ToString();
     }
 
@@ -21,11 +21,22 @@ public static partial class JsonWriter
     {
         ArgumentNullException.ThrowIfNull(value);
         var builder = new StringBuilder();
-        Append(value, builder, canonical: true, depth: 0);
+        Append(value, builder, canonical: true, depth: 0, allowLargeIntegers: false);
         return builder.ToString();
     }
 
-    private static void Append(JsonValue value, StringBuilder builder, bool canonical, int depth)
+    internal static string WriteModern(JsonValue value) => WriteCore(value, canonical: false, allowLargeIntegers: true);
+
+    internal static string WriteCanonicalModern(JsonValue value) => WriteCore(value, canonical: true, allowLargeIntegers: true);
+
+    private static string WriteCore(JsonValue value, bool canonical, bool allowLargeIntegers)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var builder = new StringBuilder();
+        Append(value, builder, canonical, depth: 0, allowLargeIntegers);
+        return builder.ToString();
+    }
+    private static void Append(JsonValue value, StringBuilder builder, bool canonical, int depth, bool allowLargeIntegers)
     {
         switch (value)
         {
@@ -36,7 +47,7 @@ public static partial class JsonWriter
                 builder.Append(boolean.Value ? "true" : "false");
                 return;
             case JsonInteger integer:
-                if (BigInteger.Abs(integer.Value) > IntegerLimit)
+                if (!allowLargeIntegers && BigInteger.Abs(integer.Value) > IntegerLimit)
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), "JSON integer is outside the portable v0 range.");
                 }
@@ -50,17 +61,17 @@ public static partial class JsonWriter
                 AppendString(text.Value, builder, canonical);
                 return;
             case JsonArray array:
-                AppendArray(array, builder, canonical, depth);
+                AppendArray(array, builder, canonical, depth, allowLargeIntegers);
                 return;
             case JsonObject obj:
-                AppendObject(obj, builder, canonical, depth);
+                AppendObject(obj, builder, canonical, depth, allowLargeIntegers);
                 return;
             default:
                 throw new ArgumentOutOfRangeException(nameof(value), "Unknown JSON value.");
         }
     }
 
-    private static void AppendArray(JsonArray array, StringBuilder builder, bool canonical, int depth)
+    private static void AppendArray(JsonArray array, StringBuilder builder, bool canonical, int depth, bool allowLargeIntegers)
     {
         if (array.Items.Count == 0)
         {
@@ -85,7 +96,7 @@ public static partial class JsonWriter
                 builder.Append(',');
             }
 
-            Append(array.Items[index], builder, canonical, depth + 1);
+            Append(array.Items[index], builder, canonical, depth + 1, allowLargeIntegers);
         }
 
         if (canonical)
@@ -96,7 +107,7 @@ public static partial class JsonWriter
         builder.Append(']');
     }
 
-    private static void AppendObject(JsonObject value, StringBuilder builder, bool canonical, int depth)
+    private static void AppendObject(JsonObject value, StringBuilder builder, bool canonical, int depth, bool allowLargeIntegers)
     {
         if (value.Properties.Count == 0)
         {
@@ -123,7 +134,7 @@ public static partial class JsonWriter
 
             AppendString(property.Name, builder, canonical);
             builder.Append(canonical ? ": " : ":");
-            Append(property.Value, builder, canonical, depth + 1);
+            Append(property.Value, builder, canonical, depth + 1, allowLargeIntegers);
             first = false;
         }
 

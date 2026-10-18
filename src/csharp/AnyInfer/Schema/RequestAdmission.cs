@@ -6,7 +6,7 @@ public static class RequestAdmission
     /// <summary>Validates construction constraints and the frozen request profile.</summary>
     public static void Validate(GenerationRequest request) => Validate(request, allowTargetAliases: false);
 
-    internal static void Validate(GenerationRequest request, bool allowTargetAliases)
+    internal static void Validate(GenerationRequest request, bool allowTargetAliases, SchemaExecutionProfile profile = SchemaExecutionProfile.FrozenV0)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateConstruction(request.Sampling);
@@ -32,7 +32,10 @@ public static class RequestAdmission
             }
         }
 
-        SchemaAdmission.Validate(request.Schema);
+        if (profile == SchemaExecutionProfile.FrozenV0)
+        {
+            SchemaAdmission.Validate(request.Schema);
+        }
     }
 
     private static void ValidateConstruction(Sampling? sampling)

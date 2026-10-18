@@ -123,7 +123,7 @@ public sealed class SchemaTests
         var schema = Assert.IsType<JsonObject>(JsonReader.Read("{\"maximum\":0}"));
         var instance = JsonReader.Read("1e-30");
         Assert.True(schema.TryGetValue("maximum", out var constraint));
-        var assessment = SchemaValidator.Assess(schema, instance, Guid.NewGuid(), 0);
+        var assessment = FrozenSchemaValidator.Assess(schema, instance, Guid.NewGuid(), 0);
 
         var finding = Assert.Single(assessment.SelectedFindings);
         Assert.Equal("maximum", finding.Issue.Rule);
@@ -181,7 +181,7 @@ public sealed class SchemaTests
         var schema = Assert.IsType<JsonObject>(JsonReader.Read("{\"required\":[\"age\",\"name\"]}"));
         var instance = Assert.IsType<JsonObject>(JsonReader.Read("{\"name\":\"Ada\"}"));
         Assert.True(schema.TryGetValue("required", out var constraint));
-        var assessment = SchemaValidator.Assess(schema, instance, Guid.NewGuid(), 0);
+        var assessment = FrozenSchemaValidator.Assess(schema, instance, Guid.NewGuid(), 0);
 
         var finding = Assert.Single(assessment.SelectedFindings);
         Assert.Same(finding, Assert.Single(assessment.AllFindings));
@@ -339,7 +339,7 @@ public sealed class SchemaTests
     [Fact]
     public void Assess_response_short_circuits_extraction_before_malformed_schema()
     {
-        var assessment = SchemaValidator.AssessResponse(JsonReader.Read("{\"required\":17}"), "not json", Guid.NewGuid(), 3);
+        var assessment = FrozenSchemaValidator.AssessResponse(JsonReader.Read("{\"required\":17}"), "not json", Guid.NewGuid(), 3);
 
         Assert.Equal("extraction", assessment.Kind);
         Assert.Equal("no_json_candidate", Assert.Single(assessment.Issues).Rule);
@@ -351,7 +351,7 @@ public sealed class SchemaTests
     {
         var schema = Assert.IsType<JsonObject>(JsonReader.Read("{\"required\":17}"));
         Assert.True(schema.TryGetValue("required", out var defective));
-        var assessment = SchemaValidator.Assess(schema, JsonNull.Instance, Guid.NewGuid(), 0);
+        var assessment = FrozenSchemaValidator.Assess(schema, JsonNull.Instance, Guid.NewGuid(), 0);
 
         var finding = Assert.Single(assessment.SelectedFindings);
         var issue = Assert.Single(assessment.Issues);
@@ -370,8 +370,8 @@ public sealed class SchemaTests
     public void Assessments_preserve_identity_and_native_findings_without_regenerating_feedback()
     {
         var operation = Guid.NewGuid();
-        var first = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation, 7);
-        var second = SchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation, 7);
+        var first = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation, 7);
+        var second = FrozenSchemaValidator.Assess(JsonReader.Read("{\"required\":[\"age\"]}"), JsonReader.Read("{}"), operation, 7);
 
         Assert.Equal(operation, first.OperationId);
         Assert.Equal(7, first.SourceEntryOrdinal);
@@ -445,7 +445,7 @@ public sealed class SchemaTests
     }
 
     private static NativeAssessment Assess(string schema, string instance) =>
-        SchemaValidator.Assess(JsonReader.Read(schema), JsonReader.Read(instance), Guid.NewGuid(), 0);
+        FrozenSchemaValidator.Assess(JsonReader.Read(schema), JsonReader.Read(instance), Guid.NewGuid(), 0);
 
     private static void AssertExtractionFailure(string text, string rule)
     {

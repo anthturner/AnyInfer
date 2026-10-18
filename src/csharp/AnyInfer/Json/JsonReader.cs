@@ -24,6 +24,16 @@ public static class JsonReader
     }
 
     public static JsonValue Read(ReadOnlySpan<byte> utf8)
+        => ReadCore(utf8, allowLargeIntegers: false);
+
+    internal static JsonValue ReadModern(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        try { return ReadCore(StrictUtf8.GetBytes(json), allowLargeIntegers: true); }
+        catch (EncoderFallbackException exception) { throw new FormatException("JSON input contains an unpaired UTF-16 surrogate.", exception); }
+    }
+
+    private static JsonValue ReadCore(ReadOnlySpan<byte> utf8, bool allowLargeIntegers)
     {
         try
         {
@@ -37,7 +47,7 @@ public static class JsonReader
                 throw new FormatException("JSON input is empty.");
             }
 
-            var value = ReadValue(ref reader);
+            var value = ReadValue(ref reader, allowLargeIntegers);
             if (reader.Read())
             {
                 throw new FormatException("JSON input contains more than one value.");
@@ -55,7 +65,7 @@ public static class JsonReader
         }
     }
 
-    private static JsonValue ReadValue(ref Utf8JsonReader reader)
+    private static JsonValue ReadValue(ref Utf8JsonReader reader, bool allowLargeIntegers)
     {
         return reader.TokenType switch
         {
@@ -63,19 +73,19 @@ public static class JsonReader
             JsonTokenType.True => new JsonBoolean(true),
             JsonTokenType.False => new JsonBoolean(false),
             JsonTokenType.String => new JsonString(ReadString(ref reader)),
-            JsonTokenType.Number => ReadNumber(ref reader),
-            JsonTokenType.StartArray => ReadArray(ref reader),
-            JsonTokenType.StartObject => ReadObject(ref reader),
+            JsonTokenType.Number => ReadNumber(ref reader, allowLargeIntegers),
+            JsonTokenType.StartArray => ReadArray(ref reader, allowLargeIntegers),
+            JsonTokenType.StartObject => ReadObject(ref reader, allowLargeIntegers),
             _ => throw new FormatException($"Unexpected JSON token {reader.TokenType}.")
         };
     }
 
-    private static JsonArray ReadArray(ref Utf8JsonReader reader)
+    private static JsonArray ReadArray(ref Utf8JsonReader reader, bool allowLargeIntegers)
     {
         var items = new List<JsonValue>();
         while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
         {
-            items.Add(ReadValue(ref reader));
+            items.Add(ReadValue(ref reader, allowLargeIntegers));
         }
 
         if (reader.TokenType != JsonTokenType.EndArray)
@@ -86,7 +96,7 @@ public static class JsonReader
         return new JsonArray(items);
     }
 
-    private static JsonObject ReadObject(ref Utf8JsonReader reader)
+    private static JsonObject ReadObject(ref Utf8JsonReader reader, bool allowLargeIntegers)
     {
         var properties = new List<JsonProperty>();
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
@@ -102,7 +112,7 @@ public static class JsonReader
                 throw new FormatException("JSON object property has no value.");
             }
 
-            properties.Add(new JsonProperty(name, ReadValue(ref reader)));
+            properties.Add(new JsonProperty(name, ReadValue(ref reader, allowLargeIntegers)));
         }
 
         if (reader.TokenType != JsonTokenType.EndObject)
@@ -113,7 +123,7 @@ public static class JsonReader
         return new JsonObject(properties);
     }
 
-    private static JsonValue ReadNumber(ref Utf8JsonReader reader)
+    private static JsonValue ReadNumber(ref Utf8JsonReader reader, bool allowLargeIntegers)
     {
         var lexeme = StrictUtf8.GetString(reader.ValueSpan);
         if (!lexeme.Contains('.', StringComparison.Ordinal) &&
@@ -121,7 +131,7 @@ public static class JsonReader
             !lexeme.Contains('E', StringComparison.Ordinal))
         {
             var integer = BigInteger.Parse(lexeme, CultureInfo.InvariantCulture);
-            if (BigInteger.Abs(integer) > IntegerLimit)
+            if (!allowLargeIntegers && BigInteger.Abs(integer) > IntegerLimit)
             {
                 throw new FormatException("JSON integer is outside the portable v0 range.");
             }

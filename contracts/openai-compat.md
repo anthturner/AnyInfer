@@ -29,6 +29,9 @@ substitution already established for the embeddings section below.
   parameter name), `stop`, `seed`, `presence_penalty`, `frequency_penalty`,
   `tools`, `tool_choice`,
   `response_format: {"type":"json_schema","json_schema":{...}}` or `{"type":"json_object"}`
+- The C# SDK’s modern-schema path projects only its internally selected JSON Schema and
+  JSON mode mechanisms to those forms. Offline native tests cover that projection; frozen C#
+  requests do not add the response-format field.
 - `logprobs: true` plus optional `top_logprobs: <int>` (added 2026-08-25). The pair is
   load-bearing: `top_logprobs` alone is rejected upstream, and `logprobs: true` alone
   returns the chosen token's own probability with no alternatives — which is why the

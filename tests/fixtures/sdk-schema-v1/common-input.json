@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {"id":"draft3-property-required","schema":{"$schema":"http://json-schema.org/draft-03/schema#","type":"object","properties":{"name":{"type":"string","required":true}}},"instance":{}},
+    {"id":"draft4-boolean-exclusive-minimum","schema":{"$schema":"http://json-schema.org/draft-04/schema#","minimum":1,"exclusiveMinimum":true},"instance":1},
+    {"id":"draft6-numeric-exclusive-minimum","schema":{"$schema":"http://json-schema.org/draft-06/schema#","exclusiveMinimum":1},"instance":1},
+    {"id":"draft7-if-then-else","schema":{"$schema":"http://json-schema.org/draft-07/schema#","if":{"properties":{"kind":{"const":"number"}}},"then":{"required":["value"]},"else":{"required":["text"]}},"instance":{"kind":"number"}},
+    {"id":"draft2019-recursive-reference","schema":{"$schema":"https://json-schema.org/draft/2019-09/schema","$recursiveAnchor":true,"type":"object","properties":{"next":{"$recursiveRef":"#"}}},"instance":{"next":{"next":1}}},
+    {"id":"draft2020-dynamic-reference","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$dynamicAnchor":"node","type":"object","properties":{"next":{"$dynamicRef":"#node"}}},"instance":{"next":{"next":1}}},
+    {"id":"invalid-type-schema","schema":{"type":"not-a-real-type"},"instance":{}},
+    {"id":"invalid-required-schema","schema":{"required":17},"instance":{}},
+    {"id":"format-is-disabled-by-default","schema":{"type":"string","format":"email"},"instance":"not-an-email"},
+    {"id":"local-definitions-reference","schema":{"$defs":{"positive":{"type":"integer","minimum":1}},"$ref":"#/$defs/positive"},"instance":0},
+    {"id":"boolean-is-not-integer","schema":{"type":"integer"},"instance":true},
+    {"id":"integral-float-is-integer","schema":{"type":"integer"},"instance":1.0},
+    {"id":"large-integer-const","schema":{"const":9007199254740993},"instance":9007199254740993},
+    {"id":"multiple-of-binary-float","schema":{"multipleOf":0.1},"instance":0.3},
+    {"id":"unicode-scalar-length-valid","schema":{"minLength":2,"maxLength":2},"instance":"😀x"},
+    {"id":"unicode-scalar-length-invalid","schema":{"maxLength":1},"instance":"😀x"},
+    {"id":"unicode-dot-pattern","schema":{"pattern":"^.$"},"instance":"😀"},
+    {"id":"unicode-word-pattern","schema":{"pattern":"^\\w+$"},"instance":"é"},
+    {"id":"python-named-group-pattern","schema":{"pattern":"^(?P<letter>a)$"},"instance":"a"},
+    {"id":"nested-instance-paths","schema":{"type":"object","properties":{"a.b":{"type":"integer"},"a":{"type":"object","properties":{"b":{"type":"integer"}}}}},"instance":{"a.b":"no","a":{"b":"also no"}}},
+    {"id":"required-over-five","schema":{"type":"object","required":["a","b","c","d","e","f"]},"instance":{}},
+    {"id":"additional-properties-unicode-order","schema":{"type":"object","additionalProperties":false},"instance":{"😀":1,"z":2,"a":3}}
+  ],
+  "extraction_inputs": [
+    {"id":"whole-null","text":"  null\n"},
+    {"id":"fenced-object","text":"prose ```json\n{\"ok\":true}\n```"},
+    {"id":"quoted-brace","text":"prose {\"text\":\"a } brace\",\"n\":1} tail"},
+    {"id":"first-malformed-not-rescued","text":"prefix {\"broken\":} later {\"valid\":true}"},
+    {"id":"empty","text":"   "}
+  ],
+  "repair_inputs": {
+    "messages": [{"role":"user","text":"Describe Ada."}],
+    "invalid_response":"{\"name\":\"Ada\"}",
+    "schema":{"type":"object","required":["name","age"]},
+    "corrected_response":"{\"name\":\"Ada\",\"age\":36}"
+  }
+}

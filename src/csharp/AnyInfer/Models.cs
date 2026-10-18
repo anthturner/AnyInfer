@@ -175,7 +175,7 @@ public sealed record GenerationRequest
         Route route,
         Sampling? sampling = null,
         Repair? repair = null,
-        JsonValue? schema = null,
+        SchemaSpec? schema = null,
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
@@ -197,7 +197,7 @@ public sealed record GenerationRequest
     public Route Route { get; }
     public Sampling? Sampling { get; }
     public Repair? Repair { get; }
-    public JsonValue? Schema { get; }
+    public SchemaSpec? Schema { get; }
     public string? SchemaMechanism { get; }
     public double? TimeoutS { get; }
     public int? MaxResponseBytes { get; }
@@ -240,4 +240,27 @@ public sealed record Generation
     public int RepairAttempts { get; }
     public IReadOnlyList<AttemptRecord> Attempts { get; }
     public IReadOnlyList<string> Warnings { get; }
+
+    /// <summary>Deserializes the structured result with the supplied serializer options.</summary>
+    public T? DeserializeStructured<T>(System.Text.Json.JsonSerializerOptions? options = null)
+    {
+        if (Structured is null)
+        {
+            throw new InvalidOperationException("This generation has no structured result to deserialize.");
+        }
+
+        return System.Text.Json.JsonSerializer.Deserialize<T>(Json.JsonWriter.WriteModern(Structured), options);
+    }
+
+    /// <summary>Deserializes the structured result with supplied type metadata.</summary>
+    public T? DeserializeStructured<T>(System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
+    {
+        ArgumentNullException.ThrowIfNull(typeInfo);
+        if (Structured is null)
+        {
+            throw new InvalidOperationException("This generation has no structured result to deserialize.");
+        }
+
+        return System.Text.Json.JsonSerializer.Deserialize(Json.JsonWriter.WriteModern(Structured), typeInfo);
+    }
 }

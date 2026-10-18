@@ -17,10 +17,14 @@ build environment:
 dotnet pack AnyInfer/AnyInfer.csproj -c Release -p:SourceRevisionId=<40-character-git-revision>
 ```
 
-The package targets `net8.0`, has no runtime NuGet dependencies, and includes a portable
-symbol package. For a complete local pack, archive inspection, and isolated consumer check,
-run this repository's `python scripts/check_csharp_package.py` command from the repository
-root.
+The package targets `net8.0`, carries the qualified `JsonSchema.Net` `8.0.5` runtime dependency
+for modern JSON Schema validation, and includes a portable symbol package. The proof supports
+Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12; legacy Draft 3 and Draft 4 remain deferred.
+Modern schema input and generated values can retain arbitrary-size integers, but the pinned native
+validator compares numeric values for `const`, `enum`, and `uniqueItems` through .NET `decimal`.
+Values outside that range, such as `1e70`, raise a controlled schema-evaluation exception.
+For a complete local pack, archive inspection, and isolated consumer check, run this repository's
+`python scripts/check_csharp_package.py` command from the repository root.
 
 ## Run the SDK proof examples
 

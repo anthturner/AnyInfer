@@ -3,6 +3,7 @@ using AnyInfer.Core;
 using AnyInfer.Internal;
 using AnyInfer.Json;
 using AnyInfer.Providers;
+using AnyInfer.Schema;
 
 namespace AnyInfer.Conformance;
 
@@ -183,7 +184,8 @@ internal static class NativeRunner
     internal static GenerationRequest ReadOperationRequest(JsonObject request, JsonObject route, string consumeMode)
     {
         var messages = RequireArray(request, "messages").Items.Select(ReadMessage).ToArray();
-        var schema = Optional(request, "schema") is JsonNull or null ? null : Optional(request, "schema");
+        var schemaValue = Optional(request, "schema") is JsonNull or null ? null : Optional(request, "schema");
+        var schema = schemaValue is null ? null : new SchemaSpec(schemaValue, "response");
         var sampling = Optional(request, "sampling") is { } samplingValue ? ReadSampling(RequireObject(samplingValue, "sampling")) : null;
         var repair = Optional(request, "repair") is { } repairValue
             ? new Repair(ReadInt32(Require(RequireObject(repairValue, "repair"), "max_attempts"), "max_attempts"))
