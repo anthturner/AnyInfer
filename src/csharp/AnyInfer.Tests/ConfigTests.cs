@@ -274,7 +274,7 @@ public sealed class ConfigTests
                     handler,
                     bound.ProviderId == bound.EngineId ? null : bound.ProviderId);
                 return builtin.Factory(new ProviderConfig(injectedSettings, bound.EngineId, bound.ApiKey, bound.Options), cancellationToken);
-            }, builtin.Aliases, builtin.Setup, builtin.DefaultBaseUrl, builtin.RequiresBaseUrl, builtin.ModelCapabilities, builtin.MaxRepairAttempts),
+            }, builtin.Aliases, builtin.Setup, builtin.DefaultBaseUrl, builtin.RequiresBaseUrl, builtin.StructuredOutputProfiles, builtin.MaxRepairAttempts),
         ]);
         var config = AnyInferConfig.Loads(JsonWriter.Write(fixtureConfig), registry, chain);
 

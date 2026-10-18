@@ -705,7 +705,7 @@ public sealed class RoutingTests
     public async Task Native_admission_rejects_every_excluded_raw_family_before_adapter_entry()
     {
         var adapter = new ScriptAdapter(static (_, token) => Events(token, new AdapterFinal("stop")));
-        await using var client = Client(new ProviderRegistration("alpha", adapter));
+        await using var client = new AsyncClient([new ProviderRegistration("alpha", adapter)], new VirtualClock());
         var excluded = new GenerationRequest[]
         {
             Request(messages: [new Message("tool", [new Text("raw")])]),

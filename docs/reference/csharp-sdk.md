@@ -13,6 +13,9 @@ supported public SDK and its generated Python API reference remains under
 | `Generation`, `Timing`, `Usage` | Buffered result, timing, and reported token usage. |
 | `AsyncStream`, `StreamEvent` | Streaming result and typed events. |
 | `AnyInferConfig` | Restricted version 1 configuration reader and writer. |
+| `Catalog`, `ResolvedTarget`, `PricingTable` | Pure target resolution and catalog-derived price facts. |
+| `ModelCapabilities` | Provenance-bearing model facts; unknown values remain unknown. |
+| `ModelsAsync`, `HealthAsync` / `Models`, `Health` | Explicit asynchronous or synchronous lifecycle calls for one provider instance. |
 
 The proof currently demonstrates text generation through the OpenAI-compatible adapter,
 structured JSON validation, repair, configuration, routing, and reported token usage. It has no

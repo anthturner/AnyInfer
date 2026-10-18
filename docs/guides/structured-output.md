@@ -36,6 +36,9 @@ Pass a schema and `result.structured` comes back already validated against it, w
     --8<-- "examples/csharp-sdk/StructuredOutputExample.cs"
     ```
 
+The C# proof supports its documented schema subset only. Capability facts can be queried before
+dispatch, but unknown or defaulted values are not evidence that another schema mechanism works.
+
 `repair=ai.Repair(max_attempts=1)` allows one corrective round trip against the same
 model before the call fails; see [repair](../concepts/structured-output.md#repair) for
 what that costs and why it never falls back to another provider.

@@ -58,6 +58,27 @@ synchronous .NET caller; it does not create or depend on Python's event-loop fac
 --8<-- "examples/csharp-sdk/SyncStreamingExample.cs"
 ```
 
+## Inspect configured metadata
+
+Catalog resolution and capability or pricing facts are pure client queries: they select from
+the configured instance and return provenance-bearing values without constructing an adapter or
+sending a request. Unknown facts stay unknown; a listed or catalog value is not an accounting
+total.
+
+```csharp
+--8<-- "examples/csharp-sdk/CatalogExample.cs"
+```
+
+## List models and check health
+
+Discovery and health are explicit I/O operations for one configured instance. The async and
+synchronous methods both own their clients in the example and accept cancellation through the
+source-linked methods.
+
+```csharp
+--8<-- "examples/csharp-sdk/LifecycleExample.cs"
+```
+
 ## Stream, validate, and route
 
 The remaining examples are source-linked so the site stays aligned with the code the offline

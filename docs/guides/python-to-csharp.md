@@ -17,6 +17,8 @@ does not claim provider or feature parity with Python.
 | async stream | `AsyncStream` and `StreamEvent` |
 | Python `Client` | .NET `Client` and `SyncStream` |
 | `AnyInferError` | typed .NET `Exception` subclasses |
+| `client.models(...)`, `client.health(...)` | `ModelsAsync` / `HealthAsync`, or `Models` / `Health` |
+| catalog and capability queries | `Catalog`, `Resolve(...)`, and `Capabilities(...)` |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
@@ -33,6 +35,20 @@ subset, so port a schema only after checking its supported shape.
 
 ```csharp
 --8<-- "examples/csharp-sdk/ConfigurationExample.cs"
+```
+
+## Metadata and lifecycle calls
+
+Catalog resolution and capability or pricing metadata are pure queries over configured inputs;
+their values can remain unknown and carry provenance. Model listing and health are separate,
+explicit instance I/O calls. The executable examples show both the async and synchronous forms.
+
+```csharp
+--8<-- "examples/csharp-sdk/CatalogExample.cs"
+```
+
+```csharp
+--8<-- "examples/csharp-sdk/LifecycleExample.cs"
 ```
 
 ## What to use in an application

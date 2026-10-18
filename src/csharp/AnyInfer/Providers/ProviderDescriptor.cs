@@ -1,4 +1,6 @@
+using System.Collections.Frozen;
 using System.Collections.ObjectModel;
+using AnyInfer.Capabilities;
 
 namespace AnyInfer.Providers;
 
@@ -13,8 +15,16 @@ public sealed record ProviderDescriptor
         ProviderSetupSpec? setup = null,
         string? defaultBaseUrl = null,
         bool requiresBaseUrl = false,
-        IReadOnlyDictionary<string, StructuredOutputProfile>? modelCapabilities = null,
-        int? maxRepairAttempts = null)
+        IReadOnlyDictionary<string, StructuredOutputProfile>? structuredOutputProfiles = null,
+        int? maxRepairAttempts = null,
+        ProviderLocality locality = ProviderLocality.Hosted,
+        ModelCapabilities? defaultCapabilities = null,
+        IReadOnlyDictionary<string, ModelCapabilities>? staticCapabilities = null,
+        IEnumerable<InferenceOperation>? operations = null,
+        IReadOnlyDictionary<string, EmbeddingCapabilities>? staticEmbeddingCapabilities = null,
+        IReadOnlyDictionary<string, RerankCapabilities>? staticRerankCapabilities = null,
+        TokenCalibration? tokenCalibration = null,
+        RateLimitHeaders? rateLimitHeaders = null)
     {
         Id = ProviderSettings.NormalizeId(id, nameof(id));
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -30,8 +40,8 @@ public sealed record ProviderDescriptor
         Setup = setup ?? new ProviderSetupSpec();
         DefaultBaseUrl = defaultBaseUrl;
         RequiresBaseUrl = requiresBaseUrl;
-        ModelCapabilities = new ReadOnlyDictionary<string, StructuredOutputProfile>(
-            (modelCapabilities ?? new Dictionary<string, StructuredOutputProfile>())
+        StructuredOutputProfiles = new ReadOnlyDictionary<string, StructuredOutputProfile>(
+            (structuredOutputProfiles ?? new Dictionary<string, StructuredOutputProfile>())
                 .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal));
         if (maxRepairAttempts < 0)
         {
@@ -39,6 +49,23 @@ public sealed record ProviderDescriptor
         }
 
         MaxRepairAttempts = maxRepairAttempts;
+        if (!Enum.IsDefined(locality)) throw new ArgumentOutOfRangeException(nameof(locality));
+        Locality = locality;
+        DefaultCapabilities = defaultCapabilities ?? new ModelCapabilities();
+        StaticCapabilities = Copy(staticCapabilities);
+        Operations = (operations ?? [InferenceOperation.Generation]).ToFrozenSet();
+        StaticEmbeddingCapabilities = Copy(staticEmbeddingCapabilities);
+        StaticRerankCapabilities = Copy(staticRerankCapabilities);
+        foreach (var operation in Operations)
+        {
+            if (!Enum.IsDefined(operation))
+            {
+                throw new ArgumentOutOfRangeException(nameof(operations));
+            }
+        }
+
+        TokenCalibration = tokenCalibration ?? new TokenCalibration();
+        RateLimitHeaders = rateLimitHeaders ?? new RateLimitHeaders();
     }
 
     /// <summary>Gets the canonical provider descriptor ID.</summary>
@@ -55,8 +82,27 @@ public sealed record ProviderDescriptor
     public string? DefaultBaseUrl { get; }
     /// <summary>Gets whether setup requires a base URL after defaults are applied.</summary>
     public bool RequiresBaseUrl { get; }
-    /// <summary>Gets immutable model capability metadata.</summary>
-    public IReadOnlyDictionary<string, StructuredOutputProfile> ModelCapabilities { get; }
+    /// <summary>Gets immutable structured-output profiles keyed by exact model name.</summary>
+    public IReadOnlyDictionary<string, StructuredOutputProfile> StructuredOutputProfiles { get; }
     /// <summary>Gets the optional descriptor repair-attempt ceiling.</summary>
     public int? MaxRepairAttempts { get; }
+    /// <summary>Gets the descriptor's default locality.</summary>
+    public ProviderLocality Locality { get; }
+    /// <summary>Gets baseline facts for models without a static row.</summary>
+    public ModelCapabilities DefaultCapabilities { get; }
+    /// <summary>Gets immutable static facts keyed by exact model name.</summary>
+    public IReadOnlyDictionary<string, ModelCapabilities> StaticCapabilities { get; }
+    /// <summary>Gets immutable declared operations, defaulting to generation.</summary>
+    public IReadOnlySet<InferenceOperation> Operations { get; }
+    /// <summary>Gets static embedding facts keyed by exact model name.</summary>
+    public IReadOnlyDictionary<string, EmbeddingCapabilities> StaticEmbeddingCapabilities { get; }
+    /// <summary>Gets static rerank facts keyed by exact model name.</summary>
+    public IReadOnlyDictionary<string, RerankCapabilities> StaticRerankCapabilities { get; }
+    /// <summary>Gets provider token calibration metadata, defaulting to identity calibration.</summary>
+    public TokenCalibration TokenCalibration { get; }
+    /// <summary>Gets declared rate-limit header names, empty when the provider declares none.</summary>
+    public RateLimitHeaders RateLimitHeaders { get; }
+
+    private static IReadOnlyDictionary<string, TValue> Copy<TValue>(IReadOnlyDictionary<string, TValue>? values) =>
+        new ReadOnlyDictionary<string, TValue>(new Dictionary<string, TValue>(values ?? new Dictionary<string, TValue>(), StringComparer.Ordinal));
 }

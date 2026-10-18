@@ -5,12 +5,15 @@ namespace AnyInfer;
 /// <summary>Represents one lazy generation operation and its ordered public events.</summary>
 public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposable
 {
+    private readonly AsyncClient _client;
+    private readonly Client? _syncClient;
     private readonly Func<CancellationToken, IAsyncEnumerable<StreamEvent>> _factory;
     private readonly CancellationTokenSource _closeSource = new();
     private readonly object _gate = new();
     private readonly Action<AsyncStream>? _onClosed;
     private StreamEnumerator? _enumerator;
     private Task? _disposeTask;
+    private Task<Exception?>? _closeSignal;
     private bool _claimed;
     private bool _closed;
     private bool _succeeded;
@@ -20,10 +23,14 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     private OperationContext? _operation;
 
     internal AsyncStream(
+        AsyncClient client,
+        Client? syncClient,
         Func<CancellationToken, IAsyncEnumerable<StreamEvent>> factory,
         CancellationToken callerCancellation,
         Action<AsyncStream>? onClosed = null)
     {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _syncClient = syncClient;
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         CallerCancellation = callerCancellation;
         _onClosed = onClosed;
@@ -115,6 +122,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
                 CallerCancellation,
                 cancellationToken,
                 _closeSource.Token);
+            using var context = AsyncExecutionContext.Push(_client, _syncClient);
             _enumerator = new StreamEnumerator(this, _factory(linked.Token).GetAsyncEnumerator(linked.Token), linked);
             return _enumerator;
         }
@@ -123,16 +131,24 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
+        var signal = BeginCloseAsync();
         lock (_gate)
         {
             if (_disposeTask is null)
             {
-                _closed = true;
-                _closeSource.Cancel();
-                _disposeTask = DisposeCoreAsync(_enumerator);
+                _disposeTask = DisposeCoreAsync(_enumerator, signal);
             }
 
             return new ValueTask(_disposeTask);
+        }
+    }
+
+    internal Task<Exception?> BeginCloseAsync()
+    {
+        lock (_gate)
+        {
+            _closed = true;
+            return _closeSignal ??= Task.Run(SignalCloseCore);
         }
     }
 
@@ -175,9 +191,9 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         }
     }
 
-    private async Task DisposeCoreAsync(StreamEnumerator? enumerator)
+    private async Task DisposeCoreAsync(StreamEnumerator? enumerator, Task<Exception?> signal)
     {
-        await Task.Yield();
+        Exception? failure = await signal.ConfigureAwait(false);
         try
         {
             if (enumerator is not null)
@@ -189,6 +205,26 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         {
             _closeSource.Dispose();
             NotifyClosed();
+        }
+
+        if (failure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+    }
+
+    private Exception? SignalCloseCore()
+    {
+        try
+        {
+            using var asyncContext = AsyncExecutionContext.Push(_client, _syncClient);
+            using var syncContext = _syncClient is null ? null : SyncExecutionContext.Push(_syncClient);
+            _closeSource.Cancel();
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
         }
     }
 
@@ -236,6 +272,7 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
                     return false;
                 }
 
+                using var context = AsyncExecutionContext.Push(_owner._client, _owner._syncClient);
                 return await _inner.MoveNextAsync().ConfigureAwait(false);
             }
             catch (Exception exception)
@@ -273,11 +310,15 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         private async Task DisposeCoreAsync()
         {
             _owner.NoteConsumerClosing();
-            _linked.Cancel();
+            using (AsyncExecutionContext.Push(_owner._client, _owner._syncClient))
+            {
+                _linked.Cancel();
+            }
             Exception? disposalFailure = null;
             await _moveGate.WaitAsync().ConfigureAwait(false);
             try
             {
+                using var context = AsyncExecutionContext.Push(_owner._client, _owner._syncClient);
                 await _inner.DisposeAsync().ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (_linked.IsCancellationRequested)

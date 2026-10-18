@@ -15,10 +15,10 @@ internal sealed record NormalizedRequest(
 
 internal static class RequestNormalizer
 {
-    internal static NormalizedRequest Normalize(GenerationRequest request)
+    internal static NormalizedRequest Normalize(GenerationRequest request, bool allowTargetAliases = false)
     {
         ArgumentNullException.ThrowIfNull(request);
-        RequestAdmission.Validate(request);
+        RequestAdmission.Validate(request, allowTargetAliases);
 
         var messages = request.Messages
             .Select(static message => new Message(

@@ -672,18 +672,36 @@ must report a real conflict rather than silently changing a dependent public sig
   `types/capabilities.py`, `catalog/`, `capabilities/`, `providers/base.py`. Reuse shared data
   assets through build inputs without importing Python runtime code. Gate: alias resolution,
   unknown-vs-false facts, overrides and model-kind filtering match Python on shared fixtures.
+  > NOTE: Detailed source ownership and gates are in `ANYINFER_CSHARP_SDK_CATALOG.md`.
+  > CAT.0's bounded contract reviews are closed; CAT.1 pure capability types passed the
+  > zero-warning solution build and all 7 focused tests. CAT.2 then passed 8 Python bridge
+  > tests, 22 focused native tests, solution compilation and isolated package validation.
+  > CAT.3 assembly/query integration passed its reviewed native and isolated-package gates:
+  > zero-warning solution build, 274 native unit tests, 93 conformance tests including all
+  > 102 cases, and 12 focused packaging tests. CAT.4a lifecycle contract/mechanism critiques
+  > are closed; resume CAT.4b implementation.
+  > SDK.4a remains unchecked until
+  > the complete catalog, assembly, lifecycle, documentation and checkpoint gates pass.
 - [ ] **SDK.4b** Select/test a native general JSON Schema implementation against Python's
-  supported dialect, schema coercion/ref/format/error behavior and local-only resolution
-  policy. Preserve frozen v0 validation exactly through an explicit profile boundary where
+  supported dialect and schema coercion/ref/format/error behavior. C# resolves internal and
+  caller-registered schema references by default; external URL/file retrieval requires
+  explicit opt-in. Preserve frozen v0 validation exactly through an explicit profile boundary where
   necessary. Add `SchemaSpec`, richer result validation and typed-result deserialization
   conveniences without a new wire contract. Gate: common-schema corpus plus malformed,
-  recursive/ref, numeric, extraction/repair and remote-fetch refusal controls in both runtimes.
+  recursive/ref, numeric and extraction/repair controls in both runtimes, plus C# default
+  zero-retrieval and explicit-opt-in controls. Record the authorized default-policy difference.
   > NOTE: Source discovery found that the baseline Python validator does not configure a
   > local-only reference policy. The observed jsonschema 4.26.0 default can retrieve external
   > references through urllib before warning; the project dependency is jsonschema>=4.21,
-  > not a fixed 4.26.0 pin. Settle this behavioral difference before SDK.4b implementation.
-  > The local-only wording above is proposed policy, not existing Python parity evidence;
-  > no Python behavior change or automatic retrieval is authorized by this assumption.
+  > not a fixed 4.26.0 pin. On 2026-10-17 the user selected explicit retrieval in C#:
+  > internal/caller-registered references work by default; external URL/file retrieval
+  > requires opt-in. Document this deliberate difference from Python. Do not change Python's
+  > behavior. The dependency, exact opt-in API and semantic qualification remain open.
+  > Dependency research is also open: current JsonSchema.Net binary releases carry a
+  > maintenance-fee EULA, while NuGet lists the older net8-compatible 8.0.5 package as MIT.
+  > Inspect versioned licenses/transitive dependencies and actual semantic fixes before
+  > selection; no dependency has been added. Research is retained in Traycer
+  > `csharp-sdk/sdk-four-schema-research`.
 - [ ] **SDK.4c** Port model/token discovery, capability probes and configuration setup metadata
   incrementally from `capabilities/probes*`, `registry.py`, catalog APIs. Probe/network work
   remains explicit opt-in. Gate: fake/cassette discovery/probe conformance, no probing during
@@ -804,9 +822,22 @@ must report a real conflict rather than silently changing a dependent public sig
 
 Current resume point: **SDK.4a**. SDK.3a–3c passed the final 18-step workspace gate
 (238 native unit tests, 93 conformance tests, package-only async/sync consumer and eight
-offline documentation methods). Commit this accepted snapshot and qualify its clean-revision
-package before editing SDK.4 source. Catalog/capability discovery is read-only so far;
-the schema-reference policy difference recorded under SDK.4b remains open.
+offline documentation methods). Accepted source checkpoint:
+`04dfa37231f26f5c72b7215afd747c47de4e6d19`. Its clean-revision package verifier passed
+archive inspection and fresh local-feed async/sync consumption. CAT.1 pure capability types
+passed cold review, a zero-warning solution build and all 7 focused native tests. CAT.2 passed
+its expanded Python/native/package gates. CAT.3 capability assembly, pure client queries
+and reached catalog-target integration passed reviewed native/package gates (274 unit tests,
+93 conformance tests including all 102 cases, and the isolated public API consumer).
+CAT.4a/CAT.4b source, mechanism and causal reviews are closed. All 30 focused lifecycle
+tests and the full 304-unit/93-conformance native regression pass, preserving all 102 frozen
+cases. The Python lifecycle bridge, exact offline examples/rendered snippets and dirty-tree
+package consumer pass. Resume CAT.4c/CAT.5 full workspace and clean checkpoint qualification
+in the child checklist.
+The full 18-step workspace gate now passes in 106.7s, including the fresh package consumer;
+resume CAT.5's source commit and clean-revision qualification before checking SDK.4a.
+SDK.4b's C# explicit-retrieval default
+is user-approved; dependency selection and exact opt-in API remain open.
 SDK.2a–2d and its checkpoint passed the full
 18-step workspace gate and clean-revision package qualification at
 `b50459bc644cff95e9e50f97ba6dd61ae3e1ef46`.

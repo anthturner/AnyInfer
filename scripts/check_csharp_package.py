@@ -192,7 +192,117 @@ def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> Non
 ''', encoding="utf-8")
     (consumer / "Program.cs").write_text(
         """using AnyInfer;
+using AnyInfer.Capabilities;
+using AnyInfer.Catalog;
 using AnyInfer.Providers;
+
+var factoryCalls = 0;
+var descriptor = new ProviderDescriptor(
+    "demo",
+    "Demo",
+    (_, _) =>
+    {
+        factoryCalls++;
+        throw new InvalidOperationException("pure catalog queries must not construct an adapter");
+    });
+var registry = new ProviderRegistry([descriptor]);
+var settings = ProviderSettings.Of("demo", alias: "demo-instance");
+var catalog = new global::AnyInfer.Catalog.Catalog(
+    aliases: new Dictionary<string, AliasEntry>
+    {
+        ["tier"] = new AliasEntry("tier", targets: new Dictionary<string, TargetEntry>
+        {
+            ["demo-instance"] = new TargetEntry("demo-instance", Model: "demo-model"),
+        }),
+    });
+var pricingTable = new PricingTable(new Dictionary<string, IReadOnlyList<PricingEntry>>
+{
+    ["demo-instance"] =
+    [
+        new PricingEntry("demo-model", new Pricing(3.25m, 4.5m), "2026-10-17", "package proof"),
+    ],
+});
+var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>
+{
+    ["demo-instance"] = new Dictionary<string, ModelCapabilities>
+    {
+        ["demo-model"] = new ModelCapabilities(
+            pricing: new Sourced<Pricing>(new Pricing(5.75m, 6.25m), Provenance.Catalog)),
+    },
+};
+{
+    await using var client = new AsyncClient([settings], registry, catalog: catalog,
+        pricingTable: pricingTable, capabilityOverrides: overrides);
+    var resolved = client.Resolve("tier");
+    var capability = client.Capabilities("tier");
+    var capabilityPricing = capability.Pricing;
+    var quoted = pricingTable.Lookup("demo-instance", "demo-model");
+    if (resolved.ProviderId != "demo-instance"
+        || resolved.Model != "demo-model"
+        || resolved.ViaAlias != "tier"
+        || !ReferenceEquals(client.Catalog, catalog)
+        || capabilityPricing is null
+        || capabilityPricing.Value.InputPer1M != 5.75m
+        || capabilityPricing.Provenance != Provenance.Override
+        || quoted is null
+        || quoted.Value.InputPer1M != 3.25m
+        || quoted.Provenance != Provenance.Catalog)
+        throw new InvalidOperationException(
+            "asynchronous pure catalog or capability query failed");
+}
+{
+    using var client = new Client([settings], registry, catalog: catalog,
+        pricingTable: pricingTable, capabilityOverrides: overrides);
+    var resolved = client.Resolve("tier");
+    var capability = client.Capabilities("tier");
+    var capabilityPricing = capability.Pricing;
+    if (resolved.ProviderId != "demo-instance"
+        || resolved.ViaAlias != "tier"
+        || !ReferenceEquals(client.Catalog, catalog)
+        || capabilityPricing is null
+        || capabilityPricing.Value.OutputPer1M != 6.25m
+        || capabilityPricing.Provenance != Provenance.Override)
+        throw new InvalidOperationException(
+            "synchronous pure catalog or capability query failed");
+}
+if (factoryCalls != 0)
+    throw new InvalidOperationException("pure catalog queries constructed an adapter");
+
+var lifecycleAdapter = new LifecycleAdapter();
+{
+    await using var client = AsyncClient.FromAdapters(
+        [new ProviderRegistration("lifecycle-demo", lifecycleAdapter)]);
+    var models = await client.ModelsAsync("lifecycle-demo");
+    var health = await client.HealthAsync("lifecycle-demo");
+    var discoveredCapabilities = client.Capabilities("lifecycle-demo:lifecycle-model");
+    if (models.Count != 1
+        || models[0].Id != "lifecycle-model"
+        || !health.Ok
+        || discoveredCapabilities.ContextWindow?.Value != 2048
+        || lifecycleAdapter.ModelCalls != 1
+        || lifecycleAdapter.HealthCalls != 1)
+        throw new InvalidOperationException("asynchronous public lifecycle query failed");
+}
+if (lifecycleAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("asynchronous lifecycle adapter disposal failed");
+
+var syncLifecycleAdapter = new LifecycleAdapter();
+{
+    using var client = Client.FromAdapters(
+        [new ProviderRegistration("sync-lifecycle-demo", syncLifecycleAdapter)]);
+    var models = client.Models("sync-lifecycle-demo");
+    var health = client.Health("sync-lifecycle-demo");
+    var discoveredCapabilities = client.Capabilities("sync-lifecycle-demo:lifecycle-model");
+    if (models.Count != 1
+        || models[0].Id != "lifecycle-model"
+        || !health.Ok
+        || discoveredCapabilities.ContextWindow?.Value != 2048
+        || syncLifecycleAdapter.ModelCalls != 1
+        || syncLifecycleAdapter.HealthCalls != 1)
+        throw new InvalidOperationException("synchronous public lifecycle query failed");
+}
+if (syncLifecycleAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("synchronous lifecycle adapter disposal failed");
 
 var adapter = new DemoAdapter();
 {
@@ -244,6 +354,49 @@ sealed class DemoAdapter : IProviderAdapter
         yield return new AdapterTextDelta(_calls++ == 0 ? "buffered" : "streamed");
         yield return new AdapterFinal("stop");
         await Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
+    }
+}
+
+sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle
+{
+    public int ModelCalls { get; private set; }
+    public int HealthCalls { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    public async IAsyncEnumerable<AdapterEvent> GenerateAsync(
+        WireRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await Task.CompletedTask;
+        yield break;
+    }
+
+    public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ModelCalls++;
+        IReadOnlyList<DiscoveredModel> models = Array.AsReadOnly(
+        [
+            new DiscoveredModel("lifecycle-model", new ModelCapabilities(
+                contextWindow: new Sourced<int>(2048, Provenance.Discovered))),
+        ]);
+        return ValueTask.FromResult(models);
+    }
+
+    public ValueTask<Health> HealthAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        HealthCalls++;
+        return ValueTask.FromResult(new Health(true));
     }
 
     public ValueTask DisposeAsync()

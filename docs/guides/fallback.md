@@ -27,6 +27,10 @@ semantics live in [routing](../concepts/routing.md).
     --8<-- "examples/csharp-sdk/RoutingExample.cs"
     ```
 
+The C# proof exposes model listing and health as explicit calls rather than a replacement for
+route policy. Its [source-linked lifecycle example](csharp-sdk.md#list-models-and-check-health)
+uses one configured instance at a time.
+
 ## Set a Default Route Once
 
 ```python

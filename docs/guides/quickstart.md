@@ -78,6 +78,10 @@ read.
     --8<-- "examples/csharp-sdk/SyncGenerationExample.cs"
     ```
 
+The C# tabs cover bounded generation through the prerelease proof. Model discovery and health
+are explicit instance calls; the [C# SDK guide](csharp-sdk.md) shows their source-linked async
+and synchronous forms.
+
 The highlighted line is the only one that changes when you point the same call at a
 different provider or a local model.
 

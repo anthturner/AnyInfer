@@ -14,6 +14,8 @@ internal static class GenerationCore
         NormalizedRequest request,
         Route route,
         ProviderPool registry,
+        TargetMetadataResolver targetResolver,
+        TargetResolutionProfile resolutionProfile,
         RouteState health,
         IOperationClock clock,
         OperationCapture? capture,
@@ -23,25 +25,26 @@ internal static class GenerationCore
         var operation = new OperationContext(capture);
         stream.BeginOperation(operation);
         var attempts = new List<AttemptRecord>();
-        var visitedTargets = new HashSet<ResolvedTarget>();
+        var visitedTargets = new HashSet<(string ProviderId, string Model)>();
 
         try
         {
             foreach (var rawTarget in route.Targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var resolved = registry.ResolveMetadata(rawTarget);
-                if (!visitedTargets.Add(resolved.Target))
+                var metadata = targetResolver.Resolve(rawTarget, resolutionProfile);
+                if (!visitedTargets.Add((metadata.Target.ProviderId, metadata.Target.Model)))
                 {
                     continue;
                 }
 
-                if (route.HealthGate && health.IsUnhealthy(resolved.Target, route.HealthTtlS))
+                if (route.HealthGate && health.IsUnhealthy(metadata.Target, route.HealthTtlS))
                 {
-                    attempts.Add(new AttemptRecord(resolved.Target, "skipped_unhealthy"));
+                    attempts.Add(new AttemptRecord(metadata.Target, "skipped_unhealthy"));
                     continue;
                 }
 
+                var resolved = registry.Materialize(metadata);
                 var adapter = await registry.GetAdapterAsync(resolved, cancellationToken).ConfigureAwait(false);
 
                 var effectiveRepairs = EffectiveRepairBudget(request, resolved, operation, capture);

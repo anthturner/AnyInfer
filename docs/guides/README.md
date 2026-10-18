@@ -65,6 +65,10 @@ runs against in-process fakes with no credentials.
 The C# surface is a bounded prerelease proof for contributors. It is not an installation or
 release path, and it does not change the supported Python SDK surface.
 
+Its source-linked examples cover generation, routing, configuration, pure catalog and capability
+queries, plus explicit model discovery and health for a configured instance. They do not imply
+provider parity, released NuGet distribution, or a supported application integration path.
+
 - [Explore the C# SDK proof](csharp-sdk.md)
 - [Move from Python to the C# SDK proof](python-to-csharp.md)
 

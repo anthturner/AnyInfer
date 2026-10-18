@@ -8,8 +8,8 @@ released package, or supported application integration path.
 
 - **[SDK reference](api/README.md)**: the generated API reference: every public class,
   function, and event, from the docstrings.
-- **[C# SDK proof reference](csharp-sdk.md)**: the bounded prerelease .NET surface and its
-  executable source examples.
+- **[C# SDK proof reference](csharp-sdk.md)**: the bounded prerelease .NET surface, including
+  pure catalog metadata and explicit lifecycle calls, with executable source examples.
 - **[Error catalog](errors.md)**: every exception, when it is raised, whether it retries,
   and the `hint` the user will see.
 - **[Conformance matrix](conformance-matrix.md)**: what each provider actually supports,

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
 using AnyInfer;
+using AnyInfer.Capabilities;
+using AnyInfer.Catalog;
 using AnyInfer.Config;
 using AnyInfer.Examples;
 using AnyInfer.Providers;
@@ -14,6 +16,69 @@ static async Task VerifyAsync()
 
     var displayedSettings = SettingsExample.Create(baseUrl);
     Require(displayedSettings.ProviderId == "openai-compat", "Settings example did not produce the expected provider.");
+
+    var pureFactoryCalls = 0;
+    var pureRegistry = new ProviderRegistry(
+    [
+        new ProviderDescriptor(
+            "demo",
+            "Demo",
+            (_, _) =>
+            {
+                pureFactoryCalls++;
+                throw new InvalidOperationException("Pure catalog queries must not construct an adapter.");
+            }),
+    ]);
+    var catalog = new global::AnyInfer.Catalog.Catalog(
+        aliases: new Dictionary<string, AliasEntry>
+        {
+            ["tier"] = new AliasEntry("tier", targets: new Dictionary<string, TargetEntry>
+            {
+                ["demo-instance"] = new TargetEntry("demo-instance", Model: "demo-model"),
+            }),
+        });
+    var pricing = new PricingTable(new Dictionary<string, IReadOnlyList<PricingEntry>>
+    {
+        ["demo-instance"] =
+        [
+            new PricingEntry("demo-model", new Pricing(3.25m, 4.5m), "2026-10-17", "offline example"),
+        ],
+    });
+    var catalogObservation = CatalogExample.Inspect(
+        catalog,
+        pricing,
+        ProviderSettings.Of("demo", alias: "demo-instance"),
+        pureRegistry);
+    Require(catalogObservation.Target.ProviderId == "demo-instance"
+        && catalogObservation.Target.Model == "demo-model"
+        && catalogObservation.Target.ViaAlias == "tier"
+        && catalogObservation.Pricing is { Value.InputPer1M: 3.25m, Provenance: Provenance.Catalog },
+        "Catalog example did not expose the expected public facts.");
+    Require(pureFactoryCalls == 0, "Catalog example constructed an adapter for a pure query.");
+
+    var asyncLifecycleHandler = new CountingHandler();
+    var asyncLifecycle = await LifecycleExample.RunAsync(
+        WithTransport(displayedSettings, asyncLifecycleHandler),
+        "openai-compat");
+    Require(asyncLifecycle.Models.Count == 1
+        && asyncLifecycle.Models[0].Id == "demo"
+        && asyncLifecycle.Health.Ok
+        && asyncLifecycleHandler.ModelRequestCount == 2
+        && asyncLifecycleHandler.EmptyModelBodies == 2
+        && asyncLifecycleHandler.DisposeCount == 1,
+        "Asynchronous lifecycle example did not preserve discovery facts or transport ownership.");
+
+    var syncLifecycleHandler = new CountingHandler();
+    var syncLifecycle = LifecycleExample.Run(
+        WithTransport(displayedSettings, syncLifecycleHandler),
+        "openai-compat");
+    Require(syncLifecycle.Models.Count == 1
+        && syncLifecycle.Models[0].Id == "demo"
+        && syncLifecycle.Health.Ok
+        && syncLifecycleHandler.ModelRequestCount == 2
+        && syncLifecycleHandler.EmptyModelBodies == 2
+        && syncLifecycleHandler.DisposeCount == 1,
+        "Synchronous lifecycle example did not preserve discovery facts or transport ownership.");
 
     var bufferedHandler = new CountingHandler();
     var buffered = await GenerationExample.RunAsync(WithTransport(displayedSettings, bufferedHandler), target);
@@ -98,7 +163,7 @@ static ProviderRegistry BuiltinRegistry(HttpMessageHandler transport)
         builtin.Setup,
         builtin.DefaultBaseUrl,
         builtin.RequiresBaseUrl,
-        builtin.ModelCapabilities,
+        builtin.StructuredOutputProfiles,
         builtin.MaxRepairAttempts);
     return new ProviderRegistry([wrapped]);
 }
@@ -114,11 +179,32 @@ static void Require(bool condition, string message)
 sealed class CountingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, bool structured = false) : HttpMessageHandler
 {
     public int RequestCount { get; private set; }
+    public int ModelRequestCount { get; private set; }
+    public int EmptyModelBodies { get; private set; }
     public int DisposeCount { get; private set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         RequestCount++;
+        if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/v1/models")
+        {
+            ModelRequestCount++;
+            byte[] bytes = request.Content is null
+                ? []
+                : await request.Content.ReadAsByteArrayAsync(cancellationToken);
+            if (bytes.Length == 0
+                && request.Content?.Headers.ContentType?.MediaType == "application/json"
+                && request.Headers.Authorization is null)
+            {
+                EmptyModelBodies++;
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"data\":[{\"id\":\"demo\"}]}", Encoding.UTF8, "application/json"),
+            };
+        }
+
         var stream = request.Content is not null && (await request.Content.ReadAsStringAsync(cancellationToken)).Contains("\"stream\":true", StringComparison.Ordinal);
         if (statusCode != HttpStatusCode.OK)
         {

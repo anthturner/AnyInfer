@@ -89,8 +89,10 @@ adding a provider. Live documentation fetched on this date confirms
 [`Authorization: Bearer` for the hosted API](https://developers.openai.com/api/reference/overview#authentication),
 and the usage chunk preceding the SSE `[DONE]` sentinel in that create reference. The
 [models reference](https://developers.openai.com/api/reference/resources/models/methods/list)
-and [changelog](https://developers.openai.com/api/docs/changelog) were also fetched; model
-discovery is not implemented by this C# milestone.
+and [changelog](https://developers.openai.com/api/docs/changelog) were also fetched. The
+C# proof implements the recorded `GET /models` discovery endpoint through its
+optional provider lifecycle interface. It keeps the bounded proof's typed discovery and
+health behavior; this does not widen the supported provider surface.
 
 For keyless compatible endpoints, the current upstream
 [llama-server option reference](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)

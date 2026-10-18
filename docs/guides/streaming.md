@@ -53,6 +53,9 @@ frontend needs; the full event vocabulary is in the [API reference](../reference
     --8<-- "examples/csharp-sdk/SyncStreamingExample.cs"
     ```
 
+The C# proof keeps streaming separate from explicit model discovery and health operations; see
+the [C# SDK guide](csharp-sdk.md) for those source-linked calls.
+
 ## Use the Context Manager
 
 Leaving the block early cancels the in-flight request. Without it, an abandoned stream keeps

@@ -1,0 +1,63 @@
+{
+  "_comment": "Input-only OpenAI-compatible lifecycle traffic shared by Python and C# SDK tests.",
+  "instances": [
+    {
+      "id": "primary",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_SDK_LIFECYCLE_TEST_KEY",
+      "headers": {
+        "X-Lifecycle": "primary"
+      },
+      "timeout_s": 0.25
+    },
+    {
+      "id": "secondary",
+      "adapter": "openai-compat",
+      "base_url": "https://fixture.invalid/v1",
+      "credential": "env://ANYINFER_SDK_LIFECYCLE_TEST_KEY",
+      "headers": {
+        "X-Lifecycle": "secondary"
+      },
+      "timeout_s": 0.25
+    }
+  ],
+  "calls": [
+    {
+      "instance": "primary",
+      "operation": "models",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body_utf8": "{\"data\":[{\"id\":\"alpha\"},{\"id\":\"alpha\"},\"ignored\",{\"id\":9}]}"
+    },
+    {
+      "instance": "primary",
+      "operation": "health",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body_utf8": "this is deliberately not JSON"
+    },
+    {
+      "instance": "secondary",
+      "operation": "health",
+      "status": 503,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body_utf8": "{\"error\":{\"message\":\"unavailable\"}}"
+    },
+    {
+      "instance": "secondary",
+      "operation": "models",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body_utf8": "[{\"id\":\"beta\"},{\"id\":\"beta\"},false,{\"id\":null}]"
+    }
+  ]
+}

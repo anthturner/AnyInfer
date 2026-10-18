@@ -9,7 +9,7 @@ public sealed record ProviderRegistration
     public ProviderRegistration(
         string providerId,
         IProviderAdapter adapter,
-        IReadOnlyDictionary<string, StructuredOutputProfile>? modelCapabilities = null,
+        IReadOnlyDictionary<string, StructuredOutputProfile>? structuredOutputProfiles = null,
         int? maxRepairAttempts = null)
     {
         if (string.IsNullOrWhiteSpace(providerId))
@@ -25,20 +25,20 @@ public sealed record ProviderRegistration
         ProviderId = providerId;
         Adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
         var copied = new Dictionary<string, StructuredOutputProfile>(StringComparer.Ordinal);
-        if (modelCapabilities is not null)
+        if (structuredOutputProfiles is not null)
         {
-            foreach (var (model, profile) in modelCapabilities)
+            foreach (var (model, profile) in structuredOutputProfiles)
             {
                 if (model is null)
                 {
-                    throw new ArgumentException("Model capability keys cannot be null.", nameof(modelCapabilities));
+                    throw new ArgumentException("Model capability keys cannot be null.", nameof(structuredOutputProfiles));
                 }
 
-                copied.Add(model, profile ?? throw new ArgumentException("Model capability values cannot be null.", nameof(modelCapabilities)));
+                copied.Add(model, profile ?? throw new ArgumentException("Model capability values cannot be null.", nameof(structuredOutputProfiles)));
             }
         }
 
-        ModelCapabilities = new ReadOnlyDictionary<string, StructuredOutputProfile>(copied);
+        StructuredOutputProfiles = new ReadOnlyDictionary<string, StructuredOutputProfile>(copied);
         MaxRepairAttempts = maxRepairAttempts;
     }
 
@@ -49,7 +49,7 @@ public sealed record ProviderRegistration
     public IProviderAdapter Adapter { get; }
 
     /// <summary>Gets immutable capabilities keyed by exact resolved model name.</summary>
-    public IReadOnlyDictionary<string, StructuredOutputProfile> ModelCapabilities { get; }
+    public IReadOnlyDictionary<string, StructuredOutputProfile> StructuredOutputProfiles { get; }
 
     /// <summary>Gets the optional provider repair ceiling.</summary>
     public int? MaxRepairAttempts { get; }

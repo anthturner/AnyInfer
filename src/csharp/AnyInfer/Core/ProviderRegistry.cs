@@ -13,12 +13,21 @@ internal sealed record ResolvedProvider(
     int? MaxRepairAttempts,
     ProviderPool.InstanceState State);
 
+internal sealed record TargetMetadata(
+    ResolvedTarget Target,
+    ProviderDescriptor? Descriptor,
+    ProviderRegistration? Registration,
+    ProviderSettings Settings,
+    StructuredOutputProfile Capabilities,
+    int? MaxRepairAttempts);
+
 /// <summary>Client-owned lazy adapter pool. Descriptor lookup remains public registry work.</summary>
 internal sealed class ProviderPool : IAsyncDisposable
 {
     private readonly ProviderRegistry? _descriptors;
     private readonly ResolverChain? _resolver;
     private readonly Dictionary<string, InstanceState> _instances;
+    private readonly IReadOnlyList<AnyInfer.Catalog.CatalogProviderBinding> _bindings;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _gate = new();
     private readonly HashSet<Task> _builds = [];
@@ -40,6 +49,7 @@ internal sealed class ProviderPool : IAsyncDisposable
 
             _adopted.Add(registration.Adapter);
         }
+        _bindings = Array.AsReadOnly(_instances.Values.Select(state => new AnyInfer.Catalog.CatalogProviderBinding(state.InstanceId, state.InstanceId)).ToArray());
     }
 
     internal ProviderPool(IEnumerable<ProviderSettings>? settings, ProviderRegistry descriptors, ResolverChain resolver)
@@ -83,9 +93,10 @@ internal sealed class ProviderPool : IAsyncDisposable
                 throw ConfigurationError(supplied.InstanceId, "A transport handler may belong to only one configured provider instance.");
             }
         }
+        _bindings = Array.AsReadOnly(_instances.Values.Select(state => new AnyInfer.Catalog.CatalogProviderBinding(state.InstanceId, state.Descriptor!.Id)).ToArray());
     }
 
-    internal ResolvedProvider ResolveMetadata(string rawTarget)
+    internal TargetMetadata ResolveMetadata(string rawTarget)
     {
         ArgumentNullException.ThrowIfNull(rawTarget);
         if (string.IsNullOrWhiteSpace(rawTarget))
@@ -121,35 +132,70 @@ internal sealed class ProviderPool : IAsyncDisposable
             }
 
             var descriptor = _descriptors.Get(normalized);
-            state = GetOrCreateDefaultState(descriptor);
+            state = InstanceState.FromSettings(descriptor.Id, descriptor, ProviderSettings.Of(descriptor.Id));
         }
 
         var capabilities = state.Registration is { } registration
-            ? registration.ModelCapabilities.TryGetValue(model, out var profile) ? profile : new StructuredOutputProfile()
-            : state.Descriptor!.ModelCapabilities.TryGetValue(model, out var descriptorProfile) ? descriptorProfile : new StructuredOutputProfile();
+            ? registration.StructuredOutputProfiles.TryGetValue(model, out var profile) ? profile : new StructuredOutputProfile()
+            : state.Descriptor!.StructuredOutputProfiles.TryGetValue(model, out var descriptorProfile) ? descriptorProfile : new StructuredOutputProfile();
         var maximumRepairs = state.Registration?.MaxRepairAttempts ?? state.Descriptor?.MaxRepairAttempts;
-        return new ResolvedProvider(
+        return new TargetMetadata(
             new ResolvedTarget(state.InstanceId, model),
             state.Descriptor,
             state.Registration,
             state.Settings,
             capabilities,
-            maximumRepairs,
-            state);
+            maximumRepairs);
+    }
+
+    internal IReadOnlyList<AnyInfer.Catalog.CatalogProviderBinding> Bindings
+    {
+        get { return _bindings; }
+    }
+
+    internal ProviderRegistry? DescriptorSnapshot => _descriptors;
+
+    internal TargetMetadata ResolveMetadata(ResolvedTarget target)
+    {
+        var resolved = ResolveMetadata($"{target.ProviderId}:{target.Model}");
+        return resolved with { Target = target };
+    }
+
+    internal ProviderLocality EffectiveLocality(TargetMetadata provider)
+    {
+        var descriptor = provider.Descriptor;
+        if (descriptor is null || descriptor.Locality != ProviderLocality.Local) return descriptor?.Locality ?? ProviderLocality.Hosted;
+        var baseUrl = provider.Settings.BaseUrl ?? descriptor.DefaultBaseUrl;
+        return baseUrl is null || (Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) && uri.IsLoopback) ? ProviderLocality.Local : ProviderLocality.Remote;
     }
 
     internal async ValueTask<IProviderAdapter> GetAdapterAsync(ResolvedProvider resolved, CancellationToken callerToken)
     {
         ArgumentNullException.ThrowIfNull(resolved);
+        return await GetAdapterAsync(resolved.State, callerToken).ConfigureAwait(false);
+    }
+
+    internal async ValueTask<IProviderAdapter> GetAdapterAsync(
+        InstanceState state,
+        CancellationToken callerToken,
+        CancellationToken callerIdentity = default)
+    {
+        ArgumentNullException.ThrowIfNull(state);
         ThrowIfClosing();
-        if (resolved.Registration is { } registration)
+        if (state.Registration is { } registration)
         {
             return registration.Adapter;
         }
 
-        var state = resolved.State;
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(callerToken, _lifetime.Token);
-        await state.Gate.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            await state.Gate.WaitAsync(linked.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (callerIdentity.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(callerIdentity);
+        }
         try
         {
             ThrowIfClosing();
@@ -158,7 +204,7 @@ internal sealed class ProviderPool : IAsyncDisposable
                 return state.Adapter;
             }
 
-            var build = BuildAsync(state, _resolver!, linked.Token);
+            var build = BuildAsync(state, _resolver!, linked.Token, callerIdentity);
             TrackBuild(build);
             IProviderAdapter adapter;
             try
@@ -173,7 +219,7 @@ internal sealed class ProviderPool : IAsyncDisposable
             if (linked.IsCancellationRequested)
             {
                 await adapter.DisposeAsync().ConfigureAwait(false);
-                linked.Token.ThrowIfCancellationRequested();
+                ThrowPoolOwnedCancellation(callerIdentity, linked.Token);
             }
 
             var closing = false;
@@ -199,6 +245,48 @@ internal sealed class ProviderPool : IAsyncDisposable
         {
             state.Gate.Release();
         }
+    }
+
+    internal InstanceState ResolveLifecycleInstance(string providerId)
+    {
+        ArgumentNullException.ThrowIfNull(providerId);
+        var normalized = ProviderSettings.NormalizeId(providerId, nameof(providerId));
+        lock (_gate)
+        {
+            if (_instances.TryGetValue(normalized, out var configured))
+            {
+                return configured;
+            }
+        }
+
+        if (_descriptors is null)
+        {
+            throw ConfigureError("Provider is not registered.");
+        }
+
+        return GetOrCreateDefaultState(_descriptors.Get(normalized));
+    }
+
+    internal ResolvedProvider Materialize(TargetMetadata metadata)
+    {
+        InstanceState state;
+        lock (_gate)
+        {
+            if (!_instances.TryGetValue(metadata.Target.ProviderId, out var existing))
+            {
+                if (metadata.Descriptor is null)
+                {
+                    throw ConfigureError("Target provider is not registered.");
+                }
+                state = GetOrCreateDefaultState(metadata.Descriptor);
+            }
+            else
+            {
+                state = existing;
+            }
+        }
+        return new ResolvedProvider(metadata.Target, state.Descriptor, state.Registration, state.Settings,
+            metadata.Capabilities, metadata.MaxRepairAttempts, state);
     }
 
     public async ValueTask DisposeAsync()
@@ -293,7 +381,11 @@ internal sealed class ProviderPool : IAsyncDisposable
         }
     }
 
-    private static async Task<IProviderAdapter> BuildAsync(InstanceState state, ResolverChain resolver, CancellationToken cancellationToken)
+    private static async Task<IProviderAdapter> BuildAsync(
+        InstanceState state,
+        ResolverChain resolver,
+        CancellationToken cancellationToken,
+        CancellationToken callerIdentity = default)
     {
         var descriptor = state.Descriptor ?? throw new InvalidOperationException("Prebuilt registrations do not require a factory.");
         var settings = state.Settings;
@@ -306,25 +398,36 @@ internal sealed class ProviderPool : IAsyncDisposable
             ? ProviderSettings.Of(settings.ProviderId, descriptor.DefaultBaseUrl, settings.ApiKey, settings.ApiVersion, settings.Headers, settings.Options, settings.TimeoutS, settings.Transport, settings.Alias)
             : settings;
         var resolvedKey = await resolver.ResolveAsync(boundSettings.ApiKey, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
+        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
         var apiKeyField = descriptor.Setup.Fields.SingleOrDefault(static field => field.Key == "api_key");
         if (apiKeyField is { Required: true } && string.IsNullOrWhiteSpace(resolvedKey))
         {
             throw ConfigurationError(settings.InstanceId, "The required setup field 'api_key' is missing.");
         }
 
-        var resolvedOptions = await ResolveOptionsAsync(descriptor, boundSettings, resolver, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
+        var resolvedOptions = await ResolveOptionsAsync(descriptor, boundSettings, resolver, cancellationToken, callerIdentity).ConfigureAwait(false);
+        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
         var config = new ProviderConfig(boundSettings, descriptor.Id, resolvedKey, resolvedOptions);
-        cancellationToken.ThrowIfCancellationRequested();
+        ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
         return await descriptor.Factory(config, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void ThrowPoolOwnedCancellation(CancellationToken callerIdentity, CancellationToken linkedToken)
+    {
+        if (callerIdentity.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(callerIdentity);
+        }
+
+        linkedToken.ThrowIfCancellationRequested();
     }
 
     private static async ValueTask<AnyInfer.Json.JsonObject?> ResolveOptionsAsync(
         ProviderDescriptor descriptor,
         ProviderSettings settings,
         ResolverChain resolver,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CancellationToken callerIdentity = default)
     {
         var options = settings.Options?.Properties.ToDictionary(
             static property => property.Name,
@@ -369,7 +472,7 @@ internal sealed class ProviderPool : IAsyncDisposable
             if (field.Kind == "secret")
             {
                 var resolved = await resolver.ResolveAsync(text.Value, cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
+                ThrowPoolOwnedCancellation(callerIdentity, cancellationToken);
                 if (resolved is null)
                 {
                     if (field.Required)

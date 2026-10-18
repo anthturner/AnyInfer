@@ -4,7 +4,9 @@ namespace AnyInfer.Schema;
 public static class RequestAdmission
 {
     /// <summary>Validates construction constraints and the frozen request profile.</summary>
-    public static void Validate(GenerationRequest request)
+    public static void Validate(GenerationRequest request) => Validate(request, allowTargetAliases: false);
+
+    internal static void Validate(GenerationRequest request, bool allowTargetAliases)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateConstruction(request.Sampling);
@@ -24,7 +26,7 @@ public static class RequestAdmission
 
         foreach (var target in request.Route.Targets)
         {
-            if (!string.IsNullOrWhiteSpace(target) && !target.Contains(':'))
+            if (!allowTargetAliases && !string.IsNullOrWhiteSpace(target) && !target.Contains(':'))
             {
                 ThrowUnsupported("Target aliases are outside the v0 profile.");
             }

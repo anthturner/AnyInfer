@@ -4,7 +4,7 @@ internal sealed class RouteState
 {
     private readonly IOperationClock _clock;
     private readonly object _gate = new();
-    private readonly Dictionary<ResolvedTarget, double> _failedAt = [];
+    private readonly Dictionary<(string ProviderId, string Model), double> _failedAt = [];
 
     internal RouteState(IOperationClock clock)
     {
@@ -16,14 +16,15 @@ internal sealed class RouteState
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
         {
-            if (!_failedAt.TryGetValue(target, out var failedAt))
+            var key = Key(target);
+            if (!_failedAt.TryGetValue(key, out var failedAt))
             {
                 return false;
             }
 
             if (_clock.NowSeconds - failedAt >= healthTtlS)
             {
-                _failedAt.Remove(target);
+                _failedAt.Remove(key);
                 return false;
             }
 
@@ -36,7 +37,7 @@ internal sealed class RouteState
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
         {
-            _failedAt[target] = _clock.NowSeconds;
+            _failedAt[Key(target)] = _clock.NowSeconds;
         }
     }
 
@@ -45,7 +46,7 @@ internal sealed class RouteState
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
         {
-            _failedAt.Remove(target);
+            _failedAt.Remove(Key(target));
         }
     }
 
@@ -54,7 +55,7 @@ internal sealed class RouteState
         ArgumentNullException.ThrowIfNull(target);
         lock (_gate)
         {
-            _failedAt[target] = failedAtSeconds;
+            _failedAt[Key(target)] = failedAtSeconds;
         }
     }
 
@@ -70,4 +71,7 @@ internal sealed class RouteState
         var floor = Math.Max(exponential, retryAfterS ?? 0);
         return Math.Clamp(floor, 0, policy.BackoffMaxS);
     }
+
+    private static (string ProviderId, string Model) Key(ResolvedTarget target) =>
+        (target.ProviderId, target.Model);
 }

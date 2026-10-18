@@ -179,7 +179,7 @@ def test_main_preserves_preexisting_output_run_directory(tmp_path: Path, monkeyp
     assert copied_pins[0].read_bytes() == (ROOT / "src" / "csharp" / "global.json").read_bytes()
 
 
-def test_external_consumer_uses_sdk1_public_vocabulary(tmp_path: Path) -> None:
+def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecycle_vocabulary(tmp_path: Path) -> None:
     consumer = tmp_path / "consumer"
     CHECKER.write_consumer(consumer, tmp_path / "feed", tmp_path / "cache", CHECKER.package_version())
 
@@ -197,4 +197,28 @@ def test_external_consumer_uses_sdk1_public_vocabulary(tmp_path: Path) -> None:
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source
     assert "GenerationResult" not in source
-    assert "new AsyncClient(" not in source
+    assert 'new AsyncClient([settings], registry, catalog: catalog,' in source
+    assert 'new Client([settings], registry, catalog: catalog,' in source
+    assert "using AnyInfer.Capabilities;" in source
+    assert "using AnyInfer.Catalog;" in source
+    assert 'ProviderSettings.Of("demo", alias: "demo-instance")' in source
+    assert 'new global::AnyInfer.Catalog.Catalog(' in source
+    assert 'new PricingTable(' in source
+    assert 'new PricingEntry("demo-model", new Pricing(3.25m, 4.5m)' in source
+    assert 'new Sourced<Pricing>(new Pricing(5.75m, 6.25m), Provenance.Catalog)' in source
+    assert 'client.Resolve("tier")' in source
+    assert 'client.Capabilities("tier")' in source
+    assert 'pricingTable.Lookup("demo-instance", "demo-model")' in source
+    assert 'factoryCalls != 0' in source
+    assert 'AsyncClient.FromAdapters(\n        [new ProviderRegistration("lifecycle-demo", lifecycleAdapter)])' in source
+    assert 'await client.ModelsAsync("lifecycle-demo")' in source
+    assert 'await client.HealthAsync("lifecycle-demo")' in source
+    assert 'client.Capabilities("lifecycle-demo:lifecycle-model")' in source
+    assert 'Client.FromAdapters(\n        [new ProviderRegistration("sync-lifecycle-demo", syncLifecycleAdapter)])' in source
+    assert 'client.Models("sync-lifecycle-demo")' in source
+    assert 'client.Health("sync-lifecycle-demo")' in source
+    assert 'client.Capabilities("sync-lifecycle-demo:lifecycle-model")' in source
+    assert 'sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle' in source
+    assert 'new Sourced<int>(2048, Provenance.Discovered)' in source
+    assert 'lifecycleAdapter.DisposeCount != 1' in source
+    assert 'syncLifecycleAdapter.DisposeCount != 1' in source

@@ -1,0 +1,363 @@
+{
+  "base": {
+    "format_version": true,
+    "default_alias": "tier",
+    "aliases": {
+      "tier": {
+        "description": "base tier",
+        "future_alias_field": { "ignored": true },
+        "targets": {
+          "backup": {
+            "model": "backup:stable"
+          },
+          "primary": {
+            "model": "primary:stable",
+            "gguf": "ignored-when-model-present",
+            "context_window": 0,
+            "max_output_tokens": 0,
+            "description": true,
+            "future_target_field": "ignored"
+          },
+          "local": {
+            "gguf": "explicit-artifact"
+          }
+        }
+      },
+      "no-candidate": {
+        "targets": {
+          "other": {
+            "model": "other-model"
+          }
+        }
+      },
+      "empty-ref": {
+        "targets": {
+          "primary": {
+            "description": "intentionally lacks a reference"
+          }
+        }
+      }
+    },
+    "gguf_artifacts": {
+      "explicit-artifact": {
+        "files": [
+          {
+            "filename": "explicit.gguf",
+            "url": "https://example.invalid/explicit.gguf",
+            "sha256": "explicit-digest",
+            "size_bytes": 11,
+            "role": "model"
+          }
+        ],
+        "license": "mit",
+        "description": "explicit artifact"
+      },
+      "derived-hf": {
+        "files": [
+          {
+            "filename": "authoritative.gguf",
+            "url": "https://example.invalid/authoritative.gguf",
+            "sha256": "explicit-wins",
+            "size_bytes": 99,
+            "role": "model"
+          }
+        ],
+        "description": "explicit beats derived"
+      }
+    },
+    "models": [
+      {
+        "id": "chat-alpha",
+        "display_name": false,
+        "source": true,
+        "last_verified": null,
+        "best_at": [" coding "],
+        "unknown_model_field": [1, 2, 3]
+      },
+      {
+        "id": "vector-beta",
+        "kind": "embedding",
+        "display_name": "Vector Beta",
+        "best_at": [" EMBEDDINGS ", "rag"],
+        "embedding": {
+          "dimensions": 0,
+          "max_input_tokens": 2048
+        }
+      },
+      {
+        "id": "artifact-model",
+        "kind": "generation",
+        "display_name": "Artifact Model",
+        "quantization": "Q4_K_M",
+        "license": "apache-2.0",
+        "variants": [
+          {
+            "id": "hf-gguf",
+            "engine": "llama.cpp",
+            "kind": "gguf",
+            "quantization": "Q4_K_M",
+            "quality_rank": 7,
+            "artifact_id": "derived-hf",
+            "source": {
+              "resolver": "huggingface",
+              "repo": "example/artifact-model",
+              "revision": "0123456789012345678901234567890123456789",
+              "files": ["weights/model.gguf", "vision/projector.gguf"],
+              "sha256": {
+                "weights/model.gguf": "hf-model-digest",
+                "vision/projector.gguf": "hf-projector-digest"
+              },
+              "size_bytes": {
+                "weights/model.gguf": 1234,
+                "vision/projector.gguf": true
+              },
+              "roles": {
+                "vision/projector.gguf": "projector"
+              }
+            }
+          },
+          {
+            "id": "url-gguf",
+            "engine": "llama.cpp",
+            "kind": "gguf",
+            "quantization": "Q8_0",
+            "quality_rank": 9,
+            "artifact_id": "derived-url",
+            "source": {
+              "resolver": "url",
+              "urls": ["https://example.invalid/weights/url-model.gguf"],
+              "sha256": {
+                "url-model.gguf": "url-model-digest"
+              },
+              "size_bytes": {
+                "url-model.gguf": 4567
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "overlay": {
+    "format_version": 1,
+    "default_alias": "overlay-tier",
+    "aliases": {
+      "tier": {
+        "description": "overlay replaces targets wholesale",
+        "targets": {
+          "primary": {
+            "model": "overlay-primary"
+          }
+        }
+      }
+    },
+    "gguf_artifacts": {
+      "explicit-artifact": {
+        "url": "https://example.invalid/overlay.gguf",
+        "sha256": "overlay-digest",
+        "size_bytes": 22
+      }
+    },
+    "models": [
+      {
+        "id": "chat-alpha",
+        "display_name": "Overlay Chat",
+        "best_at": ["general-chat"]
+      }
+    ]
+  },
+  "configured_instance_ids": ["primary", "backup", "local"],
+  "requests": {
+    "explicit_targets": [" Primary : model:with:colon ", "primary:"],
+    "alias_targets": ["tier", "no-candidate", "empty-ref"],
+    "unknown_targets": ["unknown-alias", "   "]
+  },
+  "invalid_documents": {
+    "closed_embedding": {
+      "models": [
+        {
+          "id": "closed-embedding",
+          "kind": "embedding",
+          "embedding": {
+            "dimensions": 32,
+            "normalized": true
+          }
+        }
+      ]
+    },
+    "unknown_kind": {
+      "models": [
+        {
+          "id": "unknown-kind",
+          "kind": "reranking"
+        }
+      ]
+    },
+    "duplicate_variant_ids": {
+      "models": [
+        {
+          "id": "duplicate-variants",
+          "variants": [
+            {
+              "id": "same-variant"
+            },
+            {
+              "id": "same-variant"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "boundary_documents": {
+    "omitted_collections_and_version": {},
+    "null_aliases": {
+      "aliases": null
+    },
+    "null_models": {
+      "models": null
+    },
+    "null_version": {
+      "format_version": null
+    },
+    "omitted_best_at": {
+      "models": [
+        {
+          "id": "omitted-best-at"
+        }
+      ]
+    },
+    "null_best_at": {
+      "models": [
+        {
+          "id": "null-best-at",
+          "best_at": null
+        }
+      ]
+    },
+    "omitted_variants_and_sources": {
+      "models": [
+        {
+          "id": "omitted-variants-and-sources"
+        }
+      ]
+    },
+    "null_variants": {
+      "models": [
+        {
+          "id": "null-variants",
+          "variants": null
+        }
+      ]
+    },
+    "null_sources": {
+      "models": [
+        {
+          "id": "null-sources",
+          "sources": null
+        }
+      ]
+    },
+    "omitted_variant_source": {
+      "models": [
+        {
+          "id": "omitted-variant-source",
+          "variants": [
+            {
+              "id": "omitted-source-variant"
+            }
+          ]
+        }
+      ]
+    },
+    "null_variant_source": {
+      "models": [
+        {
+          "id": "null-variant-source",
+          "variants": [
+            {
+              "id": "null-source-variant",
+              "source": null
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "derived_documents": {
+    "nested_huggingface": {
+      "models": [
+        {
+          "id": "nested-hf-model",
+          "display_name": "Nested HF Name",
+          "description": "Different display prose",
+          "license": "mit",
+          "variants": [
+            {
+              "id": "nested-hf-variant",
+              "engine": "llama.cpp",
+              "kind": "gguf",
+              "artifact_id": "derived-nested-hf",
+              "source": {
+                "resolver": "huggingface",
+                "repo": "example/nested-hf",
+                "revision": "abcdefabcdefabcdefabcdefabcdefabcdefabcd",
+                "files": ["deep/model/model.gguf", "deep/vision/projector.gguf"],
+                "sha256": {
+                  "deep/model/model.gguf": "nested-model-digest",
+                  "deep/vision/projector.gguf": "nested-projector-digest"
+                },
+                "size_bytes": {
+                  "deep/model/model.gguf": 321,
+                  "deep/vision/projector.gguf": 654
+                },
+                "roles": {
+                  "deep/vision/projector.gguf": "projector"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "alias_documents": {
+    "underscore_alias": {
+      "aliases": {
+        "Tier_Name": {
+          "targets": {
+            "Raw_Key": {
+              "model": "raw-key-model"
+            }
+          }
+        }
+      }
+    },
+    "configured_instance_ids": ["raw_key"]
+  },
+  "scalar_documents": {
+    "python_string_coercion": {
+      "models": [
+        {
+          "id": "scalar-coercion",
+          "family": 1e16,
+          "display_name": ["quote\"", "line\nbreak", null, true, false],
+          "license": {
+            "quote": "\"",
+            "newline": "x\ny",
+            "none": null,
+            "true": true,
+            "false": false
+          },
+          "last_verified": 1e3,
+          "source": 1e-5,
+          "description": -0.0
+        },
+        {
+          "id": "null-scalar-coercion",
+          "family": null
+        }
+      ]
+    }
+  }
+}

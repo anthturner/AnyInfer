@@ -19,6 +19,9 @@
   <ItemGroup>
     <None Include="../README.md" Pack="true" PackagePath="" />
     <None Include="../../../LICENSE" Pack="true" PackagePath="" />
+    <EmbeddedResource Include="../../python/anyinfer/catalog/default.json" LogicalName="AnyInfer.Catalog.default.json" />
+    <EmbeddedResource Include="../../python/anyinfer/catalog/models.json" LogicalName="AnyInfer.Catalog.models.json" />
+    <EmbeddedResource Include="../../python/anyinfer/capabilities/pricing.json" LogicalName="AnyInfer.Capabilities.pricing.json" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AnyInfer.Tests" />

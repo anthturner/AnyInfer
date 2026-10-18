@@ -1,4 +1,6 @@
 using AnyInfer.Config;
+using AnyInfer.Capabilities;
+using AnyInfer.Catalog;
 using AnyInfer.Credentials;
 using AnyInfer.Internal;
 using AnyInfer.Json;
@@ -25,8 +27,11 @@ public sealed class Client : IDisposable
         ProviderRegistry? registry = null,
         ResolverChain? resolver = null,
         Route? route = null,
-        Repair? repair = null)
-        : this(new AsyncClient(providers, registry, resolver, route, repair))
+        Repair? repair = null,
+        global::AnyInfer.Catalog.Catalog? catalog = null,
+        PricingTable? pricingTable = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null)
+        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides))
     {
     }
 
@@ -36,8 +41,34 @@ public sealed class Client : IDisposable
     public static Client FromAdapters(IEnumerable<ProviderRegistration> providers) => new(AsyncClient.FromAdapters(providers));
 
     /// <summary>Creates a synchronous client from inert parsed configuration.</summary>
-    public static Client FromConfig(AnyInferConfig config, ProviderRegistry? registry = null, ResolverChain? resolver = null) =>
-        new(AsyncClient.FromConfig(config, registry, resolver));
+    public static Client FromConfig(
+        AnyInferConfig config,
+        ProviderRegistry? registry = null,
+        ResolverChain? resolver = null,
+        global::AnyInfer.Catalog.Catalog? catalog = null,
+        PricingTable? pricingTable = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? capabilityOverrides = null) =>
+        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides));
+
+    /// <summary>Gets the immutable catalog used by pure target resolution.</summary>
+    public global::AnyInfer.Catalog.Catalog Catalog => _inner.Catalog;
+
+    /// <summary>Resolves a target without credentials, factories, or network work.</summary>
+    public ResolvedTarget Resolve(string target) => _inner.Resolve(target);
+
+    /// <summary>Gets assembled immutable capability facts without constructing an adapter.</summary>
+    public ModelCapabilities Capabilities(string target) => _inner.Capabilities(target);
+
+    /// <summary>Lists models for one selected provider instance and optionally filters by operation.</summary>
+    public IReadOnlyList<DiscoveredModel> Models(
+        string providerId,
+        InferenceOperation? operation = null,
+        CancellationToken cancellationToken = default) =>
+        RunOperation(token => _inner.ModelsAsync(providerId, operation, token), cancellationToken);
+
+    /// <summary>Gets a health observation for one selected provider instance.</summary>
+    public Health Health(string providerId, CancellationToken cancellationToken = default) =>
+        RunOperation(token => _inner.HealthAsync(providerId, token), cancellationToken);
 
     /// <summary>Generates a terminal result from an explicit request.</summary>
     public Generation Generate(GenerationRequest request, CancellationToken cancellationToken = default) =>
@@ -96,7 +127,7 @@ public sealed class Client : IDisposable
         disposal.GetAwaiter().GetResult();
     }
 
-    private Generation RunOperation(Func<CancellationToken, Task<Generation>> operation, CancellationToken callerCancellation)
+    private T RunOperation<T>(Func<CancellationToken, Task<T>> operation, CancellationToken callerCancellation)
     {
         ArgumentNullException.ThrowIfNull(operation);
         var reservation = ReserveOperation();
@@ -106,6 +137,7 @@ public sealed class Client : IDisposable
             {
                 using var context = SyncExecutionContext.Push(this);
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(callerCancellation, _lifetime.Token);
+                using var identity = CancellationIdentityContext.Push(linked.Token, callerCancellation);
                 return await operation(linked.Token).ConfigureAwait(false);
             }).GetAwaiter().GetResult();
         }

@@ -1,3 +1,5 @@
+using AnyInfer.Capabilities;
+using AnyInfer.Internal;
 using AnyInfer.Json;
 using System.Net;
 using System.Net.Http.Headers;
@@ -8,14 +10,16 @@ using System.Text;
 namespace AnyInfer.Providers;
 
 /// <summary>Translates the bounded OpenAI-compatible chat-completions dialect.</summary>
-internal sealed class OpenAIChatAdapter : IProviderAdapter
+internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly HttpClient _client;
     private readonly Uri _endpoint;
+    private readonly Uri _modelsEndpoint;
     private readonly string? _apiKey;
     private readonly string _providerId;
     private readonly IReadOnlyList<KeyValuePair<string, string>> _headers;
+    private readonly TimeSpan _timeout;
     private int _disposed;
 
     internal OpenAIChatAdapter(
@@ -23,7 +27,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         string? apiKey,
         IReadOnlyDictionary<string, string>? headers = null,
         HttpMessageHandler? handler = null,
-        string providerId = "openai-compat")
+        string providerId = "openai-compat",
+        double timeoutS = 120)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
         if (!baseUrl.IsAbsoluteUri ||
@@ -35,12 +40,14 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
             throw new ArgumentException("The OpenAI-compatible base URL must be an absolute HTTP(S) URL without userinfo, query, or fragment.", nameof(baseUrl));
         }
 
-        _endpoint = BuildEndpoint(baseUrl);
+        _endpoint = BuildEndpoint(baseUrl, "chat/completions");
+        _modelsEndpoint = BuildEndpoint(baseUrl, "models");
         _apiKey = apiKey;
         _providerId = ProviderSettings.NormalizeId(providerId, nameof(providerId));
         _headers = (headers ?? new Dictionary<string, string>())
             .Select(static header => new KeyValuePair<string, string>(header.Key, header.Value))
             .ToArray();
+        _timeout = TimeSpan.FromSeconds(timeoutS);
         var ownedHandler = handler ?? new HttpClientHandler
         {
             AllowAutoRedirect = false,
@@ -70,7 +77,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         try
         {
             ValidateHeaders(config.Headers);
-            return new OpenAIChatAdapter(new Uri(baseUrl, UriKind.Absolute), config.ApiKey, config.Headers, config.Transport, config.ProviderId);
+            return new OpenAIChatAdapter(new Uri(baseUrl, UriKind.Absolute), config.ApiKey, config.Headers, config.Transport, config.ProviderId, config.TimeoutS);
         }
         catch (UriFormatException exception)
         {
@@ -95,6 +102,98 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         CancellationToken cancellationToken = default) =>
         GenerateIterator(request, cancellationToken);
 
+    public async ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        using var timeout = CreateLifecycleTimeout(cancellationToken);
+        using var message = CreateModelsRequest();
+        HttpResponseMessage? response = null;
+        Stream? responseStream = null;
+        try
+        {
+            response = await SendAsync(message, "discover", timeout.Token).ConfigureAwait(false);
+            responseStream = await OpenResponseStreamAsync(response.Content, "discover", timeout.Token).ConfigureAwait(false);
+            var body = await ReadLifecycleResponseBytesAsync(responseStream, "discover", timeout.Token).ConfigureAwait(false);
+            if ((int)response.StatusCode >= 400)
+            {
+                throw HttpFailure(response, body, "discover");
+            }
+
+            return ParseDiscoveredModels(body);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            var callerIdentity = CancellationIdentityContext.Resolve(cancellationToken);
+            throw new OperationCanceledException(
+                callerIdentity.IsCancellationRequested ? callerIdentity : cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            throw LifecycleTimeout();
+        }
+        finally
+        {
+            try
+            {
+                if (responseStream is not null)
+                {
+                    await DisposeResponseStreamAsync(responseStream, "discover").ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                DisposeResponse(response, "discover");
+            }
+        }
+    }
+
+    public async ValueTask<Health> HealthAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        using var timeout = CreateLifecycleTimeout(cancellationToken);
+        using var message = CreateModelsRequest();
+        HttpResponseMessage? response = null;
+        Stream? responseStream = null;
+        try
+        {
+            response = await SendAsync(message, "discover", timeout.Token).ConfigureAwait(false);
+            responseStream = await OpenResponseStreamAsync(response.Content, "discover", timeout.Token).ConfigureAwait(false);
+            await ReadLifecycleResponseBytesAsync(responseStream, "discover", timeout.Token).ConfigureAwait(false);
+            return (int)response.StatusCode < 400
+                ? new Health(true)
+                : new Health(false, $"HTTP {(int)response.StatusCode}");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            var callerIdentity = CancellationIdentityContext.Resolve(cancellationToken);
+            throw new OperationCanceledException(
+                callerIdentity.IsCancellationRequested ? callerIdentity : cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            return new Health(false, "The provider request timed out.");
+        }
+        catch (TransportException exception)
+        {
+            return new Health(false, BoundHealthDetail(exception.Detail ?? exception.Message));
+        }
+        finally
+        {
+            try
+            {
+                if (responseStream is not null)
+                {
+                    await DisposeResponseStreamAsync(responseStream, "discover").ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                DisposeResponse(response, "discover");
+            }
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
@@ -117,8 +216,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         Stream? responseStream = null;
         try
         {
-            response = await SendAsync(message, cancellationToken).ConfigureAwait(false);
-            responseStream = await OpenResponseStreamAsync(response.Content, cancellationToken).ConfigureAwait(false);
+            response = await SendAsync(message, "generate", cancellationToken).ConfigureAwait(false);
+            responseStream = await OpenResponseStreamAsync(response.Content, "generate", cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 var errorBytes = await ReadResponseBytesAsync(
@@ -126,7 +225,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
                     request.MaxResponseBytes,
                     "generate",
                     cancellationToken).ConfigureAwait(false);
-                throw HttpFailure(response, errorBytes);
+                throw HttpFailure(response, errorBytes, "generate");
             }
 
             if (request.Stream)
@@ -182,6 +281,23 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         };
         ApplyHeaders(message, content, _headers);
 
+        if (!string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization"))
+        {
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        }
+
+        return message;
+    }
+
+    private HttpRequestMessage CreateModelsRequest()
+    {
+        var content = new ByteArrayContent([]);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        var message = new HttpRequestMessage(HttpMethod.Get, _modelsEndpoint)
+        {
+            Content = content,
+        };
+        ApplyHeaders(message, content, _headers);
         if (!string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization"))
         {
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
@@ -446,7 +562,29 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage message, CancellationToken cancellationToken)
+    private async Task<byte[]> ReadLifecycleResponseBytesAsync(
+        Stream stream,
+        string phase,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[4096];
+        using var body = new MemoryStream();
+        while (true)
+        {
+            var read = await ReadChunkAsync(stream, buffer, phase, cancellationToken).ConfigureAwait(false);
+            if (read == 0)
+            {
+                return body.ToArray();
+            }
+
+            await body.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage message,
+        string phase,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -457,11 +595,14 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
         catch (HttpRequestException exception)
         {
-            throw TransportFailure("The OpenAI-compatible request could not be sent.", "generate", exception);
+            throw TransportFailure("The OpenAI-compatible request could not be sent.", phase, exception);
         }
     }
 
-    private async Task<Stream> OpenResponseStreamAsync(HttpContent content, CancellationToken cancellationToken)
+    private async Task<Stream> OpenResponseStreamAsync(
+        HttpContent content,
+        string phase,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -469,11 +610,11 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
         catch (HttpRequestException exception)
         {
-            throw TransportFailure("The OpenAI-compatible response could not be opened.", "generate", exception);
+            throw TransportFailure("The OpenAI-compatible response could not be opened.", phase, exception);
         }
         catch (IOException exception)
         {
-            throw TransportFailure("The OpenAI-compatible response could not be opened.", "generate", exception);
+            throw TransportFailure("The OpenAI-compatible response could not be opened.", phase, exception);
         }
     }
 
@@ -534,7 +675,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private ProviderException HttpFailure(HttpResponseMessage response, byte[] errorBytes)
+    private ProviderException HttpFailure(HttpResponseMessage response, byte[] errorBytes, string phase)
     {
         var (category, retryable) = response.StatusCode switch
         {
@@ -550,7 +691,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
             $"The OpenAI-compatible service returned HTTP {(int)response.StatusCode}.",
             category,
             retryable,
-            phase: "generate",
+            phase,
             retryAfterS: RetryAfter(response.Headers.RetryAfter),
             httpStatus: (int)response.StatusCode,
             provider: _providerId);
@@ -574,8 +715,66 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
     private ProviderException TransportFailure(string message, string phase, Exception exception) =>
         ProviderException.Create(message, "transport", retryable: true, phase, provider: _providerId, nativeInner: exception);
 
+    private ProviderException LifecycleTimeout() =>
+        ProviderException.Create(
+            "The provider request timed out.",
+            "transport",
+            retryable: true,
+            phase: "discover",
+            provider: _providerId);
+
     private ProviderException ProtocolFailure(string message) =>
         ProviderException.Create(message, "stream_protocol", retryable: false, phase: "stream", provider: _providerId);
+
+    private CancellationTokenSource CreateLifecycleTimeout(CancellationToken cancellationToken)
+    {
+        var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(_timeout);
+        return timeout;
+    }
+
+    private IReadOnlyList<DiscoveredModel> ParseDiscoveredModels(byte[] body)
+    {
+        var payload = JsonReader.Read(body);
+        var entries = payload is JsonObject root && root.TryGetValue("data", out var data)
+            ? data
+            : payload;
+        if (entries is not JsonArray array)
+        {
+            return Array.Empty<DiscoveredModel>();
+        }
+
+        return Array.AsReadOnly(array.Items
+            .OfType<JsonObject>()
+            .Select(static entry => new DiscoveredModel(PythonModelId(entry)))
+            .ToArray());
+    }
+
+    private static string PythonModelId(JsonObject entry)
+    {
+        if (!entry.TryGetValue("id", out var value))
+        {
+            return string.Empty;
+        }
+
+        return value switch
+        {
+            JsonString text => text.Value,
+            JsonNull => "None",
+            JsonBoolean boolean => boolean.Value ? "True" : "False",
+            JsonInteger integer => integer.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            JsonNumber number => number.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
+            JsonArray or JsonObject => JsonWriter.Write(value),
+            _ => throw new InvalidOperationException("The JSON value is not supported."),
+        };
+    }
+
+    private static string BoundHealthDetail(string detail)
+    {
+        var redacted = Redaction.Redact(detail);
+        var runes = redacted.EnumerateRunes().Take(200).Select(static rune => rune.ToString());
+        return string.Concat(runes);
+    }
 
     private JsonObject ReadObject(ReadOnlySpan<byte> bytes)
     {
@@ -716,10 +915,10 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter
         }
     }
 
-    private static Uri BuildEndpoint(Uri baseUrl)
+    private static Uri BuildEndpoint(Uri baseUrl, string suffix)
     {
         var text = baseUrl.AbsoluteUri.TrimEnd('/');
-        return new Uri(text + "/chat/completions", UriKind.Absolute);
+        return new Uri(text + "/" + suffix, UriKind.Absolute);
     }
 
     private void ThrowIfDisposed()
