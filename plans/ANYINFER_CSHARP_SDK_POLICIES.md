@@ -7,8 +7,8 @@ phases; this plan refines that existing work. Python source authority remains
 `c7dc295d680fe51b39309fa7e17d65bf2cd7e307`, acceptance
 `ce71c5ee8a87aff3c137eba843d443feb642fbca`. All ownership checklist gates pass there.
 
-**Execution gate:** POL.0 through POL.6 gates are recorded; resume
-POL.7 full-workspace and clean-revision acceptance. Root owns this shared
+**Execution gate:** Complete through POL.7 at source
+`97e8937c281063582c282f313a35b91761293500`; resume parent SDK.6a. Root owns this shared
 checklist, solution/workspace registration, builds and Git. Authors own only their named
 source paths, report saved snapshots/reviews, and never run a shared build. Re-read a file
 before editing it; preserve other authors' changes. No package publication/version bump.
@@ -866,7 +866,7 @@ tests must catch false passes, but never substitute for executed native/public e
   > the final package proof retains dependency/license/hash/revision controls. This
   > disjoint phase closes while POL.5 continues; no package publication/version bump or
   > SDK.5c/full-workspace/clean-revision acceptance is claimed.
-- [ ] **POL.7 — Acceptance.** Root reconciles all saved files/reviews/checklists, then one
+- [x] **POL.7 — Acceptance.** Root reconciles all saved files/reviews/checklists, then one
   full workspace check after coherent source is frozen. Require zero compiler warnings,
   every actual profile, all unit/conformance/config/example/package/docs gates and unchanged
   released assets. Commit explicit paths, run clean-revision policy/accounting/package
@@ -886,12 +886,23 @@ tests must catch false passes, but never substitute for executed native/public e
   > .tmp-tests/workspace-policy-6c7ae73b72e140ca8a0303fd4c8ccd95/workspace-check.log.
   > Whitespace checks pass. Resume POL.7 at explicit-path source commit, then clean-revision
   > policy/accounting/package proofs and acceptance record; no later SDK milestone is done.
+  > Root committed the 92 explicit reviewed paths at source
+  > 97e8937c281063582c282f313a35b91761293500. Clean-revision default proofs then pass
+  > request-policy 29/29 at .tmp-tests/sdk-fivec-clean-source-97e8937/request-policy/run-zaqh9akg/report.json
+  > and accounting 42 shared plus two observed native boundaries at
+  > .tmp-tests/sdk-fivec-clean-source-97e8937/accounting/run-_nat4uxi/report.json.
+  > Both observers stamp the full source revision and source_dirty=false. Isolated package
+  > consumption passes without warnings/errors at
+  > .tmp-tests/sdk-fivec-clean-source-97e8937/package/run-a8woj5ji; its repository commit
+  > equals the same source. The first package command used the accounting-style flag;
+  > root reran only that proof using its actual --output option. Working tree was clean.
+  > Frozen fixture hashes/staged bytes and released specification assets are unchanged.
+  > Parent SDK.5c is checked; acceptance metadata is recorded separately from source, then
+  > replayed against the final clean record commit. Next implementation is SDK.6a.
 
-> NOTE: POL.0 through POL.6 gates are recorded. Resume POL.7 full/clean-revision acceptance
-> in the current working tree on accepted
-> prerequisite `ce71c5ee8a87aff3c137eba843d443feb642fbca`.
-> POL.5 prepares independent input-only observers and the closed stamped verifier.
-> Full/clean-revision acceptance remains POL.7.
+> NOTE: POL.0 through POL.7 are complete at accepted source
+> `97e8937c281063582c282f313a35b91761293500`. Resume parent SDK.6a; unported SDK.7/9 groups
+> remain unchecked. No package publication, version bump or complete-library parity claim.
 > Lifetime critique pinned deterministic timer placement, synchronous-parent checkpoints,
 > owned-wait-only cancellation translation and joined timer fault precedence above.
 > Protocol critique corrected an earlier discovery error: Python plans cache once before

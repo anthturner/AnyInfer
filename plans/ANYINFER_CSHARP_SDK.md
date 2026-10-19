@@ -790,7 +790,7 @@ must report a real conflict rather than silently changing a dependent public sig
   > ledger charges are winning-entry/completed-request only; failed retries and discarded
   > repair responses remain separate attempt facts. Pure policy/limiter foundations and
   > explicit accounting helpers precede SDK.5c automatic admission/transport wiring.
-- [ ] **SDK.5c** Connect shared timeout, cache/spend/rate/context policies to the native
+- [x] **SDK.5c** Connect shared timeout, cache/spend/rate/context policies to the native
   request path without duplicating provider orchestration. Gate: precise policy precedence,
   pre-dispatch refusal, retry/repair budget and ledger/manifest consistency tests.
   > NOTE: Source discovery confirmed a same-client transport ownership prerequisite:
@@ -804,8 +804,12 @@ must report a real conflict rather than silently changing a dependent public sig
   > reference gates: four tool, 28 cache, 57 limiter/timeout and four admission controls).
   > Independent request-policy proof now passes 29/29 from fresh stamped public observers
   > with matching provenance and clean cold reviews. The coherent source and compiled
-  > docs/package gates are closed. Resume POL.7 full-workspace and clean-revision acceptance
-  > in that checklist; SDK.5b's checkpoint is unchanged and SDK.5c stays unchecked until then.
+  > docs/package gates are closed. Root accepted source
+  > `97e8937c281063582c282f313a35b91761293500` after all 20 workspace steps in 147.6s,
+  > 681 native unit/93 conformance tests, preserved FrozenV0 102, then clean-revision
+  > policy 29/29, accounting 42+2 and isolated package consumption with matching full
+  > source metadata and source_dirty=false. The child plan records exact reports and
+  > the cache-only environmental retry. No package publication/version bump. Resume SDK.6a.
 
 ### SDK.6 — Embedding, reranking and operation-neutral routing
 
@@ -908,7 +912,17 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.5c**. SDK.5b is complete at source checkpoint
+Current resume point: **SDK.6a**. SDK.5c is complete at source checkpoint
+`97e8937c281063582c282f313a35b91761293500`: all 20 workspace steps in 147.6s,
+681 native unit and 93 conformance tests, 29 request-policy matches, 42 shared accounting
+observations plus two observed native boundaries, FrozenV0 102 preservation, compiled
+examples/strict docs and clean-revision package consumption. Observer source/dirty/corpus
+metadata agree; released assets and frozen fixture hashes are unchanged. The acceptance
+record changes only these checklists. `ANYINFER_CSHARP_SDK_POLICIES.md` records exact paths.
+The next read-only preparation maps embedding/rerank types and operation-neutral lifecycle;
+no SDK.6 implementation is yet claimed.
+
+SDK.5b is complete at source checkpoint
 `cc989e84069f09cb985e4f82fa40514f1aad5ffe`: all 19 workspace steps in 127.8s,
 532 native unit tests, 93 conformance tests, 42 shared accounting observations plus two
 separate native-only controls, strict docs, compiled examples and clean-revision package
@@ -916,8 +930,8 @@ consumption. `ANYINFER_CSHARP_SDK_ACCOUNTING.md` records the exact gates and sco
 The request-policy source, independent proof and docs/package phase gates are closed in
 `ANYINFER_CSHARP_SDK_POLICIES.md`: fresh policy comparison is 29/29, the current native
 suite is 681 unit and 93 conformance tests, and accounting/Frozen preservation remains
-42+2/102. Resume POL.7 clean-revision acceptance: all 20 full-workspace steps now pass in
-147.6s with a fresh isolated cache after the first run's shared-cache ACL shutdown failure.
+42+2/102. All 20 full-workspace steps pass in 147.6s with a fresh isolated cache after the
+first run's shared-cache ACL shutdown failure; clean-revision acceptance is recorded above.
 No later milestone or complete-library parity claim follows from this bounded checkpoint.
 
 SDK.5a is complete at source checkpoint
