@@ -795,8 +795,11 @@ must report a real conflict rather than silently changing a dependent public sig
   pre-dispatch refusal, retry/repair budget and ledger/manifest consistency tests.
   > NOTE: Source discovery confirmed a same-client transport ownership prerequisite:
   > discarding a late built-in adapter currently disposes the supplied handler reused by
-  > a later build. Resume with `ANYINFER_CSHARP_SDK_TRANSPORT_OWNERSHIP.md` before policy
-  > integration. SDK.5b's accepted checkpoint remains unchanged; SDK.5c stays unchecked.
+  > a later build. `ANYINFER_CSHARP_SDK_TRANSPORT_OWNERSHIP.md` is now complete at source
+  > `c7dc295d680fe51b39309fa7e17d65bf2cd7e307`: all 19 workspace steps, 538 native unit/
+  > 93 conformance tests, then clean-revision accounting and isolated package proofs pass.
+  > Resume SDK.5c's request-policy contract. SDK.5b's accepted checkpoint remains unchanged;
+  > SDK.5c stays unchecked.
 
 ### SDK.6 — Embedding, reranking and operation-neutral routing
 

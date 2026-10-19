@@ -58,9 +58,16 @@ disposed handler. One configured instance must own that supplied transport acros
   > specification edits or changed frozen observations. Full gate shell:
   > `df91f9ed-5e89-405d-8818-daa84fb44eea`. Existing public transport ownership wording
   > remains accurate; only the internal built-in lifetime boundary changes.
-- [ ] **OWN.4** Root commits explicit paths, runs clean-revision accounting and isolated
+- [x] **OWN.4** Root commits explicit paths, runs clean-revision accounting and isolated
   package proofs, and records source/evidence/acceptance. Gate: clean tree, stamped
   observers and isolated consumer pass. Resume the SDK.5c request-policy contract next;
   no automatic admission, pacing, cache placement, or broad SDK.7/9 completion is implied.
-  > NOTE: Resume OWN.4 at the source commit followed by clean-revision accounting/package
-  > proof. The working-tree full gate reports its dirty source status honestly.
+  > NOTE: Source `c7dc295d680fe51b39309fa7e17d65bf2cd7e307` is committed. Its clean-revision
+  > accounting proof passes at `.tmp-tests/transport-ownership-clean-observations/run-7uo6sh3n/`:
+  > both observers report that exact revision with `source_dirty=false`, 42 shared matches,
+  > no mismatches and two observed native-only boundaries. The exact same source's package
+  > proof passes at `.tmp-tests/transport-ownership-clean-package/run-mtkj2_29/`, including
+  > the pinned five-dependency archive/license/hash closure and fresh consumer restore/build/run
+  > with zero warnings. Proof shell: `e345e3f5-31f4-405f-b1e9-19c3c3e515ec` (exit 0).
+  > This prerequisite is complete. Resume parent SDK.5c request-policy contract; SDK.5c
+  > itself remains unchecked.
