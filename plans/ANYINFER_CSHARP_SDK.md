@@ -793,6 +793,10 @@ must report a real conflict rather than silently changing a dependent public sig
 - [ ] **SDK.5c** Connect shared timeout, cache/spend/rate/context policies to the native
   request path without duplicating provider orchestration. Gate: precise policy precedence,
   pre-dispatch refusal, retry/repair budget and ledger/manifest consistency tests.
+  > NOTE: Source discovery confirmed a same-client transport ownership prerequisite:
+  > discarding a late built-in adapter currently disposes the supplied handler reused by
+  > a later build. Resume with `ANYINFER_CSHARP_SDK_TRANSPORT_OWNERSHIP.md` before policy
+  > integration. SDK.5b's accepted checkpoint remains unchanged; SDK.5c stays unchecked.
 
 ### SDK.6 — Embedding, reranking and operation-neutral routing
 

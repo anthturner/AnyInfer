@@ -118,6 +118,9 @@ public sealed class ProviderRegistry
                 new SetupField("base_url", "Base URL", "endpoint", required: true),
                 new SetupField("api_key", "API key", "secret"),
             ]),
-            requiresBaseUrl: true),
+            requiresBaseUrl: true)
+        {
+            PoolOwnsConfiguredTransport = true,
+        },
     ]);
 }

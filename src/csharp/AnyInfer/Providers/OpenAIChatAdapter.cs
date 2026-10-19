@@ -28,7 +28,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         IReadOnlyDictionary<string, string>? headers = null,
         HttpMessageHandler? handler = null,
         string providerId = "openai-compat",
-        double timeoutS = 120)
+        double timeoutS = 120,
+        bool handlerOwnedByPool = false)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
         if (!baseUrl.IsAbsoluteUri ||
@@ -52,7 +53,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         {
             AllowAutoRedirect = false,
         };
-        _client = new HttpClient(ownedHandler, disposeHandler: true)
+        _client = new HttpClient(ownedHandler, disposeHandler: handler is null || !handlerOwnedByPool)
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
@@ -77,7 +78,14 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         try
         {
             ValidateHeaders(config.Headers);
-            return new OpenAIChatAdapter(new Uri(baseUrl, UriKind.Absolute), config.ApiKey, config.Headers, config.Transport, config.ProviderId, config.TimeoutS);
+            return new OpenAIChatAdapter(
+                new Uri(baseUrl, UriKind.Absolute),
+                config.ApiKey,
+                config.Headers,
+                config.Transport,
+                config.ProviderId,
+                config.TimeoutS,
+                config.TransportOwnedByPool);
         }
         catch (UriFormatException exception)
         {

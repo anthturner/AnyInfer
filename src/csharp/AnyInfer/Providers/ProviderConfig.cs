@@ -44,6 +44,8 @@ public sealed record ProviderConfig
     public double TimeoutS { get; }
     /// <summary>Gets the ownership-transferred transport supplied by settings.</summary>
     public HttpMessageHandler? Transport { get; }
+    // Set only by an opted-in pool for a supplied handler that outlives transient adapters.
+    internal bool TransportOwnedByPool { get; init; }
 
     public override string ToString() => $"ProviderConfig({ProviderId}, {EngineId})";
 }

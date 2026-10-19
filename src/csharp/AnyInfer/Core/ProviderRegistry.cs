@@ -34,6 +34,7 @@ internal sealed class ProviderPool : IAsyncDisposable
     private readonly object _gate = new();
     private readonly HashSet<Task> _builds = [];
     private readonly HashSet<IProviderAdapter> _adopted = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<HttpMessageHandler> _poolOwnedConfiguredHandlers = new(ReferenceEqualityComparer.Instance);
     private bool _closing;
 
     internal ProviderPool(IEnumerable<ProviderRegistration> registrations)
@@ -93,6 +94,11 @@ internal sealed class ProviderPool : IAsyncDisposable
             if (supplied.Transport is not null && !handlers.Add(supplied.Transport))
             {
                 throw ConfigurationError(supplied.InstanceId, "A transport handler may belong to only one configured provider instance.");
+            }
+
+            if (supplied.Transport is not null && descriptor.PoolOwnsConfiguredTransport)
+            {
+                _poolOwnedConfiguredHandlers.Add(supplied.Transport);
             }
         }
         _bindings = Array.AsReadOnly(_instances.Values.Select(state => new AnyInfer.Catalog.CatalogProviderBinding(state.InstanceId, state.Descriptor!.Id)).ToArray());
@@ -367,7 +373,26 @@ internal sealed class ProviderPool : IAsyncDisposable
             }
         }
 
-        _lifetime.Dispose();
+        foreach (var handler in _poolOwnedConfiguredHandlers)
+        {
+            try
+            {
+                handler.Dispose();
+            }
+            catch (Exception exception)
+            {
+                failure ??= exception;
+            }
+        }
+
+        try
+        {
+            _lifetime.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failure ??= exception;
+        }
         if (failure is not null)
         {
             ExceptionDispatchInfo.Capture(failure).Throw();
@@ -427,7 +452,10 @@ internal sealed class ProviderPool : IAsyncDisposable
             callerIdentity,
             cancelledParentToken).ConfigureAwait(false);
         ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
-        var config = new ProviderConfig(boundSettings, descriptor.Id, resolvedKey, resolvedOptions);
+        var config = new ProviderConfig(boundSettings, descriptor.Id, resolvedKey, resolvedOptions)
+        {
+            TransportOwnedByPool = descriptor.PoolOwnsConfiguredTransport && boundSettings.Transport is not null,
+        };
         ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
         return await descriptor.Factory(config, cancellationToken).ConfigureAwait(false);
     }

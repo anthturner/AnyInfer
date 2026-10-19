@@ -102,6 +102,8 @@ public sealed record ProviderDescriptor
     public TokenCalibration TokenCalibration { get; }
     /// <summary>Gets declared rate-limit header names, empty when the provider declares none.</summary>
     public RateLimitHeaders RateLimitHeaders { get; }
+    // Cooperative factory contract: only the pool disposes an opted-in configured handler.
+    internal bool PoolOwnsConfiguredTransport { get; init; }
 
     private static IReadOnlyDictionary<string, TValue> Copy<TValue>(IReadOnlyDictionary<string, TValue>? values) =>
         new ReadOnlyDictionary<string, TValue>(new Dictionary<string, TValue>(values ?? new Dictionary<string, TValue>(), StringComparer.Ordinal));
