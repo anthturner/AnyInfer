@@ -28,7 +28,7 @@ public sealed class AnyInferConfig
     };
     private static readonly HashSet<string> UnimplementedKeys = new(StringComparer.Ordinal)
     {
-        "operation_routes", "context", "history", "cache", "observers", "arena", "arenas", "mcp",
+        "operation_routes", "context", "history", "observers", "arena", "arenas", "mcp",
     };
     private static readonly HashSet<string> IdentityKeys = new(StringComparer.Ordinal) { "id", "adapter", "provider_id", "alias", "enabled" };
     private static readonly HashSet<string> SettingKeys = new(StringComparer.Ordinal)
@@ -38,7 +38,12 @@ public sealed class AnyInferConfig
     private static readonly HashSet<string> DirectKeys = new(StringComparer.Ordinal) { "base_url", "api_key", "api_version" };
 
     /// <summary>Creates an immutable configuration without resolving credentials or constructing adapters.</summary>
-    public AnyInferConfig(IEnumerable<ProviderSettings>? providers = null, Route? route = null, Repair? repair = null, int formatVersion = FormatVersion1)
+    public AnyInferConfig(
+        IEnumerable<ProviderSettings>? providers = null,
+        Route? route = null,
+        Repair? repair = null,
+        int formatVersion = FormatVersion1,
+        CachePolicy? cache = null)
     {
         if (formatVersion != FormatVersion1)
         {
@@ -49,6 +54,7 @@ public sealed class AnyInferConfig
         Route = route;
         Repair = repair;
         FormatVersion = formatVersion;
+        Cache = cache;
     }
 
     /// <summary>Gets provider settings in declaration order.</summary>
@@ -62,6 +68,9 @@ public sealed class AnyInferConfig
 
     /// <summary>Gets the parsed format version.</summary>
     public int FormatVersion { get; }
+
+    /// <summary>Gets the optional prompt-cache placement policy declared by configuration.</summary>
+    public CachePolicy? Cache { get; }
 
     /// <summary>Loads and validates a UTF-8 configuration document from an explicit path.</summary>
     public static AnyInferConfig Load(string path, ProviderRegistry? registry = null, ResolverChain? resolver = null)
@@ -152,6 +161,11 @@ public sealed class AnyInferConfig
             {
                 EnsureDefaultRouteCanSerialize(Route);
                 properties.Add(new JsonProperty("default_route", new JsonArray(Route.Targets.Select(static target => new JsonString(target)))));
+            }
+
+            if (Cache is not null)
+            {
+                properties.Add(new JsonProperty("cache", CacheJson(Cache)));
             }
 
             if (Repair is not null)
@@ -262,7 +276,8 @@ public sealed class AnyInferConfig
         var providers = ParseProviders(GetOrDefault(root, "providers", new JsonArray([])), source, activeRegistry, activeResolver);
         var route = ParseRoute(GetOrDefault(root, "default_route", JsonNull.Instance), source);
         var repair = ParseRepair(GetOrDefault(root, "repair", JsonNull.Instance), source);
-        return new AnyInferConfig(providers, route, repair, version);
+        var cache = ParseCache(GetOrDefault(root, "cache", JsonNull.Instance), source);
+        return new AnyInferConfig(providers, route, repair, version, cache);
     }
 
     private static IReadOnlyList<ProviderSettings> ParseProviders(JsonValue value, string source, ProviderRegistry registry, ResolverChain resolver)
@@ -374,6 +389,7 @@ public sealed class AnyInferConfig
 
         var headers = ParseHeaders(GetOrDefault(raw, "headers", new JsonObject([])), source, location);
         var timeout = ParseTimeout(GetOrDefault(raw, "timeout_s", new JsonNumber(120)), source, location);
+        var limits = ParseLimits(GetOrDefault(raw, "limits", JsonNull.Instance), source, location);
         ValidateInactiveConnectionSettings(raw, source, location);
         if (descriptor.RequiresBaseUrl && string.IsNullOrEmpty(baseUrl) && string.IsNullOrEmpty(descriptor.DefaultBaseUrl))
         {
@@ -394,7 +410,100 @@ public sealed class AnyInferConfig
             }
         }
 
-        return new ProviderSettings(ProviderRegistry.NormalizeProviderId(engine), baseUrl ?? descriptor.DefaultBaseUrl, apiKey, apiVersion, headers, mergedOptions.Properties.Count == 0 ? null : mergedOptions, timeout, alias: instanceId == ProviderRegistry.NormalizeProviderId(engine) ? null : instanceId);
+        return new ProviderSettings(
+            ProviderRegistry.NormalizeProviderId(engine),
+            baseUrl ?? descriptor.DefaultBaseUrl,
+            apiKey,
+            apiVersion,
+            headers,
+            mergedOptions.Properties.Count == 0 ? null : mergedOptions,
+            timeout,
+            alias: instanceId == ProviderRegistry.NormalizeProviderId(engine) ? null : instanceId,
+            limits: limits);
+    }
+
+    private static CachePolicy? ParseCache(JsonValue value, string source)
+    {
+        if (value is JsonNull)
+        {
+            return null;
+        }
+
+        if (value is not JsonObject raw)
+        {
+            throw Fail(source, "cache must be an object.");
+        }
+
+        var known = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "mode", "min_segment_tokens", "max_marks", "include_tools", "include_system",
+        };
+        RejectUnknown(raw, known, source, "cache");
+        var mode = raw.TryGetValue("mode", out var rawMode)
+            ? ParseCacheMode(rawMode, source)
+            : CacheMode.Auto;
+        var minSegmentTokens = raw.TryGetValue("min_segment_tokens", out var rawMinimum)
+            ? RequiredLong(rawMinimum, source, "cache.min_segment_tokens")
+            : 1024;
+        var maxMarks = raw.TryGetValue("max_marks", out var rawMarks)
+            ? RequiredInteger(rawMarks, source, "cache.max_marks")
+            : 4;
+        var includeTools = raw.TryGetValue("include_tools", out var rawTools)
+            ? RequiredBoolean(rawTools, source, "cache.include_tools")
+            : true;
+        var includeSystem = raw.TryGetValue("include_system", out var rawSystem)
+            ? RequiredBoolean(rawSystem, source, "cache.include_system")
+            : true;
+        try
+        {
+            return new CachePolicy(mode, minSegmentTokens, maxMarks, includeTools, includeSystem);
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            throw Fail(source, "cache is invalid.", exception);
+        }
+    }
+
+    private static RateLimits? ParseLimits(JsonValue value, string source, string location)
+    {
+        if (value is JsonNull)
+        {
+            return null;
+        }
+
+        if (value is not JsonObject raw)
+        {
+            throw Fail(source, $"{location}.limits must be an object.");
+        }
+
+        var known = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "max_concurrent", "requests_per_minute", "min_interval_s", "respect_headers", "reserve_fraction",
+        };
+        RejectUnknown(raw, known, source, $"{location}.limits");
+        int? maxConcurrent = raw.TryGetValue("max_concurrent", out var rawConcurrency)
+            ? RequiredInteger(rawConcurrency, source, $"{location}.limits.max_concurrent")
+            : null;
+        double? requestsPerMinute = raw.TryGetValue("requests_per_minute", out var rawRate)
+            ? RequiredFiniteNumber(rawRate, source, $"{location}.limits.requests_per_minute")
+            : null;
+        var minInterval = raw.TryGetValue("min_interval_s", out var rawInterval)
+            ? RequiredFiniteNumber(rawInterval, source, $"{location}.limits.min_interval_s")
+            : 0d;
+        var respectHeaders = raw.TryGetValue("respect_headers", out var rawHeaders)
+            ? RequiredBoolean(rawHeaders, source, $"{location}.limits.respect_headers")
+            : true;
+        var reserveFraction = raw.TryGetValue("reserve_fraction", out var rawReserve)
+            ? RequiredFiniteNumber(rawReserve, source, $"{location}.limits.reserve_fraction")
+            : 0d;
+        try
+        {
+            return new RateLimits(maxConcurrent, requestsPerMinute, minInterval, respectHeaders, reserveFraction);
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            throw Fail(source, $"{location}.limits is invalid.", exception);
+        }
     }
 
     private static Route? ParseRoute(JsonValue value, string source)
@@ -462,6 +571,75 @@ public sealed class AnyInferConfig
         if (settings.TimeoutS != 120)
         {
             properties.Add(new JsonProperty("timeout_s", new JsonNumber(settings.TimeoutS)));
+        }
+
+        if (settings.Limits is not null)
+        {
+            properties.Add(new JsonProperty("limits", LimitsJson(settings.Limits)));
+        }
+
+        return new JsonObject(properties);
+    }
+
+    private static JsonObject CacheJson(CachePolicy cache)
+    {
+        var defaults = new CachePolicy();
+        var properties = new List<JsonProperty>();
+        if (cache.Mode != defaults.Mode)
+        {
+            properties.Add(new JsonProperty("mode", new JsonString(CacheModeJson(cache.Mode))));
+        }
+
+        if (cache.MinSegmentTokens != defaults.MinSegmentTokens)
+        {
+            properties.Add(new JsonProperty("min_segment_tokens", new JsonInteger(cache.MinSegmentTokens)));
+        }
+
+        if (cache.MaxMarks != defaults.MaxMarks)
+        {
+            properties.Add(new JsonProperty("max_marks", new JsonInteger(cache.MaxMarks)));
+        }
+
+        if (cache.IncludeTools != defaults.IncludeTools)
+        {
+            properties.Add(new JsonProperty("include_tools", new JsonBoolean(cache.IncludeTools)));
+        }
+
+        if (cache.IncludeSystem != defaults.IncludeSystem)
+        {
+            properties.Add(new JsonProperty("include_system", new JsonBoolean(cache.IncludeSystem)));
+        }
+
+        return new JsonObject(properties);
+    }
+
+    private static JsonObject LimitsJson(RateLimits limits)
+    {
+        var defaults = new RateLimits();
+        var properties = new List<JsonProperty>();
+        if (limits.MaxConcurrent is { } concurrency)
+        {
+            properties.Add(new JsonProperty("max_concurrent", new JsonInteger(concurrency)));
+        }
+
+        if (limits.RequestsPerMinute is { } rate)
+        {
+            properties.Add(new JsonProperty("requests_per_minute", new JsonNumber(rate)));
+        }
+
+        if (limits.MinIntervalS != defaults.MinIntervalS)
+        {
+            properties.Add(new JsonProperty("min_interval_s", new JsonNumber(limits.MinIntervalS)));
+        }
+
+        if (limits.RespectHeaders != defaults.RespectHeaders)
+        {
+            properties.Add(new JsonProperty("respect_headers", new JsonBoolean(limits.RespectHeaders)));
+        }
+
+        if (limits.ReserveFraction != defaults.ReserveFraction)
+        {
+            properties.Add(new JsonProperty("reserve_fraction", new JsonNumber(limits.ReserveFraction)));
         }
 
         return new JsonObject(properties);
@@ -552,7 +730,7 @@ public sealed class AnyInferConfig
 
     private static void ValidateInactiveConnectionSettings(JsonObject raw, string source, string location)
     {
-        foreach (var name in new[] { "limits", "proxy", "client_cert" })
+        foreach (var name in new[] { "proxy", "client_cert" })
         {
             if (raw.TryGetValue(name, out var value) && value is not JsonNull)
             {
@@ -563,6 +741,75 @@ public sealed class AnyInferConfig
         if (raw.TryGetValue("verify", out var verify) && verify is not JsonNull && (verify is not JsonBoolean boolean || !boolean.Value))
         {
             throw Fail(source, $"{location}.verify is not implemented in this SDK phase.");
+        }
+    }
+
+    private static CacheMode ParseCacheMode(JsonValue value, string source)
+    {
+        if (value is not JsonString text)
+        {
+            throw Fail(source, "cache.mode must be one of off, auto, explicit.");
+        }
+
+        return text.Value switch
+        {
+            "off" => CacheMode.Off,
+            "auto" => CacheMode.Auto,
+            "explicit" => CacheMode.Explicit,
+            _ => throw Fail(source, "cache.mode must be one of off, auto, explicit."),
+        };
+    }
+
+    private static string CacheModeJson(CacheMode mode) => mode switch
+    {
+        CacheMode.Off => "off",
+        CacheMode.Auto => "auto",
+        CacheMode.Explicit => "explicit",
+        _ => throw new ArgumentOutOfRangeException(nameof(mode)),
+    };
+
+    private static bool RequiredBoolean(JsonValue value, string source, string location)
+    {
+        if (value is not JsonBoolean boolean)
+        {
+            throw Fail(source, $"{location} must be a boolean.");
+        }
+
+        return boolean.Value;
+    }
+
+    private static long RequiredLong(JsonValue value, string source, string location)
+    {
+        if (value is not JsonInteger integer || integer.Value < long.MinValue || integer.Value > long.MaxValue)
+        {
+            throw Fail(source, $"{location} must be an integer.");
+        }
+
+        return (long)integer.Value;
+    }
+
+    private static double RequiredFiniteNumber(JsonValue value, string source, string location)
+    {
+        var number = value switch
+        {
+            JsonInteger integer => (double)integer.Value,
+            JsonNumber decimalNumber => decimalNumber.Value,
+            _ => double.NaN,
+        };
+        if (!double.IsFinite(number))
+        {
+            throw Fail(source, $"{location} must be a finite number.");
+        }
+
+        return number;
+    }
+
+    private static void RejectUnknown(JsonObject raw, IReadOnlySet<string> allowed, string source, string location)
+    {
+        var unknown = raw.Properties.Select(static property => property.Name).Where(name => !allowed.Contains(name)).ToArray();
+        if (unknown.Length != 0)
+        {
+            throw Fail(source, $"{location} has unknown key(s): {string.Join(", ", unknown.OrderBy(static name => name, StringComparer.Ordinal))}.");
         }
     }
 
@@ -608,6 +855,11 @@ public sealed class AnyInferConfig
         if (route.Retry.MaxAttempts != 2 || route.Retry.BackoffBaseS != 0.5 || route.Retry.BackoffMaxS != 30 || !route.HealthGate || route.HealthTtlS != 30)
         {
             throw new ConfigException("A route with custom retry or health policy cannot be serialized by configuration format version 1.");
+        }
+
+        if (route.ContextWindowTargets.Count != 0)
+        {
+            throw new ConfigException("A route with context-window targets cannot be serialized by configuration format version 1.");
         }
     }
 

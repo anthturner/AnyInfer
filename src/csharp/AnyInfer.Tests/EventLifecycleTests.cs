@@ -43,8 +43,13 @@ public sealed class EventLifecycleTests
         Assert.Equal("1.25", manifest.Usage.CostUsd);
         Assert.Equal(7, ended.Result.Usage!.SearchUnits);
         Assert.Equal(
-            [typeof(RequestStarted), typeof(TargetResolved), typeof(AttemptStarted), typeof(FirstToken), typeof(AttemptCompleted), typeof(RequestCompleted)],
+            [typeof(RequestStarted), typeof(TargetResolved), typeof(AttemptStarted), typeof(UsageEstimated), typeof(FirstToken), typeof(AttemptCompleted), typeof(RequestCompleted)],
             observer.Events.Select(static item => item.GetType()));
+        var estimate = Assert.Single(observer.Events.OfType<UsageEstimated>());
+        Assert.Equal(Assert.IsType<RequestStarted>(observer.Events.First()).RequestId, estimate.RequestId);
+        Assert.Equal(new ResolvedTarget("alpha", "model"), estimate.Target);
+        Assert.Equal("input_tokens", estimate.FieldName);
+        Assert.Equal("pre-dispatch context-gate estimate", estimate.Method);
         Assert.Single(adapter.Requests);
     }
 

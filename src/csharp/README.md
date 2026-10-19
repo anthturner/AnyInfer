@@ -38,12 +38,17 @@ dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --config
 The examples demonstrate settings, buffered generation, streaming, structured output,
 configuration, fallback, explicit capability probes, declarative setup metadata, bounded
 winning-request pricing, explicit budgeting, caller-owned ledger/store helpers, standalone pacing,
-and the synchronous `Client`/`SyncStream` facade. Their source is linked from the documentation site.
+explicit request-policy inputs, and the synchronous `Client`/`SyncStream` facade. Their source is linked from the documentation site.
 Capability probes can send up to four requests by default; the raw tool declaration used by that
 measurement does not provide normal tool execution. The examples are a bounded proof surface, not
 a released NuGet package or a provider-parity promise. Accounting values do not represent provider
-invoices or all-wire totals, and the helpers do not activate automatic admission, transport pacing,
-or transactional cross-process store updates.
+invoices or all-wire totals, and the helpers do not activate automatic tool execution, rich-media
+input breadth, context/history reduction, or transactional cross-process store
+updates. Spend policy, cache planning, specialized context fallback, and raw tool values are
+explicit caller inputs; the generic OpenAI-compatible descriptor declares no cache mechanism, and
+raw tool values do not execute a tool. Configured `RateLimits` pace normal provider HTTP inside the
+generation entry deadline; own-transport descriptors and opaque prebuilt registrations with active
+injected limiters use an outer slot before entry.
 
 ## Use a custom adapter
 

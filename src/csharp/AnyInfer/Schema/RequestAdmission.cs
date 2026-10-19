@@ -13,15 +13,22 @@ public static class RequestAdmission
 
         foreach (var message in request.Messages)
         {
-            if (message.Role is not ("system" or "user" or "assistant"))
+            if (message.Role is not ("system" or "user" or "assistant" or "tool") ||
+                profile == SchemaExecutionProfile.FrozenV0 && message.Role == "tool")
             {
-                ThrowUnsupported("The message role is outside the v0 profile.");
+                ThrowUnsupported("The message role is outside the supported request profile.");
             }
 
-            if (message.Content.Any(static part => part is not Text))
+            if (profile == SchemaExecutionProfile.FrozenV0 && message.Content.Any(static part => part is not Text))
             {
                 ThrowUnsupported("Non-text message content is outside the v0 profile.");
             }
+
+            if (profile == SchemaExecutionProfile.ModernSdk && message.Content.Any(static part => part is not (Text or ToolCall or ToolResult)))
+            {
+                ThrowUnsupported("The message content is outside the supported SDK request profile.");
+            }
+
         }
 
         foreach (var target in request.Route.Targets)

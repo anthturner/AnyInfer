@@ -17,8 +17,9 @@ public sealed record WireRequest
         int maxResponseBytes = 1_048_576,
         string schemaName = "response",
         IEnumerable<ToolSpec>? tools = null,
-        string toolChoice = "auto")
-        : this(model, messages, sampling, schema, mechanism, stream, timeoutS, maxResponseBytes, schemaName, modernSchema: false, tools, toolChoice)
+        string toolChoice = "auto",
+        IEnumerable<int>? cacheMarks = null)
+        : this(model, messages, sampling, schema, mechanism, stream, timeoutS, maxResponseBytes, schemaName, modernSchema: false, tools, toolChoice, cacheMarks)
     {
     }
 
@@ -34,7 +35,8 @@ public sealed record WireRequest
         string schemaName,
         bool modernSchema,
         IEnumerable<ToolSpec>? tools = null,
-        string toolChoice = "auto")
+        string toolChoice = "auto",
+        IEnumerable<int>? cacheMarks = null)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
         ArgumentNullException.ThrowIfNull(messages);
@@ -48,7 +50,8 @@ public sealed record WireRequest
         SchemaName = schemaName ?? throw new ArgumentNullException(nameof(schemaName));
         Tools = Array.AsReadOnly((tools ?? []).Select(static tool => tool ?? throw new ArgumentException("Wire tools cannot contain null references.")).ToArray());
         ToolChoice = toolChoice ?? throw new ArgumentNullException(nameof(toolChoice));
-        if (Tools.Count == 0 && !string.Equals(ToolChoice, "auto", StringComparison.Ordinal))
+        CacheMarks = Array.AsReadOnly((cacheMarks ?? []).ToArray());
+        if (!modernSchema && Tools.Count == 0 && !string.Equals(ToolChoice, "auto", StringComparison.Ordinal))
         {
             throw new ArgumentException("A non-auto tool choice requires at least one tool.", nameof(toolChoice));
         }
@@ -77,5 +80,7 @@ public sealed record WireRequest
     public IReadOnlyList<ToolSpec> Tools { get; }
     /// <summary>Gets the raw provider tool-choice spelling.</summary>
     public string ToolChoice { get; }
+    /// <summary>Gets copied cache segment marks selected by the core.</summary>
+    public IReadOnlyList<int> CacheMarks { get; }
     internal bool UsesModernSchema { get; }
 }

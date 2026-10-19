@@ -53,6 +53,10 @@ public static partial class JsonWriter
     internal static string WriteAccounting(JsonValue value, int? indent = null) =>
         WriteCore(value, AccountingPolicy with { Indent = indent, Compact = indent is null, SpaceAfterComma = indent is null, SpaceAfterColon = true });
 
+    /// <summary>Writes scalar-sorted ASCII JSON with Python-compatible default separators for cache diagnostics.</summary>
+    internal static string WriteCacheSignature(JsonValue value) =>
+        WriteCore(value, AccountingPolicy with { SortKeys = true });
+
     private static string WriteCore(JsonValue value, WritePolicy policy)
     {
         ArgumentNullException.ThrowIfNull(value);

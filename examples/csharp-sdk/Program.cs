@@ -7,6 +7,7 @@ using AnyInfer.Catalog;
 using AnyInfer.Config;
 using AnyInfer.Examples;
 using AnyInfer.Events;
+using AnyInfer.Json;
 using AnyInfer.Manifest;
 using AnyInfer.Providers;
 using PeterO.Numbers;
@@ -178,6 +179,29 @@ static async Task VerifyAsync()
         Directory.Delete(accountingDirectory, recursive: true);
     }
 
+    var policyHandler = new CountingHandler(policy: true);
+    var policy = await RequestPolicyExample.RunAsync(WithTransport(displayedSettings, policyHandler), target);
+    Require(policy.Generation.Text == ""
+        && policy.Generation.FinishReason == "tool_calls"
+        && policy.Totals.Requests == 1
+        && policy.Route.ContextWindowTargets.SequenceEqual([target])
+        && policy.RequestCache.Mode == CacheMode.Off
+        && policy.Tool.Name == "lookup_weather"
+        && policy.RawCall.Name == "lookup_weather"
+        && policy.RawResult.Content == "clear"
+        && policy.Generation.ToolCalls.Single() is { Id: "inbound-call", Name: "lookup_weather" } inboundCall
+        && IsBoston(inboundCall.Arguments)
+        && policy.ToolDeltas.Single() is
+        {
+            Index: 0,
+            CallId: "inbound-call",
+            Name: "lookup_weather",
+            ArgumentsFragment: "{\"city\":\"Boston\"}",
+        }
+        && policyHandler.RequestCount == 1
+        && policyHandler.DisposeCount == 1,
+        "Request-policy example did not preserve public policy, raw-tool, or ownership facts.");
+
     var structuredHandler = new CountingHandler(structured: true);
     var structured = await StructuredOutputExample.RunAsync(WithTransport(displayedSettings, structuredHandler), target);
     Require(structured.Answer == "ok", "Structured-output example returned unexpected text.");
@@ -254,10 +278,14 @@ static void Require(bool condition, string message)
     }
 }
 
+static bool IsBoston(JsonObject value) =>
+    value.TryGetValue("city", out var city) && city is JsonString { Value: "Boston" };
+
 sealed class CountingHandler(
     HttpStatusCode statusCode = HttpStatusCode.OK,
     bool structured = false,
-    bool probes = false) : HttpMessageHandler
+    bool probes = false,
+    bool policy = false) : HttpMessageHandler
 {
     public int RequestCount { get; private set; }
     public int ModelRequestCount { get; private set; }
@@ -311,6 +339,11 @@ sealed class CountingHandler(
             }
 
             return ProbeResponse(requestBody);
+        }
+
+        if (policy)
+        {
+            return PolicyResponse(requestBody);
         }
 
         var stream = requestBody.Contains("\"stream\":true", StringComparison.Ordinal);
@@ -377,6 +410,42 @@ sealed class CountingHandler(
             3 => ToolProbeResponse(root),
             4 => StreamingProbeResponse(root),
             _ => throw new InvalidOperationException("Probe example made an unexpected request."),
+        };
+    }
+
+    private static HttpResponseMessage PolicyResponse(string requestBody)
+    {
+        using var document = JsonDocument.Parse(requestBody);
+        var root = document.RootElement;
+        var messages = root.GetProperty("messages").EnumerateArray().ToArray();
+        var function = root.GetProperty("tools")[0].GetProperty("function");
+        var parameters = function.GetProperty("parameters");
+        var assistant = messages.Single(static message => message.GetProperty("role").GetString() == "assistant");
+        var outboundCall = assistant.GetProperty("tool_calls")[0];
+        var outboundFunction = outboundCall.GetProperty("function");
+        using var outboundArguments = JsonDocument.Parse(outboundFunction.GetProperty("arguments").GetString()!);
+        var tool = messages.Single(static message => message.GetProperty("role").GetString() == "tool");
+        if (!root.GetProperty("stream").GetBoolean()
+            || function.GetProperty("name").GetString() != "lookup_weather"
+            || parameters.GetProperty("type").GetString() != "object"
+            || parameters.GetProperty("properties").GetProperty("city").GetProperty("type").GetString() != "string"
+            || assistant.GetProperty("content").ValueKind != JsonValueKind.Null
+            || outboundCall.GetProperty("id").GetString() != "call-1"
+            || outboundFunction.GetProperty("name").GetString() != "lookup_weather"
+            || outboundArguments.RootElement.GetProperty("city").GetString() != "Boston"
+            || tool.GetProperty("tool_call_id").GetString() != "call-1"
+            || tool.GetProperty("content").GetString() != "clear"
+            || tool.TryGetProperty("is_error", out _))
+        {
+            throw new InvalidOperationException("Request-policy example did not project raw tool feedback.");
+        }
+
+        const string payload = "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"inbound-call\",\"function\":{\"name\":\"lookup_weather\",\"arguments\":\"{\\\"city\\\":\\\"Boston\\\"}\"}}]}}]}\n\n" +
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1,\"total_tokens\":2}}\n\n" +
+            "data: [DONE]\n\n";
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "text/event-stream"),
         };
     }
 

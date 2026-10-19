@@ -48,7 +48,10 @@ public sealed class ConfigTests
     [InlineData("{\"unknown\":true}")]
     [InlineData("{\"providers\":{}}")]
     [InlineData("{\"default_route\":\"fake:model\"}")]
+    [InlineData("{\"default_route\":{\"targets\":[\"fake:model\"],\"context_window_targets\":[\"larger:model\"]}}")]
     [InlineData("{\"operation_routes\":{}}")]
+    [InlineData("{\"context\":null}")]
+    [InlineData("{\"history\":null}")]
     public void V1_loads_rejects_invalid_type_unknown_or_active_unsupported_policy(string document)
     {
         Assert.Throws<ConfigException>(() => AnyInferConfig.Loads(document, Registry()));
@@ -100,7 +103,134 @@ public sealed class ConfigTests
         Assert.Throws<ConfigException>(() => AnyInferConfig.Loads("{\"repair\":{\"extra\":1}}", Registry()));
         Assert.Throws<ConfigException>(() => AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"headers\":{\"x\":1}}]}", Registry()));
         Assert.Throws<ConfigException>(() => AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"timeout_s\":0}]}", Registry()));
-        Assert.Throws<ConfigException>(() => AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"limits\":{}}]}", Registry()));
+    }
+
+    [Fact]
+    public void Provider_limits_parse_as_an_opt_in_block_and_round_trip_with_changed_fields_only()
+    {
+        var configured = AnyInferConfig.Loads("""
+            {"providers":[{"id":"fake","limits":{}}]}
+            """, Registry());
+        var defaults = Assert.IsType<RateLimits>(Assert.Single(configured.Providers).Limits);
+        Assert.True(defaults.Active);
+        Assert.Null(AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"limits\":null}]}", Registry()).Providers.Single().Limits);
+
+        var parsed = AnyInferConfig.Loads("""
+            {"providers":[{"id":"fake","limits":{
+              "max_concurrent":2,"requests_per_minute":12.5,"min_interval_s":0.25,
+              "respect_headers":false,"reserve_fraction":0.5
+            }}]}
+            """, Registry());
+        var limits = Assert.IsType<RateLimits>(Assert.Single(parsed.Providers).Limits);
+        Assert.Equal(2, limits.MaxConcurrent);
+        Assert.Equal(12.5, limits.RequestsPerMinute);
+        Assert.Equal(0.25, limits.MinIntervalS);
+        Assert.False(limits.RespectHeaders);
+        Assert.Equal(0.5, limits.ReserveFraction);
+        Assert.Equal(limits, Assert.IsType<RateLimits>(Assert.Single(AnyInferConfig.Loads(parsed.Dumps(), Registry()).Providers).Limits));
+
+        var defaultProvider = Assert.IsType<JsonObject>(Assert.Single(ArrayProperty(Assert.IsType<JsonObject>(JsonReader.Read(configured.Dumps())), "providers").Items));
+        Assert.Empty(ObjectProperty(defaultProvider, "limits").Properties);
+
+        var configuredProvider = Assert.IsType<JsonObject>(Assert.Single(ArrayProperty(Assert.IsType<JsonObject>(JsonReader.Read(parsed.Dumps())), "providers").Items));
+        var serializedLimits = ObjectProperty(configuredProvider, "limits");
+        Assert.Equal(
+            ["max_concurrent", "min_interval_s", "requests_per_minute", "reserve_fraction", "respect_headers"],
+            serializedLimits.Properties.Select(static property => property.Name));
+        Assert.Equal(2, IntegerProperty(serializedLimits, "max_concurrent"));
+        Assert.Equal(12.5, Assert.IsType<JsonNumber>(ValueProperty(serializedLimits, "requests_per_minute")).Value);
+        Assert.Equal(0.25, Assert.IsType<JsonNumber>(ValueProperty(serializedLimits, "min_interval_s")).Value);
+        Assert.False(Assert.IsType<JsonBoolean>(ValueProperty(serializedLimits, "respect_headers")).Value);
+        Assert.Equal(0.5, Assert.IsType<JsonNumber>(ValueProperty(serializedLimits, "reserve_fraction")).Value);
+
+        var partial = AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"max_concurrent\":2}}]}", Registry());
+        var partialProvider = Assert.IsType<JsonObject>(Assert.Single(ArrayProperty(Assert.IsType<JsonObject>(JsonReader.Read(partial.Dumps())), "providers").Items));
+        var partialLimits = ObjectProperty(partialProvider, "limits");
+        Assert.Equal("max_concurrent", Assert.Single(partialLimits.Properties).Name);
+        Assert.Equal(2, IntegerProperty(partialLimits, "max_concurrent"));
+    }
+
+    [Theory]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":true}]}")]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"unknown\":1}}]}")]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"max_concurrent\":true}}]}")]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"max_concurrent\":2147483648}}]}")]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"requests_per_minute\":0}}]}")]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"min_interval_s\":-1}}]}")]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"respect_headers\":1}}]}")]
+    [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"reserve_fraction\":1}}]}")]
+    public void Provider_limits_are_strict_and_fail_closed(string document)
+    {
+        Assert.Throws<ConfigException>(() => AnyInferConfig.Loads(document, Registry()));
+    }
+
+    [Fact]
+    public void Root_cache_is_strict_nullable_and_round_trips_its_declared_tuning()
+    {
+        var defaults = AnyInferConfig.Loads("{\"cache\":{}}", Registry());
+        var defaultCache = Assert.IsType<CachePolicy>(defaults.Cache);
+        Assert.Equal(CacheMode.Auto, defaultCache.Mode);
+        Assert.Equal(1024, defaultCache.MinSegmentTokens);
+        Assert.Equal(4, defaultCache.MaxMarks);
+        Assert.True(defaultCache.IncludeTools);
+        Assert.True(defaultCache.IncludeSystem);
+        Assert.Equal(defaultCache, Assert.IsType<CachePolicy>(AnyInferConfig.Loads(defaults.Dumps(), Registry()).Cache));
+        Assert.Null(AnyInferConfig.Loads("{\"cache\":null}", Registry()).Cache);
+        Assert.Equal(CacheMode.Off, Assert.IsType<CachePolicy>(AnyInferConfig.Loads("{\"cache\":{\"mode\":\"off\"}}", Registry()).Cache).Mode);
+
+        var configured = AnyInferConfig.Loads("""
+            {"cache":{"mode":"explicit","min_segment_tokens":0,"max_marks":1,
+            "include_tools":false,"include_system":false}}
+            """, Registry());
+        var cache = Assert.IsType<CachePolicy>(configured.Cache);
+        Assert.Equal(CacheMode.Explicit, cache.Mode);
+        Assert.Equal(0, cache.MinSegmentTokens);
+        Assert.Equal(1, cache.MaxMarks);
+        Assert.False(cache.IncludeTools);
+        Assert.False(cache.IncludeSystem);
+        Assert.Equal(cache, Assert.IsType<CachePolicy>(AnyInferConfig.Loads(configured.Dumps(), Registry()).Cache));
+
+        var serializedDefaults = Assert.IsType<JsonObject>(JsonReader.Read(defaults.Dumps()));
+        Assert.Empty(ObjectProperty(serializedDefaults, "cache").Properties);
+
+        var serializedConfigured = Assert.IsType<JsonObject>(JsonReader.Read(configured.Dumps()));
+        var serializedCache = ObjectProperty(serializedConfigured, "cache");
+        Assert.Equal(
+            ["include_system", "include_tools", "max_marks", "min_segment_tokens", "mode"],
+            serializedCache.Properties.Select(static property => property.Name));
+        Assert.Equal("explicit", StringProperty(serializedCache, "mode"));
+        Assert.Equal(0, IntegerProperty(serializedCache, "min_segment_tokens"));
+        Assert.Equal(1, IntegerProperty(serializedCache, "max_marks"));
+        Assert.False(Assert.IsType<JsonBoolean>(ValueProperty(serializedCache, "include_tools")).Value);
+        Assert.False(Assert.IsType<JsonBoolean>(ValueProperty(serializedCache, "include_system")).Value);
+
+        var partial = AnyInferConfig.Loads("{\"cache\":{\"mode\":\"off\"}}", Registry());
+        var partialCache = ObjectProperty(Assert.IsType<JsonObject>(JsonReader.Read(partial.Dumps())), "cache");
+        Assert.Equal("mode", Assert.Single(partialCache.Properties).Name);
+        Assert.Equal("off", StringProperty(partialCache, "mode"));
+    }
+
+    [Theory]
+    [InlineData("{\"cache\":true}")]
+    [InlineData("{\"cache\":{\"mode\":\"unexpected\"}}")]
+    [InlineData("{\"cache\":{\"mode\":true}}")]
+    [InlineData("{\"cache\":{\"min_segment_tokens\":true}}")]
+    [InlineData("{\"cache\":{\"min_segment_tokens\":9223372036854775808}}")]
+    [InlineData("{\"cache\":{\"min_segment_tokens\":-1}}")]
+    [InlineData("{\"cache\":{\"max_marks\":true}}")]
+    [InlineData("{\"cache\":{\"max_marks\":0}}")]
+    [InlineData("{\"cache\":{\"include_tools\":1}}")]
+    [InlineData("{\"cache\":{\"unknown\":true}}")]
+    public void Root_cache_rejects_unknown_or_wrongly_typed_values(string document)
+    {
+        Assert.Throws<ConfigException>(() => AnyInferConfig.Loads(document, Registry()));
+    }
+
+    [Fact]
+    public void Default_route_serialization_refuses_public_context_window_targets_that_v1_cannot_represent()
+    {
+        var config = new AnyInferConfig(route: new Route(["fake:model"], contextWindowTargets: ["larger:model"]));
+        Assert.Throws<ConfigException>(() => config.Dumps());
     }
 
     [Fact]

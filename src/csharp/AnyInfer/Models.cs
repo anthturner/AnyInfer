@@ -18,6 +18,48 @@ public sealed record Text : ContentPart
     public string Value { get; }
 }
 
+/// <summary>Represents a model-requested tool invocation in a message or terminal generation.</summary>
+public sealed record ToolCall : ContentPart
+{
+    /// <summary>Creates an immutable tool invocation.</summary>
+    public ToolCall(string id, string name, JsonObject arguments)
+    {
+        Id = id ?? throw new ArgumentNullException(nameof(id));
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+    }
+
+    /// <summary>Gets the provider call identifier.</summary>
+    public string Id { get; }
+
+    /// <summary>Gets the requested tool name.</summary>
+    public string Name { get; }
+
+    /// <summary>Gets the parsed JSON object arguments.</summary>
+    public JsonObject Arguments { get; }
+}
+
+/// <summary>Represents a tool result supplied to a subsequent model turn.</summary>
+public sealed record ToolResult : ContentPart
+{
+    /// <summary>Creates an immutable tool result.</summary>
+    public ToolResult(string callId, string content, bool isError = false)
+    {
+        CallId = callId ?? throw new ArgumentNullException(nameof(callId));
+        Content = content ?? throw new ArgumentNullException(nameof(content));
+        IsError = isError;
+    }
+
+    /// <summary>Gets the identifier of the answered tool call.</summary>
+    public string CallId { get; }
+
+    /// <summary>Gets text made available to the model.</summary>
+    public string Content { get; }
+
+    /// <summary>Gets whether the result describes a tool failure.</summary>
+    public bool IsError { get; }
+}
+
 public sealed record UnsupportedContentPart : ContentPart
 {
     public UnsupportedContentPart(string kind, JsonValue originalData)
@@ -108,19 +150,23 @@ public sealed record Route
         IEnumerable<string> targets,
         Retry? retry = null,
         bool healthGate = true,
-        double healthTtlS = 30)
+        double healthTtlS = 30,
+        IEnumerable<string>? contextWindowTargets = null)
     {
         ArgumentNullException.ThrowIfNull(targets);
         Targets = Array.AsReadOnly(targets.Select(static target => target ?? throw new ArgumentException("Route targets cannot be null.")).ToArray());
         Retry = retry ?? new Retry();
         HealthGate = healthGate;
         HealthTtlS = healthTtlS;
+        ContextWindowTargets = Array.AsReadOnly((contextWindowTargets ?? []).Select(static target => target ?? throw new ArgumentException("Context-window targets cannot be null.")).ToArray());
     }
 
     public IReadOnlyList<string> Targets { get; }
     public Retry Retry { get; }
     public bool HealthGate { get; }
     public double HealthTtlS { get; }
+    /// <summary>Gets the specialized fallback chain used after a context-window overflow.</summary>
+    public IReadOnlyList<string> ContextWindowTargets { get; }
 }
 
 /// <summary>Provider-reported token and billing usage for one generation.</summary>
@@ -342,7 +388,10 @@ public sealed record GenerationRequest
         string? schemaMechanism = null,
         double? timeoutS = null,
         int? maxResponseBytes = null,
-        bool stream = false)
+        bool stream = false,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null)
     {
         ArgumentNullException.ThrowIfNull(messages);
         Messages = Array.AsReadOnly(messages.Select(static message => message ?? throw new ArgumentException("Messages cannot contain null references.")).ToArray());
@@ -354,6 +403,9 @@ public sealed record GenerationRequest
         TimeoutS = timeoutS;
         MaxResponseBytes = maxResponseBytes;
         Stream = stream;
+        Tools = Array.AsReadOnly((tools ?? []).Select(static tool => tool ?? throw new ArgumentException("Tools cannot contain null references.")).ToArray());
+        ToolChoice = toolChoice ?? throw new ArgumentNullException(nameof(toolChoice));
+        Cache = cache;
     }
 
     public IReadOnlyList<Message> Messages { get; }
@@ -365,6 +417,12 @@ public sealed record GenerationRequest
     public double? TimeoutS { get; }
     public int? MaxResponseBytes { get; }
     public bool Stream { get; }
+    /// <summary>Gets copied tool declarations in request order.</summary>
+    public IReadOnlyList<ToolSpec> Tools { get; }
+    /// <summary>Gets the requested tool-selection mode or tool name.</summary>
+    public string ToolChoice { get; }
+    /// <summary>Gets the per-request prompt-cache policy override.</summary>
+    public CachePolicy? Cache { get; }
 }
 
 public sealed record Generation
@@ -380,7 +438,8 @@ public sealed record Generation
         int repairAttempts = 0,
         IEnumerable<AttemptRecord>? attempts = null,
         IEnumerable<string>? warnings = null,
-        RunManifest? manifest = null)
+        RunManifest? manifest = null,
+        IEnumerable<ToolCall>? toolCalls = null)
     {
         Text = text ?? throw new ArgumentNullException(nameof(text));
         Structured = structured;
@@ -393,6 +452,7 @@ public sealed record Generation
         Attempts = Array.AsReadOnly((attempts ?? []).Select(static attempt => attempt ?? throw new ArgumentException("Attempts cannot contain null references.")).ToArray());
         Warnings = Array.AsReadOnly((warnings ?? []).Select(static warning => warning ?? throw new ArgumentException("Warnings cannot contain null references.")).ToArray());
         Manifest = manifest;
+        ToolCalls = Array.AsReadOnly((toolCalls ?? []).Select(static call => call ?? throw new ArgumentException("Tool calls cannot contain null references.")).ToArray());
     }
 
     public string Text { get; }
@@ -407,6 +467,8 @@ public sealed record Generation
     public IReadOnlyList<string> Warnings { get; }
     /// <summary>Gets the immutable terminal manifest when manifest capture was enabled.</summary>
     public RunManifest? Manifest { get; }
+    /// <summary>Gets model-requested tool calls from the winning entry.</summary>
+    public IReadOnlyList<ToolCall> ToolCalls { get; }
 
     internal Generation WithManifest(RunManifest? manifest) => new(
         Text,
@@ -419,7 +481,8 @@ public sealed record Generation
         RepairAttempts,
         Attempts,
         Warnings,
-        manifest);
+        manifest,
+        ToolCalls);
 
     /// <summary>Deserializes the structured result with the supplied serializer options.</summary>
     public T? DeserializeStructured<T>(System.Text.Json.JsonSerializerOptions? options = null)

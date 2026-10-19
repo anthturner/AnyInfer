@@ -28,30 +28,58 @@ public static class TokenEstimation
         long unpricedParts = 0;
         foreach (var message in request.Messages)
         {
-            var text = string.Concat(message.Content.OfType<Text>().Select(static part => part.Value));
-            var estimate = counter.Estimate(text) ?? throw new InvalidOperationException("Token estimator returned null.");
+            var text = FlattenMessage(message, ref unpricedParts);
+            var estimate = EstimateOrThrow(counter, text);
             messages += new TokenEstimate(checked(estimate.Tokens + PerMessageOverheadTokens), estimate.Floor);
-            foreach (var part in message.Content)
-            {
-                if (part is not Text)
-                {
-                    unpricedParts = checked(unpricedParts + 1);
-                }
-            }
         }
 
         var tools = new TokenEstimate(0, 0);
+        foreach (var tool in request.Tools)
+        {
+            var declaration = new JsonObject(
+            [
+                new JsonProperty("name", new JsonString(tool.Name)),
+                new JsonProperty("description", new JsonString(tool.Description)),
+                new JsonProperty("parameters", tool.Parameters),
+            ]);
+            tools += EstimateOrThrow(counter, JsonWriter.WriteAccounting(declaration, indent: null));
+        }
+
         var schema = request.Schema is null
             ? new TokenEstimate(0, 0)
-            : counter.Estimate(JsonWriter.WriteAccounting(request.Schema.JsonSchema, indent: null));
-        if (schema is null)
-        {
-            throw new InvalidOperationException("Token estimator returned null.");
-        }
+            : EstimateOrThrow(counter, JsonWriter.WriteAccounting(request.Schema.JsonSchema, indent: null));
 
         var content = messages + tools + schema;
         return new RequestEstimate(messages, tools, schema, Envelope(content, calibration), unpricedParts);
     }
+
+    private static string FlattenMessage(Message message, ref long unpricedParts)
+    {
+        var text = new System.Text.StringBuilder();
+        foreach (var part in message.Content)
+        {
+            switch (part)
+            {
+                case Text value:
+                    text.Append(value.Value);
+                    break;
+                case ToolCall call:
+                    text.Append(call.Name);
+                    text.Append(JsonWriter.WriteAccounting(call.Arguments, indent: null));
+                    break;
+                case ToolResult result:
+                    text.Append(result.Content);
+                    break;
+                default:
+                    unpricedParts = checked(unpricedParts + 1);
+                    break;
+            }
+        }
+        return text.ToString();
+    }
+
+    private static TokenEstimate EstimateOrThrow(ITokenEstimator counter, string text) =>
+        counter.Estimate(text) ?? throw new InvalidOperationException("Token estimator returned null.");
 
     private static TokenEstimate Envelope(TokenEstimate content, TokenCalibration? calibration)
     {

@@ -1,4 +1,5 @@
 using AnyInfer.Json;
+using AnyInfer.Routing;
 using System.Collections.ObjectModel;
 using System.Net.Http;
 
@@ -16,7 +17,8 @@ public sealed record ProviderSettings
         JsonObject? options = null,
         double timeoutS = 120,
         HttpMessageHandler? transport = null,
-        string? alias = null)
+        string? alias = null,
+        RateLimits? limits = null)
     {
         ProviderId = NormalizeId(providerId, nameof(providerId));
         Alias = alias is null ? null : NormalizeId(alias, nameof(alias));
@@ -32,6 +34,7 @@ public sealed record ProviderSettings
 
         TimeoutS = timeoutS;
         Transport = transport;
+        Limits = limits;
     }
 
     /// <summary>Gets the canonical descriptor identifier.</summary>
@@ -52,6 +55,8 @@ public sealed record ProviderSettings
     public HttpMessageHandler? Transport { get; }
     /// <summary>Gets the optional distinct configured-instance alias.</summary>
     public string? Alias { get; }
+    /// <summary>Gets optional client-side pacing limits for this configured instance.</summary>
+    public RateLimits? Limits { get; }
     /// <summary>Gets the canonical configured-instance identity.</summary>
     public string InstanceId => Alias ?? ProviderId;
 
@@ -65,8 +70,9 @@ public sealed record ProviderSettings
         JsonObject? options = null,
         double timeoutS = 120,
         HttpMessageHandler? transport = null,
-        string? alias = null) =>
-        new(providerId, baseUrl, apiKey, apiVersion, headers, options, timeoutS, transport, alias);
+        string? alias = null,
+        RateLimits? limits = null) =>
+        new(providerId, baseUrl, apiKey, apiVersion, headers, options, timeoutS, transport, alias, limits);
 
     public override string ToString() => $"ProviderSettings({InstanceId})";
 

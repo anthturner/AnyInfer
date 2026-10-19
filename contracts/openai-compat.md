@@ -80,6 +80,11 @@ or document support, and an upstream rejection remains explicit.
 ### Errors
 - Non-2xx with `{"error": {"message", "type", "code"}}`; retryable statuses
   {408, 409, 425, 429} ∪ ≥500; `Retry-After` header honored
+- The C# SDK's modern generation path consumes bounded error detail from `error.message`,
+  `error.detail`, `error.type`, a string `error`, or bounded raw text. It classifies only
+  `413`/`422` responses whose detail contains one of `context length`, `context_length`,
+  `too many tokens`, or `maximum context` (case-insensitive) as context-length failures;
+  an error `code` alone, including on `400`, does not make that classification.
 - NEW-CAPABILITY (changelog, 2026-09-02): traffic-shedding now distinguishes a `429` with
   `code: "slow_down"` (rapid traffic increase) from a `503` with `code: "server_is_overloaded"`
   (temporary model unavailability). Both already fall inside the retryable-status set above, so
@@ -111,6 +116,10 @@ the `/chat/completions` suffix without inserting another version component.
 For `stream: true`, the Python adapter and current native public SDK decode
 `text/event-stream` replies as SSE and reuse buffered completion decoding for other response
 media types; the frozen native proof profile retains its original SSE interpretation.
+The native public modern streaming request also sends `Accept: text/event-stream`, overriding
+configured client `Accept` defaults just as the Python per-request header does. Buffered modern
+generation and frozen native wire requests preserve configured-header behavior and do not add
+this semantic request header.
 
 **Unverified:** no authenticated hosted request or pinned local-engine binary was run for
 this settings audit. Native evidence is restricted to offline HTTP handlers/fixtures and

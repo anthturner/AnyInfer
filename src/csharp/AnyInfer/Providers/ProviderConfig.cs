@@ -1,4 +1,5 @@
 using AnyInfer.Json;
+using AnyInfer.Routing;
 using System.Collections.ObjectModel;
 using System.Net.Http;
 
@@ -24,6 +25,7 @@ public sealed record ProviderConfig
         Options = resolvedOptions ?? settings.Options;
         TimeoutS = settings.TimeoutS;
         Transport = settings.Transport;
+        Limits = settings.Limits;
     }
 
     /// <summary>Gets the configured provider-instance identity.</summary>
@@ -44,8 +46,28 @@ public sealed record ProviderConfig
     public double TimeoutS { get; }
     /// <summary>Gets the ownership-transferred transport supplied by settings.</summary>
     public HttpMessageHandler? Transport { get; }
+    /// <summary>Gets optional client-side pacing limits for this configured instance.</summary>
+    public RateLimits? Limits { get; }
     // Set only by an opted-in pool for a supplied handler that outlives transient adapters.
     internal bool TransportOwnedByPool { get; init; }
+
+    internal ProviderConfig WithTransport(HttpMessageHandler transport, bool transportOwnedByPool) =>
+        new(this, transport, transportOwnedByPool);
+
+    private ProviderConfig(ProviderConfig source, HttpMessageHandler transport, bool transportOwnedByPool)
+    {
+        ProviderId = source.ProviderId;
+        EngineId = source.EngineId;
+        BaseUrl = source.BaseUrl;
+        ApiKey = source.ApiKey;
+        ApiVersion = source.ApiVersion;
+        Headers = source.Headers;
+        Options = source.Options;
+        TimeoutS = source.TimeoutS;
+        Limits = source.Limits;
+        Transport = transport;
+        TransportOwnedByPool = transportOwnedByPool;
+    }
 
     public override string ToString() => $"ProviderConfig({ProviderId}, {EngineId})";
 }

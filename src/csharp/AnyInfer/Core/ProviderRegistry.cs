@@ -1,6 +1,9 @@
 using AnyInfer.Providers;
 using AnyInfer.Credentials;
 using AnyInfer.Capabilities;
+using AnyInfer.Events;
+using AnyInfer.Routing;
+using System.Collections.ObjectModel;
 using System.Runtime.ExceptionServices;
 
 namespace AnyInfer.Core;
@@ -23,6 +26,9 @@ internal sealed record TargetMetadata(
     int? MaxRepairAttempts,
     ModelCapabilities? ResolvedCapabilities = null);
 
+/// <summary>Identifies the selected per-instance limiter and where its slot is acquired.</summary>
+internal readonly record struct PacingSelection(RateLimiter? Limiter, bool UsesOuterSlot);
+
 /// <summary>Client-owned lazy adapter pool. Descriptor lookup remains public registry work.</summary>
 internal sealed class ProviderPool : IAsyncDisposable
 {
@@ -35,11 +41,22 @@ internal sealed class ProviderPool : IAsyncDisposable
     private readonly HashSet<Task> _builds = [];
     private readonly HashSet<IProviderAdapter> _adopted = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<HttpMessageHandler> _poolOwnedConfiguredHandlers = new(ReferenceEqualityComparer.Instance);
+    private readonly IReadOnlyDictionary<string, RateLimiter> _injectedLimiters;
+    private readonly Action<TelemetryEvent>? _events;
+    private readonly TimeProvider _pacingTimeProvider;
+    private static readonly AsyncLocal<FactoryScope?> ActiveFactories = new();
     private bool _closing;
 
-    internal ProviderPool(IEnumerable<ProviderRegistration> registrations)
+    internal ProviderPool(
+        IEnumerable<ProviderRegistration> registrations,
+        IReadOnlyDictionary<string, RateLimiter>? injectedLimiters = null,
+        Action<TelemetryEvent>? events = null,
+        TimeProvider? pacingTimeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(registrations);
+        _injectedLimiters = CopyLimiters(injectedLimiters);
+        _events = events;
+        _pacingTimeProvider = pacingTimeProvider ?? TimeProvider.System;
         _instances = new Dictionary<string, InstanceState>(StringComparer.Ordinal);
         foreach (var registration in registrations)
         {
@@ -55,9 +72,18 @@ internal sealed class ProviderPool : IAsyncDisposable
         _bindings = Array.AsReadOnly(_instances.Values.Select(state => new AnyInfer.Catalog.CatalogProviderBinding(state.InstanceId, state.InstanceId)).ToArray());
     }
 
-    internal ProviderPool(IEnumerable<ProviderSettings>? settings, ProviderRegistry descriptors, ResolverChain resolver)
+    internal ProviderPool(
+        IEnumerable<ProviderSettings>? settings,
+        ProviderRegistry descriptors,
+        ResolverChain resolver,
+        IReadOnlyDictionary<string, RateLimiter>? injectedLimiters = null,
+        Action<TelemetryEvent>? events = null,
+        TimeProvider? pacingTimeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(descriptors);
+        _injectedLimiters = CopyLimiters(injectedLimiters);
+        _events = events;
+        _pacingTimeProvider = pacingTimeProvider ?? TimeProvider.System;
         _descriptors = new ProviderRegistry(descriptors.Descriptors);
         _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         _instances = new Dictionary<string, InstanceState>(StringComparer.Ordinal);
@@ -85,7 +111,8 @@ internal sealed class ProviderPool : IAsyncDisposable
                     supplied.Options,
                     supplied.TimeoutS,
                     supplied.Transport,
-                    supplied.Alias);
+                    supplied.Alias,
+                    supplied.Limits);
             if (!_instances.TryAdd(executionId, InstanceState.FromSettings(executionId, descriptor, boundSettings)))
             {
                 throw ConfigurationError(executionId, "Provider instances must have unique canonical identities.");
@@ -204,6 +231,7 @@ internal sealed class ProviderPool : IAsyncDisposable
             return registration.Adapter;
         }
 
+        ThrowIfFactoryReentry(state);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(callerToken, _lifetime.Token);
         try
         {
@@ -237,6 +265,7 @@ internal sealed class ProviderPool : IAsyncDisposable
 
             if (HasOwnedCancellation(callerIdentity, cancelledParentToken) || linked.IsCancellationRequested)
             {
+                MarkTransferredTransportConsumed(state);
                 await adapter.DisposeAsync().ConfigureAwait(false);
                 ThrowPoolOwnedCancellation(callerIdentity, linked.Token, cancelledParentToken);
             }
@@ -254,6 +283,7 @@ internal sealed class ProviderPool : IAsyncDisposable
 
             if (closing)
             {
+                MarkTransferredTransportConsumed(state);
                 await adapter.DisposeAsync().ConfigureAwait(false);
                 throw new ObjectDisposedException(nameof(AsyncClient));
             }
@@ -284,6 +314,48 @@ internal sealed class ProviderPool : IAsyncDisposable
         }
 
         return GetOrCreateDefaultState(_descriptors.Get(normalized));
+    }
+
+    internal PacingSelection GetPacing(ResolvedProvider resolved)
+    {
+        ArgumentNullException.ThrowIfNull(resolved);
+        return GetPacing(resolved.State);
+    }
+
+    private PacingSelection GetPacing(InstanceState state)
+    {
+        lock (_gate)
+        {
+            if (state.PacingInitialized)
+            {
+                return state.Pacing;
+            }
+
+            state.PacingInitialized = true;
+            if (_injectedLimiters.TryGetValue(state.InstanceId, out var injected))
+            {
+                state.Pacing = injected.Limits.Active
+                    ? new PacingSelection(injected, state.Descriptor?.GovernsOwnTransport ?? true)
+                    : default;
+                return state.Pacing;
+            }
+
+            if (state.Descriptor is not { } descriptor || state.Settings.Limits is not { Active: true } limits)
+            {
+                return state.Pacing;
+            }
+
+            state.Pacing = new PacingSelection(
+                new RateLimiter(
+                    limits,
+                    descriptor.RateLimitHeaders,
+                    state.InstanceId,
+                    _events,
+                    seesResponses: !descriptor.GovernsOwnTransport,
+                    _pacingTimeProvider),
+                descriptor.GovernsOwnTransport);
+            return state.Pacing;
+        }
     }
 
     internal ResolvedProvider Materialize(TargetMetadata metadata)
@@ -419,7 +491,7 @@ internal sealed class ProviderPool : IAsyncDisposable
         }
     }
 
-    private static async Task<IProviderAdapter> BuildAsync(
+    private async Task<IProviderAdapter> BuildAsync(
         InstanceState state,
         ResolverChain resolver,
         CancellationToken cancellationToken,
@@ -427,6 +499,11 @@ internal sealed class ProviderPool : IAsyncDisposable
         Func<CancellationToken?>? cancelledParentToken = null)
     {
         var descriptor = state.Descriptor ?? throw new InvalidOperationException("Prebuilt registrations do not require a factory.");
+        if (state.TransportConsumed)
+        {
+            throw ConfigurationError(state.InstanceId, "The configured transport was transferred to a discarded adapter and cannot be rebuilt.");
+        }
+
         var settings = state.Settings;
         if (descriptor.RequiresBaseUrl && string.IsNullOrWhiteSpace(settings.BaseUrl) && string.IsNullOrWhiteSpace(descriptor.DefaultBaseUrl))
         {
@@ -434,7 +511,7 @@ internal sealed class ProviderPool : IAsyncDisposable
         }
 
         var boundSettings = settings.BaseUrl is null && descriptor.DefaultBaseUrl is not null
-            ? ProviderSettings.Of(settings.ProviderId, descriptor.DefaultBaseUrl, settings.ApiKey, settings.ApiVersion, settings.Headers, settings.Options, settings.TimeoutS, settings.Transport, settings.Alias)
+            ? ProviderSettings.Of(settings.ProviderId, descriptor.DefaultBaseUrl, settings.ApiKey, settings.ApiVersion, settings.Headers, settings.Options, settings.TimeoutS, settings.Transport, settings.Alias, settings.Limits)
             : settings;
         var resolvedKey = await resolver.ResolveAsync(boundSettings.ApiKey, cancellationToken).ConfigureAwait(false);
         ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
@@ -457,7 +534,44 @@ internal sealed class ProviderPool : IAsyncDisposable
             TransportOwnedByPool = descriptor.PoolOwnsConfiguredTransport && boundSettings.Transport is not null,
         };
         ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
-        return await descriptor.Factory(config, cancellationToken).ConfigureAwait(false);
+        GovernedHttpMessageHandler? governedHandler = null;
+        var transfersRawTransport = false;
+        var pacing = GetPacing(state);
+        if (pacing.Limiter is not null && !pacing.UsesOuterSlot)
+        {
+            var (rawTransport, ownsRawTransport, transfersRaw) = CreateRawTransport(boundSettings, descriptor);
+            governedHandler = new GovernedHttpMessageHandler(rawTransport, pacing.Limiter, ownsRawTransport);
+            config = config.WithTransport(governedHandler, transportOwnedByPool: false);
+            transfersRawTransport = transfersRaw;
+        }
+
+        try
+        {
+            using var scope = PushFactoryScope(state);
+            var adapter = await descriptor.Factory(config, cancellationToken).ConfigureAwait(false);
+            state.PendingTransferredTransport = transfersRawTransport;
+            return adapter;
+        }
+        catch
+        {
+            if (governedHandler is not null)
+            {
+                try
+                {
+                    governedHandler.Dispose();
+                }
+                catch
+                {
+                }
+
+                if (transfersRawTransport)
+                {
+                    state.TransportConsumed = true;
+                }
+            }
+
+            throw;
+        }
     }
 
     private static bool HasOwnedCancellation(
@@ -571,6 +685,71 @@ internal sealed class ProviderPool : IAsyncDisposable
         }
     }
 
+    private static (HttpMessageHandler Transport, bool OwnsTransport, bool TransfersTransport) CreateRawTransport(
+        ProviderSettings settings,
+        ProviderDescriptor descriptor)
+    {
+        if (settings.Transport is null)
+        {
+            return (new HttpClientHandler { AllowAutoRedirect = false }, true, false);
+        }
+
+        if (descriptor.PoolOwnsConfiguredTransport)
+        {
+            return (settings.Transport, false, false);
+        }
+
+        return (settings.Transport, true, true);
+    }
+
+    private static IReadOnlyDictionary<string, RateLimiter> CopyLimiters(
+        IReadOnlyDictionary<string, RateLimiter>? limiters)
+    {
+        var copied = new Dictionary<string, RateLimiter>(StringComparer.Ordinal);
+        if (limiters is null)
+        {
+            return new ReadOnlyDictionary<string, RateLimiter>(copied);
+        }
+
+        foreach (var (identifier, limiter) in limiters)
+        {
+            ArgumentNullException.ThrowIfNull(limiter);
+            var normalized = ProviderSettings.NormalizeId(identifier, nameof(limiters));
+            if (!copied.TryAdd(normalized, limiter))
+            {
+                throw new ArgumentException("Injected rate limiters must have unique canonical instance IDs.", nameof(limiters));
+            }
+        }
+
+        return new ReadOnlyDictionary<string, RateLimiter>(copied);
+    }
+
+    private static void MarkTransferredTransportConsumed(InstanceState state)
+    {
+        if (state.PendingTransferredTransport)
+        {
+            state.TransportConsumed = true;
+        }
+    }
+
+    private static void ThrowIfFactoryReentry(InstanceState state)
+    {
+        for (var scope = ActiveFactories.Value; scope is not null; scope = scope.Parent)
+        {
+            if (scope.Active && ReferenceEquals(scope.State, state))
+            {
+                throw new InvalidOperationException("A provider factory cannot re-enter construction for the same configured instance.");
+            }
+        }
+    }
+
+    private static FactoryScope PushFactoryScope(InstanceState state)
+    {
+        var scope = new FactoryScope(state, ActiveFactories.Value);
+        ActiveFactories.Value = scope;
+        return scope;
+    }
+
     private void TrackBuild(Task build)
     {
         lock (_gate)
@@ -605,6 +784,24 @@ internal sealed class ProviderPool : IAsyncDisposable
     private static ConfigException ConfigurationError(string? provider, string detail, Exception? nativeInner = null) =>
         new("The provider configuration is invalid.", provider, detail, nativeInner: nativeInner);
 
+    private sealed class FactoryScope(InstanceState state, FactoryScope? parent) : IDisposable
+    {
+        private int _active = 1;
+
+        internal InstanceState State { get; } = state;
+        internal FactoryScope? Parent { get; } = parent;
+        internal bool Active => Volatile.Read(ref _active) != 0;
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _active, 0);
+            if (ReferenceEquals(ActiveFactories.Value, this))
+            {
+                ActiveFactories.Value = Parent;
+            }
+        }
+    }
+
     internal sealed class InstanceState
     {
         private InstanceState(string instanceId, ProviderSettings settings, ProviderDescriptor? descriptor, ProviderRegistration? registration)
@@ -621,6 +818,10 @@ internal sealed class ProviderPool : IAsyncDisposable
         internal ProviderRegistration? Registration { get; }
         internal SemaphoreSlim Gate { get; } = new(1, 1);
         internal IProviderAdapter? Adapter { get; set; }
+        internal bool PacingInitialized { get; set; }
+        internal PacingSelection Pacing { get; set; }
+        internal bool PendingTransferredTransport { get; set; }
+        internal bool TransportConsumed { get; set; }
 
         internal static InstanceState FromSettings(string instanceId, ProviderDescriptor descriptor, ProviderSettings settings) =>
             new(instanceId, settings, descriptor, null);

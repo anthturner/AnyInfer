@@ -38,7 +38,8 @@ internal sealed class ManifestBuilder
         Route route,
         Func<TargetMetadata, ModelCapabilities> capabilitiesFor,
         bool capturePayloads,
-        string anyinferVersion)
+        string anyinferVersion,
+        CachePolicy? cachePolicy = null)
     {
         _requestId = requestId ?? throw new ArgumentNullException(nameof(requestId));
         _request = request ?? throw new ArgumentNullException(nameof(request));
@@ -46,6 +47,7 @@ internal sealed class ManifestBuilder
         _capabilitiesFor = capabilitiesFor ?? throw new ArgumentNullException(nameof(capabilitiesFor));
         _capturePayloads = capturePayloads;
         _version = anyinferVersion ?? throw new ArgumentNullException(nameof(anyinferVersion));
+        _cache = new CacheFacet(policyMode: cachePolicy?.Mode.ToString().ToLowerInvariant());
     }
 
     /// <summary>Records the full resolved capabilities outside the builder gate.</summary>
@@ -199,8 +201,8 @@ internal sealed class ManifestBuilder
         schemaPresent: schema is not null,
         schemaName: schema?.Name,
         schemaDigest: schema is null ? null : TrySchemaDigest(schema.JsonSchema),
-        toolNames: [],
-        toolChoice: "auto",
+        toolNames: _request.Tools.Select(static tool => tool.Name).ToArray(),
+        toolChoice: _request.ToolChoice,
         sampling: Sampling(_request.Sampling),
         reasoning: null,
         timeoutS: _request.TimeoutS,
@@ -301,7 +303,7 @@ internal sealed class ManifestBuilder
             promptText: string.IsNullOrEmpty(prompt) ? null : Redaction.Redact(prompt),
             responseText: string.IsNullOrEmpty(result?.Text) ? null : Redaction.Redact(result.Text),
             schemaBody: schema is null ? null : TrySchemaPayload(schema.JsonSchema),
-            toolArguments: [],
+            toolArguments: result?.ToolCalls.Select(static call => Redaction.Redact(JsonWriter.WriteManifest(call.Arguments, indent: null))) ?? [],
             repairTexts: _repairTexts);
     }
 

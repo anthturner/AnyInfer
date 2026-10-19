@@ -66,7 +66,7 @@ internal static class ManifestSerialization
     private static RepairRecord Repair(JsonObject value) => new(Int(value, "attempt_number"), NullableString(value, "mechanism"), Array(value, "errors", RequiredString));
 
     private static JsonObject Cache(CacheFacet value) => Obj(("policy_mode", NullableText(value.PolicyMode)), ("mechanism", NullableText(value.Mechanism)), ("mark_count", Int(value.MarkCount)), ("estimated_cacheable_tokens", Int(value.EstimatedCacheableTokens)), ("read_tokens", NullableLong(value.ReadTokens)), ("write_tokens", NullableLong(value.WriteTokens)));
-    private static CacheFacet Cache(JsonObject value) => new(NullableString(value, "policy_mode"), NullableString(value, "mechanism"), Int(value, "mark_count", 0), Int(value, "estimated_cacheable_tokens", 0), NullableLong(value, "read_tokens"), NullableLong(value, "write_tokens"));
+    private static CacheFacet Cache(JsonObject value) => new(NullableString(value, "policy_mode"), NullableString(value, "mechanism"), Int(value, "mark_count", 0), Long(value, "estimated_cacheable_tokens", 0), NullableLong(value, "read_tokens"), NullableLong(value, "write_tokens"));
 
     private static JsonObject Context(ContextFacet value) => Obj(("reductions", Array(value.Reductions.Select(Reduction))));
     private static ContextFacet Context(JsonObject value) => new(Array(value, "reductions", Reduction));
@@ -111,6 +111,7 @@ internal static class ManifestSerialization
     private static bool Boolean(JsonObject value, string name, bool fallback) => !value.TryGetValue(name, out var item) ? fallback : item is JsonBoolean boolean ? boolean.Value : throw Invalid(name);
     private static bool? NullableBool(JsonObject value, string name) => !value.TryGetValue(name, out var item) || item is JsonNull ? null : item is JsonBoolean boolean ? boolean.Value : throw Invalid(name);
     private static int Int(JsonObject value, string name, int? fallback = null) => !value.TryGetValue(name, out var item) ? fallback ?? throw Invalid(name) : RequiredInt(item);
+    private static long Long(JsonObject value, string name, long? fallback = null) => !value.TryGetValue(name, out var item) ? fallback ?? throw Invalid(name) : RequiredLong(item);
     private static int? NullableInt(JsonObject value, string name) => !value.TryGetValue(name, out var item) || item is JsonNull ? null : RequiredInt(item);
     private static long? NullableLong(JsonObject value, string name) => !value.TryGetValue(name, out var item) || item is JsonNull ? null : RequiredLong(item);
     private static double? NullableDouble(JsonObject value, string name) => !value.TryGetValue(name, out var item) || item is JsonNull ? null : RequiredDouble(item);

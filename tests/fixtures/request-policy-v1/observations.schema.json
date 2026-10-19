@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://anyinfer.dev/schemas/request-policy-v1-observations.schema.json",
+  "title": "request-policy-v1 typed observation envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "runtime", "source_revision", "source_dirty", "corpus_sha256", "observations"],
+  "properties": {
+    "profile": {"const": "request-policy-v1"},
+    "runtime": {"enum": ["python", "csharp"]},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_dirty": {"type": "boolean"},
+    "corpus_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "observations": {"type": "array", "minItems": 1}
+  },
+  "oneOf": [
+    {"properties": {"runtime": {"const": "python"}, "observations": {"items": {"$ref": "#/$defs/python_observation"}}}},
+    {"properties": {"runtime": {"const": "csharp"}, "observations": {"items": {"$ref": "#/$defs/csharp_observation"}}}}
+  ],
+  "$defs": {
+    "name": {"type": "string", "minLength": 1},
+    "text": {"type": "string"},
+    "money": {"type": "string", "minLength": 1},
+    "nonnegative": {"type": "integer", "minimum": 0},
+    "nullable_nonnegative": {"type": ["integer", "null"], "minimum": 0},
+    "json": {
+      "oneOf": [
+        {"type": "null"}, {"type": "boolean"}, {"type": "number"}, {"type": "string"},
+        {"type": "array", "items": {"$ref": "#/$defs/json"}},
+        {"type": "object", "additionalProperties": {"$ref": "#/$defs/json"}}
+      ]
+    },
+    "json_object": {"type": "object", "additionalProperties": {"$ref": "#/$defs/json"}},
+    "usage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "cost_usd", "search_units", "server_tool_uses"],
+      "properties": {
+        "input_tokens": {"$ref": "#/$defs/nullable_nonnegative"}, "output_tokens": {"$ref": "#/$defs/nullable_nonnegative"},
+        "total_tokens": {"$ref": "#/$defs/nullable_nonnegative"}, "cache_read_tokens": {"$ref": "#/$defs/nullable_nonnegative"},
+        "cache_write_tokens": {"$ref": "#/$defs/nullable_nonnegative"}, "reasoning_tokens": {"$ref": "#/$defs/nullable_nonnegative"},
+        "cost_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}, "search_units": {"$ref": "#/$defs/nullable_nonnegative"},
+        "server_tool_uses": {"type": "object", "additionalProperties": {"$ref": "#/$defs/nonnegative"}}
+      }
+    },
+    "manifest_usage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "cost_usd", "search_units"],
+      "properties": {
+        "input_tokens": {"$ref": "#/$defs/nullable_nonnegative"}, "output_tokens": {"$ref": "#/$defs/nullable_nonnegative"},
+        "total_tokens": {"$ref": "#/$defs/nullable_nonnegative"}, "cache_read_tokens": {"$ref": "#/$defs/nullable_nonnegative"},
+        "cache_write_tokens": {"$ref": "#/$defs/nullable_nonnegative"}, "reasoning_tokens": {"$ref": "#/$defs/nullable_nonnegative"},
+        "cost_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}, "search_units": {"$ref": "#/$defs/nullable_nonnegative"}
+      }
+    },
+    "manifest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["format", "complete", "request_id_relation", "usage", "payload"],
+      "properties": {
+        "format": {"type": "string"}, "complete": {"type": "boolean"},
+        "request_id_relation": {"enum": ["same_operation", "absent"]},
+        "usage": {"anyOf": [{"$ref": "#/$defs/manifest_usage"}, {"type": "null"}]},
+        "payload": {"anyOf": [{"$ref": "#/$defs/payload"}, {"type": "null"}]}
+      }
+    },
+    "payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tool_arguments", "repair_texts"],
+      "properties": {
+        "tool_arguments": {"type": "array", "items": {"$ref": "#/$defs/text"}},
+        "repair_texts": {"type": "array", "items": {"$ref": "#/$defs/text"}}
+      }
+    },
+    "terminal_call": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "arguments"],
+      "properties": {"id": {"$ref": "#/$defs/name"}, "name": {"$ref": "#/$defs/text"}, "arguments": {"$ref": "#/$defs/json_object"}}
+    },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["target", "text", "structured", "finish_reason", "usage", "repair_attempts", "warnings", "tool_calls", "manifest"],
+      "properties": {
+        "target": {"$ref": "#/$defs/name"}, "text": {"$ref": "#/$defs/text"}, "structured": {"$ref": "#/$defs/json"},
+        "finish_reason": {"type": ["string", "null"]}, "usage": {"$ref": "#/$defs/usage"}, "repair_attempts": {"$ref": "#/$defs/nonnegative"},
+        "warnings": {"type": "array", "items": {"$ref": "#/$defs/text"}}, "tool_calls": {"type": "array", "items": {"$ref": "#/$defs/terminal_call"}},
+        "manifest": {"anyOf": [{"$ref": "#/$defs/manifest"}, {"type": "null"}]}
+      }
+    },
+    "ledger_totals": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cost", "currency", "requests", "unknown_requests", "input_tokens", "output_tokens", "cache_read_tokens"],
+      "properties": {
+        "cost": {"$ref": "#/$defs/money"}, "currency": {"type": "string"}, "requests": {"$ref": "#/$defs/nonnegative"},
+        "unknown_requests": {"$ref": "#/$defs/nonnegative"}, "input_tokens": {"$ref": "#/$defs/nonnegative"},
+        "output_tokens": {"$ref": "#/$defs/nonnegative"}, "cache_read_tokens": {"$ref": "#/$defs/nonnegative"}
+      }
+    },
+    "ledger": {"type": "object", "additionalProperties": false, "required": ["totals", "reserved"], "properties": {"totals": {"$ref": "#/$defs/ledger_totals"}, "reserved": {"$ref": "#/$defs/money"}}},
+    "checkpoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "reserved", "totals", "estimator_inputs"],
+      "properties": {
+        "name": {"enum": ["before_dispatch", "after_initial_reserve", "after_retry_replacement", "after_fallback_handoff", "after_repair", "while_stream_open", "after_cancel", "after_close", "after_terminal_cleanup"]},
+        "reserved": {"$ref": "#/$defs/money"}, "totals": {"$ref": "#/$defs/ledger_totals"},
+        "estimator_inputs": {"type": "array", "items": {"$ref": "#/$defs/text"}}
+      }
+    },
+    "message": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {"role": {"enum": ["system", "user", "assistant", "tool"]}, "content": {"type": ["string", "null"]}}
+    },
+    "tool_declaration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "description", "parameters"],
+      "properties": {"name": {"$ref": "#/$defs/name"}, "description": {"$ref": "#/$defs/text"}, "parameters": {"$ref": "#/$defs/json_object"}}
+    },
+    "adapter_wire": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation_index", "script_id", "instance", "target", "descriptor", "messages", "tools", "tool_choice", "cache_marks"],
+      "properties": {
+        "operation_index": {"$ref": "#/$defs/nonnegative"}, "script_id": {"$ref": "#/$defs/name"}, "instance": {"$ref": "#/$defs/name"},
+        "target": {"$ref": "#/$defs/name"}, "descriptor": {"$ref": "#/$defs/name"},
+        "messages": {"type": "array", "items": {"$ref": "#/$defs/message"}}, "tools": {"type": "array", "items": {"$ref": "#/$defs/tool_declaration"}},
+        "tool_choice": {"type": ["string", "null"]}, "cache_marks": {"type": "array", "items": {"type": "integer"}}
+      }
+    },
+    "http_capture": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation_index", "script_id", "instance", "method", "path", "query", "headers", "request_json", "status"],
+      "properties": {
+        "operation_index": {"anyOf": [{"$ref": "#/$defs/nonnegative"}, {"type": "null"}]}, "script_id": {"$ref": "#/$defs/name"}, "instance": {"$ref": "#/$defs/name"},
+        "method": {"$ref": "#/$defs/name"}, "path": {"type": "string"}, "query": {"type": "string"},
+        "headers": {"type": "object", "additionalProperties": {"type": "string"}}, "request_json": {"$ref": "#/$defs/json_object"}, "status": {"type": "integer", "minimum": 100, "maximum": 599}
+      }
+    },
+    "stream_event": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "index", "id", "name", "arguments"], "properties": {"type": {"const": "tool_call_delta"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "index": {"$ref": "#/$defs/nonnegative"}, "id": {"type": ["string", "null"]}, "name": {"type": ["string", "null"]}, "arguments": {"type": ["string", "null"]}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "name"], "properties": {"type": {"const": "timing_mark"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "name": {"enum": ["first_token", "last_token"]}}}
+      ]
+    },
+    "resource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "operation_index", "script_id", "instance"],
+      "properties": {
+        "type": {"enum": ["handler_entry", "body_ready", "body_released", "body_closed", "stream_closed", "cancel_requested", "pending_observed", "client_closed", "handler_closed", "adapter_closed"]},
+        "operation_index": {"anyOf": [{"$ref": "#/$defs/nonnegative"}, {"type": "null"}]}, "script_id": {"type": ["string", "null"]}, "instance": {"type": ["string", "null"]}
+      }
+    },
+    "telemetry": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "targets"], "properties": {"type": {"const": "RequestStarted"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "targets": {"type": "array", "items": {"type": "string"}}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "target"], "properties": {"type": {"const": "TargetResolved"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "target": {"$ref": "#/$defs/name"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "attempt", "target"], "properties": {"type": {"const": "AttemptStarted"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "attempt": {"$ref": "#/$defs/nonnegative"}, "target": {"$ref": "#/$defs/name"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "outcome"], "properties": {"type": {"const": "AttemptCompleted"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "outcome": {"const": "ok"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "attempt", "error"], "properties": {"type": {"const": "RetryScheduled"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "attempt": {"$ref": "#/$defs/nonnegative"}, "error": {"$ref": "#/$defs/attempt_error_any"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "source", "destination", "error"], "properties": {"type": {"const": "FallbackTriggered"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "source": {"$ref": "#/$defs/name"}, "destination": {"$ref": "#/$defs/name"}, "error": {"$ref": "#/$defs/attempt_error_any"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "count", "mechanism"], "properties": {"type": {"const": "RepairAttempted"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "count": {"$ref": "#/$defs/nonnegative"}, "mechanism": {"type": "string"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "field", "method"], "properties": {"type": {"const": "UsageEstimated"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "field": {"type": "string"}, "method": {"type": "string"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "target", "usage", "repair_attempts"], "properties": {"type": {"const": "RequestCompleted"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "target": {"$ref": "#/$defs/name"}, "usage": {"anyOf": [{"$ref": "#/$defs/usage"}, {"type": "null"}]}, "repair_attempts": {"$ref": "#/$defs/nonnegative"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "error"], "properties": {"type": {"const": "RequestFailed"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "error": {"$ref": "#/$defs/request_failed_error_any"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "mechanism", "count", "estimated_tokens"], "properties": {"type": {"const": "CachePlanned"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "mechanism": {"enum": ["none", "explicit", "implicit"]}, "count": {"$ref": "#/$defs/nonnegative"}, "estimated_tokens": {"type": ["integer", "null"]}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "parameter", "reason"], "properties": {"type": {"const": "ParameterDropped"}, "operation_index": {"$ref": "#/$defs/nonnegative"}, "parameter": {"type": "string"}, "reason": {"type": "string"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "target", "code", "severity"], "properties": {"type": {"const": "ProviderDiagnostic"}, "operation_index": {"anyOf": [{"$ref": "#/$defs/nonnegative"}, {"type": "null"}]}, "target": {"type": ["string", "null"]}, "code": {"type": "string"}, "severity": {"type": "string"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "operation_index", "provider", "remaining", "reset"], "properties": {"type": {"const": "RateLimitObserved"}, "operation_index": {"anyOf": [{"$ref": "#/$defs/nonnegative"}, {"type": "null"}]}, "provider": {"type": ["string", "null"]}, "remaining": {"type": ["integer", "null"]}, "reset": {"type": ["string", "null"]}}}
+      ]
+    },
+    "attempt_error_any": {"oneOf": [{"$ref": "#/$defs/python_attempt_error"}, {"$ref": "#/$defs/csharp_attempt_error"}]},
+    "request_failed_error_any": {"oneOf": [{"$ref": "#/$defs/python_request_failed_error"}, {"$ref": "#/$defs/csharp_request_failed_error"}]},
+    "python_terminal_error": {
+      "type": "object", "additionalProperties": false, "required": ["runtime_type", "provider", "phase", "retryable", "http_status", "retry_after_s", "limit_usd", "spent_usd", "estimated_usd"],
+      "properties": {"runtime_type": {"enum": ["ProviderError", "ProviderUnavailableError", "ContextLengthError", "SpendLimitError", "AllTargetsFailedError"]}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}, "retry_after_s": {"type": ["number", "null"]}, "limit_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}, "spent_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}, "estimated_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}},
+      "allOf": [{"if": {"properties": {"runtime_type": {"const": "SpendLimitError"}}}, "then": {"required": ["limit_usd", "spent_usd", "estimated_usd"]}, "else": {"properties": {"limit_usd": {"type": "null"}, "spent_usd": {"type": "null"}, "estimated_usd": {"type": "null"}}}}]
+    },
+    "csharp_terminal_error": {
+      "type": "object", "additionalProperties": false, "required": ["runtime_type", "provider", "phase", "retryable", "http_status", "retry_after_s", "limit_usd", "spent_usd", "estimated_usd"],
+      "properties": {"runtime_type": {"enum": ["ProviderException", "ProviderUnavailableException", "ContextLengthException", "SpendLimitException", "AllTargetsFailedException"]}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}, "retry_after_s": {"type": ["number", "null"]}, "limit_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}, "spent_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}, "estimated_usd": {"anyOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}},
+      "allOf": [{"if": {"properties": {"runtime_type": {"const": "SpendLimitException"}}}, "then": {"required": ["limit_usd", "spent_usd", "estimated_usd"]}, "else": {"properties": {"limit_usd": {"type": "null"}, "spent_usd": {"type": "null"}, "estimated_usd": {"type": "null"}}}}]
+    },
+    "python_attempt_error": {"type": "object", "additionalProperties": false, "required": ["runtime_type", "provider", "phase", "retryable", "http_status"], "properties": {"runtime_type": {"enum": ["ProviderError", "ProviderUnavailableError", "ContextLengthError"]}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}}},
+    "csharp_attempt_error": {"type": "object", "additionalProperties": false, "required": ["runtime_type", "provider", "phase", "retryable", "http_status"], "properties": {"runtime_type": {"enum": ["ProviderException", "ProviderUnavailableException", "ContextLengthException"]}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}}},
+    "python_request_failed_error": {"type": "object", "additionalProperties": false, "required": ["runtime_type", "provider", "phase", "retryable", "http_status"], "properties": {"runtime_type": {"enum": ["ProviderError", "ProviderUnavailableError", "ContextLengthError", "SpendLimitError", "AllTargetsFailedError"]}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}}},
+    "csharp_request_failed_error": {"type": "object", "additionalProperties": false, "required": ["runtime_type", "provider", "phase", "retryable", "http_status"], "properties": {"runtime_type": {"enum": ["ProviderException", "ProviderUnavailableException", "ContextLengthException", "SpendLimitException", "AllTargetsFailedException"]}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}}},
+    "python_telemetry": {"allOf": [{"$ref": "#/$defs/telemetry"}, {"not": {"anyOf": [{"properties": {"type": {"const": "RetryScheduled"}, "error": {"properties": {"runtime_type": {"enum": ["ProviderException", "ProviderUnavailableException", "ContextLengthException"]}}}}}, {"properties": {"type": {"const": "FallbackTriggered"}, "error": {"properties": {"runtime_type": {"enum": ["ProviderException", "ProviderUnavailableException", "ContextLengthException"]}}}}}, {"properties": {"type": {"const": "RequestFailed"}, "error": {"properties": {"runtime_type": {"enum": ["ProviderException", "ProviderUnavailableException", "ContextLengthException", "SpendLimitException", "AllTargetsFailedException"]}}}}}]}}]},
+    "csharp_telemetry": {"allOf": [{"$ref": "#/$defs/telemetry"}, {"not": {"anyOf": [{"properties": {"type": {"const": "RetryScheduled"}, "error": {"properties": {"runtime_type": {"enum": ["ProviderError", "ProviderUnavailableError", "ContextLengthError"]}}}}}, {"properties": {"type": {"const": "FallbackTriggered"}, "error": {"properties": {"runtime_type": {"enum": ["ProviderError", "ProviderUnavailableError", "ContextLengthError"]}}}}}, {"properties": {"type": {"const": "RequestFailed"}, "error": {"properties": {"runtime_type": {"enum": ["ProviderError", "ProviderUnavailableError", "ContextLengthError", "SpendLimitError", "AllTargetsFailedError"]}}}}}]}}]},
+    "python_attempt": {"type": "object", "additionalProperties": false, "required": ["target", "outcome", "error"], "properties": {"target": {"type": ["string", "null"]}, "outcome": {"enum": ["ok", "retried", "failed", "skipped_unhealthy"]}, "error": {"anyOf": [{"$ref": "#/$defs/python_attempt_error"}, {"type": "null"}]}}},
+    "csharp_attempt": {"type": "object", "additionalProperties": false, "required": ["target", "outcome", "error"], "properties": {"target": {"type": ["string", "null"]}, "outcome": {"enum": ["ok", "retried", "failed", "skipped_unhealthy"]}, "error": {"anyOf": [{"$ref": "#/$defs/csharp_attempt_error"}, {"type": "null"}]}}},
+    "operation_relations": {"type": "object", "additionalProperties": false, "required": ["request_id_relation", "send_count", "terminal_event", "cleanup", "cancel_requested", "cancelled_before_terminal"], "properties": {"request_id_relation": {"enum": ["all_present_same", "none_observed"]}, "send_count": {"$ref": "#/$defs/nonnegative"}, "terminal_event": {"enum": ["completed", "failed", "none"]}, "cleanup": {"enum": ["not_required", "released", "closed"]}, "cancel_requested": {"type": "boolean"}, "cancelled_before_terminal": {"type": "boolean"}}},
+    "python_operation": {"type": "object", "additionalProperties": false, "required": ["index", "entry_point", "outcome", "result", "error", "attempts", "relations"], "properties": {"index": {"$ref": "#/$defs/nonnegative"}, "entry_point": {"enum": ["generate", "stream"]}, "outcome": {"enum": ["ok", "error", "cancelled"]}, "result": {"anyOf": [{"$ref": "#/$defs/result"}, {"type": "null"}]}, "error": {"anyOf": [{"$ref": "#/$defs/python_terminal_error"}, {"type": "null"}]}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/python_attempt"}}, "relations": {"$ref": "#/$defs/operation_relations"}}, "allOf": [{"if": {"properties": {"outcome": {"const": "ok"}}}, "then": {"properties": {"result": {"$ref": "#/$defs/result"}, "error": {"type": "null"}}}}, {"if": {"properties": {"outcome": {"const": "error"}}}, "then": {"properties": {"result": {"type": "null"}, "error": {"$ref": "#/$defs/python_terminal_error"}}}}, {"if": {"properties": {"outcome": {"const": "cancelled"}}}, "then": {"properties": {"result": {"type": "null"}, "error": {"type": "null"}, "relations": {"properties": {"cancel_requested": {"const": true}, "cancelled_before_terminal": {"const": true}}}}}}, {"if": {"properties": {"error": {"type": "object", "required": ["runtime_type"], "properties": {"runtime_type": {"const": "SpendLimitError"}}}}}, "then": {"properties": {"attempts": {"maxItems": 0}}}}]},
+    "csharp_operation": {"type": "object", "additionalProperties": false, "required": ["index", "entry_point", "outcome", "result", "error", "attempts", "relations"], "properties": {"index": {"$ref": "#/$defs/nonnegative"}, "entry_point": {"enum": ["generate", "stream"]}, "outcome": {"enum": ["ok", "error", "cancelled"]}, "result": {"anyOf": [{"$ref": "#/$defs/result"}, {"type": "null"}]}, "error": {"anyOf": [{"$ref": "#/$defs/csharp_terminal_error"}, {"type": "null"}]}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/csharp_attempt"}}, "relations": {"$ref": "#/$defs/operation_relations"}}, "allOf": [{"if": {"properties": {"outcome": {"const": "ok"}}}, "then": {"properties": {"result": {"$ref": "#/$defs/result"}, "error": {"type": "null"}}}}, {"if": {"properties": {"outcome": {"const": "error"}}}, "then": {"properties": {"result": {"type": "null"}, "error": {"$ref": "#/$defs/csharp_terminal_error"}}}}, {"if": {"properties": {"outcome": {"const": "cancelled"}}}, "then": {"properties": {"result": {"type": "null"}, "error": {"type": "null"}, "relations": {"properties": {"cancel_requested": {"const": true}, "cancelled_before_terminal": {"const": true}}}}}}, {"if": {"properties": {"error": {"type": "object", "required": ["runtime_type"], "properties": {"runtime_type": {"const": "SpendLimitException"}}}}}, "then": {"properties": {"attempts": {"maxItems": 0}}}}]},
+    "common_value": {"type": "object", "required": ["operations", "ledger", "checkpoints", "telemetry", "http", "adapter_wires", "stream_events", "resources", "configuration"], "properties": {"ledger": {"anyOf": [{"$ref": "#/$defs/ledger"}, {"type": "null"}]}, "checkpoints": {"type": "array", "items": {"$ref": "#/$defs/checkpoint"}}, "telemetry": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/telemetry"}}, "http": {"type": "array", "items": {"$ref": "#/$defs/http_capture"}}, "adapter_wires": {"type": "array", "items": {"$ref": "#/$defs/adapter_wire"}}, "stream_events": {"type": "array", "items": {"$ref": "#/$defs/stream_event"}}, "resources": {"type": "array", "items": {"$ref": "#/$defs/resource"}}, "configuration": {"anyOf": [{"$ref": "#/$defs/configuration"}, {"type": "null"}]}}},
+    "configuration": {"type": "object", "additionalProperties": false, "required": ["provider_ids", "default_route", "cache_mode"], "properties": {"provider_ids": {"type": "array", "items": {"$ref": "#/$defs/name"}}, "default_route": {"type": "array", "items": {"$ref": "#/$defs/name"}}, "cache_mode": {"type": ["string", "null"]}}},
+    "python_value": {"allOf": [{"$ref": "#/$defs/common_value"}, {"properties": {"operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/python_operation"}}, "telemetry": {"type": "array", "items": {"$ref": "#/$defs/python_telemetry"}}}}], "unevaluatedProperties": false},
+    "csharp_value": {"allOf": [{"$ref": "#/$defs/common_value"}, {"properties": {"operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/csharp_operation"}}, "telemetry": {"type": "array", "items": {"$ref": "#/$defs/csharp_telemetry"}}}}], "unevaluatedProperties": false},
+    "python_observation": {"type": "object", "additionalProperties": false, "required": ["id", "kind", "status", "value"], "properties": {"id": {"$ref": "#/$defs/name"}, "kind": {"enum": ["admission", "context_route", "tool_stream", "cache", "governor", "config_policy"]}, "status": {"const": "ok"}, "value": {"$ref": "#/$defs/python_value"}}},
+    "csharp_observation": {"type": "object", "additionalProperties": false, "required": ["id", "kind", "status", "value"], "properties": {"id": {"$ref": "#/$defs/name"}, "kind": {"enum": ["admission", "context_route", "tool_stream", "cache", "governor", "config_policy"]}, "status": {"const": "ok"}, "value": {"$ref": "#/$defs/csharp_value"}}}
+  }
+}

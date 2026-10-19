@@ -794,12 +794,18 @@ must report a real conflict rather than silently changing a dependent public sig
   request path without duplicating provider orchestration. Gate: precise policy precedence,
   pre-dispatch refusal, retry/repair budget and ledger/manifest consistency tests.
   > NOTE: Source discovery confirmed a same-client transport ownership prerequisite:
-  > discarding a late built-in adapter currently disposes the supplied handler reused by
+  > discarding a late built-in adapter disposed the supplied handler reused by
   > a later build. `ANYINFER_CSHARP_SDK_TRANSPORT_OWNERSHIP.md` is now complete at source
   > `c7dc295d680fe51b39309fa7e17d65bf2cd7e307`: all 19 workspace steps, 538 native unit/
   > 93 conformance tests, then clean-revision accounting and isolated package proofs pass.
-  > Resume SDK.5c's request-policy contract. SDK.5b's accepted checkpoint remains unchanged;
-  > SDK.5c stays unchecked.
+  > The request-policy execution checklist is `ANYINFER_CSHARP_SDK_POLICIES.md`; POL.0
+  > contract reviews and POL.1–POL.4 raw-tool/cache/governor/admission/config gates are
+  > clean (657 unit, 93 conformance, 70 focused policy/config/HTTP controls; Python
+  > reference gates: four tool, 28 cache, 57 limiter/timeout and four admission controls).
+  > Independent request-policy proof now passes 29/29 from fresh stamped public observers
+  > with matching provenance and clean cold reviews. The coherent source and compiled
+  > docs/package gates are closed. Resume POL.7 full-workspace and clean-revision acceptance
+  > in that checklist; SDK.5b's checkpoint is unchanged and SDK.5c stays unchecked until then.
 
 ### SDK.6 — Embedding, reranking and operation-neutral routing
 
@@ -907,8 +913,12 @@ Current resume point: **SDK.5c**. SDK.5b is complete at source checkpoint
 532 native unit tests, 93 conformance tests, 42 shared accounting observations plus two
 separate native-only controls, strict docs, compiled examples and clean-revision package
 consumption. `ANYINFER_CSHARP_SDK_ACCOUNTING.md` records the exact gates and scope.
-Resume by settling the request-policy contract and the actual cache/tool input prerequisite;
-automatic admission and transport pacing remain unfinished, with no later/root parity claim.
+The request-policy source, independent proof and docs/package phase gates are closed in
+`ANYINFER_CSHARP_SDK_POLICIES.md`: fresh policy comparison is 29/29, the current native
+suite is 681 unit and 93 conformance tests, and accounting/Frozen preservation remains
+42+2/102. Resume POL.7 clean-revision acceptance: all 20 full-workspace steps now pass in
+147.6s with a fresh isolated cache after the first run's shared-cache ACL shutdown failure.
+No later milestone or complete-library parity claim follows from this bounded checkpoint.
 
 SDK.5a is complete at source checkpoint
 `68d2cc06914aaa8539eb3cc5ee8d20acdbd2a906`, recorded by acceptance commit

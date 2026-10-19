@@ -291,7 +291,7 @@ public sealed record SchemaFacet
 public sealed record CacheFacet
 {
     /// <summary>Initializes immutable cache facts.</summary>
-    public CacheFacet(string? policyMode = null, string? mechanism = null, int markCount = 0, int estimatedCacheableTokens = 0, long? readTokens = null, long? writeTokens = null)
+    public CacheFacet(string? policyMode = null, string? mechanism = null, int markCount = 0, long estimatedCacheableTokens = 0, long? readTokens = null, long? writeTokens = null)
     {
         PolicyMode = policyMode;
         Mechanism = mechanism;
@@ -311,7 +311,7 @@ public sealed record CacheFacet
     public int MarkCount { get; }
 
     /// <summary>Gets estimated cacheable tokens.</summary>
-    public int EstimatedCacheableTokens { get; }
+    public long EstimatedCacheableTokens { get; }
 
     /// <summary>Gets provider-reported cache read tokens.</summary>
     public long? ReadTokens { get; }

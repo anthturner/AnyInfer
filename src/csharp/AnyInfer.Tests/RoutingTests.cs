@@ -9,14 +9,18 @@ namespace AnyInfer.Tests;
 
 public sealed class RoutingTests
 {
-    [Fact]
-    public async Task Buffered_generation_normalizes_messages_sampling_and_effective_wire_limits()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Buffered_generation_preserves_public_parts_but_joins_frozen_parts_while_normalizing_sampling_and_effective_wire_limits(bool publicSdk)
     {
         var adapter = new ScriptAdapter(static (_, token) => Events(token,
             new AdapterTextDelta("hello"),
             new AdapterUsage(new Usage(InputTokens: 2, OutputTokens: 3)),
             new AdapterFinal("stop")));
-        await using var client = Client(new ProviderRegistration("alpha", adapter));
+        await using var client = publicSdk
+            ? AsyncClient.FromAdapters([new ProviderRegistration("alpha", adapter)])
+            : new AsyncClient([new ProviderRegistration("alpha", adapter)], new VirtualClock());
         var request = Request(
             messages:
             [
@@ -36,7 +40,16 @@ public sealed class RoutingTests
         Assert.Equal(1_048_576, wire.MaxResponseBytes);
         Assert.Null(wire.Sampling.Stop);
         Assert.Equal(2, wire.Messages.Count);
-        Assert.Equal("hello", Assert.IsType<Text>(wire.Messages[1].Content[0]).Value);
+        if (publicSdk)
+        {
+            Assert.Collection(wire.Messages[1].Content,
+                part => Assert.Equal("hel", Assert.IsType<Text>(part).Value),
+                part => Assert.Equal("lo", Assert.IsType<Text>(part).Value));
+        }
+        else
+        {
+            Assert.Equal("hello", Assert.IsType<Text>(Assert.Single(wire.Messages[1].Content)).Value);
+        }
         Assert.Equal(2, result.Usage!.InputTokens);
         Assert.Equal(3, result.Usage.OutputTokens);
     }

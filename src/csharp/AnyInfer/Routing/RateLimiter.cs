@@ -73,7 +73,12 @@ public sealed class RateLimiter
     }
 
     /// <summary>Acquires a permit after configured and observed pacing has completed.</summary>
-    public async ValueTask<RateLimitLease> AcquireAsync(CancellationToken cancellationToken = default)
+    public ValueTask<RateLimitLease> AcquireAsync(CancellationToken cancellationToken = default) =>
+        AcquireAsync(cancellationToken, null);
+
+    internal async ValueTask<RateLimitLease> AcquireAsync(
+        CancellationToken effectiveToken,
+        Func<CancellationToken?>? cancelledParentToken)
     {
         var acquiredSemaphore = false;
         try
@@ -81,7 +86,14 @@ public sealed class RateLimiter
             if (_semaphore is not null)
             {
                 var started = NowS();
-                await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await _semaphore.WaitAsync(effectiveToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (TryGetCancelledParent(effectiveToken, cancelledParentToken, out var parent))
+                {
+                    throw new OperationCanceledException(parent);
+                }
                 acquiredSemaphore = true;
                 var waited = NowS() - started;
                 if (waited > 0)
@@ -90,7 +102,7 @@ public sealed class RateLimiter
                 }
             }
 
-            await WaitForTurnAsync(cancellationToken).ConfigureAwait(false);
+            await WaitForTurnAsync(effectiveToken, cancelledParentToken).ConfigureAwait(false);
             return new RateLimitLease(() => _semaphore?.Release());
         }
         catch
@@ -134,7 +146,9 @@ public sealed class RateLimiter
         }
     }
 
-    private async Task WaitForTurnAsync(CancellationToken cancellationToken)
+    private async Task WaitForTurnAsync(
+        CancellationToken cancellationToken,
+        Func<CancellationToken?>? cancelledParentToken)
     {
         var headerWaited = 0d;
         while (true)
@@ -151,7 +165,14 @@ public sealed class RateLimiter
                 }
             }
 
-            await DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (TryGetCancelledParent(cancellationToken, cancelledParentToken, out var parent))
+            {
+                throw new OperationCanceledException(parent);
+            }
             if (reason == "provider-headers")
             {
                 headerWaited += delay;
@@ -259,6 +280,16 @@ public sealed class RateLimiter
     }
 
     private static double OrderedMax(double left, double right) => right > left ? right : left;
+
+    private static bool TryGetCancelledParent(
+        CancellationToken effectiveToken,
+        Func<CancellationToken?>? cancelledParentToken,
+        out CancellationToken parent)
+    {
+        var suppliedParent = cancelledParentToken?.Invoke();
+        parent = suppliedParent ?? default;
+        return effectiveToken.IsCancellationRequested && suppliedParent is not null;
+    }
 
     private static string? Header(IReadOnlyDictionary<string, string> headers, string name)
     {

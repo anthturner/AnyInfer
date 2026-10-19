@@ -25,6 +25,7 @@ does not claim provider or feature parity with Python.
 | result manifest | `AsyncStream.Manifest`, `SyncStream.Manifest`, or `Generation.Manifest` |
 | `ProviderSetupSpec` metadata | `ProviderSetupSpec`, `SetupField`, `HostShorthand`, and `AnyOf` |
 | explicit pricing, budgets, and ledger snapshots | `PricingCalculator`, `Budget(...)`, `SpendLedger`, and `SpendStore` |
+| request policy | `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy`, and raw `ToolSpec` values |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
@@ -113,6 +114,25 @@ you need transactional read-modify-write behavior.
 ```csharp
 --8<-- "examples/csharp-sdk/AccountingExample.cs"
 ```
+
+## Request policy inputs
+
+`SpendPolicy`, `Route.ContextWindowTargets`, and `CachePolicy` are explicit request-policy
+inputs. A client commits only its winning request to a client-local or caller-supplied ledger.
+Version 1 configuration keeps `default_route` as an ordinary target list; it has no specialized
+context-chain encoding. The generic OpenAI-compatible descriptor declares no cache mechanism.
+`ToolSpec`, `ToolCall`, and `ToolResult` are typed raw values, not a callable tool loop.
+
+```csharp
+--8<-- "examples/csharp-sdk/RequestPolicyExample.cs"
+```
+
+Callers own supplied ledgers, estimators, limiters, and stores. Normal configured HTTP, including
+a supplied handler for a normal configured descriptor, is paced inside the entry deadline when
+`RateLimits` are active. An own-transport descriptor, or an opaque prebuilt registration with an
+active injected limiter, uses an outer slot before entry. This proof does not claim provider-invoice
+or all-wire accounting, automatic tool execution, rich-media input breadth, context/history
+reduction, or universal provider transport parity.
 
 ## What to use in an application
 

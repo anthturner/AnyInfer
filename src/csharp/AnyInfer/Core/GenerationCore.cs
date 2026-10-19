@@ -7,6 +7,8 @@ using AnyInfer.Internal;
 using AnyInfer.Json;
 using AnyInfer.Providers;
 using AnyInfer.Schema;
+using AnyInfer.Routing;
+using PeterO.Numbers;
 
 namespace AnyInfer.Core;
 
@@ -22,18 +24,20 @@ internal static class GenerationCore
         IOperationClock clock,
         OperationCapture? capture,
         AsyncStream stream,
+        GenerationPolicyContext? policyContext,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var operation = new OperationContext(capture);
+        var operation = new OperationContext(capture, policyContext?.EntryTimeProvider);
         stream.BeginOperation(operation);
         var telemetry = stream.Telemetry;
         var attempts = new List<AttemptRecord>();
         var visitedTargets = new HashSet<(string ProviderId, string Model)>();
         PendingFallback? pendingFallback = null;
+        var pendingTargets = new Queue<string>(route.Targets);
 
         try
         {
-            foreach (var rawTarget in route.Targets)
+            while (pendingTargets.TryDequeue(out var rawTarget))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -74,15 +78,57 @@ internal static class GenerationCore
                     cancelledParentToken,
                     callerIdentity).ConfigureAwait(false);
                 telemetry?.NoteCapabilities(metadata);
+                var pacing = resolutionProfile == TargetResolutionProfile.PublicSdk
+                    ? registry.GetPacing(resolved)
+                    : default;
 
                 var effectiveRepairs = EffectiveRepairBudget(request, resolved, operation, capture, telemetry);
+                var contextRedirected = false;
                 for (var attemptNumber = 1; attemptNumber <= Math.Max(1, route.Retry.MaxAttempts); attemptNumber++)
                 {
                     var routeState = new RouteAttemptState();
                     telemetry?.Emit(new AttemptStarted(telemetry.RequestId, resolved.Target, attemptNumber));
+                    ContextLengthException? admissionError = null;
+                    try
+                    {
+                        EnforceSpend(policyContext, metadata, resolved, telemetry);
+                        CheckContextGate(policyContext, metadata, resolved, telemetry);
+                    }
+                    catch (ContextLengthException error)
+                    {
+                        admissionError = error;
+                    }
+
+                    if (admissionError is not null)
+                    {
+                        var disposition = RecordFailure(
+                            admissionError,
+                            resolved.Target,
+                            attempts,
+                            attemptNumber,
+                            route.Retry,
+                            contentEmitted: false,
+                            health: health);
+                        yield return new AttemptFailed(disposition.Attempt);
+                        pendingFallback = new PendingFallback(resolved.Target, admissionError.Snapshot());
+                        contextRedirected = ReplaceWithContextWindowTargets(route, pendingTargets, visitedTargets, targetResolver, resolutionProfile);
+                        break;
+                    }
+
+                    var cachePlan = PlanCache(policyContext, metadata, resolved, telemetry);
+                    var cacheMarks = cachePlan.Marks.Select(static mark => mark.Segment).ToArray();
+                    var wireRequest = RequestNormalizer.CreateWireRequest(request, resolved, cacheMarks: cacheMarks);
+                    if (resolutionProfile == TargetResolutionProfile.PublicSdk && pacing.Limiter?.UnsupportedHeadersReason is { } headersReason)
+                    {
+                        telemetry?.Emit(new ParameterDropped(
+                            telemetry.RequestId,
+                            resolved.Target,
+                            "limits.respect_headers",
+                            headersReason));
+                    }
                     var current = CreateEntry(
                         adapter,
-                        RequestNormalizer.CreateWireRequest(request, resolved),
+                        wireRequest,
                         operation,
                         stream,
                         resolved.Target,
@@ -91,7 +137,9 @@ internal static class GenerationCore
                         routeState,
                         cancellationToken,
                         telemetry,
-                        request.SchemaProfile == SchemaExecutionProfile.ModernSdk);
+                        request.SchemaProfile == SchemaExecutionProfile.ModernSdk,
+                        pacing,
+                        cancelledParentToken);
 
                     await foreach (var generationEvent in current.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
@@ -123,6 +171,10 @@ internal static class GenerationCore
                         }
 
                         pendingFallback = new PendingFallback(resolved.Target, current.Error.Snapshot());
+                        if (current.Error.Category == "context_length")
+                        {
+                            contextRedirected = ReplaceWithContextWindowTargets(route, pendingTargets, visitedTargets, targetResolver, resolutionProfile);
+                        }
                         break;
                     }
 
@@ -182,7 +234,7 @@ internal static class GenerationCore
                             new TelemetryObservation("repair_attempted", AttemptNumber: repairs));
                         current = CreateEntry(
                             adapter,
-                            RequestNormalizer.CreateWireRequest(request, resolved, preparation.Messages),
+                            RequestNormalizer.CreateWireRequest(request, resolved, preparation.Messages, cacheMarks: cacheMarks),
                             operation,
                             stream,
                             resolved.Target,
@@ -191,7 +243,9 @@ internal static class GenerationCore
                             routeState,
                             cancellationToken,
                             telemetry,
-                            request.SchemaProfile == SchemaExecutionProfile.ModernSdk);
+                            request.SchemaProfile == SchemaExecutionProfile.ModernSdk,
+                            pacing,
+                            cancelledParentToken);
 
                         await foreach (var generationEvent in current.ReadAsync(cancellationToken).ConfigureAwait(false))
                         {
@@ -232,6 +286,10 @@ internal static class GenerationCore
                         else
                         {
                             pendingFallback = new PendingFallback(resolved.Target, current.Error.Snapshot());
+                            if (current.Error.Category == "context_length")
+                            {
+                                contextRedirected = ReplaceWithContextWindowTargets(route, pendingTargets, visitedTargets, targetResolver, resolutionProfile);
+                            }
                         }
 
                         break;
@@ -259,21 +317,29 @@ internal static class GenerationCore
                         winningUsage = PricingCalculator.WithCost(winningUsage, metadata.ResolvedCapabilities);
                     }
 
+                    var toolCalls = current.ToolCalls;
+                    var finishReason = toolCalls.Count > 0 && current.FinishReason == "stop"
+                        ? "tool_calls"
+                        : current.FinishReason;
                     var result = new Generation(
                         current.Text,
                         structured,
                         resolved.Target,
-                        current.FinishReason,
+                        finishReason,
                         winningUsage,
                         new Timing(
                             current.StartedAt,
                             firstTokenMilliseconds,
                             totalMilliseconds,
-                            OutputTokensPerSecond(current.Usage, firstTokenMilliseconds, totalMilliseconds)),
+                            OutputTokensPerSecond(current.Usage, firstTokenMilliseconds, totalMilliseconds),
+                            current.QueuedMilliseconds > 0
+                                ? [new KeyValuePair<string, double>("queued_ms", current.QueuedMilliseconds)]
+                                : null),
                         current.Entry.Request.Mechanism,
                         repairs,
                         attempts,
-                        []);
+                        current.Warnings,
+                        toolCalls: toolCalls);
                     telemetry?.Emit(new AttemptCompleted(
                         telemetry.RequestId,
                         resolved.Target,
@@ -288,6 +354,11 @@ internal static class GenerationCore
 
                     yield return new StreamEnded(committed);
                     yield break;
+                }
+
+                if (contextRedirected)
+                {
+                    continue;
                 }
             }
 
@@ -310,8 +381,206 @@ internal static class GenerationCore
         RouteAttemptState routeState,
         CancellationToken cancellationToken,
         RequestTelemetry? telemetry,
-        bool publicSdk) =>
-        new(adapter, wireRequest, operation, target, role, assessment, routeState, cancellationToken, () => stream.IsClosing, telemetry, publicSdk);
+        bool publicSdk,
+        PacingSelection pacing,
+        Func<CancellationToken?>? cancelledParentToken) =>
+        new(
+            adapter,
+            wireRequest,
+            operation,
+            target,
+            role,
+            assessment,
+            routeState,
+            cancellationToken,
+            () => stream.IsClosing,
+            telemetry,
+            publicSdk,
+            pacing,
+            cancelledParentToken);
+
+    private static void EnforceSpend(
+        GenerationPolicyContext? policyContext,
+        TargetMetadata metadata,
+        ResolvedProvider resolved,
+        RequestTelemetry? telemetry)
+    {
+        if (policyContext?.SpendPolicy is not { Active: true } policy)
+        {
+            return;
+        }
+
+        var ledger = policyContext.Ledger ?? throw new InvalidOperationException("An active spend policy requires a spend ledger.");
+        var estimate = metadata.ResolvedCapabilities?.Pricing is null
+            ? null
+            : ContextBudgeting.BuildContextBudget(
+                policyContext.Request,
+                metadata.ResolvedCapabilities,
+                policyContext.Estimator,
+                new TokenCalibration()).EstimatedCost?.High;
+        var spent = ledger.Totals().Cost;
+        if (estimate is null)
+        {
+            if (policy.OnUnknown == "refuse")
+            {
+                throw new SpendLimitException(
+                    $"the cost of a request to {resolved.Target} cannot be estimated",
+                    UnknownSpendLimit(policy),
+                    spent,
+                    hint: "this target has no trusted pricing; set onUnknown='allow' to send it anyway, or supply pricing as a capability override");
+            }
+
+            return;
+        }
+
+        if (policy.MaxRequestUsd is { } requestLimit && AccountingDecimal.Compare(estimate, requestLimit) > 0)
+        {
+            throw new SpendLimitException(
+                $"a request to {resolved.Target} could cost {estimate}, above the per-request ceiling of {requestLimit}",
+                requestLimit,
+                spent,
+                estimate,
+                "shorten the prompt, cap max_output_tokens, or raise max_request_usd");
+        }
+
+        if (policy.MaxTotalUsd is not { } totalLimit)
+        {
+            return;
+        }
+
+        var requestId = telemetry?.RequestId ?? throw new InvalidOperationException("Public spend enforcement requires request telemetry.");
+        var reservation = ledger.Reserve(requestId, estimate, totalLimit);
+        if (!reservation.Accepted)
+        {
+            throw new SpendLimitException(
+                $"this client has spent {reservation.Spent}, reserved {reservation.Reserved}, and the next request could cost {estimate}, above the ceiling of {totalLimit}",
+                totalLimit,
+                reservation.Spent,
+                estimate,
+                "raise max_total_usd, or reset the ledger to start a new budget");
+        }
+    }
+
+    private static EDecimal? UnknownSpendLimit(SpendPolicy policy)
+    {
+        if (policy.MaxRequestUsd is { } requestLimit && AccountingDecimal.Compare(requestLimit, EDecimal.Zero) != 0)
+        {
+            return requestLimit;
+        }
+
+        return policy.MaxTotalUsd;
+    }
+
+    private static void CheckContextGate(
+        GenerationPolicyContext? policyContext,
+        TargetMetadata metadata,
+        ResolvedProvider resolved,
+        RequestTelemetry? telemetry)
+    {
+        if (policyContext?.ContextGate != true)
+        {
+            return;
+        }
+
+        ContextBudgeting.CheckContextFit(
+            policyContext.Request,
+            metadata.ResolvedCapabilities,
+            policyContext.Estimator,
+            metadata.Descriptor?.TokenCalibration,
+            provider: resolved.Target.ProviderId,
+            model: resolved.Target.Model);
+        telemetry?.Emit(new UsageEstimated(
+            telemetry.RequestId,
+            resolved.Target,
+            "input_tokens",
+            "pre-dispatch context-gate estimate"));
+    }
+
+    private static bool ReplaceWithContextWindowTargets(
+        Route route,
+        Queue<string> pendingTargets,
+        HashSet<(string ProviderId, string Model)> visitedTargets,
+        TargetMetadataResolver targetResolver,
+        TargetResolutionProfile resolutionProfile)
+    {
+        if (route.ContextWindowTargets.Count == 0)
+        {
+            return false;
+        }
+
+        pendingTargets.Clear();
+        foreach (var target in route.ContextWindowTargets)
+        {
+            var metadata = targetResolver.Resolve(target, resolutionProfile);
+            if (!visitedTargets.Contains((metadata.Target.ProviderId, metadata.Target.Model)))
+            {
+                pendingTargets.Enqueue(target);
+            }
+        }
+
+        return true;
+    }
+
+    private static CachePlan PlanCache(
+        GenerationPolicyContext? policyContext,
+        TargetMetadata metadata,
+        ResolvedProvider resolved,
+        RequestTelemetry? telemetry)
+    {
+        if (policyContext is null || policyContext.CachePolicy is not { Active: true } policy)
+        {
+            return new CachePlan();
+        }
+
+        var plan = metadata.Descriptor is null
+            ? new CachePlan(reasons: ["the target declares no prompt-cache mechanism"])
+            : CachePlanning.Plan(
+                policyContext.Request,
+                policy,
+                metadata.ResolvedCapabilities ?? new ModelCapabilities(),
+                metadata.Descriptor,
+                policyContext.Estimator ?? new HeuristicTokenEstimator());
+
+        if (plan.Mechanism == CacheMechanism.Implicit &&
+            policyContext.PrefixChanged(resolved.Target, plan.PrefixSignature(policyContext.Request)))
+        {
+            telemetry?.Emit(new ProviderDiagnostic(
+                resolved.Target,
+                new Diagnostic(
+                    "cache.prefix-unstable",
+                    "info",
+                    "the cacheable prefix changed since the last request to this target, so the provider's prompt cache will not be hit")));
+        }
+
+        if (!plan.Active)
+        {
+            telemetry?.Emit(new ParameterDropped(
+                telemetry.RequestId,
+                resolved.Target,
+                "cache.mode",
+                plan.Reasons.FirstOrDefault() ?? "no cacheable segment"));
+        }
+        else if (policy.Mode == CacheMode.Explicit && plan.Mechanism == CacheMechanism.Implicit)
+        {
+            telemetry?.Emit(new ParameterDropped(
+                telemetry.RequestId,
+                resolved.Target,
+                "cache.mode",
+                "the target offers implicit caching, not explicit marks"));
+        }
+
+        if (plan.Active)
+        {
+            telemetry?.Emit(new CachePlanned(
+                telemetry.RequestId,
+                resolved.Target,
+                plan.Mechanism!.Value.ToString().ToLowerInvariant(),
+                plan.Marks.Count,
+                plan.EstimatedCacheableTokens));
+        }
+
+        return plan;
+    }
     private static int EffectiveRepairBudget(
         NormalizedRequest request,
         ResolvedProvider resolved,
@@ -445,7 +714,12 @@ internal static class GenerationCore
         private readonly Func<bool> _suppressCloseCancellation;
         private readonly RequestTelemetry? _telemetry;
         private readonly bool _publicSdk;
+        private readonly PacingSelection _pacing;
+        private readonly Func<CancellationToken?>? _cancelledParentToken;
+        private AttemptPacing? _attemptPacing;
         private readonly StringBuilder _text = new();
+        private readonly Dictionary<int, ToolCallBuffer> _toolCalls = [];
+        private readonly List<string> _warnings = [];
         private EntryContext? _entry;
         private ProviderException? _error;
         private Usage? _usage;
@@ -468,7 +742,9 @@ internal static class GenerationCore
             CancellationToken cancellationToken,
             Func<bool> suppressCloseCancellation,
             RequestTelemetry? telemetry,
-            bool publicSdk)
+            bool publicSdk,
+            PacingSelection pacing,
+            Func<CancellationToken?>? cancelledParentToken)
         {
             _adapter = adapter;
             _request = request;
@@ -481,6 +757,8 @@ internal static class GenerationCore
             _suppressCloseCancellation = suppressCloseCancellation;
             _telemetry = telemetry;
             _publicSdk = publicSdk;
+            _pacing = pacing;
+            _cancelledParentToken = cancelledParentToken;
         }
 
         internal EntryContext Entry => _entry ?? throw new InvalidOperationException("The entry did not begin.");
@@ -491,13 +769,27 @@ internal static class GenerationCore
         internal double StartedAt => _startedAt;
         internal double? FirstTokenMilliseconds => _firstTokenMilliseconds;
         internal double TotalMilliseconds => _entryStopwatch.Elapsed.TotalMilliseconds;
+        internal double QueuedMilliseconds => _attemptPacing?.WaitedMs ?? 0;
+        internal IReadOnlyList<ToolCall> ToolCalls => BuildToolCalls();
+        internal IReadOnlyList<string> Warnings => _warnings;
 
         internal async IAsyncEnumerable<StreamEvent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
         {
             IAsyncEnumerator<AdapterEvent>? enumerator = null;
             Task<ReadStep>? pending = null;
+            RateLimitLease? outerLease = null;
+            _attemptPacing = _pacing.Limiter is null ? null : new AttemptPacing(_telemetry?.RequestId ?? string.Empty, _target);
             try
             {
+                ThrowIfParentCancelled();
+                if (_pacing.UsesOuterSlot && _pacing.Limiter is not null)
+                {
+                    outerLease = await _pacing.Limiter
+                        .AcquireAsync(_cancellationToken, _cancelledParentToken)
+                        .ConfigureAwait(false);
+                    ThrowIfParentCancelled();
+                }
+
                 enumerator = AdapterInvocationBoundary
                     .InvokeAsync(_adapter, _request, _operation, _role, _assessment, _cancellationToken)
                     .GetAsyncEnumerator(_cancellationToken);
@@ -553,9 +845,43 @@ internal static class GenerationCore
                 }
                 finally
                 {
+                    Exception? cleanupFailure = null;
                     if (enumerator is not null)
                     {
-                        await enumerator.DisposeAsync().ConfigureAwait(false);
+                        try
+                        {
+                            await enumerator.DisposeAsync().ConfigureAwait(false);
+                        }
+                        catch (Exception exception)
+                        {
+                            cleanupFailure = exception;
+                        }
+                    }
+
+                    if (outerLease is not null)
+                    {
+                        try
+                        {
+                            await outerLease.DisposeAsync().ConfigureAwait(false);
+                        }
+                        catch (Exception exception)
+                        {
+                            cleanupFailure ??= exception;
+                        }
+                    }
+
+                    try
+                    {
+                        _attemptPacing?.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        cleanupFailure ??= exception;
+                    }
+
+                    if (cleanupFailure is not null)
+                    {
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
                     }
                 }
 
@@ -563,6 +889,15 @@ internal static class GenerationCore
                 {
                     System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(pendingFailure).Throw();
                 }
+            }
+        }
+
+        private void ThrowIfParentCancelled()
+        {
+            var parent = _cancelledParentToken?.Invoke();
+            if (parent is { } token)
+            {
+                throw new OperationCanceledException(token);
             }
         }
 
@@ -589,21 +924,28 @@ internal static class GenerationCore
 
         private IEnumerable<StreamEvent> Project(AdapterEvent adapterEvent)
         {
+            _attemptPacing?.Detach();
             switch (adapterEvent)
             {
                 case AdapterTextDelta textDelta:
-                    if (!_firstContent)
-                    {
-                        _firstContent = true;
-                        _routeState.ContentEmitted = true;
-                        var firstTokenMilliseconds = _entryStopwatch.Elapsed.TotalMilliseconds;
-                        _firstTokenMilliseconds = firstTokenMilliseconds;
-                        _telemetry?.Emit(new FirstToken(_telemetry.RequestId, _target, firstTokenMilliseconds));
-                        yield return new TimingMark("first_token", firstTokenMilliseconds);
-                    }
+                    foreach (var timing in MarkFirstContent()) yield return timing;
 
                     _text.Append(textDelta.Text);
                     yield return new TextDelta(textDelta.Text);
+                    break;
+                case AdapterToolCallDelta toolDelta:
+                    if (!_publicSdk)
+                    {
+                        break;
+                    }
+                    foreach (var timing in MarkFirstContent()) yield return timing;
+                    if (!_toolCalls.TryGetValue(toolDelta.Index, out var buffer))
+                    {
+                        buffer = new ToolCallBuffer(toolDelta.Index);
+                        _toolCalls.Add(toolDelta.Index, buffer);
+                    }
+                    buffer.Absorb(toolDelta);
+                    yield return new ToolCallDelta(toolDelta.Index, toolDelta.CallId, toolDelta.Name, toolDelta.ArgumentsFragment);
                     break;
                 case AdapterUsage usage:
                     _sawAdapterUsage = true;
@@ -614,6 +956,57 @@ internal static class GenerationCore
                     _finishReason = final.FinishReason;
                     _usage = OverlayUsage(_usage, final.Usage, _publicSdk);
                     break;
+            }
+        }
+
+        private IEnumerable<StreamEvent> MarkFirstContent()
+        {
+            if (_firstContent) yield break;
+            _firstContent = true;
+            _routeState.ContentEmitted = true;
+            var firstTokenMilliseconds = _entryStopwatch.Elapsed.TotalMilliseconds;
+            _firstTokenMilliseconds = firstTokenMilliseconds;
+            _telemetry?.Emit(new FirstToken(_telemetry.RequestId, _target, firstTokenMilliseconds));
+            yield return new TimingMark("first_token", firstTokenMilliseconds);
+        }
+
+        private IReadOnlyList<ToolCall> BuildToolCalls()
+        {
+            var calls = new List<ToolCall>(_toolCalls.Count);
+            foreach (var (_, buffer) in _toolCalls.OrderBy(static item => item.Key)) calls.Add(buffer.Build(_warnings));
+            return calls;
+        }
+
+        private sealed class ToolCallBuffer
+        {
+            private readonly int _index;
+            private string? _callId;
+            private string? _name;
+            private readonly StringBuilder _arguments = new();
+            internal ToolCallBuffer(int index) => _index = index;
+            internal void Absorb(AdapterToolCallDelta delta)
+            {
+                if (!string.IsNullOrEmpty(delta.CallId)) _callId = delta.CallId;
+                if (!string.IsNullOrEmpty(delta.Name)) _name = delta.Name;
+                _arguments.Append(delta.ArgumentsFragment);
+            }
+            internal ToolCall Build(List<string> warnings)
+            {
+                var arguments = new JsonObject([]);
+                var text = _arguments.ToString().Trim();
+                if (text.Length > 0)
+                {
+                    try
+                    {
+                        if (JsonReader.ReadModern(text) is JsonObject objectArguments) arguments = objectArguments;
+                        else warnings.Add($"tool call {_name ?? _index.ToString()} arguments were not a JSON object; using an empty argument object");
+                    }
+                    catch (FormatException)
+                    {
+                        warnings.Add($"tool call {_name ?? _index.ToString()} had unparseable arguments; using an empty argument object");
+                    }
+                }
+                return new ToolCall(_callId ?? $"call_{_index}", _name ?? string.Empty, arguments);
             }
         }
 

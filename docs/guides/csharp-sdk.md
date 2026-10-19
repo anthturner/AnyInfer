@@ -135,6 +135,24 @@ Creating this metadata does not resolve credentials or construct a provider.
 --8<-- "examples/csharp-sdk/SetupExample.cs"
 ```
 
+## Apply request policy explicitly
+
+Spend policy, context-window routes, cache placement, and raw tool declarations are explicit
+client or request inputs. A supplied ledger remains caller-owned; a spend policy without one
+creates a client-local ledger. The generic OpenAI-compatible descriptor declares no cache
+mechanism. Tool declarations and raw tool call or result values do not run a callable tool loop.
+
+```csharp
+--8<-- "examples/csharp-sdk/RequestPolicyExample.cs"
+```
+
+Normal configured HTTP, including a supplied handler for a normal configured descriptor, is paced
+inside the generation entry deadline when `RateLimits` are active. Only an own-transport
+descriptor, or an opaque prebuilt registration with an active injected limiter, uses an outer slot
+before that deadline. Callers retain ownership of injected estimators, ledgers, limiters, and
+stores. Pool-owned raw transport differs from wrapper ownership, and transferred raw transport
+cannot rebuild through the wrapper path.
+
 ## Stream, validate, and route
 
 The remaining examples are source-linked so the site stays aligned with the code the offline
@@ -150,10 +168,11 @@ verifier runs.
 This proof covers asynchronous text generation and a synchronous facade over that same core,
 through the OpenAI-compatible adapter. It also covers structured JSON validation and repair,
 configuration, routing, reported token usage, bounded winning-request pricing, explicit budgets,
-caller-owned ledger and store helpers, standalone pacing, explicit capability probes, payload-free
+caller-owned ledger and store helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free
 typed telemetry, immutable manifests, and declarative setup metadata. It does not provide a
-released NuGet package, provider parity, provider invoice or all-wire totals, automatic spend
-admission, transport pacing, tool execution, embeddings, reranking, or production report publication.
+released NuGet package, provider parity, provider invoice or all-wire totals, automatic tool
+execution, rich-media input breadth, context/history reduction, embeddings, reranking, or
+production report publication.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with

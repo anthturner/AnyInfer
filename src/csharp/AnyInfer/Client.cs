@@ -7,6 +7,7 @@ using AnyInfer.Json;
 using AnyInfer.Providers;
 using AnyInfer.Schema;
 using AnyInfer.Events;
+using AnyInfer.Routing;
 using System.Runtime.ExceptionServices;
 
 namespace AnyInfer;
@@ -38,8 +39,12 @@ public sealed class Client : IDisposable
         bool manifests = true,
         bool manifestPayloads = false,
         ITokenEstimator? estimator = null,
-        SpendLedger? ledger = null)
-        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger))
+        SpendLedger? ledger = null,
+        SpendPolicy? spendPolicy = null,
+        bool contextGate = true,
+        IReadOnlyDictionary<string, RateLimiter>? limiters = null,
+        CachePolicy? cachePolicy = null)
+        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy))
     {
     }
 
@@ -53,8 +58,12 @@ public sealed class Client : IDisposable
         bool manifests = true,
         bool manifestPayloads = false,
         ITokenEstimator? estimator = null,
-        SpendLedger? ledger = null) =>
-        new(AsyncClient.FromAdapters(providers, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger));
+        SpendLedger? ledger = null,
+        SpendPolicy? spendPolicy = null,
+        bool contextGate = true,
+        IReadOnlyDictionary<string, RateLimiter>? limiters = null,
+        CachePolicy? cachePolicy = null) =>
+        new(AsyncClient.FromAdapters(providers, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy));
 
     /// <summary>Creates a synchronous client from inert parsed configuration.</summary>
     public static Client FromConfig(
@@ -69,8 +78,12 @@ public sealed class Client : IDisposable
         bool manifests = true,
         bool manifestPayloads = false,
         ITokenEstimator? estimator = null,
-        SpendLedger? ledger = null) =>
-        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger));
+        SpendLedger? ledger = null,
+        SpendPolicy? spendPolicy = null,
+        bool contextGate = true,
+        IReadOnlyDictionary<string, RateLimiter>? limiters = null,
+        CachePolicy? cachePolicy = null) =>
+        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy));
 
     /// <summary>Gets the immutable catalog used by pure target resolution.</summary>
     public global::AnyInfer.Catalog.Catalog Catalog => _inner.Catalog;
@@ -101,10 +114,13 @@ public sealed class Client : IDisposable
         string target,
         SchemaSpec? schema = null,
         Sampling? sampling = null,
-        long? outputReserveTokens = null)
+        long? outputReserveTokens = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null)
     {
         ThrowIfClosing();
-        return _inner.Budget(prompt, target, schema, sampling, outputReserveTokens);
+        return _inner.Budget(prompt, target, schema, sampling, outputReserveTokens, tools, toolChoice, cache);
     }
 
     /// <summary>Builds a pure context budget for caller messages and an explicit target.</summary>
@@ -113,10 +129,13 @@ public sealed class Client : IDisposable
         string target,
         SchemaSpec? schema = null,
         Sampling? sampling = null,
-        long? outputReserveTokens = null)
+        long? outputReserveTokens = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null)
     {
         ThrowIfClosing();
-        return _inner.Budget(messages, target, schema, sampling, outputReserveTokens);
+        return _inner.Budget(messages, target, schema, sampling, outputReserveTokens, tools, toolChoice, cache);
     }
 
     /// <summary>Subscribes an observer for synchronous telemetry notifications.</summary>
@@ -151,14 +170,16 @@ public sealed class Client : IDisposable
     /// <summary>Generates a terminal result from one user prompt.</summary>
     public Generation Generate(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
         Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
-        int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
-        RunOperation(token => _inner.GenerateAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest), cancellationToken);
+        int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
+        RunOperation(token => _inner.GenerateAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest, tools, toolChoice, cache), cancellationToken);
 
     /// <summary>Generates a terminal result from caller messages.</summary>
     public Generation Generate(IEnumerable<Message> messages, string? target = null, Route? route = null,
         Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
-        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
-        RunOperation(token => _inner.GenerateAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest), cancellationToken);
+        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
+        RunOperation(token => _inner.GenerateAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest, tools, toolChoice, cache), cancellationToken);
 
     /// <summary>Creates an eager-pump synchronous stream from an explicit request.</summary>
     public SyncStream Stream(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
@@ -167,14 +188,16 @@ public sealed class Client : IDisposable
     /// <summary>Creates an eager-pump synchronous stream from one user prompt.</summary>
     public SyncStream Stream(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
         Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
-        int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
-        CreateStream(() => _inner.StreamAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest));
+        int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
+        CreateStream(() => _inner.StreamAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest, tools, toolChoice, cache));
 
     /// <summary>Creates an eager-pump synchronous stream from caller messages.</summary>
     public SyncStream Stream(IEnumerable<Message> messages, string? target = null, Route? route = null,
         Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
-        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null) =>
-        CreateStream(() => _inner.StreamAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest));
+        double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
+        CreateStream(() => _inner.StreamAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest, tools, toolChoice, cache));
 
     /// <inheritdoc />
     public void Dispose()

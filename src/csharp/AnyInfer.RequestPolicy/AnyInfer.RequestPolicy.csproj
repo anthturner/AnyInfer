@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <RequestPolicySourceDirty Condition="'$(RequestPolicySourceDirty)' == ''">true</RequestPolicySourceDirty>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AnyInfer/AnyInfer.csproj" />
+    <AssemblyMetadata Include="RequestPolicySourceDirty" Value="$(RequestPolicySourceDirty)" />
+  </ItemGroup>
+</Project>

@@ -249,7 +249,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                     "generate",
                     cancellationToken,
                     request.UsesModernSchema).ConfigureAwait(false);
-                throw HttpFailure(response, errorBytes, "generate");
+                throw HttpFailure(response, errorBytes, "generate", request.UsesModernSchema);
             }
 
             if (request.Stream &&
@@ -262,7 +262,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 await foreach (var adapterEvent in ReadSseAsync(
                     responseStream,
                     request.MaxResponseBytes,
-                    request.Tools.Count > 0,
+                    request.UsesModernSchema || request.Tools.Count > 0,
                     cancellationToken,
                     request.UsesModernSchema).ConfigureAwait(false))
                 {
@@ -278,7 +278,9 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 request.Stream ? "stream" : "generate",
                 cancellationToken,
                 request.UsesModernSchema).ConfigureAwait(false);
-            foreach (var adapterEvent in ReadBuffered(body, request.Tools.Count > 0))
+            foreach (var adapterEvent in ReadBuffered(
+                body,
+                request.UsesModernSchema || request.Tools.Count > 0))
             {
                 yield return adapterEvent;
             }
@@ -314,6 +316,12 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             Content = content,
         };
         ApplyHeaders(message, content, _headers);
+
+        if (request.UsesModernSchema && request.Stream)
+        {
+            message.Headers.Remove("Accept");
+            message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        }
 
         if (!string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization"))
         {
@@ -380,7 +388,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         var properties = new List<JsonProperty>
         {
             new("model", new JsonString(request.Model)),
-            new("messages", new JsonArray(request.Messages.Select(CreateMessage))),
+            new("messages", new JsonArray(request.Messages.Select(message => CreateMessage(message, request.UsesModernSchema)))),
         };
         AddSampling(properties, request.Sampling);
         if (request.UsesModernSchema)
@@ -439,29 +447,66 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 ])),
             ]);
 
-    private JsonObject CreateMessage(Message message)
+    private JsonObject CreateMessage(Message message, bool usesModernSchema)
     {
+        if (usesModernSchema && message.Content.OfType<ToolResult>().FirstOrDefault() is { } result)
+        {
+            return new JsonObject([
+                new JsonProperty("role", new JsonString("tool")),
+                new JsonProperty("tool_call_id", new JsonString(result.CallId)),
+                new JsonProperty("content", new JsonString(result.Content)),
+            ]);
+        }
+
         var content = new StringBuilder();
+        var calls = new List<ToolCall>();
         foreach (var part in message.Content)
         {
-            if (part is not Text textPart)
+            if (part is Text textPart)
             {
+                content.Append(textPart.Value);
+                continue;
+            }
+
+            if (usesModernSchema && part is ToolCall call)
+            {
+                calls.Add(call);
+                continue;
+            }
+
             throw ProviderException.Create(
                 "The OpenAI-compatible chat adapter supports text message content only.",
                 "unsupported_input",
                 retryable: false,
                 phase: "generate",
                 provider: _providerId);
-            }
-
-            content.Append(textPart.Value);
         }
 
-        return new JsonObject([
+        var properties = new List<JsonProperty>
+        {
             new JsonProperty("role", new JsonString(message.Role)),
-            new JsonProperty("content", new JsonString(content.ToString())),
-        ]);
+            new JsonProperty(
+                "content",
+                calls.Count > 0 && content.Length == 0
+                    ? JsonNull.Instance
+                    : new JsonString(content.ToString())),
+        };
+        if (calls.Count > 0)
+        {
+            properties.Add(new JsonProperty("tool_calls", new JsonArray(calls.Select(CreateToolCall))));
+        }
+
+        return new JsonObject(properties);
     }
+
+    private static JsonObject CreateToolCall(ToolCall call) => new([
+        new JsonProperty("id", new JsonString(call.Id)),
+        new JsonProperty("type", new JsonString("function")),
+        new JsonProperty("function", new JsonObject([
+            new JsonProperty("name", new JsonString(call.Name)),
+            new JsonProperty("arguments", new JsonString(JsonWriter.WriteAccounting(call.Arguments, indent: null))),
+        ])),
+    ]);
 
     private static void AddSampling(List<JsonProperty> properties, Sampling sampling)
     {
@@ -856,8 +901,29 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             original.IsCancellationRequested ? original : effectiveToken);
     }
 
-    private ProviderException HttpFailure(HttpResponseMessage response, byte[] errorBytes, string phase)
+    private ProviderException HttpFailure(
+        HttpResponseMessage response,
+        byte[] errorBytes,
+        string phase,
+        bool modernGeneration = false)
     {
+        if (modernGeneration &&
+            response.StatusCode is (HttpStatusCode)413 or (HttpStatusCode)422)
+        {
+            var detail = ReadErrorDetail(errorBytes);
+            if (LooksLikeContextOverflow(detail))
+            {
+                return new ContextLengthException(
+                    detail,
+                    provider: _providerId,
+                    phase: phase,
+                    retryable: false,
+                    httpStatus: (int)response.StatusCode,
+                    detail: detail,
+                    hint: "shorten the prompt or choose a model with a larger context window");
+            }
+        }
+
         var (category, retryable) = response.StatusCode switch
         {
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => ("auth", false),
@@ -867,7 +933,6 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             _ when (int)response.StatusCode >= 500 => ("provider_unavailable", true),
             _ => ("invalid_request", false),
         };
-        _ = errorBytes;
         return ProviderException.Create(
             $"The OpenAI-compatible service returned HTTP {(int)response.StatusCode}.",
             category,
@@ -876,6 +941,78 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             retryAfterS: RetryAfter(response.Headers.RetryAfter),
             httpStatus: (int)response.StatusCode,
             provider: _providerId);
+    }
+
+    private static string ReadErrorDetail(byte[] errorBytes)
+    {
+        var text = Encoding.UTF8.GetString(errorBytes).Trim();
+        if (text.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            if (JsonReader.Read(errorBytes) is JsonObject root)
+            {
+                var error = root.TryGetValue("error", out var suppliedError) ? suppliedError : root;
+                if (error is JsonObject errorObject)
+                {
+                    var selected = FirstTruthyErrorValue(errorObject);
+                    return selected is JsonString selectedText
+                        ? BoundErrorDetail(selectedText.Value)
+                        : BoundErrorDetail(text);
+                }
+
+                if (error is JsonString errorText)
+                {
+                    return BoundErrorDetail(errorText.Value);
+                }
+            }
+        }
+        catch (FormatException)
+        {
+            // A malformed error body follows the same bounded raw-text fallback as Python.
+        }
+
+        return BoundErrorDetail(text);
+    }
+
+    private static JsonValue? FirstTruthyErrorValue(JsonObject error)
+    {
+        foreach (var name in new[] { "message", "detail", "type" })
+        {
+            if (error.TryGetValue(name, out var value) && IsJsonTruthy(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsJsonTruthy(JsonValue value) => value switch
+    {
+        JsonNull => false,
+        JsonBoolean boolean => boolean.Value,
+        JsonInteger integer => !integer.Value.IsZero,
+        JsonNumber number => number.Value != 0d,
+        JsonString text => text.Value.Length != 0,
+        JsonArray array => array.Items.Count != 0,
+        JsonObject obj => obj.Properties.Count != 0,
+        _ => false,
+    };
+
+    private static string BoundErrorDetail(string detail) =>
+        string.Concat(detail.EnumerateRunes().Take(400).Select(static rune => rune.ToString()));
+
+    private static bool LooksLikeContextOverflow(string detail)
+    {
+        var lowered = detail.ToLowerInvariant();
+        return lowered.Contains("context length", StringComparison.Ordinal) ||
+               lowered.Contains("context_length", StringComparison.Ordinal) ||
+               lowered.Contains("too many tokens", StringComparison.Ordinal) ||
+               lowered.Contains("maximum context", StringComparison.Ordinal);
     }
 
     private static double? RetryAfter(RetryConditionHeaderValue? retryAfter)

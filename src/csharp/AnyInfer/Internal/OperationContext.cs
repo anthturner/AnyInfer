@@ -14,15 +14,17 @@ internal sealed class OperationContext
     private readonly object _gate = new();
     private int _nextOrdinal;
 
-    internal OperationContext(OperationCapture? capture = null)
+    internal OperationContext(OperationCapture? capture = null, TimeProvider? entryTimeProvider = null)
     {
         OperationId = Guid.NewGuid();
         Capture = capture;
+        EntryTimeProvider = entryTimeProvider;
         Capture?.BindOperation(OperationId);
     }
 
     internal Guid OperationId { get; }
     internal OperationCapture? Capture { get; }
+    internal TimeProvider? EntryTimeProvider { get; }
     internal EntryContext? LastEntry { get; private set; }
     internal NativeAssessment? LastAssessment { get; private set; }
     internal bool IsClosed { get; private set; }

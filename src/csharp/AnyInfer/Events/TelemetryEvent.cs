@@ -160,7 +160,7 @@ public sealed record ContextReduced : TelemetryEvent
     public int Calls { get; }
 }
 /// <summary>Records an engaged prompt-cache plan.</summary>
-public sealed record CachePlanned(string RequestId, ResolvedTarget Target, string Mechanism, int MarkCount, int EstimatedCacheableTokens) : TelemetryEvent;
+public sealed record CachePlanned(string RequestId, ResolvedTarget Target, string Mechanism, int MarkCount, long EstimatedCacheableTokens) : TelemetryEvent;
 /// <summary>Records client-side rate-limit waiting.</summary>
 public sealed record RateLimitWaited(string RequestId,string ProviderId,double WaitedS,string Reason,ResolvedTarget? Target=null) : TelemetryEvent;
 /// <summary>Records provider-reported rate-limit state.</summary>

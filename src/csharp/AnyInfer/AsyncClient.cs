@@ -7,6 +7,7 @@ using AnyInfer.Catalog;
 using AnyInfer.Schema;
 using AnyInfer.Events;
 using AnyInfer.Manifest;
+using AnyInfer.Routing;
 
 namespace AnyInfer;
 
@@ -28,6 +29,10 @@ public sealed class AsyncClient : IAsyncDisposable
     private readonly bool _manifestPayloads;
     private readonly ITokenEstimator? _estimator;
     private readonly SpendLedger? _ledger;
+    private readonly SpendPolicy? _spendPolicy;
+    private readonly bool _contextGate;
+    private readonly CachePolicy? _cachePolicy;
+    private readonly CachePrefixState _cachePrefixes = new();
     private readonly object _gate = new();
     private readonly HashSet<AsyncStream> _activeStreams = [];
     private readonly HashSet<LifecycleReservation> _lifecycleOperations = [];
@@ -51,10 +56,22 @@ public sealed class AsyncClient : IAsyncDisposable
         bool manifests = true,
         bool manifestPayloads = false,
         ITokenEstimator? estimator = null,
-        SpendLedger? ledger = null)
+        SpendLedger? ledger = null,
+        SpendPolicy? spendPolicy = null,
+        bool contextGate = true,
+        IReadOnlyDictionary<string, RateLimiter>? limiters = null,
+        CachePolicy? cachePolicy = null)
     {
+        _dispatcher = new EventDispatcher(observers);
+        var copiedLimiters = CopyLimiters(limiters);
         var descriptors = registry ?? Providers.ProviderRegistry.CreateDefault();
-        _pool = new ProviderPool(providers, descriptors, resolver ?? Credentials.ResolverChain.CreateDefault());
+        _pool = new ProviderPool(
+            providers,
+            descriptors,
+            resolver ?? Credentials.ResolverChain.CreateDefault(),
+            copiedLimiters,
+            _dispatcher.Emit,
+            TimeProvider.System);
         _clock = new SystemOperationClock();
         _health = new RouteState(_clock);
         _defaultRoute = route;
@@ -64,12 +81,14 @@ public sealed class AsyncClient : IAsyncDisposable
         _targetResolver = new TargetMetadataResolver(_catalog, _pool.DescriptorSnapshot, () => _pool.Bindings, _pool, _capabilities);
         _resolutionProfile = TargetResolutionProfile.PublicSdk;
         _schemaValidation = schemaValidation;
-        _dispatcher = new EventDispatcher(observers);
         _manifests = manifests;
         _manifestPayloads = manifestPayloads;
         _estimator = estimator;
-        _ledger = ledger;
-        if (ledger is not null) _dispatcher.Subscribe(ledger);
+        _ledger = ledger ?? (spendPolicy is null ? null : new SpendLedger());
+        _spendPolicy = spendPolicy;
+        _contextGate = contextGate;
+        _cachePolicy = cachePolicy;
+        if (_ledger is not null) _dispatcher.Subscribe(_ledger);
     }
 
     /// <summary>Creates a client over externally constructed adapters.</summary>
@@ -80,8 +99,12 @@ public sealed class AsyncClient : IAsyncDisposable
         bool manifests = true,
         bool manifestPayloads = false,
         ITokenEstimator? estimator = null,
-        SpendLedger? ledger = null) =>
-        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger);
+        SpendLedger? ledger = null,
+        SpendPolicy? spendPolicy = null,
+        bool contextGate = true,
+        IReadOnlyDictionary<string, RateLimiter>? limiters = null,
+        CachePolicy? cachePolicy = null) =>
+        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy);
 
     /// <summary>Creates a client from inert parsed configuration without performing I/O or credential resolution.</summary>
     public static AsyncClient FromConfig(
@@ -96,14 +119,18 @@ public sealed class AsyncClient : IAsyncDisposable
         bool manifests = true,
         bool manifestPayloads = false,
         ITokenEstimator? estimator = null,
-        SpendLedger? ledger = null)
+        SpendLedger? ledger = null,
+        SpendPolicy? spendPolicy = null,
+        bool contextGate = true,
+        IReadOnlyDictionary<string, RateLimiter>? limiters = null,
+        CachePolicy? cachePolicy = null)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger);
+        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy ?? config.Cache);
     }
 
     internal AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock)
-        : this(providers, clock, publicSdk: false, schemaValidation: null, observers: null, manifests: false, manifestPayloads: false, estimator: null, ledger: null)
+        : this(providers, clock, publicSdk: false, schemaValidation: null, observers: null, manifests: false, manifestPayloads: false, estimator: null, ledger: null, spendPolicy: null, contextGate: false, limiters: null, cachePolicy: null)
     {
     }
 
@@ -116,9 +143,15 @@ public sealed class AsyncClient : IAsyncDisposable
         bool manifests,
         bool manifestPayloads,
         ITokenEstimator? estimator,
-        SpendLedger? ledger)
+        SpendLedger? ledger,
+        SpendPolicy? spendPolicy,
+        bool contextGate,
+        IReadOnlyDictionary<string, RateLimiter>? limiters,
+        CachePolicy? cachePolicy)
     {
-        _pool = new ProviderPool(providers);
+        _dispatcher = new EventDispatcher(observers);
+        var copiedLimiters = CopyLimiters(limiters);
+        _pool = new ProviderPool(providers, copiedLimiters, _dispatcher.Emit, TimeProvider.System);
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _health = new RouteState(_clock);
         _catalog = AnyInfer.Catalog.Catalog.LoadDefault();
@@ -131,14 +164,37 @@ public sealed class AsyncClient : IAsyncDisposable
             _capabilities);
         _resolutionProfile = publicSdk ? TargetResolutionProfile.PublicSdk : TargetResolutionProfile.FrozenV0;
         _schemaValidation = schemaValidation;
-        _dispatcher = new EventDispatcher(observers);
         _manifests = manifests;
         _manifestPayloads = manifestPayloads;
         _estimator = estimator;
-        _ledger = ledger;
-        if (ledger is not null) _dispatcher.Subscribe(ledger);
+        _ledger = ledger ?? (publicSdk && spendPolicy is not null ? new SpendLedger() : null);
+        _spendPolicy = publicSdk ? spendPolicy : null;
+        _contextGate = publicSdk && contextGate;
+        _cachePolicy = publicSdk ? cachePolicy : null;
+        if (_ledger is not null) _dispatcher.Subscribe(_ledger);
     }
 
+    private static IReadOnlyDictionary<string, RateLimiter>? CopyLimiters(
+        IReadOnlyDictionary<string, RateLimiter>? limiters)
+    {
+        if (limiters is null)
+        {
+            return null;
+        }
+
+        var copy = new Dictionary<string, RateLimiter>(StringComparer.Ordinal);
+        foreach (var pair in limiters)
+        {
+            var instanceId = ProviderSettings.NormalizeId(pair.Key, nameof(limiters));
+            ArgumentNullException.ThrowIfNull(pair.Value);
+            if (!copy.TryAdd(instanceId, pair.Value))
+            {
+                throw new ArgumentException("Limiter instance IDs must be unique after normalization.", nameof(limiters));
+            }
+        }
+
+        return new System.Collections.ObjectModel.ReadOnlyDictionary<string, RateLimiter>(copy);
+    }
     internal RouteState Health => _health;
 
     /// <summary>Gets the immutable catalog used by pure target resolution.</summary>
@@ -182,8 +238,11 @@ public sealed class AsyncClient : IAsyncDisposable
         string target,
         SchemaSpec? schema = null,
         Sampling? sampling = null,
-        long? outputReserveTokens = null) =>
-        Budget(new GenerationRequest([Message.User(prompt)], new Route([target]), sampling, schema: schema), target, outputReserveTokens);
+        long? outputReserveTokens = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null) =>
+        Budget(new GenerationRequest([Message.User(prompt)], new Route([target]), sampling, schema: schema, tools: tools, toolChoice: toolChoice, cache: cache), target, outputReserveTokens);
 
     /// <summary>Builds a pure context budget for caller messages and an explicit target.</summary>
     public ContextBudget Budget(
@@ -191,10 +250,13 @@ public sealed class AsyncClient : IAsyncDisposable
         string target,
         SchemaSpec? schema = null,
         Sampling? sampling = null,
-        long? outputReserveTokens = null)
+        long? outputReserveTokens = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null)
     {
         ArgumentNullException.ThrowIfNull(messages);
-        return Budget(new GenerationRequest(messages, new Route([target]), sampling, schema: schema), target, outputReserveTokens);
+        return Budget(new GenerationRequest(messages, new Route([target]), sampling, schema: schema, tools: tools, toolChoice: toolChoice, cache: cache), target, outputReserveTokens);
     }
 
     /// <summary>Subscribes an observer for synchronous telemetry notifications.</summary>
@@ -248,9 +310,12 @@ public sealed class AsyncClient : IAsyncDisposable
         double? timeoutS = null,
         int? maxResponseBytes = null,
         CancellationToken cancellationToken = default,
-        bool? manifest = null) =>
+        bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null) =>
         GenerateAsync(
-            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false),
+            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false, tools, toolChoice, cache),
             cancellationToken,
             manifest);
 
@@ -266,9 +331,12 @@ public sealed class AsyncClient : IAsyncDisposable
         double? timeoutS = null,
         int? maxResponseBytes = null,
         CancellationToken cancellationToken = default,
-        bool? manifest = null) =>
+        bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null) =>
         GenerateAsync(
-            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false),
+            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false, tools, toolChoice, cache),
             cancellationToken,
             manifest);
 
@@ -298,9 +366,12 @@ public sealed class AsyncClient : IAsyncDisposable
         double? timeoutS = null,
         int? maxResponseBytes = null,
         CancellationToken cancellationToken = default,
-        bool? manifest = null) =>
+        bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null) =>
         StreamAsync(
-            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true),
+            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true, tools, toolChoice, cache),
             cancellationToken,
             manifest);
 
@@ -316,9 +387,12 @@ public sealed class AsyncClient : IAsyncDisposable
         double? timeoutS = null,
         int? maxResponseBytes = null,
         CancellationToken cancellationToken = default,
-        bool? manifest = null) =>
+        bool? manifest = null,
+        IEnumerable<ToolSpec>? tools = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null) =>
         StreamAsync(
-            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true),
+            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true, tools, toolChoice, cache),
             cancellationToken,
             manifest);
 
@@ -340,7 +414,10 @@ public sealed class AsyncClient : IAsyncDisposable
                 request.SchemaMechanism,
                 request.TimeoutS,
                 request.MaxResponseBytes,
-                request.Stream)
+                request.Stream,
+                request.Tools,
+                request.ToolChoice,
+                request.Cache)
             : request;
         var normalized = RequestNormalizer.Normalize(
             effectiveRequest,
@@ -356,7 +433,8 @@ public sealed class AsyncClient : IAsyncDisposable
                 effectiveRequest.Route,
                 metadata => _capabilities.CapabilitiesFor(metadata.Descriptor, metadata.Target.ProviderId, metadata.Target.Model, _pool.EffectiveLocality(metadata)),
                 _manifestPayloads,
-                AnyInferVersion.Value)
+                AnyInferVersion.Value,
+                effectiveRequest.Cache ?? _cachePolicy)
             : null;
         RequestTelemetry? telemetry = _resolutionProfile == TargetResolutionProfile.PublicSdk
             ? new RequestTelemetry(normalized, effectiveRequest.Route, _dispatcher, builder, requestId)
@@ -365,7 +443,7 @@ public sealed class AsyncClient : IAsyncDisposable
         stream = new AsyncStream(
             this,
             SyncExecutionContext.CurrentClient,
-            token => RunStreamAsync(normalized, effectiveRequest.Route, capture, stream!, token),
+            token => RunStreamAsync(normalized, effectiveRequest.Route, capture, stream!, _resolutionProfile == TargetResolutionProfile.PublicSdk ? new GenerationPolicyContext(effectiveRequest, effectiveRequest.Cache ?? _cachePolicy, _estimator, _cachePrefixes, _spendPolicy, _ledger, _contextGate) : null, token),
             cancellationToken,
             OnStreamClosed,
             telemetry);
@@ -451,6 +529,7 @@ public sealed class AsyncClient : IAsyncDisposable
         Route route,
         OperationCapture? capture,
         AsyncStream stream,
+        GenerationPolicyContext? policyContext,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         try
@@ -465,6 +544,7 @@ public sealed class AsyncClient : IAsyncDisposable
                 _clock,
                 capture,
                 stream,
+                policyContext,
                 cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
             {
                 yield return generationEvent;
@@ -905,7 +985,10 @@ public sealed class AsyncClient : IAsyncDisposable
         string? schemaMechanism,
         double? timeoutS,
         int? maxResponseBytes,
-        bool stream)
+        bool stream,
+        IEnumerable<ToolSpec>? tools,
+        string toolChoice,
+        CachePolicy? cache)
     {
         ArgumentNullException.ThrowIfNull(messages);
         var selectedRoute = route;
@@ -927,6 +1010,9 @@ public sealed class AsyncClient : IAsyncDisposable
             schemaMechanism,
             timeoutS,
             maxResponseBytes,
-            stream);
+            stream,
+            tools,
+            toolChoice,
+            cache);
     }
 }

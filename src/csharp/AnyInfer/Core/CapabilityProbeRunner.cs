@@ -30,6 +30,8 @@ internal static class CapabilityProbeRunner
         var schema = mechanism is null ? null : new SchemaSpec(CapabilityProbes.ProbeSchema, "capability_probe");
         var normalized = new NormalizedRequest(
             [Message.User(CapabilityProbes.ProbePrompt(feature))],
+            [],
+            "auto",
             new Sampling(temperature: 0, maxOutputTokens: CapabilityProbes.ProbeMaxOutputTokens),
             schema,
             RepairBudget: 0,

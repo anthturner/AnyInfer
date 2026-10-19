@@ -24,7 +24,11 @@ public sealed record ProviderDescriptor
         IReadOnlyDictionary<string, EmbeddingCapabilities>? staticEmbeddingCapabilities = null,
         IReadOnlyDictionary<string, RerankCapabilities>? staticRerankCapabilities = null,
         TokenCalibration? tokenCalibration = null,
-        RateLimitHeaders? rateLimitHeaders = null)
+        RateLimitHeaders? rateLimitHeaders = null,
+        CacheMechanism? cacheMechanism = null,
+        int cacheMaxMarks = 0,
+        long cacheMinTokens = 0,
+        bool governsOwnTransport = false)
     {
         Id = ProviderSettings.NormalizeId(id, nameof(id));
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -66,6 +70,25 @@ public sealed record ProviderDescriptor
 
         TokenCalibration = tokenCalibration ?? new TokenCalibration();
         RateLimitHeaders = rateLimitHeaders ?? new RateLimitHeaders();
+        if (cacheMechanism is { } mechanism && !Enum.IsDefined(mechanism))
+        {
+            throw new ArgumentOutOfRangeException(nameof(cacheMechanism));
+        }
+
+        if (cacheMaxMarks < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cacheMaxMarks));
+        }
+
+        if (cacheMinTokens < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cacheMinTokens));
+        }
+
+        CacheMechanism = cacheMechanism;
+        CacheMaxMarks = cacheMaxMarks;
+        CacheMinTokens = cacheMinTokens;
+        GovernsOwnTransport = governsOwnTransport;
     }
 
     /// <summary>Gets the canonical provider descriptor ID.</summary>
@@ -102,6 +125,14 @@ public sealed record ProviderDescriptor
     public TokenCalibration TokenCalibration { get; }
     /// <summary>Gets declared rate-limit header names, empty when the provider declares none.</summary>
     public RateLimitHeaders RateLimitHeaders { get; }
+    /// <summary>Gets the provider's optional prompt-cache mechanism.</summary>
+    public CacheMechanism? CacheMechanism { get; }
+    /// <summary>Gets the provider cache-mark ceiling, or zero to use the request policy ceiling.</summary>
+    public int CacheMaxMarks { get; }
+    /// <summary>Gets the provider cache-mark token floor, or zero to use the request policy floor.</summary>
+    public long CacheMinTokens { get; }
+    /// <summary>Gets whether the adapter owns its HTTP transport and requires an outer pacing slot.</summary>
+    public bool GovernsOwnTransport { get; }
     // Cooperative factory contract: only the pool disposes an opted-in configured handler.
     internal bool PoolOwnsConfiguredTransport { get; init; }
 

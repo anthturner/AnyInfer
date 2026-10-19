@@ -69,9 +69,13 @@ Its source-linked examples cover generation, routing, configuration, pure catalo
 queries, explicit model discovery, health and capability probes for a configured instance,
 payload-free typed telemetry, immutable manifests, declarative provider setup metadata, bounded
 winning-request pricing, explicit budgeting, caller-owned ledger/store helpers, standalone pacing,
-and modern JSON Schema validation with typed deserialization. They do not imply provider parity,
-released NuGet distribution, provider invoice or all-wire accounting, automatic admission or
-transport pacing, or a supported application integration path.
+explicit request-policy inputs, and modern JSON Schema validation with typed deserialization. They
+do not imply provider parity, released NuGet distribution, provider invoice or all-wire accounting,
+automatic tool execution, rich-media input breadth, context/history reduction, or a supported
+application integration path. Typed raw tool values do not provide callable tool
+execution, and specialized context-window routes are public route values rather than version 1
+configuration syntax. Configured `RateLimits` pace normal provider HTTP inside the entry deadline;
+own-transport and opaque prebuilt cases have a separate outer-slot boundary.
 
 - [Explore the C# SDK proof](csharp-sdk.md)
 - [Move from Python to the C# SDK proof](python-to-csharp.md)

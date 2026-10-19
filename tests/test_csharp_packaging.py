@@ -400,6 +400,47 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "var spend = client.Spend();" in source
     assert "new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false))" in source
     assert "sealed class AccountingAdapter : IProviderAdapter" in source
+    assert "using AnyInfer.Config;" in source
+    assert 'new ProviderRegistration("policy-demo", policyAdapter)' in source
+    assert "spendPolicy: new SpendPolicy()" in source
+    assert "cachePolicy: new CachePolicy()" in source
+    assert (
+        'new Route(["policy-demo:model"], contextWindowTargets: ["policy-demo:model"])' in source
+    )
+    assert "new ToolSpec(" in source
+    assert (
+        'new Message("assistant", [new ToolCall("call-1", rawTool.Name, new JsonObject([' in source
+    )
+    assert 'new JsonProperty("properties", new JsonObject([' in source
+    assert 'new JsonProperty("city", new JsonObject([' in source
+    assert 'new JsonProperty("city", new JsonString("Boston"))' in source
+    assert 'new Message("tool", [new ToolResult("call-1", "clear")])' in source
+    assert "await using var stream = client.StreamAsync(policyRequest);" in source
+    assert "ToolCallDelta? delta = null;" in source
+    assert 'generation.Text != ""' in source
+    assert 'generation.FinishReason != "tool_calls"' in source
+    assert 'inboundCall.Id != "inbound-call"' in source
+    assert 'inboundCall.Name != "lookup_weather"' in source
+    assert 'inboundCity is not JsonString { Value: "Boston" }' in source
+    assert 'const string expectedArguments = """{"city":"Boston"}""";' in source
+    assert "Index: 0," in source
+    assert "ArgumentsFragment: expectedArguments" in source
+    assert "sealed class PolicyAdapter : IProviderAdapter" in source
+    assert "new AdapterToolCallDelta(" in source
+    assert "var captured = policyAdapter.Captured" in source
+    assert 'outboundCall.Id != "call-1"' in source
+    assert 'outboundCall.Name != "lookup_weather"' in source
+    assert 'outboundCity is not JsonString { Value: "Boston" }' in source
+    assert 'outboundResult.CallId != "call-1"' in source
+    assert 'outboundResult.Content != "clear"' in source
+    assert "outboundResult.IsError" in source
+    assert 'parameterType is not JsonString { Value: "object" }' in source
+    assert 'cityType is not JsonString { Value: "string" }' in source
+    assert "cache: new CachePolicy(CacheMode.Off)" in source
+    assert "new AnyInferConfig(" in source
+    assert "AsyncClient.FromConfig(" in source
+    assert "configured policy adapter disposal failed" in source
+    assert "policy adapter disposal failed" in source
     assert "SchemaSpec.FromJson" in source
     assert "SchemaValidator.ValidateAsync" in source
     assert ".DeserializeStructured<SchemaAnswer>()" in source

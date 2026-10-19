@@ -27,7 +27,7 @@ internal static class AdapterInvocationBoundary
         ArgumentNullException.ThrowIfNull(operation);
 
         var entry = operation.BeginEntry(request, role, repairAssessment);
-        await using var timeout = new EntryTimeoutScope(entry, cancellationToken);
+        var timeout = new EntryTimeoutScope(entry, cancellationToken, operation.EntryTimeProvider);
         using IDisposable? identity = request.UsesModernSchema
             ? CancellationIdentityContext.Push(timeout.Token, CancellationIdentityContext.Resolve(cancellationToken))
             : null;
@@ -70,6 +70,7 @@ internal static class AdapterInvocationBoundary
         }
         finally
         {
+            Exception? cleanupFailure = null;
             if (enumerator is not null)
             {
                 timeout.CleanupStart();
@@ -79,12 +80,23 @@ internal static class AdapterInvocationBoundary
                 }
                 catch (Exception exception)
                 {
-                    throw RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream);
+                    cleanupFailure = RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream);
                 }
                 finally
                 {
                     timeout.CleanupEnd();
                 }
+            }
+
+            await timeout.DisposeAsync().ConfigureAwait(false);
+            if (cleanupFailure is not null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
+            }
+
+            if (timeout.DeferredFailure is { } timerFailure && entry.TerminalFailure is null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(timerFailure).Throw();
             }
         }
     }

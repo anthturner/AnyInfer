@@ -136,6 +136,8 @@ class TestVerbs:
         workspace.main(["check", "--only=lint"])
         assert "workspace.py" in recorded[0]
         assert "scripts/check_csharp_accounting.py" in recorded[0]
+        assert "scripts/_csharp_observation.py" in recorded[0]
+        assert "scripts/check_csharp_request_policy.py" in recorded[0]
 
     def test_check_fix_reaches_the_lint_phase(self, recorded):
         workspace.main(["check", "--only=lint", "--fix"])
@@ -192,6 +194,10 @@ class TestVerbs:
             (["dotnet", "test", "AnyInfer.sln", "--no-restore"], ROOT / "src" / "csharp"),
             (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_accounting.py")],
+                ROOT,
+            ),
+            (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_request_policy.py")],
                 ROOT,
             ),
             (
@@ -344,10 +350,9 @@ class TestVerbs:
 
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
-        # The ten default phases comprise eighteen steps — sixteen subprocesses plus the two
-        # in-process docs gates; every one must have been attempted despite the failure
-        # (contracts and conformance have two steps each, docs-check three, C# six).
-        assert len(calls) == 19
+        # Every default step must be attempted despite the failure, including the two
+        # in-process docs gates and seven C# steps.
+        assert len(calls) == 20
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

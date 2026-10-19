@@ -18,19 +18,25 @@ supported public SDK and its generated Python API reference remains under
 | `ModelCapabilities` | Provenance-bearing model facts; unknown values remain unknown. |
 | `PricingCalculator`, `ContextBudget`, `SpendLedger`, `SpendStore` | Explicit winning-request pricing, planning, and caller-owned accounting helpers. |
 | `RateLimits`, `RateLimiter` | Standalone pacing configuration and caller-disposed leases. |
+| `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy` | Explicit spend admission, specialized context fallback, and cache planning inputs. |
+| `ToolSpec`, `ToolCall`, `ToolResult` | Typed raw tool declarations and feedback; no callable tool loop. |
 | `ModelsAsync`, `HealthAsync` / `Models`, `Health` | Explicit asynchronous or synchronous lifecycle calls for one provider instance. |
 | `ProbeAsync` / `Probe`, `ProbeReport` | Explicit ordered generation-capability measurements and their provenance-bearing report. |
 | `ProviderSetupSpec`, `SetupField`, `HostShorthand` | Inert declarative setup metadata for application-owned configuration surfaces. |
 | `IObserver`, `TelemetryEvent` | Synchronous typed in-process telemetry; observers and sinks remain caller-owned. |
 | `RunManifest`, `ManifestUtilities` | Immutable per-call manifest values, serialization, schema, digest, and rendering helpers. |
 
+Configured `RateLimits` can pace normal provider HTTP inside the generation entry deadline. An
+own-transport descriptor, or an opaque prebuilt registration with an active injected limiter, uses
+an outer slot before entry; this is not a universal provider transport guarantee.
+
 The proof currently demonstrates text generation through the OpenAI-compatible adapter,
 structured JSON validation, repair, configuration, routing, reported token usage, explicit
 capability probes, payload-free telemetry, immutable manifests, setup metadata, bounded
 winning-request pricing, explicit budgeting, caller-owned ledger and store helpers, and standalone
 pacing. It has no released NuGet package, provider-parity guarantee, provider invoice or all-wire
-accounting, automatic spend admission, transport pacing, tool execution, embedding, or reranking
-surface.
+accounting, automatic tool execution, rich-media input breadth, context/history reduction,
+embedding, or reranking surface.
 
 Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12. Draft 3 and Draft 4
 remain deferred. Numeric and regular-expression behavior is native to .NET, regular-expression

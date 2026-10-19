@@ -6,6 +6,8 @@ namespace AnyInfer.Core;
 
 internal sealed record NormalizedRequest(
     IReadOnlyList<Message> Messages,
+    IReadOnlyList<ToolSpec> Tools,
+    string ToolChoice,
     Sampling Sampling,
     SchemaSpec? Schema,
     int RepairBudget,
@@ -22,11 +24,13 @@ internal static class RequestNormalizer
         ArgumentNullException.ThrowIfNull(request);
         RequestAdmission.Validate(request, allowTargetAliases, schemaProfile);
 
-        var messages = request.Messages
-            .Select(static message => new Message(
-                message.Role,
-                [new Text(string.Concat(message.Content.Cast<Text>().Select(static part => part.Value)))]))
-            .ToArray();
+        var messages = schemaProfile == SchemaExecutionProfile.FrozenV0
+            ? request.Messages
+                .Select(static message => new Message(
+                    message.Role,
+                    [new Text(string.Concat(message.Content.Cast<Text>().Select(static part => part.Value)))]))
+                .ToArray()
+            : request.Messages.Select(static message => new Message(message.Role, message.Content)).ToArray();
         var sourceSampling = request.Sampling;
         var normalizedSampling = new Sampling(
             temperature: sourceSampling?.Temperature,
@@ -39,6 +43,8 @@ internal static class RequestNormalizer
 
         return new NormalizedRequest(
             Array.AsReadOnly(messages),
+            request.Tools,
+            request.ToolChoice,
             normalizedSampling,
             request.Schema,
             Math.Max(0, request.Repair?.MaxAttempts ?? 0),
@@ -54,7 +60,8 @@ internal static class RequestNormalizer
         ResolvedProvider resolved,
         IReadOnlyList<Message>? messages = null,
         IEnumerable<ToolSpec>? tools = null,
-        string toolChoice = "auto")
+        string? toolChoice = null,
+        IEnumerable<int>? cacheMarks = null)
     {
         ArgumentNullException.ThrowIfNull(normalized);
         ArgumentNullException.ThrowIfNull(resolved);
@@ -83,8 +90,9 @@ internal static class RequestNormalizer
             normalized.MaxResponseBytes,
             normalized.Schema?.Name ?? "response",
             normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk,
-            tools,
-            toolChoice);
+            tools ?? normalized.Tools,
+            toolChoice ?? normalized.ToolChoice,
+            cacheMarks);
     }
 
     private static string SelectMechanism(StructuredOutputProfile capabilities) =>

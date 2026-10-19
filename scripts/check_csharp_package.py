@@ -311,6 +311,7 @@ def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> Non
         '''using AnyInfer;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
+using AnyInfer.Config;
 using AnyInfer.Events;
 using AnyInfer.Json;
 using AnyInfer.Manifest;
@@ -435,6 +436,116 @@ var accountingLedger = new SpendLedger();
 }
 if (accountingAdapter.DisposeCount != 1)
     throw new InvalidOperationException("accounting adapter disposal failed");
+
+var policyAdapter = new PolicyAdapter();
+var policyLedger = new SpendLedger();
+var rawTool = new ToolSpec(
+    "lookup_weather",
+    "Reads a weather observation.",
+    new JsonObject([
+        new JsonProperty("type", new JsonString("object")),
+        new JsonProperty("properties", new JsonObject([
+            new JsonProperty("city", new JsonObject([
+                new JsonProperty("type", new JsonString("string")),
+            ])),
+        ])),
+    ]));
+var policyRequest = new GenerationRequest(
+    [
+        Message.System("Answer concisely."),
+        new Message("assistant", [new ToolCall("call-1", rawTool.Name, new JsonObject([
+            new JsonProperty("city", new JsonString("Boston")),
+        ]))]),
+        new Message("tool", [new ToolResult("call-1", "clear")]),
+        Message.User("weather"),
+    ],
+    new Route(["policy-demo:model"], contextWindowTargets: ["policy-demo:model"]),
+    stream: true,
+    tools: [rawTool],
+    cache: new CachePolicy(CacheMode.Off));
+{
+    await using var client = AsyncClient.FromAdapters(
+        [new ProviderRegistration("policy-demo", policyAdapter)],
+        ledger: policyLedger,
+        spendPolicy: new SpendPolicy(),
+        cachePolicy: new CachePolicy());
+    await using var stream = client.StreamAsync(policyRequest);
+    ToolCallDelta? delta = null;
+    await foreach (var item in stream)
+    {
+        if (item is ToolCallDelta observed)
+            delta = observed;
+    }
+    var generation = stream.Result;
+    var captured = policyAdapter.Captured
+        ?? throw new InvalidOperationException("policy adapter did not receive a wire request");
+    var outboundCall = captured.Messages[1].Content.Single() as ToolCall;
+    var outboundResult = captured.Messages[2].Content.Single() as ToolResult;
+    var inboundCall = generation.ToolCalls.Single();
+    const string expectedArguments = """{"city":"Boston"}""";
+    var capturedTool = captured.Tools.Single();
+    if (generation.Text != ""
+        || generation.FinishReason != "tool_calls"
+        || inboundCall.Id != "inbound-call"
+        || inboundCall.Name != "lookup_weather"
+        || !inboundCall.Arguments.TryGetValue("city", out var inboundCity)
+        || inboundCity is not JsonString { Value: "Boston" }
+        || delta is not
+        {
+            Index: 0,
+            CallId: "inbound-call",
+            Name: "lookup_weather",
+            ArgumentsFragment: expectedArguments,
+        }
+        || captured.Messages.Count != 4
+        || outboundCall is null
+        || outboundCall.Id != "call-1"
+        || outboundCall.Name != "lookup_weather"
+        || !outboundCall.Arguments.TryGetValue("city", out var outboundCity)
+        || outboundCity is not JsonString { Value: "Boston" }
+        || outboundResult is null
+        || outboundResult.CallId != "call-1"
+        || outboundResult.Content != "clear"
+        || outboundResult.IsError
+        || client.Spend().Requests != 1
+        || policyRequest.Route.ContextWindowTargets.Count != 1
+        || policyRequest.Cache?.Mode != CacheMode.Off
+        || rawTool.Annotations.Stated
+        || capturedTool.Name != "lookup_weather"
+        || !capturedTool.Parameters.TryGetValue("type", out var parameterType)
+        || parameterType is not JsonString { Value: "object" }
+        || !capturedTool.Parameters.TryGetValue("properties", out var parameterProperties)
+        || parameterProperties is not JsonObject properties
+        || !properties.TryGetValue("city", out var citySchema)
+        || citySchema is not JsonObject city
+        || !city.TryGetValue("type", out var cityType)
+        || cityType is not JsonString { Value: "string" })
+        throw new InvalidOperationException("public request policy or raw tool values failed");
+}
+if (policyAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("policy adapter disposal failed");
+
+var policyConfig = new AnyInferConfig(
+    [ProviderSettings.Of("policy-config")],
+    cache: new CachePolicy(CacheMode.Off));
+var configuredPolicyAdapter = new DemoAdapter();
+var configuredPolicyRegistry = new ProviderRegistry([
+    new ProviderDescriptor(
+        "policy-config",
+        "Policy config",
+        (_, _) => ValueTask.FromResult<IProviderAdapter>(configuredPolicyAdapter)),
+]);
+{
+    await using var client = AsyncClient.FromConfig(
+        policyConfig,
+        configuredPolicyRegistry,
+        cachePolicy: new CachePolicy(CacheMode.Off));
+    var configured = await client.GenerateAsync("configured", target: "policy-config:model");
+    if (configured.Text != "buffered" || policyConfig.Cache?.Mode != CacheMode.Off)
+        throw new InvalidOperationException("public configured policy client failed");
+}
+if (configuredPolicyAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("configured policy adapter disposal failed");
 
 var limiter = new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false));
 await using (var firstLease = await limiter.AcquireAsync())
@@ -686,6 +797,34 @@ sealed class AccountingAdapter : IProviderAdapter
         cancellationToken.ThrowIfCancellationRequested();
         yield return new AdapterTextDelta("accounting");
         yield return new AdapterFinal("stop", new Usage(InputTokens: 1, OutputTokens: 1));
+        await Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
+    }
+}
+
+sealed class PolicyAdapter : IProviderAdapter
+{
+    public WireRequest? Captured { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    public async IAsyncEnumerable<AdapterEvent> GenerateAsync(
+        WireRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        Captured = request;
+        cancellationToken.ThrowIfCancellationRequested();
+        yield return new AdapterToolCallDelta(
+            0,
+            "inbound-call",
+            "lookup_weather",
+            """{"city":"Boston"}""");
+        yield return new AdapterFinal("tool_calls", new Usage(InputTokens: 1, OutputTokens: 1));
         await Task.CompletedTask;
     }
 
