@@ -1,8 +1,8 @@
 # voyage — Protocol Contract
 
 Status: **implemented** — `providers/voyage.py`, embeddings and reranker.
-Last verified: 2026-10-12 — against live Voyage documentation (sources below). Not yet
-verified against live traffic; flagged in the watchlist.
+Last verified: 2026-10-19 — against both provider-owned reference pages listed below,
+fetched that day. Not yet verified against live traffic; flagged in the watchlist.
 
 ## Upstream sources
 - https://docs.voyageai.com/reference/embeddings-api
@@ -51,14 +51,19 @@ counterpart to TEI's retrieval-only shape.
   rather than trusting arrival order; out-of-range or duplicate indexes are rejected.
 - Usage reports **only** `total_tokens` — mapped to `Usage.total_tokens`, with
   `input_tokens` left unknown rather than assumed equal.
-- **Unverified:** per-model default dimensions (not stated) — `dimensions` stays `None`.
+- Re-read 2026-10-19: the reference now states that voyage-4-large/-4/-4-lite,
+  voyage-3-large, voyage-3.5/-3.5-lite and voyage-code-3 support `output_dimension`
+  2048/1024 (default)/512/256, while other models have one fixed dimension.
+  **Still unverified:** the fixed dimension of the other models — `dimensions` stays
+  `None` where not stated.
 
 ### Rerank request fields (verified 2026-08-12)
 - `model` (required), `query` (required), `documents` (required, list of strings —
   "The number of documents cannot exceed 1,000", a **hard limit**), `top_k` (Voyage's
   spelling of `top_n`), `return_documents` (default false), `truncation` (default true).
-- Query/token budgets by model: 8,000 query tokens and 600K total for rerank-2.5/-lite;
-  smaller for older models (see source).
+- Query/token budgets by model: 8,000 query tokens, 32,000 query+any-single-document, and
+  600K total for rerank-2.5/-lite (total = query tokens × documents + document tokens);
+  smaller for older models (see source). `top_k` omitted returns all documents.
 
 ### Rerank response (verified 2026-08-12)
 - `object: "list"`, `data[]` with `index` (**positional within the submitted
