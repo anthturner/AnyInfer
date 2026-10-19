@@ -1,10 +1,11 @@
 # jina — Protocol Contract
 
 Status: **implemented** — `providers/jina.py`, embeddings and reranker.
-Last verified: 2026-10-12 — against Jina's product documentation and its own model
-publications (sources below); the interactive API reference (`api.jina.ai/redoc`) is
-still JS-only and unfetchable headlessly — reconfirmed 2026-10-12, a ~4KB `<div
-id="app">` shell with no inline schema. Not yet verified against live traffic.
+Last verified: 2026-10-19 — against the five provider-owned pages listed below, all fetched
+that day (jina.ai/embeddings, jina.ai/reranker, the two v5 announcement posts, and the
+jina-reranker-v3 model card). The interactive API reference (`api.jina.ai/redoc`) was not
+re-fetched and remains JS-only/unfetchable headlessly (UNVERIFIABLE: error-body shape).
+Not yet verified against live traffic.
 
 ## Upstream sources
 - https://jina.ai/embeddings/ (request shape, task vocabulary, models)
@@ -79,7 +80,9 @@ Embeddings and rerank responses are not streamed.
 
 ### Published static model capabilities (verified 2026-10-15)
 - `jina-embeddings-v5-text-small` and `jina-embeddings-v5-omni-small`: 1,024
-  dimensions; Matryoshka choices 32/64/128/256/512/1,024; 32,768-token text input.
+  dimensions; Matryoshka choices 32/64/128/256/512/1,024 (the omni post, re-read
+  2026-10-19, lists 768 as well for omni-small; the text post gives only the range
+  32–1,024); 32,768-token text input.
 - `jina-embeddings-v5-text-nano` and `jina-embeddings-v5-omni-nano`: 768 dimensions;
   Matryoshka choices 32/64/128/256/512/768; 8,192-token text input.
 - `jina-reranker-v3.5`: native `top_n`; a 131,072-token shared window for the query
@@ -88,6 +91,17 @@ Embeddings and rerank responses are not streamed.
 
 The omni models accept multimodal inputs upstream, but AnyInfer's embedding request is
 text-only. They are listed here only for their verified text-compatible operation.
+
+### Audit notes (2026-10-19)
+- The embeddings page now documents typed multimodal `input` objects (`image`, `audio`,
+  `video`, `pdf` keys; URL or base64) and rate limits (429 on excess; per-key RPM/TPM
+  tiers). The omni post separately shows an `images` array of base64 data URIs, which
+  disagrees with the typed-object form — unresolved. Neither affects the text-only adapter.
+- `embedding_type` spelling is ambiguous on the page (it also shows `encoding_format`,
+  `output_dtype`, `embedding_types`); the canonical field name could not be confirmed.
+- The reranker page's response section is empty; the response shape rests on the
+  jina-reranker-v3 model card (`results[].index`/`relevance_score`, `usage.total_tokens`,
+  `model`), which also recommends `jina-reranker-v3.5` for new projects (same API).
 
 ## Watchlist
 - **Not yet live-verified** — first live lane confirms the embeddings response shape,
