@@ -867,6 +867,9 @@ must report a real conflict rather than silently changing a dependent public sig
   > tests depend on raw-literal source endings; Render emits LF. A reviewed file-specific
   > LF checkout rule preserves their exact assertions. Clean acceptance waits for the
   > follow-up source checkpoint and fresh clean21-step gate; no product behavior changes.
+  > a54f096 clean native/profile/package/docs gates pass; the Python suite finds one
+  > generated manifest-schema LF byte contract also needing a file-specific checkout rule.
+  > That canonical-generator repair changes no asset/assertion/runtime bytes in Git.
 - [ ] **SDK.6b** Port per-operation defaults, retry/health, batching of embedding inputs,
   usage and embedding-space fallback refusal. Never mix rerank scores across attempts.
   Gate: shared operation corpus covers order/indices/dimensions/unknown metadata and unsafe

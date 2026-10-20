@@ -1522,6 +1522,12 @@ accepting batch, routes, retention or manifest options it cannot honor.
     > reviewed .gitattributes rule pins that one golden-source file to LF, changing no
     > product/assertion logic. Failed clean evidence remains `.tmp-tests/sdk-six-clean-131c7aa/`.
     > Resume a fresh checkout of the follow-up commit and all21 clean workspace gates.
+    > The fresh a54f096 checkout passes791/93 and every native/profile/package/docs step,
+    > but its Python suite finds one more existing LF byte contract: generated embedded
+    > manifest.schema.json is checked out CRLF. Generator/strict-byte test review supports
+    > one file-specific LF rule; no asset bytes, assertions or product behavior change.
+    > `.tmp-tests/sdk-six-clean-a54f096/` retains the20/21 failure. Recheck a fresh final
+    > checkout rather than normalizing captured evidence or weakening byte equality.
 
 ## 7. SDK.6c research boundary
 
@@ -1547,7 +1553,7 @@ of unapproved rerank batch scores.
 
 Resume **6a.5D — public consumers and delivery**, then the separately scoped provider
 research/final gates. Source is committed at `131c7aa5535633b62e9758b497c70400e6c953ee`;
-clean-revision acceptance remains open pending the checkout-only golden-LF repair below.
+clean-revision acceptance remains open pending the checkout-only LF rules below.
 
 Foundation, connected dispatch and P/PT/N/V/G proof gates are accepted. The corrected
 shared proof independently qualifies32/32 in each runtime and matches all32 with zero
@@ -1570,8 +1576,9 @@ The earlier20/21 run, unit stall and reproduced factory-test race remain preserv
 test-only token barrier has clean independent review, all7 lifecycle controls and20 passing
 factory repetitions. Exactly99 reviewed SDK.6a/b paths are committed. The first clean
 checkout exposes4 CRLF raw-string manifest-golden failures; its source is otherwise identical.
-The reviewed narrow LF checkout rule preserves those exact assertions. Resume a fresh
-checkout after its follow-up commit, all21 clean workspace gates and plan-only acceptance.
+The reviewed narrow LF rule in a54f096 closes those failures, then its20/21 clean gate finds
+the generated manifest-schema byte contract needs the same file-specific LF protection.
+Resume the final fresh checkout, all21 clean workspace gates and plan-only acceptance.
 SDK.6c remains unstarted:
 new retrieval providers require current upstream research and a separate accepted binding
 plan before adapter edits. Parent SDK.6 boxes remain unchecked.
