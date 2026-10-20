@@ -863,6 +863,10 @@ must report a real conflict rather than silently changing a dependent public sig
   > and separately reproduced factory-test ordering race are retained; the test-only
   > cancellation barrier passes independent review and20 repetitions. Resume source commit
   > and isolated clean-revision proof in the retrieval leaf before checking SDK.6a/b.
+  > Source commit131c7aa is saved. Fresh Windows checkout finds4 existing manifest-golden
+  > tests depend on raw-literal source endings; Render emits LF. A reviewed file-specific
+  > LF checkout rule preserves their exact assertions. Clean acceptance waits for the
+  > follow-up source checkpoint and fresh clean21-step gate; no product behavior changes.
 - [ ] **SDK.6b** Port per-operation defaults, retry/health, batching of embedding inputs,
   usage and embedding-space fallback refusal. Never mix rerank scores across attempts.
   Gate: shared operation corpus covers order/indices/dimensions/unknown metadata and unsafe
@@ -970,8 +974,9 @@ SDK.6a/b source, independent32-case shared proof and public delivery pass in the
 worktree based on2820ef2. The final21-step workspace gate passes in161.1s, including791
 native unit/93 conformance cases and preserved prior profiles. The retrieval leaf records
 the focused controls, reviewed factory-test cancellation barrier and prior failure evidence.
-Resume explicit source commit and isolated clean-revision profile/package proof before
-checking SDK.6a/b; SDK.6c provider research/bindings remain separate and unchecked.
+Source commit131c7aa is saved. Resume the narrowly reviewed manifest-golden LF checkout
+repair and fresh clean21-step gate before checking SDK.6a/b; SDK.6c provider research/
+bindings remain separate and unchecked.
 
 SDK.5b is complete at source checkpoint
 `cc989e84069f09cb985e4f82fa40514f1aad5ffe`: all 19 workspace steps in 127.8s,

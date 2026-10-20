@@ -1,3 +1,5 @@
 specification/** text eol=lf
 tests/fixtures/request-policy-v1/** text eol=lf
 tests/fixtures/retrieval-v1/** text eol=lf
+# Raw-string manifest goldens must match the renderer's literal LF output.
+src/csharp/AnyInfer.Tests/ManifestRenderingTests.cs text eol=lf

@@ -1516,6 +1516,12 @@ accepting batch, routes, retention or manifest options it cannot honor.
     > untouched. An isolated clean checkout of the source commit will bind the final
     > profile/package proof without removing those unrelated files. Acceptance boxes wait
     > for that clean-revision evidence; SDK.6c is still separate.
+    > Source is committed at131c7aa. Its first fresh Windows checkout exposes4 existing
+    > manifest-rendering goldens compiled with CRLF from raw C# literals, while Render
+    > correctly emits LF. Main/clean source differs only by checkout endings. A narrowly
+    > reviewed .gitattributes rule pins that one golden-source file to LF, changing no
+    > product/assertion logic. Failed clean evidence remains `.tmp-tests/sdk-six-clean-131c7aa/`.
+    > Resume a fresh checkout of the follow-up commit and all21 clean workspace gates.
 
 ## 7. SDK.6c research boundary
 
@@ -1540,8 +1546,8 @@ of unapproved rerank batch scores.
 ## 9. Resume state
 
 Resume **6a.5D — public consumers and delivery**, then the separately scoped provider
-research/final gates. Source base remains `2820ef2d5b853a7f80f254dd9368f64ee5a2dee2`;
-SDK.6 has no commit or clean-revision acceptance yet.
+research/final gates. Source is committed at `131c7aa5535633b62e9758b497c70400e6c953ee`;
+clean-revision acceptance remains open pending the checkout-only golden-LF repair below.
 
 Foundation, connected dispatch and P/PT/N/V/G proof gates are accepted. The corrected
 shared proof independently qualifies32/32 in each runtime and matches all32 with zero
@@ -1552,7 +1558,7 @@ remain in the phase notes and Traycer evidence.
 The coherent focused gate passes78 cases and preserves all74 prior controls. Serial native
 regressions pass791 unit and93 conformance cases. Root registered AnyInfer.Retrieval in
 the solution and added the retrieval workspace step, with serial native test scheduling;
-all68 workspace controls pass. Full21-step workspace execution is still required.
+all68 workspace controls pass. The dirty-worktree full21-step gate passes below.
 
 Public examples/docs and isolated package-consumer sources are saved/held with clean
 delivery review. Corrected examples, all23 packaging controls, the warning-free isolated
@@ -1562,8 +1568,10 @@ All21 fresh-cache workspace steps pass in161.1s at
 `.tmp-tests/sdk-six-full-workspace-20261019-r2/`, including791 unit and93 conformance cases.
 The earlier20/21 run, unit stall and reproduced factory-test race remain preserved. Its
 test-only token barrier has clean independent review, all7 lifecycle controls and20 passing
-factory repetitions. Exactly99 reviewed SDK.6a/b paths are staged. Resume explicit source
-commit, then isolated clean-checkout profile/package proof and plan-only acceptance.
+factory repetitions. Exactly99 reviewed SDK.6a/b paths are committed. The first clean
+checkout exposes4 CRLF raw-string manifest-golden failures; its source is otherwise identical.
+The reviewed narrow LF checkout rule preserves those exact assertions. Resume a fresh
+checkout after its follow-up commit, all21 clean workspace gates and plan-only acceptance.
 SDK.6c remains unstarted:
 new retrieval providers require current upstream research and a separate accepted binding
 plan before adapter edits. Parent SDK.6 boxes remain unchecked.
