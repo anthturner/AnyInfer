@@ -1029,7 +1029,7 @@ accepting batch, routes, retention or manifest options it cannot honor.
   > restores parent 6.0.3 and releases actual Python execution. Corpus/output bytes and
   > exact comparison rules remain unchanged. No Python/shared runtime result is implied.
 
-- [ ] **6a.5 — Retrieval qualification and package consumers.** Implement the frozen
+- [x] **6a.5 — Retrieval qualification and package consumers.** Implement the frozen
   `retrieval-v1` profile only after the connected slice is stable; qualify actual public
   typed results with literal adapters. Root registers `AnyInfer.Retrieval` in the workspace
   after policy acceptance and before package work. Add executed docs examples and package
@@ -1469,7 +1469,7 @@ accepting batch, routes, retention or manifest options it cannot honor.
     > adds its workspace profile step. The solution test step uses -m:1; matching argv/count
     > controls pass all68 tests at `.tmp-tests/sdk-six-retrieval-registration-8fcaebb3033d4f1d82c372c553ad3fdc/`.
     > This is dirty-worktree shared-proof acceptance, not parent SDK.6 or clean-revision acceptance.
-  - [ ] **6a.5D — Public consumers and delivery.** After registration, add executed docs
+  - [x] **6a.5D — Public consumers and delivery.** After registration, add executed docs
     examples and packaged consumers using the accepted public retrieval surface. Use docs
     in their own terms without plan links. Gate: examples, reference, package, all 21
     workspace steps and clean-revision evidence; root alone commits explicit paths.
@@ -1528,6 +1528,15 @@ accepting batch, routes, retention or manifest options it cannot honor.
     > one file-specific LF rule; no asset bytes, assertions or product behavior change.
     > `.tmp-tests/sdk-six-clean-a54f096/` retains the20/21 failure. Recheck a fresh final
     > checkout rather than normalizing captured evidence or weakening byte equality.
+    > Final acceptance: clean source checkpoint03f26fc88c7c96ff8272e99dadee8c6a26fa0616
+    > passes all 21 workspace steps in 167.6s at `.tmp-tests/sdk-six-clean-03f26fc/`.
+    > Native 791/93, shared retrieval 32, policy 29 and accounting 42+2 pass; both observer
+    > stamps name that exact revision with source_dirty=false and matching corpus hashes.
+    > Frozen assets verify and explicit development execution passes 102/102 with zero
+    > failure/error/unavailable; no release report is published. The local-feed package
+    > consumer builds without warnings and executes, with compiled examples and strict docs.
+    > Clean worktree remains unchanged. Root accepts SDK.6a/b and records this in a plan-only
+    > commit. SDK.6c is separate, unstarted and requires research before binding changes.
 
 ## 7. SDK.6c research boundary
 
@@ -1539,10 +1548,13 @@ accepting batch, routes, retention or manifest options it cannot honor.
 
 ## 8. Preservation and final evidence
 
-- [ ] **6.final — Integrate and preserve.** After every implementation lane is held, root
+- [x] **6.final — Integrate and preserve.** After every implementation lane is held, root
   runs serialized cold reviews, the registered retrieval project, explicit package and docs
   gates, all existing SDK5 profiles, full workspace and conformance gates. Evidence includes
   an explicit commit and clean revision. Parent SDK.6 boxes change only after these gates.
+  > NOTE: Closed for the implemented SDK.6a/b scope at 03f26fc, with all 21 clean workspace
+  > steps, 102 Frozen observations and the clean paired/profile/package proofs above.
+  > No SDK.6c binding is implemented or accepted; its later work repeats applicable gates.
 
 Non-goals: vector databases, persistence, ANN indexing, automatic context embedding,
 model training, multimodal vectors, streaming vector/rerank output, a fake generation
@@ -1551,34 +1563,23 @@ of unapproved rerank batch scores.
 
 ## 9. Resume state
 
-Resume **6a.5D — public consumers and delivery**, then the separately scoped provider
-research/final gates. Source is committed at `131c7aa5535633b62e9758b497c70400e6c953ee`;
-clean-revision acceptance remains open pending the checkout-only LF rules below.
+SDK.6a/b are complete at clean source checkpoint
+`03f26fc88c7c96ff8272e99dadee8c6a26fa0616` (implementation 131c7aa, two narrow checkout-LF
+fixes thereafter). Resume **6c.0 — retrieval provider research preflight**, corresponding
+to the parent **SDK.6c**. That work is separate and has no accepted wire-binding plan yet.
 
-Foundation, connected dispatch and P/PT/N/V/G proof gates are accepted. The corrected
-shared proof independently qualifies32/32 in each runtime and matches all32 with zero
-mismatches. Source/dirty/corpus metadata agree. Frozen schema/input bytes and equality
-policy are unchanged. Earlier failed captures/comparisons and exact source corrections
-remain in the phase notes and Traycer evidence.
+All 21 clean workspace steps pass in 167.6s at `.tmp-tests/sdk-six-clean-03f26fc/`, including
+791 native unit/93 conformance cases, compiled offline examples, strict docs and isolated
+NuGet-only consumer execution. Shared profiles match retrieval 32, policy 29 and accounting 42
+plus its two native boundaries. Both observers identify 03f26fc with source_dirty=false and
+matching corpus hashes. Frozen assets verify; explicit unqualified development execution
+passes all 102 cases without failure/error/unavailable. No report/package is published.
 
-The coherent focused gate passes78 cases and preserves all74 prior controls. Serial native
-regressions pass791 unit and93 conformance cases. Root registered AnyInfer.Retrieval in
-the solution and added the retrieval workspace step, with serial native test scheduling;
-all68 workspace controls pass. The dirty-worktree full21-step gate passes below.
-
-Public examples/docs and isolated package-consumer sources are saved/held with clean
-delivery review. Corrected examples, all23 packaging controls, the warning-free isolated
-consumer, strict docs and all50 doc examples now pass. The verifier's first Single failure,
-one old generic factory compile failure and old-cache doc-test failure remain preserved.
-All21 fresh-cache workspace steps pass in161.1s at
-`.tmp-tests/sdk-six-full-workspace-20261019-r2/`, including791 unit and93 conformance cases.
-The earlier20/21 run, unit stall and reproduced factory-test race remain preserved. Its
-test-only token barrier has clean independent review, all7 lifecycle controls and20 passing
-factory repetitions. Exactly99 reviewed SDK.6a/b paths are committed. The first clean
-checkout exposes4 CRLF raw-string manifest-golden failures; its source is otherwise identical.
-The reviewed narrow LF rule in a54f096 closes those failures, then its20/21 clean gate finds
-the generated manifest-schema byte contract needs the same file-specific LF protection.
-Resume the final fresh checkout, all21 clean workspace gates and plan-only acceptance.
-SDK.6c remains unstarted:
-new retrieval providers require current upstream research and a separate accepted binding
-plan before adapter edits. Parent SDK.6 boxes remain unchecked.
+The 78 focused controls preserve all 74 prior identities; 68 workspace and 23 package controls
+pass. Source/oracle reviews are closed. Earlier failures, the causal factory-token test
+barrier (7 lifecycle cases/20 repetitions), and both canonical LF checkout repairs remain
+documented above. Frozen input/schema bytes and comparison policy are unchanged. Unrelated
+uv.lock/v/cache files in the primary checkout remain untouched; qualification used an
+isolated worktree, clean before and after all gates. Parent SDK.6a/b are checked; SDK.6c and
+later milestones remain unchecked. New providers require current upstream research and a
+separate accepted binding plan before adapter edits.

@@ -813,7 +813,7 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ### SDK.6 — Embedding, reranking and operation-neutral routing
 
-- [ ] **SDK.6a** Port `EmbeddingRequest`, `EmbeddingResult`, `EmbeddingVector`, `EmbeddingSpace`,
+- [x] **SDK.6a** Port `EmbeddingRequest`, `EmbeddingResult`, `EmbeddingVector`, `EmbeddingSpace`,
   `RerankRequest`, `RerankDocument`, `RerankResult`, `RankedItem` and their operation protocols
   from `types/operations.py`, `_client/async_client.py`, `_client/sync_client.py`. Lifecycle
   is shared, operation interfaces optional; no fake generation method on retrieval providers.
@@ -870,7 +870,13 @@ must report a real conflict rather than silently changing a dependent public sig
   > a54f096 clean native/profile/package/docs gates pass; the Python suite finds one
   > generated manifest-schema LF byte contract also needing a file-specific checkout rule.
   > That canonical-generator repair changes no asset/assertion/runtime bytes in Git.
-- [ ] **SDK.6b** Port per-operation defaults, retry/health, batching of embedding inputs,
+  > Final acceptance: clean checkpoint03f26fc88c7c96ff8272e99dadee8c6a26fa0616 passes all 21
+  > workspace gates in 167.6s, 791 unit/93 conformance, 102 Frozen development observations,
+  > retrieval 32, policy 29 and accounting 42+2. Observer source/dirty/corpus metadata agree
+  > at source_dirty=false; package-only consumer, compiled examples and strict docs pass.
+  > The retrieval leaf holds exact evidence and preserved failures; no publication/version
+  > bump or SDK.6c provider-binding claim follows. Root records plan-only acceptance.
+- [x] **SDK.6b** Port per-operation defaults, retry/health, batching of embedding inputs,
   usage and embedding-space fallback refusal. Never mix rerank scores across attempts.
   Gate: shared operation corpus covers order/indices/dimensions/unknown metadata and unsafe
   cross-space fallback rejection before the backup request.
@@ -966,20 +972,25 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.6a**. SDK.5c is complete at source checkpoint
+Current resume point: **SDK.6c**. SDK.6a/b are complete at clean source checkpoint
+`03f26fc88c7c96ff8272e99dadee8c6a26fa0616`: all 21 workspace gates in 167.6s, 791 native unit
+and 93 conformance cases, 32 shared retrieval matches, 29 policy matches, accounting 42+2,
+102 Frozen observations, strict docs, compiled examples and clean-revision package-only
+consumption. Observer source/dirty/corpus metadata agree with source_dirty=false; frozen
+fixture hashes and comparison policy are unchanged. The retrieval leaf records exact paths,
+independent reviews and preserved failures. SDK.6c requires current provider research and
+a separate accepted binding plan before implementation; generic compatibility stays chat-only.
+
+SDK.5c is complete at source checkpoint
 `97e8937c281063582c282f313a35b91761293500`: all 20 workspace steps in 147.6s,
 681 native unit and 93 conformance tests, 29 request-policy matches, 42 shared accounting
 observations plus two observed native boundaries, FrozenV0 102 preservation, compiled
 examples/strict docs and clean-revision package consumption. Observer source/dirty/corpus
 metadata agree; released assets and frozen fixture hashes are unchanged. The acceptance
 record changes only these checklists. `ANYINFER_CSHARP_SDK_POLICIES.md` records exact paths.
-SDK.6a/b source, independent32-case shared proof and public delivery pass in the dirty
-worktree based on2820ef2. The final21-step workspace gate passes in161.1s, including791
-native unit/93 conformance cases and preserved prior profiles. The retrieval leaf records
-the focused controls, reviewed factory-test cancellation barrier and prior failure evidence.
-Source commit131c7aa is saved. Resume the narrowly reviewed manifest-golden LF checkout
-repair and fresh clean21-step gate before checking SDK.6a/b; SDK.6c provider research/
-bindings remain separate and unchecked.
+SDK.6a/b implementation starts at 131c7aa; subsequent file-specific checkout rules preserve
+the existing LF manifest golden/source-resource contracts. The final clean checkpoint and
+acceptance are recorded above. SDK.6c provider research/bindings remain unchecked.
 
 SDK.5b is complete at source checkpoint
 `cc989e84069f09cb985e4f82fa40514f1aad5ffe`: all 19 workspace steps in 127.8s,
