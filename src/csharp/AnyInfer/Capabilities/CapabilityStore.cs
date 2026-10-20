@@ -116,6 +116,41 @@ internal sealed class CapabilityStore
         }
     }
 
+    internal EmbeddingCapabilities? EmbeddingCapabilitiesFor(
+        ProviderDescriptor? descriptor,
+        string instanceId,
+        string model,
+        ProviderLocality locality)
+    {
+        lock (_gate)
+        {
+            _discovered.TryGetValue(instanceId, out var discovered);
+            _probed.TryGetValue(instanceId, out var probed);
+            var assembled = descriptor is null
+                ? discovered is not null && discovered.TryGetValue(model, out var found) ? found : new ModelCapabilities()
+                : CapabilityAssembler.Assemble(descriptor, instanceId, model, discovered, probed, _pricing, overrides: null, locality);
+            EmbeddingCapabilities? result = descriptor?.StaticEmbeddingCapabilities.TryGetValue(model, out var declared) == true
+                ? declared
+                : null;
+            if (assembled.Embedding is { } assembledEmbedding)
+            {
+                result = result is null ? assembledEmbedding : result.Overlay(assembledEmbedding);
+            }
+
+            if (probed is not null && probed.TryGetValue(model, out var measured) && measured.Embedding is { } probedEmbedding)
+            {
+                result = result is null ? probedEmbedding : result.Overlay(probedEmbedding);
+            }
+
+            return result;
+        }
+    }
+
+    internal RerankCapabilities? RerankCapabilitiesFor(ProviderDescriptor? descriptor, string model) =>
+        descriptor?.StaticRerankCapabilities.TryGetValue(model, out var capabilities) == true
+            ? capabilities
+            : null;
+
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>> CopyOverrides(IReadOnlyDictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>? values)
     {
         var copied = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>(StringComparer.Ordinal);

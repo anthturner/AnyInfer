@@ -250,7 +250,7 @@ public sealed class AccountingLifecycleTests
 
     private static ProviderDescriptor Descriptor(ScriptedAdapter adapter, Sourced<Pricing> pricing) =>
         new ProviderDescriptor(
-            "alpha", "Alpha", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter),
+            "alpha", "Alpha", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter),
             staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal)
             {
                 ["model"] = new ModelCapabilities(pricing: pricing),

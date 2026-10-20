@@ -631,7 +631,7 @@ internal sealed class PolicyCase
                 ? Enum.Parse<CacheMechanism>(rawMechanism.GetString()!, ignoreCase: true)
                 : (CacheMechanism?)null;
             descriptors.Add(new ProviderDescriptor(
-                id, id, (config, _) => new ValueTask<IProviderAdapter>(new RecordingAdapter(scripts, _wires, config.ProviderId, id)),
+                id, id, (config, _) => new ValueTask<IAsyncDisposable>(new RecordingAdapter(scripts, _wires, config.ProviderId, id)),
                 aliases: ["recording"], cacheMechanism: mechanism,
                 cacheMaxMarks: descriptor.TryGetProperty("cache_max_marks", out var marks) ? marks.GetInt32() : 0,
                 cacheMinTokens: descriptor.TryGetProperty("cache_min_tokens", out var floor) ? floor.GetInt64() : 0,

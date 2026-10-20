@@ -112,7 +112,7 @@ public sealed class ProviderRegistry
         new ProviderDescriptor(
             "openai-compat",
             "OpenAI-compatible",
-            static (config, cancellationToken) => new ValueTask<IProviderAdapter>(OpenAIChatAdapter.Create(config, cancellationToken)),
+            static (config, cancellationToken) => new ValueTask<IAsyncDisposable>(OpenAIChatAdapter.Create(config, cancellationToken)),
             aliases: ["openai-compatible", "oai-compat"],
             setup: new ProviderSetupSpec([
                 new SetupField("base_url", "Base URL", "endpoint", required: true),

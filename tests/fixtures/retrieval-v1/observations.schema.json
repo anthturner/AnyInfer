@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://anyinfer.dev/fixtures/retrieval-v1/observations.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "runtime", "source_revision", "source_dirty", "corpus_sha256", "observations"],
+  "properties": {
+    "profile": {"const": "retrieval-v1"},
+    "runtime": {"enum": ["python", "csharp"]},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_dirty": {"type": "boolean"},
+    "corpus_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "observations": {"type": "array", "items": {"$ref": "#/$defs/observation"}}
+  },
+  "$defs": {
+    "text": {"type": "string"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+    "ordinal": {"type": "integer", "minimum": 1},
+    "finite": {"type": "number"},
+    "money": {"type": ["string", "null"], "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"},
+    "json": {"oneOf": [
+      {"type": "null"}, {"type": "boolean"}, {"type": "number"}, {"type": "string"},
+      {"type": "array", "items": {"$ref": "#/$defs/json"}},
+      {"type": "object", "additionalProperties": {"$ref": "#/$defs/json"}}
+    ]},
+    "json_map": {"type": "object", "additionalProperties": {"$ref": "#/$defs/json"}},
+    "target": {"type": "object", "additionalProperties": false, "required": ["provider_id", "model", "via_alias"], "properties": {
+      "provider_id": {"type": "string"}, "model": {"type": "string"}, "via_alias": {"type": ["string", "null"]}
+    }},
+    "usage": {"type": "object", "additionalProperties": false, "required": ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "cost_usd", "search_units", "server_tool_uses"], "properties": {
+      "input_tokens": {"type": ["integer", "null"]}, "output_tokens": {"type": ["integer", "null"]}, "total_tokens": {"type": ["integer", "null"]},
+      "cache_read_tokens": {"type": ["integer", "null"]}, "cache_write_tokens": {"type": ["integer", "null"]}, "reasoning_tokens": {"type": ["integer", "null"]},
+      "cost_usd": {"$ref": "#/$defs/money"}, "search_units": {"type": ["integer", "null"]}, "server_tool_uses": {"type": "object", "additionalProperties": {"type": "integer"}}
+    }},
+    "timing": {"type": "object", "additionalProperties": false, "required": ["started_at", "first_token_ms", "total_ms", "output_tokens_per_s", "phases"], "properties": {
+      "started_at": {"$ref": "#/$defs/finite"}, "first_token_ms": {"type": ["number", "null"]}, "total_ms": {"$ref": "#/$defs/finite"}, "output_tokens_per_s": {"type": ["number", "null"]}, "phases": {"type": "object", "additionalProperties": {"$ref": "#/$defs/finite"}}
+    }},
+    "timing_facet": {"type": "object", "additionalProperties": false, "required": ["first_token_ms", "total_ms", "output_tokens_per_s", "phases"], "properties": {
+      "first_token_ms": {"type": ["number", "null"]}, "total_ms": {"type": ["number", "null"]}, "output_tokens_per_s": {"type": ["number", "null"]}, "phases": {"type": "object", "additionalProperties": {"$ref": "#/$defs/finite"}}
+    }},
+    "error_snapshot": {"type": "object", "additionalProperties": false, "required": ["runtime_type", "provider", "phase", "retryable", "http_status", "detail"], "properties": {
+      "runtime_type": {"type": "string"}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}, "detail": {"type": ["string", "null"], "maxLength": 512}
+    }},
+    "exception_error": {"type": "object", "additionalProperties": false, "required": ["runtime_type", "message", "provider", "phase", "retryable", "http_status", "retry_after_s", "detail", "hint"], "properties": {
+      "runtime_type": {"type": "string", "not": {"enum": ["SpendLimitError", "SpendLimitException"]}}, "message": {"type": "string"}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}, "retry_after_s": {"type": ["number", "null"]}, "detail": {"type": ["string", "null"], "maxLength": 512}, "hint": {"type": ["string", "null"]}
+    }},
+    "spend_limit_error": {"type": "object", "additionalProperties": false, "required": ["runtime_type", "message", "provider", "phase", "retryable", "http_status", "retry_after_s", "detail", "hint", "limit_usd", "spent_usd", "estimated_usd"], "properties": {
+      "runtime_type": {"enum": ["SpendLimitError", "SpendLimitException"]}, "message": {"type": "string"}, "provider": {"type": ["string", "null"]}, "phase": {"type": ["string", "null"]}, "retryable": {"type": "boolean"}, "http_status": {"type": ["integer", "null"]}, "retry_after_s": {"type": ["number", "null"]}, "detail": {"type": ["string", "null"], "maxLength": 512}, "hint": {"type": ["string", "null"]}, "limit_usd": {"$ref": "#/$defs/money"}, "spent_usd": {"$ref": "#/$defs/money"}, "estimated_usd": {"$ref": "#/$defs/money"}
+    }},
+    "exception": {"oneOf": [{"$ref": "#/$defs/exception_error"}, {"$ref": "#/$defs/spend_limit_error"}]},
+    "attempt": {"type": "object", "additionalProperties": false, "required": ["target", "outcome", "error", "timing"], "properties": {
+      "target": {"anyOf": [{"$ref": "#/$defs/target"}, {"type": "null"}]}, "outcome": {"enum": ["ok", "retried", "failed", "skipped_unhealthy"]}, "error": {"anyOf": [{"$ref": "#/$defs/error_snapshot"}, {"type": "null"}]}, "timing": {"anyOf": [{"$ref": "#/$defs/timing"}, {"type": "null"}]}
+    }},
+    "space": {"type": "object", "additionalProperties": false, "required": ["provider_id", "model", "model_revision", "dimensions", "input_intent_aware", "normalized", "compatibility_id"], "properties": {
+      "provider_id": {"type": "string"}, "model": {"type": "string"}, "model_revision": {"type": ["string", "null"]}, "dimensions": {"type": ["integer", "null"]}, "input_intent_aware": {"type": "boolean"}, "normalized": {"type": ["boolean", "null"]}, "compatibility_id": {"type": ["string", "null"]}
+    }},    "embedding_result": {"type": "object", "additionalProperties": false, "required": ["target", "vectors", "space", "usage", "timing", "warnings", "raw"], "properties": {
+      "target": {"$ref": "#/$defs/target"}, "vectors": {"type": "array", "minItems": 1, "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/finite"}}}, "space": {"$ref": "#/$defs/space"}, "usage": {"$ref": "#/$defs/usage"}, "timing": {"$ref": "#/$defs/timing"}, "warnings": {"type": "array", "items": {"type": "string"}}, "raw": {"anyOf": [{"$ref": "#/$defs/json"}, {"type": "null"}]}
+    }},
+    "rerank_result": {"type": "object", "additionalProperties": false, "required": ["target", "items", "usage", "timing", "warnings", "raw"], "properties": {
+      "target": {"$ref": "#/$defs/target"}, "items": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["index", "document_id", "score", "text"], "properties": {"index": {"type": "integer", "minimum": 0}, "document_id": {"type": "string", "minLength": 1}, "score": {"$ref": "#/$defs/finite"}, "text": {"type": ["string", "null"]}}}}, "usage": {"$ref": "#/$defs/usage"}, "timing": {"$ref": "#/$defs/timing"}, "warnings": {"type": "array", "items": {"type": "string"}}, "raw": {"anyOf": [{"$ref": "#/$defs/json"}, {"type": "null"}]}
+    }},
+    "embedding_wire_request": {"type": "object", "additionalProperties": false, "required": ["model", "inputs", "input_type", "dimensions", "timeout_s", "max_response_bytes", "extra_options"], "properties": {
+      "model": {"type": "string"}, "inputs": {"type": "array", "items": {"type": "string"}}, "input_type": {"type": ["string", "null"]}, "dimensions": {"type": ["integer", "null"]}, "timeout_s": {"$ref": "#/$defs/finite"}, "max_response_bytes": {"type": "integer"}, "extra_options": {"$ref": "#/$defs/json_map"}
+    }},
+    "rerank_wire_request": {"type": "object", "additionalProperties": false, "required": ["model", "query", "documents", "top_n", "timeout_s", "max_response_bytes", "extra_options"], "properties": {
+      "model": {"type": "string"}, "query": {"type": "string"}, "documents": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["index", "text"], "properties": {"index": {"type": "integer"}, "text": {"type": "string"}}}}, "top_n": {"type": ["integer", "null"]}, "timeout_s": {"$ref": "#/$defs/finite"}, "max_response_bytes": {"type": "integer"}, "extra_options": {"$ref": "#/$defs/json_map"}
+    }},
+    "embedding_wire_response": {"type": "object", "additionalProperties": false, "required": ["vectors", "model", "dimensions", "normalized", "usage", "phases", "raw"], "properties": {
+      "vectors": {"type": "array", "items": {"type": "array", "items": {"$ref": "#/$defs/finite"}}}, "model": {"type": ["string", "null"]}, "dimensions": {"type": ["integer", "null"]}, "normalized": {"type": ["boolean", "null"]}, "usage": {"anyOf": [{"$ref": "#/$defs/usage"}, {"type": "null"}]}, "phases": {"type": "object", "additionalProperties": {"$ref": "#/$defs/finite"}}, "raw": {"anyOf": [{"$ref": "#/$defs/json"}, {"type": "null"}]}
+    }},
+    "rerank_wire_response": {"type": "object", "additionalProperties": false, "required": ["items", "model", "usage", "raw"], "properties": {
+      "items": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["index", "score"], "properties": {"index": {"type": "integer"}, "score": {"$ref": "#/$defs/finite"}}}}, "model": {"type": ["string", "null"]}, "usage": {"anyOf": [{"$ref": "#/$defs/usage"}, {"type": "null"}]}, "raw": {"anyOf": [{"$ref": "#/$defs/json"}, {"type": "null"}]}
+    }},
+    "wire_base": {"type": "object", "additionalProperties": false, "required": ["selector_id", "step_ordinal", "instance", "target", "kind", "entered_order", "terminal_order", "request", "outcome", "response", "failure"], "properties": {
+      "selector_id": {"$ref": "#/$defs/id"}, "step_ordinal": {"$ref": "#/$defs/ordinal"}, "instance": {"$ref": "#/$defs/id"}, "target": {"$ref": "#/$defs/target"}, "kind": {"enum": ["embedding", "rerank"]}, "entered_order": {"$ref": "#/$defs/ordinal"}, "terminal_order": {"$ref": "#/$defs/ordinal"}, "request": {}, "outcome": {"enum": ["response", "provider_failure", "cancelled"]}, "response": {}, "failure": {}
+    }},
+    "embedding_wire": {"allOf": [{"$ref": "#/$defs/wire_base"}, {"properties": {"kind": {"const": "embedding"}, "request": {"$ref": "#/$defs/embedding_wire_request"}}, "oneOf": [
+      {"properties": {"outcome": {"const": "response"}, "response": {"$ref": "#/$defs/embedding_wire_response"}, "failure": {"type": "null"}}},
+      {"properties": {"outcome": {"const": "provider_failure"}, "response": {"type": "null"}, "failure": {"$ref": "#/$defs/exception"}}},
+      {"properties": {"outcome": {"const": "cancelled"}, "response": {"type": "null"}, "failure": {"type": "null"}}}
+    ]}]},
+    "rerank_wire": {"allOf": [{"$ref": "#/$defs/wire_base"}, {"properties": {"kind": {"const": "rerank"}, "request": {"$ref": "#/$defs/rerank_wire_request"}}, "oneOf": [
+      {"properties": {"outcome": {"const": "response"}, "response": {"$ref": "#/$defs/rerank_wire_response"}, "failure": {"type": "null"}}},
+      {"properties": {"outcome": {"const": "provider_failure"}, "response": {"type": "null"}, "failure": {"$ref": "#/$defs/exception"}}},
+      {"properties": {"outcome": {"const": "cancelled"}, "response": {"type": "null"}, "failure": {"type": "null"}}}
+    ]}]},
+    "factory": {"oneOf": [
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "instance", "model", "declared_operations"], "properties": {"type": {"const": "factory_entered"}, "order": {"$ref": "#/$defs/ordinal"}, "instance": {"$ref": "#/$defs/id"}, "model": {"type": "string"}, "declared_operations": {"type": "array", "items": {"enum": ["embedding", "rerank"]}, "uniqueItems": true}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "instance", "model", "declared_operations", "runtime_protocols"], "properties": {"type": {"const": "factory_returned"}, "order": {"$ref": "#/$defs/ordinal"}, "instance": {"$ref": "#/$defs/id"}, "model": {"type": "string"}, "declared_operations": {"type": "array", "items": {"enum": ["embedding", "rerank"]}, "uniqueItems": true}, "runtime_protocols": {"type": "array", "items": {"enum": ["embedding", "rerank"]}, "uniqueItems": true}}}
+    ]},    "request_relation": {"const": "operation"},
+    "telemetry": {"oneOf": [
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "targets", "metadata", "operation"], "properties": {"type": {"const": "RequestStarted"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "targets": {"type": "array", "items": {"type": "string"}}, "metadata": {"type": "object", "additionalProperties": {"type": "string"}}, "operation": {"enum": ["embedding", "rerank"]}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "target"], "properties": {"type": {"const": "TargetResolved"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "target": {"$ref": "#/$defs/target"}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "target", "attempt"], "properties": {"type": {"const": "AttemptStarted"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "target": {"$ref": "#/$defs/target"}, "attempt": {"$ref": "#/$defs/ordinal"}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "target", "usage", "timing", "finish_reason"], "properties": {"type": {"const": "AttemptCompleted"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "target": {"$ref": "#/$defs/target"}, "usage": {"$ref": "#/$defs/usage"}, "timing": {"$ref": "#/$defs/timing"}, "finish_reason": {"type": "string"}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "target", "attempt", "delay_s", "error"], "properties": {"type": {"const": "RetryScheduled"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "target": {"$ref": "#/$defs/target"}, "attempt": {"$ref": "#/$defs/ordinal"}, "delay_s": {"$ref": "#/$defs/finite"}, "error": {"$ref": "#/$defs/error_snapshot"}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "from_target", "to_target", "error"], "properties": {"type": {"const": "FallbackTriggered"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "from_target": {"$ref": "#/$defs/target"}, "to_target": {"type": "string"}, "error": {"anyOf": [{"$ref": "#/$defs/error_snapshot"}, {"type": "null"}]}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "target", "usage", "timing", "repair_attempts"], "properties": {"type": {"const": "RequestCompleted"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "target": {"$ref": "#/$defs/target"}, "usage": {"$ref": "#/$defs/usage"}, "timing": {"$ref": "#/$defs/timing"}, "repair_attempts": {"const": 0}}},
+      {"type": "object", "additionalProperties": false, "required": ["type", "order", "request_relation", "error"], "properties": {"type": {"const": "RequestFailed"}, "order": {"$ref": "#/$defs/ordinal"}, "request_relation": {"$ref": "#/$defs/request_relation"}, "error": {"$ref": "#/$defs/error_snapshot"}}}
+    ]},
+    "route_step": {"type": "object", "additionalProperties": false, "required": ["target", "outcome", "reason"], "properties": {"target": {"type": "string"}, "outcome": {"type": "string"}, "reason": {"type": "string"}}},
+    "attempt_facet": {"type": "object", "additionalProperties": false, "required": ["target", "attempt_number", "outcome", "error", "first_token_ms", "total_ms", "queued_ms", "retry_reason", "retry_delay_s", "paced_s"], "properties": {
+      "target": {"type": "string"}, "attempt_number": {"$ref": "#/$defs/ordinal"}, "outcome": {"type": "string"}, "error": {"anyOf": [{"$ref": "#/$defs/error_snapshot"}, {"type": "null"}]}, "first_token_ms": {"type": ["number", "null"]}, "total_ms": {"type": ["number", "null"]}, "queued_ms": {"type": ["number", "null"]}, "retry_reason": {"type": ["string", "null"]}, "retry_delay_s": {"type": ["number", "null"]}, "paced_s": {"type": "object", "additionalProperties": {"$ref": "#/$defs/finite"}}
+    }},
+    "usage_facet": {"type": "object", "additionalProperties": false, "required": ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "cost_usd", "estimated_fields", "search_units"], "properties": {
+      "input_tokens": {"type": ["integer", "null"]}, "output_tokens": {"type": ["integer", "null"]}, "total_tokens": {"type": ["integer", "null"]}, "cache_read_tokens": {"type": ["integer", "null"]}, "cache_write_tokens": {"type": ["integer", "null"]}, "reasoning_tokens": {"type": ["integer", "null"]}, "cost_usd": {"$ref": "#/$defs/money"}, "estimated_fields": {"type": "object", "additionalProperties": {"type": "string"}}, "search_units": {"type": ["integer", "null"]}
+    }},
+    "manifest": {"type": "object", "additionalProperties": false, "required": ["request_relation", "format", "complete", "operation", "route", "attempts", "usage", "timing", "notes", "embedding_space", "payloads"], "properties": {
+      "request_relation": {"$ref": "#/$defs/request_relation"}, "format": {"const": "1"}, "complete": {"type": "boolean"}, "operation": {"enum": ["embedding", "rerank"]},
+      "route": {"type": "object", "additionalProperties": false, "required": ["requested", "resolved", "considered"], "properties": {"requested": {"type": "array", "items": {"type": "string"}}, "resolved": {"type": ["string", "null"]}, "considered": {"type": "array", "items": {"$ref": "#/$defs/route_step"}}}},
+      "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt_facet"}}, "usage": {"$ref": "#/$defs/usage_facet"}, "timing": {"$ref": "#/$defs/timing_facet"}, "notes": {"type": "array", "items": {"type": "string"}}, "embedding_space": {"anyOf": [{"$ref": "#/$defs/space"}, {"type": "null"}]}, "payloads": {"type": "null"}
+    }},
+    "resource": {"type": "object", "additionalProperties": false, "required": ["type", "order", "selector_id", "step_ordinal", "instance"], "properties": {
+      "type": {"enum": ["call_entered", "barrier_reached", "barrier_released", "caller_cancel_requested", "gate_reached", "gate_released", "operation_finally", "provider_cleanup_entered", "provider_cleanup_released", "provider_cleanup_completed", "adapter_close_started", "adapter_close_completed", "normal_client_close_started", "normal_client_close_completed"]}, "order": {"$ref": "#/$defs/ordinal"}, "selector_id": {"type": ["string", "null"]}, "step_ordinal": {"type": ["integer", "null"], "minimum": 1}, "instance": {"type": ["string", "null"]}
+    }},
+    "batch_failure": {"type": "object", "additionalProperties": false, "required": ["batch_index", "item_count", "succeeded", "error"], "properties": {"batch_index": {"type": "integer", "minimum": 0}, "item_count": {"type": "integer", "minimum": 1}, "succeeded": {"type": "boolean"}, "error": {"type": ["string", "null"]}}},    "embedding_success_operation": {"type": "object", "additionalProperties": false, "required": ["kind", "outcome", "result", "error", "attempts", "request_relation", "cancellation_relation"], "properties": {
+      "kind": {"const": "embedding"}, "outcome": {"const": "ok"}, "result": {"$ref": "#/$defs/embedding_result"}, "error": {"type": "null"}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt"}}, "request_relation": {"$ref": "#/$defs/request_relation"}, "cancellation_relation": {"const": "none"}
+    }},
+    "rerank_success_operation": {"type": "object", "additionalProperties": false, "required": ["kind", "outcome", "result", "error", "attempts", "request_relation", "cancellation_relation"], "properties": {
+      "kind": {"const": "rerank"}, "outcome": {"const": "ok"}, "result": {"$ref": "#/$defs/rerank_result"}, "error": {"type": "null"}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt"}}, "request_relation": {"$ref": "#/$defs/request_relation"}, "cancellation_relation": {"const": "none"}
+    }},
+    "error_operation": {"type": "object", "additionalProperties": false, "required": ["kind", "outcome", "result", "error", "attempts", "request_relation", "cancellation_relation"], "properties": {
+      "kind": {"enum": ["embedding", "rerank"]}, "outcome": {"const": "error"}, "result": {"type": "null"}, "error": {"$ref": "#/$defs/exception"}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt"}}, "request_relation": {"$ref": "#/$defs/request_relation"}, "cancellation_relation": {"const": "none"}
+    }, "not": {"properties": {"error": {"properties": {"runtime_type": {"enum": ["AllTargetsFailedError", "AllTargetsFailedException"]}}}}}},
+    "aggregate_error_operation": {"type": "object", "additionalProperties": false, "required": ["kind", "outcome", "result", "error", "attempts", "request_relation", "cancellation_relation"], "properties": {
+      "kind": {"enum": ["embedding", "rerank"]}, "outcome": {"const": "error"}, "result": {"type": "null"}, "error": {"allOf": [{"$ref": "#/$defs/exception_error"}, {"properties": {"runtime_type": {"enum": ["AllTargetsFailedError", "AllTargetsFailedException"]}}}]}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt"}}, "request_relation": {"$ref": "#/$defs/request_relation"}, "cancellation_relation": {"const": "none"}
+    }},
+    "cancelled_operation": {"type": "object", "additionalProperties": false, "required": ["kind", "outcome", "result", "error", "attempts", "request_relation", "cancellation_relation"], "properties": {
+      "kind": {"enum": ["embedding", "rerank"]}, "outcome": {"const": "cancelled"}, "result": {"type": "null"}, "error": {"type": "null"}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt"}}, "request_relation": {"$ref": "#/$defs/request_relation"}, "cancellation_relation": {"const": "caller_cancelled"}
+    }},
+    "ledger_totals": {"type": "object", "additionalProperties": false, "required": ["cost", "currency", "requests", "unknown_requests", "input_tokens", "output_tokens", "cache_read_tokens"], "properties": {
+      "cost": {"$ref": "#/$defs/money"}, "currency": {"type": "string"}, "requests": {"type": "integer", "minimum": 0}, "unknown_requests": {"type": "integer", "minimum": 0}, "input_tokens": {"type": "integer", "minimum": 0}, "output_tokens": {"type": "integer", "minimum": 0}, "cache_read_tokens": {"type": "integer", "minimum": 0}
+    }},
+    "ledger_snapshot": {"type": "object", "additionalProperties": false, "required": ["label", "reserved", "totals"], "properties": {
+      "label": {"enum": ["before_call", "while_provider_held", "after_operation", "after_client_close"]}, "reserved": {"$ref": "#/$defs/money"}, "totals": {"$ref": "#/$defs/ledger_totals"}
+    }},
+    "ordinary_value": {"type": "object", "additionalProperties": false, "required": ["operation", "factories", "wires", "telemetry", "ledger", "manifest", "resources", "batch_failures"], "properties": {
+      "operation": {"oneOf": [{"$ref": "#/$defs/embedding_success_operation"}, {"$ref": "#/$defs/rerank_success_operation"}, {"$ref": "#/$defs/error_operation"}, {"$ref": "#/$defs/cancelled_operation"}]}, "factories": {"type": "array", "items": {"$ref": "#/$defs/factory"}}, "wires": {"type": "array", "items": {"oneOf": [{"$ref": "#/$defs/embedding_wire"}, {"$ref": "#/$defs/rerank_wire"}]}}, "telemetry": {"type": "array", "items": {"$ref": "#/$defs/telemetry"}}, "ledger": {"anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ledger_snapshot"}}, {"type": "null"}]}, "manifest": {"anyOf": [{"$ref": "#/$defs/manifest"}, {"type": "null"}]}, "resources": {"type": "array", "items": {"$ref": "#/$defs/resource"}}, "batch_failures": {"type": "null"}
+    }},
+    "aggregate_value": {"type": "object", "additionalProperties": false, "required": ["operation", "factories", "wires", "telemetry", "ledger", "manifest", "resources", "batch_failures"], "properties": {
+      "operation": {"$ref": "#/$defs/aggregate_error_operation"}, "factories": {"type": "array", "items": {"$ref": "#/$defs/factory"}}, "wires": {"type": "array", "items": {"oneOf": [{"$ref": "#/$defs/embedding_wire"}, {"$ref": "#/$defs/rerank_wire"}]}}, "telemetry": {"type": "array", "items": {"$ref": "#/$defs/telemetry"}}, "ledger": {"anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ledger_snapshot"}}, {"type": "null"}]}, "manifest": {"anyOf": [{"$ref": "#/$defs/manifest"}, {"type": "null"}]}, "resources": {"type": "array", "items": {"$ref": "#/$defs/resource"}}, "batch_failures": {"type": "array", "items": {"$ref": "#/$defs/batch_failure"}}
+    }},
+    "value": {"oneOf": [{"$ref": "#/$defs/ordinary_value"}, {"$ref": "#/$defs/aggregate_value"}]},
+    "observation": {"type": "object", "additionalProperties": false, "required": ["id", "kind", "status", "value"], "properties": {
+      "id": {"$ref": "#/$defs/id"}, "kind": {"enum": ["embedding", "rerank"]}, "status": {"const": "ok"}, "value": {"$ref": "#/$defs/value"}
+    }}
+  }
+}

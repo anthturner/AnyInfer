@@ -71,7 +71,7 @@ public sealed class ProviderSettingsTests
                 (config, _) =>
                 {
                     calls.Add(config);
-                    return ValueTask.FromResult<IProviderAdapter>(adapter);
+                    return ValueTask.FromResult<IAsyncDisposable>(adapter);
                 },
                 defaultBaseUrl: "https://descriptor.example")]);
         var settings = ProviderSettings.Of("FAKE_ENGINE", timeoutS: 17.5, alias: "Tenant_A");
@@ -245,7 +245,7 @@ public sealed class ProviderSettingsTests
             ? Fail(retryable)
             : Events(token, new AdapterTextDelta("third"), new AdapterFinal("stop")));
         var registry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IProviderAdapter>(inherited))]);
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IAsyncDisposable>(inherited))]);
         await using var client = new AsyncClient(
             [ProviderSettings.Of("fake")],
             registry,
@@ -256,7 +256,7 @@ public sealed class ProviderSettingsTests
 
         var explicitRoute = new ScriptedAdapter((_, _) => Fail(retryable));
         var explicitRegistry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IProviderAdapter>(explicitRoute))]);
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IAsyncDisposable>(explicitRoute))]);
         await using var explicitClient = new AsyncClient(
             [ProviderSettings.Of("fake")],
             explicitRegistry,
@@ -274,7 +274,7 @@ public sealed class ProviderSettingsTests
             ? Fail(new TransportException("first", retryable: false, phase: "generate"))
             : Events(token, new AdapterTextDelta("second"), new AdapterFinal("stop")));
         var registry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter))]);
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter))]);
         await using var client = new AsyncClient(
             [ProviderSettings.Of("fake")], registry,
             route: new Route(["fake:model"], new Retry(1, 0, 0), healthGate: false));
@@ -291,7 +291,7 @@ public sealed class ProviderSettingsTests
             ? Fail(new TransportException("first", retryable: false, phase: "generate"))
             : Events(token, new AdapterTextDelta("second"), new AdapterFinal("stop")));
         var registry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter))]);
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter))]);
         await using var client = new AsyncClient(
             [ProviderSettings.Of("fake")], registry,
             route: new Route(["fake:model"], new Retry(1, 0, 0), healthGate: true, healthTtlS: 0));
@@ -309,7 +309,7 @@ public sealed class ProviderSettingsTests
             ? Events(token, new AdapterTextDelta("{\"age\":\"wrong\"}"), new AdapterFinal("stop"))
             : Events(token, new AdapterTextDelta("{\"age\":7}"), new AdapterFinal("stop")));
         var registry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IProviderAdapter>(repairing))]);
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IAsyncDisposable>(repairing))]);
         var route = new Route(["fake:model"]);
         await using var client = new AsyncClient([ProviderSettings.Of("fake")], registry, route: route, repair: new Repair(1));
 
@@ -320,7 +320,7 @@ public sealed class ProviderSettingsTests
 
         var noRepair = new ScriptedAdapter((_, token) => Events(token, new AdapterTextDelta("{\"age\":\"wrong\"}"), new AdapterFinal("stop")));
         var noRepairRegistry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IProviderAdapter>(noRepair))]);
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IAsyncDisposable>(noRepair))]);
         await using var noRepairClient = new AsyncClient([ProviderSettings.Of("fake")], noRepairRegistry, route: route, repair: new Repair(1));
 
         await Assert.ThrowsAsync<SchemaViolationException>(() =>
@@ -329,7 +329,7 @@ public sealed class ProviderSettingsTests
     }
 
     private static ProviderDescriptor Descriptor(string id, IEnumerable<string>? aliases = null) =>
-        new(id, id, static (_, _) => ValueTask.FromResult<IProviderAdapter>(new RecordingAdapter()), aliases: aliases);
+        new(id, id, static (_, _) => ValueTask.FromResult<IAsyncDisposable>(new RecordingAdapter()), aliases: aliases);
 
     private sealed class RecordingAdapter : IProviderAdapter
     {

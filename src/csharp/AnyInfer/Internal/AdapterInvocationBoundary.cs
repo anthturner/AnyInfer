@@ -6,7 +6,7 @@ namespace AnyInfer.Internal;
 internal static class AdapterInvocationBoundary
 {
     internal static IAsyncEnumerable<AdapterEvent> InvokeAsync(
-        IProviderAdapter adapter,
+        IGeneratesText adapter,
         WireRequest request,
         OperationContext operation,
         EntryRole role,
@@ -15,7 +15,7 @@ internal static class AdapterInvocationBoundary
         InvokeIterator(adapter, request, operation, role, repairAssessment, cancellationToken);
 
     private static async IAsyncEnumerable<AdapterEvent> InvokeIterator(
-        IProviderAdapter adapter,
+        IGeneratesText adapter,
         WireRequest request,
         OperationContext operation,
         EntryRole role,

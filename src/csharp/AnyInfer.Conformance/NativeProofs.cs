@@ -260,7 +260,7 @@ internal static class NativeProofs
         return new AssessmentCase(capture, outcome);
     }
 
-    private static AsyncClient CreateClient(IProviderAdapter adapter) =>
+    private static AsyncClient CreateClient(IAsyncDisposable adapter) =>
         new AsyncClient([new ProviderRegistration("proof", adapter)], new VirtualClock(0));
 
     private static GenerationRequest CreateRequest(string marker, JsonValue? schema, Repair? repair = null) =>

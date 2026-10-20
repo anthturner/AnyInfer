@@ -336,19 +336,19 @@ public sealed class CachePlanningTests
     private static ModelCapabilities Features(Feature features) => new(features: new Sourced<Feature>(features, Provenance.Catalog));
 
     private static ProviderDescriptor Descriptor(CacheMechanism? mechanism, int maxMarks = 0, long minTokens = 0) => new(
-        "cache", "Cache", static (_, _) => ValueTask.FromException<IProviderAdapter>(new InvalidOperationException("factory is not used by pure planning")),
+        "cache", "Cache", static (_, _) => ValueTask.FromException<IAsyncDisposable>(new InvalidOperationException("factory is not used by pure planning")),
         cacheMechanism: mechanism, cacheMaxMarks: maxMarks, cacheMinTokens: minTokens);
 
     private static AsyncClient PublicClient(IProviderAdapter adapter, Collector observer, CacheMechanism? mechanism, ModelCapabilities capabilities, CachePolicy? cachePolicy = null, ITokenEstimator? estimator = null) =>
         new([ProviderSettings.Of("cache")], new ProviderRegistry([new ProviderDescriptor(
-            "cache", "Cache", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter),
+            "cache", "Cache", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter),
             staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = capabilities },
             cacheMechanism: mechanism)]), observers: [observer], estimator: estimator ?? new RecordingEstimator(static _ => 10), cachePolicy: cachePolicy);
 
     private static AsyncClient ImplicitClient(IProviderAdapter alpha, IProviderAdapter beta, Collector observer) =>
         new([ProviderSettings.Of("alpha"), ProviderSettings.Of("beta")], new ProviderRegistry([
-            new ProviderDescriptor("alpha", "Alpha", (_, _) => ValueTask.FromResult<IProviderAdapter>(alpha), staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = Features(Feature.Streaming) }, cacheMechanism: CacheMechanism.Implicit),
-            new ProviderDescriptor("beta", "Beta", (_, _) => ValueTask.FromResult<IProviderAdapter>(beta), staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = Features(Feature.Streaming) }, cacheMechanism: CacheMechanism.Implicit),
+            new ProviderDescriptor("alpha", "Alpha", (_, _) => ValueTask.FromResult<IAsyncDisposable>(alpha), staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = Features(Feature.Streaming) }, cacheMechanism: CacheMechanism.Implicit),
+            new ProviderDescriptor("beta", "Beta", (_, _) => ValueTask.FromResult<IAsyncDisposable>(beta), staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = Features(Feature.Streaming) }, cacheMechanism: CacheMechanism.Implicit),
         ]), observers: [observer], cachePolicy: new CachePolicy(minSegmentTokens: 0));
 
     private static GenerationRequest CacheRequest(string provider, string system, CachePolicy? cache = null) =>

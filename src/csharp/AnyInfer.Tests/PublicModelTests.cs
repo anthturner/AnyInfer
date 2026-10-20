@@ -190,9 +190,11 @@ public sealed class PublicModelTests
     [Fact]
     public void Provider_contract_is_lazy_async_enumerable_with_optional_token()
     {
-        var method = typeof(IProviderAdapter).GetMethod(nameof(IProviderAdapter.GenerateAsync));
+        var method = typeof(IGeneratesText).GetMethod(nameof(IGeneratesText.GenerateAsync));
 
         Assert.NotNull(method);
+        Assert.True(typeof(IGeneratesText).IsAssignableFrom(typeof(IProviderAdapter)));
+        Assert.True(typeof(IAsyncDisposable).IsAssignableFrom(typeof(IProviderAdapter)));
         Assert.Equal(typeof(IAsyncEnumerable<AdapterEvent>), method.ReturnType);
         var parameter = Assert.Single(method.GetParameters().Skip(1));
         Assert.Equal(typeof(CancellationToken), parameter.ParameterType);

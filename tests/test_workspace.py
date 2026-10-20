@@ -191,13 +191,17 @@ class TestVerbs:
         assert calls == [
             (["dotnet", "--version"], ROOT / "src" / "csharp"),
             (["dotnet", "restore", "AnyInfer.sln"], ROOT / "src" / "csharp"),
-            (["dotnet", "test", "AnyInfer.sln", "--no-restore"], ROOT / "src" / "csharp"),
+            (["dotnet", "test", "AnyInfer.sln", "--no-restore", "-m:1"], ROOT / "src" / "csharp"),
             (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_accounting.py")],
                 ROOT,
             ),
             (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_request_policy.py")],
+                ROOT,
+            ),
+            (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_retrieval.py")],
                 ROOT,
             ),
             (
@@ -351,8 +355,8 @@ class TestVerbs:
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
         # Every default step must be attempted despite the failure, including the two
-        # in-process docs gates and seven C# steps.
-        assert len(calls) == 20
+        # in-process docs gates and eight C# steps.
+        assert len(calls) == 21
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

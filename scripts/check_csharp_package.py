@@ -533,7 +533,7 @@ var configuredPolicyRegistry = new ProviderRegistry([
     new ProviderDescriptor(
         "policy-config",
         "Policy config",
-        (_, _) => ValueTask.FromResult<IProviderAdapter>(configuredPolicyAdapter)),
+        (_, _) => ValueTask.FromResult<IAsyncDisposable>(configuredPolicyAdapter)),
 ]);
 {
     await using var client = AsyncClient.FromConfig(
@@ -701,6 +701,86 @@ var syncAdapter = new DemoAdapter();
 if (syncAdapter.DisposeCount != 1)
     throw new InvalidOperationException("synchronous adapter disposal failed");
 
+var retrievalAdapter = new RetrievalAdapter();
+var retrievalRegistry = new ProviderRegistry([
+    new ProviderDescriptor(
+        "retrieval-demo",
+        "Retrieval demo",
+        (_, _) => ValueTask.FromResult<IAsyncDisposable>(retrievalAdapter),
+        operations: [InferenceOperation.Embedding, InferenceOperation.Rerank]),
+]);
+var retrievalConfig = new AnyInferConfig(
+    [ProviderSettings.Of("retrieval-demo")],
+    operationRoutes: new Dictionary<InferenceOperation, Route>
+    {
+        [InferenceOperation.Embedding] = new Route(["retrieval-demo:embedding-model"]),
+        [InferenceOperation.Rerank] = new Route(["retrieval-demo:rerank-model"]),
+    });
+{
+    await using var client = AsyncClient.FromConfig(retrievalConfig, retrievalRegistry);
+    var withoutRaw = await client.EmbedAsync("first", manifest: true);
+    var retained = await client.EmbedAsync(
+        new EmbeddingRequest(
+            ["second", "third"],
+            batch: new BatchPolicy(maxConcurrency: 1, maxItemsOverride: 2),
+            retainRaw: true),
+        manifest: true);
+    var reranked = await client.RerankAsync(
+        new RerankRequest(
+            "query",
+            [
+                new RerankDocument("first-id", "first document"),
+                new RerankDocument("second-id", "second document"),
+            ],
+            topN: 1,
+            batch: new BatchPolicy(maxConcurrency: 1, maxItemsOverride: 2),
+            returnDocuments: true,
+            retainRaw: true),
+        manifest: true);
+    if (withoutRaw.Raw is not null
+        || retained.Vectors.Count != 2
+        || retained.Target.ToString() != "retrieval-demo:embedding-model"
+        || retained.Raw is not JsonString { Value: "embedding-raw" }
+        || retained.Attempts.Single().Timing is null
+        || retained.Manifest is not { Complete: true, Operation: "embedding", Payloads: null }
+        || reranked.Items.Single() is not
+            { Index: 1, DocumentId: "second-id", Text: "second document" }
+        || reranked.Target.ToString() != "retrieval-demo:rerank-model"
+        || reranked.Raw is not JsonString { Value: "rerank-raw" }
+        || reranked.Attempts.Single().Timing is null
+        || reranked.Manifest is not { Complete: true, Operation: "rerank", Payloads: null }
+        || retrievalAdapter.EmbeddingCalls != 2
+        || retrievalAdapter.RerankCalls != 1)
+        throw new InvalidOperationException("configured retrieval public contract failed");
+}
+if (retrievalAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("retrieval adapter disposal failed");
+
+var syncRetrievalAdapter = new RetrievalAdapter();
+{
+    using var client = Client.FromAdapters(
+        [new ProviderRegistration("sync-retrieval-demo", syncRetrievalAdapter)],
+        operationRoutes: new Dictionary<InferenceOperation, Route>
+        {
+            [InferenceOperation.Embedding] = new Route(["sync-retrieval-demo:embedding-model"]),
+            [InferenceOperation.Rerank] = new Route(["sync-retrieval-demo:rerank-model"]),
+        });
+    var embedded = client.Embed("sync", batch: new BatchPolicy(maxConcurrency: 1));
+    var reranked = client.Rerank(
+        "query",
+        [new RerankDocument("sync-id", "sync document")],
+        topN: 1,
+        returnDocuments: true);
+    if (embedded.Vectors.Single().Values.Count != 2
+        || reranked.Items.Single() is not
+            { Index: 0, DocumentId: "sync-id", Text: "sync document" }
+        || syncRetrievalAdapter.EmbeddingCalls != 1
+        || syncRetrievalAdapter.RerankCalls != 1)
+        throw new InvalidOperationException("synchronous retrieval public contract failed");
+}
+if (syncRetrievalAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("synchronous retrieval adapter disposal failed");
+
 var telemetryAdapter = new DemoAdapter();
 var asyncObserver = new CollectingObserver();
 {
@@ -762,6 +842,45 @@ var syncObserver = new CollectingObserver();
 if (syncTelemetryAdapter.DisposeCount != 1 || syncObserver.DisposeCount != 0)
     throw new InvalidOperationException("sync telemetry ownership or adapter disposal failed");
 syncObserver.Dispose();
+
+sealed class RetrievalAdapter : IEmbedsText, IReranksText, IAsyncDisposable
+{
+    public int EmbeddingCalls { get; private set; }
+    public int RerankCalls { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    public ValueTask<EmbeddingWireResult> EmbedAsync(
+        EmbeddingWireRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EmbeddingCalls++;
+        return ValueTask.FromResult(new EmbeddingWireResult(
+            request.Inputs.Select((_, index) => new[] { (double)(index + 1), 2d }),
+            model: request.Model,
+            raw: new JsonString("embedding-raw")));
+    }
+
+    public ValueTask<RerankWireResult> RerankAsync(
+        RerankWireRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        RerankCalls++;
+        return ValueTask.FromResult(new RerankWireResult(
+            request.Documents.Reverse()
+                .Take(request.TopN ?? int.MaxValue)
+                .Select(document => new WireRankedItem(document.Index, document.Index + 0.5d)),
+            model: request.Model,
+            raw: new JsonString("rerank-raw")));
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
+    }
+}
 
 sealed class DemoAdapter : IProviderAdapter
 {

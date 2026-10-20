@@ -368,6 +368,24 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'client.Stream("hello", target: "sync-demo:model")' in source
     assert "foreach (var item in stream)" in source
     assert "synchronous adapter disposal failed" in source
+    assert "operations: [InferenceOperation.Embedding, InferenceOperation.Rerank]" in source
+    assert "operationRoutes: new Dictionary<InferenceOperation, Route>" in source
+    assert "AsyncClient.FromConfig(retrievalConfig, retrievalRegistry)" in source
+    assert 'new EmbeddingRequest(\n            ["second", "third"],' in source
+    assert 'new RerankDocument("second-id", "second document")' in source
+    assert (
+        'retained.Manifest is not { Complete: true, Operation: "embedding", Payloads: null }'
+        in source
+    )
+    assert (
+        'reranked.Manifest is not { Complete: true, Operation: "rerank", Payloads: null }'
+        in source
+    )
+    assert "retained.Attempts.Single().Timing is null" in source
+    assert "reranked.Attempts.Single().Timing is null" in source
+    assert "sealed class RetrievalAdapter : IEmbedsText, IReranksText, IAsyncDisposable" in source
+    assert "synchronous retrieval adapter disposal failed" in source
+    assert "sealed class RetrievalAdapter : IProviderAdapter" not in source
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source
     assert "GenerationResult" not in source

@@ -99,7 +99,7 @@ public sealed class ConfiguredTransportOwnershipTests
         var sentinel = new InvalidOperationException("factory failure");
         var failing = new AsyncClient(
             [ProviderSettings.Of("openai-compat", "https://fixture.invalid/v1", "secret", transport: failedHandler)],
-            new ProviderRegistry([CooperativeDescriptor((_, _) => ValueTask.FromException<IProviderAdapter>(sentinel), true)]), route: new Route(["openai-compat:model"]));
+            new ProviderRegistry([CooperativeDescriptor((_, _) => ValueTask.FromException<IAsyncDisposable>(sentinel), true)]), route: new Route(["openai-compat:model"]));
         try
         {
             await Assert.ThrowsAnyAsync<Exception>(() => failing.GenerateAsync("fail", target: "openai-compat:model"));
@@ -117,7 +117,7 @@ public sealed class ConfiguredTransportOwnershipTests
         var sentinel = new InvalidOperationException("handler disposal failure");
         var failing = new TrackingHandler(sentinel);
         var other = new TrackingHandler();
-        var descriptor = CooperativeDescriptor((_, _) => ValueTask.FromException<IProviderAdapter>(new InvalidOperationException("unused")), true);
+        var descriptor = CooperativeDescriptor((_, _) => ValueTask.FromException<IAsyncDisposable>(new InvalidOperationException("unused")), true);
         var client = new AsyncClient(
             [
                 ProviderSettings.Of("openai-compat", "https://fixture.invalid/v1", "secret", transport: failing, alias: "first"),
@@ -154,7 +154,7 @@ public sealed class ConfiguredTransportOwnershipTests
         Assert.Equal(1, handler.DisposeCalls);
     }
 
-    private static ProviderDescriptor CooperativeDescriptor(Func<ProviderConfig, CancellationToken, ValueTask<IProviderAdapter>> factory, bool poolOwnsTransport)
+    private static ProviderDescriptor CooperativeDescriptor(Func<ProviderConfig, CancellationToken, ValueTask<IAsyncDisposable>> factory, bool poolOwnsTransport)
     {
         var builtin = ProviderRegistry.CreateDefault().Get("openai-compat");
         return new ProviderDescriptor(
@@ -187,9 +187,9 @@ public sealed class ConfiguredTransportOwnershipTests
                 route: new Route(["openai-compat:model"]));
         }
 
-        private async ValueTask<IProviderAdapter> BuildAsync(ProviderConfig config, CancellationToken cancellationToken)
+        private async ValueTask<IAsyncDisposable> BuildAsync(ProviderConfig config, CancellationToken cancellationToken)
         {
-            var adapter = new TrackingAdapter(await _builtin.Factory(config, cancellationToken));
+            var adapter = new TrackingAdapter((IProviderAdapter)await _builtin.Factory(config, cancellationToken));
             if (Interlocked.Increment(ref FactoryCalls) == 1)
             {
                 First = adapter;

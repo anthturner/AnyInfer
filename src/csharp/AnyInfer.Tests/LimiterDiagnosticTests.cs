@@ -38,7 +38,7 @@ public sealed class LimiterDiagnosticTests
         var declared = new ProviderDescriptor(
             "declared",
             "declared",
-            (_, _) => ValueTask.FromResult<IProviderAdapter>(new ScriptedAdapter(static (_, token) => Success(token))),
+            (_, _) => ValueTask.FromResult<IAsyncDisposable>(new ScriptedAdapter(static (_, token) => Success(token))),
             rateLimitHeaders: new RateLimitHeaders(requestsRemaining: "x-remaining", requestsReset: "x-reset"));
         await using var declaredClient = new AsyncClient(
             [ProviderSettings.Of("declared", limits: new RateLimits(minIntervalS: 1))],
@@ -123,7 +123,7 @@ public sealed class LimiterDiagnosticTests
         var descriptor = new ProviderDescriptor(
             id,
             id,
-            (_, _) => ValueTask.FromResult(adapter));
+            (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter));
         return new AsyncClient(
             [ProviderSettings.Of(id, limits: limits)],
             new ProviderRegistry([descriptor]),

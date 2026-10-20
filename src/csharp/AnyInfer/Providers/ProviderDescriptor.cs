@@ -10,7 +10,7 @@ public sealed record ProviderDescriptor
     public ProviderDescriptor(
         string id,
         string displayName,
-        Func<ProviderConfig, CancellationToken, ValueTask<IProviderAdapter>> factory,
+        Func<ProviderConfig, CancellationToken, ValueTask<IAsyncDisposable>> factory,
         IEnumerable<string>? aliases = null,
         ProviderSetupSpec? setup = null,
         string? defaultBaseUrl = null,
@@ -96,7 +96,7 @@ public sealed record ProviderDescriptor
     /// <summary>Gets the descriptor display name.</summary>
     public string DisplayName { get; }
     /// <summary>Gets the lazy factory, invoked only when a selected target first needs an adapter.</summary>
-    public Func<ProviderConfig, CancellationToken, ValueTask<IProviderAdapter>> Factory { get; }
+    public Func<ProviderConfig, CancellationToken, ValueTask<IAsyncDisposable>> Factory { get; }
     /// <summary>Gets immutable normalized descriptor aliases.</summary>
     public IReadOnlyList<string> Aliases { get; }
     /// <summary>Gets declarative setup metadata.</summary>

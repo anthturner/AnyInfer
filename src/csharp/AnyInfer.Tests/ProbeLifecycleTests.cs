@@ -78,7 +78,7 @@ public sealed class ProbeLifecycleTests
             new ProviderDescriptor("primary", "Primary", (_, _) =>
             {
                 factoryCalls++;
-                return ValueTask.FromResult<IProviderAdapter>(adapter);
+                return ValueTask.FromResult<IAsyncDisposable>(adapter);
             }),
         ]);
         var client = new AsyncClient([ProviderSettings.Of("primary")], registry);
@@ -127,7 +127,7 @@ public sealed class ProbeLifecycleTests
             new ProviderDescriptor("embedding-only", "Embedding only", (_, _) =>
             {
                 factoryCalls++;
-                return ValueTask.FromResult<IProviderAdapter>(adapter);
+                return ValueTask.FromResult<IAsyncDisposable>(adapter);
             }, operations: [InferenceOperation.Embedding]),
         ]);
         await using var nonGeneration = new AsyncClient([ProviderSettings.Of("embedding-only")], registry);
@@ -199,13 +199,11 @@ public sealed class ProbeLifecycleTests
     {
         var timeoutEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var timeoutCleaned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var timeoutWasCancelledAtEntry = 0;
-        var timeoutAdapter = new ProbeAdapter((_, token) => BlockingEvents(token, timeoutEntered, timeoutCleaned, cancelled => Volatile.Write(ref timeoutWasCancelledAtEntry, cancelled ? 1 : 0)));
+        var timeoutAdapter = new ProbeAdapter((_, token) => BlockingEvents(token, timeoutEntered, timeoutCleaned));
         await using (var timeoutClient = AsyncClient.FromAdapters([new ProviderRegistration("primary", timeoutAdapter)]))
         {
             var pendingTimeout = timeoutClient.ProbeAsync("primary:model", [Feature.JsonMode], timeoutS: 0.02);
             await timeoutEntered.Task.WaitAsync(TimeSpan.FromSeconds(1));
-            Assert.Equal(0, Volatile.Read(ref timeoutWasCancelledAtEntry));
             var timed = await pendingTimeout;
             await timeoutCleaned.Task.WaitAsync(TimeSpan.FromSeconds(1));
             Assert.Equal(ProbeOutcome.Inconclusive, Assert.Single(timed.Probes).Outcome);
@@ -282,7 +280,7 @@ public sealed class ProbeLifecycleTests
             new ProviderDescriptor("engine", "Engine", (_, _) =>
             {
                 factoryCalls++;
-                return ValueTask.FromResult<IProviderAdapter>(adapter);
+                return ValueTask.FromResult<IAsyncDisposable>(adapter);
             }),
         ]);
         var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabilities>>

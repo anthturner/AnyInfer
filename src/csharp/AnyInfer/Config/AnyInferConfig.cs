@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using AnyInfer.Capabilities;
 using AnyInfer.Credentials;
 using AnyInfer.Json;
 using AnyInfer.Providers;
@@ -28,7 +30,7 @@ public sealed class AnyInferConfig
     };
     private static readonly HashSet<string> UnimplementedKeys = new(StringComparer.Ordinal)
     {
-        "operation_routes", "context", "history", "observers", "arena", "arenas", "mcp",
+        "context", "history", "observers", "arena", "arenas", "mcp",
     };
     private static readonly HashSet<string> IdentityKeys = new(StringComparer.Ordinal) { "id", "adapter", "provider_id", "alias", "enabled" };
     private static readonly HashSet<string> SettingKeys = new(StringComparer.Ordinal)
@@ -43,7 +45,8 @@ public sealed class AnyInferConfig
         Route? route = null,
         Repair? repair = null,
         int formatVersion = FormatVersion1,
-        CachePolicy? cache = null)
+        CachePolicy? cache = null,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes = null)
     {
         if (formatVersion != FormatVersion1)
         {
@@ -55,6 +58,7 @@ public sealed class AnyInferConfig
         Repair = repair;
         FormatVersion = formatVersion;
         Cache = cache;
+        OperationRoutes = CopyOperationRoutes(operationRoutes);
     }
 
     /// <summary>Gets provider settings in declaration order.</summary>
@@ -71,6 +75,9 @@ public sealed class AnyInferConfig
 
     /// <summary>Gets the optional prompt-cache placement policy declared by configuration.</summary>
     public CachePolicy? Cache { get; }
+
+    /// <summary>Gets copied routes declared for retrieval operations.</summary>
+    public IReadOnlyDictionary<InferenceOperation, Route> OperationRoutes { get; }
 
     /// <summary>Loads and validates a UTF-8 configuration document from an explicit path.</summary>
     public static AnyInferConfig Load(string path, ProviderRegistry? registry = null, ResolverChain? resolver = null)
@@ -166,6 +173,25 @@ public sealed class AnyInferConfig
             if (Cache is not null)
             {
                 properties.Add(new JsonProperty("cache", CacheJson(Cache)));
+            }
+
+            if (OperationRoutes.Count != 0)
+            {
+                var operationRoutes = new List<JsonProperty>();
+                foreach (var operation in new[] { InferenceOperation.Embedding, InferenceOperation.Rerank })
+                {
+                    if (!OperationRoutes.TryGetValue(operation, out var route))
+                    {
+                        continue;
+                    }
+
+                    EnsureDefaultRouteCanSerialize(route);
+                    operationRoutes.Add(new JsonProperty(
+                        OperationRouteName(operation),
+                        new JsonArray(route.Targets.Select(static target => new JsonString(target)))));
+                }
+
+                properties.Add(new JsonProperty("operation_routes", new JsonObject(operationRoutes)));
             }
 
             if (Repair is not null)
@@ -277,7 +303,8 @@ public sealed class AnyInferConfig
         var route = ParseRoute(GetOrDefault(root, "default_route", JsonNull.Instance), source);
         var repair = ParseRepair(GetOrDefault(root, "repair", JsonNull.Instance), source);
         var cache = ParseCache(GetOrDefault(root, "cache", JsonNull.Instance), source);
-        return new AnyInferConfig(providers, route, repair, version, cache);
+        var operationRoutes = ParseOperationRoutes(GetOrDefault(root, "operation_routes", JsonNull.Instance), source);
+        return new AnyInferConfig(providers, route, repair, version, cache, operationRoutes);
     }
 
     private static IReadOnlyList<ProviderSettings> ParseProviders(JsonValue value, string source, ProviderRegistry registry, ResolverChain resolver)
@@ -524,6 +551,42 @@ public sealed class AnyInferConfig
         }
 
         return new Route(array.Items.Select((item, index) => RequiredNonBlankString(item, source, $"default_route[{index}]")));
+    }
+
+    private static IReadOnlyDictionary<InferenceOperation, Route> ParseOperationRoutes(JsonValue value, string source)
+    {
+        if (value is JsonNull)
+        {
+            return new Dictionary<InferenceOperation, Route>();
+        }
+
+        if (value is not JsonObject routes)
+        {
+            throw Fail(source, "operation_routes must be an object.");
+        }
+
+        var parsed = new Dictionary<InferenceOperation, Route>();
+        foreach (var property in routes.Properties)
+        {
+            var operation = property.Name switch
+            {
+                "embedding" => InferenceOperation.Embedding,
+                "rerank" => InferenceOperation.Rerank,
+                _ => throw Fail(source, $"operation_routes has unsupported key '{property.Name}'."),
+            };
+            if (property.Value is not JsonArray targets || targets.Items.Count == 0)
+            {
+                throw Fail(source, $"operation_routes.{property.Name} must be a nonempty array of target strings.");
+            }
+
+            if (!parsed.TryAdd(operation, new Route(targets.Items.Select((item, index) =>
+                RequiredNonBlankString(item, source, $"operation_routes.{property.Name}[{index}]")))))
+            {
+                throw Fail(source, $"operation_routes has duplicate key '{property.Name}'.");
+            }
+        }
+
+        return parsed;
     }
 
     private static Repair? ParseRepair(JsonValue value, string source)
@@ -862,6 +925,33 @@ public sealed class AnyInferConfig
             throw new ConfigException("A route with context-window targets cannot be serialized by configuration format version 1.");
         }
     }
+
+    private static IReadOnlyDictionary<InferenceOperation, Route> CopyOperationRoutes(
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes)
+    {
+        var copied = new Dictionary<InferenceOperation, Route>();
+        if (operationRoutes is not null)
+        {
+            foreach (var pair in operationRoutes)
+            {
+                if (pair.Key is not InferenceOperation.Embedding and not InferenceOperation.Rerank)
+                {
+                    throw new ConfigException("Operation routes support only embedding and rerank.");
+                }
+
+                copied.Add(pair.Key, pair.Value ?? throw new ConfigException("Operation routes cannot contain null routes."));
+            }
+        }
+
+        return new ReadOnlyDictionary<InferenceOperation, Route>(copied);
+    }
+
+    private static string OperationRouteName(InferenceOperation operation) => operation switch
+    {
+        InferenceOperation.Embedding => "embedding",
+        InferenceOperation.Rerank => "rerank",
+        _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+    };
 
     private static ConfigException Fail(string source, string detail, Exception? nativeInner = null)
         => new($"Configuration {source}: {detail}", detail: detail, hint: "See the shared configuration guide for supported format version 1.", nativeInner: nativeInner);

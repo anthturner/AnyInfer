@@ -73,7 +73,7 @@ public sealed class ProviderCapabilityTests
                 factory: (_, _) =>
                 {
                     factoryCalls++;
-                    return ValueTask.FromException<IProviderAdapter>(new InvalidOperationException("Pure metadata queries must not construct adapters."));
+                    return ValueTask.FromException<IAsyncDisposable>(new InvalidOperationException("Pure metadata queries must not construct adapters."));
                 },
                 locality: ProviderLocality.Local,
                 defaultCapabilities: new ModelCapabilities(features: new Sourced<Feature>(Feature.JsonSchema, Provenance.Catalog)),
@@ -169,7 +169,7 @@ public sealed class ProviderCapabilityTests
             Descriptor(factory: (_, _) =>
             {
                 factoryCalls++;
-                return ValueTask.FromResult<IProviderAdapter>(adapter);
+                return ValueTask.FromResult<IAsyncDisposable>(adapter);
             })
         ]);
         var catalog = CatalogWithAliases(
@@ -203,7 +203,7 @@ public sealed class ProviderCapabilityTests
             Descriptor(factory: (_, _) =>
             {
                 factoryCalls++;
-                return ValueTask.FromResult<IProviderAdapter>(adapter);
+                return ValueTask.FromResult<IAsyncDisposable>(adapter);
             })
         ]);
         var catalog = CatalogWithAliases(("usable", "primary", "model"));
@@ -226,7 +226,7 @@ public sealed class ProviderCapabilityTests
             StringComparer.Ordinal)));
 
     private static ProviderDescriptor Descriptor(
-        Func<ProviderConfig, CancellationToken, ValueTask<IProviderAdapter>>? factory = null,
+        Func<ProviderConfig, CancellationToken, ValueTask<IAsyncDisposable>>? factory = null,
         ProviderLocality locality = ProviderLocality.Hosted,
         ModelCapabilities? defaultCapabilities = null,
         IReadOnlyDictionary<string, ModelCapabilities>? staticCapabilities = null,
@@ -235,7 +235,7 @@ public sealed class ProviderCapabilityTests
         IReadOnlyDictionary<string, RerankCapabilities>? staticRerankCapabilities = null,
         TokenCalibration? tokenCalibration = null,
         RateLimitHeaders? rateLimitHeaders = null) =>
-        new("engine", "Engine", factory ?? (static (_, _) => ValueTask.FromResult<IProviderAdapter>(new NoopAdapter())),
+        new("engine", "Engine", factory ?? (static (_, _) => ValueTask.FromResult<IAsyncDisposable>(new NoopAdapter())),
             locality: locality, defaultCapabilities: defaultCapabilities, staticCapabilities: staticCapabilities,
             operations: operations, staticEmbeddingCapabilities: staticEmbeddingCapabilities,
             staticRerankCapabilities: staticRerankCapabilities, tokenCalibration: tokenCalibration,

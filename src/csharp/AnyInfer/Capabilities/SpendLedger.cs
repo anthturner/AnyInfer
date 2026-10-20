@@ -116,6 +116,17 @@ public sealed class SpendLedger : IObserver
         }
     }
 
+    /// <summary>Removes request-local accounting state after an operation that did not complete.</summary>
+    internal void Abandon(string requestId)
+    {
+        ArgumentNullException.ThrowIfNull(requestId);
+        lock (_gate)
+        {
+            _metadata.Remove(requestId);
+            _reservations.Remove(requestId);
+        }
+    }
+
     /// <summary>Gets the exact sum of current reservations.</summary>
     public EDecimal Reserved()
     {

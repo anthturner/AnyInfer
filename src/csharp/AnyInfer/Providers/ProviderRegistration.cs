@@ -8,7 +8,7 @@ public sealed record ProviderRegistration
     /// <summary>Creates an immutable provider registration.</summary>
     public ProviderRegistration(
         string providerId,
-        IProviderAdapter adapter,
+        IAsyncDisposable adapter,
         IReadOnlyDictionary<string, StructuredOutputProfile>? structuredOutputProfiles = null,
         int? maxRepairAttempts = null)
     {
@@ -46,7 +46,7 @@ public sealed record ProviderRegistration
     public string ProviderId { get; }
 
     /// <summary>Gets the adapter owned by this registration.</summary>
-    public IProviderAdapter Adapter { get; }
+    public IAsyncDisposable Adapter { get; }
 
     /// <summary>Gets immutable capabilities keyed by exact resolved model name.</summary>
     public IReadOnlyDictionary<string, StructuredOutputProfile> StructuredOutputProfiles { get; }

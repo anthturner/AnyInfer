@@ -8,6 +8,7 @@ using AnyInfer.Schema;
 using AnyInfer.Events;
 using AnyInfer.Manifest;
 using AnyInfer.Routing;
+using AnyInfer.Json;
 
 namespace AnyInfer;
 
@@ -32,6 +33,8 @@ public sealed class AsyncClient : IAsyncDisposable
     private readonly SpendPolicy? _spendPolicy;
     private readonly bool _contextGate;
     private readonly CachePolicy? _cachePolicy;
+    private readonly bool _retainRaw;
+    private readonly IReadOnlyDictionary<InferenceOperation, Route> _operationRoutes;
     private readonly CachePrefixState _cachePrefixes = new();
     private readonly object _gate = new();
     private readonly HashSet<AsyncStream> _activeStreams = [];
@@ -60,7 +63,9 @@ public sealed class AsyncClient : IAsyncDisposable
         SpendPolicy? spendPolicy = null,
         bool contextGate = true,
         IReadOnlyDictionary<string, RateLimiter>? limiters = null,
-        CachePolicy? cachePolicy = null)
+        CachePolicy? cachePolicy = null,
+        bool retainRaw = false,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes = null)
     {
         _dispatcher = new EventDispatcher(observers);
         var copiedLimiters = CopyLimiters(limiters);
@@ -88,6 +93,8 @@ public sealed class AsyncClient : IAsyncDisposable
         _spendPolicy = spendPolicy;
         _contextGate = contextGate;
         _cachePolicy = cachePolicy;
+        _retainRaw = retainRaw;
+        _operationRoutes = CopyOperationRoutes(operationRoutes);
         if (_ledger is not null) _dispatcher.Subscribe(_ledger);
     }
 
@@ -103,8 +110,10 @@ public sealed class AsyncClient : IAsyncDisposable
         SpendPolicy? spendPolicy = null,
         bool contextGate = true,
         IReadOnlyDictionary<string, RateLimiter>? limiters = null,
-        CachePolicy? cachePolicy = null) =>
-        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy);
+        CachePolicy? cachePolicy = null,
+        bool retainRaw = false,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes = null) =>
+        new(providers, new SystemOperationClock(), publicSdk: true, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy, retainRaw, operationRoutes);
 
     /// <summary>Creates a client from inert parsed configuration without performing I/O or credential resolution.</summary>
     public static AsyncClient FromConfig(
@@ -123,14 +132,16 @@ public sealed class AsyncClient : IAsyncDisposable
         SpendPolicy? spendPolicy = null,
         bool contextGate = true,
         IReadOnlyDictionary<string, RateLimiter>? limiters = null,
-        CachePolicy? cachePolicy = null)
+        CachePolicy? cachePolicy = null,
+        bool retainRaw = false,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes = null)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy ?? config.Cache);
+        return new AsyncClient(config.Providers, registry, resolver, config.Route, config.Repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy ?? config.Cache, retainRaw, operationRoutes ?? config.OperationRoutes);
     }
 
     internal AsyncClient(IEnumerable<ProviderRegistration> providers, IOperationClock clock)
-        : this(providers, clock, publicSdk: false, schemaValidation: null, observers: null, manifests: false, manifestPayloads: false, estimator: null, ledger: null, spendPolicy: null, contextGate: false, limiters: null, cachePolicy: null)
+        : this(providers, clock, publicSdk: false, schemaValidation: null, observers: null, manifests: false, manifestPayloads: false, estimator: null, ledger: null, spendPolicy: null, contextGate: false, limiters: null, cachePolicy: null, retainRaw: false, operationRoutes: null)
     {
     }
 
@@ -147,7 +158,9 @@ public sealed class AsyncClient : IAsyncDisposable
         SpendPolicy? spendPolicy,
         bool contextGate,
         IReadOnlyDictionary<string, RateLimiter>? limiters,
-        CachePolicy? cachePolicy)
+        CachePolicy? cachePolicy,
+        bool retainRaw,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes)
     {
         _dispatcher = new EventDispatcher(observers);
         var copiedLimiters = CopyLimiters(limiters);
@@ -171,6 +184,8 @@ public sealed class AsyncClient : IAsyncDisposable
         _spendPolicy = publicSdk ? spendPolicy : null;
         _contextGate = publicSdk && contextGate;
         _cachePolicy = publicSdk ? cachePolicy : null;
+        _retainRaw = publicSdk && retainRaw;
+        _operationRoutes = publicSdk ? CopyOperationRoutes(operationRoutes) : EmptyOperationRoutes;
         if (_ledger is not null) _dispatcher.Subscribe(_ledger);
     }
 
@@ -194,6 +209,32 @@ public sealed class AsyncClient : IAsyncDisposable
         }
 
         return new System.Collections.ObjectModel.ReadOnlyDictionary<string, RateLimiter>(copy);
+    }
+
+    private static readonly IReadOnlyDictionary<InferenceOperation, Route> EmptyOperationRoutes =
+        new System.Collections.ObjectModel.ReadOnlyDictionary<InferenceOperation, Route>(
+            new Dictionary<InferenceOperation, Route>());
+
+    private static IReadOnlyDictionary<InferenceOperation, Route> CopyOperationRoutes(
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes)
+    {
+        if (operationRoutes is null || operationRoutes.Count == 0)
+        {
+            return EmptyOperationRoutes;
+        }
+
+        var copy = new Dictionary<InferenceOperation, Route>();
+        foreach (var pair in operationRoutes)
+        {
+            if (pair.Key is not InferenceOperation.Embedding and not InferenceOperation.Rerank)
+            {
+                throw new ArgumentException("Operation routes support only embedding and rerank.", nameof(operationRoutes));
+            }
+
+            copy.Add(pair.Key, pair.Value ?? throw new ArgumentException("Operation routes cannot contain null routes.", nameof(operationRoutes)));
+        }
+
+        return new System.Collections.ObjectModel.ReadOnlyDictionary<InferenceOperation, Route>(copy);
     }
     internal RouteState Health => _health;
 
@@ -294,6 +335,110 @@ public sealed class AsyncClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(target);
         return ProbeCoreAsync(target, features, timeoutS, record, cancellationToken, CancellationIdentityContext.Resolve(cancellationToken));
     }
+
+    /// <summary>Embeds one immutable request through the selected retrieval route.</summary>
+    public Task<EmbeddingResult> EmbedAsync(
+        EmbeddingRequest request,
+        string? target = null,
+        Route? route = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return EmbedCoreAsync(request, target, route, cancellationToken, CancellationIdentityContext.Resolve(cancellationToken), manifest);
+    }
+
+    /// <summary>Embeds one text input through the selected retrieval route.</summary>
+    public Task<EmbeddingResult> EmbedAsync(
+        string input,
+        string? target = null,
+        Route? route = null,
+        EmbeddingInputIntent? inputType = null,
+        int? dimensions = null,
+        EmbeddingSpace? expectedSpace = null,
+        bool allowIncompatibleFallback = false,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        EmbedAsync(new EmbeddingRequest([input], inputType, dimensions, expectedSpace, timeoutS,
+            maxResponseBytes ?? 64 * 1024 * 1024, metadata, providerOptions, batch,
+            retainRaw ?? _retainRaw, allowIncompatibleFallback), target, route, cancellationToken, manifest);
+
+    /// <summary>Embeds ordered text inputs through the selected retrieval route.</summary>
+    public Task<EmbeddingResult> EmbedAsync(
+        IEnumerable<string> inputs,
+        string? target = null,
+        Route? route = null,
+        EmbeddingInputIntent? inputType = null,
+        int? dimensions = null,
+        EmbeddingSpace? expectedSpace = null,
+        bool allowIncompatibleFallback = false,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        EmbedAsync(new EmbeddingRequest(inputs, inputType, dimensions, expectedSpace, timeoutS,
+            maxResponseBytes ?? 64 * 1024 * 1024, metadata, providerOptions, batch,
+            retainRaw ?? _retainRaw, allowIncompatibleFallback), target, route, cancellationToken, manifest);
+
+    /// <summary>Reranks one immutable request through the selected retrieval route.</summary>
+    public Task<RerankResult> RerankAsync(
+        RerankRequest request,
+        string? target = null,
+        Route? route = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return RerankCoreAsync(request, target, route, cancellationToken, CancellationIdentityContext.Resolve(cancellationToken), manifest);
+    }
+
+    /// <summary>Reranks ordered document texts through the selected retrieval route.</summary>
+    public Task<RerankResult> RerankAsync(
+        string query,
+        IEnumerable<string> documents,
+        string? target = null,
+        Route? route = null,
+        int? topN = null,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool returnDocuments = false,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RerankAsync(new RerankRequest(query, documents.Select((text, index) => new RerankDocument(index.ToString(System.Globalization.CultureInfo.InvariantCulture), text)), topN, timeoutS,
+            maxResponseBytes ?? 8 * 1024 * 1024, metadata, providerOptions, batch, returnDocuments, retainRaw ?? _retainRaw), target, route, cancellationToken, manifest);
+
+    /// <summary>Reranks ordered documents through the selected retrieval route.</summary>
+    public Task<RerankResult> RerankAsync(
+        string query,
+        IEnumerable<RerankDocument> documents,
+        string? target = null,
+        Route? route = null,
+        int? topN = null,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool returnDocuments = false,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RerankAsync(new RerankRequest(query, documents, topN, timeoutS,
+            maxResponseBytes ?? 8 * 1024 * 1024, metadata, providerOptions, batch, returnDocuments, retainRaw ?? _retainRaw), target, route, cancellationToken, manifest);
     /// <summary>Consumes this client's single streaming execution path to its terminal result.</summary>
     public Task<Generation> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
         GenerateAsync(request, capture: null, cancellationToken: cancellationToken, manifest: manifest);
@@ -443,7 +588,7 @@ public sealed class AsyncClient : IAsyncDisposable
         stream = new AsyncStream(
             this,
             SyncExecutionContext.CurrentClient,
-            token => RunStreamAsync(normalized, effectiveRequest.Route, capture, stream!, _resolutionProfile == TargetResolutionProfile.PublicSdk ? new GenerationPolicyContext(effectiveRequest, effectiveRequest.Cache ?? _cachePolicy, _estimator, _cachePrefixes, _spendPolicy, _ledger, _contextGate) : null, token),
+            token => RunStreamAsync(normalized, effectiveRequest.Route, capture, stream!, _resolutionProfile == TargetResolutionProfile.PublicSdk ? new GenerationPolicyContext(effectiveRequest, effectiveRequest.Cache ?? _cachePolicy, _estimator, _cachePrefixes, _spendPolicy, _ledger, _contextGate) : null, token, _retainRaw),
             cancellationToken,
             OnStreamClosed,
             telemetry);
@@ -530,7 +675,8 @@ public sealed class AsyncClient : IAsyncDisposable
         OperationCapture? capture,
         AsyncStream stream,
         GenerationPolicyContext? policyContext,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken,
+        bool retainRaw)
     {
         try
         {
@@ -545,7 +691,8 @@ public sealed class AsyncClient : IAsyncDisposable
                 capture,
                 stream,
                 policyContext,
-                cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+                cancellationToken,
+                retainRaw).WithCancellation(cancellationToken).ConfigureAwait(false))
             {
                 yield return generationEvent;
             }
@@ -554,6 +701,151 @@ public sealed class AsyncClient : IAsyncDisposable
         {
             RemoveActiveStream(stream);
         }
+    }
+
+    private async Task<EmbeddingResult> EmbedCoreAsync(
+        EmbeddingRequest request,
+        string? target,
+        Route? route,
+        CancellationToken cancellationToken,
+        CancellationToken callerIdentity,
+        bool? manifest)
+    {
+        var reservation = ReserveLifecycle(cancellationToken, callerIdentity);
+        using var context = AsyncExecutionContext.Push(this, reservation.SyncOwner);
+        using var identity = CancellationIdentityContext.Push(reservation.Token, reservation.CallerIdentity);
+        var requestId = Guid.NewGuid().ToString("D");
+        var committed = false;
+        try
+        {
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+            var effectiveRoute = ResolveOperationRoute(InferenceOperation.Embedding, target, route);
+            var admission = _targetResolver.Resolve(effectiveRoute.Targets[0], _resolutionProfile);
+            RetrievalCore.EnforceEmbeddingSpend(request, admission.ResolvedCapabilities, admission.Target, requestId, _spendPolicy, _ledger, _estimator);
+            _dispatcher.Emit(new RequestStarted(requestId, effectiveRoute.Targets, request.Metadata, operation: "embedding"));
+            var outcome = await RetrievalCore.EmbedAsync(request, effectiveRoute, _pool, _targetResolver, _health, _clock,
+                _capabilities, reservation.Token, reservation.CallerIdentity, _dispatcher.Emit, requestId, TimeProvider.System).ConfigureAwait(false);
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+            var timing = outcome.Timing;
+            var result = new EmbeddingResult(outcome.Vectors, outcome.Target, outcome.Space, outcome.Usage, timing,
+                outcome.Attempts, outcome.Warnings, outcome.Raw,
+                _resolutionProfile == TargetResolutionProfile.PublicSdk && (manifest ?? _manifests)
+                    ? OperationManifestBuilder.Build(requestId, "embedding", effectiveRoute, outcome.Target, outcome.Usage, timing, outcome.Attempts, outcome.Warnings, outcome.Space)
+                    : null);
+            bool closed;
+            lock (_gate)
+            {
+                closed = _disposed;
+                if (!closed)
+                {
+                    reservation.ThrowIfCallerCancelled();
+                    committed = true;
+                }
+            }
+            if (closed)
+            {
+                await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            }
+            _dispatcher.Emit(new RequestCompleted(requestId, outcome.Target, outcome.Usage, timing));
+            return result;
+        }
+        catch (RetrievalCore.OwnedCallerDeadlineCancellationException)
+        {
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+            throw;
+        }
+        finally
+        {
+            if (!committed)
+            {
+                _ledger?.Abandon(requestId);
+            }
+
+            await CompleteLifecycleAsync(reservation).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<RerankResult> RerankCoreAsync(
+        RerankRequest request,
+        string? target,
+        Route? route,
+        CancellationToken cancellationToken,
+        CancellationToken callerIdentity,
+        bool? manifest)
+    {
+        var reservation = ReserveLifecycle(cancellationToken, callerIdentity);
+        using var context = AsyncExecutionContext.Push(this, reservation.SyncOwner);
+        using var identity = CancellationIdentityContext.Push(reservation.Token, reservation.CallerIdentity);
+        var requestId = Guid.NewGuid().ToString("D");
+        var committed = false;
+        try
+        {
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+            var effectiveRoute = ResolveOperationRoute(InferenceOperation.Rerank, target, route);
+            var admission = _targetResolver.Resolve(effectiveRoute.Targets[0], _resolutionProfile);
+            RetrievalCore.EnforceUnknownSpend(admission.Target, requestId, _spendPolicy, _ledger);
+            _dispatcher.Emit(new RequestStarted(requestId, effectiveRoute.Targets, request.Metadata, operation: "rerank"));
+            var outcome = await RetrievalCore.RerankAsync(request, effectiveRoute, _pool, _targetResolver, _health, _clock,
+                _capabilities, reservation.Token, reservation.CallerIdentity, _dispatcher.Emit, requestId, TimeProvider.System).ConfigureAwait(false);
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+            var timing = outcome.Timing;
+            var result = new RerankResult(outcome.Items, outcome.Target, outcome.Usage, timing,
+                outcome.Attempts, outcome.Warnings, outcome.Raw,
+                _resolutionProfile == TargetResolutionProfile.PublicSdk && (manifest ?? _manifests)
+                    ? OperationManifestBuilder.Build(requestId, "rerank", effectiveRoute, outcome.Target, outcome.Usage, timing, outcome.Attempts, outcome.Warnings)
+                    : null);
+            bool closed;
+            lock (_gate)
+            {
+                closed = _disposed;
+                if (!closed)
+                {
+                    reservation.ThrowIfCallerCancelled();
+                    committed = true;
+                }
+            }
+            if (closed)
+            {
+                await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            }
+            _dispatcher.Emit(new RequestCompleted(requestId, outcome.Target, outcome.Usage, timing));
+            return result;
+        }
+        catch (RetrievalCore.OwnedCallerDeadlineCancellationException)
+        {
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+            throw;
+        }
+        finally
+        {
+            if (!committed)
+            {
+                _ledger?.Abandon(requestId);
+            }
+
+            await CompleteLifecycleAsync(reservation).ConfigureAwait(false);
+        }
+    }
+
+    private Route ResolveOperationRoute(InferenceOperation operation, string? target, Route? route)
+    {
+        if (target is not null && route is null)
+        {
+            return _defaultRoute is null
+                ? new Route([target])
+                : new Route([target], _defaultRoute.Retry, _defaultRoute.HealthGate, _defaultRoute.HealthTtlS);
+        }
+
+        return route
+            ?? (target is null && _operationRoutes.TryGetValue(operation, out var operationRoute) ? operationRoute : null)
+            ?? _defaultRoute
+            ?? throw new ConfigException("Specify a target, route, operation route, or client default route.");
     }
 
     private void OnStreamClosed(AsyncStream stream)
@@ -604,6 +896,13 @@ public sealed class AsyncClient : IAsyncDisposable
 
             var resolved = _pool.Materialize(metadata);
             var adapter = await _pool.GetAdapterAsync(resolved.State, reservation.Token, reservation.CallerIdentity).ConfigureAwait(false);
+            if (adapter is not IGeneratesText generationAdapter)
+            {
+                throw new ConfigException(
+                    "The selected provider does not implement generation support.",
+                    resolved.Target.ProviderId,
+                    hint: "Configure a provider adapter that implements IGeneratesText.");
+            }
             await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
             reservation.ThrowIfCallerCancelled();
 
@@ -613,7 +912,7 @@ public sealed class AsyncClient : IAsyncDisposable
             {
                 await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
                 var result = await CapabilityProbeRunner.RunAsync(
-                    adapter,
+                    generationAdapter,
                     resolved,
                     feature,
                     timeoutS,
@@ -779,7 +1078,7 @@ public sealed class AsyncClient : IAsyncDisposable
         IReadOnlyList<DiscoveredModel> models,
         ProviderPool.InstanceState state,
         InferenceOperation? operation,
-        IProviderAdapter adapter)
+        IAsyncDisposable adapter)
     {
         if (operation is null) return models;
         return models.Where(model => SupportsOperation(state, model, operation.Value, adapter));
@@ -789,24 +1088,35 @@ public sealed class AsyncClient : IAsyncDisposable
         ProviderPool.InstanceState state,
         DiscoveredModel model,
         InferenceOperation operation,
-        IProviderAdapter adapter)
+        IAsyncDisposable adapter)
     {
+        if (state.Descriptor is { } descriptor && !descriptor.Operations.Contains(operation))
+        {
+            return false;
+        }
+
         if (model.Capabilities?.Operations is { } operations)
         {
             return operations.Value.Contains(operation);
         }
 
-        if (state.Descriptor is { } descriptor)
+        if (state.Descriptor is { } declared)
         {
             return operation switch
             {
-                InferenceOperation.Embedding => descriptor.StaticEmbeddingCapabilities.ContainsKey(model.Id),
-                InferenceOperation.Rerank => descriptor.StaticRerankCapabilities.ContainsKey(model.Id),
-                _ => descriptor.Operations.Contains(operation),
+                InferenceOperation.Embedding => declared.StaticEmbeddingCapabilities.ContainsKey(model.Id),
+                InferenceOperation.Rerank => declared.StaticRerankCapabilities.ContainsKey(model.Id),
+                _ => declared.Operations.Contains(operation),
             };
         }
 
-        return operation == InferenceOperation.Generation && adapter is IProviderAdapter;
+        return operation switch
+        {
+            InferenceOperation.Generation => adapter is IGeneratesText,
+            InferenceOperation.Embedding => adapter is IEmbedsText,
+            InferenceOperation.Rerank => adapter is IReranksText,
+            _ => false,
+        };
     }
 
     private LifecycleReservation ReserveLifecycle(CancellationToken callerCancellation, CancellationToken callerIdentity)

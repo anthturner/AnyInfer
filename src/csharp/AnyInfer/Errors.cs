@@ -291,13 +291,24 @@ public sealed class SchemaEvaluationException : AnyInferException
 public sealed class AllTargetsFailedException : AnyInferException
 {
     /// <summary>Initializes a failure containing every target attempt.</summary>
-    public AllTargetsFailedException(string message, IEnumerable<AttemptRecord> attempts, string? provider = null, string? detail = null, string? hint = null, Exception? nativeInner = null)
+    public AllTargetsFailedException(
+        string message,
+        IEnumerable<AttemptRecord> attempts,
+        string? provider = null,
+        string? detail = null,
+        string? hint = null,
+        Exception? nativeInner = null,
+        IEnumerable<BatchFailure>? batchFailures = null)
         : base(message, "all_targets_failed", false, "generate", null, null, provider, detail, hint, nativeInner)
     {
         ArgumentNullException.ThrowIfNull(attempts);
         Attempts = Array.AsReadOnly(attempts.Select(static attempt => attempt ?? throw new ArgumentException("Attempts cannot contain null references.")).ToArray());
+        BatchFailures = Array.AsReadOnly((batchFailures ?? []).Select(static failure => failure ?? throw new ArgumentException("Batch failures cannot contain null references.")).ToArray());
     }
 
     /// <summary>Gets the ordered failed target attempts.</summary>
     public IReadOnlyList<AttemptRecord> Attempts { get; }
+
+    /// <summary>Gets copied internal batch outcomes for a retrieval failure.</summary>
+    public IReadOnlyList<BatchFailure> BatchFailures { get; }
 }

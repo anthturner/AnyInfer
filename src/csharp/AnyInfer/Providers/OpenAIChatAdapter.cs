@@ -280,7 +280,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 request.UsesModernSchema).ConfigureAwait(false);
             foreach (var adapterEvent in ReadBuffered(
                 body,
-                request.UsesModernSchema || request.Tools.Count > 0))
+                request.UsesModernSchema || request.Tools.Count > 0,
+                request.UsesModernSchema))
             {
                 yield return adapterEvent;
             }
@@ -546,7 +547,10 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         }
     }
 
-    private IEnumerable<AdapterEvent> ReadBuffered(byte[] body, bool toolsEnabled)
+    private IEnumerable<AdapterEvent> ReadBuffered(
+        byte[] body,
+        bool toolsEnabled,
+        bool usesModernSchema)
     {
         var root = ReadObject(body);
         var choice = FirstChoice(root);
@@ -572,7 +576,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             yield return new AdapterUsage(usage);
         }
 
-        yield return new AdapterFinal(finishReason, usage);
+        yield return new AdapterFinal(finishReason, usage, usesModernSchema ? root : null);
     }
 
     private async IAsyncEnumerable<AdapterEvent> ReadSseAsync(

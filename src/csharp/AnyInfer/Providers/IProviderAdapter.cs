@@ -1,6 +1,6 @@
 namespace AnyInfer.Providers;
 
-public interface IProviderAdapter : IAsyncDisposable
+/// <summary>Preserves the legacy generation adapter composition.</summary>
+public interface IProviderAdapter : IAsyncDisposable, IGeneratesText
 {
-    IAsyncEnumerable<AdapterEvent> GenerateAsync(WireRequest request, CancellationToken cancellationToken = default);
 }

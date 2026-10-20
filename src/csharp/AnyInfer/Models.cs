@@ -363,11 +363,16 @@ public sealed record Timing
 
 public sealed record AttemptRecord
 {
-    public AttemptRecord(ResolvedTarget? target, string outcome, AnyInferException? error = null)
+    public AttemptRecord(
+        ResolvedTarget? target,
+        string outcome,
+        AnyInferException? error = null,
+        Timing? timing = null)
     {
         Target = target;
         Outcome = outcome ?? throw new ArgumentNullException(nameof(outcome));
         Error = error;
+        Timing = timing;
     }
 
     public ResolvedTarget? Target { get; }
@@ -375,6 +380,9 @@ public sealed record AttemptRecord
     public string Outcome { get; }
 
     public AnyInferException? Error { get; }
+
+    /// <summary>Gets attempt timing when the operation measured it.</summary>
+    public Timing? Timing { get; }
 }
 
 public sealed record GenerationRequest
@@ -439,7 +447,8 @@ public sealed record Generation
         IEnumerable<AttemptRecord>? attempts = null,
         IEnumerable<string>? warnings = null,
         RunManifest? manifest = null,
-        IEnumerable<ToolCall>? toolCalls = null)
+        IEnumerable<ToolCall>? toolCalls = null,
+        JsonValue? raw = null)
     {
         Text = text ?? throw new ArgumentNullException(nameof(text));
         Structured = structured;
@@ -453,6 +462,7 @@ public sealed record Generation
         Warnings = Array.AsReadOnly((warnings ?? []).Select(static warning => warning ?? throw new ArgumentException("Warnings cannot contain null references.")).ToArray());
         Manifest = manifest;
         ToolCalls = Array.AsReadOnly((toolCalls ?? []).Select(static call => call ?? throw new ArgumentException("Tool calls cannot contain null references.")).ToArray());
+        Raw = raw;
     }
 
     public string Text { get; }
@@ -469,6 +479,8 @@ public sealed record Generation
     public RunManifest? Manifest { get; }
     /// <summary>Gets model-requested tool calls from the winning entry.</summary>
     public IReadOnlyList<ToolCall> ToolCalls { get; }
+    /// <summary>Gets the caller-retained raw terminal provider payload when enabled.</summary>
+    public JsonValue? Raw { get; }
 
     internal Generation WithManifest(RunManifest? manifest) => new(
         Text,
@@ -482,7 +494,8 @@ public sealed record Generation
         Attempts,
         Warnings,
         manifest,
-        ToolCalls);
+        ToolCalls,
+        Raw);
 
     /// <summary>Deserializes the structured result with the supplied serializer options.</summary>
     public T? DeserializeStructured<T>(System.Text.Json.JsonSerializerOptions? options = null)

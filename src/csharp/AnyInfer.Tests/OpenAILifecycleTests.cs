@@ -308,7 +308,7 @@ public sealed class OpenAILifecycleTests
         var builtin = ProviderRegistry.CreateDefault().Get("openai-compat");
         var settings = ProviderSettings.Of("openai-compat", "https://fixture.invalid/v1", secret,
             headers: headers ?? new Dictionary<string, string> { ["X-Lifecycle"] = instanceId }, transport: handler, timeoutS: timeoutS, alias: instanceId);
-        return builtin.Factory(new ProviderConfig(settings, "openai-compat", secret), CancellationToken.None).Result;
+        return (IProviderAdapter)builtin.Factory(new ProviderConfig(settings, "openai-compat", secret), CancellationToken.None).Result;
     }
 
     private static IEnumerable<ProviderSettings> InstanceSettings(JsonObject fixture) =>

@@ -25,7 +25,8 @@ internal static class GenerationCore
         OperationCapture? capture,
         AsyncStream stream,
         GenerationPolicyContext? policyContext,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken,
+        bool retainRaw = false)
     {
         var operation = new OperationContext(capture, policyContext?.EntryTimeProvider);
         stream.BeginOperation(operation);
@@ -77,6 +78,20 @@ internal static class GenerationCore
                     cancellationToken,
                     cancelledParentToken,
                     callerIdentity).ConfigureAwait(false);
+                if (resolved.Descriptor is { } descriptor && !descriptor.Operations.Contains(InferenceOperation.Generation))
+                {
+                    throw new ConfigException(
+                        "The selected provider does not declare generation support.",
+                        resolved.Target.ProviderId,
+                        hint: "Configure a provider descriptor that declares generation support.");
+                }
+                if (adapter is not IGeneratesText generatesText)
+                {
+                    throw new ConfigException(
+                        "The selected provider does not implement generation support.",
+                        resolved.Target.ProviderId,
+                        hint: "Configure a provider adapter that implements IGeneratesText.");
+                }
                 telemetry?.NoteCapabilities(metadata);
                 var pacing = resolutionProfile == TargetResolutionProfile.PublicSdk
                     ? registry.GetPacing(resolved)
@@ -127,7 +142,7 @@ internal static class GenerationCore
                             headersReason));
                     }
                     var current = CreateEntry(
-                        adapter,
+                        generatesText,
                         wireRequest,
                         operation,
                         stream,
@@ -139,7 +154,8 @@ internal static class GenerationCore
                         telemetry,
                         request.SchemaProfile == SchemaExecutionProfile.ModernSdk,
                         pacing,
-                        cancelledParentToken);
+                        cancelledParentToken,
+                        retainRaw);
 
                     await foreach (var generationEvent in current.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
@@ -233,7 +249,7 @@ internal static class GenerationCore
                             operation.OperationId,
                             new TelemetryObservation("repair_attempted", AttemptNumber: repairs));
                         current = CreateEntry(
-                            adapter,
+                            generatesText,
                             RequestNormalizer.CreateWireRequest(request, resolved, preparation.Messages, cacheMarks: cacheMarks),
                             operation,
                             stream,
@@ -245,7 +261,8 @@ internal static class GenerationCore
                             telemetry,
                             request.SchemaProfile == SchemaExecutionProfile.ModernSdk,
                             pacing,
-                            cancelledParentToken);
+                            cancelledParentToken,
+                            retainRaw);
 
                         await foreach (var generationEvent in current.ReadAsync(cancellationToken).ConfigureAwait(false))
                         {
@@ -339,7 +356,8 @@ internal static class GenerationCore
                         repairs,
                         attempts,
                         current.Warnings,
-                        toolCalls: toolCalls);
+                        toolCalls: toolCalls,
+                        raw: retainRaw && publicSdk ? current.Raw : null);
                     telemetry?.Emit(new AttemptCompleted(
                         telemetry.RequestId,
                         resolved.Target,
@@ -371,7 +389,7 @@ internal static class GenerationCore
     }
 
     private static EntrySession CreateEntry(
-        IProviderAdapter adapter,
+        IGeneratesText adapter,
         WireRequest wireRequest,
         OperationContext operation,
         AsyncStream stream,
@@ -383,7 +401,8 @@ internal static class GenerationCore
         RequestTelemetry? telemetry,
         bool publicSdk,
         PacingSelection pacing,
-        Func<CancellationToken?>? cancelledParentToken) =>
+        Func<CancellationToken?>? cancelledParentToken,
+        bool retainRaw) =>
         new(
             adapter,
             wireRequest,
@@ -397,7 +416,8 @@ internal static class GenerationCore
             telemetry,
             publicSdk,
             pacing,
-            cancelledParentToken);
+            cancelledParentToken,
+            retainRaw);
 
     private static void EnforceSpend(
         GenerationPolicyContext? policyContext,
@@ -703,7 +723,7 @@ internal static class GenerationCore
 
     private sealed class EntrySession
     {
-        private readonly IProviderAdapter _adapter;
+        private readonly IGeneratesText _adapter;
         private readonly WireRequest _request;
         private readonly OperationContext _operation;
         private readonly ResolvedTarget _target;
@@ -724,6 +744,8 @@ internal static class GenerationCore
         private ProviderException? _error;
         private Usage? _usage;
         private string? _finishReason;
+        private readonly bool _retainRaw;
+        private JsonValue? _raw;
         private bool _sawAdapterUsage;
         private bool _firstContent;
         private bool _clean;
@@ -732,7 +754,7 @@ internal static class GenerationCore
         private double? _firstTokenMilliseconds;
 
         internal EntrySession(
-            IProviderAdapter adapter,
+            IGeneratesText adapter,
             WireRequest request,
             OperationContext operation,
             ResolvedTarget target,
@@ -744,7 +766,8 @@ internal static class GenerationCore
             RequestTelemetry? telemetry,
             bool publicSdk,
             PacingSelection pacing,
-            Func<CancellationToken?>? cancelledParentToken)
+            Func<CancellationToken?>? cancelledParentToken,
+            bool retainRaw)
         {
             _adapter = adapter;
             _request = request;
@@ -759,6 +782,7 @@ internal static class GenerationCore
             _publicSdk = publicSdk;
             _pacing = pacing;
             _cancelledParentToken = cancelledParentToken;
+            _retainRaw = retainRaw;
         }
 
         internal EntryContext Entry => _entry ?? throw new InvalidOperationException("The entry did not begin.");
@@ -766,6 +790,7 @@ internal static class GenerationCore
         internal string Text => _text.ToString();
         internal Usage? Usage => _usage;
         internal string? FinishReason => _finishReason;
+        internal JsonValue? Raw => _raw;
         internal double StartedAt => _startedAt;
         internal double? FirstTokenMilliseconds => _firstTokenMilliseconds;
         internal double TotalMilliseconds => _entryStopwatch.Elapsed.TotalMilliseconds;
@@ -955,6 +980,7 @@ internal static class GenerationCore
                 case AdapterFinal final:
                     _finishReason = final.FinishReason;
                     _usage = OverlayUsage(_usage, final.Usage, _publicSdk);
+                    _raw = _retainRaw ? final.Raw : null;
                     break;
             }
         }

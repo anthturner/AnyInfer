@@ -10,7 +10,7 @@ namespace AnyInfer.Core;
 internal static class CapabilityProbeRunner
 {
     internal static async Task<(FeatureProbe Probe, Usage Usage)> RunAsync(
-        IProviderAdapter adapter,
+        IGeneratesText adapter,
         ResolvedProvider resolved,
         Feature feature,
         double timeoutS,

@@ -985,7 +985,7 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
         ),
         Phase(
             "csharp",
-            "the bounded C# core-generation proof",
+            "the bounded C# SDK proof",
             (
                 (
                     "dotnet SDK version",
@@ -997,7 +997,7 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                 ),
                 (
                     "test C# proof solution",
-                    lambda: _run_csharp("test", "AnyInfer.sln", "--no-restore"),
+                    lambda: _run_csharp("test", "AnyInfer.sln", "--no-restore", "-m:1"),
                 ),
                 (
                     "validate C# accounting observations",
@@ -1008,6 +1008,10 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                     lambda: python(
                         str(ROOT / "scripts" / "check_csharp_request_policy.py"), cwd=ROOT
                     ),
+                ),
+                (
+                    "validate C# retrieval observations",
+                    lambda: python(str(ROOT / "scripts" / "check_csharp_retrieval.py"), cwd=ROOT),
                 ),
                 (
                     "validate C# NuGet proof package",
@@ -1090,7 +1094,7 @@ def cmd_check(args: argparse.Namespace) -> int:
       conformance  provider conformance + the serve invariants (ADR-009)
       docs-check   docstring coverage, doc links, runnable doc examples
       docs-build   the strict site build the Pages deploy publishes
-      csharp       the bounded C# core-generation proof
+      csharp       the bounded C# SDK proof
 
     Select phases with --skip=a,b or --only=a,b (mutually exclusive). Every selected
     phase runs even after one fails, so a single invocation tells you everything that is

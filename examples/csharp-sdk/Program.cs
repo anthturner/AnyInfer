@@ -130,6 +130,45 @@ static async Task VerifyAsync()
     Require(syncStreamed.Text == "hello", "Synchronous streaming example returned unexpected text.");
     Require(syncStreamingHandler.RequestCount == 1 && syncStreamingHandler.DisposeCount == 1, "Synchronous streaming example did not close its transport once.");
 
+    var asyncRetriever = new RecordingRetriever();
+    var asyncRetrieval = await RetrievalExample.RunAsync(
+        ProviderSettings.Of("offline-retrieval"),
+        RetrievalRegistry(asyncRetriever),
+        "offline-retrieval:demo");
+    Require(asyncRetrieval.Embeddings.Vectors.Count == 2
+        && asyncRetrieval.Embeddings.Vectors[0].Values.SequenceEqual([0.1, 0.2])
+        && asyncRetrieval.Embeddings.Space is { ProviderId: "offline-retrieval", Model: "demo", Dimensions: 2 }
+        && asyncRetrieval.Embeddings.Raw is null
+        && asyncRetrieval.Embeddings.Manifest is { Operation: "embedding", Payloads: null }
+        && asyncRetrieval.Reranking.Items.Count == 2
+        && asyncRetrieval.Reranking.Items[0] is { Index: 0, DocumentId: "river", Text: "A quiet river bends through the valley.", Score: 0.9 }
+        && asyncRetrieval.Reranking.Items[1] is { Index: 1, DocumentId: "lighthouse", Text: "A lighthouse watches the harbor.", Score: 0.1 }
+        && asyncRetrieval.Reranking.Raw is null
+        && asyncRetrieval.Reranking.Manifest is { Operation: "rerank", Payloads: null }
+        && asyncRetriever.EmbedCalls == 1
+        && asyncRetriever.RerankCalls == 1
+        && asyncRetriever.DisposeCount == 1,
+        "Asynchronous retrieval example did not preserve operation, identity, manifest, or disposal facts.");
+
+    var syncRetriever = new RecordingRetriever();
+    var syncRetrieval = RetrievalExample.Run(
+        ProviderSettings.Of("offline-retrieval"),
+        RetrievalRegistry(syncRetriever),
+        "offline-retrieval:demo");
+    Require(syncRetrieval.Embeddings.Vectors.Count == 2
+        && syncRetrieval.Embeddings.Vectors[0].Values.SequenceEqual([0.1, 0.2])
+        && syncRetrieval.Reranking.Items.Count == 2
+        && syncRetrieval.Reranking.Items[0] is { Index: 0, DocumentId: "river", Text: "A quiet river bends through the valley.", Score: 0.9 }
+        && syncRetrieval.Reranking.Items[1] is { Index: 1, DocumentId: "lighthouse", Text: "A lighthouse watches the harbor.", Score: 0.1 }
+        && syncRetrieval.Embeddings.Raw is null
+        && syncRetrieval.Embeddings.Manifest is { Operation: "embedding", Payloads: null }
+        && syncRetrieval.Reranking.Raw is null
+        && syncRetrieval.Reranking.Manifest is { Operation: "rerank", Payloads: null }
+        && syncRetriever.EmbedCalls == 1
+        && syncRetriever.RerankCalls == 1
+        && syncRetriever.DisposeCount == 1,
+        "Synchronous retrieval example did not preserve operation, identity, or disposal facts.");
+
     var telemetryHandler = new CountingHandler();
     var telemetry = await TelemetryExample.RunAsync(WithTransport(displayedSettings, telemetryHandler), target);
     Require(telemetry.Generation.Text == "hello"
@@ -269,6 +308,15 @@ static ProviderRegistry BuiltinRegistry(HttpMessageHandler transport)
         builtin.MaxRepairAttempts);
     return new ProviderRegistry([wrapped]);
 }
+
+static ProviderRegistry RetrievalRegistry(RecordingRetriever retriever) =>
+    new([
+        new ProviderDescriptor(
+            "offline-retrieval",
+            "Offline retrieval",
+            (_, _) => new ValueTask<IAsyncDisposable>(retriever),
+            operations: [InferenceOperation.Embedding, InferenceOperation.Rerank]),
+    ]);
 
 static void Require(bool condition, string message)
 {
@@ -512,5 +560,53 @@ sealed class CountingHandler(
         }
 
         base.Dispose(disposing);
+    }
+}
+
+sealed class RecordingRetriever : IEmbedsText, IReranksText, IAsyncDisposable
+{
+    public int EmbedCalls { get; private set; }
+    public int RerankCalls { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    public ValueTask<EmbeddingWireResult> EmbedAsync(EmbeddingWireRequest request, CancellationToken cancellationToken = default)
+    {
+        EmbedCalls++;
+        if (EmbedCalls != 1
+            || RerankCalls != 0
+            || request.Model != "demo"
+            || !request.Inputs.SequenceEqual(["A quiet river bends through the valley.", "A lighthouse watches the harbor."]))
+        {
+            throw new InvalidOperationException("Retrieval embedding example did not preserve its literal request or call order.");
+        }
+
+        return ValueTask.FromResult(new EmbeddingWireResult(
+            [[0.1, 0.2], [0.3, 0.4]],
+            model: "demo",
+            dimensions: 2,
+            normalized: true));
+    }
+
+    public ValueTask<RerankWireResult> RerankAsync(RerankWireRequest request, CancellationToken cancellationToken = default)
+    {
+        RerankCalls++;
+        if (EmbedCalls != 1
+            || RerankCalls != 1
+            || request.Model != "demo"
+            || request.Query != "Which text mentions water?"
+            || !request.Documents.Select(static document => document.Index).SequenceEqual([0, 1])
+            || !request.Documents.Select(static document => document.Text).SequenceEqual(
+                ["A quiet river bends through the valley.", "A lighthouse watches the harbor."]))
+        {
+            throw new InvalidOperationException("Retrieval reranking example did not preserve caller document order.");
+        }
+
+        return ValueTask.FromResult(new RerankWireResult([new WireRankedItem(0, 0.9), new WireRankedItem(1, 0.1)], model: "demo"));
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
     }
 }

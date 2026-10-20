@@ -145,7 +145,7 @@ public sealed class EntryPacingTests
         var limiter = new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false), timeProvider: clock);
         var held = await limiter.AcquireAsync();
         var adapter = new ScriptedAdapter(static (_, token) => Finish(token));
-        var descriptor = new ProviderDescriptor("opaque", "Opaque", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter), governsOwnTransport: true);
+        var descriptor = new ProviderDescriptor("opaque", "Opaque", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter), governsOwnTransport: true);
         var descriptors = new ProviderRegistry([descriptor]);
         await using var owner = AsyncClient.FromAdapters([]);
         await using var pool = new ProviderPool(
@@ -194,7 +194,7 @@ public sealed class EntryPacingTests
             new ProviderDescriptor(
                 "normal-http",
                 "Normal HTTP",
-                (config, _) => ValueTask.FromResult<IProviderAdapter>(new HttpSendingAdapter(config.Transport!)))
+                (config, _) => ValueTask.FromResult<IAsyncDisposable>(new HttpSendingAdapter(config.Transport!)))
         ]);
         await using var owner = AsyncClient.FromAdapters([]);
         await using var pool = new ProviderPool(
@@ -241,7 +241,7 @@ public sealed class EntryPacingTests
         var limiter = new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false), timeProvider: clock);
         RateLimitLease? held = await limiter.AcquireAsync();
         var adapter = new ScriptedAdapter(static (_, token) => Finish(token));
-        var descriptor = new ProviderDescriptor("normal", "Normal", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter));
+        var descriptor = new ProviderDescriptor("normal", "Normal", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter));
         var descriptors = new ProviderRegistry([descriptor]);
         await using var owner = AsyncClient.FromAdapters([]);
         await using var pool = new ProviderPool(
@@ -329,7 +329,7 @@ public sealed class EntryPacingTests
         var adapter = new ScriptedAdapter((_, token) => Interlocked.Increment(ref calls) == 1
             ? Throw(new ProviderException("retry", "transport", true, "generate"))
             : Finish(token));
-        var descriptor = new ProviderDescriptor("retry", "Retry", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter), governsOwnTransport: true);
+        var descriptor = new ProviderDescriptor("retry", "Retry", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter), governsOwnTransport: true);
         var descriptors = new ProviderRegistry([descriptor]);
         await using var owner = AsyncClient.FromAdapters([]);
         await using var pool = new ProviderPool([ProviderSettings.Of("retry")], descriptors,
@@ -380,7 +380,7 @@ public sealed class EntryPacingTests
         var adapter = new ScriptedAdapter((_, token) => Interlocked.Increment(ref calls) == 1
             ? Events(token, new AdapterTextDelta("\"wrong\""), new AdapterFinal("stop"))
             : Events(token, new AdapterTextDelta("\"correct\""), new AdapterFinal("stop")));
-        var descriptor = new ProviderDescriptor("repair", "Repair", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter), governsOwnTransport: true);
+        var descriptor = new ProviderDescriptor("repair", "Repair", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter), governsOwnTransport: true);
         var descriptors = new ProviderRegistry([descriptor]);
         await using var owner = AsyncClient.FromAdapters([]);
         await using var pool = new ProviderPool([ProviderSettings.Of("repair")], descriptors,
@@ -424,7 +424,7 @@ public sealed class EntryPacingTests
         var adapter = new ScriptedAdapter(static (_, token) => Events(token,
             new AdapterTextDelta("first"), new AdapterFinal("stop")));
         var generationLimiter = new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false));
-        var descriptor = new ProviderDescriptor("reentry", "Reentry", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter), governsOwnTransport: true);
+        var descriptor = new ProviderDescriptor("reentry", "Reentry", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter), governsOwnTransport: true);
         var descriptors = new ProviderRegistry([descriptor]);
         await using var owner = AsyncClient.FromAdapters([]);
         await using var pool = new ProviderPool([ProviderSettings.Of("reentry")], descriptors,
@@ -575,7 +575,7 @@ public sealed class EntryPacingTests
         var limiter = new RateLimiter(new RateLimits(maxConcurrent: 1, respectHeaders: false), timeProvider: clock);
         var source = new InvalidOperationException("native cleanup");
         var adapter = new ScriptedAdapter((_, token) => FinalThenCleanupFailure(token, source));
-        var descriptor = new ProviderDescriptor("cleanup", "Cleanup", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter), governsOwnTransport: true);
+        var descriptor = new ProviderDescriptor("cleanup", "Cleanup", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter), governsOwnTransport: true);
         var descriptors = new ProviderRegistry([descriptor]);
         await using var owner = AsyncClient.FromAdapters([]);
         await using var pool = new ProviderPool([ProviderSettings.Of("cleanup")], descriptors, AnyInfer.Credentials.ResolverChain.CreateDefault(),

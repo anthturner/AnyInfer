@@ -168,7 +168,7 @@ public sealed class CapabilityAssemblyTests
     }
 
     private static ProviderDescriptor Descriptor(IReadOnlyDictionary<string, ModelCapabilities>? staticCapabilities = null) =>
-        new("engine", "Engine", static (_, _) => ValueTask.FromException<IProviderAdapter>(new InvalidOperationException()),
+        new("engine", "Engine", static (_, _) => ValueTask.FromException<IAsyncDisposable>(new InvalidOperationException()),
             defaultCapabilities: new ModelCapabilities(
                 contextWindow: new Sourced<int>(4096, Provenance.Default),
                 features: new Sourced<Feature>(Feature.JsonSchema, Provenance.Default)),

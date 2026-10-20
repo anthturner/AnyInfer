@@ -362,7 +362,7 @@ public sealed class GovernedTransportTests
                 nestedFailure = Assert.Throws<InvalidOperationException>(() =>
                     client!.ModelsAsync("alpha").GetAwaiter().GetResult());
                 Assert.Contains("factory", nestedFailure.Message, StringComparison.OrdinalIgnoreCase);
-                return ValueTask.FromException<IProviderAdapter>(nestedFailure);
+                return ValueTask.FromException<IAsyncDisposable>(nestedFailure);
             },
             defaultBaseUrl: "https://fixture.invalid/v1",
             requiresBaseUrl: true,
@@ -723,7 +723,7 @@ public sealed class GovernedTransportTests
 
     private static ProviderDescriptor Descriptor(
         string id,
-        Func<ProviderConfig, CancellationToken, ValueTask<IProviderAdapter>> factory) =>
+        Func<ProviderConfig, CancellationToken, ValueTask<IAsyncDisposable>> factory) =>
         new(
             id,
             id,
@@ -1066,7 +1066,7 @@ public sealed class GovernedTransportTests
                 new ProviderRegistry([descriptor]));
         }
 
-        private async ValueTask<IProviderAdapter> BuildAsync(ProviderConfig config, CancellationToken cancellationToken)
+        private async ValueTask<IAsyncDisposable> BuildAsync(ProviderConfig config, CancellationToken cancellationToken)
         {
             var adapter = await _builtin.Factory(config, cancellationToken);
             if (Interlocked.Increment(ref FactoryCalls) == 1)

@@ -736,7 +736,7 @@ public sealed class PolicyContextTests
             (_, _) =>
             {
                 onFactory?.Invoke();
-                return ValueTask.FromResult<IProviderAdapter>(adapter);
+                return ValueTask.FromResult<IAsyncDisposable>(adapter);
             },
             staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal)
             {

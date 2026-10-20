@@ -189,7 +189,7 @@ public sealed class ToolProtocolTests
     {
         var descriptor = ProviderRegistry.CreateDefault().Get("openai-compat");
         var settings = ProviderSettings.Of("openai-compat", "https://fixture.invalid/v1", "fixture-secret", transport: handler, alias: instance);
-        return descriptor.Factory(new ProviderConfig(settings, "openai-compat", "fixture-secret"), CancellationToken.None).Result;
+        return (IProviderAdapter)descriptor.Factory(new ProviderConfig(settings, "openai-compat", "fixture-secret"), CancellationToken.None).Result;
     }
 
     private static async Task<List<AdapterEvent>> Collect(IAsyncEnumerable<AdapterEvent> source)

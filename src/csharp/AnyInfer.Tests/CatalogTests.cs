@@ -333,7 +333,7 @@ public sealed class CatalogTests
         new(id, id, (_, _) =>
         {
             factoryCalls.Value++;
-            return ValueTask.FromException<IProviderAdapter>(new InvalidOperationException("Catalog resolution must not construct adapters."));
+            return ValueTask.FromException<IAsyncDisposable>(new InvalidOperationException("Catalog resolution must not construct adapters."));
         });
 
     private static JsonObject Fixture() => Assert.IsType<JsonObject>(JsonReader.Read(File.ReadAllText(FixturePath())));

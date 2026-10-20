@@ -43,8 +43,10 @@ public sealed class Client : IDisposable
         SpendPolicy? spendPolicy = null,
         bool contextGate = true,
         IReadOnlyDictionary<string, RateLimiter>? limiters = null,
-        CachePolicy? cachePolicy = null)
-        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy))
+        CachePolicy? cachePolicy = null,
+        bool retainRaw = false,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes = null)
+        : this(new AsyncClient(providers, registry, resolver, route, repair, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy, retainRaw, operationRoutes))
     {
     }
 
@@ -62,8 +64,10 @@ public sealed class Client : IDisposable
         SpendPolicy? spendPolicy = null,
         bool contextGate = true,
         IReadOnlyDictionary<string, RateLimiter>? limiters = null,
-        CachePolicy? cachePolicy = null) =>
-        new(AsyncClient.FromAdapters(providers, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy));
+        CachePolicy? cachePolicy = null,
+        bool retainRaw = false,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes = null) =>
+        new(AsyncClient.FromAdapters(providers, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy, retainRaw, operationRoutes));
 
     /// <summary>Creates a synchronous client from inert parsed configuration.</summary>
     public static Client FromConfig(
@@ -82,8 +86,10 @@ public sealed class Client : IDisposable
         SpendPolicy? spendPolicy = null,
         bool contextGate = true,
         IReadOnlyDictionary<string, RateLimiter>? limiters = null,
-        CachePolicy? cachePolicy = null) =>
-        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy));
+        CachePolicy? cachePolicy = null,
+        bool retainRaw = false,
+        IReadOnlyDictionary<InferenceOperation, Route>? operationRoutes = null) =>
+        new(AsyncClient.FromConfig(config, registry, resolver, catalog, pricingTable, capabilityOverrides, schemaValidation, observers, manifests, manifestPayloads, estimator, ledger, spendPolicy, contextGate, limiters, cachePolicy, retainRaw, operationRoutes));
 
     /// <summary>Gets the immutable catalog used by pure target resolution.</summary>
     public global::AnyInfer.Catalog.Catalog Catalog => _inner.Catalog;
@@ -163,6 +169,98 @@ public sealed class Client : IDisposable
         bool record = true,
         CancellationToken cancellationToken = default) =>
         RunOperation(token => _inner.ProbeAsync(target, features, timeoutS, record, token), cancellationToken);
+
+    /// <summary>Embeds one immutable request through the selected retrieval route.</summary>
+    public EmbeddingResult Embed(
+        EmbeddingRequest request,
+        string? target = null,
+        Route? route = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.EmbedAsync(request, target, route, token, manifest), cancellationToken);
+
+    /// <summary>Embeds one text input through the selected retrieval route.</summary>
+    public EmbeddingResult Embed(
+        string input,
+        string? target = null,
+        Route? route = null,
+        EmbeddingInputIntent? inputType = null,
+        int? dimensions = null,
+        EmbeddingSpace? expectedSpace = null,
+        bool allowIncompatibleFallback = false,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.EmbedAsync(input, target, route, inputType, dimensions, expectedSpace, allowIncompatibleFallback, batch, timeoutS, providerOptions, metadata, maxResponseBytes, retainRaw, token, manifest), cancellationToken);
+
+    /// <summary>Embeds ordered text inputs through the selected retrieval route.</summary>
+    public EmbeddingResult Embed(
+        IEnumerable<string> inputs,
+        string? target = null,
+        Route? route = null,
+        EmbeddingInputIntent? inputType = null,
+        int? dimensions = null,
+        EmbeddingSpace? expectedSpace = null,
+        bool allowIncompatibleFallback = false,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.EmbedAsync(inputs, target, route, inputType, dimensions, expectedSpace, allowIncompatibleFallback, batch, timeoutS, providerOptions, metadata, maxResponseBytes, retainRaw, token, manifest), cancellationToken);
+
+    /// <summary>Reranks one immutable request through the selected retrieval route.</summary>
+    public RerankResult Rerank(
+        RerankRequest request,
+        string? target = null,
+        Route? route = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.RerankAsync(request, target, route, token, manifest), cancellationToken);
+
+    /// <summary>Reranks ordered document texts through the selected retrieval route.</summary>
+    public RerankResult Rerank(
+        string query,
+        IEnumerable<string> documents,
+        string? target = null,
+        Route? route = null,
+        int? topN = null,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool returnDocuments = false,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.RerankAsync(query, documents, target, route, topN, batch, timeoutS, providerOptions, metadata, maxResponseBytes, returnDocuments, retainRaw, token, manifest), cancellationToken);
+
+    /// <summary>Reranks ordered documents through the selected retrieval route.</summary>
+    public RerankResult Rerank(
+        string query,
+        IEnumerable<RerankDocument> documents,
+        string? target = null,
+        Route? route = null,
+        int? topN = null,
+        BatchPolicy? batch = null,
+        double? timeoutS = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonValue>>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? maxResponseBytes = null,
+        bool returnDocuments = false,
+        bool? retainRaw = null,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.RerankAsync(query, documents, target, route, topN, batch, timeoutS, providerOptions, metadata, maxResponseBytes, returnDocuments, retainRaw, token, manifest), cancellationToken);
     /// <summary>Generates a terminal result from an explicit request.</summary>
     public Generation Generate(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
         RunOperation(token => _inner.GenerateAsync(request, token, manifest), cancellationToken);

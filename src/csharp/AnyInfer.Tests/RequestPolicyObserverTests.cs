@@ -211,7 +211,7 @@ public sealed class RequestPolicyObserverTests
         var wires = new List<System.Text.Json.Nodes.JsonObject>();
         using var scripts = ScriptQueue.Create(document.RootElement, resources, new List<System.Text.Json.Nodes.JsonObject>(), static (_, _) => { });
         var adapter = new RecordingAdapter(scripts, wires, "fixture", "recording");
-        var descriptor = new ProviderDescriptor("recording", "Recording", (_, _) => new ValueTask<IProviderAdapter>(adapter));
+        var descriptor = new ProviderDescriptor("recording", "Recording", (_, _) => new ValueTask<IAsyncDisposable>(adapter));
         await using var client = new AsyncClient([ProviderSettings.Of("recording", alias: "fixture")], new ProviderRegistry([descriptor]));
         var events = new List<StreamEvent>();
 
@@ -335,7 +335,7 @@ public sealed class RequestPolicyObserverTests
         var descriptor = new ProviderDescriptor(
             "fixture",
             "Fixture",
-            (_, _) => new ValueTask<IProviderAdapter>(adapter),
+            (_, _) => new ValueTask<IAsyncDisposable>(adapter),
             defaultCapabilities: defaultCapabilities,
             staticCapabilities: staticCapabilities);
         return new AsyncClient([ProviderSettings.Of("fixture")], new ProviderRegistry([descriptor]), estimator: estimator);

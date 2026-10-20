@@ -818,6 +818,51 @@ must report a real conflict rather than silently changing a dependent public sig
   from `types/operations.py`, `_client/async_client.py`, `_client/sync_client.py`. Lifecycle
   is shared, operation interfaces optional; no fake generation method on retrieval providers.
   Gate: fake adapters implement independent operations and async/sync API examples agree.
+  > NOTE: The execution leaf is `ANYINFER_CSHARP_SDK_RETRIEVAL.md`. Its source-contract,
+  > optional-protocol/ownership and raw-retention prerequisite maps have bounded cold
+  > review closure. Domain/protocol and common-pool foundation now pass the zero-warning
+  > solution build and all existing comparison profiles. The shared raw prerequisite
+  > also passes (708 native unit/93 conformance). Connected public async/sync operations,
+  > routing/batching, safety, accounting, manifests and joined lifecycle/deadline behavior
+  > passed 55 focused controls, 780 unit and 93 conformance tests with all prior
+  > Frozen/policy/accounting comparisons preserved. Public-seam mapping then found untested
+  > response-cap, embedding-phase and error-projection gaps. Their bounded corrections and
+  > independent controls now pass 63 connected / 788 unit / 93 conformance tests with prior
+  > profiles preserved. The execution leaf's 6.0.3 profile is frozen after 32 literal cases,
+  > 31 pure tests and closed source/oracle reviews. Resume independent observers and the
+  > verifier; no actual retrieval comparison has run. SDK.6a stays
+  > unchecked pending independent qualification and executed public consumer examples.
+  > Recorder source authoring then found 24 cases with no literal target/route; both SDKs
+  > refuse that construction. Leaf 6.0.3d reopens the input-byte freeze for explicit targets,
+  > source review and pure validation. Generic observer/checker authoring continues, while
+  > runtime acceptance is held; observers must not infer missing routing inputs.
+  > Closure: source review, exact 24-field delta, unchanged schemas and all 32 pure tests
+  > pass. Leaf 6.0.3d and the replacement input-byte freeze are accepted. Resume observer
+  > authoring and checker corrections; runtime/consumer acceptance remains open.
+  > A later source-found boundary contradiction requires exactly five literal input
+  > changes: nullable unknown limits in four ceiling cases and explicit rerank cross-batch
+  > opt-in in the upper-bound case. Source/saved-byte review, exact delta, unchanged schemas
+  > and all 36 pure tests pass. Leaf 6.0.3e and its replacement byte freeze are accepted;
+  > observer/checker runtime acceptance remains open.
+  > Three missing literal second-failure steps in the split-failure corpus are also
+  > corrected after source/saved-byte review, exact delta and all 39 pure tests. Leaf
+  > 6.0.3f restores the byte freeze; SDK retry/defaults and equality are unchanged.
+  > Retrieval shared proof now passes32/32 with zero mismatches after source-only
+  > correction review, all78 focused Python controls and791 native unit/93 conformance
+  > tests. Source/dirty/corpus stamps agree; profile bytes/equality policy remain frozen.
+  > The native retrieval project and workspace step are registered; all68 workspace
+  > controls pass. Public docs/examples and isolated package-consumer sources are held
+  > for execution/review. Resume leaf6a.5D; parent SDK.6a/b remain unchecked until delivery
+  > and clean-revision gates. SDK.6c provider research/bindings remain separate and open.
+  > This evidence is dirty-worktree based on 2820ef2, not clean-revision acceptance. The shared
+  > raw-retention default requires the minimal Generation.Raw prerequisite from SDK.7;
+  > this does not complete the rich-generation milestone.
+  > Public delivery review, examples and isolated package consumer now pass. Root's final
+  > workspace run passes all21 steps in161.1s, with791 native unit/93 conformance cases,
+  > accounting42+2, policy29 and retrieval32 shared matches. An earlier stalled unit run
+  > and separately reproduced factory-test ordering race are retained; the test-only
+  > cancellation barrier passes independent review and20 repetitions. Resume source commit
+  > and isolated clean-revision proof in the retrieval leaf before checking SDK.6a/b.
 - [ ] **SDK.6b** Port per-operation defaults, retry/health, batching of embedding inputs,
   usage and embedding-space fallback refusal. Never mix rerank scores across attempts.
   Gate: shared operation corpus covers order/indices/dimensions/unknown metadata and unsafe
@@ -893,6 +938,8 @@ must report a real conflict rather than silently changing a dependent public sig
   > during SDK.4b qualification. Modern-schema support must not tick those semantics or
   > imply Python-identical numeric/regex behavior; the user approved documented native
   > differences for those semantics while preserving frozen v0.
+  > Credential TTL/rotation/refresh left outstanding by SDK.2 is assigned here; the
+  > SDK.6 retrieval contract explicitly excludes rotating-credential parity until then.
 
 ### SDK.12 — SDK qualification and delivery
 
@@ -919,8 +966,12 @@ observations plus two observed native boundaries, FrozenV0 102 preservation, com
 examples/strict docs and clean-revision package consumption. Observer source/dirty/corpus
 metadata agree; released assets and frozen fixture hashes are unchanged. The acceptance
 record changes only these checklists. `ANYINFER_CSHARP_SDK_POLICIES.md` records exact paths.
-The next read-only preparation maps embedding/rerank types and operation-neutral lifecycle;
-no SDK.6 implementation is yet claimed.
+SDK.6a/b source, independent32-case shared proof and public delivery pass in the dirty
+worktree based on2820ef2. The final21-step workspace gate passes in161.1s, including791
+native unit/93 conformance cases and preserved prior profiles. The retrieval leaf records
+the focused controls, reviewed factory-test cancellation barrier and prior failure evidence.
+Resume explicit source commit and isolated clean-revision profile/package proof before
+checking SDK.6a/b; SDK.6c provider research/bindings remain separate and unchecked.
 
 SDK.5b is complete at source checkpoint
 `cc989e84069f09cb985e4f82fa40514f1aad5ffe`: all 19 workspace steps in 127.8s,

@@ -58,7 +58,7 @@ public sealed class LateFactoryCancellationTests
             new ProviderDescriptor("fake", "Fake", (_, _) =>
             {
                 Interlocked.Increment(ref factoryCalls);
-                return ValueTask.FromResult<IProviderAdapter>(new RecordingAdapter());
+                return ValueTask.FromResult<IAsyncDisposable>(new RecordingAdapter());
             })]);
         await using var pool = new ProviderPool([ProviderSettings.Of("fake")], registry, ResolverChain.CreateDefault());
         var resolved = pool.Materialize(pool.ResolveMetadata("fake:model"));
@@ -233,7 +233,7 @@ public sealed class LateFactoryCancellationTests
         using var source = new CancellationTokenSource();
         var planted = new OperationCanceledException(source.Token);
         var registry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromException<IProviderAdapter>(planted))]);
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromException<IAsyncDisposable>(planted))]);
         await using var pool = new ProviderPool([ProviderSettings.Of("fake")], registry, ResolverChain.CreateDefault());
         var resolved = pool.Materialize(pool.ResolveMetadata("fake:model"));
 

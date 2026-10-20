@@ -101,7 +101,7 @@ public sealed class UnknownSpendEstimationTests
         var descriptor = new ProviderDescriptor(
             id,
             id,
-            (_, _) => ValueTask.FromResult(adapter),
+            (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter),
             staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal)
             {
                 ["model"] = capabilities,

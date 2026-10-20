@@ -39,7 +39,7 @@ internal sealed class ProviderPool : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _gate = new();
     private readonly HashSet<Task> _builds = [];
-    private readonly HashSet<IProviderAdapter> _adopted = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<IAsyncDisposable> _adopted = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<HttpMessageHandler> _poolOwnedConfiguredHandlers = new(ReferenceEqualityComparer.Instance);
     private readonly IReadOnlyDictionary<string, RateLimiter> _injectedLimiters;
     private readonly Action<TelemetryEvent>? _events;
@@ -204,7 +204,7 @@ internal sealed class ProviderPool : IAsyncDisposable
         return baseUrl is null || (Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) && uri.IsLoopback) ? ProviderLocality.Local : ProviderLocality.Remote;
     }
 
-    internal async ValueTask<IProviderAdapter> GetAdapterAsync(
+    internal async ValueTask<IAsyncDisposable> GetAdapterAsync(
         ResolvedProvider resolved,
         CancellationToken callerToken,
         Func<CancellationToken?>? cancelledParentToken = null,
@@ -218,7 +218,7 @@ internal sealed class ProviderPool : IAsyncDisposable
             cancelledParentToken).ConfigureAwait(false);
     }
 
-    internal async ValueTask<IProviderAdapter> GetAdapterAsync(
+    internal async ValueTask<IAsyncDisposable> GetAdapterAsync(
         InstanceState state,
         CancellationToken callerToken,
         CancellationToken callerIdentity = default,
@@ -253,7 +253,7 @@ internal sealed class ProviderPool : IAsyncDisposable
 
             var build = BuildAsync(state, _resolver!, linked.Token, callerIdentity, cancelledParentToken);
             TrackBuild(build);
-            IProviderAdapter adapter;
+            IAsyncDisposable adapter;
             try
             {
                 adapter = await build.ConfigureAwait(false);
@@ -266,26 +266,54 @@ internal sealed class ProviderPool : IAsyncDisposable
             if (HasOwnedCancellation(callerIdentity, cancelledParentToken) || linked.IsCancellationRequested)
             {
                 MarkTransferredTransportConsumed(state);
-                await adapter.DisposeAsync().ConfigureAwait(false);
+                await DisposeUnadoptedAdapterAsync(state, adapter).ConfigureAwait(false);
                 ThrowPoolOwnedCancellation(callerIdentity, linked.Token, cancelledParentToken);
             }
 
             var closing = false;
+            var alreadyAdopted = false;
             lock (_gate)
             {
                 closing = _closing;
-                if (!closing)
+                alreadyAdopted = !closing && _adopted.Contains(adapter);
+                if (!closing && !alreadyAdopted)
                 {
                     state.Adapter = adapter;
                     _adopted.Add(adapter);
+                    state.PendingGovernedHandler = null;
                 }
             }
 
             if (closing)
             {
                 MarkTransferredTransportConsumed(state);
-                await adapter.DisposeAsync().ConfigureAwait(false);
+                await DisposeUnadoptedAdapterAsync(state, adapter).ConfigureAwait(false);
                 throw new ObjectDisposedException(nameof(AsyncClient));
+            }
+
+            if (alreadyAdopted)
+            {
+                MarkTransferredTransportConsumed(state);
+                DisposePendingGovernedHandler(state);
+                if (HasOwnedCancellation(callerIdentity, cancelledParentToken) || linked.IsCancellationRequested)
+                {
+                    ThrowPoolOwnedCancellation(callerIdentity, linked.Token, cancelledParentToken);
+                }
+
+                lock (_gate)
+                {
+                    closing = _closing;
+                    if (!closing)
+                    {
+                        state.Adapter = adapter;
+                    }
+                }
+
+                if (closing)
+                {
+                    await DisposeUnadoptedAdapterAsync(state, adapter).ConfigureAwait(false);
+                    throw new ObjectDisposedException(nameof(AsyncClient));
+                }
             }
 
             return adapter;
@@ -426,7 +454,7 @@ internal sealed class ProviderPool : IAsyncDisposable
             state.Gate.Release();
         }
 
-        IProviderAdapter[] adapters;
+        IAsyncDisposable[] adapters;
         lock (_gate)
         {
             adapters = _adopted.ToArray();
@@ -491,7 +519,7 @@ internal sealed class ProviderPool : IAsyncDisposable
         }
     }
 
-    private async Task<IProviderAdapter> BuildAsync(
+    private async Task<IAsyncDisposable> BuildAsync(
         InstanceState state,
         ResolverChain resolver,
         CancellationToken cancellationToken,
@@ -536,6 +564,7 @@ internal sealed class ProviderPool : IAsyncDisposable
         ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
         GovernedHttpMessageHandler? governedHandler = null;
         var transfersRawTransport = false;
+        var factoryReturned = false;
         var pacing = GetPacing(state);
         if (pacing.Limiter is not null && !pacing.UsesOuterSlot)
         {
@@ -549,12 +578,23 @@ internal sealed class ProviderPool : IAsyncDisposable
         {
             using var scope = PushFactoryScope(state);
             var adapter = await descriptor.Factory(config, cancellationToken).ConfigureAwait(false);
+            factoryReturned = true;
             state.PendingTransferredTransport = transfersRawTransport;
+            state.PendingGovernedHandler = governedHandler;
+            if (adapter is null)
+            {
+                MarkTransferredTransportConsumed(state);
+                DisposePendingGovernedHandler(state);
+
+                throw ConfigurationError(state.InstanceId, "The provider factory returned no adapter.");
+            }
+
+            await ValidateDeclaredProtocolsAsync(state, descriptor, adapter).ConfigureAwait(false);
             return adapter;
         }
         catch
         {
-            if (governedHandler is not null)
+            if (!factoryReturned && governedHandler is not null)
             {
                 try
                 {
@@ -572,6 +612,75 @@ internal sealed class ProviderPool : IAsyncDisposable
 
             throw;
         }
+    }
+
+    private async ValueTask ValidateDeclaredProtocolsAsync(
+        InstanceState state,
+        ProviderDescriptor descriptor,
+        IAsyncDisposable adapter)
+    {
+        var invalid = descriptor.Operations.Any(operation => operation switch
+        {
+            InferenceOperation.Generation => adapter is not IGeneratesText,
+            InferenceOperation.Embedding => adapter is not IEmbedsText,
+            InferenceOperation.Rerank => adapter is not IReranksText,
+            _ => true,
+        });
+        if (!invalid)
+        {
+            return;
+        }
+
+        MarkTransferredTransportConsumed(state);
+        await DisposeUnadoptedAdapterAsync(state, adapter).ConfigureAwait(false);
+        throw ConfigurationError(
+            state.InstanceId,
+            "The provider factory returned an adapter that does not implement every declared operation.");
+    }
+
+    private async ValueTask DisposeUnadoptedAdapterAsync(InstanceState state, IAsyncDisposable adapter)
+    {
+        Exception? failure = null;
+        if (!IsAdopted(adapter))
+        {
+            try
+            {
+                await adapter.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        }
+
+        try
+        {
+            DisposePendingGovernedHandler(state);
+        }
+        catch (Exception exception)
+        {
+            failure ??= exception;
+        }
+
+        if (failure is not null)
+        {
+            ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+    }
+
+    private bool IsAdopted(IAsyncDisposable adapter)
+    {
+        lock (_gate)
+        {
+            return _adopted.Contains(adapter);
+        }
+    }
+
+    private static void DisposePendingGovernedHandler(InstanceState state)
+    {
+        var handler = state.PendingGovernedHandler;
+        state.PendingGovernedHandler = null;
+        handler?.Dispose();
     }
 
     private static bool HasOwnedCancellation(
@@ -817,9 +926,10 @@ internal sealed class ProviderPool : IAsyncDisposable
         internal ProviderDescriptor? Descriptor { get; }
         internal ProviderRegistration? Registration { get; }
         internal SemaphoreSlim Gate { get; } = new(1, 1);
-        internal IProviderAdapter? Adapter { get; set; }
+        internal IAsyncDisposable? Adapter { get; set; }
         internal bool PacingInitialized { get; set; }
         internal PacingSelection Pacing { get; set; }
+        internal GovernedHttpMessageHandler? PendingGovernedHandler { get; set; }
         internal bool PendingTransferredTransport { get; set; }
         internal bool TransportConsumed { get; set; }
 

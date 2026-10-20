@@ -21,7 +21,7 @@ public sealed class ProviderLifecycleTests
         var registry = Registry((config, _) =>
         {
             factories.Add(config.ProviderId);
-            return ValueTask.FromResult<IProviderAdapter>(config.ProviderId == "primary" ? primary : secondary);
+            return ValueTask.FromResult<IAsyncDisposable>(config.ProviderId == "primary" ? primary : secondary);
         });
 
         await using var client = new AsyncClient(
@@ -46,7 +46,7 @@ public sealed class ProviderLifecycleTests
         var registry = Registry((config, _) =>
         {
             factories.Add(config.ProviderId);
-            return ValueTask.FromResult<IProviderAdapter>(config.ProviderId == "tenant" ? tenant : defaultInstance);
+            return ValueTask.FromResult<IAsyncDisposable>(config.ProviderId == "tenant" ? tenant : defaultInstance);
         });
         await using var client = new AsyncClient([ProviderSettings.Of("fake", alias: "tenant")], registry);
 
@@ -63,12 +63,13 @@ public sealed class ProviderLifecycleTests
     public async Task Models_filter_uses_known_operations_then_static_embedding_facts_without_replacing_discovery()
     {
         var models = new[] { new DiscoveredModel("static-embedding"), new DiscoveredModel("id-only") };
-        var adapter = new LifecycleAdapter(models: models);
+        var adapter = new EmbeddingLifecycleAdapter(new LifecycleAdapter(models: models));
         var registry = new ProviderRegistry([
             new ProviderDescriptor(
                 "fake",
                 "Fake",
-                (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter),
+                (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter),
+                operations: [InferenceOperation.Generation, InferenceOperation.Embedding],
                 staticEmbeddingCapabilities: new Dictionary<string, EmbeddingCapabilities>
                 {
                     ["static-embedding"] = new(),
@@ -88,13 +89,14 @@ public sealed class ProviderLifecycleTests
     {
         var knownEmpty = new ModelCapabilities(operations: new Sourced<IReadOnlySet<InferenceOperation>>(
             new HashSet<InferenceOperation>(), Provenance.Discovered));
-        var adapter = new LifecycleAdapter(models: [
+        var adapter = new EmbeddingLifecycleAdapter(new LifecycleAdapter(models: [
             new DiscoveredModel("known-empty", knownEmpty),
             new DiscoveredModel("static-embedding"),
             new DiscoveredModel("unknown"),
-        ]);
+        ]));
         var registry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IProviderAdapter>(adapter),
+            new ProviderDescriptor("fake", "Fake", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter),
+                operations: [InferenceOperation.Generation, InferenceOperation.Embedding],
                 staticEmbeddingCapabilities: new Dictionary<string, EmbeddingCapabilities> { ["static-embedding"] = new() })]);
         await using var client = new AsyncClient([ProviderSettings.Of("fake")], registry);
 
@@ -138,7 +140,7 @@ public sealed class ProviderLifecycleTests
         var registry = Registry((_, _) =>
         {
             factoryCalls++;
-            return ValueTask.FromResult<IProviderAdapter>(adapter);
+            return ValueTask.FromResult<IAsyncDisposable>(adapter);
         });
         await using var client = new AsyncClient([ProviderSettings.Of("fake")], registry);
 
@@ -188,7 +190,7 @@ public sealed class ProviderLifecycleTests
             },
             generateEntered: generationEntered,
             generateRelease: release);
-        var registry = Registry((_, _) => ValueTask.FromResult<IProviderAdapter>(adapter));
+        var registry = Registry((_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter));
         await using var client = new AsyncClient([ProviderSettings.Of("fake")], registry, route: new Route(["fake:model"]));
 
         var listing = client.ModelsAsync("fake");
@@ -298,7 +300,7 @@ public sealed class ProviderLifecycleTests
     public async Task Factory_and_lifecycle_source_failures_preserve_the_original_exception_object()
     {
         var factoryFailure = new InvalidOperationException("factory sentinel");
-        var factoryRegistry = Registry((_, _) => ValueTask.FromException<IProviderAdapter>(factoryFailure));
+        var factoryRegistry = Registry((_, _) => ValueTask.FromException<IAsyncDisposable>(factoryFailure));
         await using var factoryClient = new AsyncClient([ProviderSettings.Of("fake")], factoryRegistry);
         var observedFactory = await Assert.ThrowsAnyAsync<Exception>(() => factoryClient.ModelsAsync("fake"));
         Assert.Same(factoryFailure, observedFactory);
@@ -318,7 +320,7 @@ public sealed class ProviderLifecycleTests
         var registry = Registry((_, _) =>
         {
             Assert.Throws<InvalidOperationException>(() => client!.DisposeAsync());
-            return ValueTask.FromResult<IProviderAdapter>(adapter);
+            return ValueTask.FromResult<IAsyncDisposable>(adapter);
         });
         client = new AsyncClient([ProviderSettings.Of("fake")], registry);
         Assert.Equal("model", Assert.Single(await client.ModelsAsync("fake")).Id);
@@ -356,7 +358,7 @@ public sealed class ProviderLifecycleTests
         AsyncClient? client = null;
         var adapter = new LifecycleAdapter(models: [new DiscoveredModel("model")]);
         var resolver = new SelfDisposingResolver("custom://lifecycle", () => client!.DisposeAsync());
-        var registry = Registry((_, _) => ValueTask.FromResult<IProviderAdapter>(adapter));
+        var registry = Registry((_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter));
         client = new AsyncClient([ProviderSettings.Of("fake", apiKey: "custom://lifecycle")], registry, new ResolverChain([resolver]));
 
         Assert.Equal("model", Assert.Single(await client.ModelsAsync("fake")).Id);
@@ -386,7 +388,7 @@ public sealed class ProviderLifecycleTests
         var registry = Registry((_, _) =>
         {
             callbackFailures.Enqueue(Record.Exception(() => client!.Dispose()));
-            return ValueTask.FromResult<IProviderAdapter>(adapter);
+            return ValueTask.FromResult<IAsyncDisposable>(adapter);
         });
         client = new Client([ProviderSettings.Of("fake")], registry);
 
@@ -414,7 +416,7 @@ public sealed class ProviderLifecycleTests
             new ProviderDescriptor("fake", "Fake", (_, _) =>
             {
                 factoryCalls++;
-                return ValueTask.FromResult<IProviderAdapter>(new LifecycleAdapter(models: []));
+                return ValueTask.FromResult<IAsyncDisposable>(new LifecycleAdapter(models: []));
             }, setup: new ProviderSetupSpec([new SetupField("token", "Token", "secret")]))]);
         var options = new JsonObject([new JsonProperty("token", new JsonString("vault://option"))]);
         await using var client = new AsyncClient([ProviderSettings.Of("fake", options: options)], registry, new ResolverChain([resolver]));
@@ -437,7 +439,7 @@ public sealed class ProviderLifecycleTests
             return ValueTask.FromException<string>(sentinel);
         });
         var registry = new ProviderRegistry([
-            new ProviderDescriptor("fake", "Fake", static (_, _) => ValueTask.FromResult<IProviderAdapter>(new LifecycleAdapter(models: [])),
+            new ProviderDescriptor("fake", "Fake", static (_, _) => ValueTask.FromResult<IAsyncDisposable>(new LifecycleAdapter(models: [])),
                 setup: new ProviderSetupSpec([new SetupField("token", "Token", "secret")]))]);
         var options = new JsonObject([new JsonProperty("token", new JsonString("vault://throws"))]);
         await using var client = new AsyncClient([ProviderSettings.Of("fake", options: options)], registry, new ResolverChain([resolver]));
@@ -503,7 +505,7 @@ public sealed class ProviderLifecycleTests
             generateEntered: null,
             generateRelease: null,
             generateBlock: token => BlockGeneration(token, () => Signal()));
-        var registry = Registry((_, _) => ValueTask.FromResult<IProviderAdapter>(adapter));
+        var registry = Registry((_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter));
         var client = new AsyncClient([ProviderSettings.Of("fake")], registry, route: new Route(["fake:model"]));
 
         var listing = client.ModelsAsync("fake");
@@ -545,7 +547,7 @@ public sealed class ProviderLifecycleTests
             },
             health: token => BlockHealth(token, Signal),
             generateBlock: token => BlockGeneration(token, Signal));
-        var registry = Registry((_, _) => ValueTask.FromResult<IProviderAdapter>(adapter));
+        var registry = Registry((_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter));
         var client = new AsyncClient([ProviderSettings.Of("fake")], registry, route: new Route(["fake:model"]));
         var listing = client.ModelsAsync("fake");
         var health = client.HealthAsync("fake");
@@ -591,7 +593,7 @@ public sealed class ProviderLifecycleTests
         Assert.Equal(0, late.ListCalls);
     }
 
-    private static ProviderRegistry Registry(Func<ProviderConfig, CancellationToken, ValueTask<IProviderAdapter>> factory) =>
+    private static ProviderRegistry Registry(Func<ProviderConfig, CancellationToken, ValueTask<IAsyncDisposable>> factory) =>
         new([new ProviderDescriptor("fake", "Fake", factory)]);
 
     private sealed class LifecycleAdapter : IProviderAdapter, IProviderLifecycle
@@ -662,6 +664,28 @@ public sealed class ProviderLifecycleTests
             DisposeCalls++;
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class EmbeddingLifecycleAdapter(LifecycleAdapter inner) : IProviderAdapter, IProviderLifecycle, IEmbedsText
+    {
+        internal int ListCalls => inner.ListCalls;
+
+        public ValueTask<IReadOnlyList<DiscoveredModel>> ListModelsAsync(CancellationToken cancellationToken = default) =>
+            inner.ListModelsAsync(cancellationToken);
+
+        public ValueTask<Health> HealthAsync(CancellationToken cancellationToken = default) =>
+            inner.HealthAsync(cancellationToken);
+
+        public IAsyncEnumerable<AdapterEvent> GenerateAsync(WireRequest request, CancellationToken cancellationToken = default) =>
+            inner.GenerateAsync(request, cancellationToken);
+
+        public ValueTask<EmbeddingWireResult> EmbedAsync(EmbeddingWireRequest request, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(new EmbeddingWireResult(request.Inputs.Select(static _ => new[] { 0d }), request.Model));
+        }
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 
     private static async ValueTask<IReadOnlyList<DiscoveredModel>> BlockLifecycle(CancellationToken token, Action entered)

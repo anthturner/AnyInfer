@@ -49,7 +49,6 @@ public sealed class ConfigTests
     [InlineData("{\"providers\":{}}")]
     [InlineData("{\"default_route\":\"fake:model\"}")]
     [InlineData("{\"default_route\":{\"targets\":[\"fake:model\"],\"context_window_targets\":[\"larger:model\"]}}")]
-    [InlineData("{\"operation_routes\":{}}")]
     [InlineData("{\"context\":null}")]
     [InlineData("{\"history\":null}")]
     public void V1_loads_rejects_invalid_type_unknown_or_active_unsupported_policy(string document)
@@ -257,7 +256,7 @@ public sealed class ConfigTests
             new ProviderDescriptor("fake", "Fake", (_, _) =>
             {
                 factoryCalls++;
-                return ValueTask.FromResult<IProviderAdapter>(new CountingAdapter());
+                return ValueTask.FromResult<IAsyncDisposable>(new CountingAdapter());
             }, setup: new ProviderSetupSpec([
                 new SetupField("region", "Region", "choice", choices: ["east", "west"]),
             ])),
@@ -337,7 +336,7 @@ public sealed class ConfigTests
             {
                 factoryCalls++;
                 bound = config;
-                return ValueTask.FromResult<IProviderAdapter>(adapter);
+                return ValueTask.FromResult<IAsyncDisposable>(adapter);
             }, setup: new ProviderSetupSpec([
                 new SetupField("token", "Token", "secret"),
                 new SetupField("region", "Region", "choice", choices: ["east", "west"]),
@@ -483,7 +482,7 @@ public sealed class ConfigTests
     }
 
     private static ProviderRegistry Registry() => new([
-        new ProviderDescriptor("fake", "Fake", static (_, _) => ValueTask.FromResult<IProviderAdapter>(new CountingAdapter()), setup: new ProviderSetupSpec([
+        new ProviderDescriptor("fake", "Fake", static (_, _) => ValueTask.FromResult<IAsyncDisposable>(new CountingAdapter()), setup: new ProviderSetupSpec([
             new SetupField("token", "Token", "secret"),
             new SetupField("region", "Region", "choice", choices: ["east", "west"]),
         ])),
