@@ -193,6 +193,20 @@ static async Task VerifyAsync()
         && syncTeiRerankHandler.DisposeCount == 1,
         "Synchronous TEI example did not retain transport ownership.");
 
+    var asyncVoyageHandler = new VoyageScriptedHandler();
+    var asyncVoyage = await VoyageExample.RunAsync(
+        VoyageExample.Settings(asyncVoyageHandler, "offline-voyage-key"));
+    RequireVoyageObservation(asyncVoyage, "Asynchronous", expectedInputCount: 2);
+    Require(asyncVoyageHandler.RequestCount == 2 && asyncVoyageHandler.DisposeCount == 1,
+        "Asynchronous Voyage example did not retain transport ownership.");
+
+    var syncVoyageHandler = new VoyageScriptedHandler();
+    var syncVoyage = VoyageExample.Run(
+        VoyageExample.Settings(syncVoyageHandler, "offline-voyage-key"));
+    RequireVoyageObservation(syncVoyage, "Synchronous", expectedInputCount: 1);
+    Require(syncVoyageHandler.RequestCount == 2 && syncVoyageHandler.DisposeCount == 1,
+        "Synchronous Voyage example did not retain transport ownership.");
+
     var telemetryHandler = new CountingHandler();
     var telemetry = await TelemetryExample.RunAsync(WithTransport(displayedSettings, telemetryHandler), target);
     Require(telemetry.Generation.Text == "hello"
@@ -373,6 +387,29 @@ static void RequireTeiObservation(TeiObservation observation, string lane)
         && observation.Reranking.Raw is not null
         && observation.Reranking.Manifest is { Complete: true, Operation: "rerank", Payloads: null },
         $"{lane} TEI example did not preserve public result, caller identity, manifest, or unknown usage facts.");
+}
+
+static void RequireVoyageObservation(VoyageObservation observation, string lane, int expectedInputCount)
+{
+    Require(observation.Embeddings.Target.ProviderId == "voyage-retrieval"
+        && observation.Embeddings.Target.Model == "voyage-3.5-lite"
+        && observation.Embeddings.Vectors.Count == expectedInputCount
+        && observation.Embeddings.Vectors[0].Values.SequenceEqual(expectedInputCount == 2 ? [0.1, 0.2] : [0.5, 0.6])
+        && observation.Embeddings.Usage.InputTokens is null
+        && observation.Embeddings.Usage.OutputTokens is null
+        && observation.Embeddings.Usage.TotalTokens == 7
+        && observation.Embeddings.Raw is not null
+        && observation.Embeddings.Manifest is { Complete: true, Operation: "embedding", Payloads: null }
+        && observation.Reranking.Target.ProviderId == "voyage-retrieval"
+        && observation.Reranking.Target.Model == "rerank-2.5"
+        && observation.Reranking.Items.Count == 1
+        && observation.Reranking.Items[0] is { Index: 1, DocumentId: "lighthouse", Score: 0.1 }
+        && observation.Reranking.Usage.InputTokens is null
+        && observation.Reranking.Usage.OutputTokens is null
+        && observation.Reranking.Usage.TotalTokens == 7
+        && observation.Reranking.Raw is not null
+        && observation.Reranking.Manifest is { Complete: true, Operation: "rerank", Payloads: null },
+        $"{lane} Voyage example did not preserve public result, total-only usage, provider order, or manifest privacy.");
 }
 
 sealed class CountingHandler(

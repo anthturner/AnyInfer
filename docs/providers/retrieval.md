@@ -52,7 +52,20 @@ Two behaviors are shared:
 - **No model listing.** Neither API has a listing endpoint, so `client.models("voyage")`
   and `client.models("jina")` return empty lists; the verified model set ships in each
   descriptor's [capabilities](../concepts/capabilities.md).
-- **Usage is `total_tokens` only**: `input_tokens` stays unknown rather than assumed.
+- **Usage is `total_tokens` only.** Both public and raw results keep the input and output
+  breakdown unknown rather than inventing it.
+
+## C# proof boundary
+
+The bounded prerelease C# proof has native built-in retrieval adapters for Voyage and
+[Text Embeddings Inference](tei.md). Its Voyage example uses a caller-supplied
+`env://VOYAGE_API_KEY` reference and scripted HTTP responses; hosted Voyage traffic has not
+been live-verified. Jina remains available through the Python SDK but has no C# built-in
+adapter in this proof.
+
+```csharp
+--8<-- "examples/csharp-sdk/VoyageExample.cs"
+```
 
 ## Wire Contract
 

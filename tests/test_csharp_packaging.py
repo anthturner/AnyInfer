@@ -386,8 +386,14 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "sealed class RetrievalAdapter : IEmbedsText, IReranksText, IAsyncDisposable" in source
     assert "synchronous retrieval adapter disposal failed" in source
     assert "sealed class RetrievalAdapter : IProviderAdapter" not in source
-    assert 'ProviderSettings.Of(\n    "tei", "https://tei-embed.offline/v1", transport: teiEmbedHandler, alias: "tei-embed")' in source
-    assert 'target: "tei-rerank:rerank-model", returnDocuments: true, retainRaw: true, manifest: true)' in source
+    assert (
+        'ProviderSettings.Of(\n    "tei", "https://tei-embed.offline/v1", transport: teiEmbedHandler, alias: "tei-embed")'
+        in source
+    )
+    assert (
+        'target: "tei-rerank:rerank-model", returnDocuments: true, retainRaw: true, manifest: true)'
+        in source
+    )
     assert "default TEI builtin retrieval witness failed" in source
     assert "embedded.Usage.OutputTokens is not null" in source
     assert "embedded.Raw is null" in source
@@ -395,6 +401,20 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "reranked.Raw is null" in source
     assert "sealed class TeiHandler(bool reranker) : HttpMessageHandler" in source
     assert "sealed class TeiHandler : IEmbedsText" not in source
+    assert '"voyage", apiKey: "offline-voyage-key", transport: voyageAsyncHandler,' in source
+    assert 'alias: "voyage-retrieval");' in source
+    assert 'target: "voyage-retrieval:voyage-3.5-lite"' in source
+    assert "inputType: EmbeddingInputIntent.Document, retainRaw: true" in source
+    assert "inputType: EmbeddingInputIntent.Query, retainRaw: true" in source
+    assert 'target: "voyage-retrieval:rerank-2.5", topN: 1, returnDocuments: true,' in source
+    assert "retainRaw: true, manifest: true);" in source
+    assert "default Voyage builtin retrieval witness failed" in source
+    assert "default Voyage sync builtin retrieval witness failed" in source
+    assert "embedded.Usage.TotalTokens != 7" in source
+    assert "reranked.Usage.TotalTokens != 7" in source
+    assert "sealed class VoyageHandler : HttpMessageHandler" in source
+    assert "sealed class VoyageHandler : IEmbedsText" not in source
+    assert 'request.Headers.Accept.Single().MediaType != "application/json"' in source
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source
     assert "GenerationResult" not in source

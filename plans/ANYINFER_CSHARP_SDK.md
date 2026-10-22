@@ -889,6 +889,10 @@ must report a real conflict rather than silently changing a dependent public sig
   > The TEI leaf is complete at clean verified source
   > `af5d0d64840cb8ec81ecdcb92acb9a457958d814`: all 22 gates, preserved profiles,
   > public live calls and packed consumers pass. Other SDK.6c providers remain open.
+  > On 2026-10-22 the user requested continued parity work. The next bounded lane is
+  > `ANYINFER_CSHARP_SDK_VOYAGE.md`: a complete native Voyage embedding/rerank binding,
+  > current documented wire facts, independent Python/native controls, and public
+  > consumers. No released foundational asset changes; hosted live evidence is unverified.
 
 ### SDK.7 — Rich generation, tools and multimodal input
 

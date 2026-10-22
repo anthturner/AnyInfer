@@ -435,6 +435,71 @@ if (teiEmbedHandler.RequestCount != 1 || teiRerankHandler.RequestCount != 1
     || teiEmbedHandler.DisposeCount != 1 || teiRerankHandler.DisposeCount != 1)
     throw new InvalidOperationException("default TEI builtin transport ownership failed");
 
+var voyageAsyncHandler = new VoyageHandler();
+var voyageAsyncSettings = ProviderSettings.Of(
+    "voyage", apiKey: "offline-voyage-key", transport: voyageAsyncHandler,
+    alias: "voyage-retrieval");
+{
+    await using var client = new AsyncClient([voyageAsyncSettings], manifests: true);
+    var embedded = await client.EmbedAsync(
+        ["first", "second"], target: "voyage-retrieval:voyage-3.5-lite",
+        inputType: EmbeddingInputIntent.Document, retainRaw: true, manifest: true);
+    var reranked = await client.RerankAsync(
+        "find first",
+        [new RerankDocument("first-id", "first"), new RerankDocument("second-id", "second")],
+        target: "voyage-retrieval:rerank-2.5", topN: 1, returnDocuments: true,
+        retainRaw: true, manifest: true);
+    if (embedded.Vectors.Count != 2
+        || !embedded.Vectors[0].Values.SequenceEqual([0.1, 0.2])
+        || embedded.Usage.InputTokens is not null
+        || embedded.Usage.OutputTokens is not null
+        || embedded.Usage.TotalTokens != 7
+        || embedded.Raw is null
+        || embedded.Manifest is not { Complete: true, Operation: "embedding", Payloads: null }
+        || reranked.Items.Count != 1
+        || reranked.Items[0] is not { Index: 1, DocumentId: "second-id", Score: 0.1 }
+        || reranked.Usage.InputTokens is not null
+        || reranked.Usage.OutputTokens is not null
+        || reranked.Usage.TotalTokens != 7
+        || reranked.Raw is null
+        || reranked.Manifest is not { Complete: true, Operation: "rerank", Payloads: null })
+        throw new InvalidOperationException("default Voyage builtin retrieval witness failed");
+}
+if (voyageAsyncHandler.RequestCount != 2 || voyageAsyncHandler.DisposeCount != 1)
+    throw new InvalidOperationException("default Voyage async builtin transport ownership failed");
+
+var voyageSyncHandler = new VoyageHandler();
+var voyageSyncSettings = ProviderSettings.Of(
+    "voyage", apiKey: "offline-voyage-key", transport: voyageSyncHandler,
+    alias: "voyage-retrieval");
+{
+    using var client = new Client([voyageSyncSettings], manifests: true);
+    var embedded = client.Embed(
+        ["find first"], target: "voyage-retrieval:voyage-3.5-lite",
+        inputType: EmbeddingInputIntent.Query, retainRaw: true, manifest: true);
+    var reranked = client.Rerank(
+        "find first",
+        [new RerankDocument("first-id", "first"), new RerankDocument("second-id", "second")],
+        target: "voyage-retrieval:rerank-2.5", topN: 1, returnDocuments: true,
+        retainRaw: true, manifest: true);
+    if (embedded.Vectors.Count != 1
+        || !embedded.Vectors[0].Values.SequenceEqual([0.5, 0.6])
+        || embedded.Usage.InputTokens is not null
+        || embedded.Usage.OutputTokens is not null
+        || embedded.Usage.TotalTokens != 7
+        || embedded.Raw is null
+        || reranked.Items.Count != 1
+        || reranked.Items[0] is not { Index: 1, DocumentId: "second-id", Score: 0.1 }
+        || reranked.Usage.InputTokens is not null
+        || reranked.Usage.OutputTokens is not null
+        || reranked.Usage.TotalTokens != 7
+        || reranked.Raw is null)
+        throw new InvalidOperationException(
+            "default Voyage sync builtin retrieval witness failed");
+}
+if (voyageSyncHandler.RequestCount != 2 || voyageSyncHandler.DisposeCount != 1)
+    throw new InvalidOperationException("default Voyage sync builtin transport ownership failed");
+
 var trustedAccounting = new ModelCapabilities(
     pricing: new Sourced<Pricing>(
         new Pricing(EDecimal.FromString("2"), EDecimal.FromString("4")),
@@ -1161,6 +1226,78 @@ sealed class TeiHandler(bool reranker) : HttpMessageHandler
     {
         if (disposing) DisposeCount++;
         base.Dispose(disposing);
+    }
+
+    private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(body, Encoding.UTF8, "application/json"),
+    };
+}
+
+sealed class VoyageHandler : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = request.Content is null
+            ? ""
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        using var json = JsonDocument.Parse(body);
+        if (request.Method != HttpMethod.Post
+            || request.Headers.Authorization?.Scheme != "Bearer"
+            || request.Headers.Authorization.Parameter != "offline-voyage-key"
+            || request.Headers.Accept.Single().MediaType != "application/json"
+            || request.Content?.Headers.ContentType?.MediaType != "application/json")
+            throw new InvalidOperationException("Voyage builtin used unexpected HTTP fields");
+
+        return request.RequestUri?.AbsolutePath switch
+        {
+            "/v1/embeddings" => Embeddings(json.RootElement),
+            "/v1/rerank" => Rerank(json.RootElement),
+            _ => throw new InvalidOperationException(
+                "Voyage builtin used an unexpected request path"),
+        };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+
+    private static HttpResponseMessage Embeddings(JsonElement request)
+    {
+        var input = request.GetProperty("input").EnumerateArray()
+            .Select(static item => item.GetString()).ToArray();
+        var inputType = request.GetProperty("input_type").GetString();
+        if (request.GetProperty("model").GetString() != "voyage-3.5-lite"
+            || (inputType != "document" && inputType != "query")
+            || (inputType == "document" && !input.SequenceEqual(["first", "second"]))
+            || (inputType == "query" && !input.SequenceEqual(["find first"])))
+            throw new InvalidOperationException(
+                "Voyage builtin lost embedding values or array input shape");
+        return Json(inputType == "document"
+            ? "{\\"data\\":[{\\"index\\":1,\\"embedding\\":[0.3,0.4]},"
+                + "{\\"index\\":0,\\"embedding\\":[0.1,0.2]}],\\"usage\\":{\\"total_tokens\\":7}}"
+            : "{\\"data\\":[{\\"index\\":0,\\"embedding\\":[0.5,0.6]}],"
+                + "\\"usage\\":{\\"total_tokens\\":7}}");
+    }
+
+    private static HttpResponseMessage Rerank(JsonElement request)
+    {
+        if (request.GetProperty("model").GetString() != "rerank-2.5"
+            || request.GetProperty("query").GetString() != "find first"
+            || request.GetProperty("top_k").GetInt32() != 1
+            || !request.GetProperty("documents").EnumerateArray()
+                .Select(static item => item.GetString()).SequenceEqual(["first", "second"]))
+            throw new InvalidOperationException(
+                "Voyage builtin lost rerank values or native top_k");
+        return Json("{\\"data\\":[{\\"index\\":1,\\"relevance_score\\":0.1}],"
+            + "\\"usage\\":{\\"total_tokens\\":7}}");
     }
 
     private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)

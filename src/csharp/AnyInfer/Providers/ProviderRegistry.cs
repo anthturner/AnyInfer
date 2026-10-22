@@ -138,5 +138,39 @@ public sealed class ProviderRegistry
         {
             PoolOwnsConfiguredTransport = true,
         },
+        new ProviderDescriptor(
+            "voyage",
+            "Voyage AI",
+            static (config, cancellationToken) => new ValueTask<IAsyncDisposable>(VoyageAdapter.Create(config, cancellationToken)),
+            aliases: ["voyageai"],
+            setup: new ProviderSetupSpec([
+                new SetupField("api_key", "API key", "secret", required: true, placeholder: "env://VOYAGE_API_KEY or a literal key", envVar: "VOYAGE_API_KEY", helpText: "Accepts a literal, env://VAR, or credential://system/name."),
+                new SetupField("base_url", "Base URL", "endpoint", required: false, advanced: true, defaultValue: "https://api.voyageai.com/v1", helpText: "Defaults to https://api.voyageai.com/v1."),
+            ], modelSelection: "manual-only"),
+            defaultBaseUrl: "https://api.voyageai.com/v1",
+            locality: ProviderLocality.Hosted,
+            operations: [InferenceOperation.Embedding, InferenceOperation.Rerank],
+            staticEmbeddingCapabilities: new Dictionary<string, EmbeddingCapabilities>(StringComparer.Ordinal)
+            {
+                ["voyage-4-large"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-4"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-4-lite"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-3-large"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-3.5"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-3.5-lite"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-code-3"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-finance-2"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["voyage-law-2"] = new(maxBatchInputs: 1_000, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+            },
+            staticRerankCapabilities: new Dictionary<string, RerankCapabilities>(StringComparer.Ordinal)
+            {
+                ["rerank-2.5"] = new(maxDocuments: 1_000, nativeTopN: true),
+                ["rerank-2.5-lite"] = new(maxDocuments: 1_000, nativeTopN: true),
+                ["rerank-2"] = new(maxDocuments: 1_000, nativeTopN: true),
+                ["rerank-2-lite"] = new(maxDocuments: 1_000, nativeTopN: true),
+            })
+        {
+            PoolOwnsConfiguredTransport = true,
+        },
     ]);
 }

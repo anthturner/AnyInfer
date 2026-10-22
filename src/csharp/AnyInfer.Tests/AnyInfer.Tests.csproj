@@ -16,5 +16,6 @@
     <None Include="../../../tests/cassettes/tei_embed.json" Link="tei-cassettes/tei_embed.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../../tests/cassettes/tei_info.json" Link="tei-cassettes/tei_info.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../../tests/cassettes/tei_rerank.json" Link="tei-cassettes/tei_rerank.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../tests/fixtures/voyage-wire-v1/inputs.json" Link="voyage-wire/inputs.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

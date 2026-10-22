@@ -38,6 +38,16 @@ EXPECTED_BINDINGS = [
         "operation": "rerank",
         "contract_dependencies": ["contracts/tei.md"],
     },
+    {
+        "provider_id": "voyage",
+        "operation": "embedding",
+        "contract_dependencies": ["contracts/voyage.md"],
+    },
+    {
+        "provider_id": "voyage",
+        "operation": "rerank",
+        "contract_dependencies": ["contracts/voyage.md"],
+    },
 ]
 
 

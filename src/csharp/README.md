@@ -2,9 +2,9 @@
 
 `AnyInfer` is a bounded prerelease .NET 8 core. It exposes `AsyncClient`, typed requests and
 events, routing, structured-output enforcement, a chat-only built-in OpenAI-compatible adapter,
-and a built-in TEI adapter for buffered text embeddings and reranking. Applications configure
-these adapters with `ProviderSettings` and credential references such as
-`env://ANYINFER_API_KEY` or `env://TEI_API_KEY`; custom adapters remain available for
+and built-in TEI and Voyage adapters for buffered text embeddings and reranking. Applications
+configure these adapters with `ProviderSettings` and credential references such as
+`env://ANYINFER_API_KEY`, `env://TEI_API_KEY`, or `env://VOYAGE_API_KEY`; custom adapters remain available for
 application-owned protocols.
 
 This package is a proof artifact at version `0.1.0-proof`. It is not a claim of parity
@@ -38,7 +38,7 @@ dotnet run --project ../../examples/csharp-sdk/AnyInfer.Examples.csproj --config
 ```
 
 The examples demonstrate settings, buffered generation, streaming, structured output,
-configuration, fallback, built-in TEI embedding and reranking, explicit capability probes,
+configuration, fallback, built-in TEI and Voyage embedding and reranking, explicit capability probes,
 declarative setup metadata, bounded
 winning-request pricing, explicit budgeting, caller-owned ledger/store helpers, standalone pacing,
 explicit request-policy inputs, and the synchronous `Client`/`SyncStream` facade. Their source is linked from the documentation site.
@@ -53,8 +53,12 @@ raw tool values do not execute a tool. Configured `RateLimits` pace normal provi
 generation entry deadline; own-transport descriptors and opaque prebuilt registrations with active
 injected limiters use an outer slot before entry.
 
-The TEI adapter is the bounded built-in native retrieval binding. The example uses separate
-loopback instances for embedding and reranking because a TEI process serves one model. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU deployment on 2026-10-22. The OpenAI-compatible adapter remains chat-only, and this proof does not claim full provider parity or a released NuGet package.
+The TEI and Voyage adapters are the bounded built-in native retrieval bindings. The TEI example
+uses separate loopback instances for embedding and reranking because a TEI process serves one
+model. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
+deployment on 2026-10-22. The Voyage example is an offline scripted-handler witness and does not
+live-verify hosted Voyage traffic. The OpenAI-compatible adapter remains chat-only, and Jina has
+no C# built-in adapter in this proof.
 
 ## Use a custom adapter
 

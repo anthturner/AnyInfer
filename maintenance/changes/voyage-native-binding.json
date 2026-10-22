@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "id": "voyage-native-binding",
+  "sources": [
+    {"url": "https://docs.voyageai.com/reference/embeddings-api", "fetched_at": "2026-10-22", "version_pin": "Voyage HTTP API /v1"},
+    {"url": "https://docs.voyageai.com/reference/reranker-api", "fetched_at": "2026-10-22", "version_pin": "Voyage HTTP API /v1"},
+    {"url": "https://docs.voyageai.com/docs/error-codes", "fetched_at": "2026-10-22", "version_pin": "Voyage HTTP API /v1"}
+  ],
+  "disposition": "adopted",
+  "changes": [
+    {
+      "contract_id": "contracts/voyage.md",
+      "scope": "inference",
+      "operations": ["embedding", "rerank"],
+      "summary": "Refresh documentation evidence for the existing Voyage wire subset and add native C# embeddings/reranking with the same normalized behavior. Hosted live traffic remains unverified."
+    }
+  ],
+  "shared_spec": {
+    "impact": "no_delta",
+    "rationale": "Adds a provider-specific translation binding for existing buffered embedding/rerank operations. Normalized requests/results, accounting, routing, safety and validation remain governed by the existing shared contracts. No normative specification, released schema, inventory, frozen fixture or expectation is changed; new tests provide provider wire inputs without redefining shared results. No candidate release or qualification is claimed."
+  },
+  "implementations": [
+    {
+      "implementation_id": "anyinfer-python",
+      "status": "updated",
+      "rationale": "Refreshes the existing contract documentation and independently exercises the Python Voyage builtin against shared provider-wire inputs; no Python product behavior or model inventory expansion is proposed.",
+      "owned_paths": [
+        "contracts/voyage.md",
+        "tests/fixtures/voyage-wire-v1/inputs.json",
+        "tests/test_voyage_binding.py",
+        "docs/providers/retrieval.md"
+      ],
+      "required_gate_ids": ["python-contracts", "python-fixtures", "python-conformance", "python-tests"]
+    },
+    {
+      "implementation_id": "anyinfer-csharp",
+      "status": "updated",
+      "rationale": "Adds native Voyage translation, independent handler controls and public packaged consumers. This declaration supplies scope and gate requirements, never run outcomes, hosted verification or a full-library parity claim.",
+      "owned_paths": [
+        "contracts/voyage.md",
+        "tests/fixtures/voyage-wire-v1/inputs.json",
+        "src/csharp/AnyInfer/Providers/VoyageAdapter.cs",
+        "src/csharp/AnyInfer/Providers/VoyageHttpTransport.cs",
+        "src/csharp/AnyInfer/Providers/ProviderRegistry.cs",
+        "src/csharp/AnyInfer.Tests/VoyageAdapterTests.cs",
+        "src/csharp/AnyInfer.Tests/VoyageLifecycleTests.cs",
+        "src/csharp/AnyInfer.Tests/AnyInfer.Tests.csproj",
+        "src/csharp/AnyInfer.Maintenance/Program.cs",
+        "scripts/check_csharp_binding_inventory.py",
+        "examples/csharp-sdk/VoyageExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "scripts/check_csharp_package.py",
+        "tests/test_csharp_packaging.py",
+        "docs/providers/retrieval.md",
+        "docs/guides/csharp-sdk.md",
+        "docs/reference/csharp-sdk.md",
+        "docs/guides/README.md",
+        "src/csharp/README.md"
+      ],
+      "required_gate_ids": ["csharp-workspace"]
+    }
+  ]
+}

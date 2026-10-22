@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "embedding-indexed",
+      "operation": "embedding",
+      "target": "voyage:voyage-3.5",
+      "request": {
+        "inputs": ["alpha", "beta"],
+        "input_type": "query",
+        "dimensions": 2
+      },
+      "response": {
+        "object": "list",
+        "data": [
+          {"index": 1, "embedding": [0.3, 0.4]},
+          {"index": 0, "embedding": [0.1, 0.2]}
+        ],
+        "model": "voyage-3.5",
+        "usage": {"total_tokens": 7}
+      }
+    },
+    {
+      "id": "rerank-positional",
+      "operation": "rerank",
+      "target": "voyage:rerank-2.5",
+      "request": {
+        "query": "question",
+        "documents": [
+          {"id": "doc-z", "text": "first"},
+          {"id": "doc-a", "text": "second"}
+        ],
+        "top_n": 1
+      },
+      "response": {
+        "object": "list",
+        "data": [
+          {"index": 1, "relevance_score": 0.9}
+        ],
+        "model": "rerank-2.5",
+        "usage": {"total_tokens": 11}
+      }
+    }
+  ]
+}

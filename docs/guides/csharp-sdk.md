@@ -6,9 +6,9 @@ repository's native C# work, while the supported product SDK and published packa
 Python.
 
 The generation examples use `ProviderSettings` and the built-in OpenAI-compatible provider.
-The C# proof also includes a built-in TEI adapter for buffered embeddings and reranking;
-other provider-specific retrieval remains application-owned. The async calls accept a
-cancellation token and use `await using`; the matching synchronous facade uses `using` and
+The C# proof also includes built-in TEI and Voyage adapters for buffered embeddings and
+reranking; other provider-specific retrieval remains application-owned. The async calls accept
+a cancellation token and use `await using`; the matching synchronous facade uses `using` and
 the .NET default task scheduler.
 
 ## Run the examples
@@ -63,7 +63,8 @@ synchronous .NET caller; it does not create or depend on Python's event-loop fac
 ## Embed and rerank text
 
 Embedding and reranking are buffered retrieval operations, not generation prompts. The built-in
-TEI descriptor provides both operations for a local TEI server; the public protocols also let an
+TEI descriptor provides both operations for a local TEI server, and the built-in Voyage
+descriptor provides them for a configured hosted instance. The public protocols also let an
 application register its own retrieval adapter. The TEI example uses separate embedding and
 rerank instances because each TEI server process serves one model. It demonstrates async
 disposal and the synchronous facade with caller-owned document IDs.
@@ -73,6 +74,16 @@ disposal and the synchronous facade with caller-owned document IDs.
 ```
 
 The offline example verifier uses scripted HTTP responses. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU deployment on 2026-10-22.
+
+The Voyage example accepts a caller-provided credential value or `env://VOYAGE_API_KEY`
+reference, configures an instance alias, and requests raw payload retention explicitly. Its
+scripted handler demonstrates the built-in descriptor's array input, `query` and `document`
+input intents, and native `top_k`. It makes no hosted Voyage
+request and does not provide live-verification evidence.
+
+```csharp
+--8<-- "examples/csharp-sdk/VoyageExample.cs"
+```
 
 ```csharp
 --8<-- "examples/csharp-sdk/RetrievalExample.cs"
@@ -197,15 +208,15 @@ verifier runs.
 
 This proof covers asynchronous text generation and a synchronous facade over that same core
 through the OpenAI-compatible adapter, plus buffered text embeddings and reranking through the
-built-in TEI adapter and application-owned retrieval adapters. The OpenAI-compatible adapter
-remains chat-only. It also covers structured JSON validation and repair,
+built-in TEI and Voyage adapters and application-owned retrieval adapters. The
+OpenAI-compatible adapter remains chat-only. It also covers structured JSON validation and repair,
 configuration, routing, reported token usage, bounded winning-request pricing, explicit budgets,
 caller-owned ledger and store helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free
 typed telemetry, immutable manifests, and declarative setup metadata. It does not provide a
 released NuGet package, full provider parity, provider invoice or all-wire totals, automatic
 tool execution, rich-media input breadth, context/history reduction, or production report
-publication. Built-in retrieval coverage is limited to TEI, and generic OpenAI-compatible
-retrieval is not implemented.
+publication. Built-in retrieval coverage is limited to TEI and Voyage; Jina and generic
+OpenAI-compatible retrieval are not implemented in this proof.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with
