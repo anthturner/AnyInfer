@@ -65,22 +65,25 @@ change `no listing API` to `reachability only`, without accepted transport refac
   tests read. Gate: cold source review, root serialized compile and independent controls.
   > NOTE: Native source is held. Root library build passes with zero warnings/errors
   > at .tmp-tests/jina-native-first/library.txt; independent cold source review is clean.
-  > Focused native control execution remains before acceptance.
+  > Focused native controls and the final full/clean gates below close this source gate.
 - [x] **JINA.2P** Python owner: providers/jina.py task/capability correction;
   openai_shaped_retrieval.py discovery/health wording; new input-only
   tests/fixtures/jina-wire-v1/inputs.json and tests/test_jina_binding.py. Both runtimes
   consume literal request AND response fields; no expected SDK output/verdict in fixture.
   Gate: focused test_jina/test_jina_binding/test_voyage/test_voyage_binding with
   cacheprovider disabled, fresh ignored log/JUnit/basetemp and targeted Ruff. No .NET.
-  > NOTE: Independent Python gate passes62 cases, including all28 model/intent pairs
+  > NOTE: Independent Python gate passes 62 cases, including all 28 model/intent pairs
   > and both public v4 warning/omission cases. Retained evidence:
   > .tmp-tests/jina-python-controls-final/junit.xml; targeted Ruff is clean.
+  > Subsequent exact-membership review adds a v5-shaped unknown: both matrices now cover
+  > 32 model/intent pairs; the final binding-only Python gate passes 40 cases at
+  > .tmp-tests/jina-unknown-model-controls/. The full suite exercises all updated controls.
 - [x] **JINA.2N** Independent controls owner: JinaAdapterTests.cs/JinaLifecycleTests.cs
   authored from contract, Python and public APIs WITHOUT new adapter source. Cover all
   task variants, overlay/headers/index/order/raw/usage/metadata/health/discovery, errors,
   caps, cancellation/timeout/ownership and primary cleanup precedence. Root adds fixture
   project link. Gate: root filtered native execution, no sleeps/disconnected spies.
-  > NOTE: Root native gate passes28/28 with zero skips, including full task matrix
+  > NOTE: Root native gate passes 28/28 with zero skips, including full task matrix
   > controls inside the fact cases. Native log/TRX retained at
   > .tmp-tests/jina-native-controls-first/. Cold test-oracle review remains in JINA.5.
 - [x] **JINA.3** Root exporter mapping and expected seven native rows; new immutable
@@ -94,27 +97,27 @@ change `no listing API` to `reachability only`, without accepted transport refac
   NuGet-only builtin witness + packaging source tests, retrieval guide and consistent C#
   guide/reference/README/enumeration. No new page/nav/provider count.
   Gate: source controls/Ruff, root examples/package/strict docs execution.
-  > NOTE: Delivery source controls pass23/23 and targeted Ruff/format checks. Root
+  > NOTE: Delivery source controls pass 23/23 and targeted Ruff/format checks. Root
   > compiled and executed async/sync public examples at .tmp-tests/jina-public-native/;
   > isolated NuGet-only consumer also compiles/runs with zero warnings/errors
-  > at package.txt. Cold delivery review remains in progress.
+  > at package.txt. Subsequent bounded delivery review findings are closed below.
   > NOTE: Final raw-prompt witnesses are wired only to Jina. Root actual compiled
   > examples and NuGet consumer pass with zero warnings/errors at
   > .tmp-tests/jina-public-native-final/. Failed BigInteger-pattern and helper-placement
   > compile logs remain retained; final source review closes both corrections.
 - [x] **JINA.5** Cold source/test/delivery review and fixes; root exact
   `.venv/Scripts/python.exe workspace.py check`, cacheprovider disabled.
-  Gate: all22 steps, shared retrieval32/policy29/accounting42+2 and Frozen102 preserved.
+  Gate: all 22 steps, shared retrieval 32/policy 29/accounting 42+2 and Frozen 102 preserved.
   > NOTE: The first operator aborted on PowerShell stderr handling. The next full run
   > exposes the canonical not-yet-live-verified marker and raw-witness compile issues;
-  > all872 native unit/93 conformance and shared profiles already pass. Marker wording
+  > all 872 native unit/93 conformance and shared profiles already pass. Marker wording
   > is restored (17 focused drift controls pass), public witnesses compile/run, and root
   > reruns the exact full gate. Both failed runs remain in .tmp-tests.
-  > NOTE: Final coherent root gate passes all22 steps in178.4s at
-  > .tmp-tests/jina-workspace-final/ (exit-code.txt=0), including872 native unit and
+  > NOTE: Final coherent root gate passes all 22 steps in 178.4 s at
+  > .tmp-tests/jina-workspace-final/ (exit-code.txt=0), including 872 native unit and
   > 93 conformance tests, all prior shared comparisons, strict docs, actual examples and
-  > NuGet-only consumer. The canonical loader verifies all106 Frozen assets unchanged.
-- [ ] **JINA.6** Root explicit-path source commit; clean isolated checkout actual registered
+  > NuGet-only consumer. The canonical loader verifies all 106 Frozen assets unchanged.
+- [x] **JINA.6** Root explicit-path source commit; clean isolated checkout actual registered
   Python/native producers + aggregate, stamped profiles/package/examples and explicit
   Frozen development. Retain raw artifacts/hashes, clean before/after; plans-only closure.
   Gate: no invented hosted/spec qualification; exact resume source recorded.
@@ -122,3 +125,26 @@ change `no listing API` to `reachability only`, without accepted transport refac
 Root retains plan ownership to avoid concurrent edits. Workers report box/evidence and root
 checks after actual gates. Preserve user uv.lock, v/ and .pytest_cache/v. Artifacts go only
 under the epic's csharp-sdk/sdk-six-c-jina directory. Full SDK.6c remains open afterward.
+
+## Resume
+
+All boxes are complete at accepted source `a3b0cc785c723616d5e724f7f7b7b20f432ce647`, tree
+`c76532ea37af84819ade720064a8941630608f9c`. Clean run `local-jina-a3b0cc78-20261022T203641Z` attempt 1
+passes all five actual registered gates and pure aggregation with dirty=false. Retained
+packet `.tmp-tests/jina-acceptance/source-a3b0cc7/` contains both inventories/verification
+files, shared profile observations/reports, source-stamped packages and explicit Frozen
+DEVELOPMENT 102/102. An independent read-only audit verifies raw child hashes and identity;
+root also verifies all six observer stamps and the package repository commit.
+
+The primary full22 gate is development evidence (178.4 s, 872 unit/93 conformance). Clean
+acceptance runs the registered behavioral gates; it does not relabel primary logs as clean.
+All106 Frozen assets and previous declarations remain unchanged. No hosted Jina verification,
+new spec qualification/support declaration, public package or release is claimed.
+
+Next executable work is parent **SDK.7a**, followed by the relevant SDK.8 prerequisites.
+TEI, Voyage and Jina exhaust the standalone retrieval-only Python descriptors. Remaining
+retrieval providers also expose generation/batch; keep SDK.6c unchecked for those until
+those prerequisites permit complete descriptors. Generic OpenAI compatibility stays chat-only.
+This is dependency ordering, not reduced parity scope. Each later binding still requires
+current research and its own accepted plan. Temporary checkout registration/content were
+removed after evidence retention; Windows retains its empty root directory.

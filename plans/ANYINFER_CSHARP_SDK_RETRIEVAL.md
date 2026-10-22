@@ -1511,7 +1511,7 @@ accepting batch, routes, retention or manifest options it cannot honor.
     > independent review and final acceptance are still required. Product behavior is unchanged.
     > Closure: independent barrier review is clean. All21 canonical workspace steps pass
     > in161.1s at `.tmp-tests/sdk-six-full-workspace-20261019-r2/`, including791 unit,
-    > 93 conformance, accounting42+2, policy29, retrieval32, isolated package and examples.
+    > 93 conformance, accounting 42+2, policy 29, retrieval 32, isolated package and examples.
     > Root stages exactly99 reviewed SDK.6a/b paths; unrelated uv.lock and v/cache remain
     > untouched. An isolated clean checkout of the source commit will bind the final
     > profile/package proof without removing those unrelated files. Acceptance boxes wait
@@ -1574,9 +1574,9 @@ of unapproved rerank batch scores.
 
 SDK.6a/b are complete at clean source checkpoint
 `03f26fc88c7c96ff8272e99dadee8c6a26fa0616` (implementation 131c7aa, two narrow checkout-LF
-fixes thereafter). Resume **6c.0 — retrieval provider research preflight**, corresponding
-to the parent **SDK.6c**. Completed provider tranches are recorded below; remaining
-providers require their own research preflight.
+fixes thereafter). Standalone retrieval-only provider tranches are now complete.
+Resume parent **SDK.7a** prerequisites before remaining mixed-operation SDK.6c/SDK.8
+bindings; each still requires its own 6c.0 research preflight.
 
 The TEI leaf `ANYINFER_CSHARP_SDK_TEI.md` is complete at clean verified source
 `af5d0d64840cb8ec81ecdcb92acb9a457958d814`. The Voyage leaf
@@ -1602,6 +1602,8 @@ later milestones remain unchecked. New providers require current upstream resear
 separate accepted binding plan before adapter edits.
 
 > NOTE: Continued SDK.6c on 2026-10-22 with `ANYINFER_CSHARP_SDK_JINA.md`.
-> Current OpenAPI research and the native library/source review pass; Python v4/v5
-> task support is corrected with independent controls. Full integration and clean-source
-> acceptance remain open in the Jina leaf. Other provider bindings stay unchecked.
+> Accepted source `a3b0cc785c723616d5e724f7f7b7b20f432ce647` passes all 22 primary gates,
+> 872 native unit/93 conformance, clean registered producers/aggregation, prior profiles
+> and Frozen 102. Hosted Jina remains unverified. TEI/Voyage/Jina exhaust standalone
+> retrieval-only descriptors; remaining generation/batch providers require SDK.7/8
+> prerequisites. SDK.6c stays unchecked for those; next executable box is SDK.7a.

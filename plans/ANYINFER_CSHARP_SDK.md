@@ -859,7 +859,7 @@ must report a real conflict rather than silently changing a dependent public sig
   > this does not complete the rich-generation milestone.
   > Public delivery review, examples and isolated package consumer now pass. Root's final
   > workspace run passes all21 steps in161.1s, with791 native unit/93 conformance cases,
-  > accounting42+2, policy29 and retrieval32 shared matches. An earlier stalled unit run
+  > accounting 42+2, policy 29 and retrieval 32 shared matches. An earlier stalled unit run
   > and separately reproduced factory-test ordering race are retained; the test-only
   > cancellation barrier passes independent review and20 repetitions. Resume source commit
   > and isolated clean-revision proof in the retrieval leaf before checking SDK.6a/b.
@@ -899,8 +899,12 @@ must report a real conflict rather than silently changing a dependent public sig
   > Hosted Voyage traffic remains unverified; other SDK.6c providers remain open.
   > Continued on 2026-10-22 with `ANYINFER_CSHARP_SDK_JINA.md`: native text retrieval
   > plus evidence-backed v4/v5 task corrections in both SDKs. Current-schema research
-  > is complete; all22 primary gates and independent source/control reviews pass.
-  > Clean-source registered producer/aggregate acceptance remains in the Jina leaf.
+  > is complete; all 22 primary gates and independent source/control reviews pass.
+  > Jina is accepted at `a3b0cc785c723616d5e724f7f7b7b20f432ce647`: clean registered producers,
+  > aggregation, prior shared profiles, source-stamped packages/examples and Frozen 102 pass.
+  > All standalone retrieval-only descriptors are now ported. Remaining SDK.6c bindings
+  > also require generation/batch; execute SDK.7a and relevant SDK.8 prerequisites before
+  > returning to those bindings. SDK.6c remains unchecked; parity scope is unchanged.
 
 ### SDK.7 — Rich generation, tools and multimodal input
 
@@ -990,7 +994,9 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.6c**. SDK.6a/b are complete at clean source checkpoint
+Current executable resume point: **SDK.7a**, a prerequisite for remaining mixed-operation
+SDK.6c/SDK.8 providers. SDK.6c remains unchecked; its standalone retrieval-only tranches
+are complete. SDK.6a/b are complete at clean source checkpoint
 `03f26fc88c7c96ff8272e99dadee8c6a26fa0616`: all 21 workspace gates in 167.6s, 791 native unit
 and 93 conformance cases, 32 shared retrieval matches, 29 policy matches, accounting 42+2,
 102 Frozen observations, strict docs, compiled examples and clean-revision package-only
@@ -1005,7 +1011,10 @@ The TEI lane `ANYINFER_CSHARP_SDK_TEI.md` is complete at
 `289f8427b29fd769110ad669bf44b86efcaeb623`: native embeddings/rerank, independent
 Python/native wire controls, all 22 primary gates and clean registered maintenance
 aggregation pass. Existing shared profiles and Frozen 102 remain unchanged. Hosted
-Voyage traffic is unverified; continue SDK.6c with the remaining providers.
+Voyage traffic is unverified. The Jina leaf is now accepted at `a3b0cc785c723616d5e724f7f7b7b20f432ce647`
+with all 22 primary gates,872 unit/93 conformance, clean registered aggregation and
+Frozen 102 preservation. Hosted Jina traffic is also unverified. Resume SDK.7a prerequisites
+before the remaining mixed-operation SDK.6c/SDK.8 bindings.
 
 SDK.5c is complete at source checkpoint
 `97e8937c281063582c282f313a35b91761293500`: all 20 workspace steps in 147.6s,
