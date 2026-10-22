@@ -886,8 +886,9 @@ must report a real conflict rather than silently changing a dependent public sig
   > NOTE: On 2026-10-22 the user authorized implementation of the reviewed TEI and
   > provider-propagation plans in parallel. `ANYINFER_CSHARP_SDK_TEI.md` owns native TEI
   > retrieval and Python requalification against pinned CPU 1.9.4 and exact model revisions.
-  > Focused controls, live development calls and public delivery are accepted; the leaf's
-  > TEI.8 full clean-source gate remains open. Other SDK.6c providers remain open.
+  > The TEI leaf is complete at clean verified source
+  > `af5d0d64840cb8ec81ecdcb92acb9a457958d814`: all 22 gates, preserved profiles,
+  > public live calls and packed consumers pass. Other SDK.6c providers remain open.
 
 ### SDK.7 — Rich generation, tools and multimodal input
 
@@ -987,8 +988,8 @@ independent reviews and preserved failures. SDK.6c requires current provider res
 a separate accepted binding plan before implementation; generic compatibility stays chat-only.
 
 The current authorized lane is `ANYINFER_CSHARP_SDK_TEI.md`: TEI 1.9.4 for both the new
-C# binding and refreshed Python live evidence. Resume its TEI.8 clean-source acceptance;
-the broader SDK.6c box remains unchecked for its other providers.
+C# binding and refreshed Python live evidence. Its clean-source acceptance is complete at
+`af5d0d64840cb8ec81ecdcb92acb9a457958d814`; continue SDK.6c with the remaining providers.
 
 SDK.5c is complete at source checkpoint
 `97e8937c281063582c282f313a35b91761293500`: all 20 workspace steps in 147.6s,

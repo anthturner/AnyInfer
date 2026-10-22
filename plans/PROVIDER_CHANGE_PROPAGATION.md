@@ -2,12 +2,12 @@
 
 > Resume from the first unchecked box. The user authorized both TEI and provider-change
 > propagation implementations on 2026-10-22: implement both, in parallel where possible.
-> Implementation and focused independent reviews are accepted through P6.2. Resume at P6.3
-> for the full repository gate, source commit and isolated clean-source replay.
+> All boxes are complete at verified source `af5d0d64840cb8ec81ecdcb92acb9a457958d814`.
+> Later closure notes change plans only; they do not introduce a new runtime checkpoint.
 
-**Status:** implementation authorized; focused lanes accepted as noted below, integration open.
+**Status:** implementation and clean-source acceptance complete.
 **Baseline (historical plan source):** `acdc94469f86eca0a67f9226fbc2c7ae6a7e7bf8`.
-**Current source HEAD:** `acdc94469f86eca0a67f9226fbc2c7ae6a7e7bf8`.
+**Verified source checkpoint:** `af5d0d64840cb8ec81ecdcb92acb9a457958d814`.
 **Scope:** connect upstream provider drift review to coordinated changes across the shared
 language-neutral specification and registered language implementations.
 
@@ -484,7 +484,7 @@ current test or release claim is implied by this plan.
   > public delivery and focused acceptance controls. Frozen assets have no source diff.
   > No actual future candidate release is created or qualified; synthetic positive evidence
   > tests the supported grammar and trusted-fact joins. The real TEI record is wire-only.
-- [ ] **P6.3** Run the repository's required final gate `python workspace.py check` once after
+- [x] **P6.3** Run the repository's required final gate `python workspace.py check` once after
   all changes are integrated, plus any workflow validation required by repository convention.
   Verify clean source acceptance for any candidate specification release without sealing or
   publishing it absent separate authorization. **Gate:** all required checks pass, reviewer
@@ -510,6 +510,20 @@ current test or release claim is implied by this plan.
   > count; validate() checks its returned report for API/CLI/CI alike. The real CLI positive
   > and cold review pass (43 focused passes, one Windows capability skip), and root's full
   > gate passes in 155.5s. Final clean replay must name the checkpoint including this fix.
+  > Final source `af5d0d64840cb8ec81ecdcb92acb9a457958d814`, tree
+  > `8a4a30bcb174b1d1c17015860e91ea01b7647b1a`, passes all 22 steps from a fresh clean
+  > checkout in 154.2s. Frozen102 development, immutable release verification, the pinned
+  > clean native TEI probe, NuGet-only consumer and all preserved profiles pass.
+  > The real canonical dispatcher then runs Python contracts/fixtures/conformance/test
+  > and csharp-workspace, producing two inventories and two verification artifacts.
+  > Pure aggregation accepts them under local run `local-clean-af5d0d64-20261022T162407Z`,
+  > with the same clean source/tree/fingerprint and unchanged raw TEI declaration.
+  > This is local execution evidence; remote Actions/model proposal publication was not run,
+  > and no actual candidate release was created, sealed or published. One Windows symlink-
+  > capability skip remains recorded as a skip. Both owned TEI containers are stopped;
+  > caches and failed-first evidence are retained. Temporary Git worktrees are retired,
+  > with only three locked empty Windows directories remaining. Detailed evidence is at
+  > `epics/a4822703-eee2-44cb-960c-47b3ae3d4c73/artifacts/provider-maintenance/execution/acceptance/index.md`.
 
 ## Work ownership and sequencing
 
@@ -527,7 +541,7 @@ current test or release claim is implied by this plan.
 Parallelize only disjoint path owners after shared interfaces are settled. Serialize schema,
 registry and workflow integration; re-read shared manifests immediately before a minimal edit.
 Run heavy builds and the full gate serially, by the coordinator. Sub-agents do not change Git
-state; root coordinator alone may commit by explicit path, after separate authorization.
+state; root coordinator alone may commit by explicit path under the execution authorization.
 
 ## Deferred boundaries
 

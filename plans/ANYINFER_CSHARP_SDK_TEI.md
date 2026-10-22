@@ -2,10 +2,9 @@
 
 > Resume from the first unchecked box. The user authorized implementation of both
 > C# SDK plans in parallel on 2026-10-22, with TEI as this wave's owner lane and
-> Python TEI requalification included. TEI.1–6 are accepted at their stated focused
-> and development boundaries. TEI.7 delivery is accepted; resume at TEI.8 for final
-> clean-source acceptance.
-> The resume record below distinguishes focused evidence from final acceptance.
+> Python TEI requalification included. TEI.1–8 are complete at verified source
+> `af5d0d64840cb8ec81ecdcb92acb9a457958d814`. The parent SDK.6c remains open for
+> its other provider bindings. The resume record below names the acceptance checkpoint.
 
 ## 1. Starting point and completion boundary
 
@@ -411,7 +410,7 @@ ticks only its assigned boxes after its gate and adds a `> NOTE:` for deviations
 > cold delivery review is closed. Public pages share the bounded 2026-10-22 TEI 1.9.4
 > exercise statement, while detailed source-state evidence remains in the execution artifact.
 
-- [ ] **TEI.8 — Preserve SDK proofs and qualify one clean source checkpoint.**
+- [x] **TEI.8 — Preserve SDK proofs and qualify one clean source checkpoint.**
   Close all owner/source/test/protocol reviews, then root runs `python workspace.py check`
   (22 steps after the maintenance-exporter gate) with recording disabled and no local server requirement.
   Preserve retrieval32, policy29, accounting42+2 and Frozen102, with source/dirty/
@@ -452,6 +451,25 @@ ticks only its assigned boxes after its gate and adds a `> NOTE:` for deviations
 > The corrected native-boundary gate has clean independent review and the repeated root
 > full gate passes all 22 steps in 156.1s. Clean replay of the correction is still required.
 
+> NOTE: Final acceptance is source `af5d0d64840cb8ec81ecdcb92acb9a457958d814`, tree
+> `8a4a30bcb174b1d1c17015860e91ea01b7647b1a`. Root's full gate passes in 155.5s;
+> a fresh isolated checkout passes all 22 steps in 154.2s, including 815 native unit and
+> 93 conformance tests, preserved retrieval32/policy29/accounting42+2, strict docs,
+> compiled examples and the NuGet-only consumer. Recording is disabled. Frozen release
+> verification retains `16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391`;
+> explicit development output records 102 pass, zero fail/error/unavailable.
+>
+> The clean public TEI probe records that exact commit with Dirty=false, expected 1.9.4
+> models/deployment facts, normalized 384-dimensional embedding, rerank caller ID and unknown
+> usage/cost. No live floating-value comparison or backend-cancellation claim is made.
+> Before/after Git status is empty in the acceptance checkout. Both owned test containers
+> are stopped; image/model caches and all failed-first logs are retained. Evidence was copied
+> to `.tmp-tests/tei-propagation-acceptance/final-source-af5d0d6/` before retiring the three
+> temporary Git worktrees. Windows retains their locked empty directories; no source/build
+> files or Git registrations remain there. Unrelated uv.lock/v files retain their hashes.
+> See the combined acceptance artifact at
+> `epics/a4822703-eee2-44cb-960c-47b3ae3d4c73/artifacts/provider-maintenance/execution/acceptance/index.md`.
+
 ## 6. Integration and evidence rules
 
 Heavy gates are serialized. Offline tests never contact public networks or require
@@ -488,18 +506,9 @@ as part of this tranche. Model/runtime acquisition remains outside the adapter.
 ## 7. Resume record
 
 Planning checkpoint: `acdc94469f86eca0a67f9226fbc2c7ae6a7e7bf8`.
-First unchecked box: **TEI.8**, under the 2026-10-22 authorization to implement both plans.
-TEI 1.9.4 and the exact CPU/model pins above are selected for the draft. Python
-requalification is included at the user's request; no dependency bump is needed.
-Research review's mutable-model-link P2 was corrected to revision-pinned URLs and
-closed. Independent plan critique is also closed: raw BCL deployment verification
-is separate from public-SDK proof, and parent SDK.6c wording now permits the
-selected native dialect. TEI.1 and TEI.2 are independently accepted. TEI.4 builds without
-warnings. TEI.5's adversarial cleanup test exposed status classification after disposal;
-conversion now runs inside the transport lifetime and the held 503 control passes.
-The final focused native gate records 24/24 and its cold review is closed. TEI.3 records
-33/33 plus a one-test complete unknown-usage assertion recheck. TEI.6 development live
-probe passes with an honest dirty stamp. TEI.7 examples compile/run and the isolated
-NuGet-only consumer passes after a bounded namespace alias fix; strict docs and independent
-delivery review are closed. The integrated full gate and clean committed replay remain open.
-Full clean-source qualification and SDK.6c completion are not claimed.
+Verified implementation checkpoint: `af5d0d64840cb8ec81ecdcb92acb9a457958d814`.
+There is no unchecked TEI box. All focused/source/protocol reviews and full clean-source
+acceptance are closed. The later closure commit changes plans only and does not claim a new
+runtime observation. Continue the parent SDK.6c with its remaining providers; generic
+OpenAI compatibility remains chat-only. No package release or qualified specification report
+was published. Failed-first evidence and the earlier development checkpoint remain retained.
