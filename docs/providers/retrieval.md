@@ -39,7 +39,7 @@ batch ceilings, and truncation behavior.
 
 | | Voyage AI | Jina AI |
 |---|---|---|
-| [Input intents](../concepts/embeddings.md#input-intent) | `query` and `document` only; `classification`/`clustering` have no wire value, are never sent, and the result carries a warning | All four: `query` → `retrieval.query`, `document` → `retrieval.passage`, `classification` verbatim, `clustering` → `separation` (Jina's clustering-flavored task, recorded in the contract) |
+| [Input intents](../concepts/embeddings.md#input-intent) | `query` and `document` only; `classification`/`clustering` have no wire value, are never sent, and the result carries a warning | `query` → `retrieval.query`, `document` → `retrieval.passage`, `classification` verbatim; `clustering` is `clustering` for the four supported v5 embedding IDs and `separation` otherwise. v4 exposes only query/document normalized intents. |
 | Embedding batches | [Batching engages](../concepts/embeddings.md#batching) at 1,000 inputs | No documented ceiling: Jina batches internally, so no limit is invented; requests above the library's sanity ceilings refuse locally, and `BatchPolicy.max_items_override` applies an independently verified limit |
 | Rerank documents | 1,000 is a hard cap; the core refuses larger requests unless `rerank_cross_batch` opts into chunk-local rankings | `top_n` is taken natively by the reranker |
 | Truncation | Defaults on server-side: over-length inputs are cut, not rejected. Disable per call with `provider_options={"voyage": {"truncation": False}}` | — |
@@ -49,22 +49,29 @@ batch ceilings, and truncation behavior.
 
 Two behaviors are shared:
 
-- **No model listing.** Neither API has a listing endpoint, so `client.models("voyage")`
-  and `client.models("jina")` return empty lists; the verified model set ships in each
-  descriptor's [capabilities](../concepts/capabilities.md).
-- **Usage is `total_tokens` only.** Both public and raw results keep the input and output
-  breakdown unknown rather than inventing it.
+- **Manual selection with empty discovery.** The supported SDK subset returns empty lists
+  from `client.models("voyage")` and `client.models("jina")`; Jina's documented model-listing
+  endpoint is not implemented by this bounded discovery surface. The verified model set ships in
+  each descriptor's [capabilities](../concepts/capabilities.md).
+- **Usage is `total_tokens` only.** Public normalized usage keeps the input and output
+  breakdown unknown rather than inventing it. When raw retention is opted in, the raw payload
+  preserves reported prompt or modality usage fields without promoting them into that normalized
+  breakdown.
 
 ## C# proof boundary
 
-The bounded prerelease C# proof has native built-in retrieval adapters for Voyage and
+The bounded prerelease C# proof has native built-in retrieval adapters for Jina, Voyage and
 [Text Embeddings Inference](tei.md). Its Voyage example uses a caller-supplied
 `env://VOYAGE_API_KEY` reference and scripted HTTP responses; hosted Voyage traffic has not
-been live-verified. Jina remains available through the Python SDK but has no C# built-in
-adapter in this proof.
+been live-verified. Its Jina example uses the same offline scripted-handler form; hosted Jina
+traffic has not been live-verified.
 
 ```csharp
 --8<-- "examples/csharp-sdk/VoyageExample.cs"
+```
+
+```csharp
+--8<-- "examples/csharp-sdk/JinaExample.cs"
 ```
 
 ## Wire Contract

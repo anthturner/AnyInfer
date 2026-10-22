@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "jina-native-binding",
+  "sources": [
+    {
+      "url": "https://api.jina.ai/openapi.json",
+      "fetched_at": "2026-10-22",
+      "version_pin": "Jina HTTP API /v1; OpenAPI 2026.10.13.1624"
+    },
+    {
+      "url": "https://jina.ai/embeddings/",
+      "fetched_at": "2026-10-22",
+      "version_pin": "Jina HTTP API /v1; OpenAPI 2026.10.13.1624"
+    },
+    {
+      "url": "https://jina.ai/reranker/",
+      "fetched_at": "2026-10-22",
+      "version_pin": "Jina HTTP API /v1; OpenAPI 2026.10.13.1624"
+    }
+  ],
+  "disposition": "adopted",
+  "changes": [
+    {
+      "contract_id": "contracts/jina.md",
+      "scope": "inference",
+      "operations": [
+        "embedding",
+        "rerank"
+      ],
+      "summary": "Refresh Jina protocol evidence, correct model-specific v4/v5 task support in Python and C#, and add native text embeddings/reranking. Hosted traffic remains unverified."
+    }
+  ],
+  "shared_spec": {
+    "impact": "no_delta",
+    "rationale": "Adds a provider-specific translation binding for existing buffered embedding/rerank operations. Normalized requests/results, accounting, routing, safety and validation remain governed by the existing shared contracts. No normative specification, released schema, inventory, frozen fixture or expectation is changed; new tests provide provider wire inputs without redefining shared results. No candidate release or qualification is claimed."
+  },
+  "implementations": [
+    {
+      "implementation_id": "anyinfer-python",
+      "status": "updated",
+      "rationale": "Corrects the exact v4 supported intents and four known v5 clustering task literals against the current model-specific OpenAPI; independently exercises the existing normalized text-only subset. Empty discovery and total-token-only usage remain explicit SDK limits.",
+      "owned_paths": [
+        "contracts/jina.md",
+        "tests/fixtures/jina-wire-v1/inputs.json",
+        "tests/test_jina_binding.py",
+        "docs/providers/retrieval.md",
+        "src/python/anyinfer/providers/jina.py",
+        "src/python/anyinfer/providers/openai_shaped_retrieval.py"
+      ],
+      "required_gate_ids": [
+        "python-contracts",
+        "python-fixtures",
+        "python-conformance",
+        "python-tests"
+      ]
+    },
+    {
+      "implementation_id": "anyinfer-csharp",
+      "status": "updated",
+      "rationale": "Adds native Jina text retrieval, independent public controls and packaged consumers; changes Voyage reachability wording to match the shared Python diagnostic. No hosted verification or full-library parity claim.",
+      "owned_paths": [
+        "contracts/jina.md",
+        "tests/fixtures/jina-wire-v1/inputs.json",
+        "src/csharp/AnyInfer/Providers/JinaAdapter.cs",
+        "src/csharp/AnyInfer/Providers/JinaHttpTransport.cs",
+        "src/csharp/AnyInfer/Providers/ProviderRegistry.cs",
+        "src/csharp/AnyInfer.Tests/JinaAdapterTests.cs",
+        "src/csharp/AnyInfer.Tests/JinaLifecycleTests.cs",
+        "src/csharp/AnyInfer.Tests/AnyInfer.Tests.csproj",
+        "src/csharp/AnyInfer.Maintenance/Program.cs",
+        "scripts/check_csharp_binding_inventory.py",
+        "examples/csharp-sdk/JinaExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "scripts/check_csharp_package.py",
+        "tests/test_csharp_packaging.py",
+        "docs/providers/retrieval.md",
+        "docs/guides/csharp-sdk.md",
+        "docs/reference/csharp-sdk.md",
+        "docs/guides/README.md",
+        "src/csharp/README.md",
+        "src/csharp/AnyInfer/Providers/VoyageAdapter.cs"
+      ],
+      "required_gate_ids": [
+        "csharp-workspace"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "embedding-v3-indexed",
+      "operation": "embedding",
+      "target": "jina:jina-embeddings-v3",
+      "request": {
+        "inputs": ["alpha", "beta"],
+        "input_type": "query",
+        "dimensions": 2
+      },
+      "response": {
+        "object": "list",
+        "data": [
+          {"index": 1, "embedding": [0.3, 0.4]},
+          {"index": 0, "embedding": [0.1, 0.2]}
+        ],
+        "model": "jina-embeddings-v3",
+        "usage": {"total_tokens": 7}
+      }
+    },
+    {
+      "id": "embedding-v5-clustering",
+      "operation": "embedding",
+      "target": "jina:jina-embeddings-v5-text-small",
+      "request": {
+        "inputs": ["cluster input"],
+        "input_type": "clustering"
+      },
+      "response": {
+        "object": "list",
+        "data": [{"index": 0, "embedding": [0.5, 0.6]}],
+        "model": "jina-embeddings-v5-text-small",
+        "usage": {"total_tokens": 9, "prompt_tokens": 8, "image_tokens": 1}
+      }
+    },
+    {
+      "id": "rerank-positional-results",
+      "operation": "rerank",
+      "target": "jina:jina-reranker-v3",
+      "request": {
+        "query": "question",
+        "documents": [
+          {"id": "doc-z", "text": "first"},
+          {"id": "doc-a", "text": "second"}
+        ],
+        "top_n": 1
+      },
+      "response": {
+        "results": [{"index": 1, "relevance_score": 0.9}],
+        "model": "jina-reranker-v3",
+        "usage": {"total_tokens": 11}
+      }
+    }
+  ]
+}

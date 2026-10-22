@@ -172,5 +172,36 @@ public sealed class ProviderRegistry
         {
             PoolOwnsConfiguredTransport = true,
         },
+        new ProviderDescriptor(
+            "jina",
+            "Jina AI",
+            static (config, cancellationToken) => new ValueTask<IAsyncDisposable>(JinaAdapter.Create(config, cancellationToken)),
+            aliases: ["jinaai"],
+            setup: new ProviderSetupSpec([
+                new SetupField("api_key", "API key", "secret", required: true, placeholder: "env://JINA_API_KEY or a literal key", envVar: "JINA_API_KEY", helpText: "Accepts a literal, env://VAR, or credential://system/name."),
+                new SetupField("base_url", "Base URL", "endpoint", required: false, advanced: true, defaultValue: "https://api.jina.ai/v1", helpText: "Defaults to https://api.jina.ai/v1."),
+            ], modelSelection: "manual-only"),
+            defaultBaseUrl: "https://api.jina.ai/v1",
+            locality: ProviderLocality.Hosted,
+            operations: [InferenceOperation.Embedding, InferenceOperation.Rerank],
+            staticEmbeddingCapabilities: new Dictionary<string, EmbeddingCapabilities>(StringComparer.Ordinal)
+            {
+                ["jina-embeddings-v3"] = new(inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document, EmbeddingInputIntent.Classification, EmbeddingInputIntent.Clustering]),
+                ["jina-embeddings-v4"] = new(inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document]),
+                ["jina-embeddings-v5-text-small"] = new(dimensions: 1_024, dimensionChoices: [32, 64, 128, 256, 512, 1_024], maxInputTokens: 32_768, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document, EmbeddingInputIntent.Classification, EmbeddingInputIntent.Clustering]),
+                ["jina-embeddings-v5-omni-small"] = new(dimensions: 1_024, dimensionChoices: [32, 64, 128, 256, 512, 1_024], maxInputTokens: 32_768, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document, EmbeddingInputIntent.Classification, EmbeddingInputIntent.Clustering]),
+                ["jina-embeddings-v5-text-nano"] = new(dimensions: 768, dimensionChoices: [32, 64, 128, 256, 512, 768], maxInputTokens: 8_192, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document, EmbeddingInputIntent.Classification, EmbeddingInputIntent.Clustering]),
+                ["jina-embeddings-v5-omni-nano"] = new(dimensions: 768, dimensionChoices: [32, 64, 128, 256, 512, 768], maxInputTokens: 8_192, inputIntents: [EmbeddingInputIntent.Query, EmbeddingInputIntent.Document, EmbeddingInputIntent.Classification, EmbeddingInputIntent.Clustering]),
+            },
+            staticRerankCapabilities: new Dictionary<string, RerankCapabilities>(StringComparer.Ordinal)
+            {
+                ["jina-reranker-v3"] = new(nativeTopN: true),
+                ["jina-reranker-v3.5"] = new(nativeTopN: true),
+                ["jina-reranker-m0"] = new(nativeTopN: true),
+                ["jina-reranker-v2-base-multilingual"] = new(nativeTopN: true),
+            })
+        {
+            PoolOwnsConfiguredTransport = true,
+        },
     ]);
 }

@@ -1600,3 +1600,8 @@ uv.lock/v/cache files in the primary checkout remain untouched; qualification us
 isolated worktree, clean before and after all gates. Parent SDK.6a/b are checked; SDK.6c and
 later milestones remain unchecked. New providers require current upstream research and a
 separate accepted binding plan before adapter edits.
+
+> NOTE: Continued SDK.6c on 2026-10-22 with `ANYINFER_CSHARP_SDK_JINA.md`.
+> Current OpenAPI research and the native library/source review pass; Python v4/v5
+> task support is corrected with independent controls. Full integration and clean-source
+> acceptance remain open in the Jina leaf. Other provider bindings stay unchecked.

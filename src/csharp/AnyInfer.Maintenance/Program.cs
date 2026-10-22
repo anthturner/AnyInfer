@@ -68,6 +68,7 @@ static IReadOnlyList<string> Dependencies(string providerId)
         "openai-compat" => ["contracts/openai-compat.md"],
         "tei" => ["contracts/tei.md"],
         "voyage" => ["contracts/voyage.md"],
+        "jina" => ["contracts/jina.md"],
         _ => throw new InvalidOperationException($"Registered provider '{providerId}' has no checked contract dependency mapping."),
     };
     foreach (var dependency in dependencies)

@@ -1,12 +1,13 @@
 """Shared plumbing for OpenAI-*shaped*, retrieval-only providers.
 
 Jina and Voyage are both specialist embeddings-and-reranking providers with no generation
-endpoint, no model-listing endpoint, and an embeddings response that carries the OpenAI
-``{data: [{index, embedding}]}`` envelope even though the *request* vocabulary is each
-provider's own (``task`` for Jina; ``input_type``/``output_dimension`` for Voyage). That
-request-side divergence is why this is a separate module from `openai_compat_embeddings.py`
-rather than a rename of it — a preset there opts into the OpenAI-compatible dialect
-end-to-end, but these two only share the response shape.
+endpoint and an embeddings response that carries the OpenAI ``{data: [{index, embedding}]}``
+envelope even though the *request* vocabulary is each provider's own (``task`` for Jina;
+``input_type``/``output_dimension`` for Voyage). The adapters intentionally provide empty
+SDK discovery: Jina now documents a listing endpoint, but this bounded subset retains manual
+model selection. That request-side divergence is why this is a separate module from
+`openai_compat_embeddings.py` rather than a rename of it — a preset there opts into the
+OpenAI-compatible dialect end-to-end, but these two only share the response shape.
 
 This module's response parsing is also intentionally stricter than
 `OpenAICompatEmbeddingsMixin`'s: a missing or malformed entry raises `ProviderError` instead
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
 
         def _build_embedding_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]: ...
 
+
 __all__ = ["OpenAIShapedRetrievalMixin", "parse_retrieval_usage"]
 
 
@@ -64,7 +66,7 @@ def parse_retrieval_usage(payload: Any) -> Usage | None:
 
 
 class OpenAIShapedRetrievalMixin:
-    """Discovery, lifecycle, and embeddings-response parsing shared by Jina and Voyage.
+    """Empty discovery, lifecycle, and embeddings-response parsing shared by Jina and Voyage.
 
     What stays on the adapter subclass: authentication headers, the default base URL, the
     static model-capability tables, and ``_build_embedding_payload`` — the one place the two
@@ -72,21 +74,20 @@ class OpenAIShapedRetrievalMixin:
     """
 
     async def list_models(self) -> Sequence[DiscoveredModel]:
-        """This provider documents no listing endpoint; the answer is honestly empty.
+        """Return no discovered models because this SDK subset does not implement discovery.
 
-        The models an adapter built on this mixin was verified against live in the
-        descriptor's static capability tables, which is catalog knowledge rather than
-        discovery — reporting them here would stamp ``discovered`` provenance on something
-        the provider never said.
+        Jina documents a listing endpoint, while Voyage does not. Neither adapter uses one:
+        their manual-selection model tables are catalog knowledge, not live discovery, and
+        reporting those rows here would mislabel their provenance as ``discovered``.
         """
         return ()
 
     async def health(self) -> Health:
-        """Reachability probe: any HTTP answer from the endpoint counts.
+        """Reachability-only probe: any HTTP answer from the endpoint counts.
 
-        There is no documented health or listing route, so this asks for one and treats
-        *any* HTTP status — including the expected 404 — as proof the service answered.
-        Only a transport failure reports unhealthy.
+        This GET does not verify authentication, model readiness, or whether a listing API
+        is usable. Any HTTP status, including a 404, only proves that the endpoint answered;
+        only a transport failure reports unhealthy.
         """
         host: _RetrievalHost = self  # type: ignore[assignment]
         try:
@@ -95,7 +96,7 @@ class OpenAIShapedRetrievalMixin:
             return Health(ok=False, detail=str(exc)[:200])
         return Health(
             ok=True,
-            detail=f"endpoint reachable (HTTP {response.status_code}; no listing API)",
+            detail=f"endpoint reachable (HTTP {response.status_code}; reachability only)",
         )
 
     async def aclose(self) -> None:
@@ -108,9 +109,7 @@ class OpenAIShapedRetrievalMixin:
         host: _RetrievalHost = self  # type: ignore[assignment]
         payload = host._build_embedding_payload(req)
         try:
-            response = await host._client.post(
-                "/embeddings", json=payload, timeout=req.timeout_s
-            )
+            response = await host._client.post("/embeddings", json=payload, timeout=req.timeout_s)
         except httpx2.HTTPError as exc:
             raise map_transport_error(exc, provider=host.provider_id, phase="generate") from exc
         if response.status_code >= 400:
@@ -131,13 +130,10 @@ class OpenAIShapedRetrievalMixin:
             raise ProviderError("embeddings response is not a JSON object", phase="validate")
         data = payload.get("data")
         if not isinstance(data, list):
-            raise ProviderError(
-                "embeddings response is missing a 'data' array", phase="validate"
-            )
+            raise ProviderError("embeddings response is missing a 'data' array", phase="validate")
         if len(data) != len(req.inputs):
             raise ProviderError(
-                f"embeddings response returned {len(data)} vectors for "
-                f"{len(req.inputs)} inputs",
+                f"embeddings response returned {len(data)} vectors for {len(req.inputs)} inputs",
                 phase="validate",
             )
         # Entries carry their input index; order by it rather than trusting arrival order.

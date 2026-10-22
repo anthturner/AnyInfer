@@ -24,6 +24,16 @@ SCHEMA = ROOT / "maintenance" / "binding-inventory.schema.json"
 IMPLEMENTATIONS = ROOT / "maintenance" / "implementations.json"
 EXPECTED_BINDINGS = [
     {
+        "provider_id": "jina",
+        "operation": "embedding",
+        "contract_dependencies": ["contracts/jina.md"],
+    },
+    {
+        "provider_id": "jina",
+        "operation": "rerank",
+        "contract_dependencies": ["contracts/jina.md"],
+    },
+    {
         "provider_id": "openai-compat",
         "operation": "generation",
         "contract_dependencies": ["contracts/openai-compat.md"],

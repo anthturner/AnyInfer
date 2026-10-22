@@ -67,7 +67,7 @@ release path, and it does not change the supported Python SDK surface.
 
 Its source-linked examples cover generation, routing, configuration, pure catalog and capability
 queries, explicit model discovery, health and capability probes for a configured instance,
-payload-free typed telemetry, immutable manifests, built-in TEI and Voyage embedding and reranking,
+payload-free typed telemetry, immutable manifests, built-in TEI, Voyage, and Jina embedding and reranking,
 declarative provider setup metadata, bounded winning-request pricing, explicit budgeting,
 caller-owned ledger/store helpers, standalone pacing, explicit request-policy inputs, and modern
 JSON Schema validation with typed deserialization. They do not imply full provider parity,

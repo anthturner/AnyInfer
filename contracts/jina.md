@@ -1,98 +1,118 @@
 # jina — Protocol Contract
 
-Status: **implemented** — `providers/jina.py`, embeddings and reranker.
-Last verified: 2026-10-12 — against Jina's product documentation and its own model
-publications (sources below); the interactive API reference (`api.jina.ai/redoc`) is
-still JS-only and unfetchable headlessly — reconfirmed 2026-10-12, a ~4KB `<div
-id="app">` shell with no inline schema. Not yet verified against live traffic.
+Status: **implemented** — Python and native C# text embeddings and reranking.
+
+Last verified: 2026-10-22 — documentation and machine-readable schema.
+Hosted traffic is **not yet live-verified**.
 
 ## Upstream sources
-- https://jina.ai/embeddings/ (request shape, task vocabulary, models)
-- https://jina.ai/reranker/ (rerank request shape, models, no-hard-limit statement)
+
+- https://api.jina.ai/openapi.json — OpenAPI 3.1 version `2026.10.13.1624`, fetched
+  2026-10-22. Model-specific requests, responses, errors and model listing.
+- https://jina.ai/embeddings/ — request/auth examples, task/model and batching guidance;
+  fetched 2026-10-22.
+- https://jina.ai/reranker/ — request examples, top_n and model guidance; fetched 2026-10-22.
 - https://jina.ai/en-US/news/jina-embeddings-v5-text-distilling-4b-quality-into-sub-1b-multilingual-embeddings/
-  (v5 text dimensions and context limits)
 - https://jina.ai/en-US/news/jina-embeddings-v5-omni-multimodal-embeddings-for-text-image-audio-and-video/
-  (v5 omni text compatibility, dimensions, and context limits)
-- https://huggingface.co/jinaai/jina-reranker-v3 and Jina's reranker announcement posts
-  (rerank response shape: `results[]` with `index`/`relevance_score`,
-  `usage.total_tokens`)
+  — existing v5 static capability evidence (verified 2026-10-15).
 
 ## Wire contract
 
 ### Endpoints
-- `POST https://api.jina.ai/v1/embeddings`
-- `POST https://api.jina.ai/v1/rerank`
-- **No listing endpoint** — `list_models()` is honestly empty; `health()` is a labeled
-  reachability probe (any HTTP answer counts).
+
+POST `https://api.jina.ai/v1/embeddings` and POST `https://api.jina.ai/v1/rerank`.
 
 ### Auth
-- `Authorization: Bearer <api_key>`. Conventionally `env://JINA_API_KEY`.
+
+`Authorization: Bearer <api_key>`; convention `env://JINA_API_KEY`.
 
 ### Version pins
-- The API version is in the path (`/v1`). No header or query parameter carries a version.
-  Jina publishes model generations (v3, v4, m0) as *model ids* rather than API versions,
-  so a new generation is a catalog change, not a wire change.
 
-### Embeddings request fields (verified 2026-08-12)
-- `model` (required), `input` (array of strings; no per-request ceiling documented —
-  "batches inputs internally"), `task` — Jina's intent vocabulary, covering all four
-  normalized intents: query→`retrieval.query`, document→`retrieval.passage`,
-  classification→`classification`, and **clustering→`separation`** (Jina's
-  clustering-flavored task; a deliberate mapping recorded here, not an upstream
-  equivalence claim), plus `text-matching` (unmapped), `dimensions` (Matryoshka
-  truncation), `truncate` (over-limit inputs otherwise fail), `late_chunking`,
-  `embedding_type`/format options, `normalized`.
-- The adapter sends `model`, `input`, `task` (when an intent was given), and
-  `dimensions`; everything else is reachable via `provider_options`.
+Version is in the /v1 path; no API-version header/query is sent.
 
-### Embeddings response (corroborated 2026-08-12, not yet live-verified)
-- OpenAI-shaped: `data[]` with `embedding`/`index` (adapter orders by the reported
-  index and rejects out-of-range/duplicates), `usage.total_tokens` →
-  `Usage.total_tokens` only, never assumed into `input_tokens`.
-- For multimodal calls, Jina also documents a `usage.image_tokens` breakdown. The
-  adapter remains text-only, so it preserves the complete raw payload but does not
-  normalize that modality-specific field.
-- **Unverified:** default dimensions for the older v3/v4 models; the exact error-body
-  shape.
+Upstream now documents unauthenticated GET `/v1/models`. The current supported SDK
+subset keeps manual model selection and empty discovery without HTTP: a library
+limitation, not an assertion that upstream has no listing endpoint. Health GET `/models`
+is any-status reachability only, not authentication or model-readiness verification.
 
-### Rerank request fields (verified 2026-08-12)
-- `model`, `query`, `documents` (list of strings; **"no hard limit on the number of
-  documents per request"** — so no `max_documents` is declared and the sanity ceiling
-  governs), `top_n` (native), `return_documents` (default false).
+### Request fields
 
-### Rerank response (verified 2026-08-12 from Jina's own publications)
-- `results[]` with `index` (**positional within the submitted `documents`**, mapped
-  back onto the caller-supplied index before core validation) and `relevance_score`;
-  `model`; `usage.total_tokens`.
-- **Cross-batch comparability: not documented** — refuse-by-default stands.
+#### Embeddings
 
-### Errors
-- **Not yet verified.** Jina's error bodies are documented only in the interactive
-  reference (`api.jina.ai/redoc`), which is JS-rendered and unfetchable headlessly, and no
-  live lane has run. The adapter maps HTTP status alone through the shared status
-  classification and reads no provider-specific error field — which is safe precisely
-  because nothing here claims to know the body shape. Confirming it is the first task of
-  the live lane, tracked on the watchlist below.
+- Send model and array-of-string input; optional task and dimensions. Per-operation
+  provider options overlay last. No default normalized/format/truncate flags invented.
+- Query maps to retrieval.query, document to retrieval.passage, classification verbatim.
+  Clustering maps to **clustering** for the exact four known v5 IDs below and to
+  **separation** otherwise (including v3); exact v4 omits unsupported classification/clustering tasks. OpenAPI's model-specific EmbeddingsV5Request
+  enum differs from v3. V4 accepts retrieval.query/retrieval.passage and other
+  upstream text/code tasks, but no classification/separation/clustering; its normalized
+  capability intents are therefore only query/document. The product FAQ still gives generic separation guidance;
+  the model-specific enum governs this literal wire choice. Unknown future model IDs
+  retain the existing separation mapping; no claim of support for future vocabularies.
+- Dense-float subset: object data array, each entry integer positional index and embedding
+  array. Require exact input count, unique in-range integer nonbool indexes; restore input
+  order. Public core validates nonempty/finite/consistent vectors. Optional string model
+  preserved, dimensions observed from vectors, normalization unknown. Complete raw retained
+  when opted in. Quantized/base64/sparse/multivector/multimodal outputs are not normalized.
+- OpenAPI EmbeddingUsage documents total_tokens and prompt_tokens plus optional modality
+  counters. Existing normalized text-only SDK subset consumes integer nonbool total_tokens
+  ONLY; input_tokens/output_tokens remain unknown. Other fields remain raw, without a
+  fabricated token breakdown.
+
+#### Reranking
+
+- Send model/query/documents (text strings), optional top_n. No top_k; no default
+  return_documents sent. Defaults differ across model-specific schemas; options may set it.
+- Parse results array: integer nonbool positional index and numeric nonbool relevance_score.
+  Map to original caller indexes/IDs, preserving returned order and cardinality. No local
+  sorting/TopN truncation. Optional model; total_tokens-only usage; raw retained.
+- Cross-batch score comparability undocumented; refuse-by-default remains.
+
+### Response fields
+
+The embedding data/index/embedding fields and rerank results/index/relevance_score
+fields above are the consumed response subset. Model is optional, usage is total-only,
+and unknown facts remain unknown.
 
 ### Streaming
-Embeddings and rerank responses are not streamed.
 
-### Published static model capabilities (verified 2026-10-15)
-- `jina-embeddings-v5-text-small` and `jina-embeddings-v5-omni-small`: 1,024
-  dimensions; Matryoshka choices 32/64/128/256/512/1,024; 32,768-token text input.
-- `jina-embeddings-v5-text-nano` and `jina-embeddings-v5-omni-nano`: 768 dimensions;
-  Matryoshka choices 32/64/128/256/512/768; 8,192-token text input.
-- `jina-reranker-v3.5`: native `top_n`; a 131,072-token shared window for the query
-  and all documents, with automatic truncation. That is not a per-document ceiling, so
-  `max_tokens_per_document` remains unset.
+Neither embedding nor rerank produces incremental SDK results; responses are buffered.
 
-The omni models accept multimodal inputs upstream, but AnyInfer's embedding request is
-text-only. They are listed here only for their verified text-compatible operation.
+### Errors, limits and lifetime
+
+- OpenAPI ErrorResponse: required detail, optional code/request_id/errors; error entries
+  contain field/message/type. Shared HTTP status classification and bounded/redacted
+  detail extraction apply; code strings do not invent new normalized categories.
+- Documented statuses include 400/401/403/404/409/422/429/500/503/504. Product and OpenAPI
+  RPM/TPM tables conflict; no rate/price estimates enter capability metadata.
+- Numeric finite nonnegative Retry-After seconds (including fractions) are consumed by
+  shared HTTP behavior; upstream emission remains unverified.
+- No hard count ceiling published; input/document metadata stays unknown and the core
+  sanity ceiling applies. Successful response bytes bounded before parsing; error statuses
+  retain classification with bounded diagnostic bodies. Responses are buffered.
+- Native cancellation evidence concerns client transport cleanup; no upstream computation
+  cancellation claim. Primary status/JSON/shape failures survive owned cleanup failures.
+
+### Existing static capability subset
+
+- jina-embeddings-v3: four intents; v4: query/document only. Old dimensions/token limits
+  remain unknown in metadata.
+- jina-embeddings-v5-text-small and jina-embeddings-v5-omni-small: dimensions 1,024,
+  choices 32/64/128/256/512/1024, input 32,768 tokens.
+- jina-embeddings-v5-text-nano and jina-embeddings-v5-omni-nano: dimensions 768,
+  choices 32/64/128/256/512/768, input 8,192 tokens.
+- jina-reranker-v3, jina-reranker-v3.5, jina-reranker-m0 and
+  jina-reranker-v2-base-multilingual: native top_n, unknown per-document/count limits.
+  v3.5's shared context window is not a per-document limit.
+
+Omni IDs are included only for their text-compatible operation. This subset does not
+expand Python's existing model inventory.
 
 ## Watchlist
-- **Not yet live-verified** — first live lane confirms the embeddings response shape,
-  error bodies, and usage fields.
-- The clustering→`separation` mapping, should Jina document its tasks more precisely.
-- `late_chunking`, multimodal inputs (v4/m0 and v5-omni), quantized
-  `embedding_type` values — unmodelled; reachable via `provider_options`.
-- A listing endpoint, if one appears.
+
+- **Not yet live-verified:** first hosted lane must confirm response/error/usage and v5 task
+  behavior. No credentials or hosted spending used for documentation evidence.
+- Documented model discovery remains unimplemented in this bounded SDK subset.
+- Prompt/modality usage, multimodal inputs, sparse/quantized/multivector outputs and batch
+  endpoints remain outside normalized text retrieval.
+- Resolve generic-task versus model-schema and RPM/TPM source conflicts explicitly.

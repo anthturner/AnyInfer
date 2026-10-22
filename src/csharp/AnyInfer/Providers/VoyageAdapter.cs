@@ -53,7 +53,7 @@ internal sealed class VoyageAdapter : IEmbedsText, IReranksText, IProviderLifecy
         try
         {
             var status = await SendAsync(HttpMethod.Get, "models", null, "discover", null, 1024 * 1024, cancellationToken, static response => response.StatusCode, readBody: false).ConfigureAwait(false);
-            return new Health(true, $"endpoint reachable (HTTP {(int)status}; no listing API)");
+            return new Health(true, $"endpoint reachable (HTTP {(int)status}; reachability only)");
         }
         catch (ProviderException exception)
         {

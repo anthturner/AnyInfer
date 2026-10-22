@@ -11,7 +11,7 @@ supported public SDK and its generated Python API reference remains under
 | `EmbeddingRequest`, `EmbeddingResult`, `EmbeddingSpace` | Buffered ordered text embedding, its vectors, and their compatibility identity. |
 | `RerankRequest`, `RerankDocument`, `RerankResult`, `RankedItem` | Buffered query-to-document ranking with caller-owned document IDs and original indices. |
 | `BatchPolicy`, `BatchFailure` | Core-managed bounded batching controls and the failures retained when a batch operation fails. |
-| `IEmbedsText`, `IReranksText`, `InferenceOperation` | Optional retrieval adapter protocols; the built-in TEI and Voyage adapters declare embedding and rerank operations. |
+| `IEmbedsText`, `IReranksText`, `InferenceOperation` | Optional retrieval adapter protocols; the built-in TEI, Voyage, and Jina adapters declare embedding and rerank operations. |
 | `ProviderSettings` | Provider setup including an `env://` credential reference. |
 | `Route`, `Retry`, `Repair` | Routing, retry, and structured-output repair controls. |
 | `SchemaSpec`, `SchemaValidator`, `SchemaValidationOptions` | Modern schema specification, validation, and explicit resource controls. |
@@ -36,7 +36,7 @@ own-transport descriptor, or an opaque prebuilt registration with an active inje
 an outer slot before entry; this is not a universal provider transport guarantee.
 
 The proof demonstrates text generation through the chat-only OpenAI-compatible adapter and
-buffered text embedding and reranking through the built-in TEI or Voyage adapter or optional
+buffered text embedding and reranking through the built-in TEI, Voyage, or Jina adapter or optional
 application-owned retrieval adapters. Retrieval results
 carry reported usage, timing, attempts, warnings, optional raw payloads, and manifests just as
 their operation permits. `operationRoutes` can provide embedding or rerank defaults without
@@ -45,10 +45,10 @@ provider batch ceilings do not cause guessed splitting;
 `BatchPolicy` supplies an explicit override when the application has verified a limit. It has no
 released NuGet package, full provider-parity guarantee, provider invoice or all-wire accounting,
 automatic tool execution, rich-media input breadth, context/history reduction, or production
-report publication. Generic OpenAI-compatible and Jina retrieval remain unimplemented in this
+report publication. Generic OpenAI-compatible retrieval remains unimplemented in this
 proof. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
 deployment on 2026-10-22. Voyage's built-in adapter has offline scripted-handler evidence only;
-hosted Voyage traffic has not been live-verified.
+hosted Voyage traffic has not been live-verified. Jina's built-in adapter has offline scripted-handler evidence only; hosted Jina traffic has not been live-verified.
 
 Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12. Draft 3 and Draft 4
 remain deferred. Numeric and regular-expression behavior is native to .NET, regular-expression

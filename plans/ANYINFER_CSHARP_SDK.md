@@ -897,6 +897,10 @@ must report a real conflict rather than silently changing a dependent public sig
   > all 22 primary gates, 844 unit/93 conformance tests, clean registered Python/C#
   > producers/aggregation, preserved shared profiles, Frozen 102 and packaged consumers.
   > Hosted Voyage traffic remains unverified; other SDK.6c providers remain open.
+  > Continued on 2026-10-22 with `ANYINFER_CSHARP_SDK_JINA.md`: native text retrieval
+  > plus evidence-backed v4/v5 task corrections in both SDKs. Current-schema research
+  > is complete; all22 primary gates and independent source/control reviews pass.
+  > Clean-source registered producer/aggregate acceptance remains in the Jina leaf.
 
 ### SDK.7 — Rich generation, tools and multimodal input
 

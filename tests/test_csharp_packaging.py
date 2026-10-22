@@ -414,6 +414,27 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "reranked.Usage.TotalTokens != 7" in source
     assert "sealed class VoyageHandler : HttpMessageHandler" in source
     assert "sealed class VoyageHandler : IEmbedsText" not in source
+    assert '"jina", apiKey: "offline-jina-key", transport: jinaHandler,' in source
+    assert 'alias: "jina-retrieval");' in source
+    assert 'target: "jina-retrieval:jina-embeddings-v5-text-small"' in source
+    assert 'target: "jina-retrieval:jina-reranker-v3", topN: 1,' in source
+    assert "returnDocuments: true, retainRaw: true, manifest: true);" in source
+    assert "default Jina builtin retrieval witness failed" in source
+    assert "default Jina builtin transport ownership failed" in source
+    jina_block = source.split("var jinaHandler = new JinaHandler();", 1)[1].split(
+        "var trustedAccounting", 1
+    )[0]
+    voyage_block = source.split("var voyageAsyncHandler = new VoyageHandler();", 1)[1].split(
+        "var jinaHandler = new JinaHandler();", 1
+    )[0]
+    assert "HasPromptTokens(embedded.Raw)" in jina_block
+    assert "HasPromptTokens(reranked.Raw)" in jina_block
+    assert "HasPromptTokens" not in voyage_block
+    assert 'usage.TryGetValue("prompt_tokens", out var promptTokens)' in source
+    assert "promptTokens is JsonInteger integer" in source
+    assert "integer.Value == 7" in source
+    assert "sealed class JinaHandler : HttpMessageHandler" in source
+    assert "sealed class JinaHandler : IEmbedsText" not in source
     assert 'request.Headers.Accept.Single().MediaType != "application/json"' in source
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source

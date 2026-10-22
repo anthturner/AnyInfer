@@ -500,6 +500,40 @@ var voyageSyncSettings = ProviderSettings.Of(
 if (voyageSyncHandler.RequestCount != 2 || voyageSyncHandler.DisposeCount != 1)
     throw new InvalidOperationException("default Voyage sync builtin transport ownership failed");
 
+var jinaHandler = new JinaHandler();
+var jinaSettings = ProviderSettings.Of("jina", apiKey: "offline-jina-key", transport: jinaHandler,
+    alias: "jina-retrieval");
+{
+    await using var client = new AsyncClient([jinaSettings], manifests: true);
+    var embedded = await client.EmbedAsync(
+        ["first", "second"],
+        target: "jina-retrieval:jina-embeddings-v5-text-small",
+        inputType: EmbeddingInputIntent.Document,
+        retainRaw: true, manifest: true);
+    var reranked = await client.RerankAsync("find first",
+        [new RerankDocument("first-id", "first"), new RerankDocument("second-id", "second")],
+        target: "jina-retrieval:jina-reranker-v3", topN: 1,
+        returnDocuments: true, retainRaw: true, manifest: true);
+    if (embedded.Vectors.Count != 2 || !embedded.Vectors[0].Values.SequenceEqual([0.1, 0.2])
+        || embedded.Usage.InputTokens is not null
+        || embedded.Usage.OutputTokens is not null
+        || embedded.Usage.TotalTokens != 7
+        || embedded.Raw is null
+        || !HasPromptTokens(embedded.Raw)
+        || embedded.Manifest is not { Complete: true, Operation: "embedding", Payloads: null }
+        || reranked.Items.Count != 1
+        || reranked.Items[0] is not { Index: 1, DocumentId: "second-id", Score: 0.1 }
+        || reranked.Usage.InputTokens is not null
+        || reranked.Usage.OutputTokens is not null
+        || reranked.Usage.TotalTokens != 7
+        || reranked.Raw is null
+        || !HasPromptTokens(reranked.Raw)
+        || reranked.Manifest is not { Complete: true, Operation: "rerank", Payloads: null })
+        throw new InvalidOperationException("default Jina builtin retrieval witness failed");
+}
+if (jinaHandler.RequestCount != 2 || jinaHandler.DisposeCount != 1)
+    throw new InvalidOperationException("default Jina builtin transport ownership failed");
+
 var trustedAccounting = new ModelCapabilities(
     pricing: new Sourced<Pricing>(
         new Pricing(EDecimal.FromString("2"), EDecimal.FromString("4")),
@@ -945,6 +979,13 @@ if (syncTelemetryAdapter.DisposeCount != 1 || syncObserver.DisposeCount != 0)
     throw new InvalidOperationException("sync telemetry ownership or adapter disposal failed");
 syncObserver.Dispose();
 
+static bool HasPromptTokens(JsonValue? raw) => raw is JsonObject payload
+    && payload.TryGetValue("usage", out var usageValue)
+    && usageValue is JsonObject usage
+    && usage.TryGetValue("prompt_tokens", out var promptTokens)
+    && promptTokens is JsonInteger integer
+    && integer.Value == 7;
+
 sealed class RetrievalAdapter : IEmbedsText, IReranksText, IAsyncDisposable
 {
     public int EmbeddingCalls { get; private set; }
@@ -1300,6 +1341,66 @@ sealed class VoyageHandler : HttpMessageHandler
             + "\\"usage\\":{\\"total_tokens\\":7}}");
     }
 
+    private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(body, Encoding.UTF8, "application/json"),
+    };
+}
+sealed class JinaHandler : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = request.Content is null
+            ? ""
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        using var json = JsonDocument.Parse(body);
+        if (request.Method != HttpMethod.Post || request.Headers.Authorization?.Scheme != "Bearer"
+            || request.Headers.Authorization.Parameter != "offline-jina-key"
+            || request.Headers.Accept.Single().MediaType != "application/json"
+            || request.Content?.Headers.ContentType?.MediaType != "application/json")
+            throw new InvalidOperationException("Jina builtin used unexpected HTTP fields");
+        return request.RequestUri?.AbsolutePath switch
+        {
+            "/v1/embeddings" => Embeddings(json.RootElement),
+            "/v1/rerank" => Rerank(json.RootElement),
+            _ => throw new InvalidOperationException(
+                "Jina builtin used an unexpected request path"),
+        };
+    }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+    private static HttpResponseMessage Embeddings(JsonElement request)
+    {
+        if (request.GetProperty("model").GetString() != "jina-embeddings-v5-text-small"
+            || request.GetProperty("task").GetString() != "retrieval.passage"
+            || !request.GetProperty("input").EnumerateArray()
+                .Select(static item => item.GetString())
+                .SequenceEqual(["first", "second"]))
+            throw new InvalidOperationException(
+                "Jina builtin lost embedding values or task mapping");
+        return Json("{\\\"data\\\":[{\\\"index\\\":1,\\\"embedding\\\":[0.3,0.4]},"
+            + "{\\\"index\\\":0,\\\"embedding\\\":[0.1,0.2]}],"
+            + "\\\"usage\\\":{\\\"total_tokens\\\":7,\\\"prompt_tokens\\\":7}}");
+    }
+    private static HttpResponseMessage Rerank(JsonElement request)
+    {
+        if (request.GetProperty("model").GetString() != "jina-reranker-v3"
+            || request.GetProperty("query").GetString() != "find first"
+            || request.GetProperty("top_n").GetInt32() != 1
+            || !request.GetProperty("documents").EnumerateArray()
+                .Select(static item => item.GetString())
+                .SequenceEqual(["first", "second"]))
+            throw new InvalidOperationException("Jina builtin lost rerank values or native top_n");
+        return Json("{\\\"results\\\":[{\\\"index\\\":1,\\\"relevance_score\\\":0.1}],"
+            + "\\\"usage\\\":{\\\"total_tokens\\\":7,\\\"prompt_tokens\\\":7}}");
+    }
     private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(body, Encoding.UTF8, "application/json"),

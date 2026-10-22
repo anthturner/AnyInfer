@@ -207,6 +207,18 @@ static async Task VerifyAsync()
     Require(syncVoyageHandler.RequestCount == 2 && syncVoyageHandler.DisposeCount == 1,
         "Synchronous Voyage example did not retain transport ownership.");
 
+    var asyncJinaHandler = new JinaScriptedHandler();
+    var asyncJina = await JinaExample.RunAsync(JinaExample.Settings(asyncJinaHandler, "offline-jina-key"));
+    RequireJinaObservation(asyncJina, "Asynchronous", expectedInputCount: 2);
+    Require(asyncJinaHandler.RequestCount == 2 && asyncJinaHandler.DisposeCount == 1,
+        "Asynchronous Jina example did not retain transport ownership.");
+
+    var syncJinaHandler = new JinaScriptedHandler();
+    var syncJina = JinaExample.Run(JinaExample.Settings(syncJinaHandler, "offline-jina-key"));
+    RequireJinaObservation(syncJina, "Synchronous", expectedInputCount: 1);
+    Require(syncJinaHandler.RequestCount == 2 && syncJinaHandler.DisposeCount == 1,
+        "Synchronous Jina example did not retain transport ownership.");
+
     var telemetryHandler = new CountingHandler();
     var telemetry = await TelemetryExample.RunAsync(WithTransport(displayedSettings, telemetryHandler), target);
     Require(telemetry.Generation.Text == "hello"
@@ -411,6 +423,38 @@ static void RequireVoyageObservation(VoyageObservation observation, string lane,
         && observation.Reranking.Manifest is { Complete: true, Operation: "rerank", Payloads: null },
         $"{lane} Voyage example did not preserve public result, total-only usage, provider order, or manifest privacy.");
 }
+
+static void RequireJinaObservation(JinaObservation observation, string lane, int expectedInputCount)
+{
+    Require(observation.Embeddings.Target.ProviderId == "jina-retrieval"
+        && observation.Embeddings.Target.Model == "jina-embeddings-v5-text-small"
+        && observation.Embeddings.Vectors.Count == expectedInputCount
+        && observation.Embeddings.Vectors[0].Values.SequenceEqual(expectedInputCount == 2 ? [0.1, 0.2] : [0.5, 0.6])
+        && observation.Embeddings.Usage.InputTokens is null
+        && observation.Embeddings.Usage.OutputTokens is null
+        && observation.Embeddings.Usage.TotalTokens == 7
+        && observation.Embeddings.Raw is not null
+        && HasPromptTokens(observation.Embeddings.Raw)
+        && observation.Embeddings.Manifest is { Complete: true, Operation: "embedding", Payloads: null }
+        && observation.Reranking.Target.ProviderId == "jina-retrieval"
+        && observation.Reranking.Target.Model == "jina-reranker-v3"
+        && observation.Reranking.Items.Count == 1
+        && observation.Reranking.Items[0] is { Index: 1, DocumentId: "lighthouse", Score: 0.1 }
+        && observation.Reranking.Usage.InputTokens is null
+        && observation.Reranking.Usage.OutputTokens is null
+        && observation.Reranking.Usage.TotalTokens == 7
+        && observation.Reranking.Raw is not null
+        && HasPromptTokens(observation.Reranking.Raw)
+        && observation.Reranking.Manifest is { Complete: true, Operation: "rerank", Payloads: null },
+        $"{lane} Jina example did not preserve public result, total-only usage, provider order, or manifest privacy.");
+}
+
+static bool HasPromptTokens(JsonValue? raw) => raw is JsonObject payload
+    && payload.TryGetValue("usage", out var usageValue)
+    && usageValue is JsonObject usage
+    && usage.TryGetValue("prompt_tokens", out var promptTokens)
+    && promptTokens is JsonInteger integer
+    && integer.Value == 7;
 
 sealed class CountingHandler(
     HttpStatusCode statusCode = HttpStatusCode.OK,

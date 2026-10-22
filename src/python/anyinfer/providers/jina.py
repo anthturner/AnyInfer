@@ -2,12 +2,12 @@
 
 A specialist retrieval provider: embeddings and reranking, no generation. The
 embeddings API is OpenAI-*shaped* but carries Jina's own ``task`` vocabulary and
-``late_chunking``, and there is no model-listing endpoint — a dedicated adapter, not a
-preset.
+``late_chunking``. Jina documents a model-listing endpoint, but this bounded SDK subset
+keeps manual model selection and empty discovery — a dedicated adapter, not a preset.
 
-Jina's task vocabulary covers all four normalized intents: ``retrieval.query``,
-``retrieval.passage``, ``classification``, and ``separation`` — the last being Jina's
-clustering-flavored task, a deliberate mapping recorded in the contract snapshot.
+Jina v3's task vocabulary covers all four normalized intents: ``retrieval.query``,
+``retrieval.passage``, ``classification``, and ``separation``. V4 accepts only query and
+document, while the four known v5 models use their model-specific ``clustering`` spelling.
 """
 
 from __future__ import annotations
@@ -51,11 +51,23 @@ _TASKS: Mapping[str, str] = {
     "classification": "classification",
     "clustering": "separation",
 }
-"""Normalized intents mapped onto Jina ``task`` values (verified 2026-08-12).
+"""Normalized intents mapped onto Jina ``task`` values.
 
-``separation`` is Jina's clustering-flavored task — a deliberate mapping, recorded in
-`contracts/jina.md` rather than left implicit.
+The model-specific v5 clustering exception is applied in `_build_embedding_payload`.
 """
+
+_V5_CLUSTERING_MODELS = frozenset(
+    {
+        "jina-embeddings-v5-text-small",
+        "jina-embeddings-v5-text-nano",
+        "jina-embeddings-v5-omni-small",
+        "jina-embeddings-v5-omni-nano",
+    }
+)
+"""Known v5 IDs whose model-specific task enum spells clustering literally."""
+
+_V4_INPUT_INTENTS = frozenset({"query", "document"})
+"""Jina v4's documented embedding-task subset."""
 
 
 class JinaAdapter(OpenAIShapedRetrievalMixin):
@@ -90,8 +102,16 @@ class JinaAdapter(OpenAIShapedRetrievalMixin):
     def _build_embedding_payload(self, req: EmbeddingWireRequest) -> dict[str, Any]:
         """Build ``POST /v1/embeddings`` body in Jina's own dialect."""
         payload: dict[str, Any] = {"model": req.model, "input": list(req.inputs)}
-        if req.input_type is not None and req.input_type in _TASKS:
-            payload["task"] = _TASKS[req.input_type]
+        if (
+            req.input_type is not None
+            and req.input_type in _TASKS
+            and (req.model != "jina-embeddings-v4" or req.input_type in _V4_INPUT_INTENTS)
+        ):
+            payload["task"] = (
+                "clustering"
+                if req.input_type == "clustering" and req.model in _V5_CLUSTERING_MODELS
+                else _TASKS[req.input_type]
+            )
         if req.dimensions is not None:
             payload["dimensions"] = req.dimensions
         payload.update(req.extra_options)
@@ -135,9 +155,7 @@ class JinaAdapter(OpenAIShapedRetrievalMixin):
             raise ProviderError("rerank response is not a JSON object", phase="validate")
         data = payload.get("results")
         if not isinstance(data, list):
-            raise ProviderError(
-                "rerank response is missing a 'results' array", phase="validate"
-            )
+            raise ProviderError("rerank response is missing a 'results' array", phase="validate")
         items: list[WireRankedItem] = []
         for entry in data:
             if not isinstance(entry, Mapping):
@@ -147,9 +165,7 @@ class JinaAdapter(OpenAIShapedRetrievalMixin):
             position = entry.get("index")
             score = entry.get("relevance_score")
             if not isinstance(position, int) or isinstance(position, bool):
-                raise ProviderError(
-                    "rerank entry is missing an integer 'index'", phase="validate"
-                )
+                raise ProviderError("rerank entry is missing an integer 'index'", phase="validate")
             if not isinstance(score, int | float) or isinstance(score, bool):
                 raise ProviderError(
                     "rerank entry is missing a numeric 'relevance_score'", phase="validate"
@@ -177,8 +193,8 @@ _STATIC_EMBEDDING_CAPABILITIES = {
     # 2026-08-12. No per-request input ceiling is documented ("batches internally"), so
     # max_batch_inputs stays None — over-ceiling requests refuse locally rather than
     # split at a guessed size. Default dimensions are not uniformly stated; None.
-    model: EmbeddingCapabilities(input_intents=_EMBED_INTENTS)
-    for model in ("jina-embeddings-v4", "jina-embeddings-v3")
+    "jina-embeddings-v3": EmbeddingCapabilities(input_intents=_EMBED_INTENTS),
+    "jina-embeddings-v4": EmbeddingCapabilities(input_intents=("query", "document")),
 }
 _STATIC_EMBEDDING_CAPABILITIES.update(
     {
