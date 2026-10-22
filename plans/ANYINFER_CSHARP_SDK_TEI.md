@@ -441,6 +441,16 @@ ticks only its assigned boxes after its gate and adds a `> NOTE:` for deviations
 > in its own held await rather than a separate registration subject to callback ordering.
 > The repeated root gate passes all 22 steps in 137.5s, with 815 unit and 93 conformance
 > tests. Source commit and isolated clean-source replay are the remaining TEI.8 work.
+>
+> Initial source commit `3834e8e7387bf26637f5965a77ffd5125b0f82fb` passed the primary
+> full gate but its isolated clean replay exposed a prebuilt-exporter dependency. The Python
+> suite ran native controls before the native build, and the native shape step also assumed
+> its non-test executable was built by `dotnet test`. Clean replay is not accepted for that
+> commit. The existing native inventory step now builds the solution and executes all five
+> exporter controls; Python checks only that boundary. The 9/22 step counts are unchanged.
+> A new source checkpoint and full clean replay are required.
+> The corrected native-boundary gate has clean independent review and the repeated root
+> full gate passes all 22 steps in 156.1s. Clean replay of the correction is still required.
 
 ## 6. Integration and evidence rules
 

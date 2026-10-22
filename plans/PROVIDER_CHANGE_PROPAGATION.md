@@ -496,6 +496,13 @@ current test or release claim is implied by this plan.
   > The exact test-only fixes have clean cold review; the repeated full 22-step root gate
   > passes in 137.5s, including 815 native unit and 93 conformance tests. Commit and isolated
   > clean-source replay remain open; no remote workflow or qualified release is claimed.
+  > Clean replay of initial source `3834e8e7387bf26637f5965a77ffd5125b0f82fb` then exposed
+  > the exporter's hidden prebuild assumption. Its five executable controls now live in the
+  > existing native inventory gate after an explicit solution build; the ordinary Python
+  > suite has no .NET dependency. Counts remain 9 C# / 22 total. Targeted boundary and native
+  > checker runs pass; full verification of a new source checkpoint remains required.
+  > The corrected boundary has clean cold review; root's repeated full 22-step gate passes
+  > in 156.1s. Isolated verification of the next committed source checkpoint remains open.
 
 ## Work ownership and sequencing
 
