@@ -562,6 +562,7 @@ def validate(
     }
     if candidate_report is not None:
         report["candidate_qualification"] = candidate_report
+    _validate(report, "run-report.schema.json")
     return report
 
 

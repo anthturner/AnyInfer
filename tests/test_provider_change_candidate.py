@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -323,6 +324,33 @@ def test_generic_non_v0_candidate_qualifies_only_with_independent_context(tmp_pa
     candidate = _candidate(tmp_path, paths[0], paths[1], paths[2])
     report = CHECKER.validate(*paths, candidate_evidence=candidate)
     assert report["candidate_qualification"]["release_id"] == "synthetic-r1"
+
+
+def test_candidate_cli_writes_a_schema_valid_aggregate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _base(tmp_path)
+    candidate = _candidate(tmp_path, paths[0], paths[1], paths[2])
+    output = tmp_path / "aggregate.json"
+    arguments = [
+        "check_provider_change.py",
+        "--input",
+        str(paths[0]),
+        "--registry",
+        str(paths[1]),
+        "--context",
+        str(paths[2]),
+    ]
+    for path in paths[3]:
+        arguments.extend(["--inventory", str(path)])
+    for path in paths[4]:
+        arguments.extend(["--verification", str(path)])
+    arguments.extend(["--candidate-evidence", str(candidate), "--output", str(output)])
+    monkeypatch.setattr(sys, "argv", arguments)
+    assert CHECKER.main() == 0
+    result, _ = CHECKER.read_json(output)
+    CHECKER._validate(result, "run-report.schema.json")
+    assert result["candidate_qualification"]["report_count"] == 1
 
 
 def test_candidate_accepts_an_inventory_eligible_extension_with_evidence(tmp_path: Path) -> None:

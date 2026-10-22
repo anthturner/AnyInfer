@@ -503,6 +503,13 @@ current test or release claim is implied by this plan.
   > checker runs pass; full verification of a new source checkpoint remains required.
   > The corrected boundary has clean cold review; root's repeated full 22-step gate passes
   > in 156.1s. Isolated verification of the next committed source checkpoint remains open.
+  > Clean source `52149c8204970d6e3f14db13ed7b22de9de14a76` passes all 22 steps in
+  > 153.2s, Frozen102 development and the native live probe. A final CLI-path audit then
+  > found that the derived candidate summary was absent from the closed aggregate schema.
+  > The schema now permits only its existing release ID, manifest hash and positive report
+  > count; validate() checks its returned report for API/CLI/CI alike. The real CLI positive
+  > and cold review pass (43 focused passes, one Windows capability skip), and root's full
+  > gate passes in 155.5s. Final clean replay must name the checkpoint including this fix.
 
 ## Work ownership and sequencing
 
