@@ -1544,11 +1544,15 @@ accepting batch, routes, retention or manifest options it cannot honor.
   against current upstream material for TEI or any later retrieval provider. Produce a new
   concrete wire contract, response/cancellation/error mapping and disjoint binding brief.
   Generic OpenAI compatibility remains chat-only. Gate: root accepts research and a separate
-  implementation plan. This is not a completed wire plan and authorizes no adapter edit.
+  implementation plan. This umbrella box stays open for later providers; each accepted
+  child plan authorizes only its named binding.
   > NOTE: TEI is selected first (2026-10-22). The user authorized implementation of
   > `ANYINFER_CSHARP_SDK_TEI.md` and the propagation plan in parallel. Native retrieval,
   > Python refresh, focused controls and full clean-source acceptance now pass at
   > `af5d0d64840cb8ec81ecdcb92acb9a457958d814`. Other provider bindings remain open.
+  > Voyage subsequently completes `ANYINFER_CSHARP_SDK_VOYAGE.md` at source
+  > `289f8427b29fd769110ad669bf44b86efcaeb623`, preserving shared/Frozen observations.
+  > Its hosted live evidence remains unverified. Remaining provider preflights stay open.
 
 ## 8. Preservation and final evidence
 
@@ -1558,7 +1562,8 @@ accepting batch, routes, retention or manifest options it cannot honor.
   an explicit commit and clean revision. Parent SDK.6 boxes change only after these gates.
   > NOTE: Closed for the implemented SDK.6a/b scope at 03f26fc, with all 21 clean workspace
   > steps, 102 Frozen observations and the clean paired/profile/package proofs above.
-  > No SDK.6c binding is implemented or accepted; its later work repeats applicable gates.
+  > No SDK.6c binding was implemented at that checkpoint; later binding work repeats
+  > applicable gates independently.
 
 Non-goals: vector databases, persistence, ANN indexing, automatic context embedding,
 model training, multimodal vectors, streaming vector/rerank output, a fake generation
@@ -1570,11 +1575,15 @@ of unapproved rerank batch scores.
 SDK.6a/b are complete at clean source checkpoint
 `03f26fc88c7c96ff8272e99dadee8c6a26fa0616` (implementation 131c7aa, two narrow checkout-LF
 fixes thereafter). Resume **6c.0 — retrieval provider research preflight**, corresponding
-to the parent **SDK.6c**. That work is separate; its reviewed TEI draft is described below.
+to the parent **SDK.6c**. Completed provider tranches are recorded below; remaining
+providers require their own research preflight.
 
-The authorized leaf is `ANYINFER_CSHARP_SDK_TEI.md`, covering native C# TEI and Python
-requalification together. It is complete at clean verified source
-`af5d0d64840cb8ec81ecdcb92acb9a457958d814`; SDK.6c remains unchecked for its other providers.
+The TEI leaf `ANYINFER_CSHARP_SDK_TEI.md` is complete at clean verified source
+`af5d0d64840cb8ec81ecdcb92acb9a457958d814`. The Voyage leaf
+`ANYINFER_CSHARP_SDK_VOYAGE.md` is complete at accepted source
+`289f8427b29fd769110ad669bf44b86efcaeb623`: all 22 primary gates, clean registered
+producers/aggregation, shared profiles and Frozen 102 pass. Hosted Voyage remains
+unverified; SDK.6c stays unchecked for the remaining provider bindings.
 
 All 21 clean workspace steps pass in 167.6s at `.tmp-tests/sdk-six-clean-03f26fc/`, including
 791 native unit/93 conformance cases, compiled offline examples, strict docs and isolated

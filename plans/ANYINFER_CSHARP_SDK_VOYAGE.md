@@ -110,12 +110,15 @@ offline handler evidence is labelled as such.
   > `.tmp-tests/voyage-native-final/`. Shared inputs and responses are independently
   > consumed; malformed-score controls pre-parse their JSON. Subsequent redaction setup
   > explicitly registers its own secret and exercises the real health-detail bound.
-- [ ] **VOY.3** Root integrates exact exporter dependency mapping and native inventory
+- [x] **VOY.3** Root integrates exact exporter dependency mapping and native inventory
   expected rows for `voyage` embedding/rerank; public registry controls reflect achieved
   count. New immutable `maintenance/changes/voyage-native-binding.json` uses adopted
   inference embedding/rerank and no_delta rationale plus all applicable gates; the existing
   TEI declaration remains byte-identical. Gate: schema/FormatChecker and native inventory
   actual metadata controls; pure propagation planning accepts honest current inventory.
+  > NOTE: The clean controlled pipeline emits 129 Python and five C# bindings, runs
+  > all five mandatory registered gates, and passes pure aggregation. Both inventories,
+  > both verification files and aggregate agree on run/source/input/registry identity.
 - [x] **VOY.4** Delivery owner: executable `examples/csharp-sdk/VoyageExample.cs`, invoke
   it from existing Program; same public builtin witness in isolated NuGet consumer
   `scripts/check_csharp_package.py` plus its source tests. Update
@@ -138,15 +141,27 @@ offline handler evidence is labelled as such.
   > `.tmp-tests/voyage-workspace/workspace.txt` is the retained full log. Explicit Frozen
   > development output `.tmp-tests/voyage-frozen-primary.json` has 102 pass, zero
   > fail/error/unavailable. Cold reviews close all findings; no released asset changed.
-- [ ] **VOY.6** Root explicit-path commit after full gate, fresh clean checkout execution
+- [x] **VOY.6** Root explicit-path commit after full gate, fresh clean checkout execution
   with import provenance, isolated package/native/profile evidence, then plans-only
   acceptance closure. Record exact source/tree/evidence and remaining SDK.6c providers.
   Gate: clean source and no fabricated qualification; no remote publication.
+  > NOTE: Accepted source `289f8427b29fd769110ad669bf44b86efcaeb623`, tree
+  > `2e43e85be2f8fcb8c6feb709f67af8d00c0a5ed5`. Clean run
+  > `local-voyage-289f8427-20261022T175423Z` attempt 1 passes the actual registered
+  > Python/C# producers and aggregate with dirty=false. All prior native comparisons,
+  > source-stamped package-only consumer, examples and 102 Frozen observations pass.
+  > Retained packet: `.tmp-tests/voyage-acceptance/source-289f842/`; an independent
+  > read-only audit verifies child hashes, five exit-0 gates and all source bindings.
+  > The primary full 22-step gate above is development evidence; clean acceptance runs
+  > the registered behavioral gates once rather than fabricating verification wrappers.
+  > Temporary checkout contents/registration were removed after retention; Windows holds
+  > its empty root directory. Hosted Voyage remains unverified; no package/spec release.
 
 ## Resume
 
-VOY.3/VOY.6 at baseline `c5b274d0445a0ac9ec36792e1f4606bc5797133b`: source and
-all 22 primary gates pass. Commit explicit source paths, then run actual registered
-Python/C# producers and pure aggregation against this declaration from a clean checkout,
-with import provenance, native profiles/package/examples and Frozen development proof.
-Preserve user-owned `uv.lock`, `v/`, and `.pytest_cache/v`.
+All boxes in this leaf are complete at accepted source
+`289f8427b29fd769110ad669bf44b86efcaeb623`. Resume parent **SDK.6c** with the remaining
+provider bindings after current research and an accepted per-binding plan. TEI and Voyage
+are complete bounded tranches; generic OpenAI-compatible remains chat-only. Full-library
+parity and public release remain open. User-owned `uv.lock`, `v/`, and `.pytest_cache/v`
+were preserved; old foundational releases and accepted profile bytes are unchanged.

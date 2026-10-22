@@ -893,6 +893,10 @@ must report a real conflict rather than silently changing a dependent public sig
   > `ANYINFER_CSHARP_SDK_VOYAGE.md`: a complete native Voyage embedding/rerank binding,
   > current documented wire facts, independent Python/native controls, and public
   > consumers. No released foundational asset changes; hosted live evidence is unverified.
+  > Voyage is complete at accepted source `289f8427b29fd769110ad669bf44b86efcaeb623`:
+  > all 22 primary gates, 844 unit/93 conformance tests, clean registered Python/C#
+  > producers/aggregation, preserved shared profiles, Frozen 102 and packaged consumers.
+  > Hosted Voyage traffic remains unverified; other SDK.6c providers remain open.
 
 ### SDK.7 — Rich generation, tools and multimodal input
 
@@ -991,9 +995,13 @@ fixture hashes and comparison policy are unchanged. The retrieval leaf records e
 independent reviews and preserved failures. SDK.6c requires current provider research and
 a separate accepted binding plan before implementation; generic compatibility stays chat-only.
 
-The current authorized lane is `ANYINFER_CSHARP_SDK_TEI.md`: TEI 1.9.4 for both the new
-C# binding and refreshed Python live evidence. Its clean-source acceptance is complete at
-`af5d0d64840cb8ec81ecdcb92acb9a457958d814`; continue SDK.6c with the remaining providers.
+The TEI lane `ANYINFER_CSHARP_SDK_TEI.md` is complete at
+`af5d0d64840cb8ec81ecdcb92acb9a457958d814`. The next lane,
+`ANYINFER_CSHARP_SDK_VOYAGE.md`, is complete at accepted source
+`289f8427b29fd769110ad669bf44b86efcaeb623`: native embeddings/rerank, independent
+Python/native wire controls, all 22 primary gates and clean registered maintenance
+aggregation pass. Existing shared profiles and Frozen 102 remain unchanged. Hosted
+Voyage traffic is unverified; continue SDK.6c with the remaining providers.
 
 SDK.5c is complete at source checkpoint
 `97e8937c281063582c282f313a35b91761293500`: all 20 workspace steps in 147.6s,
