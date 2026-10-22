@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "id": "tei-1-9-4",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/huggingface/text-embeddings-inference/v1.9.4/docs/openapi.json",
+      "fetched_at": "2026-10-22",
+      "version_pin": "Text Embeddings Inference v1.9.4"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/huggingface/text-embeddings-inference/v1.9.4/router/src/http/server.rs",
+      "fetched_at": "2026-10-22",
+      "version_pin": "Text Embeddings Inference v1.9.4"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/huggingface/text-embeddings-inference/v1.9.4/router/src/main.rs",
+      "fetched_at": "2026-10-22",
+      "version_pin": "Text Embeddings Inference v1.9.4"
+    },
+    {
+      "url": "https://github.com/huggingface/text-embeddings-inference/releases/tag/v1.9.4",
+      "fetched_at": "2026-10-22",
+      "version_pin": "ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.4@sha256:8419f533857b503ebf6ec292a95d4f1cf9c0464ac8b8abeef39518cf110e5726"
+    },
+    {
+      "url": "https://huggingface.co/api/models/BAAI/bge-small-en-v1.5/revision/5c38ec7c405ec4b44b94cc5a9bb96e735b38267a?blobs=true",
+      "fetched_at": "2026-10-22",
+      "version_pin": "BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+    },
+    {
+      "url": "https://huggingface.co/api/models/BAAI/bge-reranker-base/revision/2cfc18c9415c912f9d8155881c133215df768a70?blobs=true",
+      "fetched_at": "2026-10-22",
+      "version_pin": "BAAI/bge-reranker-base@2cfc18c9415c912f9d8155881c133215df768a70"
+    }
+  ],
+  "disposition": "adopted",
+  "changes": [
+    {
+      "contract_id": "contracts/tei.md",
+      "scope": "inference",
+      "operations": [
+        "embedding",
+        "rerank"
+      ],
+      "summary": "Adopt the verified TEI 1.9.4 wire-contract refresh and add the native C# TEI embedding and rerank binding. Preserve the existing normalized buffered operation behavior; keep provider runtime acquisition outside the adapter."
+    }
+  ],
+  "shared_spec": {
+    "impact": "no_delta",
+    "rationale": "The change updates a provider-specific wire contract, requalifies existing Python TEI behavior, and adds a C# translation binding for the already represented buffered embedding and rerank operations. It does not change normalized request/result semantics, the shared normative specification, schemas, fixtures, case inventory, or any frozen release asset; the existing buffered retrieval corpus remains unchanged. No normative specification paths are modified, so no candidate release is proposed."
+  },
+  "implementations": [
+    {
+      "implementation_id": "anyinfer-python",
+      "status": "updated",
+      "rationale": "Updates the existing Python TEI contract and cassette evidence for the pinned v1.9.4 runtime while preserving normalized adapter behavior. The Python adapter source remains unchanged; this declaration records affected paths and required registered gates, not test outcomes or qualification state.",
+      "owned_paths": [
+        "contracts/tei.md",
+        "src/python/anyinfer/providers/tei.py",
+        "tests/test_tei.py",
+        "tests/test_tei_cassettes.py",
+        "tests/cassettes/tei_embed.json",
+        "tests/cassettes/tei_info.json",
+        "tests/cassettes/tei_rerank.json",
+        "docs/providers/tei.md"
+      ],
+      "required_gate_ids": [
+        "python-contracts",
+        "python-fixtures",
+        "python-conformance",
+        "python-tests"
+      ]
+    },
+    {
+      "implementation_id": "anyinfer-csharp",
+      "status": "updated",
+      "rationale": "Adds the built-in C# TEI embedding and rerank binding, its offline controls, public consumer, and probe source against the shared refreshed contract. The native live public-API probe remains pending; this declaration makes no claim of final native live success, release qualification, or full provider parity.",
+      "owned_paths": [
+        "contracts/tei.md",
+        "tests/cassettes/tei_embed.json",
+        "tests/cassettes/tei_info.json",
+        "tests/cassettes/tei_rerank.json",
+        "src/csharp/AnyInfer/Providers/TeiAdapter.cs",
+        "src/csharp/AnyInfer/Providers/TeiHttpTransport.cs",
+        "src/csharp/AnyInfer/Providers/ProviderRegistry.cs",
+        "src/csharp/AnyInfer.Tests/TeiAdapterTests.cs",
+        "src/csharp/AnyInfer.Tests/TeiLifecycleTests.cs",
+        "src/csharp/AnyInfer.Tests/TeiCassetteTests.cs",
+        "src/csharp/AnyInfer.Tests/AnyInfer.Tests.csproj",
+        "src/csharp/AnyInfer.sln",
+        "src/csharp/AnyInfer.TeiProbe/AnyInfer.TeiProbe.csproj",
+        "src/csharp/AnyInfer.TeiProbe/Program.cs",
+        "examples/csharp-sdk/TeiExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "scripts/check_csharp_package.py",
+        "tests/test_csharp_packaging.py",
+        "docs/providers/tei.md",
+        "docs/guides/csharp-sdk.md",
+        "docs/reference/csharp-sdk.md",
+        "docs/guides/README.md",
+        "src/csharp/README.md"
+      ],
+      "required_gate_ids": [
+        "csharp-workspace"
+      ]
+    }
+  ]
+}

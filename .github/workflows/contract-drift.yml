@@ -57,6 +57,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       due: ${{ steps.select.outputs.due }}
+      report_sha256: ${{ steps.report.outputs.sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -88,16 +89,23 @@ jobs:
           name: contract-drift-report
           path: contract-drift-report.json
           if-no-files-found: warn
+      - name: bind the selection report bytes
+        id: report
+        shell: bash
+        run: |
+          sha256sum contract-drift-report.json | awk '{print "sha256=" $1}' >> "$GITHUB_OUTPUT"
 
   propose:
-    name: audit against upstream documentation and open a PR
+    name: audit against upstream documentation and prepare a proposal
     needs: check
     if: needs.check.outputs.due == 'true' || inputs.force_propose
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      baseline: ${{ steps.trusted.outputs.baseline }}
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      pull-requests: read
       id-token: write # exchange for the Claude GitHub App token
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -110,7 +118,12 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: contract-drift-report
-          path: drift-report
+          path: ${{ runner.temp }}/drift-report
+      - name: bind trusted proposal inputs
+        id: trusted
+        shell: bash
+        run: |
+          echo "baseline=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: audit the selected snapshots
         uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1
         with:
@@ -118,13 +131,13 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: "--allowedTools Bash,Read,Edit,Write,WebSearch,WebFetch"
           prompt: |
-            Read drift-report/contract-drift-report.json. Its `selected` array is the
+            Read `$RUNNER_TEMP/drift-report/contract-drift-report.json`. Its `selected` array is the
             immutable output of the deterministic stage and is the exact, complete list of
             snapshots to audit in this run. Do not add a snapshot it did not select, and
             do not skip one it did. If `selected` is empty, say so and stop.
 
-            Follow contracts/DRIFT-CHECK.md exactly — it is the canonical procedure and
-            this prompt does not restate it. For each selected snapshot, open that
+            Follow contracts/DRIFT-CHECK.md and contracts/PROPAGATE-CHANGE.md exactly — they
+            are the canonical procedures and this prompt does not restate them. For each selected snapshot, open that
             provider's OWN current public documentation and changelog and compare it
             against what the snapshot records: endpoints, auth headers, version pins,
             request fields sent, response fields read, streaming framing, and
@@ -144,16 +157,105 @@ jobs:
             - A snapshot the report marks `never_live_verified` is being checked against
               upstream for the first time. Expect real differences, and treat a
               suspiciously perfect match as a sign you read the wrong page.
-            - If a finding implies an adapter change, describe it in the pull request.
-              Do not change adapter code here: this workflow audits claims, and a wire
-              change needs its conformance case and its own review.
+            - A meaningful adopted finding may prepare one coordinated draft: the cited
+              contract snapshot, affected implementation and test changes, declared new
+              candidate assets when shared behavior changes, and an immutable
+              maintenance/changes declaration. Never create reference expectations,
+              qualification evidence, a release manifest, or a seal. New capabilities are
+              informational unless separately adopted with evidence.
+            - Blocked or incomplete meaningful work remains an honest draft with its
+              declaration; do not invent verification or claim qualification.
             - Run `python scripts/validate_contracts.py` after editing.
 
-            If any snapshot changed, create contract-drift/<today>, commit with a
-            per-provider summary of what moved, push it, and open a pull request against
-            develop titled "Contract drift audit <date>". The body must, for each audited
-            snapshot, cite the provider-owned pages you opened and state its
-            classification — including the ones that came back OK, since "we checked and
-            nothing moved" is the result that makes the rotation meaningful. List every
-            finding you left unapplied with the reason. Never auto-merge. If nothing
-            changed, print the summary and do not open a pull request.
+            Do not commit, push, or open a pull request. Leave a concise draft summary in
+            the working tree for the trusted workflow steps. If there is no meaningful
+            adopted, blocked, or incomplete change, leave the tree unchanged.
+      - name: capture untrusted proposed files
+        shell: bash
+        run: |
+          python scripts/check_provider_change_proposal.py \
+            --capture-bundle "$RUNNER_TEMP/proposed-files.json" \
+            --baseline "${{ steps.trusted.outputs.baseline }}"
+      - name: upload untrusted proposed files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: contract-drift-proposed-files
+          path: ${{ runner.temp }}/proposed-files.json
+          if-no-files-found: error
+
+  publish:
+    name: validate proposal and create guarded draft pull request
+    needs: [check, propose]
+    if: needs.propose.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.propose.outputs.baseline }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: install trusted publisher dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e .
+      - name: download the original selection report
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: contract-drift-report
+          path: ${{ runner.temp }}/drift-report
+      - name: download the untrusted proposed files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: contract-drift-proposed-files
+          path: ${{ runner.temp }}/proposed-files
+      - name: validate and materialize a trusted proposal
+        shell: bash
+        run: |
+          baseline="${{ needs.propose.outputs.baseline }}"
+          if [ "$(git rev-parse HEAD)" != "$baseline" ]; then
+            echo "Publisher checkout does not match the trusted proposal baseline." >&2
+            exit 1
+          fi
+          selection="$RUNNER_TEMP/drift-report/contract-drift-report.json"
+          if [ "$(sha256sum "$selection" | awk '{print $1}')" != "${{ needs.check.outputs.report_sha256 }}" ]; then
+            echo "The independently downloaded selection report has unexpected bytes." >&2
+            exit 1
+          fi
+          python scripts/check_provider_change_proposal.py \
+            --restore-bundle "$RUNNER_TEMP/proposed-files/proposed-files.json" \
+            --selection-report "$selection" \
+            --selection-sha256 "${{ needs.check.outputs.report_sha256 }}" \
+            --baseline "$baseline" \
+            --approved-paths "$RUNNER_TEMP/proposal-approved-paths.nul" > "$RUNNER_TEMP/proposal-result.txt"
+      - name: create guarded draft pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          paths="$RUNNER_TEMP/proposal-approved-paths.nul"
+          if [ "$(cat "$RUNNER_TEMP/proposal-result.txt")" = "no-change" ]; then
+            echo "No meaningful proposed change; no pull request."
+            exit 0
+          fi
+          if [ "$(git rev-parse HEAD)" != "${{ needs.propose.outputs.baseline }}" ]; then
+            echo "Trusted proposal baseline changed before publishing." >&2
+            exit 1
+          fi
+          if [ ! -s "$paths" ]; then
+            echo "No meaningful proposed change; no pull request."
+            exit 0
+          fi
+          today="$(date -u +%F)"
+          branch="contract-drift/${today}"
+          git checkout -b "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          while IFS= read -r -d '' path; do git add -- "$path"; done < "$paths"
+          git commit -m "Contract drift audit ${today}"
+          git push origin "$branch"
+          gh pr create --base develop --head "$branch" --draft \
+            --title "Contract drift audit ${today}" \
+            --body "Automated draft; see the audited provider-owned citations and classifications in the commit."

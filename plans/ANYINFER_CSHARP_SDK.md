@@ -880,9 +880,14 @@ must report a real conflict rather than silently changing a dependent public sig
   usage and embedding-space fallback refusal. Never mix rerank scores across attempts.
   Gate: shared operation corpus covers order/indices/dimensions/unknown metadata and unsafe
   cross-space fallback rejection before the backup request.
-- [ ] **SDK.6c** Add supported OpenAI-compatible embedding/rerank wire adapters only where
+- [ ] **SDK.6c** Add supported embedding/rerank wire adapters only where
   existing Python contracts define them, following the provider procedure. Gate: cassette/
   fake-server tests, public consumers, manifest/accounting consistency, full workspace.
+  > NOTE: On 2026-10-22 the user authorized implementation of the reviewed TEI and
+  > provider-propagation plans in parallel. `ANYINFER_CSHARP_SDK_TEI.md` owns native TEI
+  > retrieval and Python requalification against pinned CPU 1.9.4 and exact model revisions.
+  > Focused controls, live development calls and public delivery are accepted; the leaf's
+  > TEI.8 full clean-source gate remains open. Other SDK.6c providers remain open.
 
 ### SDK.7 — Rich generation, tools and multimodal input
 
@@ -980,6 +985,10 @@ consumption. Observer source/dirty/corpus metadata agree with source_dirty=false
 fixture hashes and comparison policy are unchanged. The retrieval leaf records exact paths,
 independent reviews and preserved failures. SDK.6c requires current provider research and
 a separate accepted binding plan before implementation; generic compatibility stays chat-only.
+
+The current authorized lane is `ANYINFER_CSHARP_SDK_TEI.md`: TEI 1.9.4 for both the new
+C# binding and refreshed Python live evidence. Resume its TEI.8 clean-source acceptance;
+the broader SDK.6c box remains unchecked for its other providers.
 
 SDK.5c is complete at source checkpoint
 `97e8937c281063582c282f313a35b91761293500`: all 20 workspace steps in 147.6s,

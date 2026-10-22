@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Target Name="ReadSourceFacts" BeforeTargets="GetAssemblyAttributes">
+    <Exec Command="git rev-parse HEAD" ConsoleToMSBuild="true"><Output TaskParameter="ConsoleOutput" PropertyName="TeiProbeCommit" /></Exec>
+    <Exec Command="git status --porcelain" ConsoleToMSBuild="true"><Output TaskParameter="ConsoleOutput" PropertyName="TeiProbeDirtyRaw" /></Exec>
+    <PropertyGroup>
+      <TeiProbeCommit>$(TeiProbeCommit.Trim())</TeiProbeCommit>
+      <TeiProbeDirty>false</TeiProbeDirty>
+      <TeiProbeDirty Condition="'$(TeiProbeDirtyRaw.Trim())' != ''">true</TeiProbeDirty>
+    </PropertyGroup>
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(TeiProbeCommit)', '^[0-9a-f]{40}$'))" Text="TEI probe source commit must be a 40-character lowercase hexadecimal Git commit." />
+    <Error Condition="'$(TeiProbeDirty)' != 'true' And '$(TeiProbeDirty)' != 'false'" Text="TEI probe dirty source metadata must be Boolean." />
+    <ItemGroup>
+      <AssemblyMetadata Include="TeiProbeSourceCommit" Value="$(TeiProbeCommit)" />
+      <AssemblyMetadata Include="TeiProbeSourceDirty" Value="$(TeiProbeDirty)" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <ProjectReference Include="../AnyInfer/AnyInfer.csproj" />
+  </ItemGroup>
+</Project>

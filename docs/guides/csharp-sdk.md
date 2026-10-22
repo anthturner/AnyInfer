@@ -6,9 +6,10 @@ repository's native C# work, while the supported product SDK and published packa
 Python.
 
 The generation examples use `ProviderSettings` and the built-in OpenAI-compatible provider.
-Retrieval is configured through an application-owned adapter that opts into the embedding and
-reranking protocols. The async calls accept a cancellation token and use `await using`; the
-matching synchronous facade uses `using` and the .NET default task scheduler.
+The C# proof also includes a built-in TEI adapter for buffered embeddings and reranking;
+other provider-specific retrieval remains application-owned. The async calls accept a
+cancellation token and use `await using`; the matching synchronous facade uses `using` and
+the .NET default task scheduler.
 
 ## Run the examples
 
@@ -61,11 +62,17 @@ synchronous .NET caller; it does not create or depend on Python's event-loop fac
 
 ## Embed and rerank text
 
-Embedding and reranking are buffered retrieval operations, not generation prompts. Configure
-an application-owned descriptor whose adapter implements the optional `IEmbedsText` and
-`IReranksText` protocols, and declare the `Embedding` and `Rerank` operations on that
-descriptor. The example embeds two texts and reranks caller-owned documents with stable IDs;
-the synchronous method follows the same sequence.
+Embedding and reranking are buffered retrieval operations, not generation prompts. The built-in
+TEI descriptor provides both operations for a local TEI server; the public protocols also let an
+application register its own retrieval adapter. The TEI example uses separate embedding and
+rerank instances because each TEI server process serves one model. It demonstrates async
+disposal and the synchronous facade with caller-owned document IDs.
+
+```csharp
+--8<-- "examples/csharp-sdk/TeiExample.cs"
+```
+
+The offline example verifier uses scripted HTTP responses. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU deployment on 2026-10-22.
 
 ```csharp
 --8<-- "examples/csharp-sdk/RetrievalExample.cs"
@@ -188,16 +195,17 @@ verifier runs.
 
 ## Scope
 
-This proof covers asynchronous text generation and a synchronous facade over that same core,
-through the OpenAI-compatible adapter, plus buffered text embeddings and reranking through
-application-owned retrieval adapters. It also covers structured JSON validation and repair,
+This proof covers asynchronous text generation and a synchronous facade over that same core
+through the OpenAI-compatible adapter, plus buffered text embeddings and reranking through the
+built-in TEI adapter and application-owned retrieval adapters. The OpenAI-compatible adapter
+remains chat-only. It also covers structured JSON validation and repair,
 configuration, routing, reported token usage, bounded winning-request pricing, explicit budgets,
 caller-owned ledger and store helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free
 typed telemetry, immutable manifests, and declarative setup metadata. It does not provide a
-released NuGet package, provider parity, provider invoice or all-wire totals, automatic tool
-execution, rich-media input breadth, context/history reduction, or production report
-publication. The shipped OpenAI-compatible adapter remains chat-only; provider-specific
-retrieval parity awaits separate research.
+released NuGet package, full provider parity, provider invoice or all-wire totals, automatic
+tool execution, rich-media input breadth, context/history reduction, or production report
+publication. Built-in retrieval coverage is limited to TEI, and generic OpenAI-compatible
+retrieval is not implemented.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with

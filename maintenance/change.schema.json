@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://anyinfer.dev/schemas/maintenance/change-v1.json",
+  "title": "Immutable provider-change input declaration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "sources", "disposition", "changes", "shared_spec", "implementations"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$"},
+    "sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
+    "disposition": {"enum": ["adopted", "informational", "unverifiable", "blocked"]},
+    "changes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/change"}},
+    "shared_spec": {"$ref": "#/$defs/sharedSpec"},
+    "implementations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/implementation"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"},
+    "source": {"type": "object", "additionalProperties": false, "required": ["url", "fetched_at", "version_pin"], "properties": {"url": {"type": "string", "format": "uri", "pattern": "^https?://[^/\\s]+"}, "fetched_at": {"type": "string", "format": "date"}, "version_pin": {"type": "string", "minLength": 1}}},
+    "change": {"type": "object", "additionalProperties": false, "required": ["contract_id", "scope", "operations", "summary"], "properties": {"contract_id": {"type": "string", "pattern": "^contracts/[a-z0-9-]+\\.md(?:#[A-Za-z0-9_.-]+)?$"}, "scope": {"enum": ["inference", "non_inference"]}, "operations": {"type": "array", "uniqueItems": true, "items": {"enum": ["generation", "embedding", "rerank", "batch"]}}, "summary": {"type": "string", "minLength": 1}}, "allOf": [{"if": {"properties": {"scope": {"const": "inference"}}}, "then": {"properties": {"operations": {"minItems": 1}}}}, {"if": {"properties": {"scope": {"const": "non_inference"}}}, "then": {"properties": {"operations": {"maxItems": 0}}}}]},
+    "sharedSpec": {"type": "object", "additionalProperties": false, "required": ["impact", "rationale"], "properties": {"impact": {"enum": ["no_delta", "candidate_draft", "blocked"]}, "rationale": {"type": "string", "minLength": 1}, "candidate": {"type": "object", "additionalProperties": false, "required": ["release_id", "paths"], "properties": {"release_id": {"type": "string", "minLength": 1}, "paths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/path"}}}}}, "allOf": [{"if": {"properties": {"impact": {"const": "candidate_draft"}}}, "then": {"required": ["candidate"]}, "else": {"not": {"required": ["candidate"]}}}]},
+    "implementation": {"type": "object", "additionalProperties": false, "required": ["implementation_id", "status", "rationale", "owned_paths", "required_gate_ids"], "properties": {"implementation_id": {"$ref": "#/$defs/id"}, "status": {"enum": ["updated", "unaffected", "unsupported", "blocked"]}, "rationale": {"type": "string", "minLength": 1}, "owned_paths": {"type": "array", "items": {"$ref": "#/$defs/path"}}, "required_gate_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}}, "allOf": [{"if": {"properties": {"status": {"const": "updated"}}}, "then": {"properties": {"owned_paths": {"minItems": 1}}}}]}
+  },
+  "allOf": [{"if": {"properties": {"disposition": {"const": "unverifiable"}}}, "then": {"properties": {"shared_spec": {"properties": {"impact": {"const": "blocked"}}}}}}]
+}

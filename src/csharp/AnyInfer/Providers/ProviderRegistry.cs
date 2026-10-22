@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using AnyInfer.Capabilities;
 
 namespace AnyInfer.Providers;
 
@@ -119,6 +120,21 @@ public sealed class ProviderRegistry
                 new SetupField("api_key", "API key", "secret"),
             ]),
             requiresBaseUrl: true)
+        {
+            PoolOwnsConfiguredTransport = true,
+        },
+        new ProviderDescriptor(
+            "tei",
+            "Text Embeddings Inference",
+            static (config, cancellationToken) => new ValueTask<IAsyncDisposable>(TeiAdapter.Create(config, cancellationToken)),
+            aliases: ["text-embeddings-inference"],
+            setup: new ProviderSetupSpec([
+                new SetupField("base_url", "Base URL", "endpoint", required: false, advanced: true, defaultValue: "http://127.0.0.1:8080", helpText: "Defaults to the local TEI server."),
+                new SetupField("api_key", "API key", "secret", required: false, advanced: true, placeholder: "env://TEI_API_KEY or a literal key", envVar: "TEI_API_KEY", helpText: "Only when the TEI server was started with an API key."),
+            ], modelSelection: "discover-or-manual"),
+            defaultBaseUrl: "http://127.0.0.1:8080",
+            locality: ProviderLocality.Local,
+            operations: [InferenceOperation.Embedding, InferenceOperation.Rerank])
         {
             PoolOwnsConfiguredTransport = true,
         },

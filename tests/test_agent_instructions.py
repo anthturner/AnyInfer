@@ -89,6 +89,23 @@ def test_new_provider_entry_points_defer_to_one_procedure() -> None:
         assert len(shim.split()) < 130
 
 
+def test_provider_change_entry_points_defer_to_one_procedure() -> None:
+    """Provider-change entrypoints point to one canonical process without duplicating it."""
+    canonical = _read("contracts/PROPAGATE-CHANGE.md")
+    assert "## 1. Establish the evidence" in canonical
+    assert "## 6. Preserve control-plane integrity" in canonical
+
+    for relative in (
+        ".agents/skills/propagate-provider-change/SKILL.md",
+        ".claude/skills/propagate-provider-change/SKILL.md",
+        ".github/prompts/propagate-provider-change.prompt.md",
+    ):
+        shim = _read(relative)
+        assert "contracts/PROPAGATE-CHANGE.md" in shim
+        assert re.search(r"only\s+authoritative", shim)
+        assert len(shim.split()) < 130
+
+
 def test_the_new_provider_procedure_covers_every_registration_gate() -> None:
     """Each gate below fails a build when missed, so the procedure must name all of them.
 
@@ -241,6 +258,9 @@ def test_no_user_facing_text_carries_an_adr_identifier() -> None:
         ".agents/skills/add-provider/SKILL.md",
         ".claude/skills/add-provider/SKILL.md",
         ".github/prompts/add-provider.prompt.md",
+        ".agents/skills/propagate-provider-change/SKILL.md",
+        ".claude/skills/propagate-provider-change/SKILL.md",
+        ".github/prompts/propagate-provider-change.prompt.md",
     ):
         if re.search(r"\bADR-\d", _read(relative)):
             offenders.append(relative)

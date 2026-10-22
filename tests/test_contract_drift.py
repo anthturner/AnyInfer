@@ -113,6 +113,7 @@ class TestSelection:
             "TEMPLATE.md",
             "DRIFT-CHECK.md",
             "NEW-PROVIDER.md",
+            "PROPAGATE-CHANGE.md",
             "openai-compat-presets.md",
         }
 

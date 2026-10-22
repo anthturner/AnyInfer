@@ -386,6 +386,15 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "sealed class RetrievalAdapter : IEmbedsText, IReranksText, IAsyncDisposable" in source
     assert "synchronous retrieval adapter disposal failed" in source
     assert "sealed class RetrievalAdapter : IProviderAdapter" not in source
+    assert 'ProviderSettings.Of(\n    "tei", "https://tei-embed.offline/v1", transport: teiEmbedHandler, alias: "tei-embed")' in source
+    assert 'target: "tei-rerank:rerank-model", returnDocuments: true, retainRaw: true, manifest: true)' in source
+    assert "default TEI builtin retrieval witness failed" in source
+    assert "embedded.Usage.OutputTokens is not null" in source
+    assert "embedded.Raw is null" in source
+    assert "reranked.Usage.OutputTokens is not null" in source
+    assert "reranked.Raw is null" in source
+    assert "sealed class TeiHandler(bool reranker) : HttpMessageHandler" in source
+    assert "sealed class TeiHandler : IEmbedsText" not in source
     assert "TextPart" not in source
     assert "TextDeltaEvent" not in source
     assert "GenerationResult" not in source

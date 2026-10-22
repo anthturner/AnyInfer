@@ -40,6 +40,7 @@ NOT_SNAPSHOTS = frozenset(
         "DRIFT-CHECK.md",
         "TEMPLATE.md",
         "NEW-PROVIDER.md",
+        "PROPAGATE-CHANGE.md",
         # Not a provider snapshot: the presets record verifies eighty-six endpoints against
         # one shared dialect, so it is organized per preset rather than per wire section.
         "openai-compat-presets.md",

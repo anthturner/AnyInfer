@@ -9,16 +9,16 @@
       "headers": {
         "content-type": "application/json",
         "x-compute-type": "gpu+optimized",
-        "x-compute-time": "64",
+        "x-compute-time": "33",
         "x-compute-characters": "210",
         "x-compute-tokens": "61",
-        "x-total-time": "64",
+        "x-total-time": "33",
         "x-tokenization-time": "0",
-        "x-queue-time": "4",
-        "x-inference-time": "58",
+        "x-queue-time": "0",
+        "x-inference-time": "30",
         "vary": "origin, access-control-request-method, access-control-request-headers",
         "access-control-allow-origin": "*",
-        "date": "Mon, 24 Aug 2026 20:58:32 GMT"
+        "date": "Thu, 22 Oct 2026 14:06:10 GMT"
       },
       "body": "[{\"index\":1,\"score\":0.47565052},{\"index\":0,\"score\":0.000037436883},{\"index\":2,\"score\":0.000037418642}]"
     }

@@ -43,6 +43,32 @@ on:
   pull_request:
     branches: [develop, main]
   workflow_dispatch:
+    inputs:
+      provider_change_input_path:
+        description: Canonical candidate declaration under maintenance/changes/
+        required: false
+        type: string
+        default: ""
+      candidate_evidence_path:
+        description: Checked-out candidate-evidence JSON path
+        required: false
+        type: string
+        default: ""
+      candidate_qualification_json:
+        description: Operator-supplied expected candidate qualification facts JSON
+        required: false
+        type: string
+        default: ""
+      candidate_evidence_artifact_run_id:
+        description: Prior Actions run ID holding the candidate evidence bundle
+        required: false
+        type: string
+        default: ""
+      candidate_evidence_artifact_name:
+        description: Prior Actions artifact name holding the candidate evidence bundle
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -53,6 +79,7 @@ concurrency:
 # stated explicitly rather than inherited from the repository default, matching the
 # other five workflows. A job that ever needs more elevates itself.
 permissions:
+  actions: read
   contents: read
 
 env:
@@ -76,7 +103,11 @@ jobs:
     timeout-minutes: 5
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
+      provider_change: ${{ steps.provider_change.outputs.applicable }}
+      provider_change_input: ${{ steps.provider_change.outputs.input }}
+      provider_change_paths: ${{ steps.provider_change.outputs.changed_paths }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: classify changed paths
         id: classify
         env:
@@ -108,6 +139,35 @@ jobs:
           done <<< "$files"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
           echo "docs_only=$docs_only"
+          printf '%s\n' "$files" > .tmp-provider-change-paths.txt
+      - name: select provider-change applicability
+        id: provider_change
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_INPUT_PATH: ${{ inputs.provider_change_input_path || '' }}
+          CANDIDATE_EVIDENCE_PATH: ${{ inputs.candidate_evidence_path || '' }}
+          CANDIDATE_QUALIFICATION_JSON: ${{ inputs.candidate_qualification_json || '' }}
+          CANDIDATE_ARTIFACT_RUN_ID: ${{ inputs.candidate_evidence_artifact_run_id || '' }}
+          CANDIDATE_ARTIFACT_NAME: ${{ inputs.candidate_evidence_artifact_name || '' }}
+        run: |
+          python scripts/provider_change_ci.py select \
+            --changed-paths .tmp-provider-change-paths.txt \
+            --event-name "$EVENT_NAME" \
+            --manual-input-path "$MANUAL_INPUT_PATH" \
+            --candidate-evidence-path "$CANDIDATE_EVIDENCE_PATH" \
+            --candidate-qualification-json "$CANDIDATE_QUALIFICATION_JSON" \
+            --candidate-artifact-run-id "$CANDIDATE_ARTIFACT_RUN_ID" \
+            --candidate-artifact-name "$CANDIDATE_ARTIFACT_NAME" \
+            --output .tmp-provider-change-selection.json
+          echo "applicable=$(python -c \"import json; print(str(json.load(open('.tmp-provider-change-selection.json'))['applicable']).lower())\")" >> "$GITHUB_OUTPUT"
+          echo "input=$(python -c \"import json; print(json.load(open('.tmp-provider-change-selection.json')).get('input', ''))\")" >> "$GITHUB_OUTPUT"
+          echo "changed_paths=$(python -c \"import json; print(json.dumps(json.load(open('.tmp-provider-change-selection.json')).get('changed_paths', []), separators=(',', ':')))\")" >> "$GITHUB_OUTPUT"
+      - name: retain provider-change selection
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-selection
+          path: .tmp-provider-change-selection.json
+          if-no-files-found: error
 
   # Every gate that is not the test suite, on one runner. Each ran well under a minute as
   # its own job, so each was billed a full minute for ~20s of work; together they bill
@@ -119,6 +179,7 @@ jobs:
     name: gates
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [changes]
     steps:
       # Full history, for the `changelog` gate alone: it proves that sections for
       # already-released versions still match `main` byte for byte, which needs main's
@@ -159,12 +220,45 @@ jobs:
       - name: mypy --strict
         run: python workspace.py check --only=types
 
+      - name: provider-change Python inventory and gates
+        if: needs.changes.outputs.provider_change == 'true'
+        env:
+          TRUSTED_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python scripts/run_provider_change_checks.py \
+            --input "${{ needs.changes.outputs.provider_change_input }}" \
+            --registry maintenance/implementations.json --implementation anyinfer-python \
+            --output-dir .tmp-tests/provider-change-python-gates \
+            --trusted-pr-head "$TRUSTED_PR_HEAD" --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" \
+            --gate python-contracts --gate python-fixtures --gate python-conformance
+          python scripts/run_provider_change_checks.py \
+            --input "${{ needs.changes.outputs.provider_change_input }}" \
+            --registry maintenance/implementations.json --implementation anyinfer-python \
+            --output-dir .tmp-tests/provider-change-python-inventory \
+            --trusted-pr-head "$TRUSTED_PR_HEAD" --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --inventory-only
+      - name: retain provider-change Python inventory
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-python-inventory
+          path: .tmp-tests/provider-change-python-inventory/**/inventory.json
+          if-no-files-found: error
+      - name: retain provider-change Python gate verification
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-python-gates-verification
+          path: .tmp-tests/provider-change-python-gates/**/verification.json
+          if-no-files-found: error
+
       - name: architecture contracts
+        if: needs.changes.outputs.provider_change != 'true'
         # Enforces the ADRs mechanically: adapters never orchestrate, serve stays a codec,
         # types stay leaf modules.
         run: python workspace.py check --only=contracts
 
       - name: portable fixture assets
+        if: needs.changes.outputs.provider_change != 'true'
         run: python workspace.py check --only=fixtures
 
       # Shape, and that no released section has been rewritten. The second half is the
@@ -175,6 +269,7 @@ jobs:
         run: python workspace.py check --only=changelog
 
       - name: conformance and serve invariants (ADR-009)
+        if: needs.changes.outputs.provider_change != 'true'
         run: python workspace.py check --only=conformance
 
       # Docstring coverage, link check, and the executable doc examples. Examples run
@@ -202,7 +297,41 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: src/csharp/global.json
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - run: python -m pip install jsonschema
+      - name: provider-change C# inventory and gate
+        if: needs.changes.outputs.provider_change == 'true'
+        env:
+          TRUSTED_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python scripts/run_provider_change_checks.py \
+            --input "${{ needs.changes.outputs.provider_change_input }}" \
+            --registry maintenance/implementations.json --implementation anyinfer-csharp \
+            --output-dir .tmp-tests/provider-change-csharp-gates \
+            --trusted-pr-head "$TRUSTED_PR_HEAD" --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --gate csharp-workspace
+          python scripts/run_provider_change_checks.py \
+            --input "${{ needs.changes.outputs.provider_change_input }}" \
+            --registry maintenance/implementations.json --implementation anyinfer-csharp \
+            --output-dir .tmp-tests/provider-change-csharp-inventory \
+            --trusted-pr-head "$TRUSTED_PR_HEAD" --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --inventory-only
+      - name: retain provider-change C# inventory
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-csharp-inventory
+          path: .tmp-tests/provider-change-csharp-inventory/**/inventory.json
+          if-no-files-found: error
+      - name: retain provider-change C# gate verification
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-csharp-verification
+          path: .tmp-tests/provider-change-csharp-gates/**/verification.json
+          if-no-files-found: error
       - name: C# proof
+        if: needs.changes.outputs.provider_change != 'true'
         run: python workspace.py check --only=csharp
       - name: retain C# NuGet proof packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -275,7 +404,20 @@ jobs:
       # The test phase sets QT_QPA_PLATFORM=offscreen, so the demo app's Qt tests run
       # on a runner with no display.
       - name: pytest
+        if: needs.changes.outputs.provider_change != 'true' || matrix.os != 'ubuntu-latest' || matrix.python-version != '3.11'
         run: python workspace.py check --only=test
+      - name: provider-change Python suite gate
+        if: needs.changes.outputs.provider_change == 'true' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        env:
+          TRUSTED_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python scripts/run_provider_change_checks.py --input "${{ needs.changes.outputs.provider_change_input }}" --registry maintenance/implementations.json --implementation anyinfer-python --output-dir .tmp-tests/provider-change-python-suite --trusted-pr-head "$TRUSTED_PR_HEAD" --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --gate python-tests
+      - name: retain provider-change Python suite verification
+        if: needs.changes.outputs.provider_change == 'true' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-python-suite-verification
+          path: .tmp-tests/provider-change-python-suite/**/verification.json
+          if-no-files-found: error
 
   # The interpreter rows `test` brackets rather than runs. Same reasoning as `test-macos`
   # below, at a smaller multiplier: these are Linux runners, but each is a full ~140s suite
@@ -347,6 +489,116 @@ jobs:
       - name: pytest
         run: python workspace.py check --only=test
 
+  # Same-run consumer for the dispatcher artifacts.  It runs for an honest no-op too, so
+  # branch protection sees that no declaration was applicable rather than a skipped gate.
+  provider-change:
+    name: provider-change
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [changes, gates, native-csharp, test]
+    if: always()
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - run: python -m pip install jsonschema
+      - name: require applicable producer success
+        if: needs.changes.outputs.provider_change == 'true'
+        run: |
+          test '${{ needs.gates.result }}' = success
+          test '${{ needs.native-csharp.result }}' = success
+          test '${{ needs.test.result }}' = success
+      - name: download provider-change Python inventory
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v8.0.0
+        with:
+          name: provider-change-python-inventory
+          path: .tmp-provider-change-artifacts/python-inventory
+      - name: download provider-change Python gate verification
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v8.0.0
+        with:
+          name: provider-change-python-gates-verification
+          path: .tmp-provider-change-artifacts/python-gates
+      - name: download provider-change Python suite verification
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v8.0.0
+        with:
+          name: provider-change-python-suite-verification
+          path: .tmp-provider-change-artifacts/python-suite
+      - name: download provider-change C# inventory
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v8.0.0
+        with:
+          name: provider-change-csharp-inventory
+          path: .tmp-provider-change-artifacts/csharp-inventory
+      - name: download provider-change C# gate verification
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v8.0.0
+        with:
+          name: provider-change-csharp-verification
+          path: .tmp-provider-change-artifacts/csharp-gates
+      - name: download manually selected candidate evidence bundle
+        if: github.event_name == 'workflow_dispatch' && needs.changes.outputs.provider_change == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v8.0.0
+        with:
+          name: ${{ inputs.candidate_evidence_artifact_name }}
+          run-id: ${{ inputs.candidate_evidence_artifact_run_id }}
+          github-token: ${{ github.token }}
+          path: .tmp-tests/provider-change/manual-candidate/${{ github.run_id }}
+      - name: validate same-run provider-change evidence
+        if: needs.changes.outputs.provider_change == 'true'
+        env:
+          TRUSTED_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_ACTOR: ${{ github.actor }}
+          CANDIDATE_EVIDENCE_PATH: ${{ inputs.candidate_evidence_path || '' }}
+          CANDIDATE_QUALIFICATION_JSON: ${{ inputs.candidate_qualification_json || '' }}
+          CANDIDATE_ARTIFACT_RUN_ID: ${{ inputs.candidate_evidence_artifact_run_id || '' }}
+          CANDIDATE_ARTIFACT_NAME: ${{ inputs.candidate_evidence_artifact_name || '' }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            mkdir -p .tmp-provider-change
+            printf '%s' "$CANDIDATE_QUALIFICATION_JSON" > .tmp-provider-change/candidate-qualification.json
+            candidate_args=(
+              --candidate-evidence ".tmp-tests/provider-change/manual-candidate/${{ github.run_id }}/$CANDIDATE_EVIDENCE_PATH"
+              --candidate-qualification .tmp-provider-change/candidate-qualification.json
+              --manual-bundle-root ".tmp-tests/provider-change/manual-candidate/${{ github.run_id }}"
+              --candidate-artifact-run-id "$CANDIDATE_ARTIFACT_RUN_ID"
+              --candidate-artifact-name "$CANDIDATE_ARTIFACT_NAME"
+            )
+          else
+            candidate_args=()
+          fi
+          python scripts/provider_change_ci.py aggregate \
+            --input "${{ needs.changes.outputs.provider_change_input }}" \
+            --registry maintenance/implementations.json \
+            --artifact-dir .tmp-provider-change-artifacts \
+            --trusted-pr-head "$TRUSTED_PR_HEAD" \
+            --workflow-run-id "${{ github.run_id }}" --workflow-run-attempt "${{ github.run_attempt }}" \
+            --changed-paths-json '${{ needs.changes.outputs.provider_change_paths }}' \
+            --event-name "$EVENT_NAME" --actor "$WORKFLOW_ACTOR" \
+            "${candidate_args[@]}" \
+            --output .tmp-provider-change/provider-change-run-report.json
+      - name: record provider-change no-op
+        if: needs.changes.outputs.provider_change != 'true'
+        run: echo 'no applicable production provider-change declaration'
+      - name: retain provider-change run report
+        if: needs.changes.outputs.provider_change == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-run-report
+          path: .tmp-provider-change/provider-change-run-report.json
+          if-no-files-found: error
+      - name: retain provider-change dispatch receipt
+        if: github.event_name == 'workflow_dispatch' && needs.changes.outputs.provider_change == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provider-change-dispatch-receipt
+          path: .tmp-provider-change/provider-change-dispatch-receipt.json
+          if-no-files-found: error
+
   # Aggregate gate. Branch protection on `develop` and `main` requires exactly this
   # check and nothing else, so adding or renaming upstream jobs (or matrix rows) never
   # silently un-protects a branch. `if: always()` makes it report a real failure instead
@@ -358,7 +610,7 @@ jobs:
     name: ci-ok
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [changes, gates, native-csharp, test, test-extra, test-macos]
+    needs: [changes, gates, native-csharp, test, test-extra, test-macos, provider-change]
     if: always()
     steps:
       - name: verify every upstream job succeeded or was deliberately skipped
@@ -371,3 +623,6 @@ jobs:
               *) echo "a required job did not succeed"; exit 1 ;;
             esac
           done
+      - name: require applicable provider-change success
+        if: needs.changes.outputs.provider_change == 'true'
+        run: test '${{ needs.provider-change.result }}' = success

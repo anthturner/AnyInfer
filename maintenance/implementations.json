@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "non_inference_contracts": ["contracts/mcp.md", "contracts/huggingface.md"],
+  "implementations": [
+    {
+      "id": "anyinfer-python",
+      "language": "Python",
+      "root": "src/python",
+      "exporter_argv": ["{sys.executable}", "scripts/export_python_provider_bindings.py"],
+      "gates": [
+        {"id": "python-contracts", "argv": ["{sys.executable}", "workspace.py", "check", "--only=contracts"]},
+        {"id": "python-fixtures", "argv": ["{sys.executable}", "workspace.py", "check", "--only=fixtures"]},
+        {"id": "python-conformance", "argv": ["{sys.executable}", "workspace.py", "check", "--only=conformance"]},
+        {"id": "python-tests", "argv": ["{sys.executable}", "workspace.py", "check", "--only=test"]}
+      ],
+      "profile_claims": ["core-generation-v0"]
+    },
+    {
+      "id": "anyinfer-csharp",
+      "language": "C#",
+      "root": "src/csharp",
+      "exporter_argv": ["dotnet", "run", "--project", "src/csharp/AnyInfer.Maintenance"],
+      "gates": [
+        {"id": "csharp-workspace", "argv": ["{sys.executable}", "workspace.py", "check", "--only=csharp"]}
+      ],
+      "profile_claims": []
+    }
+  ]
+}

@@ -138,6 +138,12 @@ class TestVerbs:
         assert "scripts/check_csharp_accounting.py" in recorded[0]
         assert "scripts/_csharp_observation.py" in recorded[0]
         assert "scripts/check_csharp_request_policy.py" in recorded[0]
+        assert "scripts/check_csharp_binding_inventory.py" in recorded[0]
+        assert "scripts/export_python_provider_bindings.py" in recorded[0]
+        assert "scripts/run_provider_change_checks.py" in recorded[0]
+        assert "scripts/check_provider_change.py" in recorded[0]
+        assert "scripts/provider_change_ci.py" in recorded[0]
+        assert "scripts/check_provider_change_proposal.py" in recorded[0]
 
     def test_check_fix_reaches_the_lint_phase(self, recorded):
         workspace.main(["check", "--only=lint", "--fix"])
@@ -205,6 +211,10 @@ class TestVerbs:
                 ROOT,
             ),
             (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_binding_inventory.py")],
+                ROOT,
+            ),
+            (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_package.py")],
                 ROOT,
             ),
@@ -266,6 +276,11 @@ class TestVerbs:
         assert "if: needs.changes.outputs.docs_only != 'true'" in body
         assert "actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0" in body
         assert "global-json-file: src/csharp/global.json" in body
+        assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7" in body
+        assert 'python-version: "3.11"' in body
+        assert "python -m pip install jsonschema" in body
+        assert "python scripts/run_provider_change_checks.py" in body
+        assert "--gate csharp-workspace" in body
         assert "python workspace.py check --only=csharp" in body
         assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2" in body
         assert ".tmp-tests/nuget/*.nupkg" in body
@@ -273,7 +288,6 @@ class TestVerbs:
         assert "include-hidden-files: true" in body
         assert "if-no-files-found: error" in body
         assert "nuget push" not in body.lower()
-        assert "setup-python" not in body
         assert "setup-uv" not in body
         assert "uv pip install" not in body
         aggregate = re.search(r"^  ci-ok:\n(?P<body>.*?)(?=^  [\w-]+:|\Z)", workflow, re.M | re.S)
@@ -355,8 +369,8 @@ class TestVerbs:
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
         # Every default step must be attempted despite the failure, including the two
-        # in-process docs gates and eight C# steps.
-        assert len(calls) == 21
+        # in-process docs gates and nine C# steps.
+        assert len(calls) == 22
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

@@ -40,10 +40,10 @@ This file is the single authoritative instruction set for Codex, Claude Code, Gi
 Copilot, and other coding agents. `CLAUDE.md` and `.github/copilot-instructions.md` are
 discovery shims only: they point here and contain no independent engineering policy. A
 tool-specific skill or prompt may adapt invocation syntax, but the procedure it runs must
-live in one tool-neutral canonical file. Today three procedures follow that model:
-`contracts/NEW-PROVIDER.md`, `contracts/DRIFT-CHECK.md`, and `docs/agents/INTEGRATION.md`
-are authoritative; the Codex and Claude skills and the Copilot prompts beside each are thin
-entry points.
+live in one tool-neutral canonical file. Today four procedures follow that model:
+`contracts/NEW-PROVIDER.md`, `contracts/DRIFT-CHECK.md`,
+`contracts/PROPAGATE-CHANGE.md`, and `docs/agents/INTEGRATION.md` are authoritative; the
+Codex and Claude skills and the Copilot prompts beside each are thin entry points.
 
 **The same rule governs instruction text that ships outward.** Agent instructions this
 project *emits* — `anyinfer agents-md`, the `llms.txt` pair built with the docs site, and
@@ -186,6 +186,10 @@ changelogs:
 When you change an adapter's wire behavior, update its contract snapshot **in the same
 change**. When a drift check finds upstream changes, propose contract/adapter/matrix updates
 — do not silently rewrite snapshots without citing the upstream source.
+
+When an adopted upstream finding requires coordinated changes across the shared specification
+or registered implementations, continue with
+[contracts/PROPAGATE-CHANGE.md](contracts/PROPAGATE-CHANGE.md).
 
 ## Things agents get wrong here — explicit warnings
 

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "id": "synthetic-wire-change",
+  "sources": [
+    {
+      "url": "https://example.invalid/provider/changelog",
+      "fetched_at": "2026-10-22",
+      "version_pin": "synthetic-v1"
+    }
+  ],
+  "disposition": "adopted",
+  "changes": [
+    {
+      "contract_id": "contracts/openai-compat.md",
+      "scope": "inference",
+      "operations": ["generation"],
+      "summary": "Synthetic wire-field clarification for schema controls."
+    }
+  ],
+  "shared_spec": {
+    "impact": "no_delta",
+    "rationale": "The normalized event stream is unchanged."
+  },
+  "implementations": [
+    {
+      "implementation_id": "anyinfer-python",
+      "status": "updated",
+      "rationale": "This synthetic fixture models a hypothetical Python transport update.",
+      "owned_paths": ["src/python/anyinfer/providers/openai_compat.py"],
+      "required_gate_ids": [
+        "python-contracts",
+        "python-fixtures",
+        "python-conformance",
+        "python-tests"
+      ]
+    },
+    {
+      "implementation_id": "anyinfer-csharp",
+      "status": "updated",
+      "rationale": "This synthetic fixture models a hypothetical update to the existing C# binding.",
+      "owned_paths": ["src/csharp/AnyInfer/Providers/ProviderRegistry.cs"],
+      "required_gate_ids": ["csharp-workspace"]
+    }
+  ]
+}

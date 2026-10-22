@@ -139,6 +139,12 @@ LINT_PATHS = (
     "scripts/check_csharp_accounting.py",
     "scripts/_csharp_observation.py",
     "scripts/check_csharp_request_policy.py",
+    "scripts/check_csharp_binding_inventory.py",
+    "scripts/export_python_provider_bindings.py",
+    "scripts/run_provider_change_checks.py",
+    "scripts/check_provider_change.py",
+    "scripts/provider_change_ci.py",
+    "scripts/check_provider_change_proposal.py",
 )
 
 # Build outputs and tool caches. Directories are removed wholesale; the glob patterns are
@@ -1012,6 +1018,12 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                 (
                     "validate C# retrieval observations",
                     lambda: python(str(ROOT / "scripts" / "check_csharp_retrieval.py"), cwd=ROOT),
+                ),
+                (
+                    "validate C# provider binding inventory",
+                    lambda: python(
+                        str(ROOT / "scripts" / "check_csharp_binding_inventory.py"), cwd=ROOT
+                    ),
                 ),
                 (
                     "validate C# NuGet proof package",

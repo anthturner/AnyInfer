@@ -1545,6 +1545,10 @@ accepting batch, routes, retention or manifest options it cannot honor.
   concrete wire contract, response/cancellation/error mapping and disjoint binding brief.
   Generic OpenAI compatibility remains chat-only. Gate: root accepts research and a separate
   implementation plan. This is not a completed wire plan and authorizes no adapter edit.
+  > NOTE: TEI is selected first (2026-10-22). The user authorized implementation of
+  > `ANYINFER_CSHARP_SDK_TEI.md` and the propagation plan in parallel. Native retrieval,
+  > Python refresh, focused controls and live development evidence now pass; the TEI leaf
+  > resumes at TEI.8 for full clean-source acceptance. Other provider bindings remain open.
 
 ## 8. Preservation and final evidence
 
@@ -1566,7 +1570,11 @@ of unapproved rerank batch scores.
 SDK.6a/b are complete at clean source checkpoint
 `03f26fc88c7c96ff8272e99dadee8c6a26fa0616` (implementation 131c7aa, two narrow checkout-LF
 fixes thereafter). Resume **6c.0 — retrieval provider research preflight**, corresponding
-to the parent **SDK.6c**. That work is separate and has no accepted wire-binding plan yet.
+to the parent **SDK.6c**. That work is separate; its reviewed TEI draft is described below.
+
+The authorized leaf is `ANYINFER_CSHARP_SDK_TEI.md`, covering native C# TEI and Python
+requalification together. Resume its TEI.8 clean-source gate from implementation based on
+planning checkpoint acdc944; SDK.6c remains unchecked for its other providers.
 
 All 21 clean workspace steps pass in 167.6s at `.tmp-tests/sdk-six-clean-03f26fc/`, including
 791 native unit/93 conformance cases, compiled offline examples, strict docs and isolated

@@ -169,6 +169,30 @@ static async Task VerifyAsync()
         && syncRetriever.DisposeCount == 1,
         "Synchronous retrieval example did not preserve operation, identity, or disposal facts.");
 
+    var asyncTeiEmbedHandler = new TeiScriptedHandler(reranker: false);
+    var asyncTeiRerankHandler = new TeiScriptedHandler(reranker: true);
+    var asyncTei = await TeiExample.RunAsync(
+        TeiExample.EmbeddingSettings(asyncTeiEmbedHandler),
+        TeiExample.RerankSettings(asyncTeiRerankHandler));
+    RequireTeiObservation(asyncTei, "Asynchronous");
+    Require(asyncTeiEmbedHandler.RequestCount == 1
+        && asyncTeiRerankHandler.RequestCount == 1
+        && asyncTeiEmbedHandler.DisposeCount == 1
+        && asyncTeiRerankHandler.DisposeCount == 1,
+        "Asynchronous TEI example did not retain transport ownership.");
+
+    var syncTeiEmbedHandler = new TeiScriptedHandler(reranker: false);
+    var syncTeiRerankHandler = new TeiScriptedHandler(reranker: true);
+    var syncTei = TeiExample.Run(
+        TeiExample.EmbeddingSettings(syncTeiEmbedHandler),
+        TeiExample.RerankSettings(syncTeiRerankHandler));
+    RequireTeiObservation(syncTei, "Synchronous");
+    Require(syncTeiEmbedHandler.RequestCount == 1
+        && syncTeiRerankHandler.RequestCount == 1
+        && syncTeiEmbedHandler.DisposeCount == 1
+        && syncTeiRerankHandler.DisposeCount == 1,
+        "Synchronous TEI example did not retain transport ownership.");
+
     var telemetryHandler = new CountingHandler();
     var telemetry = await TelemetryExample.RunAsync(WithTransport(displayedSettings, telemetryHandler), target);
     Require(telemetry.Generation.Text == "hello"
@@ -328,6 +352,28 @@ static void Require(bool condition, string message)
 
 static bool IsBoston(JsonObject value) =>
     value.TryGetValue("city", out var city) && city is JsonString { Value: "Boston" };
+
+static void RequireTeiObservation(TeiObservation observation, string lane)
+{
+    Require(observation.Embeddings.Target.ProviderId == "tei-embed"
+        && observation.Embeddings.Target.Model == "embed-model"
+        && observation.Embeddings.Vectors.Count == 2
+        && observation.Embeddings.Vectors[0].Values.SequenceEqual([0.1, 0.2])
+        && observation.Embeddings.Usage.InputTokens is null
+        && observation.Embeddings.Usage.OutputTokens is null
+        && observation.Embeddings.Raw is not null
+        && observation.Embeddings.Manifest is { Complete: true, Operation: "embedding", Payloads: null }
+        && observation.Reranking.Target.ProviderId == "tei-rerank"
+        && observation.Reranking.Target.Model == "rerank-model"
+        && observation.Reranking.Items.Count == 2
+        && observation.Reranking.Items[0] is { Index: 0, DocumentId: "river", Score: 0.9 }
+        && observation.Reranking.Items[1] is { Index: 1, DocumentId: "lighthouse", Score: 0.1 }
+        && observation.Reranking.Usage.InputTokens is null
+        && observation.Reranking.Usage.OutputTokens is null
+        && observation.Reranking.Raw is not null
+        && observation.Reranking.Manifest is { Complete: true, Operation: "rerank", Payloads: null },
+        $"{lane} TEI example did not preserve public result, caller identity, manifest, or unknown usage facts.");
+}
 
 sealed class CountingHandler(
     HttpStatusCode statusCode = HttpStatusCode.OK,

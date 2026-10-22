@@ -308,7 +308,10 @@ def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> Non
         encoding="utf-8",
     )
     (consumer / "Program.cs").write_text(
-        '''using AnyInfer;
+        '''using System.Net;
+using System.Text;
+using System.Text.Json;
+using AnyInfer;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
 using AnyInfer.Config;
@@ -319,6 +322,7 @@ using AnyInfer.Providers;
 using AnyInfer.Routing;
 using AnyInfer.Schema;
 using PeterO.Numbers;
+using JsonProperty = AnyInfer.Json.JsonProperty;
 
 var factoryCalls = 0;
 var descriptor = new ProviderDescriptor(
@@ -397,6 +401,39 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
 }
 if (factoryCalls != 0)
     throw new InvalidOperationException("pure catalog queries constructed an adapter");
+
+var teiEmbedHandler = new TeiHandler(reranker: false);
+var teiRerankHandler = new TeiHandler(reranker: true);
+var teiEmbedSettings = ProviderSettings.Of(
+    "tei", "https://tei-embed.offline/v1", transport: teiEmbedHandler, alias: "tei-embed");
+var teiRerankSettings = ProviderSettings.Of(
+    "tei", "https://tei-rerank.offline/v1", transport: teiRerankHandler, alias: "tei-rerank");
+{
+    await using var client = new AsyncClient(
+        [teiEmbedSettings, teiRerankSettings], manifests: true);
+    var embedded = await client.EmbedAsync(
+        ["first", "second"], target: "tei-embed:embed-model", retainRaw: true, manifest: true);
+    var reranked = await client.RerankAsync(
+        "find first",
+        [new RerankDocument("first-id", "first"), new RerankDocument("second-id", "second")],
+        target: "tei-rerank:rerank-model", returnDocuments: true, retainRaw: true, manifest: true);
+    if (embedded.Vectors.Count != 2
+        || embedded.Vectors[0].Values[0] != 0.1
+        || embedded.Usage.InputTokens is not null
+        || embedded.Usage.OutputTokens is not null
+        || embedded.Raw is null
+        || embedded.Manifest is not { Complete: true, Operation: "embedding", Payloads: null }
+        || reranked.Items.Count != 2
+        || reranked.Items[0] is not { Index: 0, DocumentId: "first-id", Score: 0.9 }
+        || reranked.Usage.InputTokens is not null
+        || reranked.Usage.OutputTokens is not null
+        || reranked.Raw is null
+        || reranked.Manifest is not { Complete: true, Operation: "rerank", Payloads: null })
+        throw new InvalidOperationException("default TEI builtin retrieval witness failed");
+}
+if (teiEmbedHandler.RequestCount != 1 || teiRerankHandler.RequestCount != 1
+    || teiEmbedHandler.DisposeCount != 1 || teiRerankHandler.DisposeCount != 1)
+    throw new InvalidOperationException("default TEI builtin transport ownership failed");
 
 var trustedAccounting = new ModelCapabilities(
     pricing: new Sourced<Pricing>(
@@ -1085,6 +1122,51 @@ sealed class ProbeAdapter : IProviderAdapter
         DisposeCount++;
         return ValueTask.CompletedTask;
     }
+}
+
+sealed class TeiHandler(bool reranker) : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = request.Content is null
+            ? ""
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        using var json = JsonDocument.Parse(body);
+        if (request.Method != HttpMethod.Post
+            || request.RequestUri?.AbsolutePath != (reranker ? "/v1/rerank" : "/v1/embed")
+            || request.Content?.Headers.ContentType?.MediaType != "application/json")
+            throw new InvalidOperationException("TEI builtin used unexpected HTTP fields");
+        if (!reranker)
+        {
+            var inputs = json.RootElement.GetProperty("inputs").EnumerateArray()
+                .Select(static item => item.GetString());
+            if (!inputs.SequenceEqual(["first", "second"]))
+                throw new InvalidOperationException("TEI builtin lost embedding order");
+            return Json("[[0.1,0.2],[0.3,0.4]]");
+        }
+        if (json.RootElement.GetProperty("query").GetString() != "find first"
+            || !json.RootElement.GetProperty("texts").EnumerateArray()
+                .Select(static item => item.GetString()).SequenceEqual(["first", "second"])
+            || json.RootElement.GetProperty("return_text").GetBoolean())
+            throw new InvalidOperationException("TEI builtin lost rerank caller values");
+        return Json("[{\\"index\\":1,\\"score\\":0.1},{\\"index\\":0,\\"score\\":0.9}]");
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+
+    private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(body, Encoding.UTF8, "application/json"),
+    };
 }
 ''',
         encoding="utf-8",

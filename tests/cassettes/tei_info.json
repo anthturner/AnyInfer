@@ -10,9 +10,9 @@
         "content-type": "application/json",
         "vary": "origin, access-control-request-method, access-control-request-headers",
         "access-control-allow-origin": "*",
-        "date": "Mon, 24 Aug 2026 20:58:32 GMT"
+        "date": "Thu, 22 Oct 2026 14:06:09 GMT"
       },
-      "body": "{\"model_id\":\"BAAI/bge-small-en-v1.5\",\"model_sha\":null,\"model_dtype\":\"float32\",\"model_type\":{\"embedding\":{\"pooling\":\"cls\"}},\"max_concurrent_requests\":512,\"max_input_length\":512,\"max_batch_tokens\":16384,\"max_batch_requests\":8,\"max_client_batch_size\":32,\"auto_truncate\":false,\"tokenization_workers\":16,\"version\":\"1.8.3\",\"sha\":\"78502d8e61223d2c73d4bb7aeaea46787e90d596\",\"docker_label\":\"sha-78502d8\"}"
+      "body": "{\"model_id\":\"BAAI/bge-small-en-v1.5\",\"model_sha\":\"5c38ec7c405ec4b44b94cc5a9bb96e735b38267a\",\"model_dtype\":\"float32\",\"served_model_name\":\"BAAI/bge-small-en-v1.5\",\"model_type\":{\"embedding\":{\"pooling\":\"cls\"}},\"max_concurrent_requests\":512,\"max_input_length\":512,\"max_batch_tokens\":16384,\"max_batch_requests\":8,\"max_client_batch_size\":32,\"auto_truncate\":true,\"tokenization_workers\":15,\"version\":\"1.9.4\",\"sha\":\"e80ef225ed0e6cb1717ce632a6a84b6cf211bb67\",\"docker_label\":\"sha-e80ef22\"}"
     }
   ]
 }

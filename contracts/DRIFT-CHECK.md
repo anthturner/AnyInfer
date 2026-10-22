@@ -5,6 +5,11 @@ provider's *current* public API. Entry points: Claude Code skill `check-provider
 Copilot prompt `.github/prompts/check-provider-drift.prompt.md`, or any agent following this
 file directly.
 
+When an adopted finding requires coordinated changes across the shared specification or
+registered implementations, continue with [PROPAGATE-CHANGE.md](PROPAGATE-CHANGE.md). This
+file remains the authority for auditing upstream evidence; it does not repeat the propagation
+procedure.
+
 ## Purpose
 
 `contracts/<provider>.md` records the exact upstream protocol details AnyInfer depends

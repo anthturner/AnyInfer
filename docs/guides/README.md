@@ -67,10 +67,11 @@ release path, and it does not change the supported Python SDK surface.
 
 Its source-linked examples cover generation, routing, configuration, pure catalog and capability
 queries, explicit model discovery, health and capability probes for a configured instance,
-payload-free typed telemetry, immutable manifests, declarative provider setup metadata, bounded
-winning-request pricing, explicit budgeting, caller-owned ledger/store helpers, standalone pacing,
-explicit request-policy inputs, and modern JSON Schema validation with typed deserialization. They
-do not imply provider parity, released NuGet distribution, provider invoice or all-wire accounting,
+payload-free typed telemetry, immutable manifests, built-in TEI embedding and reranking,
+declarative provider setup metadata, bounded winning-request pricing, explicit budgeting,
+caller-owned ledger/store helpers, standalone pacing, explicit request-policy inputs, and modern
+JSON Schema validation with typed deserialization. They do not imply full provider parity,
+released NuGet distribution, provider invoice or all-wire accounting,
 automatic tool execution, rich-media input breadth, context/history reduction, or a supported
 application integration path. Typed raw tool values do not provide callable tool
 execution, and specialized context-window routes are public route values rather than version 1

@@ -10,6 +10,11 @@ snapshot true over time, this one produces the snapshot and the adapter in the f
 Both exist because the failure mode is the same — protocol details believed rather than
 verified.
 
+When research or implementation changes require coordinated updates across the shared
+specification or registered implementations, follow
+[PROPAGATE-CHANGE.md](PROPAGATE-CHANGE.md). This file remains the authority for provider
+research and adapter implementation; it does not repeat the propagation procedure.
+
 Read [AGENTS.md](../AGENTS.md) first for the architecture rules this procedure assumes;
 [docs/contributing/writing-an-adapter.md](../docs/contributing/writing-an-adapter.md) is the
 prose companion explaining *why* an adapter is shaped the way it is. Neither repeats the

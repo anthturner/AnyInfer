@@ -12,4 +12,9 @@
     <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="all" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../../tests/cassettes/tei_embed.json" Link="tei-cassettes/tei_embed.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../tests/cassettes/tei_info.json" Link="tei-cassettes/tei_info.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../tests/cassettes/tei_rerank.json" Link="tei-cassettes/tei_rerank.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
