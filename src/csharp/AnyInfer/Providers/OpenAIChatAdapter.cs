@@ -20,6 +20,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
     private readonly string _providerId;
     private readonly IReadOnlyList<KeyValuePair<string, string>> _headers;
     private readonly TimeSpan _timeout;
+    private readonly OpenAICompatDialectOptions _dialect;
     private int _disposed;
 
     internal OpenAIChatAdapter(
@@ -29,7 +30,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         HttpMessageHandler? handler = null,
         string providerId = "openai-compat",
         double timeoutS = 120,
-        bool handlerOwnedByPool = false)
+        bool handlerOwnedByPool = false,
+        OpenAICompatDialectOptions? dialect = null)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
         if (!baseUrl.IsAbsoluteUri ||
@@ -49,6 +51,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             .Select(static header => new KeyValuePair<string, string>(header.Key, header.Value))
             .ToArray();
         _timeout = TimeSpan.FromSeconds(timeoutS);
+        _dialect = dialect ?? new OpenAICompatDialectOptions();
         var ownedHandler = handler ?? new HttpClientHandler
         {
             AllowAutoRedirect = false,
@@ -59,10 +62,17 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         };
     }
 
-    internal static IProviderAdapter Create(ProviderConfig config, CancellationToken cancellationToken)
+    internal static IProviderAdapter Create(ProviderConfig config, CancellationToken cancellationToken) =>
+        Create(config, new OpenAICompatDialectOptions(), cancellationToken);
+
+    internal static IProviderAdapter Create(
+        ProviderConfig config,
+        OpenAICompatDialectOptions dialect,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(dialect);
         if (config.ApiVersion is not null || config.Options is { Properties.Count: > 0 })
         {
             throw new ConfigException(
@@ -85,7 +95,8 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 config.Transport,
                 config.ProviderId,
                 config.TimeoutS,
-                config.TransportOwnedByPool);
+                config.TransportOwnedByPool,
+                dialect);
         }
         catch (UriFormatException exception)
         {
@@ -114,6 +125,12 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        if (!_dialect.ModelsListing)
+        {
+            ThrowIfNoListingCancellation(cancellationToken);
+            return Array.Empty<DiscoveredModel>();
+        }
+
         using var timeout = CreateLifecycleTimeout(cancellationToken);
         using var message = CreateModelsRequest();
         HttpResponseMessage? response = null;
@@ -159,6 +176,12 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
     public async ValueTask<Health> HealthAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        if (!_dialect.ModelsListing)
+        {
+            ThrowIfNoListingCancellation(cancellationToken);
+            return new Health(true, "no cheap readiness probe; failures surface on use");
+        }
+
         using var timeout = CreateLifecycleTimeout(cancellationToken);
         using var message = CreateModelsRequest();
         HttpResponseMessage? response = null;
@@ -323,10 +346,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         }
 
-        if (!string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization"))
-        {
-            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-        }
+        ApplyAuthentication(message);
 
         return message;
     }
@@ -340,12 +360,32 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             Content = content,
         };
         ApplyHeaders(message, content, _headers);
-        if (!string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization"))
-        {
-            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-        }
+        ApplyAuthentication(message);
 
         return message;
+    }
+
+    private void ApplyAuthentication(HttpRequestMessage message)
+    {
+        if (string.IsNullOrEmpty(_apiKey))
+        {
+            return;
+        }
+
+        if (_dialect.AuthHeader == "bearer")
+        {
+            if (!message.Headers.Contains("Authorization"))
+            {
+                message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            }
+
+            return;
+        }
+
+        if (!message.Headers.Contains("x-api-key"))
+        {
+            message.Headers.TryAddWithoutValidation("x-api-key", _apiKey);
+        }
     }
 
     private static void ValidateHeaders(IReadOnlyDictionary<string, string> headers)
@@ -445,6 +485,19 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             properties.RemoveAll(static property => property.Name is "stream" or "stream_options");
         }
 
+        var payload = new JsonObject(properties);
+        return _dialect.OutputTokensField == "max_completion_tokens" &&
+               payload.TryGetValue("max_tokens", out var maxTokens)
+            ? RenameOutputTokens(payload, maxTokens)
+            : payload;
+    }
+
+    private static JsonObject RenameOutputTokens(JsonObject payload, JsonValue maxTokens)
+    {
+        var properties = payload.Properties
+            .Where(static property => property.Name != "max_tokens")
+            .ToList();
+        properties.Add(new JsonProperty("max_completion_tokens", maxTokens));
         return new JsonObject(properties);
     }
 
@@ -1069,6 +1122,18 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         var original = CancellationIdentityContext.Resolve(effectiveToken);
         return new OperationCanceledException(
             original.IsCancellationRequested ? original : effectiveToken);
+    }
+
+    private static void ThrowIfNoListingCancellation(CancellationToken cancellationToken)
+    {
+        if (!cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var callerIdentity = CancellationIdentityContext.Resolve(cancellationToken);
+        throw new OperationCanceledException(
+            callerIdentity.IsCancellationRequested ? callerIdentity : cancellationToken);
     }
 
     private ProviderException HttpFailure(
