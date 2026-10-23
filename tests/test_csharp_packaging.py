@@ -368,6 +368,31 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert 'client.Stream("hello", target: "sync-demo:model")' in source
     assert "foreach (var item in stream)" in source
     assert "synchronous adapter disposal failed" in source
+    rich_block = source.split("var richAsyncAdapter = new RichLoopAdapter", 1)[1].split(
+        "var retrievalAdapter = new RetrievalAdapter();", 1
+    )[0]
+    assert "using System.Numerics;" in source
+    assert 'new ImagePart(data: [1, 2], detail: "low")' in rich_block
+    assert 'new DocumentPart(data: [3, 4], filename: "source.pdf")' in rich_block
+    assert 'new AudioPart([5, 6], mediaType: "audio/mpeg")' in rich_block
+    assert "new VideoPart(data: [7, 8], startOffsetS: 0, endOffsetS: 1, fps: 2)" in rich_block
+    assert "await client.RunToolsAsync(richRequest, [asyncIncrement], maxRounds: 2)" in rich_block
+    assert "var final = client.RunTools(richRequest, [syncIncrement], maxRounds: 2);" in rich_block
+    assert "Tool.From((Func<BigInteger, BigInteger>)" in rich_block
+    assert "observedAsyncBigInteger != new BigInteger(17)" in rich_block
+    assert "observedSyncBigInteger != new BigInteger(17)" in rich_block
+    assert "asyncHandlerCalls != 1" in rich_block
+    assert "syncHandlerCalls != 1" in rich_block
+    assert "richAsyncAdapter.Requests.Count != 3" in rich_block
+    assert "richSyncAdapter.Requests.Count != 2" in rich_block
+    assert 'toolWire.ReasoningWire.TryGetValue("effort", out var effort)' in rich_block
+    assert "final.Raw is not JsonObject finalRaw" in rich_block
+    assert "public rich package async adapter disposal failed" in rich_block
+    assert "public rich package sync adapter disposal failed" in rich_block
+    assert (
+        "sealed class RichLoopAdapter(bool includeStreamWitness = false) : IProviderAdapter"
+        in source
+    )
     assert "operations: [InferenceOperation.Embedding, InferenceOperation.Rerank]" in source
     assert "operationRoutes: new Dictionary<InferenceOperation, Route>" in source
     assert "AsyncClient.FromConfig(retrievalConfig, retrievalRegistry)" in source
@@ -531,7 +556,16 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "asyncObserver.DisposeCount != 0" in source
     assert 'new ProviderRegistration("sync-telemetry-demo", syncTelemetryAdapter)' in source
     assert "syncObserver.DisposeCount != 0" in source
-    assert 'request.Schema is null || request.SchemaName != "response"' in source
+    assert 'request.Mechanism != "prompt"' in source
+    assert "request.Schema is not null" in source
+    assert 'request.SchemaName != "response"' in source
+    assert 'request.Messages[0].Role != "system"' in source
+    assert (
+        '"Respond with ONLY a JSON value matching this JSON Schema. No prose. Schema:\\n",'
+        in source
+    )
+    assert 'Contains("\\"$defs\\"", StringComparison.Ordinal)' in source
+    assert "Modern prompt schema wire boundary was not preserved." in source
     assert "schemaAdapter.SchemaRequests != 1" in source
     assert "schemaAdapter.DisposeCount != 1" in source
     assert (

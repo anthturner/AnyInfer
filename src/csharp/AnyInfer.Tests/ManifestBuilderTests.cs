@@ -169,7 +169,9 @@ public sealed class ManifestBuilderTests
         new("r", Normalized(schema), new Route(["alpha:model", "beta:model"]), _ => capabilities ?? new ModelCapabilities(), payloads, "v");
 
     private static NormalizedRequest Normalized(SchemaSpec? schema) =>
-        new([Message.User("hello"), Message.System("system")], [], "auto", new Sampling(stop: ["one", "two"], seed: 7), schema, 2, 10, 1024, false, SchemaExecutionProfile.FrozenV0, null);
+        new([Message.User("hello"), Message.System("system")], [], "auto", new Sampling(stop: ["one", "two"], seed: 7), schema, 2, 10, 1024,
+            Reasoning: null, ProviderOptions: new Dictionary<string, JsonObject>(), Metadata: new Dictionary<string, string>(), Logprobs: null,
+            CiteDocuments: false, ServerTools: [], Stream: false, SchemaProfile: SchemaExecutionProfile.FrozenV0, SchemaValidation: null);
 
     private static TargetMetadata Metadata(ResolvedTarget target, StructuredOutputProfile profile) =>
         new(target, null, null, new ProviderSettings("alpha"), profile, null);

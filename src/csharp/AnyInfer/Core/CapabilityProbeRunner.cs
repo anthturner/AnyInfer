@@ -29,14 +29,20 @@ internal static class CapabilityProbeRunner
         var mechanism = CapabilityProbes.MechanismFor(feature);
         var schema = mechanism is null ? null : new SchemaSpec(CapabilityProbes.ProbeSchema, "capability_probe");
         var normalized = new NormalizedRequest(
-            [Message.User(CapabilityProbes.ProbePrompt(feature))],
-            [],
-            "auto",
-            new Sampling(temperature: 0, maxOutputTokens: CapabilityProbes.ProbeMaxOutputTokens),
-            schema,
+            Messages: [Message.User(CapabilityProbes.ProbePrompt(feature))],
+            Tools: [],
+            ToolChoice: "auto",
+            Sampling: new Sampling(temperature: 0, maxOutputTokens: CapabilityProbes.ProbeMaxOutputTokens),
+            Schema: schema,
             RepairBudget: 0,
             TimeoutS: timeoutS,
             MaxResponseBytes: 1_048_576,
+            Reasoning: null,
+            ProviderOptions: new Dictionary<string, JsonObject>(StringComparer.Ordinal),
+            Metadata: new Dictionary<string, string>(StringComparer.Ordinal),
+            Logprobs: null,
+            CiteDocuments: false,
+            ServerTools: [],
             Stream: feature == Feature.Streaming,
             SchemaProfile: SchemaExecutionProfile.ModernSdk,
             SchemaValidation: null);

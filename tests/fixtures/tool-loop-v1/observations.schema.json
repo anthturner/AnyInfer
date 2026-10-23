@@ -1,0 +1,1289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tool-loop-v1/observations.schema.json",
+  "type": "object",
+  "properties": {
+    "profile": {
+      "const": "tool-loop-v1"
+    },
+    "runtime": {
+      "enum": [
+        "python",
+        "csharp"
+      ]
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_dirty": {
+      "type": "boolean"
+    },
+    "corpus_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "enum": [
+              "tools-final-no-calls",
+              "tools-one-call",
+              "tools-ordered-calls",
+              "tools-repeated-id",
+              "tools-duplicate-name",
+              "tools-round-exhaustion",
+              "tools-zero-rounds",
+              "tools-negative-rounds",
+              "tools-unknown-name",
+              "tools-sync-path"
+            ]
+          },
+          "public": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "entry_point": {
+                    "enum": [
+                      "async_run_tools",
+                      "sync_run_tools"
+                    ]
+                  },
+                  "result": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "finish_reason": {
+                        "type": "string"
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "provider_id": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "provider_id",
+                          "model"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "usage": {
+                        "type": "object",
+                        "properties": {
+                          "input_tokens": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "output_tokens": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "total_tokens": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "input_tokens",
+                          "output_tokens",
+                          "total_tokens"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "finish_reason",
+                      "target",
+                      "usage"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "error": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "entry_point",
+                  "result",
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "entry_point": {
+                    "enum": [
+                      "async_run_tools",
+                      "sync_run_tools"
+                    ]
+                  },
+                  "result": {
+                    "type": "null"
+                  },
+                  "error": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "hint": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "entry_point",
+                  "result",
+                  "error"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "messages": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "enum": [
+                              "system",
+                              "user"
+                            ]
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "content"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "const": "assistant"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "content"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "const": "assistant"
+                          },
+                          "content": {
+                            "type": "null"
+                          },
+                          "tool_calls": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "const": "function"
+                                },
+                                "function": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "arguments": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "arguments"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "function"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "content",
+                          "tool_calls"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "const": "tool"
+                          },
+                          "tool_call_id": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "tool_call_id",
+                          "content"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "const": "function"
+                      },
+                      "function": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "parameters": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "$ref": "#/$defs/json"
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "parameters"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "function"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tool_choice": {
+                  "const": "auto"
+                }
+              },
+              "required": [
+                "model",
+                "messages",
+                "tools",
+                "tool_choice"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler_calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "registration_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/json"
+                  }
+                },
+                "returned_data": {
+                  "$ref": "#/$defs/json"
+                }
+              },
+              "required": [
+                "registration_index",
+                "name",
+                "arguments",
+                "returned_data"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "public",
+          "requests",
+          "handler_calls"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "profile",
+    "runtime",
+    "source_revision",
+    "source_dirty",
+    "corpus_sha256",
+    "observations"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "json": {
+      "oneOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        }
+      ]
+    },
+    "wire_message": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "enum": [
+                "system",
+                "user"
+              ]
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "const": "assistant"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "const": "assistant"
+            },
+            "content": {
+              "type": "null"
+            },
+            "tool_calls": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "function"
+                  },
+                  "function": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "arguments": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "function"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "role",
+            "content",
+            "tool_calls"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "const": "tool"
+            },
+            "tool_call_id": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "tool_call_id",
+            "content"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "advertised_tool": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "function"
+        },
+        "function": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "parameters": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/json"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "description",
+            "parameters"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "function"
+      ],
+      "additionalProperties": false
+    },
+    "trace_request": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "enum": [
+                      "system",
+                      "user"
+                    ]
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "role",
+                  "content"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "const": "assistant"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "role",
+                  "content"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "const": "assistant"
+                  },
+                  "content": {
+                    "type": "null"
+                  },
+                  "tool_calls": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "const": "function"
+                        },
+                        "function": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "arguments": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "arguments"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "function"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "role",
+                  "content",
+                  "tool_calls"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "const": "tool"
+                  },
+                  "tool_call_id": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "role",
+                  "tool_call_id",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "function"
+              },
+              "function": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/$defs/json"
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "description",
+                  "parameters"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type",
+              "function"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "tool_choice": {
+          "const": "auto"
+        }
+      },
+      "required": [
+        "model",
+        "messages",
+        "tools",
+        "tool_choice"
+      ],
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "provider_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "model"
+      ],
+      "additionalProperties": false
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "total_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "total_tokens"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "finish_reason": {
+          "type": "string"
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "provider_id": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider_id",
+            "model"
+          ],
+          "additionalProperties": false
+        },
+        "usage": {
+          "type": "object",
+          "properties": {
+            "input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "total_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "input_tokens",
+            "output_tokens",
+            "total_tokens"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "text",
+        "finish_reason",
+        "target",
+        "usage"
+      ],
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "handler_call": {
+      "type": "object",
+      "properties": {
+        "registration_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        "returned_data": {
+          "$ref": "#/$defs/json"
+        }
+      },
+      "required": [
+        "registration_index",
+        "name",
+        "arguments",
+        "returned_data"
+      ],
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "enum": [
+            "tools-final-no-calls",
+            "tools-one-call",
+            "tools-ordered-calls",
+            "tools-repeated-id",
+            "tools-duplicate-name",
+            "tools-round-exhaustion",
+            "tools-zero-rounds",
+            "tools-negative-rounds",
+            "tools-unknown-name",
+            "tools-sync-path"
+          ]
+        },
+        "public": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "entry_point": {
+                  "enum": [
+                    "async_run_tools",
+                    "sync_run_tools"
+                  ]
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "finish_reason": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "provider_id": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider_id",
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "output_tokens": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "total_tokens": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens",
+                        "total_tokens"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "finish_reason",
+                    "target",
+                    "usage"
+                  ],
+                  "additionalProperties": false
+                },
+                "error": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "entry_point",
+                "result",
+                "error"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "entry_point": {
+                  "enum": [
+                    "async_run_tools",
+                    "sync_run_tools"
+                  ]
+                },
+                "result": {
+                  "type": "null"
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "hint": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "entry_point",
+                "result",
+                "error"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "enum": [
+                            "system",
+                            "user"
+                          ]
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "content"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "const": "assistant"
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "content"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "const": "assistant"
+                        },
+                        "content": {
+                          "type": "null"
+                        },
+                        "tool_calls": {
+                          "type": "array",
+                          "minItems": 1,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "const": "function"
+                              },
+                              "function": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "arguments": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "arguments"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type",
+                              "function"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "content",
+                        "tool_calls"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "const": "tool"
+                        },
+                        "tool_call_id": {
+                          "type": "string"
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "tool_call_id",
+                        "content"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "tools": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "function"
+                    },
+                    "function": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "$ref": "#/$defs/json"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "description",
+                        "parameters"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "function"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "tool_choice": {
+                "const": "auto"
+              }
+            },
+            "required": [
+              "model",
+              "messages",
+              "tools",
+              "tool_choice"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "handler_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "registration_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "name": {
+                "type": "string"
+              },
+              "arguments": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/json"
+                }
+              },
+              "returned_data": {
+                "$ref": "#/$defs/json"
+              }
+            },
+            "required": [
+              "registration_index",
+              "name",
+              "arguments",
+              "returned_data"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "id",
+        "public",
+        "requests",
+        "handler_calls"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

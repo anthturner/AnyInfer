@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <RichGenerationSourceDirty Condition="'$(RichGenerationSourceDirty)' == ''">true</RichGenerationSourceDirty>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AnyInfer/AnyInfer.csproj" />
+    <AssemblyMetadata Include="RichGenerationSourceDirty" Value="$(RichGenerationSourceDirty)" />
+  </ItemGroup>
+</Project>

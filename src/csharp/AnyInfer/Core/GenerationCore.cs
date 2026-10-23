@@ -101,15 +101,20 @@ internal static class GenerationCore
                 var contextRedirected = false;
                 for (var attemptNumber = 1; attemptNumber <= Math.Max(1, route.Retry.MaxAttempts); attemptNumber++)
                 {
+                    var attemptStopwatch = Stopwatch.StartNew();
+                    var attemptStartedAt = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    var publicSdk = request.SchemaProfile == SchemaExecutionProfile.ModernSdk;
                     var routeState = new RouteAttemptState();
                     telemetry?.Emit(new AttemptStarted(telemetry.RequestId, resolved.Target, attemptNumber));
-                    ContextLengthException? admissionError = null;
+                    ProviderException? admissionError = null;
                     try
                     {
+                        RichGenerationPolicy.ValidateInputs(request, metadata, resolved);
+                        if (attemptNumber == 1) RichGenerationPolicy.EmitDroppedParameters(request, metadata, resolved, telemetry);
                         EnforceSpend(policyContext, metadata, resolved, telemetry);
                         CheckContextGate(policyContext, metadata, resolved, telemetry);
                     }
-                    catch (ContextLengthException error)
+                    catch (ProviderException error)
                     {
                         admissionError = error;
                     }
@@ -123,16 +128,17 @@ internal static class GenerationCore
                             attemptNumber,
                             route.Retry,
                             contentEmitted: false,
-                            health: health);
+                            health: health,
+                            timing: publicSdk ? new Timing(attemptStartedAt, totalMs: attemptStopwatch.Elapsed.TotalMilliseconds) : null);
                         yield return new AttemptFailed(disposition.Attempt);
                         pendingFallback = new PendingFallback(resolved.Target, admissionError.Snapshot());
-                        contextRedirected = ReplaceWithContextWindowTargets(route, pendingTargets, visitedTargets, targetResolver, resolutionProfile);
+                        contextRedirected = admissionError is ContextLengthException && ReplaceWithContextWindowTargets(route, pendingTargets, visitedTargets, targetResolver, resolutionProfile);
                         break;
                     }
 
                     var cachePlan = PlanCache(policyContext, metadata, resolved, telemetry);
                     var cacheMarks = cachePlan.Marks.Select(static mark => mark.Segment).ToArray();
-                    var wireRequest = RequestNormalizer.CreateWireRequest(request, resolved, cacheMarks: cacheMarks);
+                    var wireRequest = RequestNormalizer.CreateWireRequest(request, resolved, cacheMarks: cacheMarks, capabilities: metadata.ResolvedCapabilities);
                     if (resolutionProfile == TargetResolutionProfile.PublicSdk && pacing.Limiter?.UnsupportedHeadersReason is { } headersReason)
                     {
                         telemetry?.Emit(new ParameterDropped(
@@ -171,7 +177,8 @@ internal static class GenerationCore
                             attemptNumber,
                             route.Retry,
                             routeState.ContentEmitted,
-                            health);
+                            health,
+                            publicSdk ? current.BuildTiming() : null);
                         yield return new AttemptFailed(disposition.Attempt);
                         if (current.Error.Category == "stream_protocol" && routeState.ContentEmitted)
                         {
@@ -250,7 +257,7 @@ internal static class GenerationCore
                             new TelemetryObservation("repair_attempted", AttemptNumber: repairs));
                         current = CreateEntry(
                             generatesText,
-                            RequestNormalizer.CreateWireRequest(request, resolved, preparation.Messages, cacheMarks: cacheMarks),
+                            RequestNormalizer.CreateWireRequest(request, resolved, preparation.Messages, cacheMarks: cacheMarks, capabilities: metadata.ResolvedCapabilities),
                             operation,
                             stream,
                             resolved.Target,
@@ -286,7 +293,8 @@ internal static class GenerationCore
                             attemptNumber,
                             route.Retry,
                             routeState.ContentEmitted,
-                            health);
+                            health,
+                            publicSdk ? current.BuildTiming() : null);
                         yield return new AttemptFailed(disposition.Attempt);
                         if (current.Error.Category == "stream_protocol" && routeState.ContentEmitted)
                         {
@@ -323,11 +331,11 @@ internal static class GenerationCore
                     }
 
                     var structured = request.Schema is null ? null : operation.LastAssessment?.Structured;
-                    attempts.Add(new AttemptRecord(resolved.Target, "ok"));
+                    // FrozenV0 has always exposed the winning entry's observed timing too.
+                    // ModernSdk additionally projects that same entry timing into its attempt trail.
+                    var winningTiming = current.BuildTiming();
+                    attempts.Add(new AttemptRecord(resolved.Target, "ok", timing: publicSdk ? winningTiming : null));
                     health.Clear(resolved.Target);
-                    var totalMilliseconds = current.TotalMilliseconds;
-                    var firstTokenMilliseconds = current.FirstTokenMilliseconds;
-                    var publicSdk = request.SchemaProfile == SchemaExecutionProfile.ModernSdk;
                     var winningUsage = NormalizeWinningUsage(current.Usage, publicSdk);
                     if (publicSdk && winningUsage is not null)
                     {
@@ -344,20 +352,16 @@ internal static class GenerationCore
                         resolved.Target,
                         finishReason,
                         winningUsage,
-                        new Timing(
-                            current.StartedAt,
-                            firstTokenMilliseconds,
-                            totalMilliseconds,
-                            OutputTokensPerSecond(current.Usage, firstTokenMilliseconds, totalMilliseconds),
-                            current.QueuedMilliseconds > 0
-                                ? [new KeyValuePair<string, double>("queued_ms", current.QueuedMilliseconds)]
-                                : null),
+                        winningTiming,
                         current.Entry.Request.Mechanism,
                         repairs,
                         attempts,
                         current.Warnings,
                         toolCalls: toolCalls,
-                        raw: retainRaw && publicSdk ? current.Raw : null);
+                        raw: retainRaw && publicSdk ? current.Raw : null,
+                        logprobs: current.Logprobs,
+                        citations: current.Citations,
+                        serverToolUses: current.ServerToolUses);
                     telemetry?.Emit(new AttemptCompleted(
                         telemetry.RequestId,
                         resolved.Target,
@@ -630,11 +634,12 @@ internal static class GenerationCore
         int attemptNumber,
         Retry policy,
         bool contentEmitted,
-        RouteState health)
+        RouteState health,
+        Timing? timing)
     {
         var protocolAfterContent = failure.Category == "stream_protocol" && contentEmitted;
         var shouldRetry = !protocolAfterContent && CanRetry(failure, attemptNumber, policy);
-        var attempt = new AttemptRecord(target, shouldRetry ? "retried" : "failed", failure);
+        var attempt = new AttemptRecord(target, shouldRetry ? "retried" : "failed", failure, timing);
         attempts.Add(attempt);
         if (!shouldRetry && !protocolAfterContent && ShouldMarkUnhealthy(failure))
         {
@@ -740,6 +745,10 @@ internal static class GenerationCore
         private readonly StringBuilder _text = new();
         private readonly Dictionary<int, ToolCallBuffer> _toolCalls = [];
         private readonly List<string> _warnings = [];
+        private readonly List<Citation> _citations = [];
+        private readonly List<ServerToolUse> _serverToolUses = [];
+        private IReadOnlyList<TokenLogprob> _logprobs = [];
+        private IReadOnlyDictionary<string, double> _providerPhases = new Dictionary<string, double>();
         private EntryContext? _entry;
         private ProviderException? _error;
         private Usage? _usage;
@@ -747,6 +756,7 @@ internal static class GenerationCore
         private readonly bool _retainRaw;
         private JsonValue? _raw;
         private bool _sawAdapterUsage;
+        private bool _sawTerminalUsage;
         private bool _firstContent;
         private bool _clean;
         private readonly Stopwatch _entryStopwatch = Stopwatch.StartNew();
@@ -797,6 +807,23 @@ internal static class GenerationCore
         internal double QueuedMilliseconds => _attemptPacing?.WaitedMs ?? 0;
         internal IReadOnlyList<ToolCall> ToolCalls => BuildToolCalls();
         internal IReadOnlyList<string> Warnings => _warnings;
+        internal IReadOnlyList<Citation> Citations => _citations;
+        internal IReadOnlyList<ServerToolUse> ServerToolUses => _serverToolUses;
+        internal IReadOnlyList<TokenLogprob> Logprobs => _logprobs;
+        internal IReadOnlyDictionary<string, double> ProviderPhases => _providerPhases;
+
+        internal Timing BuildTiming()
+        {
+            var totalMilliseconds = TotalMilliseconds;
+            return new Timing(
+                StartedAt,
+                FirstTokenMilliseconds,
+                totalMilliseconds,
+                OutputTokensPerSecond(Usage, FirstTokenMilliseconds, totalMilliseconds),
+                ProviderPhases.Concat(QueuedMilliseconds > 0
+                    ? [new KeyValuePair<string, double>("queued_ms", QueuedMilliseconds)]
+                    : []));
+        }
 
         internal async IAsyncEnumerable<StreamEvent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
         {
@@ -816,7 +843,7 @@ internal static class GenerationCore
                 }
 
                 enumerator = AdapterInvocationBoundary
-                    .InvokeAsync(_adapter, _request, _operation, _role, _assessment, _cancellationToken)
+                    .InvokeAsync(_adapter, _request, _operation, _role, _assessment, _cancellationToken, _cancelledParentToken)
                     .GetAsyncEnumerator(_cancellationToken);
                 pending = ReadStepAsync(enumerator);
                 _entry = _operation.LastEntry ?? throw new InvalidOperationException("The boundary did not create an entry.");
@@ -928,7 +955,7 @@ internal static class GenerationCore
 
         internal IEnumerable<StreamEvent> FinalUsageEvents()
         {
-            if (_clean && !_sawAdapterUsage && _usage is not null)
+            if (_clean && !_sawAdapterUsage && _sawTerminalUsage && _usage is not null)
             {
                 yield return new UsageUpdate(_usage);
             }
@@ -958,6 +985,17 @@ internal static class GenerationCore
                     _text.Append(textDelta.Text);
                     yield return new TextDelta(textDelta.Text);
                     break;
+                case AdapterReasoningDelta reasoning:
+                    foreach (var timing in MarkFirstContent()) yield return timing;
+                    yield return new ReasoningDelta(reasoning.Text);
+                    break;
+                case AdapterCitationDelta citation:
+                    _citations.Add(citation.Citation);
+                    yield return new CitationDelta(citation.Citation);
+                    break;
+                case AdapterServerToolDelta tool:
+                    yield return new ServerToolDelta(tool.Kind, tool.Status, tool.Sources, tool.Output, tool.Detail);
+                    break;
                 case AdapterToolCallDelta toolDelta:
                     if (!_publicSdk)
                     {
@@ -979,8 +1017,23 @@ internal static class GenerationCore
                     break;
                 case AdapterFinal final:
                     _finishReason = final.FinishReason;
+                    _sawTerminalUsage = final.Usage is not null;
                     _usage = OverlayUsage(_usage, final.Usage, _publicSdk);
                     _raw = _retainRaw ? final.Raw : null;
+                    _providerPhases = final.Phases;
+                    _logprobs = final.Logprobs;
+                    _serverToolUses.Clear();
+                    _serverToolUses.AddRange(final.ServerToolUses);
+                    if (final.ServerToolUses.Count != 0)
+                    {
+                        var serverToolUses = new Dictionary<string, long>(StringComparer.Ordinal);
+                        foreach (var use in final.ServerToolUses)
+                        {
+                            serverToolUses[use.Kind] = use.Uses;
+                        }
+
+                        _usage = (_usage ?? new Usage()) with { ServerToolUses = serverToolUses };
+                    }
                     break;
             }
         }

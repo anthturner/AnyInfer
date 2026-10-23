@@ -45,6 +45,29 @@ and cancellation token so application code can supply its own configuration boun
 --8<-- "examples/csharp-sdk/GenerationExample.cs"
 ```
 
+## Rich generation inputs and outputs
+
+Generation can combine `Text` with typed `ImagePart`, `DocumentPart`, `AudioPart`, and
+`VideoPart` inputs. Inline bytes are copied into read-only values. Image, document, and video
+parts take exactly one inline byte source or URL reference; audio is inline-only. The core
+does not fetch URL references. Inline input defaults to 20 MiB per part and 50 MiB total.
+The built-in C# chat-completions adapter supports images, inline documents, and inline audio;
+it refuses video and document URL inputs before sending a request. Other adapters may define
+their own rich-input translation.
+
+The executed example below sends typed inline image, document, and audio input and requests
+token log-probabilities. Its scripted transport is checked by the offline example runner.
+
+```csharp
+--8<-- "examples/csharp-sdk/RichGenerationExample.cs"
+```
+
+`Generation.Text` contains visible answer text. Reasoning remains a separate stream event;
+log-probabilities, citations, and provider-run tool usage are exposed through separate typed
+result fields or events. Rich custom adapters can provide those normalized values. The built-in
+chat-completions adapter currently projects log-probability requests and responses; it does not
+invent reasoning, citation, or provider-run tool support.
+
 ## Use the synchronous facade
 
 `Client` drains the same core execution path through a synchronous facade. It is intended for a
@@ -149,9 +172,9 @@ source-linked methods.
 
 Probing is explicit I/O: the default selection sends up to four small requests in the fixed
 JSON Schema, JSON mode, raw tool-call, and streaming order. The returned immutable report
-records what the endpoint actually established at `Probed` provenance. The tool declaration
-exists only for this raw probe translation; normal tool execution and tool loops are not part
-of this proof.
+records what the endpoint actually established at `Probed` provenance. The raw tool declaration
+here is only the probe input. Normal registered-tool execution uses the separate bounded loop
+documented in [Run the tool loop](tool-loop.md).
 
 ```csharp
 --8<-- "examples/csharp-sdk/ProbeExample.cs"
@@ -189,7 +212,8 @@ Creating this metadata does not resolve credentials or construct a provider.
 Spend policy, context-window routes, cache placement, and raw tool declarations are explicit
 client or request inputs. A supplied ledger remains caller-owned; a spend policy without one
 creates a client-local ledger. The generic OpenAI-compatible descriptor declares no cache
-mechanism. Tool declarations and raw tool call or result values do not run a callable tool loop.
+mechanism. `ToolSpec`, `ToolCall`, and `ToolResult` remain available as raw values; the bounded
+registered-tool loop is documented in [Run the tool loop](tool-loop.md).
 
 ```csharp
 --8<-- "examples/csharp-sdk/RequestPolicyExample.cs"
@@ -214,16 +238,16 @@ verifier runs.
 
 ## Scope
 
-This proof covers asynchronous text generation and a synchronous facade over that same core
-through the OpenAI-compatible adapter, plus buffered text embeddings and reranking through the
+This proof covers asynchronous text generation and typed rich-input generation through the
+OpenAI-compatible adapter, plus a bounded registered-tool loop and a synchronous facade over
+that same core. It also covers buffered text embeddings and reranking through the
 built-in TEI, Voyage, and Jina adapters and application-owned retrieval adapters. The
 OpenAI-compatible adapter remains chat-only. It also covers structured JSON validation and repair,
 configuration, routing, reported token usage, bounded winning-request pricing, explicit budgets,
 caller-owned ledger and store helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free
 typed telemetry, immutable manifests, and declarative setup metadata. It does not provide a
-released NuGet package, full provider parity, provider invoice or all-wire totals, automatic
-tool execution, rich-media input breadth, context/history reduction, or production report
-publication. Built-in retrieval coverage is limited to TEI, Voyage, and Jina; generic
+released NuGet package, full provider parity, provider invoice or all-wire totals, context/history
+reduction, or production report publication. Built-in retrieval coverage is limited to TEI, Voyage, and Jina; generic
 OpenAI-compatible retrieval is not implemented in this proof.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.

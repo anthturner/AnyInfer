@@ -280,8 +280,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 request.UsesModernSchema).ConfigureAwait(false);
             foreach (var adapterEvent in ReadBuffered(
                 body,
-                request.UsesModernSchema || request.Tools.Count > 0,
-                request.UsesModernSchema))
+                request.UsesModernSchema || request.Tools.Count > 0))
             {
                 yield return adapterEvent;
             }
@@ -389,7 +388,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         var properties = new List<JsonProperty>
         {
             new("model", new JsonString(request.Model)),
-            new("messages", new JsonArray(request.Messages.Select(message => CreateMessage(message, request.UsesModernSchema)))),
+            new("messages", new JsonArray(request.Messages.Select(CreateMessage))),
         };
         AddSampling(properties, request.Sampling);
         if (request.UsesModernSchema)
@@ -399,7 +398,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 properties.Add(new JsonProperty("response_format", new JsonObject([
                     new JsonProperty("type", new JsonString("json_schema")),
                     new JsonProperty("json_schema", new JsonObject([
-                        new JsonProperty("name", new JsonString(request.SchemaName)),
+                        new JsonProperty("name", new JsonString(request.SchemaName ?? "response")),
                         new JsonProperty("schema", request.Schema),
                         new JsonProperty("strict", new JsonBoolean(false)),
                     ])),
@@ -425,6 +424,27 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             ])));
         }
 
+        if (request.Logprobs is not null)
+        {
+            properties.Add(new JsonProperty("logprobs", new JsonBoolean(true)));
+            if (request.Logprobs > 0)
+            {
+                properties.Add(new JsonProperty("top_logprobs", new JsonInteger(new BigInteger(request.Logprobs.Value))));
+            }
+        }
+
+        // The core translates generic reasoning controls before the adapter sees a request.
+        // Raw extra options deliberately remain the final overlay, matching Python.
+        properties.AddRange(request.ReasoningWire.Properties);
+        properties.AddRange(request.ExtraOptions.Properties);
+
+        // Buffered generation must not inherit a caller-supplied stream override. This
+        // happens after the extra-options overlay for the same precedence as Python.
+        if (!request.Stream)
+        {
+            properties.RemoveAll(static property => property.Name is "stream" or "stream_options");
+        }
+
         return new JsonObject(properties);
     }
 
@@ -448,9 +468,9 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 ])),
             ]);
 
-    private JsonObject CreateMessage(Message message, bool usesModernSchema)
+    private JsonObject CreateMessage(Message message)
     {
-        if (usesModernSchema && message.Content.OfType<ToolResult>().FirstOrDefault() is { } result)
+        if (message.Content.OfType<ToolResult>().FirstOrDefault() is { } result)
         {
             return new JsonObject([
                 new JsonProperty("role", new JsonString("tool")),
@@ -459,28 +479,87 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             ]);
         }
 
-        var content = new StringBuilder();
+        var text = new StringBuilder();
         var calls = new List<ToolCall>();
+        var multimodal = message.Content.Any(static part => part is ImagePart or DocumentPart or AudioPart or VideoPart);
+        var items = new List<JsonValue>();
         foreach (var part in message.Content)
         {
             if (part is Text textPart)
             {
-                content.Append(textPart.Value);
+                text.Append(textPart.Value);
+                if (multimodal)
+                {
+                    items.Add(new JsonObject([
+                        new JsonProperty("type", new JsonString("text")),
+                        new JsonProperty("text", new JsonString(textPart.Value)),
+                    ]));
+                }
                 continue;
             }
 
-            if (usesModernSchema && part is ToolCall call)
+            if (part is ToolCall call)
             {
                 calls.Add(call);
                 continue;
             }
 
-            throw ProviderException.Create(
-                "The OpenAI-compatible chat adapter supports text message content only.",
-                "unsupported_input",
-                retryable: false,
-                phase: "generate",
-                provider: _providerId);
+            if (part is ImagePart image)
+            {
+                var imageProperties = new List<JsonProperty>
+                {
+                    new("url", new JsonString(image.Url ?? DataUrl(image.MediaType, image.Data!))),
+                };
+                if (image.Detail is not null)
+                {
+                    imageProperties.Add(new JsonProperty("detail", new JsonString(image.Detail)));
+                }
+                items.Add(new JsonObject([
+                    new JsonProperty("type", new JsonString("image_url")),
+                    new JsonProperty("image_url", new JsonObject(imageProperties)),
+                ]));
+                continue;
+            }
+
+            if (part is DocumentPart document)
+            {
+                if (document.Url is not null)
+                {
+                    throw UnsupportedPart("document URL");
+                }
+                var fileProperties = new List<JsonProperty>
+                {
+                    new("file_data", new JsonString(DataUrl(document.MediaType, document.Data!))),
+                };
+                if (document.Filename is not null)
+                {
+                    fileProperties.Add(new JsonProperty("filename", new JsonString(document.Filename)));
+                }
+                items.Add(new JsonObject([
+                    new JsonProperty("type", new JsonString("file")),
+                    new JsonProperty("file", new JsonObject(fileProperties)),
+                ]));
+                continue;
+            }
+
+            if (part is AudioPart audio)
+            {
+                items.Add(new JsonObject([
+                    new JsonProperty("type", new JsonString("input_audio")),
+                    new JsonProperty("input_audio", new JsonObject([
+                        new JsonProperty("data", new JsonString(Convert.ToBase64String(audio.Data.ToArray()))),
+                        new JsonProperty("format", new JsonString(MediaSubtype(audio.MediaType))),
+                    ])),
+                ]));
+                continue;
+            }
+
+            if (part is VideoPart)
+            {
+                throw UnsupportedPart("video");
+            }
+
+            throw UnsupportedPart("content");
         }
 
         var properties = new List<JsonProperty>
@@ -488,9 +567,9 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             new JsonProperty("role", new JsonString(message.Role)),
             new JsonProperty(
                 "content",
-                calls.Count > 0 && content.Length == 0
+                calls.Count > 0 && text.Length == 0 && !multimodal
                     ? JsonNull.Instance
-                    : new JsonString(content.ToString())),
+                    : multimodal ? new JsonArray(items) : new JsonString(text.ToString())),
         };
         if (calls.Count > 0)
         {
@@ -498,6 +577,21 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         }
 
         return new JsonObject(properties);
+    }
+
+    private UnsupportedInputException UnsupportedPart(string modality) => new(
+        $"{_providerId} cannot project {modality} input",
+        provider: _providerId,
+        phase: "generate");
+
+    private static string DataUrl(string mediaType, IReadOnlyList<byte> data) =>
+        $"data:{mediaType};base64,{Convert.ToBase64String(data.ToArray())}";
+
+    private static string MediaSubtype(string mediaType)
+    {
+        var separator = mediaType.IndexOf('/');
+        var subtype = separator < 0 ? mediaType : mediaType[(separator + 1)..];
+        return string.Equals(subtype, "mpeg", StringComparison.OrdinalIgnoreCase) ? "mp3" : subtype.ToLowerInvariant();
     }
 
     private static JsonObject CreateToolCall(ToolCall call) => new([
@@ -549,8 +643,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 
     private IEnumerable<AdapterEvent> ReadBuffered(
         byte[] body,
-        bool toolsEnabled,
-        bool usesModernSchema)
+        bool toolsEnabled)
     {
         var root = ReadObject(body);
         var choice = FirstChoice(root);
@@ -576,7 +669,11 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             yield return new AdapterUsage(usage);
         }
 
-        yield return new AdapterFinal(finishReason, usage, usesModernSchema ? root : null);
+        yield return new AdapterFinal(
+            finishReason,
+            usage,
+            root,
+            logprobs: ReadLogprobs(choice));
     }
 
     private async IAsyncEnumerable<AdapterEvent> ReadSseAsync(
@@ -592,6 +689,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         long bytesRead = 0;
         Usage? finalUsage = null;
         string? finishReason = null;
+        var logprobs = new List<TokenLogprob>();
 
         while (true)
         {
@@ -648,7 +746,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 dataLines.Clear();
                 if (frame == "[DONE]")
                 {
-                    yield return new AdapterFinal(finishReason ?? "stop", finalUsage);
+                    yield return new AdapterFinal(finishReason ?? "stop", finalUsage, logprobs: logprobs);
                     yield break;
                 }
 
@@ -656,6 +754,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 var choice = OptionalFirstChoice(chunk);
                 if (choice is not null)
                 {
+                    logprobs.AddRange(ReadLogprobs(choice));
                     var delta = OptionalObject(choice, "delta");
                     var content = delta is null ? null : OptionalString(delta, "content");
                     if (content is { Length: > 0 })
@@ -736,6 +835,73 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 
     private static string? OptionalToolString(JsonObject source, string name) =>
         source.TryGetValue(name, out var value) && value is JsonString text ? text.Value : null;
+
+    private static IReadOnlyList<TokenLogprob> ReadLogprobs(JsonObject choice)
+    {
+        if (!choice.TryGetValue("logprobs", out var raw) || raw is not JsonObject container ||
+            !container.TryGetValue("content", out var entries) || entries is not JsonArray array)
+        {
+            return [];
+        }
+
+        return Array.AsReadOnly(array.Items
+            .Select(static entry => ParseLogprob(entry, withTop: true))
+            .Where(static entry => entry is not null)
+            .Cast<TokenLogprob>()
+            .ToArray());
+    }
+
+    private static TokenLogprob? ParseLogprob(JsonValue entry, bool withTop)
+    {
+        if (entry is not JsonObject item ||
+            !item.TryGetValue("token", out var rawToken) || rawToken is not JsonString token ||
+            !item.TryGetValue("logprob", out var rawLogprob))
+        {
+            return null;
+        }
+
+        var logprob = rawLogprob switch
+        {
+            JsonNumber number => number.Value,
+            JsonInteger integer => (double)integer.Value,
+            _ => double.NaN,
+        };
+        if (double.IsNaN(logprob))
+        {
+            return null;
+        }
+
+        IEnumerable<TokenLogprob>? top = null;
+        if (withTop && item.TryGetValue("top_logprobs", out var rawTop) && rawTop is JsonArray topArray)
+        {
+            top = topArray.Items
+                .Select(static alternative => ParseLogprob(alternative, withTop: false))
+                .Where(static alternative => alternative is not null)
+                .Cast<TokenLogprob>()
+                .ToArray();
+        }
+
+        IReadOnlyList<byte>? bytes = null;
+        if (item.TryGetValue("bytes", out var rawBytes))
+        {
+            if (rawBytes is not JsonArray byteArray)
+            {
+                return new TokenLogprob(token.Value, logprob, top, bytes);
+            }
+            var parsed = new List<byte>();
+            foreach (var value in byteArray.Items)
+            {
+                if (value is not JsonInteger { Value: var integer } || integer < byte.MinValue || integer > byte.MaxValue)
+                {
+                    return new TokenLogprob(token.Value, logprob, top, bytes);
+                }
+                parsed.Add((byte)integer);
+            }
+            bytes = parsed;
+        }
+
+        return new TokenLogprob(token.Value, logprob, top, bytes);
+    }
 
     private async Task<byte[]> ReadResponseBytesAsync(
         Stream stream,

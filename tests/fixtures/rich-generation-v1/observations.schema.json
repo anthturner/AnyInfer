@@ -1,0 +1,1989 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "runtime",
+    "source_revision",
+    "source_dirty",
+    "corpus_sha256",
+    "observations"
+  ],
+  "properties": {
+    "profile": {
+      "const": "rich-generation-v1"
+    },
+    "runtime": {
+      "enum": [
+        "python",
+        "csharp"
+      ]
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_dirty": {
+      "type": "boolean"
+    },
+    "corpus_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "json": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        }
+      ]
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "canonicalData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_json",
+        "sha256"
+      ],
+      "properties": {
+        "canonical_json": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "byteEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length",
+        "sha256"
+      ],
+      "properties": {
+        "length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "stringLeaf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "utf8_length",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "utf8_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "serializationEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_paths",
+        "string_leaves"
+      ],
+      "properties": {
+        "field_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "string_leaves": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stringLeaf"
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_id",
+        "model",
+        "via_alias"
+      ],
+      "properties": {
+        "provider_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "via_alias": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_index",
+        "end_index",
+        "quoted_text",
+        "document_index",
+        "title",
+        "uri"
+      ],
+      "properties": {
+        "start_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "end_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "quoted_text": {
+          "type": "string"
+        },
+        "document_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "title"
+      ],
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      }
+    },
+    "serverUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "uses"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "web_search",
+            "code_execution"
+          ]
+        },
+        "uses": {
+          "type": "integer"
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "reasoning_tokens",
+        "cost_usd",
+        "search_units",
+        "server_tool_uses"
+      ],
+      "properties": {
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "total_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cache_read_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cache_write_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reasoning_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cost_usd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "search_units": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "server_tool_uses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/serverUse"
+          }
+        }
+      }
+    },
+    "logprob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token",
+        "logprob",
+        "top",
+        "bytes"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "logprob": {
+          "type": "number"
+        },
+        "top": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/logprob"
+          }
+        },
+        "bytes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      }
+    },
+    "toolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "arguments"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "#/$defs/canonicalData"
+        }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first_token_present",
+        "total_present",
+        "phase_order"
+      ],
+      "properties": {
+        "first_token_present": {
+          "type": "boolean"
+        },
+        "total_present": {
+          "type": "boolean"
+        },
+        "phase_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type_name",
+        "provider",
+        "phase",
+        "retryable",
+        "retry_after_s",
+        "http_status",
+        "detail",
+        "hint"
+      ],
+      "properties": {
+        "type_name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retry_after_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "http_status": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "attempt_number",
+        "outcome",
+        "error",
+        "timing"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "attempt_number": {
+          "type": "integer"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/error"
+            }
+          ]
+        },
+        "timing": {
+          "$ref": "#/$defs/timing"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "tool_calls",
+        "target",
+        "finish_reason",
+        "usage",
+        "logprobs",
+        "citations",
+        "server_tool_uses",
+        "raw",
+        "timing",
+        "attempts",
+        "warnings"
+      ],
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/toolCall"
+          }
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "finish_reason": {
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "logprobs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/logprob"
+          }
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/citation"
+          }
+        },
+        "server_tool_uses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/serverUse"
+          }
+        },
+        "raw": {
+          "$ref": "#/$defs/json"
+        },
+        "timing": {
+          "$ref": "#/$defs/timing"
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attempt"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "event": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "TextDelta",
+                "ReasoningDelta"
+              ]
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "index",
+            "call_id",
+            "name",
+            "arguments_fragment"
+          ],
+          "properties": {
+            "type": {
+              "const": "ToolCallDelta"
+            },
+            "index": {
+              "type": "integer"
+            },
+            "call_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "arguments_fragment": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "citation"
+          ],
+          "properties": {
+            "type": {
+              "const": "CitationDelta"
+            },
+            "citation": {
+              "$ref": "#/$defs/citation"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "kind",
+            "status",
+            "sources",
+            "output",
+            "detail"
+          ],
+          "properties": {
+            "type": {
+              "const": "ServerToolDelta"
+            },
+            "kind": {
+              "enum": [
+                "web_search",
+                "code_execution"
+              ]
+            },
+            "status": {
+              "enum": [
+                "started",
+                "completed",
+                "failed"
+              ]
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/source"
+              }
+            },
+            "output": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "usage"
+          ],
+          "properties": {
+            "type": {
+              "const": "UsageUpdate"
+            },
+            "usage": {
+              "$ref": "#/$defs/usage"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "name"
+          ],
+          "properties": {
+            "type": {
+              "const": "TimingMark"
+            },
+            "name": {
+              "enum": [
+                "attempt_start",
+                "first_token"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "record"
+          ],
+          "properties": {
+            "type": {
+              "const": "AttemptFailed"
+            },
+            "record": {
+              "$ref": "#/$defs/attempt"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "result"
+          ],
+          "properties": {
+            "type": {
+              "const": "StreamEnded"
+            },
+            "result": {
+              "$ref": "#/$defs/result"
+            }
+          }
+        }
+      ]
+    },
+    "public": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_point",
+        "events",
+        "result",
+        "error"
+      ],
+      "properties": {
+        "entry_point": {
+          "enum": [
+            "async_generate",
+            "async_stream",
+            "sync_generate",
+            "sync_stream",
+            "async_stream_close",
+            "async_stream_cancel",
+            "construct_request"
+          ]
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "result": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/result"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/error"
+            }
+          ]
+        }
+      }
+    },
+    "part": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "name",
+            "arguments"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool_call"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "arguments": {
+              "$ref": "#/$defs/canonicalData"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "call_id",
+            "content",
+            "is_error"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool_result"
+            },
+            "call_id": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "is_error": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "url",
+            "media_type",
+            "detail"
+          ],
+          "properties": {
+            "type": {
+              "const": "image"
+            },
+            "data": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/byteEvidence"
+                }
+              ]
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "detail": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "url",
+            "media_type",
+            "filename"
+          ],
+          "properties": {
+            "type": {
+              "const": "document"
+            },
+            "data": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/byteEvidence"
+                }
+              ]
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "filename": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "media_type"
+          ],
+          "properties": {
+            "type": {
+              "const": "audio"
+            },
+            "data": {
+              "$ref": "#/$defs/byteEvidence"
+            },
+            "media_type": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "url",
+            "media_type",
+            "start_offset_s",
+            "end_offset_s",
+            "fps"
+          ],
+          "properties": {
+            "type": {
+              "const": "video"
+            },
+            "data": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/byteEvidence"
+                }
+              ]
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "start_offset_s": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "end_offset_s": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "fps": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "adapterMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "content"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/part"
+          }
+        }
+      }
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature",
+        "top_p",
+        "max_output_tokens",
+        "stop",
+        "seed",
+        "presence_penalty",
+        "frequency_penalty"
+      ],
+      "properties": {
+        "temperature": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "top_p": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max_output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stop": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "presence_penalty": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "frequency_penalty": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "parameters",
+        "annotations"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "parameters": {
+          "$ref": "#/$defs/canonicalData"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "read_only",
+            "destructive",
+            "idempotent",
+            "open_world"
+          ],
+          "properties": {
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "read_only": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "destructive": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "idempotent": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "open_world": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "sessionState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "const": "absent"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "const": "null"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "value"
+          ],
+          "properties": {
+            "state": {
+              "const": "value"
+            },
+            "value": {
+              "$ref": "#/$defs/canonicalData"
+            }
+          }
+        }
+      ]
+    },
+    "adapterRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "messages",
+        "sampling",
+        "reasoning_wire",
+        "mechanism",
+        "wire_schema",
+        "schema_name",
+        "tools",
+        "tool_choice",
+        "stream",
+        "timeout_s",
+        "max_response_bytes",
+        "cache_marks",
+        "server_tools",
+        "cite_documents",
+        "logprobs",
+        "extra_options",
+        "session_state"
+      ],
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/adapterMessage"
+          }
+        },
+        "sampling": {
+          "$ref": "#/$defs/sampling"
+        },
+        "reasoning_wire": {
+          "$ref": "#/$defs/canonicalData"
+        },
+        "mechanism": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wire_schema": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/canonicalData"
+            }
+          ]
+        },
+        "schema_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tool"
+          }
+        },
+        "tool_choice": {
+          "type": "string"
+        },
+        "stream": {
+          "type": "boolean"
+        },
+        "timeout_s": {
+          "type": "number"
+        },
+        "max_response_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cache_marks": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "server_tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "max_uses"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "web_search",
+                  "code_execution"
+                ]
+              },
+              "max_uses": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "cite_documents": {
+          "type": "boolean"
+        },
+        "logprobs": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "extra_options": {
+          "$ref": "#/$defs/canonicalData"
+        },
+        "session_state": {
+          "$ref": "#/$defs/sessionState"
+        }
+      }
+    },
+    "wireCall": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transport",
+            "provider",
+            "model",
+            "request"
+          ],
+          "properties": {
+            "transport": {
+              "const": "adapter"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "request": {
+              "$ref": "#/$defs/adapterRequest"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transport",
+            "provider",
+            "model",
+            "body"
+          ],
+          "properties": {
+            "transport": {
+              "const": "http"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "body": {
+              "$ref": "#/$defs/json"
+            }
+          }
+        }
+      ]
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calls"
+      ],
+      "properties": {
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/wireCall"
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "adapter_close",
+            "client_close",
+            "server_close",
+            "barrier_finally",
+            "reader_cancelled"
+          ]
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "metadata": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "telemetryStable": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target"
+          ],
+          "properties": {
+            "event": {
+              "const": "TargetResolved"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "targets",
+            "metadata",
+            "operation",
+            "prompt_text"
+          ],
+          "properties": {
+            "event": {
+              "const": "RequestStarted"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "metadata": {
+              "$ref": "#/$defs/metadata"
+            },
+            "operation": {
+              "type": "string"
+            },
+            "prompt_text": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "attempt_number"
+          ],
+          "properties": {
+            "event": {
+              "const": "AttemptStarted"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "attempt_number": {
+              "type": "integer"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "usage",
+            "timing",
+            "finish_reason"
+          ],
+          "properties": {
+            "event": {
+              "const": "AttemptCompleted"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "usage": {
+              "$ref": "#/$defs/usage"
+            },
+            "timing": {
+              "$ref": "#/$defs/timing"
+            },
+            "finish_reason": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "usage",
+            "timing",
+            "repair_attempts",
+            "response_text"
+          ],
+          "properties": {
+            "event": {
+              "const": "RequestCompleted"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "usage": {
+              "$ref": "#/$defs/usage"
+            },
+            "timing": {
+              "$ref": "#/$defs/timing"
+            },
+            "repair_attempts": {
+              "type": "integer"
+            },
+            "response_text": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "attempt_number",
+            "mechanism",
+            "errors",
+            "raw_text"
+          ],
+          "properties": {
+            "event": {
+              "const": "RepairAttempted"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "attempt_number": {
+              "type": "integer"
+            },
+            "mechanism": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "raw_text": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "from_target",
+            "to_target",
+            "error"
+          ],
+          "properties": {
+            "event": {
+              "const": "FallbackTriggered"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "from_target": {
+              "$ref": "#/$defs/target"
+            },
+            "to_target": {
+              "type": "string"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/error"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "parameter",
+            "reason"
+          ],
+          "properties": {
+            "event": {
+              "const": "ParameterDropped"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "parameter": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "error"
+          ],
+          "properties": {
+            "event": {
+              "const": "RequestFailed"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "error": {
+              "$ref": "#/$defs/error"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "at_ms_present"
+          ],
+          "properties": {
+            "event": {
+              "const": "FirstToken"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "at_ms_present": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "field_name",
+            "method"
+          ],
+          "properties": {
+            "event": {
+              "const": "UsageEstimated"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "field_name": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "event",
+            "request_id",
+            "target",
+            "attempt_number",
+            "delay_s",
+            "error"
+          ],
+          "properties": {
+            "event": {
+              "const": "RetryScheduled"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "attempt_number": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "delay_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "error": {
+              "$ref": "#/$defs/error"
+            }
+          }
+        }
+      ]
+    },
+    "telemetryEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stable",
+        "serialized"
+      ],
+      "properties": {
+        "stable": {
+          "$ref": "#/$defs/telemetryStable"
+        },
+        "serialized": {
+          "$ref": "#/$defs/serializationEvidence"
+        }
+      }
+    },
+    "requestShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message_count",
+        "role_counts",
+        "schema_present",
+        "schema_name",
+        "tool_names",
+        "tool_choice",
+        "metadata_keys"
+      ],
+      "properties": {
+        "message_count": {
+          "type": "integer"
+        },
+        "role_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "count"
+            ],
+            "properties": {
+              "role": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "schema_present": {
+          "type": "boolean"
+        },
+        "schema_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tool_choice": {
+          "type": "string"
+        },
+        "metadata_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "target",
+        "request",
+        "payloads",
+        "serialized"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/target"
+            }
+          ]
+        },
+        "request": {
+          "$ref": "#/$defs/requestShape"
+        },
+        "payloads": {
+          "enum": [
+            "null",
+            "present"
+          ]
+        },
+        "serialized": {
+          "$ref": "#/$defs/serializationEvidence"
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "events",
+        "manifest"
+      ],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/telemetryEvent"
+          }
+        },
+        "manifest": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/manifest"
+            }
+          ]
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "public",
+        "wire",
+        "cleanup",
+        "telemetry"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "kind": {
+          "enum": [
+            "generation",
+            "validation"
+          ]
+        },
+        "public": {
+          "$ref": "#/$defs/public"
+        },
+        "wire": {
+          "$ref": "#/$defs/wire"
+        },
+        "cleanup": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cleanup"
+          }
+        },
+        "telemetry": {
+          "$ref": "#/$defs/telemetry"
+        }
+      }
+    }
+  }
+}

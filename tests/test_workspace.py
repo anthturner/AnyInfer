@@ -138,6 +138,10 @@ class TestVerbs:
         assert "scripts/check_csharp_accounting.py" in recorded[0]
         assert "scripts/_csharp_observation.py" in recorded[0]
         assert "scripts/check_csharp_request_policy.py" in recorded[0]
+        assert "scripts/check_csharp_rich_generation.py" in recorded[0]
+        assert "scripts/observe_python_tool_loop.py" in recorded[0]
+        assert "scripts/_tool_loop_python.py" in recorded[0]
+        assert "scripts/check_csharp_tool_loop.py" in recorded[0]
         assert "scripts/check_csharp_binding_inventory.py" in recorded[0]
         assert "scripts/export_python_provider_bindings.py" in recorded[0]
         assert "scripts/run_provider_change_checks.py" in recorded[0]
@@ -211,6 +215,14 @@ class TestVerbs:
                 ROOT,
             ),
             (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_rich_generation.py")],
+                ROOT,
+            ),
+            (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_tool_loop.py")],
+                ROOT,
+            ),
+            (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_binding_inventory.py")],
                 ROOT,
             ),
@@ -230,6 +242,42 @@ class TestVerbs:
                 ROOT / "src" / "csharp",
             ),
         ]
+
+    def test_csharp_solution_registers_the_nonpackable_rich_generation_observer(self):
+        solution = (ROOT / "src" / "csharp" / "AnyInfer.sln").read_text(encoding="utf-8")
+
+        identifier = "{9C68F55D-07E1-4CE7-A966-CB8F71D9E3EF}"
+        assert (
+            'Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = '
+            '"AnyInfer.RichGeneration", '
+            '"AnyInfer.RichGeneration\\AnyInfer.RichGeneration.csproj", '
+            f'"{identifier}"'
+        ) in solution
+        for configuration in ("Debug", "Release"):
+            assert (
+                f"{identifier}.{configuration}|Any CPU.ActiveCfg = {configuration}|Any CPU"
+            ) in solution
+            assert (
+                f"{identifier}.{configuration}|Any CPU.Build.0 = {configuration}|Any CPU"
+            ) in solution
+
+    def test_csharp_solution_registers_the_nonpackable_tool_loop_observer(self):
+        solution = (ROOT / "src" / "csharp" / "AnyInfer.sln").read_text(encoding="utf-8")
+
+        identifier = "{4F69340C-769A-4EFE-B8F0-BE774B56067F}"
+        assert (
+            'Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = '
+            '"AnyInfer.ToolLoop", '
+            '"AnyInfer.ToolLoop\\AnyInfer.ToolLoop.csproj", '
+            f'"{identifier}"'
+        ) in solution
+        for configuration in ("Debug", "Release"):
+            assert (
+                f"{identifier}.{configuration}|Any CPU.ActiveCfg = {configuration}|Any CPU"
+            ) in solution
+            assert (
+                f"{identifier}.{configuration}|Any CPU.Build.0 = {configuration}|Any CPU"
+            ) in solution
 
     def test_check_only_csharp_refuses_without_the_pinned_sdk(self, monkeypatch, capsys):
         monkeypatch.setattr(workspace.shutil, "which", lambda name: None)
@@ -369,8 +417,8 @@ class TestVerbs:
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
         # Every default step must be attempted despite the failure, including the two
-        # in-process docs gates and nine C# steps.
-        assert len(calls) == 22
+        # in-process docs gates and eleven C# steps.
+        assert len(calls) == 24
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

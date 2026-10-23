@@ -265,19 +265,96 @@ public sealed class Client : IDisposable
     public Generation Generate(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
         RunOperation(token => _inner.GenerateAsync(request, token, manifest), cancellationToken);
 
+    /// <summary>Generates and dispatches explicitly registered tools until the model stops calling them.</summary>
+    public Generation RunTools(
+        GenerationRequest request,
+        IEnumerable<Tool> tools,
+        int maxRounds = 8,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.RunToolsAsync(request, tools, maxRounds, token, manifest), cancellationToken);
+
+    /// <summary>Generates from one prompt while dispatching explicitly registered tools.</summary>
+    public Generation RunTools(
+        string prompt,
+        IEnumerable<Tool> tools,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        SchemaSpec? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024,
+        int maxRounds = 8,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.RunToolsAsync(prompt, tools, target, route, sampling, repair, schema,
+            schemaMechanism, timeoutS, maxResponseBytes, toolChoice, cache, reasoning,
+            providerOptions, metadata, logprobs, citeDocuments, serverTools, maxInputPartBytes,
+            maxInputBytes, maxRounds, token, manifest), cancellationToken);
+
+    /// <summary>Generates from caller messages while dispatching explicitly registered tools.</summary>
+    public Generation RunTools(
+        IEnumerable<Message> messages,
+        IEnumerable<Tool> tools,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        SchemaSpec? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024,
+        int maxRounds = 8,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunOperation(token => _inner.RunToolsAsync(messages, tools, target, route, sampling, repair, schema,
+            schemaMechanism, timeoutS, maxResponseBytes, toolChoice, cache, reasoning,
+            providerOptions, metadata, logprobs, citeDocuments, serverTools, maxInputPartBytes,
+            maxInputBytes, maxRounds, token, manifest), cancellationToken);
+
     /// <summary>Generates a terminal result from one user prompt.</summary>
     public Generation Generate(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
         Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
         int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
-        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
-        RunOperation(token => _inner.GenerateAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest, tools, toolChoice, cache), cancellationToken);
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null,
+        string? reasoning = null, IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null, int? logprobs = null, bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null, int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
+        RunOperation(token => _inner.GenerateAsync(prompt: prompt, target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, cancellationToken: token, manifest: manifest, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes), cancellationToken);
 
     /// <summary>Generates a terminal result from caller messages.</summary>
     public Generation Generate(IEnumerable<Message> messages, string? target = null, Route? route = null,
         Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
         double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
-        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
-        RunOperation(token => _inner.GenerateAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, token, manifest, tools, toolChoice, cache), cancellationToken);
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null,
+        string? reasoning = null, IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null, int? logprobs = null, bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null, int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
+        RunOperation(token => _inner.GenerateAsync(messages: messages, target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, cancellationToken: token, manifest: manifest, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes), cancellationToken);
 
     /// <summary>Creates an eager-pump synchronous stream from an explicit request.</summary>
     public SyncStream Stream(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
@@ -287,15 +364,23 @@ public sealed class Client : IDisposable
     public SyncStream Stream(string prompt, string? target = null, Route? route = null, Sampling? sampling = null,
         Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null, double? timeoutS = null,
         int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
-        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
-        CreateStream(() => _inner.StreamAsync(prompt, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest, tools, toolChoice, cache));
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null,
+        string? reasoning = null, IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null, int? logprobs = null, bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null, int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
+        CreateStream(() => _inner.StreamAsync(prompt: prompt, target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, cancellationToken: cancellationToken, manifest: manifest, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes));
 
     /// <summary>Creates an eager-pump synchronous stream from caller messages.</summary>
     public SyncStream Stream(IEnumerable<Message> messages, string? target = null, Route? route = null,
         Sampling? sampling = null, Repair? repair = null, SchemaSpec? schema = null, string? schemaMechanism = null,
         double? timeoutS = null, int? maxResponseBytes = null, CancellationToken cancellationToken = default, bool? manifest = null,
-        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null) =>
-        CreateStream(() => _inner.StreamAsync(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, cancellationToken, manifest, tools, toolChoice, cache));
+        IEnumerable<ToolSpec>? tools = null, string toolChoice = "auto", CachePolicy? cache = null,
+        string? reasoning = null, IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null, int? logprobs = null, bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null, int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
+        CreateStream(() => _inner.StreamAsync(messages: messages, target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, cancellationToken: cancellationToken, manifest: manifest, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes));
 
     /// <inheritdoc />
     public void Dispose()

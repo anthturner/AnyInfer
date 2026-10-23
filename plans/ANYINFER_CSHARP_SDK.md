@@ -913,10 +913,20 @@ must report a real conflict rather than silently changing a dependent public sig
   provider wire contracts. Keep visible answer text separate from reasoning and tool data.
   Gate: streaming reconstruction, first-content timing, unsupported-input and bounded/private
   payload tests; ordinary text flows remain unchanged.
+  > NOTE: Execution continues under `ANYINFER_CSHARP_SDK_RICH_GENERATION.md` after the
+  > 2026-10-22 full-readiness instruction. Independent maps cover the actual Python
+  > contract, current native gaps and the new input-only proof boundary. Source authoring
+  > follows cold contract review; SDK.7a/b remain unchecked.
 - [ ] **SDK.7b** Port bounded `RunToolsAsync`/sync facade, typed function registration and
   JSON argument validation, cancellation and tool-error behavior from `_client/tools*`.
   Tools are caller-approved functions, not an agent planner. Gate: shared tool-loop traces,
   max-round/call limits, malicious/invalid args and no-double-execution controls.
+  > NOTE: The rich-generation leaf records the actual Python baseline: callable argument
+  > binding, max_rounds=8, sequential once-per-returned-entry dispatch, and final-round-only
+  > results. Python has no separate total-call setting, arbitrary argument-schema enforcement
+  > or ordinary-loop deduplication. Those parent gate phrases must not be used to claim
+  > absent Python policies or introduce C#-only policies. Native API and cold review remain
+  > open under RICH.4a before tool implementation.
 
 ### SDK.8 — Provider breadth and reusable adapter certification
 
@@ -975,6 +985,10 @@ must report a real conflict rather than silently changing a dependent public sig
   > differences for those semantics while preserving frozen v0.
   > Credential TTL/rotation/refresh left outstanding by SDK.2 is assigned here; the
   > SDK.6 retrieval contract explicitly excludes rotating-credential parity until then.
+  > NOTE: Rich-generation review found both current Python Usage.merge/sum and native
+  > counterparts omit server_tool_uses. Terminal generation separately attaches the
+  > winning map after merge. Audit and settle the public merge/sum map contract in
+  > both languages before final readiness; do not count the terminal fix as that work.
 
 ### SDK.12 — SDK qualification and delivery
 

@@ -24,7 +24,7 @@ public static class RequestAdmission
                 ThrowUnsupported("Non-text message content is outside the v0 profile.");
             }
 
-            if (profile == SchemaExecutionProfile.ModernSdk && message.Content.Any(static part => part is not (Text or ToolCall or ToolResult)))
+            if (profile == SchemaExecutionProfile.ModernSdk && message.Content.Any(static part => part is not (Text or ToolCall or ToolResult or ImagePart or DocumentPart or AudioPart or VideoPart)))
             {
                 ThrowUnsupported("The message content is outside the supported SDK request profile.");
             }
@@ -41,6 +41,10 @@ public static class RequestAdmission
 
         if (profile == SchemaExecutionProfile.FrozenV0)
         {
+            if (request.Reasoning is not null || request.ProviderOptions.Count != 0 || request.Metadata.Count != 0 || request.Logprobs is not null || request.CiteDocuments || request.ServerTools.Count != 0 || request.MaxInputPartBytes != 20 * 1024 * 1024 || request.MaxInputBytes != 50 * 1024 * 1024)
+            {
+                ThrowUnsupported("Rich generation request fields are outside the v0 profile.");
+            }
             SchemaAdmission.Validate(request.Schema);
         }
     }

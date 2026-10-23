@@ -14,7 +14,9 @@ does not claim provider or feature parity with Python.
 | `Repair(max_attempts=...)` | `Repair(MaxAttempts: ...)` |
 | JSON Schema mapping | `SchemaSpec` and typed `Generation.DeserializeStructured<T>()` |
 | `Text.text` | `Text.Value` |
+| `ImagePart`, `DocumentPart`, `AudioPart`, `VideoPart` | Same public names; C# properties use PascalCase, and byte inputs are defensively copied. |
 | `result.text` | `Generation.Text` |
+| `result.logprobs`, `result.citations`, provider tool-use counts | `Generation.Logprobs`, `Generation.Citations`, `Generation.ServerToolUses`; reasoning is a separate event. |
 | async stream | `AsyncStream` and `StreamEvent` |
 | Python `Client` | .NET `Client` and `SyncStream` |
 | `AnyInferError` | typed .NET `Exception` subclasses |
@@ -25,7 +27,8 @@ does not claim provider or feature parity with Python.
 | result manifest | `AsyncStream.Manifest`, `SyncStream.Manifest`, or `Generation.Manifest` |
 | `ProviderSetupSpec` metadata | `ProviderSetupSpec`, `SetupField`, `HostShorthand`, and `AnyOf` |
 | explicit pricing, budgets, and ledger snapshots | `PricingCalculator`, `Budget(...)`, `SpendLedger`, and `SpendStore` |
-| request policy | `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy`, and raw `ToolSpec` values |
+| request policy | `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy`, and `ToolSpec` values |
+| `client.run_tools(...)` / `async_client.run_tools(...)` | `Client.RunTools(...)` / `AsyncClient.RunToolsAsync(...)` |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
@@ -121,7 +124,8 @@ you need transactional read-modify-write behavior.
 inputs. A client commits only its winning request to a client-local or caller-supplied ledger.
 Version 1 configuration keeps `default_route` as an ordinary target list; it has no specialized
 context-chain encoding. The generic OpenAI-compatible descriptor declares no cache mechanism.
-`ToolSpec`, `ToolCall`, and `ToolResult` are typed raw values, not a callable tool loop.
+`ToolSpec`, `ToolCall`, and `ToolResult` are also available as typed raw values. The C#
+proof provides a separate bounded loop over explicitly registered `Tool` handlers.
 
 ```csharp
 --8<-- "examples/csharp-sdk/RequestPolicyExample.cs"
@@ -131,13 +135,14 @@ Callers own supplied ledgers, estimators, limiters, and stores. Normal configure
 a supplied handler for a normal configured descriptor, is paced inside the entry deadline when
 `RateLimits` are active. An own-transport descriptor, or an opaque prebuilt registration with an
 active injected limiter, uses an outer slot before entry. This proof does not claim provider-invoice
-or all-wire accounting, automatic tool execution, rich-media input breadth, context/history
+or all-wire accounting, context/history
 reduction, or universal provider transport parity.
 
 ## What to use in an application
 
 Use the [Python SDK](python-sdk.md), sidecar, or CLI for supported application integration. The
 C# examples give .NET developers a concrete, source-linked async surface and synchronous facade
-over the same core for porting generation code. The package and integration remain prerelease
-proof work rather than a separate installation path, with no released NuGet package or full
-provider parity.
+over the same core for porting generation code. Rich input and bounded tool execution are
+additional prerelease proof surfaces; they do not change Python's supported-SDK status. The
+package and integration remain prerelease proof work rather than a separate installation path,
+with no released NuGet package or full provider parity.

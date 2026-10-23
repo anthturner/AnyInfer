@@ -4,6 +4,9 @@ This page is a hand-written map of the bounded prerelease C# SDK proof. Python r
 supported public SDK and its generated Python API reference remains under
 [SDK reference](api/README.md).
 
+The listed C# types are in the `AnyInfer` namespace unless otherwise noted. The C# `Text.Value`
+property corresponds to Python `Text.text`.
+
 | Surface | Purpose |
 |---|---|
 | `AsyncClient` | Async generation and streaming client. |
@@ -16,6 +19,9 @@ supported public SDK and its generated Python API reference remains under
 | `Route`, `Retry`, `Repair` | Routing, retry, and structured-output repair controls. |
 | `SchemaSpec`, `SchemaValidator`, `SchemaValidationOptions` | Modern schema specification, validation, and explicit resource controls. |
 | `Generation`, `Timing`, `Usage` | Buffered result, timing, and reported token usage. |
+| `ContentPart`, `Text`, `ImagePart`, `DocumentPart`, `AudioPart`, `VideoPart` | Typed text and media inputs; URL values are references and are never fetched by the core. |
+| `Citation`, `TokenLogprob`, `ServerToolUse`, `ServerToolSpec`, `ServerToolSource` | Normalized rich-generation output facts and provider-run tool declarations. |
+| `ReasoningDelta`, `CitationDelta`, `ServerToolDelta` | Separate typed stream events for reasoning, citations, and provider-run tools. |
 | `AsyncStream`, `StreamEvent` | Streaming result and typed events. |
 | `AnyInferConfig` | Restricted version 1 configuration reader and writer. |
 | `Catalog`, `ResolvedTarget`, `PricingTable` | Pure target resolution and catalog-derived price facts. |
@@ -23,7 +29,8 @@ supported public SDK and its generated Python API reference remains under
 | `PricingCalculator`, `ContextBudget`, `SpendLedger`, `SpendStore` | Explicit winning-request pricing, planning, and caller-owned accounting helpers. |
 | `RateLimits`, `RateLimiter` | Standalone pacing configuration and caller-disposed leases. |
 | `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy` | Explicit spend admission, specialized context fallback, and cache planning inputs. |
-| `ToolSpec`, `ToolCall`, `ToolResult` | Typed raw tool declarations and feedback; no callable tool loop. |
+| `ToolSpec`, `ToolCall`, `ToolResult`, `Tool`, `ToolRegistry` | Raw tool values, caller-authorized handlers, and ordered registration for a bounded loop; `Dispatched` counts known-name dispatches. |
+| `AsyncClient.RunToolsAsync`, `Client.RunTools` | Bounded sequential execution of registered tools, returning the final generation round. |
 | `ModelsAsync`, `HealthAsync` / `Models`, `Health` | Explicit asynchronous or synchronous lifecycle calls for one provider instance. |
 | `ProbeAsync` / `Probe`, `ProbeReport` | Explicit ordered generation-capability measurements and their provenance-bearing report. |
 | `ProviderSetupSpec`, `SetupField`, `HostShorthand` | Inert declarative setup metadata for application-owned configuration surfaces. |
@@ -44,7 +51,7 @@ changing a generation route. The TEI descriptor does not hydrate deployment limi
 provider batch ceilings do not cause guessed splitting;
 `BatchPolicy` supplies an explicit override when the application has verified a limit. It has no
 released NuGet package, full provider-parity guarantee, provider invoice or all-wire accounting,
-automatic tool execution, rich-media input breadth, context/history reduction, or production
+context/history reduction, or production
 report publication. Generic OpenAI-compatible retrieval remains unimplemented in this
 proof. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
 deployment on 2026-10-22. Voyage's built-in adapter has offline scripted-handler evidence only;

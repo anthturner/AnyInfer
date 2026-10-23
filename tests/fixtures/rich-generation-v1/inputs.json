@@ -1,0 +1,3481 @@
+{
+  "profile": "rich-generation-v1",
+  "cases": [
+    {
+      "id": "media-image-inline-order",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "before"
+              },
+              {
+                "type": "image",
+                "media_type": "image/png",
+                "detail": "high",
+                "data": {
+                  "encoding": "base64",
+                  "value": "aW1n"
+                },
+                "url": null
+              },
+              {
+                "type": "text",
+                "text": "after"
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 3,
+        "max_input_bytes": 3,
+        "retain_raw": false,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "image"
+          ],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "image-inline",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "image-inline"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-image-url-detail",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "media_type": "image/jpeg",
+                "detail": "low",
+                "data": null,
+                "url": "https://fixture.invalid/image"
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "image"
+          ],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "image-url",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "image-url"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-document-inline-filename",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "document",
+                "media_type": "application/pdf",
+                "filename": "fixture.pdf",
+                "data": {
+                  "encoding": "base64",
+                  "value": "cGRm"
+                },
+                "url": null
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 3,
+        "max_input_bytes": 3,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "document"
+          ],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "doc-inline",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "doc-inline"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-document-url",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "document",
+                "media_type": "text/plain",
+                "filename": null,
+                "data": null,
+                "url": "https://fixture.invalid/doc"
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "document"
+          ],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "doc-url",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "doc-url"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-audio-inline",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "audio",
+                "data": {
+                  "encoding": "base64",
+                  "value": "d2F2"
+                },
+                "media_type": "audio/wav"
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 3,
+        "max_input_bytes": 3,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "audio"
+          ],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "audio",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "audio"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-video-inline-window",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "video",
+                "media_type": "video/mp4",
+                "start_offset_s": 1,
+                "end_offset_s": 2,
+                "fps": 24,
+                "data": {
+                  "encoding": "base64",
+                  "value": "dmlk"
+                },
+                "url": null
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 3,
+        "max_input_bytes": 3,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "video"
+          ],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "video-inline",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "video-inline"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-video-url-window",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "video",
+                "media_type": "video/mp4",
+                "start_offset_s": null,
+                "end_offset_s": null,
+                "fps": null,
+                "data": null,
+                "url": "https://fixture.invalid/video"
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "video"
+          ],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "video-url",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "video-url"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-invalid-image-two-sources",
+      "kind": "validation",
+      "request": {
+        "entry_point": "validation",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "data": {
+                  "encoding": "base64",
+                  "value": "aW1n"
+                },
+                "url": "https://fixture.invalid/two",
+                "media_type": "image/png",
+                "detail": null
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "construct_request",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-invalid-video-window",
+      "kind": "validation",
+      "request": {
+        "entry_point": "validation",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "video",
+                "data": {
+                  "encoding": "base64",
+                  "value": "dmlk"
+                },
+                "url": null,
+                "media_type": "video/mp4",
+                "start_offset_s": 2,
+                "end_offset_s": 1,
+                "fps": 24
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "construct_request",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-invalid-audio-empty",
+      "kind": "validation",
+      "request": {
+        "entry_point": "validation",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "audio",
+                "data": {
+                  "encoding": "base64",
+                  "value": ""
+                },
+                "media_type": "audio/wav"
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "construct_request",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "bytes-part-at-limit",
+      "kind": "validation",
+      "request": {
+        "entry_point": "validation",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "data": {
+                  "encoding": "base64",
+                  "value": "eHh4"
+                },
+                "url": null,
+                "media_type": "image/png",
+                "detail": null
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 3,
+        "max_input_bytes": 3,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "construct_request",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "bytes-part-over-limit",
+      "kind": "validation",
+      "request": {
+        "entry_point": "validation",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "data": {
+                  "encoding": "base64",
+                  "value": "eHh4"
+                },
+                "url": null,
+                "media_type": "image/png",
+                "detail": null
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 2,
+        "max_input_bytes": 3,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "construct_request",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "bytes-total-at-limit",
+      "kind": "validation",
+      "request": {
+        "entry_point": "validation",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "data": {
+                  "encoding": "base64",
+                  "value": "eHg="
+                },
+                "url": null,
+                "media_type": "image/png",
+                "detail": null
+              },
+              {
+                "type": "document",
+                "data": {
+                  "encoding": "base64",
+                  "value": "eHg="
+                },
+                "url": null,
+                "media_type": "application/pdf",
+                "filename": null
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 2,
+        "max_input_bytes": 4,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "construct_request",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "bytes-total-over-limit",
+      "kind": "validation",
+      "request": {
+        "entry_point": "validation",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "data": {
+                  "encoding": "base64",
+                  "value": "eHg="
+                },
+                "url": null,
+                "media_type": "image/png",
+                "detail": null
+              },
+              {
+                "type": "document",
+                "data": {
+                  "encoding": "base64",
+                  "value": "eHg="
+                },
+                "url": null,
+                "media_type": "application/pdf",
+                "filename": null
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 2,
+        "max_input_bytes": 3,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "construct_request",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "bytes-remote-reference-not-counted",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "media_type": "image/png",
+                "detail": null,
+                "data": null,
+                "url": "https://fixture.invalid/remote"
+              }
+            ]
+          }
+        ],
+        "target": "media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "remote",
+          "transport": "adapter",
+          "provider": "media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "remote"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-known-unsupported-refusal",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "media_type": "image/png",
+                "detail": null,
+                "data": null,
+                "url": "https://fixture.invalid/image"
+              }
+            ]
+          }
+        ],
+        "target": "no-media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "no-media",
+          "model": "model",
+          "features_provenance": "catalog",
+          "features": [],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "media-default-unknown-dispatch",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "media_type": "image/png",
+                "detail": null,
+                "data": null,
+                "url": "https://fixture.invalid/image"
+              }
+            ]
+          }
+        ],
+        "target": "maybe-media:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "maybe-media",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": [
+            "media"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "maybe-media",
+          "transport": "adapter",
+          "provider": "maybe-media",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "maybe-media"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "server-tool-known-unsupported-refusal",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "search"
+              }
+            ]
+          }
+        ],
+        "target": "no-search:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [
+          {
+            "kind": "web_search",
+            "max_uses": 1
+          }
+        ],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "no-search",
+          "model": "model",
+          "features_provenance": "catalog",
+          "features": [],
+          "wire_support": [
+            "server_tools"
+          ]
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "server-tool-default-unknown-dispatch",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "search"
+              }
+            ]
+          }
+        ],
+        "target": "maybe-search:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [
+          {
+            "kind": "web_search",
+            "max_uses": 1
+          }
+        ],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "maybe-search",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": [
+            "server_tools"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "maybe-search",
+          "transport": "adapter",
+          "provider": "maybe-search",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "maybe-search"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "server-tool-missing-wire-support-refusal",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "search"
+              }
+            ]
+          }
+        ],
+        "target": "no-wire:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [
+          {
+            "kind": "web_search",
+            "max_uses": 1
+          }
+        ],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "no-wire",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "server_tools"
+          ],
+          "wire_support": []
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "reasoning-trusted-absence-dropped",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "reason"
+              }
+            ]
+          }
+        ],
+        "target": "drop:model",
+        "route": null,
+        "reasoning": "high",
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "drop",
+          "model": "model",
+          "features_provenance": "probed",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "drop-reason",
+          "transport": "adapter",
+          "provider": "drop",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "drop-reason"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "logprobs-trusted-absence-dropped",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "prob"
+              }
+            ]
+          }
+        ],
+        "target": "drop:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": 0,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "drop",
+          "model": "model",
+          "features_provenance": "probed",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "drop-prob",
+          "transport": "adapter",
+          "provider": "drop",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "drop-prob"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "citations-trusted-absence-dropped",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "cite"
+              }
+            ]
+          }
+        ],
+        "target": "drop:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": true,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "drop",
+          "model": "model",
+          "features_provenance": "probed",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "drop-cite",
+          "transport": "adapter",
+          "provider": "drop",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "drop-cite"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "options-wildcard-instance-overlay",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "options"
+              }
+            ]
+          }
+        ],
+        "target": "openai:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {
+          "*": {
+            "a": "wild",
+            "shared": "wild"
+          },
+          "openai": {
+            "b": "instance",
+            "shared": "instance"
+          }
+        },
+        "metadata": {
+          "fixture": "metadata-marker"
+        },
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "openai",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": [
+            "options"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "options",
+          "transport": "adapter",
+          "provider": "openai",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "options"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "openai-image-document-audio-wire",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "media_type": "image/png",
+                "detail": "auto",
+                "data": null,
+                "url": "https://fixture.invalid/image"
+              },
+              {
+                "type": "document",
+                "media_type": "application/pdf",
+                "filename": "doc.pdf",
+                "data": {
+                  "encoding": "base64",
+                  "value": "ZA=="
+                },
+                "url": null
+              },
+              {
+                "type": "audio",
+                "data": {
+                  "encoding": "base64",
+                  "value": "d2F2"
+                },
+                "media_type": "audio/wav"
+              }
+            ]
+          }
+        ],
+        "target": "openai:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 3,
+        "max_input_bytes": 4,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "openai",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "image",
+            "document",
+            "audio"
+          ],
+          "wire_support": [
+            "openai"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "openai-media",
+          "transport": "http",
+          "provider": "openai",
+          "model": "model",
+          "actions": [
+            {
+              "action": "sse_frame",
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream"
+              },
+              "body": "data: {\"id\":\"fixture-media\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"media-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"fixture-media\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "openai-media"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "openai-video-refusal",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "video",
+                "media_type": "video/mp4",
+                "start_offset_s": null,
+                "end_offset_s": null,
+                "fps": null,
+                "data": null,
+                "url": "https://fixture.invalid/video"
+              }
+            ]
+          }
+        ],
+        "target": "openai:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "openai",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "video"
+          ],
+          "wire_support": [
+            "openai"
+          ]
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "tool-history-fragments-wire",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool_call",
+                "id": "call-history-marker",
+                "name": "fixture_tool",
+                "arguments": {
+                  "input": "argument-marker"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": [
+              {
+                "type": "tool_result",
+                "call_id": "call-history-marker",
+                "content": "result-marker",
+                "is_error": true
+              }
+            ]
+          }
+        ],
+        "target": "openai:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "openai",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": [
+            "openai"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "tool-history",
+          "transport": "http",
+          "provider": "openai",
+          "model": "model",
+          "actions": [
+            {
+              "action": "sse_frame",
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream"
+              },
+              "body": "data: [DONE]\n\n"
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "tool-history"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "logprobs-request-terminal-raw",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "prob"
+              }
+            ]
+          }
+        ],
+        "target": "openai:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": 2,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": true,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "openai",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "logprobs"
+          ],
+          "wire_support": [
+            "openai"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "logprobs",
+          "transport": "adapter",
+          "provider": "openai",
+          "model": "model",
+          "actions": [
+            {
+              "action": "text_delta",
+              "text": "answer"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": {
+                "fixture": "raw-marker"
+              },
+              "logprobs": [
+                {
+                  "token": "answer",
+                  "logprob": -0.1,
+                  "top": [],
+                  "bytes": [
+                    97
+                  ]
+                }
+              ],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "logprobs"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "reasoning-first-content",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "reason"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": "high",
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "reasoning"
+          ],
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "reasoning",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "reasoning_delta",
+              "text": "think"
+            },
+            {
+              "action": "text_delta",
+              "text": "answer"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "reasoning"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "empty-reasoning-first-content",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "reason"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": "low",
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "reasoning"
+          ],
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "empty-reason",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "reasoning_delta",
+              "text": ""
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "empty-reason"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "empty-text-first-content",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "empty"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [],
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "empty-text",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "text_delta",
+              "text": ""
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "empty-text"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "empty-tool-fragment-first-content",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "tool"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features": [
+            "tools"
+          ],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "empty-tool",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "tool_call_delta",
+              "index": 0,
+              "call_id": null,
+              "name": null,
+              "arguments_fragment": ""
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "tool_calls",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "empty-tool"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "citation-before-content",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "cite"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": true,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features": [
+            "citations"
+          ],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "citation",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "citation_delta",
+              "citation": {
+                "quoted_text": "citation-marker",
+                "uri": "https://fixture.invalid/source"
+              }
+            },
+            {
+              "action": "text_delta",
+              "text": "answer"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "citation"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "server-tool-before-content",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "search"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [
+          {
+            "kind": "web_search",
+            "max_uses": 2
+          }
+        ],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features": [
+            "server_tools"
+          ],
+          "features_provenance": "default",
+          "wire_support": [
+            "server_tools"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "server-tool",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "server_tool_delta",
+              "kind": "web_search",
+              "status": "completed",
+              "sources": [
+                {
+                  "url": "https://fixture.invalid/source",
+                  "title": "source-marker"
+                }
+              ],
+              "output": "",
+              "detail": ""
+            },
+            {
+              "action": "text_delta",
+              "text": "answer"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": [
+                {
+                  "kind": "web_search",
+                  "uses": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "server-tool"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "rich-terminal-fields",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "rich"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": 1,
+        "cite_documents": true,
+        "server_tools": [
+          {
+            "kind": "code_execution",
+            "max_uses": 1
+          }
+        ],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": true,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features": [
+            "logprobs",
+            "citations",
+            "server_tools"
+          ],
+          "features_provenance": "default",
+          "wire_support": [
+            "server_tools"
+          ]
+        }
+      ],
+      "scripts": [
+        {
+          "id": "rich-final",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "citation_delta",
+              "citation": {
+                "quoted_text": "quote-marker"
+              }
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": {
+                "raw": "rich-marker"
+              },
+              "logprobs": [
+                {
+                  "token": "x",
+                  "logprob": -0.2
+                }
+              ],
+              "server_tool_uses": [
+                {
+                  "kind": "code_execution",
+                  "uses": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "rich-final"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "tool-fragments-assembly",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "tool"
+              }
+            ]
+          }
+        ],
+        "target": "rich:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "rich",
+          "model": "model",
+          "features": [
+            "tools"
+          ],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "fragments",
+          "transport": "adapter",
+          "provider": "rich",
+          "model": "model",
+          "actions": [
+            {
+              "action": "tool_call_delta",
+              "index": 1,
+              "call_id": "call-marker",
+              "name": "fixture_tool",
+              "arguments_fragment": "{\"a\":"
+            },
+            {
+              "action": "tool_call_delta",
+              "index": 1,
+              "call_id": null,
+              "name": null,
+              "arguments_fragment": "1}"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "tool_calls",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "fragments"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "repair-rich-fields-isolated",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "repair"
+              }
+            ]
+          }
+        ],
+        "target": "repair:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": 1,
+        "cite_documents": true,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": true,
+        "manifest": true,
+        "repair": {
+          "max_attempts": 1
+        },
+        "schema": {
+          "name": "repair_fixture",
+          "json_schema": {
+            "type": "object",
+            "required": [
+              "ok"
+            ],
+            "properties": {
+              "ok": {
+                "const": true
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "repair",
+          "model": "model",
+          "features": [],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "repair-first",
+          "transport": "adapter",
+          "provider": "repair",
+          "model": "model",
+          "actions": [
+            {
+              "action": "text_delta",
+              "text": "{\"ok\": false}"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": {
+                "raw": "discard-marker"
+              },
+              "logprobs": [
+                {
+                  "token": "bad",
+                  "logprob": -0.4,
+                  "top": [],
+                  "bytes": null
+                }
+              ],
+              "server_tool_uses": []
+            }
+          ]
+        },
+        {
+          "id": "repair-second",
+          "transport": "adapter",
+          "provider": "repair",
+          "model": "model",
+          "actions": [
+            {
+              "action": "text_delta",
+              "text": "{\"ok\": true}"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": {
+                "raw": "winner-marker"
+              },
+              "logprobs": [
+                {
+                  "token": "good",
+                  "logprob": -0.1,
+                  "top": [],
+                  "bytes": null
+                }
+              ],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "repair-first",
+          "repair-second"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "fallback-rich-fields-isolated",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "fallback"
+              }
+            ]
+          }
+        ],
+        "target": null,
+        "route": {
+          "targets": [
+            "first:model",
+            "second:model"
+          ],
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        },
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": 1,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": true,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "first",
+          "model": "model",
+          "features": [],
+          "features_provenance": "default",
+          "wire_support": []
+        },
+        {
+          "id": "second",
+          "model": "model",
+          "features": [],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "first",
+          "transport": "adapter",
+          "provider": "first",
+          "model": "model",
+          "actions": [
+            {
+              "action": "provider_failure",
+              "failure": {
+                "detail": "first-failure-marker",
+                "retryable": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "second",
+          "transport": "adapter",
+          "provider": "second",
+          "model": "model",
+          "actions": [
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": {
+                "raw": "winner-marker"
+              },
+              "logprobs": [
+                {
+                  "token": "winner",
+                  "logprob": -0.3
+                }
+              ],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "first",
+          "second"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "raw-retained-versus-private-telemetry",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "answer-marker"
+              }
+            ]
+          }
+        ],
+        "target": "privacy:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {
+          "fixture": "metadata-marker"
+        },
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": true,
+        "manifest": true,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "privacy",
+          "model": "model",
+          "features": [],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "privacy",
+          "transport": "adapter",
+          "provider": "privacy",
+          "model": "model",
+          "actions": [
+            {
+              "action": "text_delta",
+              "text": "answer-marker"
+            },
+            {
+              "action": "reasoning_delta",
+              "text": "reasoning-marker"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": {
+                "raw": "raw-marker"
+              },
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": [
+          "privacy"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "sync-public-path",
+      "kind": "generation",
+      "request": {
+        "entry_point": "generate",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "sync"
+              }
+            ]
+          }
+        ],
+        "target": "sync:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "sync",
+          "model": "model",
+          "features": [],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "sync",
+          "transport": "adapter",
+          "provider": "sync",
+          "model": "model",
+          "actions": [
+            {
+              "action": "text_delta",
+              "text": "sync-answer"
+            },
+            {
+              "action": "adapter_final",
+              "finish_reason": "stop",
+              "raw": null,
+              "logprobs": [],
+              "server_tool_uses": []
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "sync_generate",
+        "consume": "exact",
+        "script_ids": [
+          "sync"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "early-close-cleanup",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "close"
+              }
+            ]
+          }
+        ],
+        "target": "life:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "life",
+          "model": "model",
+          "features": [],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "early-close",
+          "transport": "adapter",
+          "provider": "life",
+          "model": "model",
+          "actions": [
+            {
+              "action": "barrier",
+              "readiness": "close-ready",
+              "release": "close-release",
+              "finally_cleanup": "close-finally",
+              "next_actions": [
+                {
+                  "action": "adapter_final",
+                  "finish_reason": "stop",
+                  "raw": null,
+                  "logprobs": [],
+                  "server_tool_uses": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream_close",
+        "consume": "exact",
+        "script_ids": [
+          "early-close"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "caller-cancellation-cleanup",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "cancel"
+              }
+            ]
+          }
+        ],
+        "target": "life:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "life",
+          "model": "model",
+          "features": [],
+          "features_provenance": "default",
+          "wire_support": []
+        }
+      ],
+      "scripts": [
+        {
+          "id": "cancel",
+          "transport": "adapter",
+          "provider": "life",
+          "model": "model",
+          "actions": [
+            {
+              "action": "barrier",
+              "readiness": "cancel-ready",
+              "release": "cancel-release",
+              "finally_cleanup": "cancel-finally",
+              "next_actions": [
+                {
+                  "action": "adapter_final",
+                  "finish_reason": "stop",
+                  "raw": null,
+                  "logprobs": [],
+                  "server_tool_uses": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "procedure": {
+        "name": "async_stream_cancel",
+        "consume": "exact",
+        "script_ids": [
+          "cancel"
+        ]
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    },
+    {
+      "id": "openai-document-url-refusal",
+      "kind": "generation",
+      "request": {
+        "entry_point": "astream",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "document",
+                "media_type": "application/pdf",
+                "filename": "remote.pdf",
+                "data": null,
+                "url": "https://fixture.invalid/openai-document"
+              }
+            ]
+          }
+        ],
+        "target": "openai:model",
+        "route": null,
+        "reasoning": null,
+        "provider_options": {},
+        "metadata": {},
+        "logprobs": null,
+        "cite_documents": false,
+        "server_tools": [],
+        "max_input_part_bytes": 1,
+        "max_input_bytes": 1,
+        "retain_raw": false,
+        "manifest": false,
+        "repair": null,
+        "schema": null
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false
+      },
+      "descriptors": [
+        {
+          "id": "openai",
+          "model": "model",
+          "features_provenance": "default",
+          "features": [
+            "document"
+          ],
+          "wire_support": [
+            "openai"
+          ]
+        }
+      ],
+      "scripts": [],
+      "procedure": {
+        "name": "async_stream",
+        "consume": "exact",
+        "script_ids": []
+      },
+      "fresh": {
+        "client": true,
+        "adapters": true,
+        "barriers": true
+      }
+    }
+  ]
+}

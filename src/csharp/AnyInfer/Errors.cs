@@ -312,3 +312,13 @@ public sealed class AllTargetsFailedException : AnyInferException
     /// <summary>Gets copied internal batch outcomes for a retrieval failure.</summary>
     public IReadOnlyList<BatchFailure> BatchFailures { get; }
 }
+
+/// <summary>Represents a bounded tool-loop declaration, dispatch, or exhaustion failure.</summary>
+public sealed class ToolLoopException : AnyInferException
+{
+    /// <summary>Initializes a nonretryable tool-loop failure.</summary>
+    public ToolLoopException(string message, string? detail = null, string? hint = null, Exception? nativeInner = null)
+        : base(message, "tool_loop", false, "generate", null, null, null, detail, hint, nativeInner)
+    {
+    }
+}

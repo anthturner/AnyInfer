@@ -204,10 +204,10 @@ internal sealed class ManifestBuilder
         toolNames: _request.Tools.Select(static tool => tool.Name).ToArray(),
         toolChoice: _request.ToolChoice,
         sampling: Sampling(_request.Sampling),
-        reasoning: null,
+        reasoning: _request.Reasoning,
         timeoutS: _request.TimeoutS,
         repairBudget: _request.RepairBudget,
-        metadataKeys: []);
+        metadataKeys: _request.Metadata.Keys.OrderBy(static key => key, StringComparer.Ordinal).ToArray());
 
     private CapabilityFacet BuildCapabilityFacet()
     {

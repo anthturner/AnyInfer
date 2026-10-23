@@ -8,6 +8,23 @@ namespace AnyInfer;
 
 public abstract record ContentPart;
 
+/// <summary>Immutable snapshot helpers for rich generation values.</summary>
+internal static class RichGenerationSnapshots
+{
+    internal static IReadOnlyList<byte>? Bytes(IEnumerable<byte>? values) => values is null
+        ? null
+        : Array.AsReadOnly(values.ToArray());
+
+    internal static IReadOnlyList<T> List<T>(IEnumerable<T>? values, string parameterName)
+    {
+        var snapshot = (values ?? []).ToArray();
+        if (snapshot.Any(static value => value is null)) throw new ArgumentException("Collections cannot contain null references.", parameterName);
+        return Array.AsReadOnly(snapshot);
+    }
+
+    internal static JsonObject Object(JsonObject value) => new(value.Properties);
+}
+
 public sealed record Text : ContentPart
 {
     public Text(string text)
@@ -85,6 +102,9 @@ public sealed record Message
     public string Role { get; }
 
     public IReadOnlyList<ContentPart> Content { get; }
+
+    /// <summary>Gets the concatenation of plain-text content parts only.</summary>
+    public string Text => string.Concat(Content.OfType<AnyInfer.Text>().Select(static part => part.Value));
 
     public static Message User(string text) => new("user", [new Text(text)]);
 
@@ -399,7 +419,15 @@ public sealed record GenerationRequest
         bool stream = false,
         IEnumerable<ToolSpec>? tools = null,
         string toolChoice = "auto",
-        CachePolicy? cache = null)
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024)
     {
         ArgumentNullException.ThrowIfNull(messages);
         Messages = Array.AsReadOnly(messages.Select(static message => message ?? throw new ArgumentException("Messages cannot contain null references.")).ToArray());
@@ -414,6 +442,17 @@ public sealed record GenerationRequest
         Tools = Array.AsReadOnly((tools ?? []).Select(static tool => tool ?? throw new ArgumentException("Tools cannot contain null references.")).ToArray());
         ToolChoice = toolChoice ?? throw new ArgumentNullException(nameof(toolChoice));
         Cache = cache;
+        Reasoning = reasoning;
+        ProviderOptions = SnapshotProviderOptions(providerOptions);
+        Metadata = new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(metadata ?? new Dictionary<string, string>(), StringComparer.Ordinal));
+        if (logprobs is < 0 or > 20) throw new ArgumentOutOfRangeException(nameof(logprobs));
+        Logprobs = logprobs;
+        CiteDocuments = citeDocuments;
+        ServerTools = RichGenerationSnapshots.List(serverTools, nameof(serverTools));
+        if (maxInputPartBytes < 1 || maxInputBytes < 1) throw new ArgumentOutOfRangeException(nameof(maxInputPartBytes));
+        MaxInputPartBytes = maxInputPartBytes;
+        MaxInputBytes = maxInputBytes;
+        ValidateInlineMediaBytes(Messages);
     }
 
     public IReadOnlyList<Message> Messages { get; }
@@ -431,6 +470,76 @@ public sealed record GenerationRequest
     public string ToolChoice { get; }
     /// <summary>Gets the per-request prompt-cache policy override.</summary>
     public CachePolicy? Cache { get; }
+    /// <summary>Gets the requested normalized reasoning effort, or <see langword="null"/> for the provider default.</summary>
+    public string? Reasoning { get; }
+    /// <summary>Gets copied provider-specific option objects keyed by provider namespace.</summary>
+    public IReadOnlyDictionary<string, JsonObject> ProviderOptions { get; }
+    /// <summary>Gets copied opaque request labels.</summary>
+    public IReadOnlyDictionary<string, string> Metadata { get; }
+    /// <summary>Gets the requested number of alternative log-probabilities, or <see langword="null"/>.</summary>
+    public int? Logprobs { get; }
+    /// <summary>Gets whether citations were requested for supplied documents.</summary>
+    public bool CiteDocuments { get; }
+    /// <summary>Gets copied provider-run tool declarations.</summary>
+    public IReadOnlyList<ServerToolSpec> ServerTools { get; }
+    /// <summary>Gets the per-inline-part byte ceiling.</summary>
+    public int MaxInputPartBytes { get; }
+    /// <summary>Gets the aggregate inline-media byte ceiling.</summary>
+    public int MaxInputBytes { get; }
+
+    /// <summary>Returns a request with replacement messages and every other field preserved.</summary>
+    public GenerationRequest WithMessages(IEnumerable<Message> messages) =>
+        WithMessagesAndTools(messages, Tools);
+
+    internal GenerationRequest WithMessagesAndTools(
+        IEnumerable<Message> messages,
+        IEnumerable<ToolSpec> tools) =>
+        new(
+            messages,
+            Route,
+            Sampling,
+            Repair,
+            Schema,
+            SchemaMechanism,
+            TimeoutS,
+            MaxResponseBytes,
+            Stream,
+            tools,
+            ToolChoice,
+            Cache,
+            Reasoning,
+            ProviderOptions,
+            Metadata,
+            Logprobs,
+            CiteDocuments,
+            ServerTools,
+            MaxInputPartBytes,
+            MaxInputBytes);
+
+    private static IReadOnlyDictionary<string, JsonObject> SnapshotProviderOptions(IReadOnlyDictionary<string, JsonObject>? values) =>
+        new ReadOnlyDictionary<string, JsonObject>((values ?? new Dictionary<string, JsonObject>()).ToDictionary(
+            static pair => pair.Key ?? throw new ArgumentException("Provider option namespaces cannot be null."),
+            static pair => RichGenerationSnapshots.Object(pair.Value ?? throw new ArgumentException("Provider option objects cannot be null.")),
+            StringComparer.Ordinal));
+
+    private void ValidateInlineMediaBytes(IEnumerable<Message> messages)
+    {
+        long total = 0;
+        foreach (var data in messages.SelectMany(static message => message.Content).Select(static part => part switch
+        {
+            ImagePart image => image.Data,
+            DocumentPart document => document.Data,
+            AudioPart audio => audio.Data,
+            VideoPart video => video.Data,
+            _ => null,
+        }))
+        {
+            if (data is null) continue;
+            if (data.Count > MaxInputPartBytes) throw new ArgumentOutOfRangeException(nameof(MaxInputPartBytes));
+            total += data.Count;
+            if (total > MaxInputBytes) throw new ArgumentOutOfRangeException(nameof(MaxInputBytes));
+        }
+    }
 }
 
 public sealed record Generation
@@ -448,7 +557,10 @@ public sealed record Generation
         IEnumerable<string>? warnings = null,
         RunManifest? manifest = null,
         IEnumerable<ToolCall>? toolCalls = null,
-        JsonValue? raw = null)
+        JsonValue? raw = null,
+        IEnumerable<TokenLogprob>? logprobs = null,
+        IEnumerable<Citation>? citations = null,
+        IEnumerable<ServerToolUse>? serverToolUses = null)
     {
         Text = text ?? throw new ArgumentNullException(nameof(text));
         Structured = structured;
@@ -463,6 +575,9 @@ public sealed record Generation
         Manifest = manifest;
         ToolCalls = Array.AsReadOnly((toolCalls ?? []).Select(static call => call ?? throw new ArgumentException("Tool calls cannot contain null references.")).ToArray());
         Raw = raw;
+        Logprobs = RichGenerationSnapshots.List(logprobs, nameof(logprobs));
+        Citations = RichGenerationSnapshots.List(citations, nameof(citations));
+        ServerToolUses = RichGenerationSnapshots.List(serverToolUses, nameof(serverToolUses));
     }
 
     public string Text { get; }
@@ -481,6 +596,12 @@ public sealed record Generation
     public IReadOnlyList<ToolCall> ToolCalls { get; }
     /// <summary>Gets the caller-retained raw terminal provider payload when enabled.</summary>
     public JsonValue? Raw { get; }
+    /// <summary>Gets copied token log-probabilities in generation order.</summary>
+    public IReadOnlyList<TokenLogprob> Logprobs { get; }
+    /// <summary>Gets copied citations in provider-reported order.</summary>
+    public IReadOnlyList<Citation> Citations { get; }
+    /// <summary>Gets copied counts of provider-run tool invocations.</summary>
+    public IReadOnlyList<ServerToolUse> ServerToolUses { get; }
 
     internal Generation WithManifest(RunManifest? manifest) => new(
         Text,
@@ -495,7 +616,10 @@ public sealed record Generation
         Warnings,
         manifest,
         ToolCalls,
-        Raw);
+        Raw,
+        Logprobs,
+        Citations,
+        ServerToolUses);
 
     /// <summary>Deserializes the structured result with the supplied serializer options.</summary>
     public T? DeserializeStructured<T>(System.Text.Json.JsonSerializerOptions? options = null)

@@ -54,6 +54,30 @@ Verified 2026-08-10 for the OpenAI Chat Completions dialect. Message content arr
 URLs and inline audio is base64 in its content object. Compatibility servers vary, so this
 is a projection contract rather than a capability claim: presets must discover, catalog,
 or document support, and an upstream rejection remains explicit.
+
+### Bounded rich-wire audit — 2026-10-22
+
+The existing adapter projection was checked against the fetched
+[Chat Completions create reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create),
+[streaming event reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events),
+and [file-input guide](https://developers.openai.com/api/docs/guides/file-inputs). This is a
+wire-only audit; it does not update the snapshot's overall live-verification date or widen
+the provider-support claim.
+
+- Image parts project an `image_url` object with either a remote URL or a data URL and may
+  carry `detail` (`auto`, `low`, or `high`). Inline document bytes project as `file_data`
+  plus an optional `filename`; inline audio projects as base64 `input_audio.data` with its
+  media subtype in `input_audio.format` (`audio/mpeg` becomes `mp3`). The adapter preserves
+  text/media ordering and refuses generic video explicitly.
+- The file-input guide explicitly excludes external file URLs from Chat Completions. A
+  URL-backed normalized `DocumentPart` therefore fails at the adapter boundary before an
+  HTTP request; it is not fetched or uploaded. This is narrower than the domain type, which
+  continues to allow a document URL for providers that support one.
+- `logprobs: true` enables chosen-token log probabilities; a positive normalized count also
+  sends `top_logprobs`. Buffered `choices[].logprobs.content` and per-SSE-chunk logprobs are
+  parsed in provider order, retaining reported bytes and alternatives while skipping malformed
+  entries because they are advisory. Buffered rich logprob responses retain their actual raw
+  payload; SSE finalization does not invent one.
 ### Response fields
 - `choices[0].message.content`, `choices[0].message.tool_calls[]`,
   `choices[0].finish_reason` (`stop|length|tool_calls|content_filter`),

@@ -309,6 +309,7 @@ def write_consumer(consumer: Path, feed: Path, cache: Path, version: str) -> Non
     )
     (consumer / "Program.cs").write_text(
         '''using System.Net;
+using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using AnyInfer;
@@ -837,6 +838,157 @@ var syncAdapter = new DemoAdapter();
 if (syncAdapter.DisposeCount != 1)
     throw new InvalidOperationException("synchronous adapter disposal failed");
 
+var richAsyncAdapter = new RichLoopAdapter(includeStreamWitness: true);
+var richDescriptor = new ProviderDescriptor(
+    "rich-loop",
+    "Rich package loop",
+    (_, _) => ValueTask.FromResult<IAsyncDisposable>(richAsyncAdapter),
+    reasoningTranslator: effort => new JsonObject([
+        new JsonProperty("effort", new JsonString(effort ?? "default")),
+    ]),
+    serverTools: ["web_search"]);
+var staleTool = new ToolSpec("stale", "Replaced by registered tools.", new JsonObject([
+    new JsonProperty("type", new JsonString("object")),
+]));
+var richRequest = new GenerationRequest(
+    [new Message("user", [
+        new Text("inspect this rich package input"),
+        new ImagePart(data: [1, 2], detail: "low"),
+        new DocumentPart(data: [3, 4], filename: "source.pdf"),
+        new AudioPart([5, 6], mediaType: "audio/mpeg"),
+        new VideoPart(data: [7, 8], startOffsetS: 0, endOffsetS: 1, fps: 2),
+    ])],
+    new Route(["rich-loop:model"]),
+    tools: [staleTool],
+    reasoning: "careful",
+    providerOptions: new Dictionary<string, JsonObject>
+    {
+        ["rich-loop"] = new JsonObject([
+            new JsonProperty("package_option", new JsonString("kept")),
+        ]),
+    },
+    metadata: new Dictionary<string, string> { ["consumer"] = "package" },
+    logprobs: 1,
+    citeDocuments: true,
+    serverTools: [new ServerToolSpec("web_search", maxUses: 2)]);
+var observedAsyncBigInteger = BigInteger.Zero;
+var asyncHandlerCalls = 0;
+var asyncIncrement = Tool.From((Func<BigInteger, BigInteger>)(value =>
+{
+    asyncHandlerCalls++;
+    observedAsyncBigInteger = value;
+    return value + BigInteger.One;
+}), name: "increment");
+{
+    await using var client = new AsyncClient(
+        [ProviderSettings.Of("rich-loop")], new ProviderRegistry([richDescriptor]),
+        manifests: true, retainRaw: true);
+    await using var stream = client.StreamAsync(richRequest);
+    var sawReasoning = false;
+    var sawCitation = false;
+    var sawServerTool = false;
+    var sawUsage = false;
+    await foreach (var item in stream)
+    {
+        sawReasoning |= item is ReasoningDelta { Text: "stream reasoning" };
+        sawCitation |= item is CitationDelta { Citation.QuotedText: "stream quote" };
+        sawServerTool |= item is ServerToolDelta { Kind: "web_search", Status: "completed" };
+        sawUsage |= item is UsageUpdate { Usage.OutputTokens: 4 };
+    }
+    var streamed = stream.Result;
+    var final = await client.RunToolsAsync(richRequest, [asyncIncrement], maxRounds: 2);
+    var streamWire = richAsyncAdapter.Requests[0];
+    var toolWire = richAsyncAdapter.Requests[1];
+    var finalWire = richAsyncAdapter.Requests[2];
+    var parts = toolWire.Messages[0].Content;
+    var returnedTool = finalWire.Messages[2].Content.Single() as ToolResult;
+    if (!sawReasoning
+        || !sawCitation
+        || !sawServerTool
+        || !sawUsage
+        || streamed.Text != "stream rich result"
+        || streamed.Citations.Single().QuotedText != "stream quote"
+        || streamed.ServerToolUses.Single() is not { Kind: "web_search", Uses: 1 }
+        || streamed.Logprobs.Single() is not { Token: "stream", Bytes.Count: 1 }
+        || streamed.Raw is not JsonObject streamedRaw
+        || !streamedRaw.TryGetValue("marker", out var streamedMarker)
+        || streamedMarker is not JsonString { Value: "stream-raw" }
+        || final.Text != "rich final"
+        || final.Usage is not { InputTokens: 5, OutputTokens: 8 }
+        || final.Citations.Single().QuotedText != "final quote"
+        || final.ServerToolUses.Single() is not { Kind: "web_search", Uses: 2 }
+        || final.Logprobs.Single() is not { Token: "final", Bytes.Count: 1 }
+        || final.Manifest is not { Complete: true }
+        || final.Raw is not JsonObject finalRaw
+        || !finalRaw.TryGetValue("marker", out var finalMarker)
+        || finalMarker is not JsonString { Value: "final-raw" }
+        || richAsyncAdapter.Requests.Count != 3
+        || streamWire.Tools.Single().Name != "stale"
+        || asyncHandlerCalls != 1
+        || observedAsyncBigInteger != new BigInteger(17)
+        || parts.Count != 5
+        || parts[0] is not Text { Value: "inspect this rich package input" }
+        || parts[1] is not ImagePart { Data.Count: 2, Url: null, Detail: "low" }
+        || parts[2] is not DocumentPart { Data.Count: 2, Filename: "source.pdf" }
+        || parts[3] is not AudioPart { Data.Count: 2, MediaType: "audio/mpeg" }
+        || parts[4] is not VideoPart { Data.Count: 2, StartOffsetS: 0, EndOffsetS: 1, Fps: 2 }
+        || toolWire.Tools.Single().Name != "increment"
+        || finalWire.Tools.Single().Name != "increment"
+        || toolWire.ReasoningWire.TryGetValue("effort", out var effort) is false
+        || effort is not JsonString { Value: "careful" }
+        || toolWire.ExtraOptions.TryGetValue("package_option", out var option) is false
+        || option is not JsonString { Value: "kept" }
+        || toolWire.ServerTools.Single() is not { Kind: "web_search", MaxUses: 2 }
+        || !toolWire.CiteDocuments
+        || toolWire.Logprobs != 1
+        || finalWire.Messages.Count != 3
+        || returnedTool is not { CallId: "rich-call", Content: "18", IsError: false })
+        throw new InvalidOperationException("public rich package async tool-loop witness failed");
+}
+if (richAsyncAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("public rich package async adapter disposal failed");
+
+var richSyncAdapter = new RichLoopAdapter();
+var richSyncDescriptor = new ProviderDescriptor(
+    "rich-loop",
+    "Rich package loop",
+    (_, _) => ValueTask.FromResult<IAsyncDisposable>(richSyncAdapter),
+    reasoningTranslator: effort => new JsonObject([
+        new JsonProperty("effort", new JsonString(effort ?? "default")),
+    ]),
+    serverTools: ["web_search"]);
+var observedSyncBigInteger = BigInteger.Zero;
+var syncHandlerCalls = 0;
+var syncIncrement = Tool.From((Func<BigInteger, BigInteger>)(value =>
+{
+    syncHandlerCalls++;
+    observedSyncBigInteger = value;
+    return value + BigInteger.One;
+}), name: "increment");
+{
+    using var client = new Client(
+        [ProviderSettings.Of("rich-loop")], new ProviderRegistry([richSyncDescriptor]),
+        manifests: true, retainRaw: true);
+    var final = client.RunTools(richRequest, [syncIncrement], maxRounds: 2);
+    var returnedTool = richSyncAdapter.Requests[1].Messages[2].Content.Single() as ToolResult;
+    if (final.Text != "rich final"
+        || final.Usage is not { InputTokens: 5, OutputTokens: 8 }
+        || final.Citations.Single().QuotedText != "final quote"
+        || final.ServerToolUses.Single() is not { Kind: "web_search", Uses: 2 }
+        || final.Logprobs.Single().Token != "final"
+        || final.Raw is not JsonObject raw
+        || !raw.TryGetValue("marker", out var marker)
+        || marker is not JsonString { Value: "final-raw" }
+        || richSyncAdapter.Requests.Count != 2
+        || syncHandlerCalls != 1
+        || observedSyncBigInteger != new BigInteger(17)
+        || richSyncAdapter.Requests[0].Tools.Single().Name != "increment"
+        || returnedTool is not { CallId: "rich-call", Content: "18", IsError: false })
+        throw new InvalidOperationException("public rich package sync tool-loop witness failed");
+}
+if (richSyncAdapter.DisposeCount != 1)
+    throw new InvalidOperationException("public rich package sync adapter disposal failed");
+
 var retrievalAdapter = new RetrievalAdapter();
 var retrievalRegistry = new ProviderRegistry([
     new ProviderDescriptor(
@@ -986,6 +1138,75 @@ static bool HasPromptTokens(JsonValue? raw) => raw is JsonObject payload
     && promptTokens is JsonInteger integer
     && integer.Value == 7;
 
+sealed class RichLoopAdapter(bool includeStreamWitness = false) : IProviderAdapter
+{
+    public List<WireRequest> Requests { get; } = [];
+    public int DisposeCount { get; private set; }
+
+    public async IAsyncEnumerable<AdapterEvent> GenerateAsync(
+        WireRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Requests.Add(request);
+        var call = Requests.Count;
+        if (includeStreamWitness && call == 1)
+        {
+            yield return new AdapterReasoningDelta("stream reasoning");
+            yield return new AdapterCitationDelta(
+                new Citation(0, 6, "stream quote", title: "stream source"));
+            yield return new AdapterServerToolDelta("web_search", "completed", [
+                new ServerToolSource("https://example.invalid/stream", "stream source"),
+            ]);
+            yield return new AdapterTextDelta("stream rich result");
+            yield return new AdapterUsage(new Usage(InputTokens: 2, OutputTokens: 4));
+            yield return new AdapterFinal("stop", new Usage(InputTokens: 2, OutputTokens: 4),
+                Raw: new JsonObject([new JsonProperty("marker", new JsonString("stream-raw"))]),
+                logprobs: [new TokenLogprob("stream", -0.1, bytes: [115])],
+                serverToolUses: [new ServerToolUse("web_search", 1)]);
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        var toolRound = includeStreamWitness ? 2 : 1;
+        if (call == toolRound)
+        {
+            yield return new AdapterToolCallDelta(0, "rich-call", "increment", """{"value":17}""");
+            yield return new AdapterFinal("tool_calls", new Usage(InputTokens: 1, OutputTokens: 1),
+                Raw: new JsonObject([new JsonProperty("marker", new JsonString("tool-raw"))]));
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        if (call == toolRound + 1)
+        {
+            yield return new AdapterReasoningDelta("final reasoning");
+            yield return new AdapterCitationDelta(
+                new Citation(0, 5, "final quote", title: "final source"));
+            yield return new AdapterServerToolDelta("web_search", "completed", [
+                new ServerToolSource("https://example.invalid/final", "final source"),
+            ]);
+            yield return new AdapterTextDelta("rich final");
+            yield return new AdapterUsage(new Usage(InputTokens: 5, OutputTokens: 8));
+            yield return new AdapterFinal("stop", new Usage(InputTokens: 5, OutputTokens: 8),
+                Raw: new JsonObject([new JsonProperty("marker", new JsonString("final-raw"))]),
+                logprobs: [new TokenLogprob("final", -0.2, bytes: [102])],
+                serverToolUses: [new ServerToolUse("web_search", 2)]);
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        throw new InvalidOperationException("Rich loop made an unexpected provider call.");
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        DisposeCount++;
+        return ValueTask.CompletedTask;
+    }
+}
+
 sealed class RetrievalAdapter : IEmbedsText, IReranksText, IAsyncDisposable
 {
     public int EmbeddingCalls { get; private set; }
@@ -1121,8 +1342,18 @@ sealed class SchemaAdapter : IProviderAdapter
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (request.Schema is null || request.SchemaName != "response")
-            throw new InvalidOperationException("SchemaSpec was not forwarded to the adapter.");
+        if (request.Mechanism != "prompt"
+            || request.Schema is not null
+            || request.SchemaName != "response"
+            || request.Messages.Count != 2
+            || request.Messages[0].Role != "system"
+            || !request.Messages[0].Text.StartsWith(
+                "Respond with ONLY a JSON value matching this JSON Schema. No prose. Schema:\\n",
+                StringComparison.Ordinal)
+            || !request.Messages[0].Text.Contains("\\\"$defs\\\"", StringComparison.Ordinal)
+            || request.Messages[1].Text != "Return a schema object.")
+            throw new InvalidOperationException(
+                "Modern prompt schema wire boundary was not preserved.");
         SchemaRequests++;
         yield return new AdapterTextDelta("""{"answer":"schema"}""");
         yield return new AdapterFinal("stop");

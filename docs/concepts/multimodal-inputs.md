@@ -69,6 +69,15 @@ inventing a token count.
 
 ## Frontends
 
+### C# SDK proof
+
+The C# proof exposes the same typed part names with PascalCase properties. Byte inputs are
+copied and read-only, with defaults of 20 MiB per inline part and 50 MiB total. The core never
+fetches URL references. Its built-in OpenAI-compatible adapter supports images, inline
+documents, and inline audio; it rejects video and document URLs before HTTP. See the
+[source-linked C# example](../guides/csharp-sdk.md#rich-generation-inputs-and-outputs) for
+the executed inline request.
+
 The [CLI](../guides/cli.md) reads attachments in the frontend and passes bytes to the
 same typed request:
 

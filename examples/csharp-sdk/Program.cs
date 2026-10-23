@@ -296,6 +296,32 @@ static async Task VerifyAsync()
     Require(structured.Answer == "ok", "Structured-output example returned unexpected text.");
     Require(structuredHandler.RequestCount == 1 && structuredHandler.DisposeCount == 1, "Structured-output example did not close its transport once.");
 
+    var richHandler = new RichGenerationHandler();
+    byte[] fixtureImage = [0x89, 0x50];
+    byte[] fixtureDocument = [0x5A];
+    byte[] fixtureAudio = [0x52, 0x49, 0x46, 0x46];
+    var rich = await RichGenerationExample.RunAsync(
+        WithTransport(displayedSettings, richHandler),
+        target,
+        fixtureImage,
+        fixtureDocument,
+        fixtureAudio);
+    Require(rich.Generation.Text == "rich answer"
+        && rich.Generation.Logprobs.Single() is { Token: "rich", Logprob: -0.25, Bytes: [114, 105, 99, 104] }
+        && rich.Generation.Logprobs[0].Top.Single() is { Token: "rich", Logprob: -0.25 }
+        && richHandler.RequestCount == 1
+        && richHandler.DisposeCount == 1,
+        "Rich-generation example did not retain typed inputs, logprobs, or transport ownership.");
+
+    var toolHandler = new ToolLoopHandler();
+    var toolResult = await ToolLoopExample.RunAsync(WithTransport(displayedSettings, toolHandler), target);
+    Require(toolResult.Generation.Text == "Boston is clear."
+        && toolResult.Generation.FinishReason == "stop"
+        && toolResult.HandlerCalls == 1
+        && toolHandler.RequestCount == 2
+        && toolHandler.DisposeCount == 1,
+        "Tool-loop example did not retain two-round history, final result, or transport ownership.");
+
     var configurationHandler = new CountingHandler();
     var configurationRegistry = BuiltinRegistry(configurationHandler);
     const string configJson = """
@@ -455,6 +481,91 @@ static bool HasPromptTokens(JsonValue? raw) => raw is JsonObject payload
     && usage.TryGetValue("prompt_tokens", out var promptTokens)
     && promptTokens is JsonInteger integer
     && integer.Value == 7;
+
+sealed class RichGenerationHandler : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = await request.Content!.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        var content = root.GetProperty("messages")[0].GetProperty("content").EnumerateArray().ToArray();
+        if (request.RequestUri?.AbsolutePath != "/v1/chat/completions"
+            || !root.GetProperty("logprobs").GetBoolean()
+            || root.GetProperty("top_logprobs").GetInt32() != 2
+            || content.Length != 4
+            || content[0].GetProperty("type").GetString() != "text"
+            || content[1].GetProperty("image_url").GetProperty("url").GetString() != "data:image/png;base64,iVA="
+            || content[1].GetProperty("image_url").GetProperty("detail").GetString() != "low"
+            || content[2].GetProperty("file").GetProperty("filename").GetString() != "brief.pdf"
+            || content[2].GetProperty("file").GetProperty("file_data").GetString() != "data:application/pdf;base64,Wg=="
+            || content[3].GetProperty("input_audio").GetProperty("format").GetString() != "wav"
+            || content[3].GetProperty("input_audio").GetProperty("data").GetString() != "UklGRg==")
+        {
+            throw new InvalidOperationException("Rich-generation example did not project its typed request.");
+        }
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"choices":[{"message":{"content":"rich answer"},"finish_reason":"stop","logprobs":{"content":[{"token":"rich","logprob":-0.25,"bytes":[114,105,99,104],"top_logprobs":[{"token":"rich","logprob":-0.25}]}]}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}""", Encoding.UTF8, "application/json"),
+        };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+}
+
+sealed class ToolLoopHandler : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = await request.Content!.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        if (request.RequestUri?.AbsolutePath != "/v1/chat/completions"
+            || root.GetProperty("tools")[0].GetProperty("function").GetProperty("name").GetString() != "read_weather")
+        {
+            throw new InvalidOperationException("Tool-loop example did not project its registered tool.");
+        }
+        if (RequestCount == 1)
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"choices":[{"message":{"tool_calls":[{"id":"weather-1","type":"function","function":{"name":"read_weather","arguments":"{\"city\":\"Boston\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}""", Encoding.UTF8, "application/json"),
+            };
+        }
+        var messages = root.GetProperty("messages").EnumerateArray().ToArray();
+        if (RequestCount != 2
+            || messages[^2].GetProperty("tool_calls")[0].GetProperty("id").GetString() != "weather-1"
+            || messages[^1].GetProperty("tool_call_id").GetString() != "weather-1"
+            || messages[^1].GetProperty("content").GetString() != "clear")
+        {
+            throw new InvalidOperationException("Tool-loop example did not preserve tool history.");
+        }
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"choices":[{"message":{"content":"Boston is clear."},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4}}""", Encoding.UTF8, "application/json"),
+        };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+}
 
 sealed class CountingHandler(
     HttpStatusCode statusCode = HttpStatusCode.OK,

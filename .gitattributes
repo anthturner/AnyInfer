@@ -1,6 +1,8 @@
 specification/** text eol=lf
 tests/fixtures/request-policy-v1/** text eol=lf
 tests/fixtures/retrieval-v1/** text eol=lf
+tests/fixtures/rich-generation-v1/** text eol=lf
+tests/fixtures/tool-loop-v1/** text eol=lf
 # Raw-string manifest goldens must match the renderer's literal LF output.
 src/csharp/AnyInfer.Tests/ManifestRenderingTests.cs text eol=lf
 # The embedded schema must retain the generator's canonical UTF-8/LF bytes.

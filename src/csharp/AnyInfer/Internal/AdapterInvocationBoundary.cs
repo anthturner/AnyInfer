@@ -11,8 +11,9 @@ internal static class AdapterInvocationBoundary
         OperationContext operation,
         EntryRole role,
         NativeAssessment? repairAssessment = null,
-        CancellationToken cancellationToken = default) =>
-        InvokeIterator(adapter, request, operation, role, repairAssessment, cancellationToken);
+        CancellationToken cancellationToken = default,
+        Func<CancellationToken?>? cancelledParentToken = null) =>
+        InvokeIterator(adapter, request, operation, role, repairAssessment, cancellationToken, cancelledParentToken);
 
     private static async IAsyncEnumerable<AdapterEvent> InvokeIterator(
         IGeneratesText adapter,
@@ -20,7 +21,8 @@ internal static class AdapterInvocationBoundary
         OperationContext operation,
         EntryRole role,
         NativeAssessment? repairAssessment,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken,
+        Func<CancellationToken?>? cancelledParentToken)
     {
         ArgumentNullException.ThrowIfNull(adapter);
         ArgumentNullException.ThrowIfNull(request);
@@ -43,7 +45,7 @@ internal static class AdapterInvocationBoundary
             }
             catch (Exception exception)
             {
-                throw RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream);
+                throw RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream, request.UsesModernSchema, cancelledParentToken);
             }
 
             while (true)
@@ -55,7 +57,7 @@ internal static class AdapterInvocationBoundary
                 }
                 catch (Exception exception)
                 {
-                    throw RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream);
+                    throw RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream, request.UsesModernSchema, cancelledParentToken);
                 }
 
                 if (!moved)
@@ -80,7 +82,7 @@ internal static class AdapterInvocationBoundary
                 }
                 catch (Exception exception)
                 {
-                    cleanupFailure = RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream);
+                    cleanupFailure = RecordTerminalFailure(exception, entry, timeout, cancellationToken, request.Stream, request.UsesModernSchema, cancelledParentToken);
                 }
                 finally
                 {
@@ -106,8 +108,19 @@ internal static class AdapterInvocationBoundary
         EntryContext entry,
         EntryTimeoutScope timeout,
         CancellationToken callerToken,
-        bool stream)
+        bool stream,
+        bool modernSdk,
+        Func<CancellationToken?>? cancelledParentToken)
     {
+        var parent = cancelledParentToken?.Invoke();
+        if (modernSdk && nativeFailure is OperationCanceledException cancellation &&
+            cancellation.CancellationToken == timeout.Token && parent is { } parentToken && parentToken.IsCancellationRequested)
+        {
+            var mapped = new OperationCanceledException(cancellation.Message, nativeFailure, parentToken);
+            entry.RecordFailure(nativeFailure, mapped);
+            return mapped;
+        }
+
         if (nativeFailure is OperationCanceledException && callerToken.IsCancellationRequested)
         {
             entry.RecordFailure(nativeFailure, nativeFailure);

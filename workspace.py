@@ -139,6 +139,10 @@ LINT_PATHS = (
     "scripts/check_csharp_accounting.py",
     "scripts/_csharp_observation.py",
     "scripts/check_csharp_request_policy.py",
+    "scripts/check_csharp_rich_generation.py",
+    "scripts/observe_python_tool_loop.py",
+    "scripts/_tool_loop_python.py",
+    "scripts/check_csharp_tool_loop.py",
     "scripts/check_csharp_binding_inventory.py",
     "scripts/export_python_provider_bindings.py",
     "scripts/run_provider_change_checks.py",
@@ -1018,6 +1022,16 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                 (
                     "validate C# retrieval observations",
                     lambda: python(str(ROOT / "scripts" / "check_csharp_retrieval.py"), cwd=ROOT),
+                ),
+                (
+                    "validate C# rich-generation observations",
+                    lambda: python(
+                        str(ROOT / "scripts" / "check_csharp_rich_generation.py"), cwd=ROOT
+                    ),
+                ),
+                (
+                    "validate C# tool-loop observations",
+                    lambda: python(str(ROOT / "scripts" / "check_csharp_tool_loop.py"), cwd=ROOT),
                 ),
                 (
                     "validate C# provider binding inventory",

@@ -1,0 +1,831 @@
+{
+  "profile": "tool-loop-v1",
+  "cases": [
+    {
+      "id": "tools-final-no-calls",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "system part one"
+              },
+              {
+                "type": "text",
+                "text": "system part two"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "user part one"
+              },
+              {
+                "type": "text",
+                "text": "user part two"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 3,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "echo",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        }
+      ],
+      "script_id": "script-tools-final-no-calls"
+    },
+    {
+      "id": "tools-one-call",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-one-call"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 3,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "echo",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        }
+      ],
+      "script_id": "script-tools-one-call"
+    },
+    {
+      "id": "tools-ordered-calls",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-ordered-calls"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 3,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "first",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        },
+        {
+          "spec": {
+            "name": "second",
+            "description": "constant handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "constant",
+            "async": false,
+            "value": "two"
+          }
+        }
+      ],
+      "script_id": "script-tools-ordered-calls"
+    },
+    {
+      "id": "tools-repeated-id",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-repeated-id"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 3,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "echo",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        }
+      ],
+      "script_id": "script-tools-repeated-id"
+    },
+    {
+      "id": "tools-duplicate-name",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-duplicate-name"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 3,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "dup",
+            "description": "constant handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "constant",
+            "async": false,
+            "value": "first"
+          }
+        },
+        {
+          "spec": {
+            "name": "dup",
+            "description": "constant handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "constant",
+            "async": false,
+            "value": "second"
+          }
+        }
+      ],
+      "script_id": "script-tools-duplicate-name"
+    },
+    {
+      "id": "tools-round-exhaustion",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-round-exhaustion"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 2,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "echo",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        }
+      ],
+      "script_id": "script-tools-round-exhaustion"
+    },
+    {
+      "id": "tools-zero-rounds",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-zero-rounds"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 0,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "echo",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        }
+      ],
+      "script_id": "script-tools-zero-rounds"
+    },
+    {
+      "id": "tools-negative-rounds",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-negative-rounds"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": -1,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "echo",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        }
+      ],
+      "script_id": "script-tools-negative-rounds"
+    },
+    {
+      "id": "tools-unknown-name",
+      "request": {
+        "entry_point": "async_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-unknown-name"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 3,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "known",
+            "description": "echo handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "echo",
+            "async": false,
+            "argument": "value"
+          }
+        }
+      ],
+      "script_id": "script-tools-unknown-name"
+    },
+    {
+      "id": "tools-sync-path",
+      "request": {
+        "entry_point": "sync_run_tools",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "input for tools-sync-path"
+              }
+            ]
+          }
+        ],
+        "target": "openai-compat:tool-loop-model",
+        "max_rounds": 3,
+        "tool_choice": "auto"
+      },
+      "client": {
+        "context_gate": false,
+        "use_default_catalog": false,
+        "route": {
+          "retry": {
+            "max_attempts": 1
+          },
+          "health_gate": false
+        }
+      },
+      "registrations": [
+        {
+          "spec": {
+            "name": "counter",
+            "description": "counter handler",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handler": {
+            "kind": "counter",
+            "async": true,
+            "start": 4
+          }
+        }
+      ],
+      "script_id": "script-tools-sync-path"
+    }
+  ],
+  "scripts": [
+    {
+      "id": "script-tools-final-no-calls",
+      "responses": [
+        {
+          "text": "finished",
+          "tool_calls": [],
+          "finish_reason": "stop",
+          "usage": {
+            "prompt_tokens": 3,
+            "completion_tokens": 2,
+            "total_tokens": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "script-tools-one-call",
+      "responses": [
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "c1",
+              "name": "echo",
+              "arguments": {
+                "value": "alpha"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        },
+        {
+          "text": "alpha",
+          "tool_calls": [],
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "script-tools-ordered-calls",
+      "responses": [
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "c1",
+              "name": "first",
+              "arguments": {
+                "value": "one"
+              }
+            },
+            {
+              "id": "c2",
+              "name": "second",
+              "arguments": {
+                "value": "ignored"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        },
+        {
+          "text": "done",
+          "tool_calls": [],
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "script-tools-repeated-id",
+      "responses": [
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "same",
+              "name": "echo",
+              "arguments": {
+                "value": "a"
+              }
+            },
+            {
+              "id": "same",
+              "name": "echo",
+              "arguments": {
+                "value": "b"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        },
+        {
+          "text": "done",
+          "tool_calls": [],
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "script-tools-duplicate-name",
+      "responses": [
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "c1",
+              "name": "dup",
+              "arguments": {
+                "value": "x"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        },
+        {
+          "text": "done",
+          "tool_calls": [],
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "script-tools-round-exhaustion",
+      "responses": [
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "c1",
+              "name": "echo",
+              "arguments": {
+                "value": "a"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        },
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "c2",
+              "name": "echo",
+              "arguments": {
+                "value": "b"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "script-tools-zero-rounds",
+      "responses": []
+    },
+    {
+      "id": "script-tools-negative-rounds",
+      "responses": []
+    },
+    {
+      "id": "script-tools-unknown-name",
+      "responses": [
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "c1",
+              "name": "missing",
+              "arguments": {
+                "value": "x"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "script-tools-sync-path",
+      "responses": [
+        {
+          "text": "",
+          "tool_calls": [
+            {
+              "id": "c1",
+              "name": "counter",
+              "arguments": {
+                "value": "a"
+              }
+            }
+          ],
+          "finish_reason": "tool_calls"
+        },
+        {
+          "text": "sync done",
+          "tool_calls": [],
+          "finish_reason": "stop"
+        }
+      ]
+    }
+  ]
+}

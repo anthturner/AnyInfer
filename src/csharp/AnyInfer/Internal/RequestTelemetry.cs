@@ -37,7 +37,7 @@ internal sealed class RequestTelemetry
             return;
         }
 
-        Emit(new RequestStarted(_requestId, _route.Targets, promptText: WantsPayloads ? Prompt() : null));
+        Emit(new RequestStarted(_requestId, _route.Targets, _request.Metadata, promptText: WantsPayloads ? Prompt() : null));
     }
 
     internal void NoteCapabilities(TargetMetadata metadata) => _builder?.NoteCapabilities(metadata);

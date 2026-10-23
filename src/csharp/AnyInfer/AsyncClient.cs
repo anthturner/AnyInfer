@@ -443,6 +443,89 @@ public sealed class AsyncClient : IAsyncDisposable
     public Task<Generation> GenerateAsync(GenerationRequest request, CancellationToken cancellationToken = default, bool? manifest = null) =>
         GenerateAsync(request, capture: null, cancellationToken: cancellationToken, manifest: manifest);
 
+    /// <summary>Generates and dispatches explicitly registered tools until the model stops calling them.</summary>
+    public Task<Generation> RunToolsAsync(
+        GenerationRequest request,
+        IEnumerable<Tool> tools,
+        int maxRounds = 8,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(tools);
+        return RunToolsCoreAsync(
+            request,
+            new ToolRegistry(tools),
+            maxRounds,
+            cancellationToken,
+            CancellationIdentityContext.Resolve(cancellationToken),
+            manifest);
+    }
+
+    /// <summary>Generates from one prompt while dispatching explicitly registered tools.</summary>
+    public Task<Generation> RunToolsAsync(
+        string prompt,
+        IEnumerable<Tool> tools,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        SchemaSpec? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024,
+        int maxRounds = 8,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunToolsAsync(
+            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema,
+                schemaMechanism, timeoutS, maxResponseBytes, false, null, toolChoice, cache,
+                reasoning, providerOptions, metadata, logprobs, citeDocuments, serverTools,
+                maxInputPartBytes, maxInputBytes),
+            tools, maxRounds, cancellationToken, manifest);
+
+    /// <summary>Generates from caller messages while dispatching explicitly registered tools.</summary>
+    public Task<Generation> RunToolsAsync(
+        IEnumerable<Message> messages,
+        IEnumerable<Tool> tools,
+        string? target = null,
+        Route? route = null,
+        Sampling? sampling = null,
+        Repair? repair = null,
+        SchemaSpec? schema = null,
+        string? schemaMechanism = null,
+        double? timeoutS = null,
+        int? maxResponseBytes = null,
+        string toolChoice = "auto",
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024,
+        int maxRounds = 8,
+        CancellationToken cancellationToken = default,
+        bool? manifest = null) =>
+        RunToolsAsync(
+            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism,
+                timeoutS, maxResponseBytes, false, null, toolChoice, cache, reasoning,
+                providerOptions, metadata, logprobs, citeDocuments, serverTools, maxInputPartBytes,
+                maxInputBytes),
+            tools, maxRounds, cancellationToken, manifest);
+
     /// <summary>Generates from one user prompt through the normal request path.</summary>
     public Task<Generation> GenerateAsync(
         string prompt,
@@ -458,9 +541,17 @@ public sealed class AsyncClient : IAsyncDisposable
         bool? manifest = null,
         IEnumerable<ToolSpec>? tools = null,
         string toolChoice = "auto",
-        CachePolicy? cache = null) =>
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
         GenerateAsync(
-            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false, tools, toolChoice, cache),
+            CreateConvenienceRequest(messages: [Message.User(prompt)], target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: false, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes),
             cancellationToken,
             manifest);
 
@@ -479,11 +570,58 @@ public sealed class AsyncClient : IAsyncDisposable
         bool? manifest = null,
         IEnumerable<ToolSpec>? tools = null,
         string toolChoice = "auto",
-        CachePolicy? cache = null) =>
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
         GenerateAsync(
-            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: false, tools, toolChoice, cache),
+            CreateConvenienceRequest(messages: messages, target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: false, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes),
             cancellationToken,
             manifest);
+
+    private async Task<Generation> RunToolsCoreAsync(
+        GenerationRequest request,
+        ToolRegistry registry,
+        int maxRounds,
+        CancellationToken cancellationToken,
+        CancellationToken callerIdentity,
+        bool? manifest)
+    {
+        var reservation = ReserveLifecycle(cancellationToken, callerIdentity);
+        using var context = AsyncExecutionContext.Push(this, reservation.SyncOwner);
+        using var identity = CancellationIdentityContext.Push(reservation.Token, reservation.CallerIdentity);
+        try
+        {
+            await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+            reservation.ThrowIfCallerCancelled();
+            return await ToolLoop.RunAsync(
+                request,
+                registry,
+                maxRounds,
+                (next, token) => GenerateAsync(next, token, manifest),
+                async token =>
+                {
+                    await reservation.ThrowIfClientCloseWonAsync().ConfigureAwait(false);
+                    reservation.ThrowIfCallerCancelled();
+                    token.ThrowIfCancellationRequested();
+                },
+                reservation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+            when (exception.CancellationToken == reservation.Token && reservation.CallerIdentity.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(exception.Message, exception, reservation.CallerIdentity);
+        }
+        finally
+        {
+            await CompleteLifecycleAsync(reservation).ConfigureAwait(false);
+        }
+    }
 
     internal async Task<Generation> GenerateAsync(
         GenerationRequest request,
@@ -514,9 +652,17 @@ public sealed class AsyncClient : IAsyncDisposable
         bool? manifest = null,
         IEnumerable<ToolSpec>? tools = null,
         string toolChoice = "auto",
-        CachePolicy? cache = null) =>
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
         StreamAsync(
-            CreateConvenienceRequest([Message.User(prompt)], target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true, tools, toolChoice, cache),
+            CreateConvenienceRequest(messages: [Message.User(prompt)], target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: true, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes),
             cancellationToken,
             manifest);
 
@@ -535,9 +681,17 @@ public sealed class AsyncClient : IAsyncDisposable
         bool? manifest = null,
         IEnumerable<ToolSpec>? tools = null,
         string toolChoice = "auto",
-        CachePolicy? cache = null) =>
+        CachePolicy? cache = null,
+        string? reasoning = null,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions = null,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        int? logprobs = null,
+        bool citeDocuments = false,
+        IEnumerable<ServerToolSpec>? serverTools = null,
+        int maxInputPartBytes = 20 * 1024 * 1024,
+        int maxInputBytes = 50 * 1024 * 1024) =>
         StreamAsync(
-            CreateConvenienceRequest(messages, target, route, sampling, repair, schema, schemaMechanism, timeoutS, maxResponseBytes, stream: true, tools, toolChoice, cache),
+            CreateConvenienceRequest(messages: messages, target: target, route: route, sampling: sampling, repair: repair, schema: schema, schemaMechanism: schemaMechanism, timeoutS: timeoutS, maxResponseBytes: maxResponseBytes, stream: true, tools: tools, toolChoice: toolChoice, cache: cache, reasoning: reasoning, providerOptions: providerOptions, metadata: metadata, logprobs: logprobs, citeDocuments: citeDocuments, serverTools: serverTools, maxInputPartBytes: maxInputPartBytes, maxInputBytes: maxInputBytes),
             cancellationToken,
             manifest);
 
@@ -551,18 +705,26 @@ public sealed class AsyncClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(request);
         var effectiveRequest = request.Repair is null && _defaultRepair is not null
             ? new GenerationRequest(
-                request.Messages,
-                request.Route,
-                request.Sampling,
-                _defaultRepair,
-                request.Schema,
-                request.SchemaMechanism,
-                request.TimeoutS,
-                request.MaxResponseBytes,
-                request.Stream,
-                request.Tools,
-                request.ToolChoice,
-                request.Cache)
+                messages: request.Messages,
+                route: request.Route,
+                sampling: request.Sampling,
+                repair: _defaultRepair,
+                schema: request.Schema,
+                schemaMechanism: request.SchemaMechanism,
+                timeoutS: request.TimeoutS,
+                maxResponseBytes: request.MaxResponseBytes,
+                stream: request.Stream,
+                tools: request.Tools,
+                toolChoice: request.ToolChoice,
+                cache: request.Cache,
+                reasoning: request.Reasoning,
+                providerOptions: request.ProviderOptions,
+                metadata: request.Metadata,
+                logprobs: request.Logprobs,
+                citeDocuments: request.CiteDocuments,
+                serverTools: request.ServerTools,
+                maxInputPartBytes: request.MaxInputPartBytes,
+                maxInputBytes: request.MaxInputBytes)
             : request;
         var normalized = RequestNormalizer.Normalize(
             effectiveRequest,
@@ -1298,7 +1460,15 @@ public sealed class AsyncClient : IAsyncDisposable
         bool stream,
         IEnumerable<ToolSpec>? tools,
         string toolChoice,
-        CachePolicy? cache)
+        CachePolicy? cache,
+        string? reasoning,
+        IReadOnlyDictionary<string, JsonObject>? providerOptions,
+        IReadOnlyDictionary<string, string>? metadata,
+        int? logprobs,
+        bool citeDocuments,
+        IEnumerable<ServerToolSpec>? serverTools,
+        int maxInputPartBytes,
+        int maxInputBytes)
     {
         ArgumentNullException.ThrowIfNull(messages);
         var selectedRoute = route;
@@ -1312,17 +1482,25 @@ public sealed class AsyncClient : IAsyncDisposable
         selectedRoute ??= _defaultRoute ?? throw new ConfigException("Specify a target, route, or client default route.");
 
         return new GenerationRequest(
-            messages,
-            selectedRoute,
-            sampling,
-            repair ?? _defaultRepair,
-            schema,
-            schemaMechanism,
-            timeoutS,
-            maxResponseBytes,
-            stream,
-            tools,
-            toolChoice,
-            cache);
+            messages: messages,
+            route: selectedRoute,
+            sampling: sampling,
+            repair: repair ?? _defaultRepair,
+            schema: schema,
+            schemaMechanism: schemaMechanism,
+            timeoutS: timeoutS,
+            maxResponseBytes: maxResponseBytes,
+            stream: stream,
+            tools: tools,
+            toolChoice: toolChoice,
+            cache: cache,
+            reasoning: reasoning,
+            providerOptions: providerOptions,
+            metadata: metadata,
+            logprobs: logprobs,
+            citeDocuments: citeDocuments,
+            serverTools: serverTools,
+            maxInputPartBytes: maxInputPartBytes,
+            maxInputBytes: maxInputBytes);
     }
 }

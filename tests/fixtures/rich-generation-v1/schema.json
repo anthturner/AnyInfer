@@ -1,0 +1,1178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "cases"
+  ],
+  "properties": {
+    "profile": {
+      "const": "rich-generation-v1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "json": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        }
+      ]
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/json"
+      }
+    },
+    "bytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "encoding",
+        "value"
+      ],
+      "properties": {
+        "encoding": {
+          "const": "base64"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+        }
+      }
+    },
+    "nullableBytes": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/bytes"
+        }
+      ]
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "part": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "url",
+            "media_type",
+            "detail"
+          ],
+          "properties": {
+            "type": {
+              "const": "image"
+            },
+            "data": {
+              "$ref": "#/$defs/nullableBytes"
+            },
+            "url": {
+              "$ref": "#/$defs/nullableString"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "detail": {
+              "enum": [
+                "auto",
+                "low",
+                "high",
+                null
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "url",
+            "media_type",
+            "filename"
+          ],
+          "properties": {
+            "type": {
+              "const": "document"
+            },
+            "data": {
+              "$ref": "#/$defs/nullableBytes"
+            },
+            "url": {
+              "$ref": "#/$defs/nullableString"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "filename": {
+              "$ref": "#/$defs/nullableString"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "media_type"
+          ],
+          "properties": {
+            "type": {
+              "const": "audio"
+            },
+            "data": {
+              "$ref": "#/$defs/bytes"
+            },
+            "media_type": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "data",
+            "url",
+            "media_type",
+            "start_offset_s",
+            "end_offset_s",
+            "fps"
+          ],
+          "properties": {
+            "type": {
+              "const": "video"
+            },
+            "data": {
+              "$ref": "#/$defs/nullableBytes"
+            },
+            "url": {
+              "$ref": "#/$defs/nullableString"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "start_offset_s": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "end_offset_s": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "fps": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "name",
+            "arguments"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool_call"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "arguments": {
+              "$ref": "#/$defs/json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "call_id",
+            "content",
+            "is_error"
+          ],
+          "properties": {
+            "type": {
+              "const": "tool_result"
+            },
+            "call_id": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "is_error": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "content"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/part"
+          }
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targets",
+        "retry",
+        "health_gate"
+      ],
+      "properties": {
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*:.+$"
+          }
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_attempts"
+          ],
+          "properties": {
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "health_gate": {
+          "type": "boolean"
+        }
+      }
+    },
+    "schemaSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "json_schema"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "json_schema": {
+          "$ref": "#/$defs/jsonObject"
+        }
+      }
+    },
+    "repair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_attempts"
+      ],
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "serverTool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "max_uses"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "web_search",
+            "code_execution"
+          ]
+        },
+        "max_uses": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "model",
+        "features_provenance",
+        "features",
+        "wire_support"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "model": {
+          "type": "string"
+        },
+        "features_provenance": {
+          "enum": [
+            "catalog",
+            "discovered",
+            "probed",
+            "default"
+          ]
+        },
+        "features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "wire_support": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_point",
+        "messages",
+        "target",
+        "route",
+        "schema",
+        "reasoning",
+        "provider_options",
+        "metadata",
+        "logprobs",
+        "cite_documents",
+        "server_tools",
+        "max_input_part_bytes",
+        "max_input_bytes",
+        "retain_raw",
+        "manifest",
+        "repair"
+      ],
+      "properties": {
+        "entry_point": {
+          "enum": [
+            "astream",
+            "generate",
+            "stream",
+            "validation"
+          ]
+        },
+        "messages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/message"
+          }
+        },
+        "target": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/route"
+            }
+          ]
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/schemaSpec"
+            }
+          ]
+        },
+        "reasoning": {
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            null
+          ]
+        },
+        "provider_options": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/jsonObject"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "logprobs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 20
+        },
+        "cite_documents": {
+          "type": "boolean"
+        },
+        "server_tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/serverTool"
+          }
+        },
+        "max_input_part_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_input_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retain_raw": {
+          "type": "boolean"
+        },
+        "manifest": {
+          "type": "boolean"
+        },
+        "repair": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/repair"
+            }
+          ]
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "end_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "quoted_text": {
+          "type": "string"
+        },
+        "document_index": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "title"
+      ],
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      }
+    },
+    "tokenLogprob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token",
+        "logprob"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "logprob": {
+          "type": "number"
+        },
+        "top": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tokenLogprob"
+          }
+        },
+        "bytes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      }
+    },
+    "serverToolUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "uses"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "web_search",
+            "code_execution"
+          ]
+        },
+        "uses": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "total_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cache_read_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cache_write_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reasoning_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "search_units": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "server_tool_uses": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "detail",
+        "retryable"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "phase": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retry_after_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "http_status": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        },
+        "hint": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "final": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "finish_reason",
+        "raw",
+        "logprobs",
+        "server_tool_uses"
+      ],
+      "properties": {
+        "action": {
+          "const": "adapter_final"
+        },
+        "finish_reason": {
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "phases": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "raw": {
+          "$ref": "#/$defs/json"
+        },
+        "logprobs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tokenLogprob"
+          }
+        },
+        "server_tool_uses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/serverToolUse"
+          }
+        }
+      }
+    },
+    "httpAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "status",
+        "headers",
+        "body"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "http_response",
+            "sse_frame"
+          ]
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": "string"
+        }
+      }
+    },
+    "barrier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "readiness",
+        "release",
+        "finally_cleanup",
+        "next_actions"
+      ],
+      "properties": {
+        "action": {
+          "const": "barrier"
+        },
+        "readiness": {
+          "$ref": "#/$defs/id"
+        },
+        "release": {
+          "$ref": "#/$defs/id"
+        },
+        "finally_cleanup": {
+          "$ref": "#/$defs/id"
+        },
+        "next_actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/final"
+          }
+        }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "text"
+          ],
+          "properties": {
+            "action": {
+              "enum": [
+                "text_delta",
+                "reasoning_delta"
+              ]
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "index",
+            "call_id",
+            "name",
+            "arguments_fragment"
+          ],
+          "properties": {
+            "action": {
+              "const": "tool_call_delta"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "call_id": {
+              "$ref": "#/$defs/nullableString"
+            },
+            "name": {
+              "$ref": "#/$defs/nullableString"
+            },
+            "arguments_fragment": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "citation"
+          ],
+          "properties": {
+            "action": {
+              "const": "citation_delta"
+            },
+            "citation": {
+              "$ref": "#/$defs/citation"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "kind",
+            "status",
+            "sources",
+            "output",
+            "detail"
+          ],
+          "properties": {
+            "action": {
+              "const": "server_tool_delta"
+            },
+            "kind": {
+              "enum": [
+                "web_search",
+                "code_execution"
+              ]
+            },
+            "status": {
+              "enum": [
+                "started",
+                "completed",
+                "failed"
+              ]
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/source"
+              }
+            },
+            "output": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "usage"
+          ],
+          "properties": {
+            "action": {
+              "const": "usage_update"
+            },
+            "usage": {
+              "$ref": "#/$defs/usage"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/final"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "failure"
+          ],
+          "properties": {
+            "action": {
+              "const": "provider_failure"
+            },
+            "failure": {
+              "$ref": "#/$defs/failure"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/barrier"
+        },
+        {
+          "$ref": "#/$defs/httpAction"
+        }
+      ]
+    },
+    "script": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "transport",
+        "provider",
+        "model",
+        "actions"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "transport": {
+          "enum": [
+            "adapter",
+            "http"
+          ]
+        },
+        "provider": {
+          "$ref": "#/$defs/id"
+        },
+        "model": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    },
+    "procedure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "consume",
+        "script_ids"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "construct_request",
+            "async_generate",
+            "async_stream",
+            "sync_generate",
+            "sync_stream",
+            "async_stream_close",
+            "async_stream_cancel"
+          ]
+        },
+        "consume": {
+          "const": "exact"
+        },
+        "script_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    },
+    "fresh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "client",
+        "adapters",
+        "barriers"
+      ],
+      "properties": {
+        "client": {
+          "const": true
+        },
+        "adapters": {
+          "const": true
+        },
+        "barriers": {
+          "const": true
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "request",
+        "client",
+        "descriptors",
+        "scripts",
+        "procedure",
+        "fresh"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "generation",
+            "validation"
+          ]
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "client": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "context_gate",
+            "use_default_catalog"
+          ],
+          "properties": {
+            "context_gate": {
+              "type": "boolean"
+            },
+            "use_default_catalog": {
+              "type": "boolean"
+            }
+          }
+        },
+        "descriptors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/descriptor"
+          }
+        },
+        "scripts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/script"
+          }
+        },
+        "procedure": {
+          "$ref": "#/$defs/procedure"
+        },
+        "fresh": {
+          "$ref": "#/$defs/fresh"
+        }
+      }
+    }
+  }
+}

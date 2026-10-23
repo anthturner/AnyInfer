@@ -1,5 +1,30 @@
 # Run the Tool Loop
 
+The Python API shown below is `run_tools`. The C# prerelease proof has a corresponding bounded
+loop with explicit `Tool` registration; it uses different public method names and delegate
+binding rules. Its offline example is source-linked and executed by the C# example runner.
+
+## C# SDK proof
+
+`Tool.From` builds a declaration and typed binder from a supported CLR delegate. Supply the
+provider-visible name and description explicitly when they should not come from the method.
+For signatures outside the supported binding boundary, construct `Tool` with an explicit
+`ToolSpec` and a tagged-JSON callback. Registering a `Tool` is caller authorization: the model
+cannot invoke a name that was not registered.
+
+```csharp
+--8<-- "examples/csharp-sdk/ToolLoopExample.cs"
+```
+
+`AsyncClient.RunToolsAsync` returns the final `Generation`; `Client.RunTools` is its synchronous
+facade. The default maximum is eight generation rounds. The final permitted round still
+dispatches its returned calls before exhaustion is reported, and a zero or negative limit
+exhausts without generating. Calls run sequentially in model order; a repeated call in a later
+round runs again. Ordinary handler exceptions become error-flagged tool results. Cancellation
+continues to the caller. The returned generation, usage, timing, and manifest describe only the
+final model round, not a sum across the loop. The built-in generic chat adapter uses the
+OpenAI-compatible tool-call dialect; custom adapters may provide the same typed event contract.
+
 `run_tools` runs the generate, call tools, feed results back loop for you, with bounded
 rounds and normalized errors:
 

@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.ObjectModel;
 using AnyInfer.Capabilities;
+using AnyInfer.Json;
 
 namespace AnyInfer.Providers;
 
@@ -28,7 +29,10 @@ public sealed record ProviderDescriptor
         CacheMechanism? cacheMechanism = null,
         int cacheMaxMarks = 0,
         long cacheMinTokens = 0,
-        bool governsOwnTransport = false)
+        bool governsOwnTransport = false,
+        Func<string?, JsonObject>? reasoningTranslator = null,
+        IEnumerable<string>? ignoredParameters = null,
+        IEnumerable<string>? serverTools = null)
     {
         Id = ProviderSettings.NormalizeId(id, nameof(id));
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -89,6 +93,9 @@ public sealed record ProviderDescriptor
         CacheMaxMarks = cacheMaxMarks;
         CacheMinTokens = cacheMinTokens;
         GovernsOwnTransport = governsOwnTransport;
+        ReasoningTranslator = reasoningTranslator ?? (static _ => new JsonObject([]));
+        IgnoredParameters = Array.AsReadOnly((ignoredParameters ?? []).Select(static value => value ?? throw new ArgumentException("Ignored parameters cannot contain null references.")).ToArray());
+        ServerTools = (serverTools ?? []).Select(static value => value ?? throw new ArgumentException("Server tools cannot contain null references.")).ToFrozenSet(StringComparer.Ordinal);
     }
 
     /// <summary>Gets the canonical provider descriptor ID.</summary>
@@ -133,6 +140,12 @@ public sealed record ProviderDescriptor
     public long CacheMinTokens { get; }
     /// <summary>Gets whether the adapter owns its HTTP transport and requires an outer pacing slot.</summary>
     public bool GovernsOwnTransport { get; }
+    /// <summary>Gets the descriptor translation from normalized reasoning effort to wire fields.</summary>
+    public Func<string?, JsonObject> ReasoningTranslator { get; }
+    /// <summary>Gets immutable parameter names this descriptor intentionally ignores.</summary>
+    public IReadOnlyList<string> IgnoredParameters { get; }
+    /// <summary>Gets provider-run tool kinds the descriptor can place on the wire.</summary>
+    public IReadOnlySet<string> ServerTools { get; }
     // Cooperative factory contract: only the pool disposes an opted-in configured handler.
     internal bool PoolOwnsConfiguredTransport { get; init; }
 

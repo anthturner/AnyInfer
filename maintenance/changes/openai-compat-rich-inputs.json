@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "id": "openai-compat-rich-inputs",
+  "sources": [
+    {
+      "url": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create",
+      "fetched_at": "2026-10-22",
+      "version_pin": "OpenAI Chat Completions HTTP /v1; bounded documentation evidence fetched 2026-10-22"
+    },
+    {
+      "url": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events",
+      "fetched_at": "2026-10-22",
+      "version_pin": "OpenAI Chat Completions HTTP /v1; bounded documentation evidence fetched 2026-10-22"
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/file-inputs",
+      "fetched_at": "2026-10-22",
+      "version_pin": "OpenAI Chat Completions HTTP /v1; bounded documentation evidence fetched 2026-10-22"
+    }
+  ],
+  "disposition": "adopted",
+  "changes": [
+    {
+      "contract_id": "contracts/openai-compat.md",
+      "scope": "inference",
+      "operations": [
+        "generation"
+      ],
+      "summary": "Confirm the existing chat image, inline document/audio and logprob wire subset; reject URL-backed documents before HTTP in the Python generic chat dialect and its inherited bindings, and port the existing rich chat projection into the native C# binding. This declaration claims no hosted verification."
+    }
+  ],
+  "shared_spec": {
+    "impact": "no_delta",
+    "rationale": "The adopted upstream correction restores the existing explicit projection-or-refusal boundary for one provider dialect. URL DocumentPart remains a normalized input for dialects that support it; generic Chat Completions must not fetch or upload it implicitly. Native rich generation ports existing Python and DESIGN semantics, with a new input-only development profile rather than changed normative release assets or expected results. Frozen releases and accepted earlier profiles remain unchanged; no candidate release or qualification is claimed."
+  },
+  "implementations": [
+    {
+      "implementation_id": "anyinfer-python",
+      "status": "updated",
+      "rationale": "The shared OpenAI-compatible encoder now refuses document URLs before dispatch; existing inline/media/logprob behavior is independently exercised. Generated binding inventories account for every dedicated/preset binding inheriting this shared contract, rather than declaring inherited consumers unaffected. Other dedicated dialects retain their own contracts.",
+      "owned_paths": [
+        "contracts/openai-compat.md",
+        "src/python/anyinfer/providers/openai_compat.py",
+        "tests/test_openai_compat_rich_wire.py"
+      ],
+      "required_gate_ids": [
+        "python-contracts",
+        "python-fixtures",
+        "python-conformance",
+        "python-tests"
+      ]
+    },
+    {
+      "implementation_id": "anyinfer-csharp",
+      "status": "updated",
+      "rationale": "The registered generic generation binding gains the existing rich input/tool-history/logprob projection and the same no-send refusal, while native retrieval bindings retain their separate dependencies. Independent native wire controls and the new public recording executable exercise actual transport calls. Completion must be derived from registered same-source evidence, not this rationale.",
+      "owned_paths": [
+        "contracts/openai-compat.md",
+        "src/csharp/AnyInfer/Providers/OpenAIChatAdapter.cs",
+        "src/csharp/AnyInfer/Providers/WireRequest.cs",
+        "src/csharp/AnyInfer/Providers/AdapterEvent.cs",
+        "src/csharp/AnyInfer/Providers/ProviderDescriptor.cs",
+        "src/csharp/AnyInfer/Models.cs",
+        "src/csharp/AnyInfer/MediaParts.cs",
+        "src/csharp/AnyInfer/RichGeneration.cs",
+        "src/csharp/AnyInfer/GenerationEvent.cs",
+        "src/csharp/AnyInfer/Core/RequestNormalizer.cs",
+        "src/csharp/AnyInfer/Core/GenerationCore.cs",
+        "src/csharp/AnyInfer.Tests/RichGenerationWireTests.cs",
+        "src/csharp/AnyInfer.Tests/RichGenerationParityTests.cs",
+        "tests/fixtures/rich-generation-v1/inputs.json",
+        "scripts/observe_python_rich_generation.py",
+        "scripts/check_csharp_rich_generation.py",
+        "src/csharp/AnyInfer.RichGeneration/Program.cs"
+      ],
+      "required_gate_ids": [
+        "csharp-workspace"
+      ]
+    }
+  ]
+}

@@ -248,11 +248,13 @@ class OpenAICompatAdapter(OpenAIBatchMixin):
                         image["detail"] = part.detail
                     content.append({"type": "image_url", "image_url": image})
                 elif isinstance(part, DocumentPart):
+                    if part.url is not None:
+                        # Chat Completions accepts inline file data or a provider file id,
+                        # not an arbitrary document URL. Do not turn this projection
+                        # boundary into an implicit fetch/upload path.
+                        raise unsupported(self.provider_id, "document URL")
                     file: dict[str, Any] = {}
-                    if part.data is not None:
-                        file["file_data"] = data_url(part.media_type, part.data)
-                    else:
-                        file["file_url"] = part.url
+                    file["file_data"] = data_url(part.media_type, part.data or b"")
                     if part.filename is not None:
                         file["filename"] = part.filename
                     content.append({"type": "file", "file": file})
@@ -515,15 +517,11 @@ class OpenAICompatAdapter(OpenAIBatchMixin):
                 ToolCall(
                     id="".join(d.call_id or "" for d in deltas),
                     name="".join(d.name or "" for d in deltas),
-                    arguments=_batch_tool_arguments(
-                        "".join(d.arguments_fragment for d in deltas)
-                    ),
+                    arguments=_batch_tool_arguments("".join(d.arguments_fragment for d in deltas)),
                 )
                 for _, deltas in sorted(calls.items())
             ),
-            target=ResolvedTarget(
-                provider_id=self.provider_id, model=str(body.get("model", ""))
-            ),
+            target=ResolvedTarget(provider_id=self.provider_id, model=str(body.get("model", ""))),
             finish_reason=final.finish_reason if final is not None else "stop",
             usage=usage.normalized(),
             timing=Timing(started_at=0.0, total_ms=0.0),

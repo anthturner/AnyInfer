@@ -1,6 +1,7 @@
 using AnyInfer.Json;
 using AnyInfer.Providers;
 using AnyInfer.Schema;
+using AnyInfer.Capabilities;
 
 namespace AnyInfer.Core;
 
@@ -13,6 +14,12 @@ internal sealed record NormalizedRequest(
     int RepairBudget,
     double? TimeoutS,
     int MaxResponseBytes,
+    string? Reasoning,
+    IReadOnlyDictionary<string, JsonObject> ProviderOptions,
+    IReadOnlyDictionary<string, string> Metadata,
+    int? Logprobs,
+    bool CiteDocuments,
+    IReadOnlyList<ServerToolSpec> ServerTools,
     bool Stream,
     SchemaExecutionProfile SchemaProfile,
     SchemaValidationOptions? SchemaValidation);
@@ -50,6 +57,12 @@ internal static class RequestNormalizer
             Math.Max(0, request.Repair?.MaxAttempts ?? 0),
             request.TimeoutS,
             request.MaxResponseBytes ?? 1_048_576,
+            request.Reasoning,
+            request.ProviderOptions,
+            request.Metadata,
+            request.Logprobs,
+            request.CiteDocuments,
+            request.ServerTools,
             request.Stream,
             schemaProfile,
             schemaValidation);
@@ -61,7 +74,8 @@ internal static class RequestNormalizer
         IReadOnlyList<Message>? messages = null,
         IEnumerable<ToolSpec>? tools = null,
         string? toolChoice = null,
-        IEnumerable<int>? cacheMarks = null)
+        IEnumerable<int>? cacheMarks = null,
+        ModelCapabilities? capabilities = null)
     {
         ArgumentNullException.ThrowIfNull(normalized);
         ArgumentNullException.ThrowIfNull(resolved);
@@ -83,16 +97,31 @@ internal static class RequestNormalizer
             resolved.Target.Model,
             wireMessages,
             normalized.Sampling,
-            normalized.Schema?.JsonSchema,
+            normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk && mechanism is not ("grammar" or "json_schema") ? null : normalized.Schema?.JsonSchema,
             mechanism,
             normalized.Stream,
             normalized.TimeoutS ?? resolved.Settings.TimeoutS,
             normalized.MaxResponseBytes,
-            normalized.Schema?.Name ?? "response",
+            normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk ? normalized.Schema?.Name : normalized.Schema?.Name ?? "response",
             normalized.SchemaProfile == SchemaExecutionProfile.ModernSdk,
             tools ?? normalized.Tools,
             toolChoice ?? normalized.ToolChoice,
-            cacheMarks);
+            cacheMarks,
+            reasoningWire: resolved.Descriptor is null || normalized.Reasoning is null || !RichGenerationPolicy.Allows(capabilities, Feature.Reasoning)
+                ? new JsonObject([])
+                : resolved.Descriptor.ReasoningTranslator(normalized.Reasoning),
+            serverTools: normalized.ServerTools,
+            citeDocuments: normalized.CiteDocuments && RichGenerationPolicy.Allows(capabilities, Feature.Citations),
+            logprobs: RichGenerationPolicy.Allows(capabilities, Feature.Logprobs) ? normalized.Logprobs : null,
+            extraOptions: ProviderOptions(normalized.ProviderOptions, resolved.Target.ProviderId));
+    }
+
+    private static JsonObject ProviderOptions(IReadOnlyDictionary<string, JsonObject> options, string providerId)
+    {
+        var merged = new Dictionary<string, JsonValue>(StringComparer.Ordinal);
+        if (options.TryGetValue("*", out var wildcard)) foreach (var item in wildcard.Properties) merged[item.Name] = item.Value;
+        if (options.TryGetValue(providerId, out var specific)) foreach (var item in specific.Properties) merged[item.Name] = item.Value;
+        return new JsonObject(merged.Select(static item => new JsonProperty(item.Key, item.Value)));
     }
 
     private static string SelectMechanism(StructuredOutputProfile capabilities) =>
