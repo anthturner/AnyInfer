@@ -19,3 +19,5 @@ contracts/*.md text eol=lf
 src/csharp/AnyInfer.Tests/ManifestRenderingTests.cs text eol=lf
 # The embedded schema must retain the generator's canonical UTF-8/LF bytes.
 src/csharp/AnyInfer/Manifest/manifest.schema.json text eol=lf
+# The checked preset table is compared with exact generator output bytes.
+src/csharp/AnyInfer/Providers/CompatPresetTable.g.cs text eol=lf

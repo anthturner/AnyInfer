@@ -1043,6 +1043,9 @@ registered gate, five source-stamped prior pairs, package/examples and Frozen 10
 It preserves generic defaults and registers no new preset/public API/operation. Resume a
 closed generated typed preset-data contract with separate source/implemented operations
 and default-registry disjointness; current research and provider registration follow.
+The next bounded checklist is `ANYINFER_CSHARP_SDK_PRESET_DATA.md`. It retains the source's
+non-neutral connection-settings/inventory-kind facts as explicitly pending native work,
+before any preset registration; it cannot certify a provider or complete SDK.8a by compiling data.
 SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
 `7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered

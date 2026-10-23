@@ -187,6 +187,7 @@ class TestVerbs:
         assert "scripts/check_csharp_binding_inventory.py" in recorded[0]
         assert "scripts/export_python_provider_bindings.py" in recorded[0]
         assert "scripts/export_python_provider_parity.py" in recorded[0]
+        assert "scripts/generate_csharp_compat_presets.py" in recorded[0]
         assert "scripts/run_provider_change_checks.py" in recorded[0]
         assert "scripts/check_provider_change.py" in recorded[0]
         assert "scripts/provider_change_ci.py" in recorded[0]
@@ -243,6 +244,22 @@ class TestVerbs:
         assert workspace.main(["check", "--only=csharp"]) == 0
         assert calls == [
             (["dotnet", "--version"], ROOT / "src" / "csharp"),
+            (
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "generate_csharp_compat_presets.py"),
+                    "--check",
+                    str(
+                        ROOT
+                        / "src"
+                        / "csharp"
+                        / "AnyInfer"
+                        / "Providers"
+                        / "CompatPresetTable.g.cs"
+                    ),
+                ],
+                ROOT,
+            ),
             (["dotnet", "restore", "AnyInfer.sln"], ROOT / "src" / "csharp"),
             (["dotnet", "test", "AnyInfer.sln", "--no-restore", "-m:1"], ROOT / "src" / "csharp"),
             (
@@ -460,8 +477,8 @@ class TestVerbs:
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
         # Every default step must be attempted despite the failure, including the two
-        # in-process docs gates and eleven C# steps.
-        assert len(calls) == 24
+        # in-process docs gates and twelve C# steps.
+        assert len(calls) == 25
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

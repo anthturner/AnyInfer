@@ -146,6 +146,7 @@ LINT_PATHS = (
     "scripts/check_csharp_binding_inventory.py",
     "scripts/export_python_provider_bindings.py",
     "scripts/export_python_provider_parity.py",
+    "scripts/generate_csharp_compat_presets.py",
     "scripts/run_provider_change_checks.py",
     "scripts/check_provider_change.py",
     "scripts/provider_change_ci.py",
@@ -1001,6 +1002,22 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                 (
                     "dotnet SDK version",
                     lambda: _run_csharp("--version"),
+                ),
+                (
+                    "validate generated C# compatibility presets",
+                    lambda: python(
+                        str(ROOT / "scripts" / "generate_csharp_compat_presets.py"),
+                        "--check",
+                        str(
+                            ROOT
+                            / "src"
+                            / "csharp"
+                            / "AnyInfer"
+                            / "Providers"
+                            / "CompatPresetTable.g.cs"
+                        ),
+                        cwd=ROOT,
+                    ),
                 ),
                 (
                     "restore C# proof solution",
