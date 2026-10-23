@@ -103,8 +103,8 @@ existing precedence. The rename must apply to both buffered and streamed generat
   > NOTE: Held implementation adds the private immutable dialect options, applies its auth
   > spelling to both request shapes, returns no-listing lifecycle answers only after the
   > resolved-token preflight, and renames the final overlaid tagged `max_tokens` value only
-  > for the alternate field. Source diff check passed; DIALECT.1 remains open for the
-  > independent source critique and coordinator-native gate.
+  > for the alternate field. Source diff check passed; the initial handoff was held for
+  > independent source critique and the coordinator-native gate recorded below.
   > NOTE: Independent held-source review is bounded clean for constructor/factory
   > compatibility, auth precedence, no-list cancellation/disposal and final tagged-value
   > renaming. The source-review gate is closed; compilation and causal controls remain
@@ -165,15 +165,34 @@ existing precedence. The rename must apply to both buffered and streamed generat
   > accepted declarations/profiles and user-owned files; no protected bytes changed.
   > Source and causal-control reviews are bounded clean; root is committing only the five
   > explicit owned paths before fresh clean-source qualification.
-- [ ] **DIALECT.5** Coordinator: commit only the leaf's explicit owned source/test/plan paths,
+- [x] **DIALECT.5** Coordinator: commit only the leaf's explicit owned source/test/plan paths,
   then verify the private seam at that clean source in a fresh managed checkout. Run the
   registered C# workspace gate and Frozen DEVELOPMENT at the selected clean import/source;
   retain compiled source metadata and exact release hash. Gate: clean before/after,
   C# gate passes, Frozen 102/0/0/0 with unchanged released input, independent evidence review.
-- [ ] **DIALECT.6** Coordinator: reconcile this leaf and parent SDK.8a without ticking SDK.8a.
+  > NOTE: Qualified executable source is 1f5e821ad0a4e4fd8e387af5005975ad4fbe387c,
+  > tree b3524b491b9c12796740e7f15e07fa27d1c4a211. Fresh managed checkout
+  > feature-compat-dialect-clean-1f5e821 runs actual attempt 1,
+  > local-compat-dialect-1f5e821a-20261023T045607Z. Exact registered C# workspace exits 0
+  > with 967 unit/93 conformance and all 11 C# steps. All five prior pairs pass with both
+  > observation revisions equal to this commit and source_dirty=false; package/examples pass.
+  > Clean state and HEAD/tree agree before/after; protected input hashes are unchanged.
+  > Qualification log SHA 1c18d4f726a26e72cdbade6851f103f6e79831af2702b439d693b74fdadc2b47;
+  > Frozen report SHA 4b2198fb2b7a7e688893d553830fd19aa2cca2a9f9321499724f7d87496f4353,
+  > counts 102/0/0/0 and unchanged release SHA
+  > 16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391.
+  > Independent evidence-only review is bounded clean. No new preset/public API/operation
+  > registration or provider/live/release claim follows from this private preparation.
+- [x] **DIALECT.6** Coordinator: reconcile this leaf and parent SDK.8a without ticking SDK.8a.
   Gate: qualified executable source stays distinct from the plan-only acceptance commit;
   resume the reviewed runtime-data generation/registration boundary, preserving all mixed
   operation assignments and the unchanged public provider-support boundary.
+  > NOTE: This plan-only acceptance preserves qualified executable source 1f5e821ad0a4e4fd8e387af5005975ad4fbe387c.
+  > Parent SDK.8a remains open, as do SDK.6c/8b-c/9-12 and all 235 root API inventory rows.
+  > The next preparation slice is a closed deterministic generated typed preset-data contract,
+  > with compiled generation-only rows, separate complete Python SourceOperations, and
+  > enforced disjointness from the default registry. Registration/research and mixed operations
+  > remain assigned; a compiled unused table cannot waive provider support or operation work.
 
 ## Ownership and execution rules
 
@@ -183,3 +202,8 @@ Root owns shared plan reconciliation, generated files, heavy/native gates, Git a
 Children run no .NET/restore/build/pack/native/full suite or Git mutation. Avoid concurrent
 heavy suites. Preserve user-owned `uv.lock`, `v/cache/nodeids`, immutable declarations and all
 released/profile bytes. Evidence belongs in fresh ignored roots, never an old passing run.
+
+This leaf is complete at qualified executable source
+`1f5e821ad0a4e4fd8e387af5005975ad4fbe387c`. Resume parent SDK.8a's reviewed preset-data
+generation contract under the existing full-core authorization. The later plan-only
+acceptance commit does not replace that executable qualification identity.

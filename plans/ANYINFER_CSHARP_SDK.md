@@ -1036,9 +1036,13 @@ qualification. Native preset runtime, dedicated dialects and mixed operations re
 The auth prerequisite is accepted at clean source c3d0e9a0d26bd253d58620f4bca623c02fac3d85,
 with full held-source workspace, registered clean propagation and Frozen preservation;
 it corrects Python metadata before native porting and creates no native preset binding.
-The next bounded leaf, `ANYINFER_CSHARP_SDK_COMPAT_DIALECT.md`, prepares private auth,
-model-list and output-token codec options with unchanged generic defaults. It registers no
-preset or additional operation; runtime-data generation and provider qualification follow.
+The private dialect leaf, `ANYINFER_CSHARP_SDK_COMPAT_DIALECT.md`, is complete at clean
+source 1f5e821ad0a4e4fd8e387af5005975ad4fbe387c, tree
+b3524b491b9c12796740e7f15e07fa27d1c4a211: all 24 held workspace steps, fresh exact C#
+registered gate, five source-stamped prior pairs, package/examples and Frozen 102 pass.
+It preserves generic defaults and registers no new preset/public API/operation. Resume a
+closed generated typed preset-data contract with separate source/implemented operations
+and default-registry disjointness; current research and provider registration follow.
 SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
 `7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered
