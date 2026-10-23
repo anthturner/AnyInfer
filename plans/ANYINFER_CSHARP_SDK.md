@@ -1009,11 +1009,16 @@ must report a real conflict rather than silently changing a dependent public sig
   > counterparts omit server_tool_uses. Terminal generation separately attaches the
   > winning map after merge. Audit and settle the public merge/sum map contract in
   > both languages before final readiness; do not count the terminal fix as that work.
-  > NOTE: Connection discovery also found Python ProviderSettings' generated repr includes
-  > credential fields, and proxy userinfo/client-certificate passwords have no automatic
-  > connection-path redaction registration. Verify and correct the repr/secret paths before
-  > readiness; native connection value types must not reproduce that exposure. This is a
-  > source finding, not evidence of an actual leaked credential, and remains open.
+  > NOTE: The narrow Python object-representation correction is qualified at executable
+  > 474a65e4e25541db3232c60c6d7c5c1b3df77837, tree
+  > 605e229b948106e675384981a38b32398ffe2249. ProviderSettings/ProviderConfig repr now
+  > includes only raw identity fields; stored values and literal config roundtrips remain
+  > unchanged. All 25 held workspace steps, five clean-source Python controls, the exact
+  > registered 12-step C# gate (1016 unit/93 conformance), five source-clean pairs,
+  > package/examples and Frozen DEVELOPMENT102 pass. Independent evidence review is clean.
+  > Proxy userinfo/client-certificate password registration and exception paths remain open;
+  > native connection value types must preserve their existing identifier-only formatting.
+  > This closes only object display, not SDK.11c, connection support or the broader audit.
 
 ### SDK.12 — SDK qualification and delivery
 
