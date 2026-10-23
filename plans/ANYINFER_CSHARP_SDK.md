@@ -945,6 +945,11 @@ must report a real conflict rather than silently changing a dependent public sig
   > Actual Python graph has 106 descriptors and 129 operation bindings (103 generation,
   > 16 embedding, 5 rerank, 5 batch). All declared operations remain visible; completing
   > the inventory alone does not check SDK.8a or waive mixed-operation SDK.6c work.
+  > Inventory-only acceptance is complete at source
+  > 830673e56437a695ae26f579d7ca264139b7b0ba: 106 rows/129 bindings/49 source hashes,
+  > all 24 held-source workspace steps, fresh clean --check plus 20 focused controls,
+  > and independent bounded review pass. Resume the reviewed preset runtime boundary;
+  > current Reka/Lemonade auth findings require source-backed adjudication first.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes
@@ -1019,7 +1024,11 @@ must report a real conflict rather than silently changing a dependent public sig
 ## 5. Resume and evidence log
 
 Current executable resume point: **SDK.8a**, the complete provider inventory and reviewed
-preset-data boundary before remaining mixed-operation SDK.6c bindings. SDK.7a/b are
+preset-data boundary before remaining mixed-operation SDK.6c bindings. The inventory leaf
+is complete at source 830673e56437a695ae26f579d7ca264139b7b0ba (tree
+35f35ca6a6a76291c0fe0fdf82affa6e4499cd88), with full held-source gate and clean focused
+qualification. Native preset runtime, dedicated dialects and mixed operations remain open.
+SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
 `7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered
 Python/C# propagation and pure aggregation, 947 unit/93 conformance cases, rich 43/tool 10

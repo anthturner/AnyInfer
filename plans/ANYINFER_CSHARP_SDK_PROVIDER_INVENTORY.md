@@ -180,7 +180,7 @@ authority to this checkout's `src/python`, with clear refusal for a foreign impo
   > snapshot SHA d7a92216958018d155184e6690d9fbb92254e01233f82bc03b3411446313ac34,
   > 106 rows/129 operations/49 raw source hashes. Workspace lint registration's causal
   > control passes 1/1 with Ruff clean. Full workspace and clean checkout remain PINV.3.
-- [ ] **PINV.3** Coordinator: add exporter to existing workspace lint paths and causal
+- [x] **PINV.3** Coordinator: add exporter to existing workspace lint paths and causal
   workspace controls only after the export works. Inspect exact full 106/129 inventory
   against actual source and accepted native gaps; commit explicit owned paths after the
   appropriate coherent workspace gate. Gate: deterministic `--check`, focused workspace
@@ -188,12 +188,23 @@ authority to this checkout's `src/python`, with clear refusal for a foreign impo
   > NOTE: Root's held-source full gate passes all 24 steps in 178.0 seconds at
   > .tmp-tests/provider-inventory-full-first/workspace.txt; source-input digests,
   > protected files and released/declaration bytes are unchanged after execution.
-  > Root is committing the nine explicit owned paths, then checking raw snapshot/source
-  > bytes, selected import and focused inventory behavior from a fresh clean checkout.
-- [ ] **PINV.4** Coordinator: reconcile only the completed inventory portion of SDK.8a;
+  > The nine explicit owned paths are committed at
+  > 830673e56437a695ae26f579d7ca264139b7b0ba, tree
+  > 35f35ca6a6a76291c0fe0fdf82affa6e4499cd88. Fresh managed checkout
+  > feature-provider-inventory-clean-830673e passes deterministic --check and 20 focused
+  > controls in 15.41s, with dirty=false before/after, the same snapshot digest and all
+  > 49 actual raw source hashes matching. Evidence is its
+  > .tmp-tests/provider-inventory-clean-root/{facts.json,commands.log,junit.xml}.
+  > Independent evidence-only review is bounded clean; this qualifies declarations only.
+- [x] **PINV.4** Coordinator: reconcile only the completed inventory portion of SDK.8a;
   retain parent SDK.8a/b/c and SDK.6c unchecked. The next reviewed execution contract must
   cover native metadata/adapter seams and full preset operation flags before runtime port.
   Gate: every remaining provider operation stays assigned, with no generation-only waiver.
+  > NOTE: The derived task-artifact operation matrix retains all 106 providers and 129
+  > Python bindings against seven currently declared native bindings; 122 remain pending.
+  > Parent SDK.8a/b/c and SDK.6c stay unchecked, as do all 235 root API inventory rows.
+  > Current official research flags stale Reka/Lemonade auth declarations for adjudication
+  > under NEW-PROVIDER/PROPAGATE-CHANGE before native preset runtime implementation.
 
 ## Ownership and resume
 
@@ -202,5 +213,7 @@ for deviations. Each brief owns disjoint paths; the coordinator owns shared plan
 workspace registration, Git and serial native/full gates. No worker mutates Git or runs
 .NET, full suites or live traffic. Use the explicit `.venv/Scripts/python.exe`, fresh
 ignored basetemp/JUnit paths and disabled cacheprovider. Artifacts are under
-`csharp-sdk/sdk-eight-providers/` in the task. Resume PINV.3 from plan-only acceptance
-commit `1c9e01618b71adc66930fb9cfa4df8c456943cc4`.
+`csharp-sdk/sdk-eight-providers/` in the task. This inventory leaf is complete at source
+commit `830673e56437a695ae26f579d7ca264139b7b0ba`; subsequent plan-only acceptance does
+not replace that executable identity. Resume parent SDK.8a with the reviewed native preset
+data/runtime contract and current auth findings; no provider runtime parity is accepted here.
