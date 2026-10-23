@@ -91,8 +91,8 @@ and ready. The coordinator owns Git and serial native/full gates.
   conflict: current Python has max_rounds=8 but no total call limit, no explicit argument
   schema enforcement, duplicate names last-wins, and no ordinary-loop call deduplication.
   Returned usage/timing/manifest describe only the final generation round. The bounded
-  baseline contract below resolves the parent gate wording; RICH.4a still needs cold
-  review and an exact native API handoff before tool source edits. No reflection-based
+  baseline contract below resolves the parent gate wording; RICH.4a's cold review and
+  exact native API handoff are accepted below. No reflection-based
   authorization inference or hidden tools.
 
 ### Bounded tool-loop baseline for RICH.4a review
@@ -100,8 +100,8 @@ and ready. The coordinator owns Git and serial native/full gates.
 This slice ports the existing public Python loop. It does not add a stricter execution
 policy to one SDK. The authority is `_client/tools.py`, `_client/async_client.py:run_tools`,
 the sync wrapper, and `tests/test_tool_loop.py` at the recorded Python baseline/current
-source. The native API shape and reflection binding remain subject to the RICH.4a cold
-review; the following execution behavior is settled.
+source. The native API shape and reflection binding passed the RICH.4a cold review;
+the following execution behavior is settled.
 
 - Registration is explicit caller permission. A model may select only a registered name;
   unknown names raise ToolLoopError/ToolLoopException with the registered-name hint. No
@@ -308,7 +308,7 @@ paired profile. Freeze this small grammar/corpus only after a cold executable-in
   > synthesize UsageUpdate. Source corrections and independent wire/timing controls are
   > active. Preserve the earlier green evidence, but these corrections require a fresh
   > coherent native gate and actual paired capture before RICH.3 acceptance.
-- [ ] **RICH.2b** Wire owner after API handoff: `Providers/OpenAIChatAdapter.cs` and new
+- [x] **RICH.2b** Wire owner after API handoff: `Providers/OpenAIChatAdapter.cs` and new
   private codec helpers only. Mirror existing Python encoding/parsing and caps/lifetime;
   update `contracts/openai-compat.md` only if evidence shows the shared snapshot missing
   relied-on protocol facts, after coordinator review. Gate: actual offline HTTP requests
@@ -328,6 +328,11 @@ paired profile. Freeze this small grammar/corpus only after a cold executable-in
   > rationale. Actual inherited bindings come from producers; four Python gates plus native
   > C# and the pure aggregate remain pending for the eventual clean source. Schema-valid
   > declaration SHA is 10a45384786a7cd2187d5aeab3abec41f5c95dd736ff430a1776984c13888e35.
+  > NOTE: Clean source b315ef73173b81ace643c41e95f4e6339db636b6 closes the wire and
+  > propagation gate. All four registered Python gates and the registered C# workspace
+  > gate pass against the original declaration bytes; the pure aggregate binds both
+  > actual inventories and verification artifacts to this clean commit/tree. Independent
+  > qualification review is bounded clean. Hosted upstream traffic remains unverified.
 - [x] **RICH.2c** Independent tests owner: new rich generation/core/wire/lifecycle native
   tests and corresponding Python controls, not product files. Gate: both runtimes exercise
   literal requests/raw bytes, tool assembly, privacy, predispatch refusal, known/unknown
@@ -507,7 +512,7 @@ paired profile. Freeze this small grammar/corpus only after a cold executable-in
   > old and new witnesses remain. Fresh docs/consumer review is bounded clean. The actual
   > registered strict docs-build gate passes at rich-public-docs-first. This closes this
   > public delivery slice, retaining C# prerelease qualification and broader RICH.6 gates.
-- [ ] **RICH.6** Coordinator: cold source, lifetime, oracle and delivery reviews; inspect
+- [x] **RICH.6** Coordinator: cold source, lifetime, oracle and delivery reviews; inspect
   evidence; full `.venv/Scripts/python.exe workspace.py check`, explicit source commit,
   isolated clean-checkout paired profiles/Frozen 102/package gates. Preserve failed-first
   logs. Gate: exact clean source metadata, unchanged released hashes and all required checks.
@@ -536,9 +541,27 @@ paired profile. Freeze this small grammar/corpus only after a cold executable-in
   > LF bytes. The declaration content/hash is unchanged; a small checkout-policy follow-up
   > commit and fresh clean qualification are required. The failed-first run is retained as
   > local-rich-a49258e9-20261023T023641Z in the original qualification worktree.
-- [ ] **RICH.7** Reconcile parent SDK.7a/b and parity inventory only for achieved scope,
+  > NOTE: Checkout-policy follow-up b315ef73173b81ace643c41e95f4e6339db636b6, tree
+  > 7e00ab8f148f255b94c77b5c8673370a04ad2833, passes clean qualification run
+  > local-rich-b315ef73-20261023T024719Z attempt 1. All five registered gates pass;
+  > native suites are 947 unit/93 conformance, paired profiles are accounting 42+2 native
+  > boundaries, request policy 29, retrieval 32, rich 43 and tool loop 10. Both captures
+  > in every pair report this revision with source_dirty=false. Package-only consumption
+  > and examples pass. Frozen DEVELOPMENT/UNRELEASED reports 102/0/0/0 with unchanged
+  > release SHA 16122cca...81391, and final checkout status is clean. Aggregate SHA is
+  > 2fe8e3b7d51a92829534742d4eab7e97537073a398c68ce8f0cac83a64f598e7.
+  > Root and independent evidence review agree; no P1/P2 remains in this bounded slice.
+  > The ignored operator's first import probe also had a PS5.1 quoting failure before
+  > gates; stdin delivery fixes the probe without changing source or assertions. Both
+  > failed-first attempts remain retained. Full workspace follow-up passes all 24 steps
+  > in 176.6 seconds. No release/publication or whole-library readiness follows.
+- [x] **RICH.7** Reconcile parent SDK.7a/b and parity inventory only for achieved scope,
   record acceptance and resume the remaining SDK.6c/8/9/10/11/12 work. Gate: no unfinished
   milestone is called complete; full core-library readiness remains the active user goal.
+  > NOTE: Parent SDK.7a/b now record the accepted clean source and exact bounded semantics.
+  > All 235 root API inventory rows remain unchecked until their complete assigned
+  > semantics and SDK.11c audit pass. Resume SDK.8a's complete provider inventory and
+  > reviewed preset-data boundary before remaining mixed-operation SDK.6c bindings.
 
 ## Ownership and evidence
 
@@ -550,32 +573,24 @@ files. Workers run only named targeted Python checks. Coordinator serializes nat
 packaging and full suites. Use explicit UTF-8, fresh ignored basetemp/JUnit and disabled pytest
 cacheprovider. Artifacts live under `csharp-sdk/sdk-seven-rich-generation/` in the task.
 
-Current resume: finish RICH.2b/RICH.6 qualification: the full workspace gate passes all
-24 steps after the test import and root-wrapper temp corrections. Commit only the explicit
-owned source, then execute registered propagation and paired/Frozen/package gates from an isolated clean
-checkout. RICH.4b and RICH.5 development acceptance is complete; their original failed-first
-logs remain. RICH.3a/b/c development boundaries are accepted after
-current consolidated reviews and actual independent execution. The current pair passes
-43/43 at `.tmp-tests/rich-compare-current-contract-root/run-pobmbqsd/report.json` using
-Python `.tmp-tests/rich-python-executor-state/output.json` and native
-`.tmp-tests/rich-parity-product-seventh-capture/csharp.json`. Root seventh gate passes
-53/53 native controls; recorder build has zero warnings/errors; each capture has 43
-schema-valid records. The coherent registered Python controls pass 184/184. Current profile/verifier
-review is bounded clean. Native seam's three test-only indexer compile failures are
-retained and corrected via actual TryGetValue; its source review is closed. RICH.4a's
-native mapping is accepted after params/count corrections; the foundation has an exclusive
-source owner. Session-state protocol data does not claim the later session lifecycle.
-Tool foundation's first compile, BigInteger return and nested-null failures are retained
-and corrected. The combined third gate passes 13/13 source-authored plus independent
-binding controls; its bounded source review is closed. The client-loop/lifecycle combined
-gate now passes 21/21. Tool-loop-v1 independent execution matches 10/10 under current pins;
-observer/verifier/registration reviews are closed. Package-only consumer, current examples
-and strict documentation build execute successfully. Wait for
-coherent held source/test handoffs before native compilation; do not compile an actively
-written file. Every lease has an expected reply;
-no user go-ahead or hidden background continuation is required.
+This leaf is complete at qualified executable commit
+`b315ef73173b81ace643c41e95f4e6339db636b6`, tree
+`7e00ab8f148f255b94c77b5c8673370a04ad2833`. Resume the first unchecked parent milestone,
+SDK.8a; remaining SDK.6c/8/9/10/11/12 work and full-library readiness remain active.
+The plan-only acceptance commit does not replace this qualified executable identity.
 
-The rich-generation development profile is accepted at its bounded scope. Current pins are input
+Clean checkout:
+`C:/Users/antho/.traycer/worktrees/anthturner__anyinfer/feature-rich-clean-b315ef7`.
+Its retained `.tmp-tests/local-rich-b315ef73-20261023T024719Z/` packet contains the
+qualification log, pure aggregate and Frozen report; sibling `-python` and `-csharp`
+roots retain both registered producers and their gate logs. Actual clean paired reports
+are `.tmp-tests/rich-generation/run-dph7l6gr/report.json` (43/43) and
+`.tmp-tests/tool-loop/run-sw97myej/report.json` (10/10). Both runtime captures bind this
+commit with source_dirty=false. Root and independent clean-qualification reviews are
+closed. Original failed-first source, test, runtime, wrapper and checkout logs remain;
+earlier provisional holds above are historical and superseded by these final notes.
+
+The rich-generation profile is accepted at its bounded scope. Current pins are input
 `9cff7a50fbfd553ebcfed25186173579fff582796721d0e83cc656e116cc1777`, construction schema
 `5c02e14c8ebf96432755e19b63a4a065b3a7696a8c7f6eb0c300c880c9080cae`, observation schema
 `da4ab3ac0c084bd2cfc6ca762dfeabfbe7eb67998b08e01d6ae94c0de21f6951`, README
@@ -586,9 +601,11 @@ refusal remains unchanged. Portable typed errors follow the foundational core fi
 runtime class spelling and free diagnostic detail/hint remain retained in original
 evidence, with exact causal literal-failure joins. No broad raw/HTTP normalization applies.
 
-Use root wrapper `.tmp-tests/run_rich_parity_product_gate.py` with a fresh label;
-`--capture-only` avoids invoking a verifier while its owner edits it. Consolidated source/
-profile review and coherent Python controls follow the fresh actual paired run.
-RICH.2b registered propagation gates, RICH.4 tools, public delivery and clean-source
-qualification remain open. Last clean executable a3b0cc785c723616d5e724f7f7b7b20f432ce647;
-dirty base cbc4aeb5a4922cb14506d578b90fade87e059942.
+Tool-loop input remains
+`4693fca5c88e2c3ca129b7197b819c5c55bfbe11d2621135184bb7bfcfbad5a9`, construction schema
+`7c445c33b494b2a5a0a4ca3204129fbd8630e776c5e50545f9a7bb11c7f80f7c`, observation schema
+`0eab305617e3563affe3dea43ad8360cf3a1b93cca29bd4b7bb48ccb994fa772`, README
+`4467ff276cdb8d1d1c24b16d1cd0a3470343a6effc92d5469f46804585ffa1f1`.
+The session-state wire field is protocol data only; SDK.11a owns session lifecycle.
+Generic chat remains chat-only; provider breadth and mixed-operation bindings need their
+own current contract research and certification. Hosted live traffic remains unverified.

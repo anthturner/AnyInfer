@@ -908,25 +908,30 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ### SDK.7 — Rich generation, tools and multimodal input
 
-- [ ] **SDK.7a** Port typed image/document/audio/video, tool calls/results/specs, reasoning,
+- [x] **SDK.7a** Port typed image/document/audio/video, tool calls/results/specs, reasoning,
   citations/server-tool events, logprobs and provider-option passthrough from `types/` and
   provider wire contracts. Keep visible answer text separate from reasoning and tool data.
   Gate: streaming reconstruction, first-content timing, unsupported-input and bounded/private
   payload tests; ordinary text flows remain unchanged.
-  > NOTE: Execution continues under `ANYINFER_CSHARP_SDK_RICH_GENERATION.md` after the
-  > 2026-10-22 full-readiness instruction. Independent maps cover the actual Python
-  > contract, current native gaps and the new input-only proof boundary. Source authoring
-  > follows cold contract review; SDK.7a/b remain unchecked.
-- [ ] **SDK.7b** Port bounded `RunToolsAsync`/sync facade, typed function registration and
-  JSON argument validation, cancellation and tool-error behavior from `_client/tools*`.
+  > NOTE: Accepted clean source b315ef73173b81ace643c41e95f4e6339db636b6 implements the
+  > typed rich contract and generic chat media/logprob projection, including the documented
+  > no-send document-URL/video refusals. The rich-generation leaf records independent
+  > reviews, all 24 workspace steps, clean registered propagation, 43 rich matches,
+  > preserved prior profiles and Frozen 102, source-stamped package consumers/examples
+  > and strict docs. Dedicated provider dialects remain SDK.8; C# remains prerelease.
+- [x] **SDK.7b** Port bounded `RunToolsAsync`/sync facade, typed function registration and
+  callable argument binding, cancellation and tool-error behavior from `_client/tools*`.
   Tools are caller-approved functions, not an agent planner. Gate: shared tool-loop traces,
-  max-round/call limits, malicious/invalid args and no-double-execution controls.
+  round limits, malicious/invalid args and once-per-returned-entry execution controls.
   > NOTE: The rich-generation leaf records the actual Python baseline: callable argument
   > binding, max_rounds=8, sequential once-per-returned-entry dispatch, and final-round-only
   > results. Python has no separate total-call setting, arbitrary argument-schema enforcement
   > or ordinary-loop deduplication. Those parent gate phrases must not be used to claim
-  > absent Python policies or introduce C#-only policies. Native API and cold review remain
-  > open under RICH.4a before tool implementation.
+  > absent Python policies or introduce C#-only policies. The native API/reflection,
+  > lifecycle and loop reviews are closed. Accepted source b315ef7... passes 21 focused
+  > foundation/binding/loop/lifecycle controls and ten actual paired tool traces with
+  > source_dirty=false. The final returned generation retains final-round accounting;
+  > arena memoization and later integrations remain SDK.11a.
 
 ### SDK.8 — Provider breadth and reusable adapter certification
 
@@ -1008,8 +1013,16 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current executable resume point: **SDK.7a**, a prerequisite for remaining mixed-operation
-SDK.6c/SDK.8 providers. SDK.6c remains unchecked; its standalone retrieval-only tranches
+Current executable resume point: **SDK.8a**, the complete provider inventory and reviewed
+preset-data boundary before remaining mixed-operation SDK.6c bindings. SDK.7a/b are
+accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
+`7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered
+Python/C# propagation and pure aggregation, 947 unit/93 conformance cases, rich 43/tool 10
+matches, preserved accounting/policy/retrieval profiles and Frozen 102, package-only
+consumption/examples and strict docs pass. Independent qualification review is bounded
+clean. Failed-first logs and actual hashes are retained in the rich-generation leaf and
+task artifacts. All 235 root API inventory rows remain unchecked for final completeness.
+SDK.6c remains unchecked; its standalone retrieval-only tranches
 are complete. SDK.6a/b are complete at clean source checkpoint
 `03f26fc88c7c96ff8272e99dadee8c6a26fa0616`: all 21 workspace gates in 167.6s, 791 native unit
 and 93 conformance cases, 32 shared retrieval matches, 29 policy matches, accounting 42+2,
@@ -1027,8 +1040,8 @@ Python/native wire controls, all 22 primary gates and clean registered maintenan
 aggregation pass. Existing shared profiles and Frozen 102 remain unchanged. Hosted
 Voyage traffic is unverified. The Jina leaf is now accepted at `a3b0cc785c723616d5e724f7f7b7b20f432ce647`
 with all 22 primary gates,872 unit/93 conformance, clean registered aggregation and
-Frozen 102 preservation. Hosted Jina traffic is also unverified. Resume SDK.7a prerequisites
-before the remaining mixed-operation SDK.6c/SDK.8 bindings.
+Frozen 102 preservation. Hosted Jina traffic is also unverified. SDK.7 prerequisites now
+pass; resume SDK.8a before the remaining mixed-operation SDK.6c bindings.
 
 SDK.5c is complete at source checkpoint
 `97e8937c281063582c282f313a35b91761293500`: all 20 workspace steps in 147.6s,
