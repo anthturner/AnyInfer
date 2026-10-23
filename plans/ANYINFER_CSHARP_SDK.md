@@ -964,6 +964,13 @@ must report a real conflict rather than silently changing a dependent public sig
   > profile/package/example continuity and Frozen 102 pass with bounded independent review.
   > Native preset bindings and live verification remain absent. Resume the reviewed native
   > preset runtime/data boundary without checking SDK.8a or waiving mixed operations.
+  > NOTE: Connection qualification and its plan-only reconciliation are now complete.
+  > Shared redirect hardening is qualified at source4faf9ecb22206715e01f8bd2faff8a39defe5565,
+  > tree44f6f2499762f11280badf16039034e35604fc4d. RDIR.8 plan-only reconciliation in
+  > `ANYINFER_CSHARP_SDK_REDIRECTS.md` is independently reviewed and complete. Resume
+  > SDK.8a researched registration from that qualified source.
+  > Current/minimum controls, all25 held workspace steps and the clean12-step C# gate plus56
+  > redirect controls pass with bounded independent review. Provider breadth remains open.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes
@@ -1047,8 +1054,9 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.8a's explicit redirect contract**, before researched preset
-registration and remaining mixed-operation SDK.6c bindings. NCON.8 connection plan-only
+Current resume point: **SDK.8a researched preset registration**, after the completed
+`ANYINFER_CSHARP_SDK_REDIRECTS.md` leaf and its independently reviewed plan-only
+reconciliation. Remaining mixed-operation SDK.6c bindings stay separately unchecked. NCON.8 connection plan-only
 reconciliation is complete; its executable qualification remains the separate source below. The inventory leaf
 is complete at source 830673e56437a695ae26f579d7ca264139b7b0ba (tree
 35f35ca6a6a76291c0fe0fdf82affa6e4499cd88), with full held-source gate and clean focused
@@ -1093,9 +1101,21 @@ independent qualification review is bounded clean. A prior clean attempt's exist
 close5s timeout remains retained/unexplained; isolated and full retry passed without source or
 timeout changes. Independent parent/leaf critique is bounded clean. This later plan-only
 reconciliation record preserves `8758b0e` as the qualified executable identity.
-The generated v3 source clears the approved-scope row pending list; this does not register
-providers or complete redirect parity. Resume from the leaf's first unchecked box. Redirect behavior remains
-a separate unfinished parity prerequisite after that leaf, then researched registration.
+The generated v3 source clears the approved-scope row pending list without registering
+providers. The user-selected shared redirect hardening is now qualified at source
+4faf9ecb22206715e01f8bd2faff8a39defe5565, tree44f6f2499762f11280badf16039034e35604fc4d.
+Corrected current Python80/0/0, isolated actualhttpx2 2.0.0 controls48/0/0, expanded native134/0/0
+and all25 full held-source steps pass. Full Python has4531 passes/10 documented platform skips;
+native1109/93 and Frozen DEVELOPMENT102 have zero native skips. Clean checkout
+`.tmp-tests/local-redirect-4faf9ecb-20261023T172122Z/` passes the registered12 C# steps,
+1109unit/93conformance,56 Redirect cases, five paired reports,package/examples andFrozen102.
+All1263 selected inputs and independent root source/Git guards match; external root user inputs
+and reviewed proof helpers are unchanged. Independent full and clean evidence critiques are
+bounded clean. This redirect executable is separate from the completed plan-only reconciliation.
+Python simultaneous read/cleanup behavior and opaque injected-handler hidden hops/cookies remain
+qualified limits; the historical connection external-close5s diagnostic remains unexplained.
+RDIR.8 parent/leaf/ticket reconciliation has bounded-clean independent critique. Resume
+SDK.8a researched registration; no broader SDK completion follows.
 Default registry remains four descriptors/seven bindings, with 122 operation memberships
 pending. Compiling data does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12
 and all 235 root API rows remain open.
