@@ -271,23 +271,42 @@ is checked from source review alone when its gate requires runtime evidence.
   > injected takeover, still-disabled redirects and temporary Windows OS user-key backing
   > without a memory-only/immediate-deletion claim. No package publication or cross-OS SDK
   > support follows. Clean source/package evidence remains NCON.7.
-- [ ] **NCON.6 — Held-source checkpoint.** Root runs one guarded full workspace check using
+- [x] **NCON.6 — Held-source checkpoint.** Root runs one guarded full workspace check using
   the existing all-phase registry, preserving all tracked/untracked slice sources and pinned
   user inputs. Cold source/control/docs/generator reviews must close. Gate: all development
   steps, all native suites, five existing paired profiles, package/examples/docs, Frozen 102;
   no changed protected input, no hidden skips or claim based only on injected handlers.
   Then root commits only explicit slice paths; uv.lock and v/cache/nodeids remain untouched.
-- [ ] **NCON.7 — Clean qualification.** Root creates a clean checkout of that executable
+  > NOTE: Full-third complete evidence and independent rereview are bounded clean.
+  > Root committed exactly39 slice paths as8758b0eedf9f69077274a666da3919e9f83380a0,
+  > tree1f20c9fa0f95142a28f7713b6de9ebfb12a424b5. Only useruv.lock/v/cache/nodeids
+  > remain untracked; both pins are unchanged. The checkpoint plan records the pre-commit
+  > state; clean acceptance and later plan-only reconciliation remain separate.
+- [x] **NCON.7 — Clean qualification.** Root creates a clean checkout of that executable
   revision and runs the registry-derived exact C# gate plus targeted connection loopback
   controls and Frozen DEVELOPMENT. Retain selected checkout/import, commands/exits,
   initial/final HEAD/tree/clean state, hashes and source stamps. Gate: successful clean
   package/examples and native connection witnesses, unchanged protected inputs, independent
   evidence-only review; no cross-OS promise from one Windows run.
-- [ ] **NCON.8 — Reconciliation.** Root re-reads parent/leaf, updates achieved docs and
+  > NOTE: Clean run local-native-connection-8758b0ee-20261023T134450Z qualifies executable
+  > 8758b0eedf9f69077274a666da3919e9f83380a0/tree1f20c9fa0f95142a28f7713b6de9ebfb12a424b5.
+  > Registered12steps,1051unit/93conformance zero skips,173focused(10settings/20transport),
+  > five clean-stamped pairs, package/examples and explicit Frozen102 pass. All1255 tracked
+  > inputs, external helper/operator/factory bindings and initial/final clean identity match.
+  > Independent qualification review is bounded clean. First clean attempt's existing
+  > external-close5-second timeout remains retained and unexplained; isolated and full retry
+  > passed without code or timeout changes. No all-attempts/cross-OS/full-SDK claim follows.
+- [x] **NCON.8 — Reconciliation.** Root re-reads parent/leaf, updates achieved docs and
   records executable evidence separately from the later plan-only commit. Gate: bounded
   source/gates/checks agree, default registry remains 4/7, all still-open SDK rows remain
   open. Resume the explicit redirect contract, then researched preset registration and
   remaining SDK.6c/8b-c/9–12; do not ask again to continue already authorized core SDK work.
+
+  > NOTE: Independent parent/leaf critique is bounded clean after correcting the immediate
+  > resume heading. This plan-only record completes reconciliation and does not replace
+  > executable source `8758b0eedf9f69077274a666da3919e9f83380a0` or its clean evidence.
+  > Resume SDK.8a's explicit redirect contract, then researched registration. All broader
+  > API, operation, platform and release requirements remain open.
 
 ## Required independent witnesses
 
@@ -356,32 +375,56 @@ Preserve these immutable bytes (recompute, never hand-edit a pin):
 
 ## Current resume
 
-NCON.1-5 gates pass. Full-third completes all25 workspace steps with4492 Python passes,
-10 explicit Windows/platform skips, zero failures/errors;1051 native unit and93 conformance
-passes with zero skips; five prior paired profiles; strict docs, package/examples; and explicit
-Frozen DEVELOPMENT102/0/0/0 at released SHA16122cca... . All1260 protected input hashes and
-initial/final commit/tree/status stayed unchanged. Retained full proof paths:
-.tmp-tests/native-connection-full-third/ and -coherence/.
+All NCON boxes are complete. Resume **SDK.8a's explicit redirect contract**, then researched
+provider registration. The qualified executable source remains
+`8758b0eedf9f69077274a666da3919e9f83380a0`, tree
+`1f20c9fa0f95142a28f7713b6de9ebfb12a424b5`. This later plan-only reconciliation record
+preserves that identity; it is not a replacement executable qualification.
 
-Hashes: workspace9442a32a712fccd1dd8f871e72c7cfb38a101434d29a2cca9b2298313f38ac04;
-JUnit e5a605194e6ef777ed8a8787f26765d260d3816feaa3223ee04690fb7fbf2db7;
-Frozen ca2a6aa1d8304d7e66bfb6098dbea012521ca03b3e61bd123633936c831e9b3a;
-facts89347d6e796cb2aca926cb13ad2691bf17cdf2e773c87dc6af82f4f9c57f1da6.
-Cold evidence rereview is bounded clean; prior capture P1/missing-evidence P2 are closed.
-Root next creates the explicit-path source checkpoint (NCON.6).
-No executable checkpoint commit has yet been made; reference parent staysc83816f.
+Held-source full-third passed all 25 workspace steps: 4,492 Python passes and 10 documented
+Windows/platform skips, 1,051 native unit and 93 conformance passes with zero native skips,
+five paired profiles, strict docs, package/examples and explicit Frozen DEVELOPMENT
+102/0/0/0. All 1,260 protected inputs and initial/final Git identity stayed unchanged.
+Independent full-gate review is bounded clean. Evidence is in
+`.tmp-tests/native-connection-full-third/` and `-coherence/`.
 
-Full-first all25 lacked explicit Frozen/Python totals; full-second failed solely because the
-capture helper env entered a nested pytester test. Both are retained with their limits. The
-corrected helper126fa05e... passed exact rereview and the actual nested-lifecycle case1/0/0
-before successful full-third. Full operator stays08ce666b...; phase helper stays8d021e06... .
-No product source changed during these evidence-only corrections.
+| Full evidence | SHA-256 |
+| --- | --- |
+| Workspace log | `9442a32a712fccd1dd8f871e72c7cfb38a101434d29a2cca9b2298313f38ac04` |
+| Primary Python JUnit | `e5a605194e6ef777ed8a8787f26765d260d3816feaa3223ee04690fb7fbf2db7` |
+| Frozen DEVELOPMENT | `ca2a6aa1d8304d7e66bfb6098dbea012521ca03b3e61bd123633936c831e9b3a` |
 
-After NCON.6 checkpoint, create a clean checkout of that exact commit/tree, copy/hash-bind
-ignored focused helpera0fa5952dda9b8b52b134b78dc01b014a649c4191220dc1b46e81b78bfc5f195,
-and externally bind the reviewed factoryac29cde31bf0f8fb5cabc3eab3d42b5a97122321837b030b9416b09fdbec6bb8.
-Run clean operatorcc05b50a119fc5eeb582db1fd2d61b57e85d0aa02d31acfcd501bd17de772bd9
-with expected tablef0ae5f9ac7a0ee9420d882a503590d6bf9de470c6185cefbcc8f8c5c29c2f845;
-then independent evidence review and later plan-only reconciliation. NCON.6-8 stay open.
-Useruv.lock/v/cache/nodeids stay excluded and unchanged. Redirects/registration/full-SDK
-readiness remain open.
+The accepted clean checkout is
+`C:/Users/antho/.traycer/worktrees/anthturner__anyinfer/feature-native-connection-clean-8758b0e`.
+Its accepted run is `.tmp-tests/local-native-connection-8758b0ee-20261023T134450Z/`:
+all 12 registry-derived C# steps, 1,051 unit and 93 conformance passes with zero skips,
+173 focused cases (10 settings, 20 transport), five source-clean paired reports,
+package/examples and Frozen 102/0/0/0. All 1,255 tracked inputs and initial/final
+commit/tree/clean state match. Independent qualification review is bounded clean.
+
+| Clean evidence | SHA-256 |
+| --- | --- |
+| Qualification log | `bb64dff9c1a62a513943db0502229c713bd4f26cf5a57bc2412949d162b277f3` |
+| Frozen DEVELOPMENT | `15a7755eafa70fe9e3fd17dd1c604df741e68aa92bc7b6bb055f7c82a758ef56` |
+| Final facts | `b990c50bbed55c61138be7fac6f48f672991d43aed2d98a7e71db0fef1fc85f3` |
+| Identical before/after tracked maps | `7b714bd24081d59b2dc6d4fdcd7a06b545c67a4f7667027231d636d0599b4ec3` |
+
+External bindings in `.tmp-tests/native-connection-clean-bound/` confirm the ignored focused
+helper `a0fa5952dda9b8b52b134b78dc01b014a649c4191220dc1b46e81b78bfc5f195` and clean operator
+`cc05b50a119fc5eeb582db1fd2d61b57e85d0aa02d31acfcd501bd17de772bd9` stayed unchanged.
+The clean factory raw hash `707c144ff2811094edda5a317fc847f62f4492f466dbc85c2d43031f953bd725`
+normalizes only CRLF to the reviewed LF hash
+`ac29cde31bf0f8fb5cabc3eab3d42b5a97122321837b030b9416b09fdbec6bb8`.
+The exact v3 table is `f0ae5f9ac7a0ee9420d882a503590d6bf9de470c6185cefbcc8f8c5c29c2f845`.
+
+Retain the failed/incomplete attempts. Full-first lacked explicit Python/Frozen evidence;
+full-second failed because capture environment reached a nested pytester process, corrected
+only in the ignored capture helper. First clean attempt 133934Z failed one existing external-
+close five-second wait. Its isolated case and the complete clean retry passed without code
+or timeout changes. The earlier timeout's cause remains unresolved; no claim that every
+attempt passed, or that host load or a deadlock was proved, follows from acceptance.
+
+User-pinned `uv.lock` and `v/cache/nodeids` remain excluded and unchanged. Default registry
+remains four descriptors/seven bindings. Redirects, researched registration, SDK.6c/8b-c/9-12
+and all 235 root API rows remain open. No full-SDK, cross-OS support or release/publication
+claim follows from this bounded connection slice.

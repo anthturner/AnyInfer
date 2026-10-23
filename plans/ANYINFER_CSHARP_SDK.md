@@ -1047,8 +1047,9 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current executable resume point: **SDK.8a**, the complete provider inventory and reviewed
-preset-data boundary before remaining mixed-operation SDK.6c bindings. The inventory leaf
+Current resume point: **SDK.8a's explicit redirect contract**, before researched preset
+registration and remaining mixed-operation SDK.6c bindings. NCON.8 connection plan-only
+reconciliation is complete; its executable qualification remains the separate source below. The inventory leaf
 is complete at source 830673e56437a695ae26f579d7ca264139b7b0ba (tree
 35f35ca6a6a76291c0fe0fdf82affa6e4499cd88), with full held-source gate and clean focused
 qualification. Native preset runtime, dedicated dialects and mixed operations remain open.
@@ -1073,7 +1074,9 @@ executable source `afb3f86acfefd5a15f80de2389d4b0e0396e3a2b`, tree
 generator byte equality, package/examples and Frozen DEVELOPMENT102 pass. Independent
 evidence review is bounded clean; plan-only reconciliation is a separate later commit.
 The public default category is Served; inert rows explicitly project the source category
-without filtering discovery. Only connection settings remain pending in those definitions.
+without filtering discovery. At that checkpoint connection settings remained pending; the
+native connection qualification below now closes that approved scope, with redirects and
+registration still open.
 The bounded native connection implementation is in `ANYINFER_CSHARP_SDK_CONNECTION.md`.
 The user selected native .NET TLS with documented custom-trust limits on 2026-10-23.
 NCON.0 contract critique and NCON.1-5 source/control/docs reviews are bounded clean.
@@ -1081,7 +1084,15 @@ Focused195/0/0 and full-third all25 pass:4492 Python passes/10 explicit platform
 1051 native unit/93 conformance with zero skips, five paired profiles, strict docs,
 package/examples and explicit Frozen DEVELOPMENT102. All1260 protected inputs and Git
 identity stayed unchanged. Failed earlier attempts and capture-only corrections remain
-retained in the leaf. Executable checkpoint and clean qualification are still pending.
+retained in the leaf. Executable checkpoint8758b0eedf9f69077274a666da3919e9f83380a0 (tree
+1f20c9fa0f95142a28f7713b6de9ebfb12a424b5) contains the explicit39-path slice;
+clean qualification now passes the exact registered12-step gate,1051unit/93conformance,
+173focused connection/config/ownership cases, five source-clean paired profiles, package/
+examples and explicit Frozen102. All1255tracked inputs and initial/final clean identity match;
+independent qualification review is bounded clean. A prior clean attempt's existing external-
+close5s timeout remains retained/unexplained; isolated and full retry passed without source or
+timeout changes. Independent parent/leaf critique is bounded clean. This later plan-only
+reconciliation record preserves `8758b0e` as the qualified executable identity.
 The generated v3 source clears the approved-scope row pending list; this does not register
 providers or complete redirect parity. Resume from the leaf's first unchecked box. Redirect behavior remains
 a separate unfinished parity prerequisite after that leaf, then researched registration.
