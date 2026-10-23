@@ -70,16 +70,20 @@ def test_a_keyless_local_engine_can_still_be_given_a_key() -> None:
 
 
 def test_a_preset_whose_key_would_not_authenticate_offers_no_key_field() -> None:
-    """Lemonade wants ``?api_key=``; Docker Model Runner ignores the header outright.
+    """Docker Model Runner alone ignores the header and therefore omits the setup field."""
+    descriptor = next(item for item in preset_descriptors() if item.id == "docker-model-runner")
+    assert "api_key" not in {field.key for field in descriptor.setup.fields}
 
-    Taking a credential, sending it in a header neither of them reads, and then failing
-    to authenticate is worse than not offering the field.
-    """
-    for descriptor in preset_descriptors():
-        if PRESETS_BY_ID[descriptor.id].accepts_api_key:
-            continue
-        keys = {f.key for f in descriptor.setup.fields}
-        assert "api_key" not in keys, f"{descriptor.id} cannot use a bearer credential"
+
+def test_lemonade_exposes_its_optional_bearer_credential_field() -> None:
+    descriptor = next(item for item in preset_descriptors() if item.id == "lemonade")
+    field = next(item for item in descriptor.setup.fields if item.key == "api_key")
+
+    assert field.required is False
+    assert field.advanced is True
+    assert field.env_var == "LEMONADE_API_KEY"
+    assert field.placeholder == "env://LEMONADE_API_KEY or a literal key"
+    assert "Only needed if this server was started with authentication." in field.help_text
 
 
 def test_a_preset_with_a_default_endpoint_does_not_ask_for_one() -> None:
@@ -245,22 +249,99 @@ def test_reasoning_translators_produce_the_documented_wire_fields() -> None:
     assert registry.get("mistral").reasoning_translator(None) == {}
 
 
-async def test_reka_authenticates_with_x_api_key() -> None:
-    """Reka's HTTP reference documents x-api-key on chat, not a bearer token."""
+async def test_reka_uses_bearer_for_models_and_chat_and_keeps_caller_authorization() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        if request.url.path == "/v1/models":
+            return httpx2.Response(200, json={"object": "list", "data": []})
+        assert request.url.path == "/v1/chat/completions"
+        return httpx2.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
+                ]
+            },
+        )
+
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "reka", api_key="reka-secret-key", transport=httpx2.MockTransport(handler)
+            )
+        ]
+    ) as client:
+        await client.models("reka")
+        await client.generate("hello", target="reka:reka-flash")
+
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "reka",
+                api_key="reka-secret-key",
+                headers={"Authorization": "Bearer caller-override"},
+                transport=httpx2.MockTransport(handler),
+            )
+        ]
+    ) as client:
+        await client.generate("override", target="reka:reka-flash")
+
+    assert [request.url.path for request in seen] == [
+        "/v1/models",
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+    ]
+    assert seen[0].headers["authorization"] == "Bearer reka-secret-key"
+    assert seen[1].headers["authorization"] == "Bearer reka-secret-key"
+    assert seen[2].headers["authorization"] == "Bearer caller-override"
+    assert all("x-api-key" not in request.headers for request in seen)
+
+
+async def test_lemonade_optional_bearer_key_is_forwarded_without_query_injection() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        assert request.url.path == "/v1/models"
+        assert request.url.query == b""
+        return httpx2.Response(200, json={"object": "list", "data": []})
+
+    async with ai.AsyncClient(
+        [ai.ProviderSettings.of("lemonade", transport=httpx2.MockTransport(handler))]
+    ) as client:
+        await client.models("lemonade")
+
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "lemonade", api_key="lemonade-secret-key", transport=httpx2.MockTransport(handler)
+            )
+        ]
+    ) as client:
+        await client.models("lemonade")
+
+    assert "authorization" not in seen[0].headers
+    assert seen[1].headers["authorization"] == "Bearer lemonade-secret-key"
+
+
+async def test_docker_model_runner_keeps_its_no_field_but_allows_direct_key_configuration() -> (
+    None
+):
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         seen.append(request)
         return httpx2.Response(200, json={"object": "list", "data": []})
 
-    adapter = _adapter("reka", handler, api_key="reka-secret-key")
+    adapter = _adapter("docker-model-runner", handler, api_key="caller-supplied-key")
     try:
         await adapter.list_models()
     finally:
         await adapter.aclose()
 
-    assert seen[0].headers["x-api-key"] == "reka-secret-key"
-    assert "authorization" not in seen[0].headers
+    assert seen[0].headers["authorization"] == "Bearer caller-supplied-key"
 
 
 def test_local_presets_use_their_documented_default_ports() -> None:
@@ -567,9 +648,7 @@ async def test_a_verified_preset_embeds_through_the_shared_dialect() -> None:
         from anyinfer.providers.base import EmbeddingWireRequest
 
         result = await adapter.embed(
-            EmbeddingWireRequest(
-                model="togethercomputer/m2-bert-80M-8k-retrieval", inputs=("hi",)
-            )
+            EmbeddingWireRequest(model="togethercomputer/m2-bert-80M-8k-retrieval", inputs=("hi",))
         )
     finally:
         await adapter.aclose()

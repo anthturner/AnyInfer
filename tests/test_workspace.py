@@ -8,6 +8,7 @@ patched out, so the suite stays fast and never actually runs pytest inside pytes
 from __future__ import annotations
 
 import argparse
+import asyncio
 import re
 import sys
 import tomllib
@@ -19,6 +20,47 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import workspace  # noqa: E402
+
+
+def test_matrix_preset_axes_use_tabbyapi_x_api_key_harness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The generated matrix keeps a real x-api-key representative after Reka switches auth."""
+    from anyinfer.testing import conformance
+
+    async def no_conformance_run(_harness: object) -> list[object]:
+        return []
+
+    monkeypatch.setattr(conformance, "run_conformance", no_conformance_run)
+
+    sys.path.insert(0, str(ROOT / "tests"))
+    import test_presets
+
+    actual_harness = test_presets._harness
+    selected: list[object] = []
+
+    def observe_harness(preset, model):  # type: ignore[no-untyped-def]
+        selected.append(preset)
+        return actual_harness(preset, model)
+
+    monkeypatch.setattr(test_presets, "_harness", observe_harness)
+
+    results = asyncio.run(workspace._matrix_collect())
+
+    selected_ids = [preset.id for preset in selected]
+    assert selected_ids == ["groq", "moonshot", "tabbyapi", "venice"]
+    x_api_key = next(preset for preset in selected if preset.id == "tabbyapi")
+    assert x_api_key.auth_header == "x-api-key"
+    assert "tabbyapi" in results
+    assert "reka" not in results
+
+    rendered = workspace._matrix_render(results)
+    assert (
+        "The `groq`, `moonshot`, `tabbyapi` and `venice` rows exercise the shared "
+        "adapter's quirk axes: bearer auth, the renamed output-token field, `x-api-key` "
+        "auth, and the `max_completion_tokens` dialect."
+    ) in rendered
+    assert "`reka` and `venice` rows exercise the shared adapter's quirk axes" not in rendered
 
 
 @pytest.fixture

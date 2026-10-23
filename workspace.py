@@ -1279,7 +1279,7 @@ async def _matrix_collect() -> dict[str, list[CaseResult]]:
     # Presets share one adapter, so one representative per quirk axis stands for all of
     # them rather than one row per preset: plain bearer auth, the renamed
     # output-token field, x-api-key auth, and the max_completion_tokens dialect.
-    for preset_id in ("groq", "moonshot", "reka", "venice"):
+    for preset_id in ("groq", "moonshot", "tabbyapi", "venice"):
         harnesses[preset_id] = test_presets._harness(
             test_presets.PRESETS_BY_ID[preset_id], "fake-model-small"
         )
@@ -1335,7 +1335,7 @@ def _matrix_render(results: dict[str, list[CaseResult]]) -> str:
     )
     lines.append(
         covered_note + " "
-        "The `groq`, `moonshot`, `reka` and `venice` rows exercise the shared adapter's "
+        "The `groq`, `moonshot`, `tabbyapi` and `venice` rows exercise the shared adapter's "
         "quirk axes: bearer auth, the renamed output-token field, `x-api-key` auth, and "
         "the `max_completion_tokens` dialect. Every entry in the "
         "[preset registry](../providers/presets.md) is separately instantiated and checked "

@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "id": "compat-preset-auth",
+  "sources": [
+    {
+      "url": "https://docs.reka.ai/chat/api-reference/create-chat-completion",
+      "fetched_at": "2026-10-23",
+      "version_pin": "Reka Chat API /v1 current documentation; no current release or changelog pin located during current research"
+    },
+    {
+      "url": "https://docs.reka.ai/chat/api-reference/list-models",
+      "fetched_at": "2026-10-23",
+      "version_pin": "Reka Chat API /v1 current documentation; no current machine-readable /v1 API/auth schema located during current research"
+    },
+    {
+      "url": "https://github.com/lemonade-sdk/lemonade/releases/tag/v2026.43.3",
+      "fetched_at": "2026-10-23",
+      "version_pin": "Lemonade v2026.43.3"
+    },
+    {
+      "url": "https://github.com/lemonade-sdk/lemonade/blob/b48d190a9b00a417fda9cbf206fcec5691e5578b/docs/guide/configuration/README.md",
+      "fetched_at": "2026-10-23",
+      "version_pin": "Lemonade v2026.43.3 commit b48d190a9b00a417fda9cbf206fcec5691e5578b"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/lemonade-sdk/lemonade/b48d190a9b00a417fda9cbf206fcec5691e5578b/src/cpp/server/server.cpp",
+      "fetched_at": "2026-10-23",
+      "version_pin": "Lemonade v2026.43.3 commit b48d190a9b00a417fda9cbf206fcec5691e5578b"
+    }
+  ],
+  "disposition": "adopted",
+  "changes": [
+    {
+      "contract_id": "contracts/openai-compat-presets.md",
+      "scope": "inference",
+      "operations": [
+        "generation"
+      ],
+      "summary": "Correct Reka's documented chat/models authentication to Bearer and Lemonade's optional HTTP authentication to Bearer when LEMONADE_API_KEY is configured, without changing normalized generation behavior."
+    }
+  ],
+  "shared_spec": {
+    "impact": "no_delta",
+    "rationale": "This is provider-specific authentication and setup metadata for existing OpenAI-compatible generation transport. It changes neither normalized requests/results nor shared specification inventories, schemas, frozen fixtures, expectations, or release assets. The Python provider-parity metadata witness is deliberately regenerated from the changed declarations while retaining its historical baseline; it is not a shared specification inventory. No candidate release or qualification is claimed."
+  },
+  "implementations": [
+    {
+      "implementation_id": "anyinfer-python",
+      "status": "updated",
+      "rationale": "Updates the Reka and Lemonade preset declarations, their focused controls, and their generated Python witnesses. The declaration records required work only and does not claim a live authentication probe or gate outcome.",
+      "owned_paths": [
+        "contracts/openai-compat-presets.md",
+        "src/python/anyinfer/providers/presets.py",
+        "tests/test_presets.py",
+        "workspace.py",
+        "tests/test_workspace.py",
+        "docs/reference/conformance-matrix.md",
+        "maintenance/provider-parity/python-builtins.json"
+      ],
+      "required_gate_ids": [
+        "python-contracts",
+        "python-fixtures",
+        "python-conformance",
+        "python-tests"
+      ]
+    },
+    {
+      "implementation_id": "anyinfer-csharp",
+      "status": "unsupported",
+      "rationale": "The C# workspace has no compatibility-preset registry or Reka/Lemonade provider binding, so this provider-specific preset metadata has no native binding to update. The registered workspace gate remains required for the coordinated change.",
+      "owned_paths": [],
+      "required_gate_ids": [
+        "csharp-workspace"
+      ]
+    }
+  ]
+}

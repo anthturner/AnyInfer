@@ -6217,6 +6217,18 @@
             {
               "advanced": true,
               "choices": [],
+              "default_value": "",
+              "env_var": "LEMONADE_API_KEY",
+              "help_text": "Conventionally env://LEMONADE_API_KEY. Only needed if this server was started with authentication. Accepts a literal, env://VAR, or credential://system/name.",
+              "key": "api_key",
+              "kind": "secret",
+              "label": "API key",
+              "placeholder": "env://LEMONADE_API_KEY or a literal key",
+              "required": false
+            },
+            {
+              "advanced": true,
+              "choices": [],
               "default_value": "http://127.0.0.1:13305/v1",
               "env_var": "",
               "help_text": "Defaults to http://127.0.0.1:13305/v1.",
@@ -6249,7 +6261,7 @@
       "family": "compat_preset",
       "id": "lemonade",
       "preset": {
-        "accepts_api_key": false,
+        "accepts_api_key": true,
         "aliases": [],
         "auth_header": "bearer",
         "base_url": "http://127.0.0.1:13305/v1",
@@ -6268,10 +6280,10 @@
         ],
         "id": "lemonade",
         "ignored_parameters": [],
-        "key_env": "",
+        "key_env": "LEMONADE_API_KEY",
         "locality": "local",
         "models_listing": true,
-        "note": "AMD-sponsored server with Ryzen AI NPU backends. Note the credential is not a bearer token: when LEMONADE_API_KEY is set the server wants it as an ?api_key= query parameter. Also serves the Ollama and Anthropic shapes on the same port.",
+        "note": "AMD-sponsored server with Ryzen AI NPU backends. When authentication is enabled, LEMONADE_API_KEY uses the standard Bearer header. Also serves the Ollama and Anthropic shapes on the same port.",
         "output_tokens_field": "max_tokens",
         "reasoning": null,
         "requires_api_key": false,
@@ -11665,7 +11677,7 @@
       "preset": {
         "accepts_api_key": true,
         "aliases": [],
-        "auth_header": "x-api-key",
+        "auth_header": "bearer",
         "base_url": "https://api.reka.ai/v1",
         "base_url_example": "",
         "base_url_hint": "",
@@ -11685,7 +11697,7 @@
         "key_env": "REKA_API_KEY",
         "locality": "hosted",
         "models_listing": true,
-        "note": "Multimodal (image/video/audio). The HTTP reference documents x-api-key for chat; tool_choice spells the forced case 'tool', not 'required'.",
+        "note": "Multimodal (image/video/audio). tool_choice spells the forced case 'tool', not 'required'.",
         "output_tokens_field": "max_tokens",
         "reasoning": null,
         "requires_api_key": true,
@@ -16091,7 +16103,7 @@
     },
     {
       "path": "contracts/openai-compat-presets.md",
-      "sha256": "3ec95177a944cb71999cc8245bd460d9b476ab8ee52ea54859320dea8038cc9a"
+      "sha256": "59d9b03d2d838d6999cb00ef56fcbb7462b97b53317eeca8ad90145179e5f84b"
     },
     {
       "path": "contracts/openai-compat.md",
@@ -16203,7 +16215,7 @@
     },
     {
       "path": "src/python/anyinfer/providers/presets.py",
-      "sha256": "39b6302cea26ba0178a35db058c70b1feb80da9f0430c79cc68cdc2adbe1f14c"
+      "sha256": "e84e4c123bd0f25a9ba0c3fa5236a0a534e11858e74644720aa8de278f263531"
     },
     {
       "path": "src/python/anyinfer/providers/tei.py",

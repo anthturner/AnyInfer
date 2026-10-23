@@ -950,6 +950,9 @@ must report a real conflict rather than silently changing a dependent public sig
   > all 24 held-source workspace steps, fresh clean --check plus 20 focused controls,
   > and independent bounded review pass. Resume the reviewed preset runtime boundary;
   > current Reka/Lemonade auth findings require source-backed adjudication first.
+  > Immediate prerequisite `ANYINFER_CSHARP_SDK_PRESET_AUTH.md` adopts only researched
+  > Reka Bearer and Lemonade optional-Bearer setup metadata before native data porting.
+  > It preserves missing native bindings and all unverified/live boundaries explicitly.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes

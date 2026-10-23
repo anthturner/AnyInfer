@@ -5,6 +5,7 @@ tests/fixtures/rich-generation-v1/** text eol=lf
 tests/fixtures/tool-loop-v1/** text eol=lf
 # Preserve the immutable adopted-change input's committed byte identity on Windows.
 maintenance/changes/openai-compat-rich-inputs.json text eol=lf
+maintenance/changes/compat-preset-auth.json text eol=lf
 # Provider declaration inventory binds these metadata sources by their raw bytes.
 maintenance/provider-parity/** text eol=lf
 scripts/export_python_provider_parity.py text eol=lf

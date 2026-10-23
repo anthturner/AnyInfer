@@ -83,13 +83,11 @@ class CompatPreset:
         locality: ``hosted`` services need a key; ``local`` engines default to loopback.
         key_env: Conventional environment variable for the API key, used in help text.
         requires_api_key: Whether requests fail without a credential.
-        accepts_api_key: Whether a credential can be sent at all when one is not required.
-            True for the ordinary keyless local engine, which authenticates once its
-            operator starts it with ``--api-key`` or puts a reverse proxy in front of it.
-            False only where a credential provably would not travel in the header the
-            adapter sends: Lemonade documents an ``?api_key=`` query parameter, and Docker
-            Model Runner ignores ``Authorization`` outright. Offering a key field there
-            would take a value, send it, and still fail to authenticate.
+        accepts_api_key: Whether the setup UI offers an optional credential field when one is
+            not required. It does not reject or suppress a caller-supplied credential at
+            runtime. True for a keyless local engine that can authenticate when its operator
+            enables auth or puts a reverse proxy in front of it. False for Docker Model
+            Runner, which ignores ``Authorization`` outright.
         requires_base_url: Whether a base URL must be supplied (self-hosted, per-account).
         base_url_hint: Help text describing the expected base URL shape.
         base_url_example: The templated URL a UI shows in an empty base-URL editor.
@@ -472,9 +470,9 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         display_name="Reka AI",
         base_url="https://api.reka.ai/v1",
         key_env="REKA_API_KEY",
-        auth_header="x-api-key",
-        note="Multimodal (image/video/audio). The HTTP reference documents x-api-key "
-        "for chat; tool_choice spells the forced case 'tool', not 'required'.",
+        auth_header="bearer",
+        note="Multimodal (image/video/audio). tool_choice spells the forced case 'tool', "
+        "not 'required'.",
     ),
     CompatPreset(
         id="nous",
@@ -1202,13 +1200,13 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
         display_name="Lemonade Server",
         base_url="http://127.0.0.1:13305/v1",
         locality="local",
+        key_env="LEMONADE_API_KEY",
         requires_api_key=False,
-        accepts_api_key=False,
+        accepts_api_key=True,
         default_port=13305,
-        note="AMD-sponsored server with Ryzen AI NPU backends. Note the credential is "
-        "not a bearer token: when LEMONADE_API_KEY is set the server wants it as an "
-        "?api_key= query parameter. Also serves the Ollama and Anthropic shapes on the "
-        "same port.",
+        note="AMD-sponsored server with Ryzen AI NPU backends. When authentication is "
+        "enabled, LEMONADE_API_KEY uses the standard Bearer header. Also serves the Ollama "
+        "and Anthropic shapes on the same port.",
     ),
     CompatPreset(
         id="docker-model-runner",

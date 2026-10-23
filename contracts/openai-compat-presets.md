@@ -22,12 +22,13 @@ providers publishing only low/medium/high, or a `reasoning: {effort}` object). E
 else in each entry is context for the drift check.
 
 One further knob is declarative but *not* wire logic: `accepts_api_key` controls whether a
-preset offers a credential field at all. It exists because two entries below authenticate
-somewhere other than the header this adapter sends — **lemonade** documents an `?api_key=`
-query parameter, and **docker-model-runner** ignores `Authorization` outright — so both are
-declared `accepts_api_key=False`. Every other keyless local engine does accept a bearer
-credential once its operator enables auth (see each entry's Auth line, which records the
-flag or setting that turns it on), and offers the field as an optional one.
+preset offers a credential field at all. **docker-model-runner** is declared
+`accepts_api_key=False` because it ignores `Authorization` outright. **lemonade** offers an
+optional credential because its current HTTP server auth, when enabled with
+`LEMONADE_API_KEY`, uses the same Bearer header the shared adapter sends. Every other
+keyless local engine does accept a bearer credential once its operator enables auth (see each
+entry's Auth line, which records the flag or setting that turns it on), and offers the field
+as an optional one.
 
 A second batch of twenty-three presets was added on 2026-08-07 (`featherless` through `triton`
 below), each verified against live documentation the same way. Four candidates surveyed in
@@ -1195,27 +1196,31 @@ one.
 ## reka — Reka AI
 
 - Base URL: `https://api.reka.ai/v1`
-- Auth: X-Api-Key: <REKA_API_KEY> for /v1/chat/completions and /v1/models (the Research endpoint documents Authorization: Bearer instead — the two surfaces disagree)
+- Auth: `Authorization: Bearer <REKA_API_KEY>` for the documented `/v1/chat/completions`
+  and `/v1/models` endpoints.
 - `GET /models`: yes
 - Compatibility notes:
-  The auth spelling is the headline quirk and the reason this preset sets auth_header to
-  x-api-key: the HTTP reference specifies X-Api-Key on chat and models, while the quickstart
-  drives the same base URL with the OpenAI SDK, which necessarily sends Authorization:
-  Bearer. Whether Reka accepts BOTH could not be confirmed from the documentation and is
-  flagged for the next drift check; a caller needing bearer auth can override via configured
-  headers. Non-standard defaults: temperature 0.4, top_p 0.95, top_k 1024. tool_choice spells
-  the forced case 'tool' rather than OpenAI's 'required' (values auto/tool/none). Multimodal
-  input (image, video, audio) via data URLs. max_tokens is the output cap. The legacy
-  v0.docs.reka.ai API is superseded. The pricing page lists reka-core while the models page
-  lists only reka-flash, reka-edge and reka-edge-2603 and notes "other models may be
-  available" — the models page is likely the fresher source, so reka-core's continued
-  availability is unconfirmed even though its published price is recorded.
+  Current chat and models references agree on Bearer, so the preset's auth spelling follows
+  those endpoints. Whether Reka still accepts undocumented `X-Api-Key` as an alternate is
+  unverified; no authenticated request was made. Unverified: a current Reka
+  release/changelog provenance pin and a current machine-readable `/v1` API/auth schema were
+  not located during this research. Non-standard defaults: temperature 0.4, top_p 0.95,
+  top_k 1024. tool_choice spells the forced case 'tool' rather than OpenAI's 'required'
+  (values auto/tool/none). Multimodal input (image, video, audio) via data URLs. max_tokens is
+  the output cap. The legacy v0.docs.reka.ai API is superseded. The pricing page lists
+  reka-core while the models page lists only reka-flash, reka-edge and reka-edge-2603 and notes
+  "other models may be available" — the models page is likely the fresher source, so reka-core's
+  continued availability is unconfirmed even though its published price is recorded. Those
+  non-auth facts were not rechecked in this auth-only pass.
 - Reasoning:
   No reasoning_effort on chat completions. Reka Research instead exposes a nested research
   object with parallel_thinking.mode taking none/low/high — a different surface with its own
   vocabulary, and priced per 1k requests ($25 base, $35 low, $60 high) rather than per token.
   Chat models therefore declare no reasoning control.
-- Sources (verified 2026-08-07):
+- Auth sources (rechecked 2026-10-23 UTC):
+  - https://docs.reka.ai/chat/api-reference/create-chat-completion
+  - https://docs.reka.ai/chat/api-reference/list-models
+- Earlier non-auth sources (verified 2026-08-07; not rechecked in this auth-only pass):
   - https://docs.reka.ai/chat/api-reference/create.md
   - https://docs.reka.ai/chat/models.md
   - https://docs.reka.ai/chat/overview
@@ -2388,8 +2393,10 @@ ingress with a Host header.
 ### lemonade - Lemonade Server (AMD)
 
 - Base URL: `http://localhost:13305/v1`
-- Auth: OPTIONAL AND NOT A BEARER TOKEN - when LEMONADE_API_KEY is set, the documented form
-  is an `?api_key=KEY` QUERY PARAMETER, not an Authorization header. Unset, no auth applies.
+- Auth: optional HTTP Bearer authentication. When `LEMONADE_API_KEY` is set, regular
+  `/api/*`, `/v0/*`, and `/v1/*` endpoints require `Authorization: Bearer <key>`; when unset,
+  those endpoints are unauthenticated. A WebSocket-only `api_key` query compatibility path is
+  distinct and does not establish HTTP query authentication.
 - `GET /models`: yes, plus GET /v1/models/{model_id}.
 - Reasoning:
 Model-dependent; the catalog labels reasoning-capable models (Qwen3 and similar).
@@ -2400,8 +2407,16 @@ third-party integrations still say 8000. Both /api/v1/* and /v1/* prefixes are s
 Documented parameter gaps: logprobs is unavailable for chat completions; image generation
 supports only n=1 and b64_json. It also serves the Ollama API and the Anthropic Messages API
 (/v1/messages) on the same port, and can route to remote providers whose models then appear
-dot-namespaced in the same /v1/models listing.
-- Sources (verified 2026-08-08):
+dot-namespaced in the same /v1/models listing. These non-auth compatibility facts were not
+rechecked in this auth-only pass. `LEMONADE_ADMIN_API_KEY` precedence is documented for admin
+access and is outside this preset's ordinary inference credential shape. No live pinned-server
+probe was performed.
+- Auth sources (rechecked 2026-10-23 UTC; stable `v2026.43.3`, commit
+  `b48d190a9b00a417fda9cbf206fcec5691e5578b`):
+  - https://github.com/lemonade-sdk/lemonade/releases/tag/v2026.43.3
+  - https://github.com/lemonade-sdk/lemonade/blob/b48d190a9b00a417fda9cbf206fcec5691e5578b/docs/guide/configuration/README.md
+  - https://raw.githubusercontent.com/lemonade-sdk/lemonade/b48d190a9b00a417fda9cbf206fcec5691e5578b/src/cpp/server/server.cpp
+- Earlier non-auth sources (verified 2026-08-08; not rechecked in this auth-only pass):
   - https://lemonade-server.ai/docs/api/openai/
   - https://lemonade-server.ai/docs/guide/concepts/
   - https://lemonade-server.ai/docs/guide/configuration/
