@@ -1052,13 +1052,18 @@ source `60e39c9ef011d9cbc3a03a61f330e3366e964558`, tree
 12-step C# gate, 1014 native unit/93 conformance controls, five clean source-stamped pairs,
 generator byte equality, package/examples and Frozen 102 pass. The table stays outside the
 default registry, with source operations separate from singleton implemented Generation.
-Resume the native connection-settings/model-inventory contract, then researched registration;
-these two non-neutral source facts remain pending native work. Default registry remains
-four descriptors/seven bindings, with 122 operation memberships pending. Compiling data
-does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12 remain open.
-The next bounded checklist is `ANYINFER_CSHARP_SDK_MODEL_INVENTORY.md`: expose only the
-source-defined descriptive category and remove that specific inert-data gap after qualification.
-The broader connection contract and redirect parity remain open before preset registration.
+The descriptive metadata leaf, `ANYINFER_CSHARP_SDK_MODEL_INVENTORY.md`, is qualified at
+executable source `afb3f86acfefd5a15f80de2389d4b0e0396e3a2b`, tree
+`d47d9a135207d335411c06609bda58dd95cba9f1`: all 25 held workspace steps, fresh registered
+12-step C# gate, 1016 native unit/93 conformance controls, five clean source-stamped pairs,
+generator byte equality, package/examples and Frozen DEVELOPMENT102 pass. Independent
+evidence review is bounded clean; plan-only reconciliation is a separate later commit.
+The public default category is Served; inert rows explicitly project the source category
+without filtering discovery. Only connection settings remain pending in those definitions.
+Resume the native connection-settings contract and redirect parity, then researched registration.
+Default registry remains four descriptors/seven bindings, with 122 operation memberships
+pending. Compiling data does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12
+and all 235 root API rows remain open.
 SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
 `7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered
