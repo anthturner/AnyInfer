@@ -334,6 +334,20 @@ var descriptor = new ProviderDescriptor(
         factoryCalls++;
         throw new InvalidOperationException("pure catalog queries must not construct an adapter");
     });
+var availableInventoryDescriptor = new ProviderDescriptor(
+    "available-inventory",
+    "Available inventory",
+    (_, _) => throw new InvalidOperationException("metadata must not construct an adapter"),
+    modelInventory: ModelInventoryKind.Available);
+var installedInventoryDescriptor = new ProviderDescriptor(
+    "installed-inventory",
+    "Installed inventory",
+    (_, _) => throw new InvalidOperationException("metadata must not construct an adapter"),
+    modelInventory: ModelInventoryKind.Installed);
+if (descriptor.ModelInventory != ModelInventoryKind.Served
+    || availableInventoryDescriptor.ModelInventory != ModelInventoryKind.Available
+    || installedInventoryDescriptor.ModelInventory != ModelInventoryKind.Installed)
+    throw new InvalidOperationException("public model-inventory metadata failed");
 var registry = new ProviderRegistry([descriptor]);
 var settings = ProviderSettings.Of("demo", alias: "demo-instance");
 var catalog = new global::AnyInfer.Catalog.Catalog(

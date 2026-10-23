@@ -32,7 +32,8 @@ public sealed record ProviderDescriptor
         bool governsOwnTransport = false,
         Func<string?, JsonObject>? reasoningTranslator = null,
         IEnumerable<string>? ignoredParameters = null,
-        IEnumerable<string>? serverTools = null)
+        IEnumerable<string>? serverTools = null,
+        ModelInventoryKind modelInventory = ModelInventoryKind.Served)
     {
         Id = ProviderSettings.NormalizeId(id, nameof(id));
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -96,6 +97,12 @@ public sealed record ProviderDescriptor
         ReasoningTranslator = reasoningTranslator ?? (static _ => new JsonObject([]));
         IgnoredParameters = Array.AsReadOnly((ignoredParameters ?? []).Select(static value => value ?? throw new ArgumentException("Ignored parameters cannot contain null references.")).ToArray());
         ServerTools = (serverTools ?? []).Select(static value => value ?? throw new ArgumentException("Server tools cannot contain null references.")).ToFrozenSet(StringComparer.Ordinal);
+        if (!Enum.IsDefined(modelInventory))
+        {
+            throw new ArgumentOutOfRangeException(nameof(modelInventory));
+        }
+
+        ModelInventory = modelInventory;
     }
 
     /// <summary>Gets the canonical provider descriptor ID.</summary>
@@ -146,6 +153,8 @@ public sealed record ProviderDescriptor
     public IReadOnlyList<string> IgnoredParameters { get; }
     /// <summary>Gets provider-run tool kinds the descriptor can place on the wire.</summary>
     public IReadOnlySet<string> ServerTools { get; }
+    /// <summary>Gets the descriptive category of model inventory this descriptor exposes.</summary>
+    public ModelInventoryKind ModelInventory { get; }
     // Cooperative factory contract: only the pool disposes an opted-in configured handler.
     internal bool PoolOwnsConfiguredTransport { get; init; }
 

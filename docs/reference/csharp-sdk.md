@@ -26,6 +26,7 @@ property corresponds to Python `Text.text`.
 | `AnyInferConfig` | Restricted version 1 configuration reader and writer. |
 | `Catalog`, `ResolvedTarget`, `PricingTable` | Pure target resolution and catalog-derived price facts. |
 | `ModelCapabilities` | Provenance-bearing model facts; unknown values remain unknown. |
+| `AnyInfer.Providers.ModelInventoryKind`, `AnyInfer.Providers.ProviderDescriptor.ModelInventory` | Descriptive metadata for the category of model inventory a provider exposes. |
 | `PricingCalculator`, `ContextBudget`, `SpendLedger`, `SpendStore` | Explicit winning-request pricing, planning, and caller-owned accounting helpers. |
 | `RateLimits`, `RateLimiter` | Standalone pacing configuration and caller-disposed leases. |
 | `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy` | Explicit spend admission, specialized context fallback, and cache planning inputs. |
@@ -37,6 +38,8 @@ property corresponds to Python `Text.text`.
 | `IObserver`, `TelemetryEvent` | Synchronous typed in-process telemetry; observers and sinks remain caller-owned. |
 | `RunManifest`, `ManifestUtilities` | Immutable per-call manifest values, serialization, schema, digest, and rendering helpers. |
 | `AttemptRecord.Timing`, `operationRoutes` | Per-attempt timing and optional retrieval-specific default routes on either client. |
+
+`AnyInfer.Providers.ProviderDescriptor` exposes get-only `ModelInventory`; its optional final `modelInventory` constructor argument defaults to `ModelInventoryKind.Served`. `Served` describes models exposed by an already-running engine; `Available` describes a catalog of models that could be run; `Installed` describes a provider-owned on-disk model store. This category is descriptive metadata, separate from model-listing support and the descriptor's implemented inference operations. Choosing a category does not filter discovered models, start a runtime, download models, or register a provider.
 
 Configured `RateLimits` can pace normal provider HTTP inside the generation entry deadline. An
 own-transport descriptor, or an opaque prebuilt registration with an active injected limiter, uses

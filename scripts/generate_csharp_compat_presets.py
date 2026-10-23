@@ -144,6 +144,11 @@ _REASONING = {
         "ReasoningObject",
     ),
 }
+_MODEL_INVENTORY = {
+    "served": "Served",
+    "available": "Available",
+    "installed": "Installed",
+}
 
 
 def project(document: dict[str, Any]) -> list[dict[str, Any]]:
@@ -169,11 +174,12 @@ def project(document: dict[str, Any]) -> list[dict[str, Any]]:
             or preset.get("id") != identifier
         ):
             raise ValueError("compat row IDs must agree")
-        if (
-            descriptor.get("honors_connection_settings") is not True
-            or descriptor.get("model_inventory") != "served"
-        ):
+        if descriptor.get("honors_connection_settings") is not True:
             raise ValueError(f"{identifier}: unsupported connection or inventory source fact")
+        if descriptor.get("model_inventory") not in _MODEL_INVENTORY:
+            raise ValueError(f"{identifier}: unsupported model inventory")
+        if descriptor["model_inventory"] != "served":
+            raise ValueError(f"{identifier}: compat source inventory must remain served")
         operations = descriptor.get("operations")
         if (
             not isinstance(operations, list)
@@ -333,7 +339,7 @@ def render(document: dict[str, Any], inventory_sha256: str) -> str:
         "internal static partial class CompatPresetTable",
         "{",
         "    internal const int SchemaVersion = 1;",
-        "    internal const int GeneratorVersion = 1;",
+        "    internal const int GeneratorVersion = 2;",
         f"    internal const string InventorySha256 = {_cs(inventory_sha256)};",
         "    internal static readonly IReadOnlyList<CompatPresetDefinition> Rows = Array.AsReadOnly(new CompatPresetDefinition[]",
         "    {",
@@ -348,6 +354,7 @@ def render(document: dict[str, Any], inventory_sha256: str) -> str:
         if locality is None:
             raise ValueError(f"{row['id']}: unknown locality")
         style = _REASONING[preset["reasoning"]][1]
+        inventory = _MODEL_INVENTORY[descriptor["model_inventory"]]
         lines.extend(
             [
                 "        new CompatPresetDefinition(",
@@ -362,7 +369,7 @@ def render(document: dict[str, Any], inventory_sha256: str) -> str:
                 + f", {str(descriptor['requires_base_url']).lower()}, ProviderLocality.{locality},",
                 f"                {_setup_cs(descriptor['setup'])},",
                 f"                {_capabilities_cs(descriptor['default_capabilities'])},",
-                f"                new string[] {{ {ignored} }}, new OpenAICompatDialectOptions({_cs(preset['auth_header'])}, {str(preset['models_listing']).lower()}, {_cs(preset['output_tokens_field'])}), CompatPresetReasoningStyle.{style}, new InferenceOperation[] {{ InferenceOperation.Generation }})),",
+                f"                new string[] {{ {ignored} }}, new OpenAICompatDialectOptions({_cs(preset['auth_header'])}, {str(preset['models_listing']).lower()}, {_cs(preset['output_tokens_field'])}), CompatPresetReasoningStyle.{style}, new InferenceOperation[] {{ InferenceOperation.Generation }}, ModelInventoryKind.{inventory})),",
             ]
         )
     lines.extend(["    });", "}", ""])

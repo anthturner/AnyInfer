@@ -89,7 +89,8 @@ internal sealed record CompatPresetGenerationRow
         IEnumerable<string> ignoredParameters,
         OpenAICompatDialectOptions dialect,
         CompatPresetReasoningStyle reasoningStyle,
-        IEnumerable<InferenceOperation> implementedOperations)
+        IEnumerable<InferenceOperation> implementedOperations,
+        ModelInventoryKind modelInventory)
     {
         ArgumentNullException.ThrowIfNull(setup);
         ArgumentNullException.ThrowIfNull(defaultCapabilities);
@@ -120,7 +121,8 @@ internal sealed record CompatPresetGenerationRow
             defaultCapabilities: defaultCapabilities,
             operations: operations,
             reasoningTranslator: effort => CompatPresetReasoning.Translate(reasoningStyle, effort),
-            ignoredParameters: copiedIgnoredParameters)
+            ignoredParameters: copiedIgnoredParameters,
+            modelInventory: modelInventory)
         {
             PoolOwnsConfiguredTransport = true,
         };
@@ -167,7 +169,12 @@ internal sealed record CompatPresetDefinition
             throw new ArgumentException("Compatibility preset source and generation IDs must agree.", nameof(generation));
         }
 
-        PendingNativeParity = Array.AsReadOnly(new[] { "connection-settings", "model-inventory" });
+        if (SourceModelInventory(Source.SourceModelInventory) != Generation.Descriptor.ModelInventory)
+        {
+            throw new ArgumentException("Compatibility preset source and generation model inventory must agree.", nameof(generation));
+        }
+
+        PendingNativeParity = Array.AsReadOnly(new[] { "connection-settings" });
     }
 
     internal CompatPresetSourceFacts Source { get; }
@@ -175,6 +182,14 @@ internal sealed record CompatPresetDefinition
     internal CompatPresetGenerationRow Generation { get; }
 
     internal IReadOnlyList<string> PendingNativeParity { get; }
+
+    private static ModelInventoryKind SourceModelInventory(string sourceModelInventory) => sourceModelInventory switch
+    {
+        "served" => ModelInventoryKind.Served,
+        "available" => ModelInventoryKind.Available,
+        "installed" => ModelInventoryKind.Installed,
+        _ => throw new ArgumentException("Compatibility preset source model inventory is invalid.", nameof(sourceModelInventory)),
+    };
 }
 
 /// <summary>Generated compatibility-preset metadata; intentionally separate from the default registry.</summary>

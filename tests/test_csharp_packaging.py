@@ -359,6 +359,10 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
 
     source = (consumer / "Program.cs").read_text(encoding="utf-8")
     assert 'new Text("hello")' in source
+    assert "ModelInventoryKind.Available" in source
+    assert "ModelInventoryKind.Installed" in source
+    assert "descriptor.ModelInventory != ModelInventoryKind.Served" in source
+    assert "public model-inventory metadata failed" in source
     assert 'AsyncClient.FromAdapters([new ProviderRegistration("demo", adapter)])' in source
     assert 'GenerateAsync(messages, target: "demo:model")' in source
     assert 'StreamAsync("hello", target: "demo:model")' in source

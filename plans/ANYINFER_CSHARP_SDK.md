@@ -1009,6 +1009,11 @@ must report a real conflict rather than silently changing a dependent public sig
   > counterparts omit server_tool_uses. Terminal generation separately attaches the
   > winning map after merge. Audit and settle the public merge/sum map contract in
   > both languages before final readiness; do not count the terminal fix as that work.
+  > NOTE: Connection discovery also found Python ProviderSettings' generated repr includes
+  > credential fields, and proxy userinfo/client-certificate passwords have no automatic
+  > connection-path redaction registration. Verify and correct the repr/secret paths before
+  > readiness; native connection value types must not reproduce that exposure. This is a
+  > source finding, not evidence of an actual leaked credential, and remains open.
 
 ### SDK.12 — SDK qualification and delivery
 
@@ -1051,6 +1056,9 @@ Resume the native connection-settings/model-inventory contract, then researched 
 these two non-neutral source facts remain pending native work. Default registry remains
 four descriptors/seven bindings, with 122 operation memberships pending. Compiling data
 does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12 remain open.
+The next bounded checklist is `ANYINFER_CSHARP_SDK_MODEL_INVENTORY.md`: expose only the
+source-defined descriptive category and remove that specific inert-data gap after qualification.
+The broader connection contract and redirect parity remain open before preset registration.
 SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
 `7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered
