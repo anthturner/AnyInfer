@@ -13,10 +13,18 @@ internal sealed class VoyageHttpTransport : IAsyncDisposable
     private readonly TimeSpan _configurationTimeout;
     private int _disposed;
 
+    internal VoyageHttpTransport(ProviderConfig config, CancellationToken cancellationToken)
+        : this(
+            config.Transport ?? ConnectionHandlerFactory.CreateOwned(config, cancellationToken),
+            config.TimeoutS,
+            config.Transport is not null && config.TransportOwnedByPool)
+    {
+    }
+
     internal VoyageHttpTransport(HttpMessageHandler? handler, double configurationTimeoutS, bool handlerOwnedByPool)
     {
         _configurationTimeout = TimeSpan.FromSeconds(configurationTimeoutS);
-        var ownedHandler = handler ?? new HttpClientHandler { AllowAutoRedirect = false };
+        var ownedHandler = handler ?? ConnectionHandlerFactory.CreateDefault(CancellationToken.None);
         _client = new HttpClient(ownedHandler, disposeHandler: handler is null || !handlerOwnedByPool)
         {
             Timeout = Timeout.InfiniteTimeSpan,

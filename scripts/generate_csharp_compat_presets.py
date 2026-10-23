@@ -174,8 +174,8 @@ def project(document: dict[str, Any]) -> list[dict[str, Any]]:
             or preset.get("id") != identifier
         ):
             raise ValueError("compat row IDs must agree")
-        if descriptor.get("honors_connection_settings") is not True:
-            raise ValueError(f"{identifier}: unsupported connection or inventory source fact")
+        if not isinstance(descriptor.get("honors_connection_settings"), bool):
+            raise ValueError(f"{identifier}: unsupported connection source fact")
         if descriptor.get("model_inventory") not in _MODEL_INVENTORY:
             raise ValueError(f"{identifier}: unsupported model inventory")
         if descriptor["model_inventory"] != "served":
@@ -339,7 +339,7 @@ def render(document: dict[str, Any], inventory_sha256: str) -> str:
         "internal static partial class CompatPresetTable",
         "{",
         "    internal const int SchemaVersion = 1;",
-        "    internal const int GeneratorVersion = 2;",
+        "    internal const int GeneratorVersion = 3;",
         f"    internal const string InventorySha256 = {_cs(inventory_sha256)};",
         "    internal static readonly IReadOnlyList<CompatPresetDefinition> Rows = Array.AsReadOnly(new CompatPresetDefinition[]",
         "    {",
@@ -358,7 +358,7 @@ def render(document: dict[str, Any], inventory_sha256: str) -> str:
         lines.extend(
             [
                 "        new CompatPresetDefinition(",
-                f'            new CompatPresetSourceFacts({_cs(row["id"])}, new string[] {{ {operations} }}, true, "served", new string[] {{ {dependencies} }}, {_cs(descriptor["factory"]["target"])}),',
+                f"            new CompatPresetSourceFacts({_cs(row['id'])}, new string[] {{ {operations} }}, {str(descriptor['honors_connection_settings']).lower()}, {_cs(descriptor['model_inventory'])}, new string[] {{ {dependencies} }}, {_cs(descriptor['factory']['target'])}),",
                 "            new CompatPresetGenerationRow(",
                 f"                {_cs(row['id'])}, {_cs(descriptor['display_name'])}, new string[] {{ {aliases} }}, "
                 + (
@@ -369,7 +369,7 @@ def render(document: dict[str, Any], inventory_sha256: str) -> str:
                 + f", {str(descriptor['requires_base_url']).lower()}, ProviderLocality.{locality},",
                 f"                {_setup_cs(descriptor['setup'])},",
                 f"                {_capabilities_cs(descriptor['default_capabilities'])},",
-                f"                new string[] {{ {ignored} }}, new OpenAICompatDialectOptions({_cs(preset['auth_header'])}, {str(preset['models_listing']).lower()}, {_cs(preset['output_tokens_field'])}), CompatPresetReasoningStyle.{style}, new InferenceOperation[] {{ InferenceOperation.Generation }}, ModelInventoryKind.{inventory})),",
+                f"                new string[] {{ {ignored} }}, new OpenAICompatDialectOptions({_cs(preset['auth_header'])}, {str(preset['models_listing']).lower()}, {_cs(preset['output_tokens_field'])}), CompatPresetReasoningStyle.{style}, new InferenceOperation[] {{ InferenceOperation.Generation }}, ModelInventoryKind.{inventory}, {str(descriptor['honors_connection_settings']).lower()})),",
             ]
         )
     lines.extend(["    });", "}", ""])

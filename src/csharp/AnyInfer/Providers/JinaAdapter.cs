@@ -25,7 +25,7 @@ internal sealed class JinaAdapter : IEmbedsText, IReranksText, IProviderLifecycl
     private readonly double _timeoutS;
     private int _disposed;
 
-    private JinaAdapter(ProviderConfig config)
+    private JinaAdapter(ProviderConfig config, CancellationToken cancellationToken)
     {
         _baseUrl = ParseBaseUrl(config.BaseUrl ?? DefaultBaseUrl);
         _apiKey = config.ApiKey;
@@ -33,14 +33,14 @@ internal sealed class JinaAdapter : IEmbedsText, IReranksText, IProviderLifecycl
         _headers = config.Headers.ToArray();
         ValidateHeaders(_headers);
         _timeoutS = config.TimeoutS;
-        _transport = new JinaHttpTransport(config.Transport, config.TimeoutS, config.TransportOwnedByPool);
+        _transport = new JinaHttpTransport(config, cancellationToken);
     }
 
     internal static IAsyncDisposable Create(ProviderConfig config, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(config);
-        try { return new JinaAdapter(config); }
+        try { return new JinaAdapter(config, cancellationToken); }
         catch (UriFormatException exception) { throw new ConfigException("The Jina provider configuration is invalid.", config.ProviderId, "The configured base URL is invalid.", nativeInner: exception); }
         catch (ArgumentException exception) { throw new ConfigException("The Jina provider configuration is invalid.", config.ProviderId, "The configured base URL or headers are invalid.", nativeInner: exception); }
     }

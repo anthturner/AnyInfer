@@ -29,6 +29,7 @@ does not claim provider or feature parity with Python.
 | explicit pricing, budgets, and ledger snapshots | `PricingCalculator`, `Budget(...)`, `SpendLedger`, and `SpendStore` |
 | request policy | `SpendPolicy`, `Route.ContextWindowTargets`, `CachePolicy`, and `ToolSpec` values |
 | `client.run_tools(...)` / `async_client.run_tools(...)` | `Client.RunTools(...)` / `AsyncClient.RunToolsAsync(...)` |
+| Provider proxy, TLS verification, and client certificate settings | `ProviderProxy`, `TlsVerification`, and `ClientCertificate` on `ProviderSettings` |
 
 Python cancellation uses task cancellation; C# accepts a `CancellationToken` on each async call.
 Python async clients and streams use `async with`; C# uses `await using` for the corresponding
@@ -53,6 +54,25 @@ that range, such as `1e70`, raises a controlled schema-evaluation exception.
 ```csharp
 --8<-- "examples/csharp-sdk/ConfigurationExample.cs"
 ```
+
+Connection settings can be serialized in version 1 configuration, including literal proxy
+credentials and client-key passwords. `ToString()` on the typed settings omits those values, but
+`Dumps()` preserves them. Treat the JSON as secret-bearing. The source-shared construction and
+round-trip example is deliberately inert and does not exercise TLS or load its illustrative PEM
+paths:
+
+```csharp
+--8<-- "examples/csharp-sdk/ConnectionExample.cs"
+```
+
+For SDK-created handlers, C# accepts an explicit HTTP(S) proxy; omitted verification uses platform
+defaults, `TlsVerification.Disabled` disables validation, and a PEM bundle replaces platform trust
+with custom roots. OpenSSL CA directories are unsupported. Native .NET chain building has
+platform-specific intermediate and explicit leaf-anchor behavior. A supplied handler controls its
+own proxy and TLS behavior, and the SDK does not load configured connection files for it. Automatic
+redirect parity with Python remains unfinished. On Windows, native TLS may use a temporary
+OS-managed user-key file for PEM client keys; the certificate is not added to the system store, and
+native references can defer normal cleanup after the SDK releases its handler and certificate.
 
 ## Metadata and lifecycle calls
 

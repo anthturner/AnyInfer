@@ -363,6 +363,17 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "ModelInventoryKind.Installed" in source
     assert "descriptor.ModelInventory != ModelInventoryKind.Served" in source
     assert "public model-inventory metadata failed" in source
+    assert "honorsConnectionSettings: false" in source
+    assert "!descriptor.HonorsConnectionSettings" in source
+    assert "connectionDisabledDescriptor.HonorsConnectionSettings" in source
+    assert "ProviderProxy.Parse(parsedProxyLiteral)" in source
+    assert 'TlsVerification.FromPemBundle(" non-existent-ca.pem ")' in source
+    assert "ClientCertificate.FromEncryptedPemPair(" in source
+    assert 'ClientCertificate.FromPemPair(" pair-cert.pem ", " pair-key.pem ")' in source
+    assert 'var connectionConfig = new ProviderConfig(settings, "demo", null);' in source
+    assert "AnyInferConfig.Loads(connectionDump, registry).Providers.Single()" in source
+    assert "public connection configuration projection failed" in source
+    assert "factoryCalls != 0" in source
     assert 'AsyncClient.FromAdapters([new ProviderRegistration("demo", adapter)])' in source
     assert 'GenerateAsync(messages, target: "demo:model")' in source
     assert 'StreamAsync("hello", target: "demo:model")' in source
@@ -474,7 +485,7 @@ def test_external_consumer_uses_public_sdk_catalog_capability_pricing_and_lifecy
     assert "using AnyInfer.Routing;" in source
     assert "using AnyInfer.Catalog;" in source
     assert "using AnyInfer.Schema;" in source
-    assert 'ProviderSettings.Of("demo", alias: "demo-instance")' in source
+    assert 'ProviderSettings.Of(\n    "demo",\n    alias: "demo-instance",' in source
     assert "new global::AnyInfer.Catalog.Catalog(" in source
     assert "new PricingTable(" in source
     assert 'new PricingEntry(\n            "demo-model",\n            new Pricing(' in source

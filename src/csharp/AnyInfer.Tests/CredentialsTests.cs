@@ -145,6 +145,19 @@ public sealed class CredentialsTests
     }
 
     [Fact]
+    public void Config_exception_safe_rendering_excludes_unregistered_native_path_while_preserving_identity()
+    {
+        var marker = $"unregistered-config-native-path-{Guid.NewGuid():N}";
+        var native = new FileNotFoundException($"missing {marker}", marker);
+        var failure = new ConfigException("Configuration material could not be read.", nativeInner: native);
+
+        Assert.Same(native, failure.NativeInner);
+        Assert.Same(native, failure.InnerException);
+        Assert.DoesNotContain(marker, failure.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(marker, failure.Snapshot().ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Error_safe_fields_and_message_only_snapshots_redact_registered_secrets()
     {
         var secret = $"sdk2-safe-Å😀-{Guid.NewGuid():N}";

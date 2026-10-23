@@ -97,6 +97,15 @@ an upstream contract claim without evidence, or pretending that unported feature
 - Retain `net8.0` and the existing pinned SDK for initial milestones. Do not promise new
   target frameworks or OS support without CI evidence. Package/runtime support policy is a
   distinct final SDK qualification decision, not an accidental metadata change.
+  > NOTE: On 2026-10-23, after trust/callback experiments exposed concrete differences,
+  > the user selected native .NET TLS: use platform certificate validation, document custom-
+  > trust differences from Python, and reject unsupported active settings. Do not reproduce
+  > the selected Python/OpenSSL verifier or add a separate crypto runtime for this slice.
+  > This permits a documented TLS semantic exception; it does not permit ignoring requested
+  > policy, accepting unrelated/invalid certificates, disabling hostname/EKU checks during
+  > enabled verification, or claiming new OS support without evidence. Python and frozen v0
+  > behavior remain unchanged. The bounded connection contract and implementation gates
+  > remain open; the earlier scratch probes are feasibility evidence only.
 - The proof's BCL-only limit is not an excuse to implement an incomplete general JSON
   Schema validator. When broader parity needs dependencies, select minimal native .NET
   libraries using official documentation, record license/size/semantic coverage, and update
@@ -1065,7 +1074,17 @@ generator byte equality, package/examples and Frozen DEVELOPMENT102 pass. Indepe
 evidence review is bounded clean; plan-only reconciliation is a separate later commit.
 The public default category is Served; inert rows explicitly project the source category
 without filtering discovery. Only connection settings remain pending in those definitions.
-Resume the native connection-settings contract and redirect parity, then researched registration.
+The bounded native connection implementation is in `ANYINFER_CSHARP_SDK_CONNECTION.md`.
+The user selected native .NET TLS with documented custom-trust limits on 2026-10-23.
+NCON.0 contract critique and NCON.1-5 source/control/docs reviews are bounded clean.
+Focused195/0/0 and full-third all25 pass:4492 Python passes/10 explicit platform skips,
+1051 native unit/93 conformance with zero skips, five paired profiles, strict docs,
+package/examples and explicit Frozen DEVELOPMENT102. All1260 protected inputs and Git
+identity stayed unchanged. Failed earlier attempts and capture-only corrections remain
+retained in the leaf. Executable checkpoint and clean qualification are still pending.
+The generated v3 source clears the approved-scope row pending list; this does not register
+providers or complete redirect parity. Resume from the leaf's first unchecked box. Redirect behavior remains
+a separate unfinished parity prerequisite after that leaf, then researched registration.
 Default registry remains four descriptors/seven bindings, with 122 operation memberships
 pending. Compiling data does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12
 and all 235 root API rows remain open.

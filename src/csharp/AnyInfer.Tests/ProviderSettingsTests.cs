@@ -94,6 +94,43 @@ public sealed class ProviderSettingsTests
     }
 
     [Fact]
+    public async Task Default_url_binding_copies_connection_values_without_materializing_them_before_iteration()
+    {
+        var calls = new List<ProviderConfig>();
+        var adapter = new RecordingAdapter();
+        var proxy = ProviderProxy.Parse("https://proxy-user:proxy-password@proxy.invalid:443/");
+        var verification = TlsVerification.FromPemBundle("not-loaded-before-factory.pem");
+        var certificate = ClientCertificate.FromPemFile("also-not-loaded-before-factory.pem");
+        var registry = new ProviderRegistry([
+            new ProviderDescriptor(
+                "fake-engine",
+                "Fake",
+                (config, _) =>
+                {
+                    calls.Add(config);
+                    return ValueTask.FromResult<IAsyncDisposable>(adapter);
+                },
+                defaultBaseUrl: "https://descriptor.example/v1"),
+        ]);
+        await using var client = new AsyncClient(
+            [ProviderSettings.Of("fake-engine", alias: "tenant", proxy: proxy, verify: verification, clientCertificate: certificate)],
+            registry,
+            route: new Route(["tenant:model"]));
+
+        var stream = client.StreamAsync("lazy");
+        Assert.Empty(calls);
+        Assert.Equal(0, adapter.GenerateCalls);
+
+        await stream.CollectAsync();
+
+        var bound = Assert.Single(calls);
+        Assert.Equal("https://descriptor.example/v1", bound.BaseUrl);
+        Assert.Same(proxy, bound.Proxy);
+        Assert.Same(verification, bound.Verify);
+        Assert.Same(certificate, bound.ClientCertificate);
+    }
+
+    [Fact]
     public async Task Unadvanced_post_close_streams_keep_collect_and_result_in_the_unready_state_while_manual_enumeration_is_empty()
     {
         var adapter = new RecordingAdapter();

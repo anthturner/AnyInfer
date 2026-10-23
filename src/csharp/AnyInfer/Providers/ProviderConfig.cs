@@ -26,6 +26,9 @@ public sealed record ProviderConfig
         TimeoutS = settings.TimeoutS;
         Transport = settings.Transport;
         Limits = settings.Limits;
+        Proxy = settings.Proxy;
+        Verify = settings.Verify;
+        ClientCertificate = settings.ClientCertificate;
     }
 
     /// <summary>Gets the configured provider-instance identity.</summary>
@@ -48,6 +51,12 @@ public sealed record ProviderConfig
     public HttpMessageHandler? Transport { get; }
     /// <summary>Gets optional client-side pacing limits for this configured instance.</summary>
     public RateLimits? Limits { get; }
+    /// <summary>Gets optional explicit proxy settings.</summary>
+    public ProviderProxy? Proxy { get; }
+    /// <summary>Gets optional non-default TLS verification settings.</summary>
+    public TlsVerification? Verify { get; }
+    /// <summary>Gets optional PEM client-certificate settings.</summary>
+    public ClientCertificate? ClientCertificate { get; }
     // Set only by an opted-in pool for a supplied handler that outlives transient adapters.
     internal bool TransportOwnedByPool { get; init; }
 
@@ -65,6 +74,9 @@ public sealed record ProviderConfig
         Options = source.Options;
         TimeoutS = source.TimeoutS;
         Limits = source.Limits;
+        Proxy = source.Proxy;
+        Verify = source.Verify;
+        ClientCertificate = source.ClientCertificate;
         Transport = transport;
         TransportOwnedByPool = transportOwnedByPool;
     }

@@ -16,6 +16,9 @@ property corresponds to Python `Text.text`.
 | `BatchPolicy`, `BatchFailure` | Core-managed bounded batching controls and the failures retained when a batch operation fails. |
 | `IEmbedsText`, `IReranksText`, `InferenceOperation` | Optional retrieval adapter protocols; the built-in TEI, Voyage, and Jina adapters declare embedding and rerank operations. |
 | `ProviderSettings` | Provider setup including an `env://` credential reference. |
+| `ProviderProxy`, `TlsVerification`, `ClientCertificate` | Explicit HTTP(S) proxy, SDK-handler TLS verification, and PEM client-certificate settings attached to `ProviderSettings`. |
+| `AnyInfer.Providers.ProviderDescriptor.HonorsConnectionSettings` | Descriptor metadata, defaulting to `true`, indicating whether the provider supports configured proxy, TLS, and client-certificate settings. |
+| `AnyInferConfig.Loads`, `AnyInferConfig.Dumps` | Parse and render bounded version 1 JSON; configured proxy credentials and certificate paths/passwords remain literal configuration values. |
 | `Route`, `Retry`, `Repair` | Routing, retry, and structured-output repair controls. |
 | `SchemaSpec`, `SchemaValidator`, `SchemaValidationOptions` | Modern schema specification, validation, and explicit resource controls. |
 | `Generation`, `Timing`, `Usage` | Buffered result, timing, and reported token usage. |
@@ -39,7 +42,21 @@ property corresponds to Python `Text.text`.
 | `RunManifest`, `ManifestUtilities` | Immutable per-call manifest values, serialization, schema, digest, and rendering helpers. |
 | `AttemptRecord.Timing`, `operationRoutes` | Per-attempt timing and optional retrieval-specific default routes on either client. |
 
-`AnyInfer.Providers.ProviderDescriptor` exposes get-only `ModelInventory`; its optional final `modelInventory` constructor argument defaults to `ModelInventoryKind.Served`. `Served` describes models exposed by an already-running engine; `Available` describes a catalog of models that could be run; `Installed` describes a provider-owned on-disk model store. This category is descriptive metadata, separate from model-listing support and the descriptor's implemented inference operations. Choosing a category does not filter discovered models, start a runtime, download models, or register a provider.
+`AnyInfer.Providers.ProviderDescriptor` exposes get-only `ModelInventory`; its optional `modelInventory` constructor argument defaults to `ModelInventoryKind.Served`. `Served` describes models exposed by an already-running engine; `Available` describes a catalog of models that could be run; `Installed` describes a provider-owned on-disk model store. This category is descriptive metadata, separate from model-listing support and the descriptor's implemented inference operations. Choosing a category does not filter discovered models, start a runtime, download models, or register a provider. The descriptor's get-only `HonorsConnectionSettings` value defaults to `true` and describes whether that provider supports configured connection settings.
+
+Connection settings apply to SDK-created handlers. With no `verify` value, platform certificate
+verification remains in effect; `TlsVerification.Disabled` turns it off, while a PEM bundle selects
+custom roots. Native .NET does not load OpenSSL CA directories, and intermediate or leaf trust
+anchor chain building can vary by platform. Client certificate factories accept combined
+unencrypted PEM, separate unencrypted certificate/key PEM, or encrypted-key PEM (including a
+same-path combined file). Material is loaded when a selected provider first creates its handler.
+A supplied handler owns its transport behavior and bypasses SDK proxy/TLS setup and material
+loading. `ToString()` on connection objects omits values; version 1 `Dumps()` keeps configured
+literals, so protect that output. Automatic redirect parity with Python is not complete.
+On Windows, native TLS may use a temporary OS-managed user-key file for PEM client keys; this does
+not add the certificate to the system certificate store. Native references can defer normal cleanup
+after the handler and certificate are released, so the SDK does not promise immediate deletion or
+memory-only storage.
 
 Configured `RateLimits` can pace normal provider HTTP inside the generation entry deadline. An
 own-transport descriptor, or an opaque prebuilt registration with an active injected limiter, uses

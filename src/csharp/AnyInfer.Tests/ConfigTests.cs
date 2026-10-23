@@ -149,6 +149,42 @@ public sealed class ConfigTests
         Assert.Equal(2, IntegerProperty(partialLimits, "max_concurrent"));
     }
 
+    [Fact]
+    public void Connection_settings_parse_round_trip_without_loading_material_and_keep_the_proxy_literal()
+    {
+        var literal = "https://proxy%20user:proxy%3Apassword@MiXeD.Proxy.invalid:443/";
+        var config = AnyInferConfig.Loads($$"""
+            {"providers":[{"id":"fake","proxy":" {{literal}} ","verify":" ca.pem ","client_cert":["cert.pem","key.pem","password"]}]}
+            """, Registry());
+        var settings = Assert.Single(config.Providers);
+
+        Assert.Equal("proxy user", settings.Proxy!.UserName);
+        Assert.Equal("proxy:password", settings.Proxy.Password);
+        Assert.Equal(literal, settings.Proxy.ConfigurationValue);
+        Assert.Equal("ca.pem", settings.Verify!.PemBundlePath);
+        Assert.Equal("cert.pem", settings.ClientCertificate!.CertificatePath);
+        Assert.Equal("key.pem", settings.ClientCertificate.PrivateKeyPath);
+        Assert.Equal("password", settings.ClientCertificate.Password);
+        Assert.Contains(literal, config.Dumps(), StringComparison.Ordinal);
+        var restored = Assert.Single(AnyInferConfig.Loads(config.Dumps(), Registry()).Providers);
+        Assert.Equal(settings.Proxy.ConfigurationValue, restored.Proxy!.ConfigurationValue);
+        Assert.Equal(settings.Verify.PemBundlePath, restored.Verify!.PemBundlePath);
+        Assert.Equal(settings.ClientCertificate.CertificatePath, restored.ClientCertificate!.CertificatePath);
+        Assert.Equal(settings.ClientCertificate.PrivateKeyPath, restored.ClientCertificate.PrivateKeyPath);
+        Assert.Equal(settings.ClientCertificate.Password, restored.ClientCertificate.Password);
+
+        var scalar = Assert.Single(AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"client_cert\":\" scalar.pem \"}]}", Registry()).Providers);
+        Assert.Equal("scalar.pem", scalar.ClientCertificate!.CertificatePath);
+        var literalParts = Assert.Single(AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"client_cert\":[\" cert.pem \",\" key.pem \",\" password \"]}]}", Registry()).Providers);
+        Assert.Equal(" cert.pem ", literalParts.ClientCertificate!.CertificatePath);
+        Assert.Equal(" key.pem ", literalParts.ClientCertificate.PrivateKeyPath);
+        Assert.Equal(" password ", literalParts.ClientCertificate.Password);
+
+        Assert.Null(Assert.Single(AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"verify\":true,\"client_cert\":null}]}", Registry()).Providers).Verify);
+        Assert.Throws<ConfigException>(() => AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"verify\":null}]}", Registry()));
+        Assert.Throws<ConfigException>(() => AnyInferConfig.Loads("{\"providers\":[{\"id\":\"fake\",\"proxy\":\"socks5://proxy.invalid\"}]}", Registry()));
+    }
+
     [Theory]
     [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":true}]}")]
     [InlineData("{\"providers\":[{\"id\":\"fake\",\"limits\":{\"unknown\":1}}]}")]

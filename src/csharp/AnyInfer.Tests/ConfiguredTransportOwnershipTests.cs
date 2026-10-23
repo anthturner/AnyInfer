@@ -154,6 +154,47 @@ public sealed class ConfiguredTransportOwnershipTests
         Assert.Equal(1, handler.DisposeCalls);
     }
 
+    [Fact]
+    public async Task Caller_cancellation_after_a_real_builtin_owned_handler_is_ready_discards_the_late_adapter()
+    {
+        await using var fixture = LoopbackConnectionFixture.Start();
+        var builtin = ProviderRegistry.CreateDefault().Get("openai-compat");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disposed = 0;
+        var descriptor = new ProviderDescriptor(
+            builtin.Id,
+            builtin.DisplayName,
+            async (config, token) =>
+            {
+                var adapter = (IProviderAdapter)await builtin.Factory(config, token);
+                entered.TrySetResult();
+                await release.Task;
+                return new ReadyTrackingAdapter(adapter, () => Interlocked.Increment(ref disposed));
+            },
+            defaultBaseUrl: fixture.OriginUri.ToString(),
+            requiresBaseUrl: true);
+        await using var client = new AsyncClient(
+            [ProviderSettings.Of(
+                "openai-compat",
+                fixture.OriginUri.ToString(),
+                "key",
+                verify: TlsVerification.FromPemBundle(fixture.CertificatePemPath))],
+            new ProviderRegistry([descriptor]));
+        using var caller = new CancellationTokenSource();
+
+        var pending = client.StreamAsync("late", target: "openai-compat:model", cancellationToken: caller.Token)
+            .CollectAsync(caller.Token);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        caller.Cancel();
+        release.TrySetResult();
+
+        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Assert.Equal(caller.Token, failure.CancellationToken);
+        Assert.Equal(1, disposed);
+        Assert.Equal(0, fixture.OriginRequests);
+    }
+
     private static ProviderDescriptor CooperativeDescriptor(Func<ProviderConfig, CancellationToken, ValueTask<IAsyncDisposable>> factory, bool poolOwnsTransport)
     {
         var builtin = ProviderRegistry.CreateDefault().Get("openai-compat");
@@ -213,6 +254,18 @@ public sealed class ConfiguredTransportOwnershipTests
         {
             DisposeCalls++;
             await inner.DisposeAsync();
+        }
+    }
+
+    private sealed class ReadyTrackingAdapter(IProviderAdapter inner, Action disposed) : IProviderAdapter
+    {
+        public IAsyncEnumerable<AdapterEvent> GenerateAsync(WireRequest request, CancellationToken cancellationToken = default) =>
+            inner.GenerateAsync(request, cancellationToken);
+
+        public async ValueTask DisposeAsync()
+        {
+            try { await inner.DisposeAsync(); }
+            finally { disposed(); }
         }
     }
 

@@ -90,6 +90,24 @@ public sealed class GovernedTransportTests
     }
 
     [Fact]
+    public async Task Governed_raw_transport_retains_the_owned_tls_configuration()
+    {
+        await using var fixture = LoopbackConnectionFixture.Start();
+        var settings = ProviderSettings.Of(
+            "openai-compat",
+            fixture.OriginUri.ToString(),
+            "key",
+            limits: new RateLimits(maxConcurrent: 1),
+            verify: TlsVerification.FromPemBundle(fixture.CertificatePemPath));
+        await using var client = new AsyncClient([settings], ProviderRegistry.CreateDefault());
+
+        await Assert.ThrowsAsync<AllTargetsFailedException>(() =>
+            client.GenerateAsync("governed", target: "openai-compat:model"));
+
+        Assert.Equal(1, fixture.OriginRequests);
+    }
+
+    [Fact]
     public async Task Governed_response_content_releases_the_permit_only_after_original_content_cleanup()
     {
         var firstContent = new TrackingContent();

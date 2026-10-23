@@ -67,13 +67,13 @@ public class AnyInferException : Exception
     /// <summary>Gets the redacted actionable hint, when supplied.</summary>
     public string? Hint { get; }
 
-    /// <summary>Gets the original native exception without wrapping or replacement.</summary>
+    /// <summary>Gets the original native exception without wrapping, replacement, or redaction.</summary>
     public Exception? NativeInner { get; }
 
     /// <summary>Creates a credential-safe immutable diagnostic summary.</summary>
     public ErrorInfo Snapshot() => new(GetType().Name, Provider, Phase, Retryable, HttpStatus, Bound(Detail ?? Message));
 
-    /// <summary>Returns a rendered exception chain with registered secrets removed.</summary>
+    /// <summary>Returns a rendered exception description with registered secrets removed.</summary>
     public override string ToString() => Redaction.Redact(base.ToString());
 
     private static string Sanitize(string value)
@@ -145,6 +145,9 @@ public sealed class ConfigException : AnyInferException
         : base(message, "config", false, "configure", null, null, provider, detail, hint, nativeInner)
     {
     }
+
+    /// <summary>Returns only the redacted outer configuration failure and never renders a native exception chain.</summary>
+    public override string ToString() => $"{GetType().FullName}: {Redaction.Redact(Message)}";
 }
 
 /// <summary>Represents an unavailable or invalid credential reference.</summary>

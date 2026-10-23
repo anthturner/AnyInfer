@@ -15,17 +15,12 @@ internal sealed record CompatPresetSourceFacts
     {
         Id = ProviderSettings.NormalizeId(id, nameof(id));
         SourceOperations = CopySourceOperations(sourceOperations);
-        if (!sourceHonorsConnectionSettings)
-        {
-            throw new ArgumentException("Compatibility preset source facts must retain connection-settings support.", nameof(sourceHonorsConnectionSettings));
-        }
-
         if (!string.Equals(sourceModelInventory, "served", StringComparison.Ordinal))
         {
             throw new ArgumentException("Compatibility preset source facts must retain served model inventory.", nameof(sourceModelInventory));
         }
 
-        SourceHonorsConnectionSettings = true;
+        SourceHonorsConnectionSettings = sourceHonorsConnectionSettings;
         SourceModelInventory = sourceModelInventory;
         ContractDependencies = Copy(contractDependencies, nameof(contractDependencies));
         ArgumentException.ThrowIfNullOrEmpty(sourceFactoryTarget);
@@ -90,7 +85,8 @@ internal sealed record CompatPresetGenerationRow
         OpenAICompatDialectOptions dialect,
         CompatPresetReasoningStyle reasoningStyle,
         IEnumerable<InferenceOperation> implementedOperations,
-        ModelInventoryKind modelInventory)
+        ModelInventoryKind modelInventory,
+        bool honorsConnectionSettings)
     {
         ArgumentNullException.ThrowIfNull(setup);
         ArgumentNullException.ThrowIfNull(defaultCapabilities);
@@ -122,7 +118,8 @@ internal sealed record CompatPresetGenerationRow
             operations: operations,
             reasoningTranslator: effort => CompatPresetReasoning.Translate(reasoningStyle, effort),
             ignoredParameters: copiedIgnoredParameters,
-            modelInventory: modelInventory)
+            modelInventory: modelInventory,
+            honorsConnectionSettings: honorsConnectionSettings)
         {
             PoolOwnsConfiguredTransport = true,
         };
@@ -174,7 +171,12 @@ internal sealed record CompatPresetDefinition
             throw new ArgumentException("Compatibility preset source and generation model inventory must agree.", nameof(generation));
         }
 
-        PendingNativeParity = Array.AsReadOnly(new[] { "connection-settings" });
+        if (Source.SourceHonorsConnectionSettings != Generation.Descriptor.HonorsConnectionSettings)
+        {
+            throw new ArgumentException("Compatibility preset source and generation connection-settings support must agree.", nameof(generation));
+        }
+
+        PendingNativeParity = Array.AsReadOnly(Array.Empty<string>());
     }
 
     internal CompatPresetSourceFacts Source { get; }

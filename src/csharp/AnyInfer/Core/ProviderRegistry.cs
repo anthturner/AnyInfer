@@ -103,16 +103,19 @@ internal sealed class ProviderPool : IAsyncDisposable
             var boundSettings = executionId == supplied.InstanceId
                 ? supplied
                 : ProviderSettings.Of(
-                    descriptor.Id,
-                    supplied.BaseUrl,
-                    supplied.ApiKey,
-                    supplied.ApiVersion,
-                    supplied.Headers,
-                    supplied.Options,
-                    supplied.TimeoutS,
-                    supplied.Transport,
-                    supplied.Alias,
-                    supplied.Limits);
+                    providerId: descriptor.Id,
+                    baseUrl: supplied.BaseUrl,
+                    apiKey: supplied.ApiKey,
+                    apiVersion: supplied.ApiVersion,
+                    headers: supplied.Headers,
+                    options: supplied.Options,
+                    timeoutS: supplied.TimeoutS,
+                    transport: supplied.Transport,
+                    alias: supplied.Alias,
+                    limits: supplied.Limits,
+                    proxy: supplied.Proxy,
+                    verify: supplied.Verify,
+                    clientCertificate: supplied.ClientCertificate);
             if (!_instances.TryAdd(executionId, InstanceState.FromSettings(executionId, descriptor, boundSettings)))
             {
                 throw ConfigurationError(executionId, "Provider instances must have unique canonical identities.");
@@ -539,8 +542,25 @@ internal sealed class ProviderPool : IAsyncDisposable
         }
 
         var boundSettings = settings.BaseUrl is null && descriptor.DefaultBaseUrl is not null
-            ? ProviderSettings.Of(settings.ProviderId, descriptor.DefaultBaseUrl, settings.ApiKey, settings.ApiVersion, settings.Headers, settings.Options, settings.TimeoutS, settings.Transport, settings.Alias, settings.Limits)
+            ? ProviderSettings.Of(
+                providerId: settings.ProviderId,
+                baseUrl: descriptor.DefaultBaseUrl,
+                apiKey: settings.ApiKey,
+                apiVersion: settings.ApiVersion,
+                headers: settings.Headers,
+                options: settings.Options,
+                timeoutS: settings.TimeoutS,
+                transport: settings.Transport,
+                alias: settings.Alias,
+                limits: settings.Limits,
+                proxy: settings.Proxy,
+                verify: settings.Verify,
+                clientCertificate: settings.ClientCertificate)
             : settings;
+        if (settings.Transport is null && boundSettings.HasActiveConnectionSettings && !descriptor.HonorsConnectionSettings)
+        {
+            throw ConfigurationError(settings.InstanceId, "This provider does not support SDK-owned connection settings.");
+        }
         var resolvedKey = await resolver.ResolveAsync(boundSettings.ApiKey, cancellationToken).ConfigureAwait(false);
         ThrowPoolOwnedCancellation(callerIdentity, cancellationToken, cancelledParentToken);
         var apiKeyField = descriptor.Setup.Fields.SingleOrDefault(static field => field.Key == "api_key");
@@ -568,7 +588,7 @@ internal sealed class ProviderPool : IAsyncDisposable
         var pacing = GetPacing(state);
         if (pacing.Limiter is not null && !pacing.UsesOuterSlot)
         {
-            var (rawTransport, ownsRawTransport, transfersRaw) = CreateRawTransport(boundSettings, descriptor);
+            var (rawTransport, ownsRawTransport, transfersRaw) = CreateRawTransport(config, descriptor, cancellationToken);
             governedHandler = new GovernedHttpMessageHandler(rawTransport, pacing.Limiter, ownsRawTransport);
             config = config.WithTransport(governedHandler, transportOwnedByPool: false);
             transfersRawTransport = transfersRaw;
@@ -795,20 +815,21 @@ internal sealed class ProviderPool : IAsyncDisposable
     }
 
     private static (HttpMessageHandler Transport, bool OwnsTransport, bool TransfersTransport) CreateRawTransport(
-        ProviderSettings settings,
-        ProviderDescriptor descriptor)
+        ProviderConfig config,
+        ProviderDescriptor descriptor,
+        CancellationToken cancellationToken)
     {
-        if (settings.Transport is null)
+        if (config.Transport is null)
         {
-            return (new HttpClientHandler { AllowAutoRedirect = false }, true, false);
+            return (ConnectionHandlerFactory.CreateOwned(config, cancellationToken), true, false);
         }
 
         if (descriptor.PoolOwnsConfiguredTransport)
         {
-            return (settings.Transport, false, false);
+            return (config.Transport, false, false);
         }
 
-        return (settings.Transport, true, true);
+        return (config.Transport, true, true);
     }
 
     private static IReadOnlyDictionary<string, RateLimiter> CopyLimiters(

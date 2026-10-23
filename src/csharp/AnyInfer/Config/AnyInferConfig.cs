@@ -417,7 +417,13 @@ public sealed class AnyInferConfig
         var headers = ParseHeaders(GetOrDefault(raw, "headers", new JsonObject([])), source, location);
         var timeout = ParseTimeout(GetOrDefault(raw, "timeout_s", new JsonNumber(120)), source, location);
         var limits = ParseLimits(GetOrDefault(raw, "limits", JsonNull.Instance), source, location);
-        ValidateInactiveConnectionSettings(raw, source, location);
+        var proxy = ParseProxy(raw, source, location);
+        var verify = ParseVerify(raw, source, location);
+        var clientCertificate = ParseClientCertificate(raw, source, location);
+        if (!descriptor.HonorsConnectionSettings && (proxy is not null || verify is not null || clientCertificate is not null))
+        {
+            throw Fail(source, $"{location} does not support connection settings.");
+        }
         if (descriptor.RequiresBaseUrl && string.IsNullOrEmpty(baseUrl) && string.IsNullOrEmpty(descriptor.DefaultBaseUrl))
         {
             throw Fail(source, $"{location} requires base_url.");
@@ -446,7 +452,10 @@ public sealed class AnyInferConfig
             mergedOptions.Properties.Count == 0 ? null : mergedOptions,
             timeout,
             alias: instanceId == ProviderRegistry.NormalizeProviderId(engine) ? null : instanceId,
-            limits: limits);
+            limits: limits,
+            proxy: proxy,
+            verify: verify,
+            clientCertificate: clientCertificate);
     }
 
     private static CachePolicy? ParseCache(JsonValue value, string source)
@@ -641,6 +650,27 @@ public sealed class AnyInferConfig
             properties.Add(new JsonProperty("limits", LimitsJson(settings.Limits)));
         }
 
+        if (settings.Proxy is not null)
+        {
+            properties.Add(new JsonProperty("proxy", new JsonString(settings.Proxy.ConfigurationValue)));
+        }
+
+        if (settings.Verify is not null)
+        {
+            properties.Add(new JsonProperty("verify", settings.Verify.PemBundlePath is null
+                ? new JsonBoolean(false)
+                : new JsonString(settings.Verify.PemBundlePath)));
+        }
+
+        if (settings.ClientCertificate is { } certificate)
+        {
+            properties.Add(new JsonProperty("client_cert", certificate.PrivateKeyPath is null
+                ? new JsonString(certificate.CertificatePath)
+                : new JsonArray(certificate.Password is null
+                    ? [new JsonString(certificate.CertificatePath), new JsonString(certificate.PrivateKeyPath)]
+                    : [new JsonString(certificate.CertificatePath), new JsonString(certificate.PrivateKeyPath), new JsonString(certificate.Password)])));
+        }
+
         return new JsonObject(properties);
     }
 
@@ -791,19 +821,65 @@ public sealed class AnyInferConfig
         return timeout;
     }
 
-    private static void ValidateInactiveConnectionSettings(JsonObject raw, string source, string location)
+    private static ProviderProxy? ParseProxy(JsonObject raw, string source, string location)
     {
-        foreach (var name in new[] { "proxy", "client_cert" })
+        if (!raw.TryGetValue("proxy", out var value) || value is JsonNull)
         {
-            if (raw.TryGetValue(name, out var value) && value is not JsonNull)
-            {
-                throw Fail(source, $"{location}.{name} is not implemented in this SDK phase.");
-            }
+            return null;
         }
 
-        if (raw.TryGetValue("verify", out var verify) && verify is not JsonNull && (verify is not JsonBoolean boolean || !boolean.Value))
+        if (value is not JsonString text || string.IsNullOrWhiteSpace(text.Value))
         {
-            throw Fail(source, $"{location}.verify is not implemented in this SDK phase.");
+            throw Fail(source, $"{location}.proxy must be a nonblank string.");
+        }
+
+        try { return ProviderProxy.Parse(text.Value); }
+        catch (ArgumentException exception) { throw Fail(source, $"{location}.proxy is invalid.", exception); }
+    }
+
+    private static TlsVerification? ParseVerify(JsonObject raw, string source, string location)
+    {
+        if (!raw.TryGetValue("verify", out var value) || value is JsonBoolean { Value: true })
+        {
+            return null;
+        }
+
+        if (value is JsonBoolean { Value: false })
+        {
+            return TlsVerification.Disabled;
+        }
+
+        if (value is JsonString text && !string.IsNullOrWhiteSpace(text.Value))
+        {
+            try { return TlsVerification.FromPemBundle(text.Value); }
+            catch (ArgumentException exception) { throw Fail(source, $"{location}.verify is invalid.", exception); }
+        }
+
+        throw Fail(source, $"{location}.verify must be true, false, or a nonblank string.");
+    }
+
+    private static ClientCertificate? ParseClientCertificate(JsonObject raw, string source, string location)
+    {
+        if (!raw.TryGetValue("client_cert", out var value) || value is JsonNull)
+        {
+            return null;
+        }
+
+        try
+        {
+            return value switch
+            {
+                JsonString { Value: var path } when !string.IsNullOrWhiteSpace(path) => ClientCertificate.FromPemFile(path.Trim()),
+                JsonArray { Items.Count: 2 } pair when pair.Items[0] is JsonString first && pair.Items[1] is JsonString second
+                    && !string.IsNullOrWhiteSpace(first.Value) && !string.IsNullOrWhiteSpace(second.Value) => ClientCertificate.FromPemPair(first.Value, second.Value),
+                JsonArray { Items.Count: 3 } triple when triple.Items[0] is JsonString first && triple.Items[1] is JsonString second && triple.Items[2] is JsonString password
+                    && !string.IsNullOrWhiteSpace(first.Value) && !string.IsNullOrWhiteSpace(second.Value) && password.Value.Length != 0 => ClientCertificate.FromEncryptedPemPair(first.Value, second.Value, password.Value),
+                _ => throw Fail(source, $"{location}.client_cert must be a nonblank string or a two/three-string array."),
+            };
+        }
+        catch (ArgumentException exception)
+        {
+            throw Fail(source, $"{location}.client_cert is invalid.", exception);
         }
     }
 

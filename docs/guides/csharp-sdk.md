@@ -36,6 +36,42 @@ automatically. Resolution occurs only when the client first needs it.
 --8<-- "examples/csharp-sdk/SettingsExample.cs"
 ```
 
+## Configure provider connections
+
+`ProviderSettings` can carry an explicit HTTP(S) proxy, TLS verification mode, and PEM client
+certificate for SDK-created handlers. The example below demonstrates immutable construction and
+version 1 JSON round-tripping only; its illustrative paths are not loaded. `ToString()` omits
+connection values, while `AnyInferConfig.Dumps()` preserves configured literals, including proxy
+credentials and a client-key password. Protect that JSON as a secret-bearing configuration file.
+In version 1 JSON, `proxy` is the literal proxy URI, `verify` is omitted or `true` for platform
+defaults, `false` to disable verification, or a PEM bundle path; `client_cert` is a combined PEM
+path or a two/three-item array for certificate path, key path, and optional key password.
+
+```csharp
+--8<-- "examples/csharp-sdk/ConnectionExample.cs"
+```
+
+An omitted `verify` setting uses the platform default trust behavior. `TlsVerification.Disabled`
+explicitly disables server certificate verification. `TlsVerification.FromPemBundle(path)` uses
+that PEM file as custom trust roots; it does not augment the platform roots. Configure root CA
+certificates in the bundle. The native .NET implementation does not accept OpenSSL CA directories;
+the platform chain engine determines intermediate-certificate and leaf-anchor handling. C# does
+not reproduce Python/OpenSSL partial-chain behavior.
+
+`ClientCertificate.FromPemFile` reads a combined unencrypted certificate/key PEM. `FromPemPair`
+reads separate unencrypted certificate and key files. `FromEncryptedPemPair` reads a certificate
+file and encrypted private-key file with its password; the two paths may name the same combined
+file. File access and parsing occur only when the selected provider first needs an SDK-created
+handler, and failures are reported then. A caller-supplied `HttpMessageHandler` takes ownership
+of connection behavior: SDK proxy/TLS settings are bypassed, and the SDK does not load their
+configured files. Automatic redirects remain disabled; matching Python redirect behavior is not
+implemented in this C# proof.
+
+On Windows, native TLS may back a PEM client private key with a temporary OS-managed user-key
+file; the SDK does not add the certificate to the system certificate store. Releasing the handler
+and certificate releases SDK references, but native references can defer normal key-file cleanup.
+The SDK does not promise memory-only storage or immediate file deletion.
+
 ## Generate text
 
 `GenerationExample.RunAsync` shows buffered text generation. It takes explicit settings, target,

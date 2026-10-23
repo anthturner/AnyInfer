@@ -20,7 +20,7 @@ internal sealed class VoyageAdapter : IEmbedsText, IReranksText, IProviderLifecy
     private readonly double _timeoutS;
     private int _disposed;
 
-    private VoyageAdapter(ProviderConfig config)
+    private VoyageAdapter(ProviderConfig config, CancellationToken cancellationToken)
     {
         _baseUrl = ParseBaseUrl(config.BaseUrl ?? DefaultBaseUrl);
         _apiKey = config.ApiKey;
@@ -28,14 +28,14 @@ internal sealed class VoyageAdapter : IEmbedsText, IReranksText, IProviderLifecy
         _headers = config.Headers.ToArray();
         ValidateHeaders(_headers);
         _timeoutS = config.TimeoutS;
-        _transport = new VoyageHttpTransport(config.Transport, config.TimeoutS, config.TransportOwnedByPool);
+        _transport = new VoyageHttpTransport(config, cancellationToken);
     }
 
     internal static IAsyncDisposable Create(ProviderConfig config, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(config);
-        try { return new VoyageAdapter(config); }
+        try { return new VoyageAdapter(config, cancellationToken); }
         catch (UriFormatException exception) { throw new ConfigException("The Voyage provider configuration is invalid.", config.ProviderId, "The configured base URL is invalid.", nativeInner: exception); }
         catch (ArgumentException exception) { throw new ConfigException("The Voyage provider configuration is invalid.", config.ProviderId, "The configured base URL or headers are invalid.", nativeInner: exception); }
     }

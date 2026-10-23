@@ -21,6 +21,7 @@ static async Task VerifyAsync()
 
     var displayedSettings = SettingsExample.Create(baseUrl);
     Require(displayedSettings.ProviderId == "openai-compat", "Settings example did not produce the expected provider.");
+    Require(ConnectionExample.VerifyRoundTrip(), "Connection settings example did not round-trip its inert values.");
 
     var pureFactoryCalls = 0;
     var pureRegistry = new ProviderRegistry(
@@ -354,7 +355,11 @@ static ProviderSettings WithTransport(ProviderSettings source, HttpMessageHandle
         source.Options,
         source.TimeoutS,
         transport,
-        source.Alias);
+        source.Alias,
+        source.Limits,
+        source.Proxy,
+        source.Verify,
+        source.ClientCertificate);
 
 static ProviderRegistry BuiltinRegistry(HttpMessageHandler transport)
 {

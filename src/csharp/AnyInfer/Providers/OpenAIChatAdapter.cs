@@ -34,14 +34,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         OpenAICompatDialectOptions? dialect = null)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
-        if (!baseUrl.IsAbsoluteUri ||
-            baseUrl.Scheme is not ("http" or "https") ||
-            !string.IsNullOrEmpty(baseUrl.UserInfo) ||
-            !string.IsNullOrEmpty(baseUrl.Query) ||
-            !string.IsNullOrEmpty(baseUrl.Fragment))
-        {
-            throw new ArgumentException("The OpenAI-compatible base URL must be an absolute HTTP(S) URL without userinfo, query, or fragment.", nameof(baseUrl));
-        }
+        ValidateBaseUrl(baseUrl, nameof(baseUrl));
 
         _endpoint = BuildEndpoint(baseUrl, "chat/completions");
         _modelsEndpoint = BuildEndpoint(baseUrl, "models");
@@ -52,10 +45,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             .ToArray();
         _timeout = TimeSpan.FromSeconds(timeoutS);
         _dialect = dialect ?? new OpenAICompatDialectOptions();
-        var ownedHandler = handler ?? new HttpClientHandler
-        {
-            AllowAutoRedirect = false,
-        };
+        var ownedHandler = handler ?? ConnectionHandlerFactory.CreateDefault(CancellationToken.None);
         _client = new HttpClient(ownedHandler, disposeHandler: handler is null || !handlerOwnedByPool)
         {
             Timeout = Timeout.InfiniteTimeSpan,
@@ -87,16 +77,31 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
             detail: "A base URL is required.");
         try
         {
+            var parsedBaseUrl = new Uri(baseUrl, UriKind.Absolute);
+            ValidateBaseUrl(parsedBaseUrl, nameof(baseUrl));
             ValidateHeaders(config.Headers);
-            return new OpenAIChatAdapter(
-                new Uri(baseUrl, UriKind.Absolute),
-                config.ApiKey,
-                config.Headers,
-                config.Transport,
-                config.ProviderId,
-                config.TimeoutS,
-                config.TransportOwnedByPool,
-                dialect);
+            var handler = config.Transport ?? ConnectionHandlerFactory.CreateOwned(config, cancellationToken);
+            try
+            {
+                return new OpenAIChatAdapter(
+                    parsedBaseUrl,
+                    config.ApiKey,
+                    config.Headers,
+                    handler,
+                    config.ProviderId,
+                    config.TimeoutS,
+                    config.Transport is not null && config.TransportOwnedByPool,
+                    dialect);
+            }
+            catch
+            {
+                if (config.Transport is null)
+                {
+                    handler.Dispose();
+                }
+
+                throw;
+            }
         }
         catch (UriFormatException exception)
         {
@@ -113,6 +118,18 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 config.ProviderId,
                 "The configured base URL or headers are invalid.",
                 nativeInner: exception);
+        }
+    }
+
+    private static void ValidateBaseUrl(Uri baseUrl, string parameterName)
+    {
+        if (!baseUrl.IsAbsoluteUri ||
+            baseUrl.Scheme is not ("http" or "https") ||
+            !string.IsNullOrEmpty(baseUrl.UserInfo) ||
+            !string.IsNullOrEmpty(baseUrl.Query) ||
+            !string.IsNullOrEmpty(baseUrl.Fragment))
+        {
+            throw new ArgumentException("The OpenAI-compatible base URL must be an absolute HTTP(S) URL without userinfo, query, or fragment.", parameterName);
         }
     }
 

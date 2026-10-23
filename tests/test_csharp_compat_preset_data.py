@@ -38,7 +38,7 @@ def test_current_inventory_projects_only_sorted_compat_rows_and_deterministic_so
     assert "CompatPresetTableSupport" not in rendered
     assert "new ProviderSetupSpec(" in rendered
     assert "new ModelCapabilities(" in rendered
-    assert "internal const int GeneratorVersion = 2;" in rendered
+    assert "internal const int GeneratorVersion = 3;" in rendered
     assert "ModelInventoryKind.Served" in rendered
     output = tmp_path / "CompatPresetTable.g.cs"
     output.write_bytes(rendered.encode("utf-8"))
@@ -134,6 +134,20 @@ def test_projection_rejects_closed_source_fact_and_factory_drift(generator) -> N
         ] = non_served
         with pytest.raises(ValueError, match="compat source inventory must remain served"):
             generator.project(served_only)
+
+    connection = copy.deepcopy(document)
+    next(item for item in connection["providers"] if item["id"] == row["id"])["descriptor"][
+        "honors_connection_settings"
+    ] = "true"
+    with pytest.raises(ValueError, match="connection source fact"):
+        generator.project(connection)
+
+    unsupported = copy.deepcopy(document)
+    next(item for item in unsupported["providers"] if item["id"] == row["id"])["descriptor"][
+        "honors_connection_settings"
+    ] = False
+    rendered = generator.render(unsupported, generator.load_inventory(INVENTORY)[1])
+    assert "ModelInventoryKind.Served, false" in rendered
 
 
 def test_render_rejects_unknown_reasoning_feature_provenance_and_non_neutral_capability(

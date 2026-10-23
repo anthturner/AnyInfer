@@ -344,12 +344,54 @@ var installedInventoryDescriptor = new ProviderDescriptor(
     "Installed inventory",
     (_, _) => throw new InvalidOperationException("metadata must not construct an adapter"),
     modelInventory: ModelInventoryKind.Installed);
+var connectionDisabledDescriptor = new ProviderDescriptor(
+    "connection-disabled",
+    "Connection disabled",
+    (_, _) => throw new InvalidOperationException("metadata must not construct an adapter"),
+    honorsConnectionSettings: false);
 if (descriptor.ModelInventory != ModelInventoryKind.Served
     || availableInventoryDescriptor.ModelInventory != ModelInventoryKind.Available
-    || installedInventoryDescriptor.ModelInventory != ModelInventoryKind.Installed)
+    || installedInventoryDescriptor.ModelInventory != ModelInventoryKind.Installed
+    || !descriptor.HonorsConnectionSettings
+    || connectionDisabledDescriptor.HonorsConnectionSettings)
     throw new InvalidOperationException("public model-inventory metadata failed");
 var registry = new ProviderRegistry([descriptor]);
-var settings = ProviderSettings.Of("demo", alias: "demo-instance");
+var parsedProxyLiteral = "  https://user%20name:shortpw@Proxy.Example:443/  ";
+var parsedProxy = ProviderProxy.Parse(parsedProxyLiteral);
+var encryptedCertificate = ClientCertificate.FromEncryptedPemPair(
+    " non-existent-cert.pem ", " non-existent-key.pem ", "shortpw");
+var pairCertificate = ClientCertificate.FromPemPair(" pair-cert.pem ", " pair-key.pem ");
+var settings = ProviderSettings.Of(
+    "demo",
+    alias: "demo-instance",
+    proxy: parsedProxy,
+    verify: TlsVerification.FromPemBundle(" non-existent-ca.pem "),
+    clientCertificate: encryptedCertificate);
+var connectionConfig = new ProviderConfig(settings, "demo", null);
+var connectionDump = new AnyInferConfig([settings]).Dumps();
+var roundTrippedConnection = AnyInferConfig.Loads(connectionDump, registry).Providers.Single();
+if (parsedProxy.Address.UserInfo.Length != 0
+    || parsedProxy.UserName != "user name"
+    || parsedProxy.Password != "shortpw"
+    || settings.Proxy != parsedProxy
+    || settings.Verify?.PemBundlePath != "non-existent-ca.pem"
+    || settings.ClientCertificate?.CertificatePath != " non-existent-cert.pem "
+    || settings.ClientCertificate?.PrivateKeyPath != " non-existent-key.pem "
+    || settings.ClientCertificate?.Password != "shortpw"
+    || pairCertificate.CertificatePath != " pair-cert.pem "
+    || pairCertificate.PrivateKeyPath != " pair-key.pem "
+    || connectionConfig.Proxy != parsedProxy
+    || connectionConfig.Verify != settings.Verify
+    || connectionConfig.ClientCertificate != encryptedCertificate
+    || roundTrippedConnection.Proxy?.Address.Host != "proxy.example"
+    || roundTrippedConnection.ClientCertificate?.Password != "shortpw"
+    || !connectionDump.Contains(
+        "https://user%20name:shortpw@Proxy.Example:443/", StringComparison.Ordinal)
+    || !connectionDump.Contains("non-existent-key.pem", StringComparison.Ordinal)
+    || parsedProxy.ToString().Contains("shortpw", StringComparison.Ordinal)
+    || encryptedCertificate.ToString().Contains("shortpw", StringComparison.Ordinal)
+    || connectionConfig.ToString().Contains("shortpw", StringComparison.Ordinal))
+    throw new InvalidOperationException("public connection configuration projection failed");
 var catalog = new global::AnyInfer.Catalog.Catalog(
     aliases: new Dictionary<string, AliasEntry>
     {

@@ -18,7 +18,10 @@ public sealed record ProviderSettings
         double timeoutS = 120,
         HttpMessageHandler? transport = null,
         string? alias = null,
-        RateLimits? limits = null)
+        RateLimits? limits = null,
+        ProviderProxy? proxy = null,
+        TlsVerification? verify = null,
+        ClientCertificate? clientCertificate = null)
     {
         ProviderId = NormalizeId(providerId, nameof(providerId));
         Alias = alias is null ? null : NormalizeId(alias, nameof(alias));
@@ -35,6 +38,9 @@ public sealed record ProviderSettings
         TimeoutS = timeoutS;
         Transport = transport;
         Limits = limits;
+        Proxy = proxy;
+        Verify = verify;
+        ClientCertificate = clientCertificate;
     }
 
     /// <summary>Gets the canonical descriptor identifier.</summary>
@@ -57,8 +63,16 @@ public sealed record ProviderSettings
     public string? Alias { get; }
     /// <summary>Gets optional client-side pacing limits for this configured instance.</summary>
     public RateLimits? Limits { get; }
+    /// <summary>Gets optional explicit proxy settings for SDK-created transports.</summary>
+    public ProviderProxy? Proxy { get; }
+    /// <summary>Gets optional non-default TLS verification settings for SDK-created transports.</summary>
+    public TlsVerification? Verify { get; }
+    /// <summary>Gets optional PEM client-certificate settings for SDK-created transports.</summary>
+    public ClientCertificate? ClientCertificate { get; }
     /// <summary>Gets the canonical configured-instance identity.</summary>
     public string InstanceId => Alias ?? ProviderId;
+
+    internal bool HasActiveConnectionSettings => Proxy is not null || Verify is not null || ClientCertificate is not null;
 
     /// <summary>Creates immutable settings for one configured provider instance.</summary>
     public static ProviderSettings Of(
@@ -71,8 +85,11 @@ public sealed record ProviderSettings
         double timeoutS = 120,
         HttpMessageHandler? transport = null,
         string? alias = null,
-        RateLimits? limits = null) =>
-        new(providerId, baseUrl, apiKey, apiVersion, headers, options, timeoutS, transport, alias, limits);
+        RateLimits? limits = null,
+        ProviderProxy? proxy = null,
+        TlsVerification? verify = null,
+        ClientCertificate? clientCertificate = null) =>
+        new(providerId, baseUrl, apiKey, apiVersion, headers, options, timeoutS, transport, alias, limits, proxy, verify, clientCertificate);
 
     public override string ToString() => $"ProviderSettings({InstanceId})";
 

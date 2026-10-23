@@ -33,7 +33,8 @@ public sealed record ProviderDescriptor
         Func<string?, JsonObject>? reasoningTranslator = null,
         IEnumerable<string>? ignoredParameters = null,
         IEnumerable<string>? serverTools = null,
-        ModelInventoryKind modelInventory = ModelInventoryKind.Served)
+        ModelInventoryKind modelInventory = ModelInventoryKind.Served,
+        bool honorsConnectionSettings = true)
     {
         Id = ProviderSettings.NormalizeId(id, nameof(id));
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -103,6 +104,7 @@ public sealed record ProviderDescriptor
         }
 
         ModelInventory = modelInventory;
+        HonorsConnectionSettings = honorsConnectionSettings;
     }
 
     /// <summary>Gets the canonical provider descriptor ID.</summary>
@@ -155,6 +157,8 @@ public sealed record ProviderDescriptor
     public IReadOnlySet<string> ServerTools { get; }
     /// <summary>Gets the descriptive category of model inventory this descriptor exposes.</summary>
     public ModelInventoryKind ModelInventory { get; }
+    /// <summary>Gets whether this descriptor honors SDK-owned connection settings.</summary>
+    public bool HonorsConnectionSettings { get; }
     // Cooperative factory contract: only the pool disposes an opted-in configured handler.
     internal bool PoolOwnsConfiguredTransport { get; init; }
 

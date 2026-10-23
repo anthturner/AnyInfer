@@ -26,7 +26,7 @@ public sealed class CompatPresetDataTests
         var expected = ReadCompatRows(bytes);
 
         Assert.Equal(1, CompatPresetTable.SchemaVersion);
-        Assert.Equal(2, CompatPresetTable.GeneratorVersion);
+        Assert.Equal(3, CompatPresetTable.GeneratorVersion);
         Assert.Equal(InventorySha256, CompatPresetTable.InventorySha256);
         Assert.Equal(expected.Select(static row => row.Id).OrderBy(static id => id, StringComparer.Ordinal),
             CompatPresetTable.Rows.Select(static row => row.Source.Id));
@@ -43,12 +43,13 @@ public sealed class CompatPresetDataTests
             Assert.Equal(source.Locality, descriptor.Locality.ToString().ToLowerInvariant());
             Assert.Equal(source.ContractDependencies, actual.Source.ContractDependencies);
             Assert.Equal(source.SourceOperations.OrderBy(static operation => operation, StringComparer.Ordinal), actual.Source.SourceOperations);
-            Assert.True(actual.Source.SourceHonorsConnectionSettings);
+            Assert.Equal(source.HonorsConnectionSettings, actual.Source.SourceHonorsConnectionSettings);
+            Assert.Equal(source.HonorsConnectionSettings, descriptor.HonorsConnectionSettings);
             Assert.Equal(source.ModelInventory, actual.Source.SourceModelInventory);
             Assert.Equal(ToInventoryKind(source.ModelInventory), descriptor.ModelInventory);
             Assert.Equal(source.FactoryTarget, actual.Source.SourceFactoryTarget);
             Assert.Equal(source.ReasoningStyle, actual.Generation.ReasoningStyle);
-            Assert.Equal(["connection-settings"], actual.PendingNativeParity);
+            Assert.Empty(actual.PendingNativeParity);
             Assert.Equal([InferenceOperation.Generation], descriptor.Operations);
             Assert.Empty(descriptor.StaticCapabilities);
             Assert.Empty(descriptor.StaticEmbeddingCapabilities);
@@ -106,6 +107,16 @@ public sealed class CompatPresetDataTests
         Assert.Throws<InvalidOperationException>(() => ReadCompatRows(Encoding.UTF8.GetBytes(valid.Replace("\"preset\": {", "\"other\": {}, \"preset\": {", StringComparison.Ordinal))));
         Assert.Throws<InvalidOperationException>(() => ReadCompatRows(Encoding.UTF8.GetBytes(valid.Replace("\"model_inventory\": \"served\"", "\"model_inventory\": \"available\"", StringComparison.Ordinal))));
 
+        var connectionMutation = JsonNode.Parse(valid)!.AsObject();
+        var connectionDescriptor = connectionMutation["providers"]!.AsArray()
+            .Select(static item => item!.AsObject())
+            .First(static item => item["family"]!.GetValue<string>() == "compat_preset")["descriptor"]!.AsObject();
+        connectionDescriptor["honors_connection_settings"] = false;
+        var changedConnection = ReadCompatRows(Encoding.UTF8.GetBytes(connectionMutation.ToJsonString()));
+        var changedRow = changedConnection[0];
+        var compiledConnection = CompatPresetTable.Rows.Single(value => value.Source.Id == changedRow.Id);
+        Assert.ThrowsAny<Exception>(() => Assert.Equal(changedRow.HonorsConnectionSettings, compiledConnection.Generation.Descriptor.HonorsConnectionSettings));
+
         var source = ReadCompatRows(Encoding.UTF8.GetBytes(valid));
         var temperatureRow = source.First(static value => value.DefaultTemperature is not null);
         var temperatureCompiled = CompatPresetTable.Rows.Single(value => value.Source.Id == temperatureRow.Id);
@@ -123,10 +134,10 @@ public sealed class CompatPresetDataTests
         var capabilities = new ModelCapabilities();
         var dialect = new OpenAICompatDialectOptions();
         Assert.Throws<ArgumentException>(() => new CompatPresetGenerationRow("fixture", "Fixture", [], null, false,
-            ProviderLocality.Hosted, setup, capabilities, [], dialect, CompatPresetReasoningStyle.None, [], ModelInventoryKind.Served));
+            ProviderLocality.Hosted, setup, capabilities, [], dialect, CompatPresetReasoningStyle.None, [], ModelInventoryKind.Served, true));
         Assert.Throws<ArgumentException>(() => new CompatPresetGenerationRow("fixture", "Fixture", [], null, false,
             ProviderLocality.Hosted, setup, capabilities, [], dialect, CompatPresetReasoningStyle.None,
-            [InferenceOperation.Generation, InferenceOperation.Embedding], ModelInventoryKind.Served));
+            [InferenceOperation.Generation, InferenceOperation.Embedding], ModelInventoryKind.Served, true));
         Assert.Throws<ArgumentOutOfRangeException>(() => CompatPresetReasoning.Translate((CompatPresetReasoningStyle)99, null));
 
         var actual = CompatPresetTable.Rows[0];
@@ -134,7 +145,8 @@ public sealed class CompatPresetDataTests
         var mismatchedInventory = new CompatPresetGenerationRow(descriptor.Id, descriptor.DisplayName, descriptor.Aliases,
             descriptor.DefaultBaseUrl, descriptor.RequiresBaseUrl, descriptor.Locality, descriptor.Setup,
             descriptor.DefaultCapabilities, descriptor.IgnoredParameters, actual.Generation.Dialect,
-            actual.Generation.ReasoningStyle, [InferenceOperation.Generation], ModelInventoryKind.Available);
+            actual.Generation.ReasoningStyle, [InferenceOperation.Generation], ModelInventoryKind.Available,
+            descriptor.HonorsConnectionSettings);
         Assert.Throws<ArgumentException>(() => new CompatPresetDefinition(actual.Source, mismatchedInventory));
 
         var operations = new List<string> { "generation", "embedding" };
@@ -308,7 +320,7 @@ public sealed class CompatPresetDataTests
             var descriptor = row.GetProperty("descriptor");
             var preset = row.GetProperty("preset");
             if (preset.ValueKind != JsonValueKind.Object || descriptor.GetProperty("id").GetString() != row.GetProperty("id").GetString() ||
-                !descriptor.GetProperty("honors_connection_settings").GetBoolean() || descriptor.GetProperty("model_inventory").GetString() != "served" ||
+                descriptor.GetProperty("model_inventory").GetString() != "served" ||
                 !descriptor.GetProperty("operations").EnumerateArray().Any(value => value.GetString() == "generation"))
                 throw new InvalidOperationException("The test-only source projection is not a compatibility generation row.");
             var factory = descriptor.GetProperty("factory");
@@ -327,7 +339,7 @@ public sealed class CompatPresetDataTests
             var features = capabilities.GetProperty("features");
             var setup = descriptor.GetProperty("setup");
             rows.Add(new SourceRow(
-                row.GetProperty("id").GetString()!, Strings(row.GetProperty("contract_dependencies")), Strings(descriptor.GetProperty("operations")),
+                row.GetProperty("id").GetString()!, Strings(row.GetProperty("contract_dependencies")), Strings(descriptor.GetProperty("operations")), descriptor.GetProperty("honors_connection_settings").GetBoolean(),
                 factoryTarget, descriptor.GetProperty("display_name").GetString()!, Strings(descriptor.GetProperty("aliases")),
                 NullableString(descriptor.GetProperty("default_base_url")), descriptor.GetProperty("requires_base_url").GetBoolean(), descriptor.GetProperty("locality").GetString()!, descriptor.GetProperty("model_inventory").GetString()!,
                 preset.GetProperty("auth_header").GetString()!, preset.GetProperty("models_listing").GetBoolean(), preset.GetProperty("output_tokens_field").GetString()!,
@@ -413,7 +425,7 @@ public sealed class CompatPresetDataTests
     private sealed record CapturedRequest(Uri Uri, IReadOnlyDictionary<string, string> Headers, JsonDocument Body);
 
     private sealed record SourceNumber(double Value, string Provenance);
-    private sealed record SourceRow(string Id, IReadOnlyList<string> ContractDependencies, IReadOnlyList<string> SourceOperations, string FactoryTarget,
+    private sealed record SourceRow(string Id, IReadOnlyList<string> ContractDependencies, IReadOnlyList<string> SourceOperations, bool HonorsConnectionSettings, string FactoryTarget,
         string DisplayName, IReadOnlyList<string> Aliases, string? DefaultBaseUrl, bool RequiresBaseUrl, string Locality, string ModelInventory, string AuthHeader,
         bool ModelsListing, string OutputTokensField, IReadOnlyList<string> IgnoredParameters, IReadOnlyList<string> SetupFields, string ModelSelection,
         string? HostShorthand, IReadOnlyList<string> AnyOf, string RequirementNote, IReadOnlyList<string> Features, string FeatureProvenance,

@@ -21,7 +21,7 @@ internal sealed class TeiAdapter : IEmbedsText, IReranksText, IProviderLifecycle
     private readonly double _timeoutS;
     private int _disposed;
 
-    private TeiAdapter(ProviderConfig config)
+    private TeiAdapter(ProviderConfig config, CancellationToken cancellationToken)
     {
         _baseUrl = ParseBaseUrl(config.BaseUrl ?? DefaultBaseUrl, config.ProviderId);
         _apiKey = config.ApiKey;
@@ -29,14 +29,14 @@ internal sealed class TeiAdapter : IEmbedsText, IReranksText, IProviderLifecycle
         _headers = config.Headers.ToArray();
         ValidateHeaders(_headers);
         _timeoutS = config.TimeoutS;
-        _transport = new TeiHttpTransport(config.Transport, config.TimeoutS, config.TransportOwnedByPool);
+        _transport = new TeiHttpTransport(config, cancellationToken);
     }
 
     internal static IAsyncDisposable Create(ProviderConfig config, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(config);
-        try { return new TeiAdapter(config); }
+        try { return new TeiAdapter(config, cancellationToken); }
         catch (UriFormatException exception) { throw new ConfigException("The TEI provider configuration is invalid.", config.ProviderId, "The configured base URL is invalid.", nativeInner: exception); }
         catch (ArgumentException exception) { throw new ConfigException("The TEI provider configuration is invalid.", config.ProviderId, "The configured base URL or headers are invalid.", nativeInner: exception); }
     }
