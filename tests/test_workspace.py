@@ -144,6 +144,7 @@ class TestVerbs:
         assert "scripts/check_csharp_tool_loop.py" in recorded[0]
         assert "scripts/check_csharp_binding_inventory.py" in recorded[0]
         assert "scripts/export_python_provider_bindings.py" in recorded[0]
+        assert "scripts/export_python_provider_parity.py" in recorded[0]
         assert "scripts/run_provider_change_checks.py" in recorded[0]
         assert "scripts/check_provider_change.py" in recorded[0]
         assert "scripts/provider_change_ci.py" in recorded[0]

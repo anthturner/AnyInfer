@@ -145,6 +145,7 @@ LINT_PATHS = (
     "scripts/check_csharp_tool_loop.py",
     "scripts/check_csharp_binding_inventory.py",
     "scripts/export_python_provider_bindings.py",
+    "scripts/export_python_provider_parity.py",
     "scripts/run_provider_change_checks.py",
     "scripts/check_provider_change.py",
     "scripts/provider_change_ci.py",

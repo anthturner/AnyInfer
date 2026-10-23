@@ -940,6 +940,11 @@ must report a real conflict rather than silently changing a dependent public sig
   Port compatible preset data once through a reviewed data-generation boundary, then dedicated
   dialects in contract-sized batches. Gate each batch on `contracts/NEW-PROVIDER.md` and
   existing contract snapshots; no provider marked complete solely because chat text works.
+  > NOTE: The first bounded execution leaf is `ANYINFER_CSHARP_SDK_PROVIDER_INVENTORY.md`:
+  > complete deterministic declaration inventory before native preset runtime changes.
+  > Actual Python graph has 106 descriptors and 129 operation bindings (103 generation,
+  > 16 embedding, 5 rerank, 5 batch). All declared operations remain visible; completing
+  > the inventory alone does not check SDK.8a or waive mixed-operation SDK.6c work.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes

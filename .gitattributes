@@ -5,6 +5,15 @@ tests/fixtures/rich-generation-v1/** text eol=lf
 tests/fixtures/tool-loop-v1/** text eol=lf
 # Preserve the immutable adopted-change input's committed byte identity on Windows.
 maintenance/changes/openai-compat-rich-inputs.json text eol=lf
+# Provider declaration inventory binds these metadata sources by their raw bytes.
+maintenance/provider-parity/** text eol=lf
+scripts/export_python_provider_parity.py text eol=lf
+scripts/export_python_provider_bindings.py text eol=lf
+src/python/anyinfer/providers/** text eol=lf
+src/python/anyinfer/registry.py text eol=lf
+src/python/anyinfer/types/capabilities.py text eol=lf
+src/python/anyinfer/types/operations.py text eol=lf
+contracts/*.md text eol=lf
 # Raw-string manifest goldens must match the renderer's literal LF output.
 src/csharp/AnyInfer.Tests/ManifestRenderingTests.cs text eol=lf
 # The embedded schema must retain the generator's canonical UTF-8/LF bytes.
