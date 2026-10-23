@@ -529,6 +529,13 @@ paired profile. Freeze this small grammar/corpus only after a cold executable-in
   > the direct pytest observer import now collects correctly. Root is committing explicit
   > owned source next, then running the registered immutable-declaration and Frozen/paired/
   > package qualification from a clean checkout. This box remains open until that proof.
+  > NOTE: Source commit a49258e96edd65af4d4e81d30fdb9d2633054c9f passes the full gate.
+  > Its first clean checkout stopped before gates because Windows converted the immutable
+  > rich declaration to CRLF (b5b286ad...) although the original and committed LF blob both
+  > retain SHA 10a45384.... A scoped .gitattributes rule now preserves that file's committed
+  > LF bytes. The declaration content/hash is unchanged; a small checkout-policy follow-up
+  > commit and fresh clean qualification are required. The failed-first run is retained as
+  > local-rich-a49258e9-20261023T023641Z in the original qualification worktree.
 - [ ] **RICH.7** Reconcile parent SDK.7a/b and parity inventory only for achieved scope,
   record acceptance and resume the remaining SDK.6c/8/9/10/11/12 work. Gate: no unfinished
   milestone is called complete; full core-library readiness remains the active user goal.
