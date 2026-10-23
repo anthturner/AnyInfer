@@ -1040,12 +1040,17 @@ The private dialect leaf, `ANYINFER_CSHARP_SDK_COMPAT_DIALECT.md`, is complete a
 source 1f5e821ad0a4e4fd8e387af5005975ad4fbe387c, tree
 b3524b491b9c12796740e7f15e07fa27d1c4a211: all 24 held workspace steps, fresh exact C#
 registered gate, five source-stamped prior pairs, package/examples and Frozen 102 pass.
-It preserves generic defaults and registers no new preset/public API/operation. Resume a
-closed generated typed preset-data contract with separate source/implemented operations
-and default-registry disjointness; current research and provider registration follow.
-The next bounded checklist is `ANYINFER_CSHARP_SDK_PRESET_DATA.md`. It retains the source's
-non-neutral connection-settings/inventory-kind facts as explicitly pending native work,
-before any preset registration; it cannot certify a provider or complete SDK.8a by compiling data.
+It preserves generic defaults and registers no new preset/public API/operation.
+The inert data leaf, `ANYINFER_CSHARP_SDK_PRESET_DATA.md`, is accepted at executable clean
+source `60e39c9ef011d9cbc3a03a61f330e3366e964558`, tree
+`a451153446bc4798c0b2e31a4d0c804109f3abaf`: all 25 held workspace steps, fresh registered
+12-step C# gate, 1014 native unit/93 conformance controls, five clean source-stamped pairs,
+generator byte equality, package/examples and Frozen 102 pass. The table stays outside the
+default registry, with source operations separate from singleton implemented Generation.
+Resume the native connection-settings/model-inventory contract, then researched registration;
+these two non-neutral source facts remain pending native work. Default registry remains
+four descriptors/seven bindings, with 122 operation memberships pending. Compiling data
+does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12 remain open.
 SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
 `7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered

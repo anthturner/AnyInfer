@@ -258,13 +258,28 @@ These are data/factory controls, never live-provider or default-registration evi
   > docs, package consumer and examples. Coherence facts report 162 unchanged held/protected
   > inputs, including user files. The explicit source commit records this gate; clean-source
   > qualification remains PGEN.6, separate from this development acceptance.
-- [ ] **PGEN.6** Coordinator: fresh clean managed checkout of explicit executable source;
+- [x] **PGEN.6** Coordinator: fresh clean managed checkout of explicit executable source;
   exact registered C# gate including generator check and Frozen DEVELOPMENT 102/0/0/0.
   Gate: clean before/after and exact HEAD/tree/source/input hashes, independent evidence review.
-- [ ] **PGEN.7** Coordinator: reconcile plans with accepted executable versus plan-only commit.
+  > NOTE: Executable `60e39c9ef011d9cbc3a03a61f330e3366e964558`, tree
+  > `a451153446bc4798c0b2e31a4d0c804109f3abaf`, qualifies in fresh managed checkout
+  > `feature-preset-data-clean-60e39c9`, attempt `local-preset-data-60e39c9e-20261023T053917Z`/1.
+  > Exact registered C# gate passes all 12 steps in 75.8 seconds, with 1014 unit/93
+  > conformance controls, all five pairs revision-matched/source_dirty=false, generator
+  > checked bytes, package and examples. Frozen DEVELOPMENT/UNRELEASED is 102/0/0/0
+  > against unchanged release SHA 16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391.
+  > Log SHA 5056367cf23153a21588d17a1213afa3d97368ebf7529d2edde4c2bf908542ed and
+  > Frozen SHA 439e722e3d6a8a76cfd15e28985838c59fc372eacfc4d5899a30c9c62403e996
+  > were independently recomputed. Initial/final clean commit/tree agree; evidence review is clean.
+- [x] **PGEN.7** Coordinator: reconcile plans with accepted executable versus plan-only commit.
   Gate: default registry still four descriptors/seven bindings, all 122 pending operation
   memberships and 235 API rows remain open; resume native connection-settings/model-inventory
   contract and researched registration, without a generation-only provider waiver.
+  > NOTE: This plan-only acceptance follows the qualified executable commit above and does
+  > not replace its evidence identity. All 86 compat rows remain inert, with fixed pending
+  > connection-settings/model-inventory requirements. Parent SDK.8a/6c/8b-c/9–12 and all 235
+  > root API rows remain unchecked. Resume native connection-settings/model-inventory contract;
+  > no preset is registered and no mixed-operation, live-provider or release claim is made.
 
 Workers are not alone: do not revert others. Reread this shared file before minimal box/NOTE
 edits. Root owns generated output, .gitattributes, shared reconciliation, Git and all heavy
