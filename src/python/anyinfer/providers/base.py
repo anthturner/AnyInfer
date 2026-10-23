@@ -105,7 +105,7 @@ class ProviderConfig:
     """Resolved configuration handed to an adapter factory.
 
     Credentials arrive already resolved and already registered for redaction; an adapter
-    never sees a ``credential://`` reference.
+    never sees a ``credential://`` reference. Its representation omits connection values.
     """
 
     provider_id: str
@@ -157,6 +157,10 @@ class ProviderConfig:
     Wired to the owning client's observer dispatcher. Only *lifecycle* events belong
     here — request-path telemetry stays in the core, which is what keeps adapters pure
     translators."""
+
+    def __repr__(self) -> str:
+        """Return a provider-identity representation without connection values."""
+        return f"ProviderConfig(provider_id={self.provider_id!r})"
 
 
 @dataclass(frozen=True, slots=True)

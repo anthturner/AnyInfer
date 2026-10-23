@@ -41,6 +41,8 @@ __all__ = ["AdapterPool", "ProviderSettings"]
 class ProviderSettings:
     """How one provider instance should be configured on a client.
 
+    Its representation includes only provider identity fields and omits connection values.
+
     A client may hold several instances of the same underlying engine — two Azure
     tenants, a local and a remote Ollama — by giving each one an `alias`. The alias is
     the instance's identity everywhere else: it is what a ``alias:model`` target names,
@@ -116,6 +118,10 @@ class ProviderSettings:
             alias=normalize_provider_id(alias) if alias else None,
             **kwargs,
         )
+
+    def __repr__(self) -> str:
+        """Return an identity-only representation without connection values."""
+        return f"ProviderSettings(provider_id={self.provider_id!r}, alias={self.alias!r})"
 
 
 @dataclass(slots=True)
