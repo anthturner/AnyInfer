@@ -83,6 +83,7 @@ from .http import (
     map_transport_error,
     read_error_detail,
     read_int,
+    safe_transport_detail,
 )
 from .sse import iter_sse
 
@@ -164,7 +165,15 @@ class GeminiAdapter:
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=(
+                *config.headers.keys(),
+                *self._origin_bound_header_names(config),
+            ),
         )
+
+    def _origin_bound_header_names(self, config: ProviderConfig) -> tuple[str, ...]:
+        """Return credential header names added by this dialect."""
+        return ("x-goog-api-key",)
 
     def _model_path(self, model: str, method: str) -> str:
         """Build the request path for one model and method.
@@ -259,7 +268,7 @@ class GeminiAdapter:
         try:
             response = await self._client.get("/models", params={"pageSize": 1})
         except httpx2.HTTPError as exc:
-            return Health(ok=False, detail=str(exc)[:200])
+            return Health(ok=False, detail=safe_transport_detail(exc))
         if response.status_code >= 400:
             return Health(ok=False, detail=f"HTTP {response.status_code}")
         return Health(ok=True)
@@ -664,9 +673,7 @@ class GeminiAdapter:
                 yield TextDelta(text)
 
         if isinstance(part.get("executableCode"), Mapping):
-            state.server_tools["code_execution"] = (
-                state.server_tools.get("code_execution", 0) + 1
-            )
+            state.server_tools["code_execution"] = state.server_tools.get("code_execution", 0) + 1
             yield ServerToolDelta(kind="code_execution", status="started")
         result = part.get("codeExecutionResult")
         if isinstance(result, Mapping):

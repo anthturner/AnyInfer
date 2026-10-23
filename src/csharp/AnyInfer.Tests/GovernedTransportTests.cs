@@ -19,6 +19,21 @@ public sealed class GovernedTransportTests
         limitRequests: "x-limit");
 
     [Fact]
+    public async Task Redirect_hops_each_acquire_and_release_the_governed_transport_slot()
+    {
+        var handler = new RedirectThenSuccessHandler();
+        var events = new Collector();
+        await using var client = CreateClient(
+            [Settings("alpha", handler, new RateLimits(maxConcurrent: 1))], events);
+
+        var result = await client.GenerateAsync("redirect", target: "alpha:model");
+
+        Assert.Equal("ok", result.Text);
+        Assert.Equal(2, handler.SendCalls);
+        Assert.Equal(2, events.Events.OfType<RateLimitObserved>().Count());
+    }
+
+    [Fact]
     public async Task Configured_limiters_are_isolated_per_instance_and_observe_merged_response_headers()
     {
         var alpha = new BlockingHandler();
@@ -805,6 +820,30 @@ public sealed class GovernedTransportTests
                 response.Content.Headers.TryAddWithoutValidation("x-limit", "1");
             }
             return response;
+        }
+    }
+
+    private sealed class RedirectThenSuccessHandler : HttpMessageHandler
+    {
+        private int _calls;
+        internal int SendCalls => Volatile.Read(ref _calls);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                var redirect = new HttpResponseMessage(HttpStatusCode.TemporaryRedirect);
+                redirect.Headers.Location = new Uri("/v1/chat/completions", UriKind.Relative);
+                redirect.Headers.TryAddWithoutValidation("x-remaining", "1");
+                redirect.Headers.TryAddWithoutValidation("x-reset", "1s");
+                return Task.FromResult(redirect);
+            }
+
+            var success = SuccessResponse();
+            success.Headers.TryAddWithoutValidation("x-remaining", "1");
+            success.Headers.TryAddWithoutValidation("x-reset", "1s");
+            return Task.FromResult(success);
         }
     }
 

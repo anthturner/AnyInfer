@@ -47,6 +47,10 @@ class AzureFoundryAdapter(OpenAICompatEmbeddingsMixin, OpenAICompatAdapter):
     output_tokens_field: ClassVar[str] = "max_completion_tokens"
     """Azure renamed this parameter; sending ``max_tokens`` is rejected."""
 
+    def _origin_bound_header_names(self, config: ProviderConfig) -> tuple[str, ...]:
+        """Protect both API-key and late Entra bearer credentials."""
+        return (*super()._origin_bound_header_names(config), "api-key")
+
     def __init__(self, config: ProviderConfig) -> None:
         if not config.base_url:
             raise ConfigError(

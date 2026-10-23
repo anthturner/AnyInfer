@@ -69,6 +69,7 @@ class TEIAdapter:
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=("authorization", *config.headers.keys()),
         )
 
     # ---- discovery -------------------------------------------------------------------
@@ -84,13 +85,9 @@ class TEIAdapter:
         if isinstance(model_type, Mapping) and len(model_type) == 1:
             # The spec spells model_type as a tagged object, e.g. {"embedding": {...}}.
             (kind,) = model_type.keys()
-            operations = Sourced(
-                _MODEL_TYPE_OPERATIONS.get(str(kind), frozenset()), "discovered"
-            )
+            operations = Sourced(_MODEL_TYPE_OPERATIONS.get(str(kind), frozenset()), "discovered")
         elif isinstance(model_type, str):
-            operations = Sourced(
-                _MODEL_TYPE_OPERATIONS.get(model_type, frozenset()), "discovered"
-            )
+            operations = Sourced(_MODEL_TYPE_OPERATIONS.get(model_type, frozenset()), "discovered")
         return (
             DiscoveredModel(
                 id=model_id,
@@ -160,9 +157,7 @@ class TEIAdapter:
         vectors: list[tuple[float, ...]] = []
         for entry in body:
             if not isinstance(entry, list):
-                raise ProviderError(
-                    "embed response contains a non-array vector", phase="validate"
-                )
+                raise ProviderError("embed response contains a non-array vector", phase="validate")
             vectors.append(tuple(float(v) for v in entry))
         sent_normalize = payload.get("normalize", True)
         return EmbeddingWireResult(
@@ -209,19 +204,13 @@ class TEIAdapter:
         items: list[WireRankedItem] = []
         for entry in body:
             if not isinstance(entry, Mapping):
-                raise ProviderError(
-                    "rerank response contains a non-object rank", phase="validate"
-                )
+                raise ProviderError("rerank response contains a non-object rank", phase="validate")
             position = entry.get("index")
             score = entry.get("score")
             if not isinstance(position, int) or isinstance(position, bool):
-                raise ProviderError(
-                    "rerank rank is missing an integer 'index'", phase="validate"
-                )
+                raise ProviderError("rerank rank is missing an integer 'index'", phase="validate")
             if not isinstance(score, int | float) or isinstance(score, bool):
-                raise ProviderError(
-                    "rerank rank is missing a numeric 'score'", phase="validate"
-                )
+                raise ProviderError("rerank rank is missing a numeric 'score'", phase="validate")
             index = resolve_rerank_index(req, position)
             items.append(WireRankedItem(index=index, score=float(score)))
         items.sort(key=lambda item: item.score, reverse=True)

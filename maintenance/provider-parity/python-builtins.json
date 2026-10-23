@@ -16151,19 +16151,19 @@
     },
     {
       "path": "src/python/anyinfer/providers/anthropic.py",
-      "sha256": "382f9aed4aaeb6af7767afd1cf038385cc3a9884b7ea7706cf3bb95695aa3c5c"
+      "sha256": "031c0efca932c11ccf5a745223295528cd011b845438c09b1fb573d4ef68d08c"
     },
     {
       "path": "src/python/anyinfer/providers/azure_foundry.py",
-      "sha256": "dcd65b13c0390c33d9b6e4fd271f2719b80bae300a3f4636d1c2f8d3c44b742e"
+      "sha256": "9b5fc93266cd3122d4594d5eba5b3a06d67df846de7f2a2da0cbf7113d191400"
     },
     {
       "path": "src/python/anyinfer/providers/bedrock.py",
-      "sha256": "1f81ebf94bea7af54a2a35d49b8adf78ad1402f25a038fc2ea4e0c1b8b57f5a7"
+      "sha256": "4bd9b651b30b75c7f27fe3a65e2dd83a6b74f30d284e1af5d0af186e0b7f9edd"
     },
     {
       "path": "src/python/anyinfer/providers/cohere.py",
-      "sha256": "b284dc952d87ba348d88ff1e9870fb03ccfb5e4e992d5404a1b96e81786769e7"
+      "sha256": "57d9991d80775bee0cbf303aa7ad47240f8a05af0a20e6aa5ed01919f291fd54"
     },
     {
       "path": "src/python/anyinfer/providers/copilot.py",
@@ -16175,11 +16175,11 @@
     },
     {
       "path": "src/python/anyinfer/providers/gemini.py",
-      "sha256": "549e843cf4bf2ffd86c9e713d7762ce5021070d2100b6c61424dad4ca3da4e9a"
+      "sha256": "ba60f5c0f92870069942985e5a9bf1be9ac1051dfadf96fb5bdcc8f064d9ad15"
     },
     {
       "path": "src/python/anyinfer/providers/jina.py",
-      "sha256": "0e0eddf41e83c5176ac2615f8e986746cc26d9982b013b460e56f97dc7db1e9a"
+      "sha256": "cbd5c595e36dabdef82e5ec877a8f843fcd8e93ba02be694d1536af96c2ff21f"
     },
     {
       "path": "src/python/anyinfer/providers/llama_cpp.py",
@@ -16191,7 +16191,7 @@
     },
     {
       "path": "src/python/anyinfer/providers/m365_copilot.py",
-      "sha256": "c9450fbf9945ba63318d2d390a595728738ad4523ba09cc8b19e8b85bf3365d5"
+      "sha256": "2e9418dcf695be054a29db21d48d2bb8716196fadfe49f39111616e8492cc056"
     },
     {
       "path": "src/python/anyinfer/providers/nebius.py",
@@ -16199,15 +16199,15 @@
     },
     {
       "path": "src/python/anyinfer/providers/ollama.py",
-      "sha256": "ac4fc07ca19a9e0853d4bbe8a68d42d4f48db6efdaeae1cd100da8abcb775feb"
+      "sha256": "8e5ac58eda659f1352906178a689a98027d94cce72cfca428a8810a3b80349c1"
     },
     {
       "path": "src/python/anyinfer/providers/openai.py",
-      "sha256": "4f0138fd44f5c083fb5c41c255f69fedc0b57d8e35dbf4e3f70420283a84bac5"
+      "sha256": "6c1ebe3e85bc43145de4b4131ad13adb6b753cd48e056c97eb3a090205231eb0"
     },
     {
       "path": "src/python/anyinfer/providers/openai_compat.py",
-      "sha256": "ace257d4a48ff7fe5fc0f8eb4eab80d79cb8c5a3fc377944595687def119ee77"
+      "sha256": "8e9d09f076aeaa13a0e50b2c96bddbb9e508da3028b11bfdfa977c3d57216fd7"
     },
     {
       "path": "src/python/anyinfer/providers/openrouter.py",
@@ -16215,19 +16215,19 @@
     },
     {
       "path": "src/python/anyinfer/providers/presets.py",
-      "sha256": "e84e4c123bd0f25a9ba0c3fa5236a0a534e11858e74644720aa8de278f263531"
+      "sha256": "90e34430fe2d373139e462019ae4e799aba4ce959997d74685744018d8cc566c"
     },
     {
       "path": "src/python/anyinfer/providers/tei.py",
-      "sha256": "2b682a5aa4e502c0b83cc78b1c178c7e942b8a1ae964a5133fa22ca0fd7b58b7"
+      "sha256": "1984b46b2679bcb9eff8c71f781bacd569048a21993157b59a9c81d79f3e878a"
     },
     {
       "path": "src/python/anyinfer/providers/vertex.py",
-      "sha256": "2b4c5cfdff2900a6c1c70165e66db0db3fedd47f403505a436927d5ec1b36a0f"
+      "sha256": "9ea4ce2d3ccb6de171b1f4e0b01955aff5ae392d35ea821ce7ba4eee3e054b56"
     },
     {
       "path": "src/python/anyinfer/providers/voyage.py",
-      "sha256": "af5e90e1410dedf073e4951b9cae62a6e8d16e78bcb0897ac0767d6caf325a9e"
+      "sha256": "b1408f4fb520bfbc385b9da80c559fd0774e2d327672ba3cd5fe6f76ee252cd8"
     },
     {
       "path": "src/python/anyinfer/providers/xai.py",

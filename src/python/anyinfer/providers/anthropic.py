@@ -86,7 +86,14 @@ from .base import (
     ProviderConfig,
     WireRequest,
 )
-from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
+from .http import (
+    build_client,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+    read_int,
+    safe_transport_detail,
+)
 from .sse import iter_sse
 
 __all__ = ["ANTHROPIC_VERSION", "AnthropicAdapter", "descriptor"]
@@ -167,6 +174,11 @@ class AnthropicAdapter:
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=(
+                "authorization",
+                "x-api-key",
+                *config.headers.keys(),
+            ),
         )
 
     # ---- discovery -------------------------------------------------------------------
@@ -218,7 +230,7 @@ class AnthropicAdapter:
         try:
             response = await self._client.get("/v1/models", params={"limit": 1})
         except httpx2.HTTPError as exc:
-            return Health(ok=False, detail=str(exc)[:200])
+            return Health(ok=False, detail=safe_transport_detail(exc))
         if response.status_code >= 400:
             return Health(ok=False, detail=f"HTTP {response.status_code}")
         return Health(ok=True)
@@ -273,8 +285,7 @@ class AnthropicAdapter:
         payload: dict[str, Any] = {
             "model": req.model,
             "messages": [
-                self._encode_message(m, citations_enabled=req.cite_documents)
-                for m in messages
+                self._encode_message(m, citations_enabled=req.cite_documents) for m in messages
             ],
             "max_tokens": req.sampling.max_output_tokens or _DEFAULT_MAX_TOKENS,
             "stream": True,
@@ -581,9 +592,7 @@ class AnthropicAdapter:
 
     async def cancel_batch(self, handle: BatchHandle) -> BatchReport:
         """Ask the provider to cancel, via ``POST .../cancel``."""
-        body = await self._batch_call(
-            "POST", f"/v1/messages/batches/{handle.batch_id}/cancel"
-        )
+        body = await self._batch_call("POST", f"/v1/messages/batches/{handle.batch_id}/cancel")
         return self._report(handle, body)
 
     def _report(self, handle: BatchHandle, body: Mapping[str, Any]) -> BatchReport:
@@ -676,9 +685,7 @@ class AnthropicAdapter:
             return BatchLine(custom_id=custom_id, error=_batch_error("result carried no message"))
         return BatchLine(custom_id=custom_id, result=_generation_from_message(body))
 
-    async def _batch_call(
-        self, method: str, path: str, *, json: Any = None
-    ) -> Mapping[str, Any]:
+    async def _batch_call(self, method: str, path: str, *, json: Any = None) -> Mapping[str, Any]:
         """Issue one batch-control request, classifying failures the usual way.
 
         Raises:
@@ -951,6 +958,7 @@ _SERVER_TOOL_RESULTS: Mapping[str, ServerToolKind] = {
 }
 """Result block types, which name their tool in the type rather than in a field."""
 
+
 def _server_tool_result(block: Mapping[str, Any]) -> ServerToolDelta:
     """Decode one server-tool result block into the event that carries its payload.
 
@@ -985,12 +993,8 @@ def _server_tool_result(block: Mapping[str, Any]) -> ServerToolDelta:
     if isinstance(content, Mapping):
         # stderr is appended rather than dropped: a failed execution's message is the
         # useful half, and a non-zero return code is not itself a tool failure.
-        parts = [
-            str(content.get(field, "") or "") for field in ("stdout", "stderr")
-        ]
-        return ServerToolDelta(
-            kind=tool_kind, status="completed", output="".join(parts)
-        )
+        parts = [str(content.get(field, "") or "") for field in ("stdout", "stderr")]
+        return ServerToolDelta(kind=tool_kind, status="completed", output="".join(parts))
     return ServerToolDelta(kind=tool_kind, status="completed")
 
 

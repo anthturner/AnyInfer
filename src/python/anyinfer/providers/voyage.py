@@ -74,6 +74,7 @@ class VoyageAdapter(OpenAIShapedRetrievalMixin):
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=("authorization", *config.headers.keys()),
         )
 
     # ---- embedding ---------------------------------------------------------------------
@@ -135,9 +136,7 @@ class VoyageAdapter(OpenAIShapedRetrievalMixin):
             position = entry.get("index")
             score = entry.get("relevance_score")
             if not isinstance(position, int) or isinstance(position, bool):
-                raise ProviderError(
-                    "rerank entry is missing an integer 'index'", phase="validate"
-                )
+                raise ProviderError("rerank entry is missing an integer 'index'", phase="validate")
             if not isinstance(score, int | float) or isinstance(score, bool):
                 raise ProviderError(
                     "rerank entry is missing a numeric 'relevance_score'", phase="validate"

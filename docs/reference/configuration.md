@@ -45,6 +45,35 @@ ai.ProviderSettings.of(
 The order providers are listed in is the preference order for
 [alias resolution](../concepts/targets.md#aliases).
 
+### Provider HTTP Redirects
+
+Provider HTTP clients follow up to 20 redirects (at most 21 requests including the
+original request). They follow only HTTP(S) targets and refuse redirect targets that
+contain user information. A redirect without `Location` is returned to the provider's
+ordinary response handling.
+
+Any change of scheme, host, or effective port removes provider credentials, request
+signature headers, and every name configured through `headers`. The only exception is
+an upgrade from `http` on port 80 to `https` on port 443 for the same host. Once a
+chain crosses an unsafe origin, those values stay removed even if it later returns to
+the original origin. A changed origin always receives a destination-derived `Host`.
+Same-origin redirects retain configured names. Redirects that rewrite a POST to GET
+(301, 302, or 303) omit its body and old body framing; 307 and 308 replay the existing
+serialized body.
+
+An explicit `Cookie` on the first request is retained. Every followed request instead
+recalculates destination-scoped cookies from the client cookie jar, and cookies received
+on the final response are available to the next operation using that client. Redirect
+and target failures use bounded diagnostics that do not include redirect locations,
+header values, cookies, or request bodies.
+
+This policy applies to redirects visible to an AnyInfer provider client, including one
+that uses an injected Python transport. Supplying a Python transport still takes over
+proxy, certificate-verification, and client-certificate material. A supplied C# handler
+also owns its internal transport behavior: if it follows redirects or manages cookies
+internally, those hidden hops and cookies remain caller-controlled. Return each hop to
+the SDK to receive its per-hop redirect policy.
+
 ### Proxies, Private CAs, and mTLS
 
 Three optional per-instance keys cover TLS-intercepting proxies and private certificate

@@ -64,8 +64,10 @@ file and encrypted private-key file with its password; the two paths may name th
 file. File access and parsing occur only when the selected provider first needs an SDK-created
 handler, and failures are reported then. A caller-supplied `HttpMessageHandler` takes ownership
 of connection behavior: SDK proxy/TLS settings are bypassed, and the SDK does not load their
-configured files. Automatic redirects remain disabled; matching Python redirect behavior is not
-implemented in this C# proof.
+configured files. Provider redirects follow the shared
+[redirect policy](../reference/configuration.md#provider-http-redirects). A supplied handler
+must return each hop for the SDK to apply that policy; redirects or cookies handled inside the
+handler remain caller-controlled.
 
 On Windows, native TLS may back a PEM client private key with a temporary OS-managed user-key
 file; the SDK does not add the certificate to the system certificate store. Releasing the handler

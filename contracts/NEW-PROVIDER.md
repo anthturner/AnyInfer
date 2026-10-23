@@ -107,6 +107,13 @@ Rules that every one of them already encodes, and that reviews check for:
 - **Errors are `ProviderError` subclasses** built through `classify_status` /
   `map_transport_error` / `read_error_detail`, each carrying an actionable `hint`.
 - **Credentials go through `anyinfer.credentials`** and are registered for redaction.
+- **Redirect-bound header names are declared, never inferred from values.** A provider client
+  built with `build_client` passes `origin_bound_header_names=` with the union of
+  `config.headers` names and every credential or signature header its adapter can send. Put
+  late or dynamic authentication in the adapter's class-level declaration seam as well, so it
+  is covered before that header exists on a request. Do not branch on provider id or inspect
+  header values to discover those names. This is shared library policy; do not repeat it in
+  each provider contract snapshot.
 
 ## Step 3 — register and describe it
 

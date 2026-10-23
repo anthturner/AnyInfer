@@ -145,7 +145,23 @@ class {provider_id_title}Adapter:
 
     def __init__(self, config: ProviderConfig) -> None:
         self._config = config
-        self._client = build_client(config)
+        self._client = build_client(
+            base_url=config.base_url,
+            headers=config.headers,
+            timeout_s=config.timeout_s,
+            transport=config.transport,
+            proxy=config.proxy,
+            verify=config.verify,
+            client_cert=config.client_cert,
+            origin_bound_header_names=(
+                *config.headers.keys(),
+                *self._origin_bound_header_names(config),
+            ),
+        )
+
+    def _origin_bound_header_names(self, config: ProviderConfig) -> tuple[str, ...]:
+        """List this adapter's credential/signature headers for redirect stripping."""
+        return ()
 
     async def list_models(self) -> Sequence[DiscoveredModel]:
         """Report the models this provider serves."""

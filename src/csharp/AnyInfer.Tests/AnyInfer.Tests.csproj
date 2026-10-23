@@ -18,5 +18,6 @@
     <None Include="../../../tests/cassettes/tei_rerank.json" Link="tei-cassettes/tei_rerank.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../../tests/fixtures/voyage-wire-v1/inputs.json" Link="voyage-wire/inputs.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../../tests/fixtures/jina-wire-v1/inputs.json" Link="jina-wire/inputs.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../tests/fixtures/provider_redirects.json" Link="redirects/provider_redirects.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

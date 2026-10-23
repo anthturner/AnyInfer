@@ -23,7 +23,7 @@ per-provider details and verification dates live in the contract snapshot.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Literal
@@ -156,6 +156,12 @@ class PresetCompatAdapter(OpenAICompatAdapter):
     def __init__(self, config: ProviderConfig, *, preset: CompatPreset) -> None:
         self._preset = preset
         super().__init__(config)
+
+    def _origin_bound_header_names(self, config: ProviderConfig) -> Iterable[str]:
+        """Declare the configured preset's credential spelling."""
+        if self._preset.auth_header == "bearer":
+            return super()._origin_bound_header_names(config)
+        return (self._preset.auth_header,)
 
     def _build_headers(self, config: ProviderConfig) -> dict[str, str]:
         """Spell the credential the way this provider expects."""

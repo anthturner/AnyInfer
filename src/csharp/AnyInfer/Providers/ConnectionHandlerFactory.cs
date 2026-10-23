@@ -37,7 +37,7 @@ internal static class ConnectionHandlerFactory
         try
         {
             material = new ConnectionMaterial();
-            handler = new SocketsHttpHandler { AllowAutoRedirect = false };
+            handler = new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false };
             ConfigureProxy(handler, config.Proxy);
             cancellationToken.ThrowIfCancellationRequested();
             ConfigureTls(handler, config, material, cancellationToken);

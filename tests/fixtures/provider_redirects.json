@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "cases": [
+    {"id": "same-origin", "request": {"method": "POST", "path": "/v1/chat/completions", "body": "json", "header_classes": ["configured", "credential", "framing"]}, "responses": [{"status": 307, "location": "/next"}, {"status": 200}]},
+    {"id": "post-rewrite", "request": {"method": "POST", "path": "/v1/chat/completions", "body": "json", "header_classes": ["configured", "credential", "framing"]}, "responses": [{"status": 303, "location": "/next"}, {"status": 200}]},
+    {"id": "cross-origin-sticky", "request": {"method": "POST", "path": "/v1/chat/completions", "body": "json", "header_classes": ["configured", "credential", "framing"]}, "responses": [{"status": 307, "location": "https://second.example/next"}, {"status": 307, "location": "https://first.example/return"}, {"status": 200}]},
+    {"id": "safe-upgrade", "request": {"method": "GET", "path": "/models", "body": "empty", "header_classes": ["configured", "credential"]}, "responses": [{"status": 308, "location": "https://first.example/models"}, {"status": 200}]},
+    {"id": "relative-query-fragment", "request": {"method": "GET", "path": "/catalog/base", "body": "empty", "header_classes": []}, "responses": [{"status": 302, "location": "?page=2#fragment"}, {"status": 200}]},
+    {"id": "terminal-missing-location", "request": {"method": "GET", "path": "/models", "body": "empty", "header_classes": []}, "responses": [{"status": 302}, {"status": 200}]},
+    {"id": "cookies", "request": {"method": "GET", "path": "/cookie", "body": "empty", "header_classes": ["cookie"]}, "responses": [{"status": 302, "location": "/cookie-next", "set_cookie": ["one=1; Path=/", "broken", "two=2; Path=/"]}, {"status": 200, "set_cookie": ["final=3; Path=/"]}]},
+    {"id": "unsupported-userinfo", "request": {"method": "POST", "path": "/v1/chat/completions", "body": "json", "header_classes": ["credential"]}, "responses": [{"status": 307, "location": "https://user:password@second.example/next"}]}
+  ]
+}

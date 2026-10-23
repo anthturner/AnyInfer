@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Text;
 
 namespace AnyInfer.Providers;
@@ -14,6 +15,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly HttpClient _client;
+    private readonly ProviderHttpRedirects _redirects;
     private readonly Uri _endpoint;
     private readonly Uri _modelsEndpoint;
     private readonly string? _apiKey;
@@ -50,6 +52,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
+        _redirects = new ProviderHttpRedirects(_client);
     }
 
     internal static IProviderAdapter Create(ProviderConfig config, CancellationToken cancellationToken) =>
@@ -149,43 +152,45 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         }
 
         using var timeout = CreateLifecycleTimeout(cancellationToken);
-        using var message = CreateModelsRequest();
-        HttpResponseMessage? response = null;
-        Stream? responseStream = null;
+        var resources = new ResponseResources();
+        ExceptionDispatchInfo? primary = null;
         try
-        {
-            response = await SendAsync(message, "discover", timeout.Token).ConfigureAwait(false);
-            responseStream = await OpenResponseStreamAsync(response.Content, "discover", timeout.Token).ConfigureAwait(false);
-            var body = await ReadLifecycleResponseBytesAsync(responseStream, "discover", timeout.Token).ConfigureAwait(false);
-            if ((int)response.StatusCode >= 400)
-            {
-                throw HttpFailure(response, body, "discover");
-            }
-
-            return ParseDiscoveredModels(body);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            var callerIdentity = CancellationIdentityContext.Resolve(cancellationToken);
-            throw new OperationCanceledException(
-                callerIdentity.IsCancellationRequested ? callerIdentity : cancellationToken);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
-        {
-            throw LifecycleTimeout();
-        }
-        finally
         {
             try
             {
-                if (responseStream is not null)
+                resources.Exchange = await SendAsync(_modelsEndpoint, HttpMethod.Get, CreateModelsRequest, "discover", timeout.Token).ConfigureAwait(false);
+                var response = resources.Exchange.Response;
+                resources.Stream = await OpenResponseStreamAsync(response.Content, "discover", timeout.Token).ConfigureAwait(false);
+                var body = await ReadLifecycleResponseBytesAsync(resources.Stream, "discover", timeout.Token).ConfigureAwait(false);
+                if ((int)response.StatusCode >= 400)
                 {
-                    await DisposeResponseStreamAsync(responseStream, "discover").ConfigureAwait(false);
+                    throw HttpFailure(response, body, "discover");
                 }
+
+                return ParseDiscoveredModels(body);
             }
-            finally
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                DisposeResponse(response, "discover");
+                var callerIdentity = CancellationIdentityContext.Resolve(cancellationToken);
+                throw new OperationCanceledException(
+                    callerIdentity.IsCancellationRequested ? callerIdentity : cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+            {
+                throw LifecycleTimeout();
+            }
+        }
+        catch (Exception exception)
+        {
+            primary = ExceptionDispatchInfo.Capture(exception);
+            throw;
+        }
+        finally
+        {
+            var cleanup = await DisposeResponseResourcesAsync(resources, "discover").ConfigureAwait(false);
+            if (primary is null && cleanup is not null)
+            {
+                ExceptionDispatchInfo.Capture(cleanup).Throw();
             }
         }
     }
@@ -200,44 +205,49 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         }
 
         using var timeout = CreateLifecycleTimeout(cancellationToken);
-        using var message = CreateModelsRequest();
-        HttpResponseMessage? response = null;
-        Stream? responseStream = null;
+        var resources = new ResponseResources();
+        ExceptionDispatchInfo? primary = null;
+        var handledFailure = false;
         try
-        {
-            response = await SendAsync(message, "discover", timeout.Token).ConfigureAwait(false);
-            responseStream = await OpenResponseStreamAsync(response.Content, "discover", timeout.Token).ConfigureAwait(false);
-            await ReadLifecycleResponseBytesAsync(responseStream, "discover", timeout.Token).ConfigureAwait(false);
-            return (int)response.StatusCode < 400
-                ? new Health(true)
-                : new Health(false, $"HTTP {(int)response.StatusCode}");
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            var callerIdentity = CancellationIdentityContext.Resolve(cancellationToken);
-            throw new OperationCanceledException(
-                callerIdentity.IsCancellationRequested ? callerIdentity : cancellationToken);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
-        {
-            return new Health(false, "The provider request timed out.");
-        }
-        catch (TransportException exception)
-        {
-            return new Health(false, BoundHealthDetail(exception.Detail ?? exception.Message));
-        }
-        finally
         {
             try
             {
-                if (responseStream is not null)
-                {
-                    await DisposeResponseStreamAsync(responseStream, "discover").ConfigureAwait(false);
-                }
+                resources.Exchange = await SendAsync(_modelsEndpoint, HttpMethod.Get, CreateModelsRequest, "discover", timeout.Token).ConfigureAwait(false);
+                var response = resources.Exchange.Response;
+                resources.Stream = await OpenResponseStreamAsync(response.Content, "discover", timeout.Token).ConfigureAwait(false);
+                await ReadLifecycleResponseBytesAsync(resources.Stream, "discover", timeout.Token).ConfigureAwait(false);
+                return (int)response.StatusCode < 400
+                    ? new Health(true)
+                    : new Health(false, $"HTTP {(int)response.StatusCode}");
             }
-            finally
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                DisposeResponse(response, "discover");
+                var callerIdentity = CancellationIdentityContext.Resolve(cancellationToken);
+                throw new OperationCanceledException(
+                    callerIdentity.IsCancellationRequested ? callerIdentity : cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+            {
+                handledFailure = true;
+                return new Health(false, "The provider request timed out.");
+            }
+            catch (TransportException exception)
+            {
+                handledFailure = true;
+                return new Health(false, BoundHealthDetail(exception.Detail ?? exception.Message));
+            }
+        }
+        catch (Exception exception)
+        {
+            primary = ExceptionDispatchInfo.Capture(exception);
+            throw;
+        }
+        finally
+        {
+            var cleanup = await DisposeResponseResourcesAsync(resources, "discover").ConfigureAwait(false);
+            if (!handledFailure && primary is null && cleanup is not null)
+            {
+                ExceptionDispatchInfo.Capture(cleanup).Throw();
             }
         }
     }
@@ -257,6 +267,49 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var resources = new ResponseResources();
+        ExceptionDispatchInfo? primary = null;
+        var phase = request.Stream ? "stream" : "generate";
+        var iterator = GenerateCoreIterator(request, cancellationToken, resources).GetAsyncEnumerator(cancellationToken);
+        try
+        {
+            while (true)
+            {
+                AdapterEvent current;
+                try
+                {
+                    if (!await iterator.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        break;
+                    }
+
+                    current = iterator.Current;
+                }
+                catch (Exception exception)
+                {
+                    primary = ExceptionDispatchInfo.Capture(exception);
+                    throw;
+                }
+
+                yield return current;
+            }
+        }
+        finally
+        {
+            var cleanup = await DisposeGenerateResourcesAsync(iterator, resources, phase).ConfigureAwait(false);
+            if (primary is null && cleanup is not null)
+            {
+                ExceptionDispatchInfo.Capture(cleanup).Throw();
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<AdapterEvent> GenerateCoreIterator(
+        WireRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken,
+        ResponseResources resources)
+    {
+        ArgumentNullException.ThrowIfNull(request);
         ThrowIfDisposed();
         if (request.UsesModernSchema && string.Equals(request.Mechanism, "grammar", StringComparison.Ordinal))
         {
@@ -266,118 +319,96 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 phase: "generate");
         }
 
-        using var message = CreateRequest(request);
-        HttpResponseMessage? response = null;
-        Stream? responseStream = null;
-        try
+        var payload = request.UsesModernSchema || request.Tools.Count > 0 ? JsonWriter.WriteModern(CreatePayload(request)) : JsonWriter.Write(CreatePayload(request));
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        resources.Exchange = await SendAsync(
+            _endpoint, HttpMethod.Post, context => CreateRequest(context, bytes, request.UsesModernSchema && request.Stream),
+            "generate",
+            cancellationToken,
+            request.UsesModernSchema).ConfigureAwait(false);
+        var response = resources.Exchange.Response;
+        resources.Stream = await OpenResponseStreamAsync(
+            response.Content,
+            "generate",
+            cancellationToken,
+            request.UsesModernSchema).ConfigureAwait(false);
+        if ((int)response.StatusCode >= 400)
         {
-            response = await SendAsync(
-                message,
-                "generate",
-                cancellationToken,
-                request.UsesModernSchema).ConfigureAwait(false);
-            responseStream = await OpenResponseStreamAsync(
-                response.Content,
-                "generate",
-                cancellationToken,
-                request.UsesModernSchema).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorBytes = await ReadResponseBytesAsync(
-                    responseStream,
-                    request.MaxResponseBytes,
-                    "generate",
-                    cancellationToken,
-                    request.UsesModernSchema).ConfigureAwait(false);
-                throw HttpFailure(response, errorBytes, "generate", request.UsesModernSchema);
-            }
-
-            if (request.Stream &&
-                (!request.UsesModernSchema ||
-                 string.Equals(
-                     response.Content.Headers.ContentType?.MediaType,
-                     "text/event-stream",
-                     StringComparison.OrdinalIgnoreCase)))
-            {
-                await foreach (var adapterEvent in ReadSseAsync(
-                    responseStream,
-                    request.MaxResponseBytes,
-                    request.UsesModernSchema || request.Tools.Count > 0,
-                    cancellationToken,
-                    request.UsesModernSchema).ConfigureAwait(false))
-                {
-                    yield return adapterEvent;
-                }
-
-                yield break;
-            }
-
-            var body = await ReadResponseBytesAsync(
-                responseStream,
+            var errorBytes = await ReadResponseBytesAsync(
+                resources.Stream,
                 request.MaxResponseBytes,
-                request.Stream ? "stream" : "generate",
+                "generate",
                 cancellationToken,
                 request.UsesModernSchema).ConfigureAwait(false);
-            foreach (var adapterEvent in ReadBuffered(
-                body,
-                request.UsesModernSchema || request.Tools.Count > 0))
+            throw HttpFailure(response, errorBytes, "generate", request.UsesModernSchema);
+        }
+
+        if (request.Stream &&
+            (!request.UsesModernSchema ||
+             string.Equals(
+                 response.Content.Headers.ContentType?.MediaType,
+                 "text/event-stream",
+                 StringComparison.OrdinalIgnoreCase)))
+        {
+            await foreach (var adapterEvent in ReadSseAsync(
+                resources.Stream,
+                request.MaxResponseBytes,
+                request.UsesModernSchema || request.Tools.Count > 0,
+                cancellationToken,
+                request.UsesModernSchema).ConfigureAwait(false))
             {
                 yield return adapterEvent;
             }
+
+            yield break;
         }
-        finally
+
+        var body = await ReadResponseBytesAsync(
+            resources.Stream,
+            request.MaxResponseBytes,
+            request.Stream ? "stream" : "generate",
+            cancellationToken,
+            request.UsesModernSchema).ConfigureAwait(false);
+        foreach (var adapterEvent in ReadBuffered(
+            body,
+            request.UsesModernSchema || request.Tools.Count > 0))
         {
-            try
-            {
-                if (responseStream is not null)
-                {
-                    await DisposeResponseStreamAsync(
-                        responseStream,
-                        request.Stream ? "stream" : "generate").ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                DisposeResponse(response, request.Stream ? "stream" : "generate");
-            }
+            yield return adapterEvent;
         }
     }
 
-    private HttpRequestMessage CreateRequest(WireRequest request)
+    private HttpRequestMessage CreateRequest(RedirectRequestContext context, byte[] bytes, bool sse)
     {
-        var payload = request.UsesModernSchema || request.Tools.Count > 0
-            ? JsonWriter.WriteModern(CreatePayload(request))
-            : JsonWriter.Write(CreatePayload(request));
-        var content = new ByteArrayContent(Encoding.UTF8.GetBytes(payload));
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        var content = new ByteArrayContent(context.IncludeBody ? bytes : []);
+        if (context.IncludeOriginBoundHeaders || !_headers.Any(header => string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))) content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-        var message = new HttpRequestMessage(HttpMethod.Post, _endpoint)
+        var message = new HttpRequestMessage(context.Method, context.Uri)
         {
             Content = content,
         };
-        ApplyHeaders(message, content, _headers);
+        if (context.IncludeOriginBoundHeaders) ApplyHeaders(message, content, _headers.Where(header => !context.IsRedirect || (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) ? context.OriginalConfiguredHostEligible : !(header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)) || context.IncludeBody)));
 
-        if (request.UsesModernSchema && request.Stream)
+        if (sse && (context.IncludeOriginBoundHeaders || !_headers.Any(header => string.Equals(header.Key, "Accept", StringComparison.OrdinalIgnoreCase))))
         {
             message.Headers.Remove("Accept");
             message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         }
 
-        ApplyAuthentication(message);
+        if (context.IncludeOriginBoundHeaders) ApplyAuthentication(message);
 
         return message;
     }
 
-    private HttpRequestMessage CreateModelsRequest()
+    private HttpRequestMessage CreateModelsRequest(RedirectRequestContext context)
     {
-        var content = new ByteArrayContent([]);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        var message = new HttpRequestMessage(HttpMethod.Get, _modelsEndpoint)
+        var content = new ByteArrayContent(context.IncludeBody ? [] : []);
+        if (context.IncludeOriginBoundHeaders || !_headers.Any(header => string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))) content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        var message = new HttpRequestMessage(context.Method, context.Uri)
         {
             Content = content,
         };
-        ApplyHeaders(message, content, _headers);
-        ApplyAuthentication(message);
+        if (context.IncludeOriginBoundHeaders) ApplyHeaders(message, content, _headers.Where(header => !context.IsRedirect || (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) ? context.OriginalConfiguredHostEligible : !(header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)) || context.IncludeBody)));
+        if (context.IncludeOriginBoundHeaders) ApplyAuthentication(message);
 
         return message;
     }
@@ -1025,18 +1056,15 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         }
     }
 
-    private async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage message,
+    private async Task<RedirectExchange> SendAsync(
+        Uri uri, HttpMethod method, Func<RedirectRequestContext, HttpRequestMessage> createRequest,
         string phase,
         CancellationToken cancellationToken,
         bool mapModernCancellation = false)
     {
         try
         {
-            return await _client.SendAsync(
-                message,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
+            return await _redirects.SendAsync(uri, method, createRequest, phase, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException exception)
         {
@@ -1086,6 +1114,62 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         {
             throw TransportFailure("The OpenAI-compatible response could not be closed.", phase, exception);
         }
+    }
+
+    private async Task<Exception?> DisposeGenerateResourcesAsync(
+        IAsyncEnumerator<AdapterEvent> iterator,
+        ResponseResources resources,
+        string phase)
+    {
+        Exception? first = null;
+        try
+        {
+            await iterator.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            first = exception;
+        }
+
+        var responseCleanup = await DisposeResponseResourcesAsync(resources, phase).ConfigureAwait(false);
+        return first ?? responseCleanup;
+    }
+
+    private async Task<Exception?> DisposeResponseResourcesAsync(ResponseResources resources, string phase)
+    {
+        Exception? first = null;
+        if (resources.Stream is not null)
+        {
+            try
+            {
+                await DisposeResponseStreamAsync(resources.Stream, phase).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                first = exception;
+            }
+        }
+
+        if (resources.Exchange is not null)
+        {
+            try
+            {
+                resources.Exchange.Dispose();
+            }
+            catch (Exception exception)
+            {
+                first ??= exception;
+            }
+        }
+
+        return first;
+    }
+
+    private sealed class ResponseResources
+    {
+        public RedirectExchange? Exchange { get; set; }
+
+        public Stream? Stream { get; set; }
     }
 
     private void DisposeResponse(HttpResponseMessage? response, string phase)

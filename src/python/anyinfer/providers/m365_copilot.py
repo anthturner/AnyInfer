@@ -70,6 +70,7 @@ class M365CopilotAdapter:
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=("authorization", *config.headers.keys()),
         )
 
     # ---- auth ------------------------------------------------------------------------

@@ -189,18 +189,39 @@ public sealed class OpenAIChatTests
     }
 
     [Fact]
-    public async Task Redirect_status_is_not_followed_and_maps_as_the_actual_response()
+    public async Task Terminal_missing_location_307_with_error_body_uses_buffered_completion_parser()
     {
         var handler = new ScriptedHandler(Response((HttpStatusCode)307, "application/json", """{"error":{"message":"redirect"}}"""));
         await using var adapter = Adapter(handler);
 
-        var failure = await Assert.ThrowsAsync<ProviderException>(() => Collect(adapter.GenerateAsync(Request(stream: false))));
+        var failure = await Assert.ThrowsAsync<StreamProtocolException>(() => Collect(adapter.GenerateAsync(Request(stream: false))));
 
         Assert.Single(handler.Requests);
-        Assert.Equal("invalid_request", failure.Category);
+        Assert.Equal("stream_protocol", failure.Category);
         Assert.False(failure.Retryable);
-        Assert.Equal("generate", failure.Phase);
-        Assert.Equal(307, failure.HttpStatus);
+        Assert.Equal("stream", failure.Phase);
+    }
+
+    [Fact]
+    public async Task Terminal_missing_location_307_with_completion_body_yields_buffered_events()
+    {
+        var handler = new ScriptedHandler(Response((HttpStatusCode)307, "application/json", """
+            {"choices":[{"message":{"content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}
+            """));
+        await using var adapter = Adapter(handler);
+
+        var events = await Collect(adapter.GenerateAsync(Request(stream: false)));
+
+        Assert.Single(handler.Requests);
+        Assert.Collection(events,
+            item => Assert.Equal("hello", Assert.IsType<AdapterTextDelta>(item).Text),
+            item => AssertUsage(Assert.IsType<AdapterUsage>(item).Usage, 2, 1, 3),
+            item =>
+            {
+                var final = Assert.IsType<AdapterFinal>(item);
+                Assert.Equal("stop", final.FinishReason);
+                AssertUsage(Assert.IsType<Usage>(final.Usage), 2, 1, 3);
+            });
     }
 
     [Fact]

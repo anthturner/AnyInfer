@@ -70,9 +70,12 @@ defaults, `TlsVerification.Disabled` disables validation, and a PEM bundle repla
 with custom roots. OpenSSL CA directories are unsupported. Native .NET chain building has
 platform-specific intermediate and explicit leaf-anchor behavior. A supplied handler controls its
 own proxy and TLS behavior, and the SDK does not load configured connection files for it. Automatic
-redirect parity with Python remains unfinished. On Windows, native TLS may use a temporary
-OS-managed user-key file for PEM client keys; the certificate is not added to the system store, and
-native references can defer normal cleanup after the SDK releases its handler and certificate.
+redirects use the shared [provider redirect
+policy](../reference/configuration.md#provider-http-redirects) when each hop is returned to the
+SDK; redirects or cookies handled inside a supplied handler remain caller-controlled. On Windows,
+native TLS may use a temporary OS-managed user-key file for PEM client keys; the certificate is not
+added to the system store, and native references can defer normal cleanup after the SDK releases
+its handler and certificate.
 
 ## Metadata and lifecycle calls
 

@@ -117,6 +117,7 @@ class OllamaAdapter:
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=("authorization", *config.headers.keys()),
         )
 
     @staticmethod
@@ -471,9 +472,7 @@ class OllamaAdapter:
         """
         payload = self._build_embedding_payload(req)
         try:
-            response = await self._client.post(
-                "/api/embed", json=payload, timeout=req.timeout_s
-            )
+            response = await self._client.post("/api/embed", json=payload, timeout=req.timeout_s)
         except httpx2.HTTPError as exc:
             raise map_transport_error(exc, provider=self.provider_id, phase="generate") from exc
         if response.status_code >= 400:

@@ -52,7 +52,9 @@ unencrypted PEM, separate unencrypted certificate/key PEM, or encrypted-key PEM 
 same-path combined file). Material is loaded when a selected provider first creates its handler.
 A supplied handler owns its transport behavior and bypasses SDK proxy/TLS setup and material
 loading. `ToString()` on connection objects omits values; version 1 `Dumps()` keeps configured
-literals, so protect that output. Automatic redirect parity with Python is not complete.
+literal values, so protect that output. Provider redirects follow the shared [redirect
+policy](configuration.md#provider-http-redirects) when the handler returns each hop; redirects or
+cookies handled inside a supplied handler remain caller-controlled.
 On Windows, native TLS may use a temporary OS-managed user-key file for PEM client keys; this does
 not add the certificate to the system certificate store. Native references can defer normal cleanup
 after the handler and certificate are released, so the SDK does not promise immediate deletion or

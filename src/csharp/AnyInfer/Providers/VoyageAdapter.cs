@@ -134,22 +134,19 @@ internal sealed class VoyageAdapter : IEmbedsText, IReranksText, IProviderLifecy
 
     private async ValueTask<T> SendAsync<T>(HttpMethod method, string path, JsonObject? payload, string phase, double? timeoutS, int cap, CancellationToken cancellationToken, Func<VoyageHttpResponse, T> convert, bool readBody = true)
     {
-        using var message = new HttpRequestMessage(method, Endpoint(path));
-        if (payload is not null)
+        var body = payload is null ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(JsonWriter.WriteModern(payload));
+        var endpoint = Endpoint(path);
+        HttpRequestMessage Create(RedirectRequestContext context)
         {
-            var content = new ByteArrayContent(Encoding.UTF8.GetBytes(JsonWriter.WriteModern(payload)));
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            message.Content = content;
+            var message = new HttpRequestMessage(context.Method, context.Uri);
+            var content = new ByteArrayContent(context.IncludeBody ? body : []); message.Content = content;
+            if (!_headers.Any(header => string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))) content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            if (!_headers.Any(header => string.Equals(header.Key, "Accept", StringComparison.OrdinalIgnoreCase))) message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            if (context.IncludeOriginBoundHeaders) ApplyHeaders(message, message.Content, _headers.Where(header => !context.IsRedirect || (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) ? context.OriginalConfiguredHostEligible : !(header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)) || context.IncludeBody)));
+            if (context.IncludeOriginBoundHeaders && !string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization")) message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            return message;
         }
-        else
-        {
-            message.Content = new ByteArrayContent([]);
-            message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        }
-        message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        ApplyHeaders(message, message.Content, _headers);
-        if (!string.IsNullOrEmpty(_apiKey) && !message.Headers.Contains("Authorization")) message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-        try { return await _transport.SendAsync(message, phase, timeoutS ?? _timeoutS, cap, cancellationToken, convert, readBody).ConfigureAwait(false); }
+        try { return await _transport.SendAsync(endpoint, method, Create, phase, timeoutS ?? _timeoutS, cap, cancellationToken, convert, readBody).ConfigureAwait(false); }
         catch (ProviderException exception) when (exception.Provider is null) { throw ProviderException.Create(exception.Message, exception.Category, exception.Retryable, exception.Phase, exception.RetryAfterS, exception.HttpStatus, _providerId, exception.Detail, exception.Hint, exception.NativeInner); }
     }
 

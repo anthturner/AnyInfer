@@ -76,7 +76,14 @@ from .base import (
     ProviderConfig,
     WireRequest,
 )
-from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
+from .http import (
+    build_client,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+    read_int,
+    safe_transport_detail,
+)
 from .openai_compat_embeddings import OpenAICompatEmbeddingsMixin
 from .sse import iter_sse
 
@@ -109,6 +116,7 @@ class OpenAIAdapter(OpenAIBatchMixin, OpenAICompatEmbeddingsMixin):
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=("authorization", *config.headers.keys()),
         )
 
     def _classify(
@@ -169,7 +177,7 @@ class OpenAIAdapter(OpenAIBatchMixin, OpenAICompatEmbeddingsMixin):
         try:
             response = await self._client.get("/models")
         except httpx2.HTTPError as exc:
-            return Health(ok=False, detail=str(exc)[:200])
+            return Health(ok=False, detail=safe_transport_detail(exc))
         if response.status_code >= 400:
             return Health(ok=False, detail=f"HTTP {response.status_code}")
         return Health(ok=True)
@@ -493,9 +501,7 @@ def _server_tool_result(item: Mapping[str, Any]) -> ServerToolDelta:
     if str(item.get("status", "")) in ("failed", "incomplete"):
         error = item.get("error")
         detail = error.get("message") if isinstance(error, Mapping) else error
-        return ServerToolDelta(
-            kind=tool_kind, status="failed", detail=str(detail or "")
-        )
+        return ServerToolDelta(kind=tool_kind, status="failed", detail=str(detail or ""))
     if tool_kind == "web_search":
         action = item.get("action")
         entries = action.get("sources") if isinstance(action, Mapping) else None
@@ -516,9 +522,7 @@ def _server_tool_result(item: Mapping[str, Any]) -> ServerToolDelta:
         kind=tool_kind,
         status="completed",
         output="".join(
-            str(out.get("logs", "") or "")
-            for out in (outputs or ())
-            if isinstance(out, Mapping)
+            str(out.get("logs", "") or "") for out in (outputs or ()) if isinstance(out, Mapping)
         ),
     )
 
@@ -732,9 +736,7 @@ _STATIC_EMBEDDING_CAPABILITIES = {
     # 2026-08-12: at most 2,048 inputs per request, 8,192 tokens per input, and no
     # input-intent concept anywhere in the request schema (hence the declared-empty
     # intents). Default dimensions are not stated in the reference, so they stay None.
-    model: EmbeddingCapabilities(
-        max_batch_inputs=2_048, max_input_tokens=8_192, input_intents=()
-    )
+    model: EmbeddingCapabilities(max_batch_inputs=2_048, max_input_tokens=8_192, input_intents=())
     for model in ("text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002")
 }
 
@@ -781,9 +783,7 @@ descriptor = ProviderDescriptor(
         "server_tools.max_uses",
     ),
     server_tools=frozenset({"web_search", "code_execution"}),
-    token_calibration=TokenCalibration(
-        tokenizer="tiktoken", tokenizer_provenance="catalog"
-    ),
+    token_calibration=TokenCalibration(tokenizer="tiktoken", tokenizer_provenance="catalog"),
     default_capabilities=ModelCapabilities(features=Sourced(_OPENAI_FEATURES, "default")),
     # Prompt caching is automatic on a stable prefix — there is nothing to mark, so the
     # core's only duty is to leave the prefix undisturbed. Recorded in contracts/openai.md.

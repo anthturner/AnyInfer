@@ -11,10 +11,12 @@ import sys
 import tomllib
 from pathlib import Path
 
+import httpx2
 import pytest
 
 from anyinfer.cli import main
 from anyinfer.errors import ConfigError
+from anyinfer.providers.base import ProviderConfig
 from anyinfer.registry import ProviderDescriptor, ProviderRegistry
 from anyinfer.testing.scaffold import scaffold_provider
 
@@ -50,6 +52,47 @@ def test_scaffolded_package_imports_and_registers(tmp_path: Path) -> None:
         sys.path.remove(str(tmp_path))
         sys.modules.pop("acme_anyinfer", None)
         sys.modules.pop("acme_anyinfer.adapter", None)
+
+
+@pytest.mark.anyio
+async def test_scaffolded_adapter_forwards_configured_header_provenance_to_the_shared_client(
+    tmp_path: Path,
+) -> None:
+    """A generated adapter uses the redirect-safe public client seam, not a copy."""
+    scaffold_provider("acme", tmp_path)
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return (
+            httpx2.Response(
+                307, headers={"Location": "https://second.example/next"}, request=request
+            )
+            if len(seen) == 1
+            else httpx2.Response(200, request=request)
+        )
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        adapter_module = importlib.import_module("acme_anyinfer.adapter")
+        config = ProviderConfig(
+            "acme",
+            base_url="https://first.example",
+            headers={"X-Configured": "configured"},
+            transport=httpx2.MockTransport(handler),
+        )
+        adapter = adapter_module.AcmeAdapter(config)
+        try:
+            await adapter._client.get("/models")
+        finally:
+            await adapter.aclose()
+    finally:
+        sys.path.remove(str(tmp_path))
+        sys.modules.pop("acme_anyinfer", None)
+        sys.modules.pop("acme_anyinfer.adapter", None)
+
+    assert len(seen) == 2
+    assert "x-configured" not in seen[1].headers
 
 
 def test_scaffolded_pyproject_declares_the_entry_point(tmp_path: Path) -> None:

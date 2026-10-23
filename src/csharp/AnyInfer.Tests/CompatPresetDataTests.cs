@@ -16,7 +16,7 @@ namespace AnyInfer.Tests;
 /// <summary>Independent controls for generated, inert compatibility-preset metadata.</summary>
 public sealed class CompatPresetDataTests
 {
-    private const string InventorySha256 = "47c2f58b2f4a8f9d0586c6f8ff92a171de485ef7cc73dfe496a679180e132b16";
+    private const string InventorySha256 = "46dd2eb1681b9e78c5daa97c446e28934cc128e6b7875e7509a229436810bfb4";
 
     [Fact]
     public void Generated_table_joins_every_compat_row_to_independent_source_facts()

@@ -61,7 +61,13 @@ from .base import (
 )
 from .cloud_auth import GoogleTokenSource
 from .gemini import _GEMINI_FEATURES, GeminiAdapter, _StreamState, _translate_reasoning
-from .http import check_response_size, classify_status, map_transport_error, read_error_detail
+from .http import (
+    check_response_size,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+    safe_transport_detail,
+)
 
 __all__ = ["VertexAdapter", "descriptor"]
 
@@ -84,6 +90,10 @@ counterpart; the rest are reachable through ``provider_options`` if a caller nee
 
 class VertexAdapter(GeminiAdapter):
     """Adapter for Gemini models served through Vertex AI."""
+
+    def _origin_bound_header_names(self, config: ProviderConfig) -> tuple[str, ...]:
+        """Protect the per-request Vertex bearer token."""
+        return ("authorization",)
 
     def __init__(self, config: ProviderConfig) -> None:
         options = dict(config.options)
@@ -151,7 +161,7 @@ class VertexAdapter(GeminiAdapter):
         try:
             self._tokens.token()
         except Exception as exc:  # noqa: BLE001 — surfaced as unhealthy, not raised
-            return Health(ok=False, detail=str(exc)[:200])
+            return Health(ok=False, detail=safe_transport_detail(exc))
         return Health(ok=True, detail=f"{self._project}/{self._location}")
 
     async def embed(self, req: EmbeddingWireRequest) -> EmbeddingWireResult:

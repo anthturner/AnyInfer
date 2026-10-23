@@ -64,6 +64,7 @@ from .http import (
     classify_status,
     map_transport_error,
     read_error_detail,
+    safe_transport_detail,
 )
 from .sse import iter_sse
 
@@ -119,6 +120,7 @@ class CohereAdapter:
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=("authorization", *config.headers.keys()),
         )
 
     # ---- discovery -------------------------------------------------------------------
@@ -168,7 +170,7 @@ class CohereAdapter:
         try:
             response = await self._client.get("/v1/models", params={"page_size": 1})
         except httpx2.HTTPError as exc:
-            return Health(ok=False, detail=str(exc)[:200])
+            return Health(ok=False, detail=safe_transport_detail(exc))
         if response.status_code >= 400:
             return Health(ok=False, detail=f"HTTP {response.status_code}")
         return Health(ok=True)
@@ -526,9 +528,7 @@ class CohereAdapter:
         vectors: list[tuple[float, ...]] = []
         for entry in floats:
             if not isinstance(entry, list):
-                raise ProviderError(
-                    "embed response contains a non-array vector", phase="validate"
-                )
+                raise ProviderError("embed response contains a non-array vector", phase="validate")
             vectors.append(tuple(float(v) for v in entry))
         meta = payload.get("meta")
         return EmbeddingWireResult(
@@ -576,9 +576,7 @@ class CohereAdapter:
             raise ProviderError("rerank response is not a JSON object", phase="validate")
         results = payload.get("results")
         if not isinstance(results, list):
-            raise ProviderError(
-                "rerank response is missing a 'results' array", phase="validate"
-            )
+            raise ProviderError("rerank response is missing a 'results' array", phase="validate")
         items: list[WireRankedItem] = []
         for entry in results:
             if not isinstance(entry, Mapping):
@@ -763,9 +761,7 @@ def _parse_model(entry: Mapping[str, Any]) -> DiscoveredModel:
     operations: Sourced[frozenset[InferenceOperation]] | None = None
     is_generation = True
     if isinstance(endpoints, list):
-        ops = frozenset(
-            _ENDPOINT_OPERATIONS[e] for e in endpoints if e in _ENDPOINT_OPERATIONS
-        )
+        ops = frozenset(_ENDPOINT_OPERATIONS[e] for e in endpoints if e in _ENDPOINT_OPERATIONS)
         operations = Sourced(ops, "discovered")
         is_generation = "generation" in ops
 

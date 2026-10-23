@@ -37,7 +37,14 @@ from ._logprobs import parse_openai_logprobs
 from ._multimodal import base64_data, data_url, media_subtype, unsupported
 from ._openai_batch import OpenAIBatchMixin
 from .base import AdapterEvent, AdapterFinal, ProviderConfig, WireRequest, _encode_function_tool
-from .http import build_client, classify_status, map_transport_error, read_error_detail, read_int
+from .http import (
+    build_client,
+    classify_status,
+    map_transport_error,
+    read_error_detail,
+    read_int,
+    safe_transport_detail,
+)
 from .sse import iter_sse
 
 __all__ = ["OpenAICompatAdapter", "descriptor"]
@@ -77,7 +84,15 @@ class OpenAICompatAdapter(OpenAIBatchMixin):
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=(
+                *config.headers.keys(),
+                *self._origin_bound_header_names(config),
+            ),
         )
+
+    def _origin_bound_header_names(self, config: ProviderConfig) -> Iterable[str]:
+        """Return credential header names added by this dialect."""
+        return ("authorization",)
 
     def _build_headers(self, config: ProviderConfig) -> dict[str, str]:
         """Assemble request headers. Subclasses add dialect-specific ones."""
@@ -129,7 +144,7 @@ class OpenAICompatAdapter(OpenAIBatchMixin):
         try:
             response = await self._client.get(self.models_path)
         except httpx2.HTTPError as exc:
-            return Health(ok=False, detail=str(exc)[:200])
+            return Health(ok=False, detail=safe_transport_detail(exc))
         if response.status_code >= 400:
             return Health(ok=False, detail=f"HTTP {response.status_code}")
         return Health(ok=True)

@@ -11,6 +11,7 @@ internal sealed class TeiHttpTransport : IAsyncDisposable
 {
     private const int ErrorLimit = 64 * 1024;
     private readonly HttpClient _client;
+    private readonly ProviderHttpRedirects _redirects;
     private readonly TimeSpan _configurationTimeout;
     private int _disposed;
 
@@ -30,10 +31,13 @@ internal sealed class TeiHttpTransport : IAsyncDisposable
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
+        _redirects = new ProviderHttpRedirects(_client);
     }
 
     internal async ValueTask<T> SendAsync<T>(
-        HttpRequestMessage message,
+        Uri initialUri,
+        HttpMethod initialMethod,
+        Func<RedirectRequestContext, HttpRequestMessage> createRequest,
         string phase,
         double? timeoutS,
         int successLimit,
@@ -43,12 +47,14 @@ internal sealed class TeiHttpTransport : IAsyncDisposable
         ThrowIfDisposed();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(timeoutS is null ? _configurationTimeout : TimeSpan.FromSeconds(timeoutS.Value));
+        RedirectExchange? exchange = null;
         HttpResponseMessage? response = null;
         Stream? stream = null;
         Exception? primary = null;
         try
         {
-            response = await _client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+            exchange = await _redirects.SendAsync(initialUri, initialMethod, createRequest, phase, timeout.Token).ConfigureAwait(false);
+            response = exchange.Response;
             stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
             var limit = (int)response.StatusCode >= 400 ? ErrorLimit : successLimit;
             var body = await ReadBoundedAsync(stream, limit, timeout.Token).ConfigureAwait(false);
@@ -87,7 +93,7 @@ internal sealed class TeiHttpTransport : IAsyncDisposable
             Exception? cleanup = null;
             try { if (stream is not null) await stream.DisposeAsync().ConfigureAwait(false); }
             catch (Exception exception) { if (primary is null) cleanup = exception; }
-            try { response?.Dispose(); }
+            try { exchange?.Dispose(); }
             catch (Exception exception) { if (primary is null && cleanup is null) cleanup = exception; }
             if (primary is null && cleanup is not null) throw cleanup;
         }

@@ -8,7 +8,8 @@ the router decides what to do about it.
 from __future__ import annotations
 
 import ssl
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,113 @@ from ..errors import (
     is_retryable_status,
 )
 
+_REDIRECT_STATE_EXTENSION = "anyinfer.origin_bound_redirect_state"
+_REDIRECT_FAILURE_MESSAGE = "redirect request is not safe to follow"
+
+
+class _OriginBoundRedirectState:
+    """Mutable state owned by one HTTPX redirect chain, never by the client."""
+
+    __slots__ = (
+        "body_dropped",
+        "body_length",
+        "hop_count",
+        "origin",
+        "previous_method",
+        "protected_names",
+        "stripped",
+    )
+
+    def __init__(
+        self,
+        origin: tuple[str, str, int],
+        protected_names: frozenset[str],
+        method: str,
+    ) -> None:
+        self.origin = origin
+        self.protected_names = protected_names
+        self.stripped = False
+        self.body_length: int | None = None
+        self.body_dropped = False
+        self.hop_count = 0
+        self.previous_method = method
+
+
+def _effective_origin(url: httpx2.URL) -> tuple[str, str, int]:
+    """Return normalized public URL components with the HTTP default port filled in."""
+    scheme = url.scheme.lower()
+    host = (url.host or "").lower()
+    port = url.port
+    if port is None:
+        port = {"http": 80, "https": 443}.get(scheme, 0)
+    return scheme, host, port
+
+
+def _is_safe_upgrade(previous: tuple[str, str, int], current: tuple[str, str, int]) -> bool:
+    return (
+        previous[0] == "http"
+        and previous[2] == 80
+        and current[0] == "https"
+        and current[2] == 443
+        and previous[1] == current[1]
+    )
+
+
+async def _origin_bound_request_hook(request: httpx2.Request) -> None:
+    """Strip origin-bound names after an unsafe redirect, using request-local state."""
+    state = request.extensions.get(_REDIRECT_STATE_EXTENSION)
+    origin = _effective_origin(request.url)
+    if state is None:
+        protected = request.extensions.get("anyinfer.origin_bound_header_names", frozenset())
+        state = _OriginBoundRedirectState(origin, protected, request.method)
+        request.extensions[_REDIRECT_STATE_EXTENSION] = state
+        with suppress(httpx2.RequestNotRead):
+            state.body_length = len(request.content)
+    else:
+        if state.hop_count and (request.url.username or request.url.password):
+            raise httpx2.LocalProtocolError(_REDIRECT_FAILURE_MESSAGE, request=request)
+        if request.method != state.previous_method and request.method == "GET":
+            state.body_dropped = True
+        if origin != state.origin and not _is_safe_upgrade(state.origin, origin):
+            state.stripped = True
+        state.origin = origin
+
+    if origin[0] not in {"http", "https"} or not origin[1]:
+        raise httpx2.UnsupportedProtocol(_REDIRECT_FAILURE_MESSAGE, request=request)
+
+    if state.stripped:
+        for name in state.protected_names:
+            # HTTPX has regenerated Host for a changed-origin redirect and replaced
+            # Cookie with destination-scoped client-jar state. These current values are
+            # derived for this hop, not the original configured values.
+            if name in {"host", "cookie"}:
+                continue
+            request.headers.pop(name, None)
+
+        if {"content-length", "transfer-encoding"} & state.protected_names:
+            request.headers.pop("content-length", None)
+            request.headers.pop("transfer-encoding", None)
+            if not state.body_dropped:
+                if state.body_length is None:
+                    raise httpx2.LocalProtocolError(_REDIRECT_FAILURE_MESSAGE, request=request)
+                request.headers["Content-Length"] = str(state.body_length)
+
+    state.previous_method = request.method
+    state.hop_count += 1
+
+
+def _origin_bound_hook(
+    protected_names: frozenset[str],
+) -> Callable[[httpx2.Request], Awaitable[None]]:
+    """Bind immutable header-name metadata to the shared request hook."""
+
+    async def hook(request: httpx2.Request) -> None:
+        request.extensions.setdefault("anyinfer.origin_bound_header_names", protected_names)
+        await _origin_bound_request_hook(request)
+
+    return hook
+
+
 __all__ = [
     "build_client",
     "check_response_size",
@@ -36,6 +144,7 @@ __all__ = [
     "parse_retry_after",
     "read_error_detail",
     "read_int",
+    "safe_transport_detail",
     "tls_kwargs",
 ]
 
@@ -70,6 +179,7 @@ def build_client(
     proxy: str | None = None,
     verify: str | bool | None = None,
     client_cert: str | tuple[str, str] | tuple[str, str, str] | None = None,
+    origin_bound_header_names: Iterable[str] = (),
 ) -> httpx2.AsyncClient:
     """Create an ``httpx2.AsyncClient`` configured for provider traffic.
 
@@ -88,11 +198,16 @@ def build_client(
             TLS-intercepting CA needs, and it is per instance, so one provider can trust a
             corporate CA while another keeps the public roots.
         client_cert: Client certificate for mTLS.
+        origin_bound_header_names: Header names whose current values are bound to the
+            original origin. Names are compared case-insensitively and values are never
+            inspected. ``Authorization`` is always protected.
 
     Note:
-        These are ignored when ``transport`` is supplied — a caller that brings its own
-        transport has taken over connection handling entirely, which is exactly what the
-        fake-server and cassette test modes do.
+        ``proxy``, ``verify`` and ``client_cert`` are ignored when ``transport`` is
+        supplied because the caller owns connection handling. Redirect following and
+        origin-bound header policy still run for every request visible to this client
+        before it is passed to the supplied transport. A transport that follows redirects
+        internally hides those hops from the client and owns their handling.
     """
     tls: dict[str, Any] = {}
     if transport is None:
@@ -101,11 +216,16 @@ def build_client(
         if proxy is not None:
             tls["proxy"] = proxy
         tls.update(tls_kwargs(verify, client_cert))
+    protected_names = frozenset(
+        {"authorization", *(name.lower() for name in origin_bound_header_names)}
+    )
     return httpx2.AsyncClient(
         base_url=base_url or "",
         headers=dict(headers or {}),
         timeout=httpx2.Timeout(timeout_s),
         follow_redirects=True,
+        max_redirects=20,
+        event_hooks={"request": [_origin_bound_hook(protected_names)]},
         transport=transport,
         **tls,
     )
@@ -342,6 +462,30 @@ def map_transport_error(
             phase=phase,
             hint="check the base URL and that the server is running",
         )
+    if isinstance(
+        exc,
+        _SAFE_PROTOCOL_FAILURES,
+    ):
+        return TransportError(
+            f"redirect or protocol failure talking to {provider}",
+            provider=provider,
+            phase=phase,
+        )
     return TransportError(
         f"transport failure talking to {provider}: {exc}", provider=provider, phase=phase
     )
+
+
+_SAFE_PROTOCOL_FAILURES = (
+    httpx2.TooManyRedirects,
+    httpx2.RemoteProtocolError,
+    httpx2.LocalProtocolError,
+    httpx2.UnsupportedProtocol,
+)
+
+
+def safe_transport_detail(exc: Exception) -> str:
+    """Return a bounded health detail without rendering redirect parser input."""
+    if isinstance(exc, _SAFE_PROTOCOL_FAILURES):
+        return "redirect or protocol failure"
+    return str(exc)[:200]

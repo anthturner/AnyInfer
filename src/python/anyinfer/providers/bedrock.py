@@ -186,6 +186,13 @@ class BedrockAdapter:
             proxy=config.proxy,
             verify=config.verify,
             client_cert=config.client_cert,
+            origin_bound_header_names=(
+                "authorization",
+                "x-amz-date",
+                "x-amz-content-sha256",
+                "x-amz-security-token",
+                *config.headers.keys(),
+            ),
         )
 
     # ---- auth ------------------------------------------------------------------------
@@ -935,9 +942,7 @@ class BedrockAdapter:
             "inputDataConfig": {
                 "s3InputDataConfig": {"s3Uri": input_uri, "s3InputFormat": "JSONL"}
             },
-            "outputDataConfig": {
-                "s3OutputDataConfig": {"s3Uri": f"{bucket_uri}/{job_name}/out/"}
-            },
+            "outputDataConfig": {"s3OutputDataConfig": {"s3Uri": f"{bucket_uri}/{job_name}/out/"}},
         }
         if req.metadata:
             payload["tags"] = [
