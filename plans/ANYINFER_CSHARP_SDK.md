@@ -948,11 +948,13 @@ must report a real conflict rather than silently changing a dependent public sig
   > Inventory-only acceptance is complete at source
   > 830673e56437a695ae26f579d7ca264139b7b0ba: 106 rows/129 bindings/49 source hashes,
   > all 24 held-source workspace steps, fresh clean --check plus 20 focused controls,
-  > and independent bounded review pass. Resume the reviewed preset runtime boundary;
-  > current Reka/Lemonade auth findings require source-backed adjudication first.
-  > Immediate prerequisite `ANYINFER_CSHARP_SDK_PRESET_AUTH.md` adopts only researched
-  > Reka Bearer and Lemonade optional-Bearer setup metadata before native data porting.
-  > It preserves missing native bindings and all unverified/live boundaries explicitly.
+  > and independent bounded review pass. The prerequisite
+  > `ANYINFER_CSHARP_SDK_PRESET_AUTH.md` is accepted at clean source
+  > c3d0e9a0d26bd253d58620f4bca623c02fac3d85: researched Reka Bearer and Lemonade
+  > optional-Bearer setup metadata, all five registered gates/aggregation, prior native
+  > profile/package/example continuity and Frozen 102 pass with bounded independent review.
+  > Native preset bindings and live verification remain absent. Resume the reviewed native
+  > preset runtime/data boundary without checking SDK.8a or waiving mixed operations.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes
@@ -1031,6 +1033,9 @@ preset-data boundary before remaining mixed-operation SDK.6c bindings. The inven
 is complete at source 830673e56437a695ae26f579d7ca264139b7b0ba (tree
 35f35ca6a6a76291c0fe0fdf82affa6e4499cd88), with full held-source gate and clean focused
 qualification. Native preset runtime, dedicated dialects and mixed operations remain open.
+The auth prerequisite is accepted at clean source c3d0e9a0d26bd253d58620f4bca623c02fac3d85,
+with full held-source workspace, registered clean propagation and Frozen preservation;
+it corrects Python metadata before native porting and creates no native preset binding.
 SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
 `7e00ab8f148f255b94c77b5c8673370a04ad2833`: all 24 workspace steps, clean registered

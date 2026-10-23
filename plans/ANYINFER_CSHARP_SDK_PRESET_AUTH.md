@@ -109,15 +109,36 @@ add native bindings, or certify live provider availability.
   > protected file digests match after execution; no unrelated/generated changes occurred.
   > The earlier pending note records sequence only. Root is committing the explicit source
   > set before the fresh clean registered/Frozen qualification in AUTH.4.
-- [ ] **AUTH.4** Coordinator: commit explicit owned paths, then qualify the immutable
+- [x] **AUTH.4** Coordinator: commit explicit owned paths, then qualify the immutable
   declaration in a fresh clean selected checkout through both registered producers, all
   five registered gates and pure aggregation. Verify exact declaration/registry/source/run
   bindings; preserve prior profiles and run Frozen DEVELOPMENT 102/0/0/0 with release hash
   unchanged. Gate: clean before/after, independent evidence review and no false local/live
   verification claim. Parent SDK.8a/6c/8b-c and all root API rows remain unchecked.
-- [ ] **AUTH.5** Coordinator: record the accepted source separately from plan-only
+  > NOTE: Explicit source set is committed at
+  > c3d0e9a0d26bd253d58620f4bca623c02fac3d85, tree
+  > 1c7c12b0c0e0704a940e68adfaed9d1374f1f1e1. Fresh managed checkout
+  > feature-preset-auth-clean-c3d0e9a starts clean and matches declaration SHA
+  > d261e8f00e048fe6df5dafbb25f89f7f283bb273e0c1c3997b5296ce1ac9e4e1.
+  > The independently reviewed operator now requires every one of all five gate records
+  > to pass with exit zero, even for unsupported/unbound C# presets. Real attempt 1,
+  > local-preset-auth-c3d0e9a0-20261023T041723Z, passes all five registered gates and pure
+  > aggregation, with matching two inventory/two verification records and clean state
+  > before/after. Aggregate SHA
+  > a7b00ba5d66ae0d22bf1ceb9603bb4f9230396683d3ed404ba337a5ddaf6fa74;
+  > Frozen DEVELOPMENT 102/0/0/0 report SHA
+  > 9112b6088f05939ec2a2dd25081c75a958fc51d949c8a4de0e696493a431d008,
+  > unchanged release input 16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391.
+  > Independent evidence review is bounded clean. C# workspace continuity (11/11 steps,
+  > prior profile pairs/package/examples) passes; native Reka/Lemonade bindings remain absent.
+- [x] **AUTH.5** Coordinator: record the accepted source separately from plan-only
   reconciliation and resume the reviewed native preset runtime contract. Gate: the pending
   129-operation inventory remains visible and no generation-only provider waiver appears.
+  > NOTE: Accepted executable source remains c3d0e9a0d26bd253d58620f4bca623c02fac3d85;
+  > this plan-only reconciliation does not replace it. Inventory is still 106 providers/
+  > 129 Python operations versus seven native bindings, with 122 pending. Parent SDK.8a,
+  > SDK.6c/8b-c and all 235 root API rows stay unchecked. Resume the native preset data/
+  > runtime boundary under the existing full-core authorization; no new go-ahead is needed.
 
 ## Ownership and resume
 
@@ -126,6 +147,6 @@ deviations, and never change another owner's files or Git state. Root owns share
 LF attributes, generated witnesses, explicit commits, .NET/native/full/clean gates and final
 acceptance. Use `.venv/Scripts/python.exe`, disabled cacheprovider, fresh ignored JUnit/temp
 paths and an external pytest basetemp for full/clean qualification. Preserve user-owned
-`uv.lock` and `v/cache/nodeids`. Resume AUTH.4 from the next explicit source checkpoint;
-AUTH.1/2/3 and the held-source full workspace gate are complete. Exact source identity and
-fresh clean qualification remain separate from later plan-only acceptance.
+`uv.lock` and `v/cache/nodeids`. This leaf is complete at accepted source checkpoint
+`c3d0e9a0d26bd253d58620f4bca623c02fac3d85`. Resume parent SDK.8a's reviewed native
+preset runtime/data contract; source qualification remains separate from plan-only acceptance.
