@@ -306,28 +306,52 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
     > The completed leaf is retired; its source checklist is available with
     > `git show 146fbab:plans/SDK_CONTEXT_TUNING.md`. This parent is the completion receipt.
     > Standalone tuning does not close SDK.9, any root completion mark or release support.
-  - [ ] **ALIGN.5d — Restore effective cache mechanism on results.** Execute
-    [native cache result projection](SDK_CACHE_RESULT_PROJECTION.md). Reuse the existing
+  - [x] **ALIGN.5d — Restore effective cache mechanism on results.** Reuse the existing
     winning attempt's cache plan and nullable enum; preserve policy, telemetry, wire,
     manifest and Python behavior. Gate: public model/client/stream/retry/repair controls,
     real ledger, docs/package consumer, independent review and the leaf's qualification
     pass. `Generation` remains partial for arena/context-reduction fields. Continue the
     remaining context ports after this additive projection correction.
+    > NOTE: Completed 2026-10-24 at executable checkpoint
+    > `dc74a3985bd0393ae81f199ef2b6b7657cd242c0`. Independent source/control/docs/evidence
+    > review is accepted in Traycer `sdk-foundation-alignment/cache-result-source-review`.
+    > The 28 focused public controls pass. Full serialized shell
+    > `4d069937-0c62-4cef-9d7e-4b2444df2270` passes all 27 steps in 269.1s, including
+    > 1,164 native unit / 93 conformance tests, six paired development profiles, the real
+    > 235-row ledger, isolated package consumer, exact examples and strict docs. Clean shell
+    > `b7f4f321-51ef-4d80-809a-f33e2c3ff204` passes all 14 native steps in 141.3s and
+    > preserves the exact clean revision with `source_dirty=false`. Both gates use fresh
+    > pytest caches; explicit sealed v0 verification retains the ALIGN.1 digest.
+    > The completed leaf is retired; its source checklist is available with
+    > `git show dc74a39:plans/SDK_CACHE_RESULT_PROJECTION.md`. Generation remains partial
+    > for arena/context reduction. Counts remain 171 implemented / 26 partial / 37 deferred /
+    > one different; all 235 root marks and 15 SDK milestone boxes remain open.
+  - [ ] **ALIGN.5e — Settle and execute context primitives.** Read the actual Python
+    `context/documents.py`, `structure.py` and `pack.py`, the proposed Traycer
+    `sdk-foundation-alignment/context-primitives-contract`, and the measured
+    `sdk-foundation-alignment/context-unicode-probe`. Settle scalar slicing, strict UTF-8,
+    language/generated/import/declaration behavior and deterministic Unicode word semantics
+    before creating `SDK_CONTEXT_PRIMITIVES.md`. Keep Python behavioral authority and all
+    sealed assets unchanged. Gate: cold artifact critique resolves the Unicode data/version
+    policy and public API, then a detailed executable leaf names disjoint source/control/
+    observer ownership and independent development evidence. Execute that leaf under the
+    existing autonomous authorization; broader reducers, ranking, history and request/config
+    integration remain open until their own implementations and gates pass.
 
 ## Handoff
 
-ALIGN.1–4 and ALIGN.5a–c are complete. The autonomous run resumes at
-**ALIGN.5d / CACHE.5 commit and clean qualification** on
-`feature/language-neutral-foundation`, executable base
-`146fbabed9e1b9fbbd90fb8242c7ea1109e333a9` (qualified standalone context tuning).
-Cache projection source/tests/docs are uncommitted on plan checkpoint `dcd3d7c`;
-the source build, 28 focused public controls, real ledger and all 27 workspace steps pass.
+ALIGN.1–4 and ALIGN.5a–d are complete. The autonomous run resumes at
+**ALIGN.5e / context-primitives contract and Unicode decision** on
+`feature/language-neutral-foundation`, qualified executable checkpoint
+`dc74a3985bd0393ae81f199ef2b6b7657cd242c0` (cache result projection).
+The preceding qualified standalone context-tuning checkpoint is
+`146fbabed9e1b9fbbd90fb8242c7ea1109e333a9`.
 The preceding catalog vocabulary and context-plan checkpoint is `028450e`.
 The preceding audit, documentation, evidence ledger and checker checkpoint is `8ce6bc0`;
 the earlier
 baseline was `ea85ddd42f418cdf81f55638a2e8afd0af848daf`. Recheck Git status and preserve any
 ongoing ALIGN.5 edits before continuing. Historical provider qualifications remain recorded
-separately; the bounded settings qualification is the exact source/gates under ALIGN.5c.
+separately; bounded settings/cache qualifications are the exact source/gates above.
 ALIGN.4 does not authorize changing sealed normative assets or moving data authority.
 The coordinator owns Git state and heavy checks; workers own disjoint paths and targeted
 checks. No runtime source change is required for the initial documentation correction.

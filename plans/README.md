@@ -14,9 +14,9 @@ historical evidence, it links to the version-pinned source record.
 - [Foundation and SDK alignment](SDK_FOUNDATION_ALIGNMENT.md) tracks the parity audit,
   initial documentation correction, executable API reconciliation, and the distinction
   between sealed specification coverage, development profiles and shared build-time data.
-  ALIGN.1–4, the public catalog vocabulary and standalone context tuning are complete;
-  the next bounded work is ALIGN.5d / CACHE.5, commit and clean qualification of the
-  cache-mechanism result projection after 28 focused controls and the full 27-step gate.
+  ALIGN.1–4, the public catalog vocabulary, standalone context tuning and cache result
+  projection are complete. The next bounded work is ALIGN.5e: settle the context-primitives
+  contract and Unicode semantics, then execute its reviewed implementation checklist.
   The 235-export evidence ledger
   and its workspace checker are active; their classifications are scoped evidence, not a
   full-parity claim.
@@ -26,10 +26,6 @@ historical evidence, it links to the version-pinned source record.
   the SDK.11c reconciliation.
 - [C# SDK retrieval operations](ANYINFER_CSHARP_SDK_RETRIEVAL.md) retains the open 6c.0
   retrieval-provider research preflight within SDK.6c.
-- [Native cache result projection](SDK_CACHE_RESULT_PROJECTION.md) restores the already
-  selected cache mechanism to public generation results. The qualified context-tuning
-  source checkpoint is `146fbab`; context strategies and request-path integration remain
-  unfinished. Completed tuning-checklist history is pinned in the SDK parent/alignment receipt.
 - [Language-neutral foundation](language-neutral-foundation/ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md)
   retains M3.1 operation accounting and M4.1–M4.G additional-port feasibility and approval.
 
@@ -39,5 +35,6 @@ historical evidence, it links to the version-pinned source record.
 - [Language-neutral foundation index](language-neutral-foundation/README.md) identifies the
   shared specification and the foundation plan's deferred scope.
 
-The retirement maintenance preserved every unfinished milestone. Subsequent alignment
-work records its own gates in the leaf above.
+The retirement maintenance preserved every unfinished milestone. Completed tuning and cache
+checklists are pinned in the alignment receipts at qualified source checkpoints `146fbab`
+and `dc74a39`. Context strategies and request-path integration remain unfinished.

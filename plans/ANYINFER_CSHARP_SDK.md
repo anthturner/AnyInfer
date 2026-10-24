@@ -1136,9 +1136,11 @@ must report a real conflict rather than silently changing a dependent public sig
 
 **Current resume:** the user's 2026-10-24 parity/foundation request authorizes the bounded
 [alignment leaf](SDK_FOUNDATION_ALIGNMENT.md), starting at its first unchecked box.
-ALIGN.1–4 and ALIGN.5a–c are complete: docs, the executable 235-export ledger, evidence
-map, catalog vocabulary and standalone context tuning are reconciled. ALIGN.5d next closes
-the additive cache result projection; broader context ports remain open. Provider work still resumes
+ALIGN.1–4 and ALIGN.5a–d are complete: docs, the executable 235-export ledger, evidence
+map, catalog vocabulary, standalone context tuning and cache result projection are reconciled.
+The cache slice is qualified at clean source `dc74a3985bd0393ae81f199ef2b6b7657cd242c0`;
+its completion receipt and retired-checklist pin are in ALIGN.5d. Resume at ALIGN.5e's
+context-primitives contract and Unicode decision; broader context ports remain open. Provider work still resumes
 at SDK.8a with a separately researched binding. Existing SDK completion and release gates
 remain open. The paragraph below records the superseded branch-preparation pause.
 
