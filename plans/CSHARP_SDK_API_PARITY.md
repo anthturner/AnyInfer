@@ -560,8 +560,9 @@ The following grouped inventory follows subsystem `__all__` declarations and API
 > NOTE: `AnyInfer.Context.ContextTuning` now implements the standalone 17-setting model,
 > default/recommended constants and strict mapping/merge helpers. Source and independent
 > observer review, 24 native controls and 57 shared development cases plus one separate
-> native range boundary pass; full qualification is tracked by CTUNE.4 in
-> [native context tuning](SDK_CONTEXT_TUNING.md). This subsystem export is outside the 235
+> native range boundary, full 27-step workspace and clean 14-step native/package gates pass
+> at `146fbabed9e1b9fbbd90fb8242c7ea1109e333a9`; the
+> [SDK parent](ANYINFER_CSHARP_SDK.md) records the bounded completion. This export is outside the 235
 > root rows. Reducers, document/ranking/selection/history and request/config wiring remain
 > open; settings evidence does not complete SDK.9a or a root completion mark.
 

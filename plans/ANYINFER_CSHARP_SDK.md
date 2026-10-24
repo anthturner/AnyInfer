@@ -1050,10 +1050,11 @@ must report a real conflict rather than silently changing a dependent public sig
 - [ ] **SDK.9a** Port pure context ranking/selection/representation/packing/history and
   tuning from `context/`, plus `ContextRequest`, estimates and fit gates. No filesystem walker
   in the reducer. Gate: common deterministic context-envelope/budget/selection corpus.
-  > NOTE: Autonomous execution begins with [native context tuning](SDK_CONTEXT_TUNING.md).
-  > Its reviewed contract covers the 17-setting foundation; 24 targeted native controls
-  > and independent observations pass 57 shared cases plus one separate native boundary.
-  > CTUNE.0–3 are accepted; CTUNE.4 full workspace/package qualification is next.
+  > NOTE: Standalone native context tuning is accepted at
+  > `146fbabed9e1b9fbbd90fb8242c7ea1109e333a9`: 24 targeted native controls, 57 shared
+  > observations plus one separate native boundary, full 27-step workspace and clean
+  > 14-step native/package qualification pass. ALIGN.5c records the completion receipt;
+  > the completed source checklist is pinned by `git show 146fbab:plans/SDK_CONTEXT_TUNING.md`.
   > Settings alone do not implement reducers, history, request policy or shared config.
 - [ ] **SDK.9b** Port opt-in distillation, semantic ranking, request-path compaction and
   cache placement using already-implemented operation/accounting surfaces. Gate: bounded
@@ -1135,8 +1136,9 @@ must report a real conflict rather than silently changing a dependent public sig
 
 **Current resume:** the user's 2026-10-24 parity/foundation request authorizes the bounded
 [alignment leaf](SDK_FOUNDATION_ALIGNMENT.md), starting at its first unchecked box.
-ALIGN.1–4 are complete: docs, the executable 235-export ledger and the existing evidence
-map are reconciled. ALIGN.5 resumes implementation gap closure; provider work still resumes
+ALIGN.1–4 and ALIGN.5a–c are complete: docs, the executable 235-export ledger, evidence
+map, catalog vocabulary and standalone context tuning are reconciled. ALIGN.5d next closes
+the additive cache result projection; broader context ports remain open. Provider work still resumes
 at SDK.8a with a separately researched binding. Existing SDK completion and release gates
 remain open. The paragraph below records the superseded branch-preparation pause.
 

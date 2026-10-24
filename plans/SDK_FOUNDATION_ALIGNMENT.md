@@ -24,9 +24,9 @@ behavioral exceptions. Full Python core-library parity in phases remains the des
 > asset authority retain their existing separate gates.
 
 Audit baseline: `ea85ddd42f418cdf81f55638a2e8afd0af848daf` on
-`feature/language-neutral-foundation`. The last qualified executable remains
+`feature/language-neutral-foundation`. At audit start the last qualified executable was
 `952b678d2dc020075c09bc6f8d11e2879fc992bd`; documentation work does not replace that
-clean-source evidence.
+clean-source evidence. Later bounded development qualifications are recorded by phase.
 
 | Finding | Evidence and implication |
 |---|---|
@@ -285,25 +285,46 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
     > passes at 171 implemented / 26 partial / 37 deferred / one different; these evidence
     > corrections are not a runtime regression or a completion percentage. All root
     > completion marks and 15 parent SDK milestones stay open.
-  - [ ] **ALIGN.5c — Port and qualify context tuning.** Execute the first unchecked box in
-    [native context tuning](SDK_CONTEXT_TUNING.md), the bounded SDK.9a prerequisite. Its
-    CTUNE.0–3 reviews are accepted; 24 native controls and 57 paired cases plus one separate
-    native boundary pass. Resume is CTUNE.4 full qualification. Gate: actual native settings,
+  - [x] **ALIGN.5c — Port and qualify context tuning.** Complete the bounded SDK.9a
+    settings prerequisite. Gate: actual native settings,
     independent shared development observations, documentation and the leaf's full gates
     pass before this box closes. Continue the remaining context document/representation,
     ranking/deduplication, selection/packing and history ports after this bounded leaf.
+    > NOTE: Completed 2026-10-24 at executable checkpoint
+    > `146fbabed9e1b9fbbd90fb8242c7ea1109e333a9` (settings source `cddea10`, followed by the
+    > explicit LF checkout rule). CTUNE.0–4 reviews and gates are accepted. Full shell
+    > `0403707d-9ded-4c33-aebc-c6b1ae3525ba` passes all 27 steps in 259.6s with a fresh
+    > pytest cache, 1,160 native unit / 93 conformance tests, six paired development
+    > profiles, package-only consumer, examples and strict docs. The first full attempt
+    > `cbd3d59e-dbb4-4562-ba1c-c0cd3c5a5f5f` failed four pytest teardown stages on the known
+    > root cache ACL; it is retained, and no source/test/fixture change hid the failure.
+    > Clean shell `33f00625-bf13-428c-83af-e75eac6e4804` passes all 14 native steps in 139.1s,
+    > preserving exact clean Git identity. Fresh context run `run-e3tfgj11` records the same
+    > revision with `source_dirty=false` in both runtimes: 57 shared matches, zero mismatches
+    > and one separately observed native range boundary. Actual CRLF-configured checkout
+    > preserves all four frozen LF hashes; sealed v0 retains the ALIGN.1 digest.
+    > The completed leaf is retired; its source checklist is available with
+    > `git show 146fbab:plans/SDK_CONTEXT_TUNING.md`. This parent is the completion receipt.
+    > Standalone tuning does not close SDK.9, any root completion mark or release support.
+  - [ ] **ALIGN.5d — Restore effective cache mechanism on results.** Execute
+    [native cache result projection](SDK_CACHE_RESULT_PROJECTION.md). Reuse the existing
+    winning attempt's cache plan and nullable enum; preserve policy, telemetry, wire,
+    manifest and Python behavior. Gate: public model/client/stream/retry/repair controls,
+    real ledger, docs/package consumer, independent review and the leaf's qualification
+    pass. `Generation` remains partial for arena/context-reduction fields. Continue the
+    remaining context ports after this additive projection correction.
 
 ## Handoff
 
-ALIGN.1–4 and ALIGN.5a/b are complete. The autonomous run resumes at **ALIGN.5c / CTUNE.4** on
-`feature/language-neutral-foundation`, base commit
-`028450eb4cc40d9b25a7bfff30d3ceeb5ab36234` (catalog vocabulary and context-plan checkpoint).
+ALIGN.1–4 and ALIGN.5a–c are complete. The autonomous run resumes at **ALIGN.5d / CACHE.1** on
+`feature/language-neutral-foundation`, executable base
+`146fbabed9e1b9fbbd90fb8242c7ea1109e333a9` (qualified standalone context tuning).
+The preceding catalog vocabulary and context-plan checkpoint is `028450e`.
 The preceding audit, documentation, evidence ledger and checker checkpoint is `8ce6bc0`;
 the earlier
 baseline was `ea85ddd42f418cdf81f55638a2e8afd0af848daf`. Recheck Git status and preserve any
-ongoing ALIGN.5 edits before continuing. The last separately qualified executable remains
-the source checkpoint recorded above; the new checkpoint has the working-tree full gate
-recorded under ALIGN.3d.
+ongoing ALIGN.5 edits before continuing. Historical provider qualifications remain recorded
+separately; the bounded settings qualification is the exact source/gates under ALIGN.5c.
 ALIGN.4 does not authorize changing sealed normative assets or moving data authority.
 The coordinator owns Git state and heavy checks; workers own disjoint paths and targeted
 checks. No runtime source change is required for the initial documentation correction.

@@ -14,9 +14,9 @@ historical evidence, it links to the version-pinned source record.
 - [Foundation and SDK alignment](SDK_FOUNDATION_ALIGNMENT.md) tracks the parity audit,
   initial documentation correction, executable API reconciliation, and the distinction
   between sealed specification coverage, development profiles and shared build-time data.
-  ALIGN.1–4 and the public catalog vocabulary slice are complete; the next bounded work is
-  ALIGN.5c / CTUNE.4, full qualification of native context tuning after its reviewed
-  57-case paired evidence and separate native range boundary. The 235-export evidence ledger
+  ALIGN.1–4, the public catalog vocabulary and standalone context tuning are complete;
+  the next bounded work is ALIGN.5d / CACHE.1, effective cache-mechanism result projection.
+  The 235-export evidence ledger
   and its workspace checker are active; their classifications are scoped evidence, not a
   full-parity claim.
   It does not select a new provider or change asset authority.
@@ -25,9 +25,10 @@ historical evidence, it links to the version-pinned source record.
   the SDK.11c reconciliation.
 - [C# SDK retrieval operations](ANYINFER_CSHARP_SDK_RETRIEVAL.md) retains the open 6c.0
   retrieval-provider research preflight within SDK.6c.
-- [Native context tuning](SDK_CONTEXT_TUNING.md) starts SDK.9a with the immutable settings
-  foundation and separately qualified shared development evidence; context strategies and
-  request-path integration remain unfinished.
+- [Native cache result projection](SDK_CACHE_RESULT_PROJECTION.md) restores the already
+  selected cache mechanism to public generation results. The qualified context-tuning
+  source checkpoint is `146fbab`; context strategies and request-path integration remain
+  unfinished. Completed tuning-checklist history is pinned in the SDK parent/alignment receipt.
 - [Language-neutral foundation](language-neutral-foundation/ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md)
   retains M3.1 operation accounting and M4.1–M4.G additional-port feasibility and approval.
 
