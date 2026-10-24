@@ -980,6 +980,17 @@ must report a real conflict rather than silently changing a dependent public sig
   > reconciliation is complete; this does not check SDK.8a or admit other presets.
   > Current/minimum controls, all25 held workspace steps and the clean12-step C# gate plus56
   > redirect controls pass with bounded independent review. Provider breadth remains open.
+  > NOTE: The next bounded tranche, `ANYINFER_CSHARP_SDK_HYPERBOLIC.md`, is qualified at
+  > executable `b4456054d0d3f6d79113d04714b5c8baf99f2518`, tree
+  > `9fcf09fe47641d58d683466beadbabc29155055b`. It adopts only Hyperbolic's documented
+  > endpoint migration and existing generation-row selection. Full25/4532 Python plus10
+  > documented skips/1117 native unit/93 conformance and clean12 C# steps pass; actual
+  > registered Python/C# producers and aggregate pass on the same clean source. Independent
+  > receipt admission `add9cbb6...17e4e8` preserves wrapper-invalid evidence and proves the
+  > exact root-only user-file boundary without rerunning gates or changing policy.
+  > Native defaults are now6 descriptors/9 bindings/120 pending memberships; Python106/129
+  > and86 generated rows stay unchanged. HYP.6 plan-only reconciliation is complete;
+  > SDK.8a and all broader completeness gates remain open. Hosted traffic is unverified.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes
@@ -1063,10 +1074,18 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.8a further researched preset registration**, beginning with
-Hyperbolic's endpoint migration and native registration contract. CPR.6 reconciliation is
-complete. The first Cerebras tranche is qualified at source `a51f584` /
-tree `094f2d6`; its executable identity remains separate from this later plan record.
+Current resume point: **SDK.8a further researched preset registration**. HYP.6 plan-only
+reconciliation is complete. Hyperbolic's endpoint migration and native generation registration
+are qualified at executable `b4456054d0d3f6d79113d04714b5c8baf99f2518`, tree
+`9fcf09fe47641d58d683466beadbabc29155055b`. All25 held-source checks, actual clean12-step
+C# gate and registered Python/C# producers/aggregate pass; independent actual evidence
+review and the separate root-file-boundary receipt are bounded clean. Native defaults are
+6 descriptors/9 bindings/120 pending memberships. Python106/129 and86 generated rows remain
+unchanged. The leaf `ANYINFER_CSHARP_SDK_HYPERBOLIC.md` is complete with bounded independent
+consistency review; qualified executable identity stays separate from its two-plan record.
+The earlier Cerebras source `a51f584` / tree `094f2d6` and CPR.6 reconciliation remain
+historical accepted checkpoints. Baseten/Inference.net remain research only; hosted traffic
+is unverified.
 `ANYINFER_CSHARP_SDK_REDIRECTS.md` and its independently reviewed plan-only
 reconciliation are complete. Remaining mixed-operation SDK.6c bindings stay separately unchecked. NCON.8 connection plan-only
 reconciliation is complete; its executable qualification remains the separate source below. The inventory leaf
@@ -1128,7 +1147,7 @@ Python simultaneous read/cleanup behavior and opaque injected-handler hidden hop
 qualified limits; the historical connection external-close5s diagnostic remains unexplained.
 RDIR.8 parent/leaf/ticket reconciliation has bounded-clean independent critique. Resume
 SDK.8a researched registration; no broader SDK completion follows.
-Default registry now has five descriptors/eight bindings, with 121 operation memberships
+Default registry now has six descriptors/nine bindings, with 120 operation memberships
 pending. Compiling data does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12
 and all 235 root API rows remain open.
 SDK.7a/b are
