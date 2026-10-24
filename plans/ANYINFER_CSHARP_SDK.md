@@ -991,6 +991,21 @@ must report a real conflict rather than silently changing a dependent public sig
   > Native defaults are now6 descriptors/9 bindings/120 pending memberships; Python106/129
   > and86 generated rows stay unchanged. HYP.6 plan-only reconciliation is complete;
   > SDK.8a and all broader completeness gates remain open. Hosted traffic is unverified.
+  > NOTE: The native SSE completion prerequisite in `ANYINFER_CSHARP_SDK_SSE_COMPLETION.md`
+  > is qualified at executable `d388e6832c0436d9aae3f884ca753cff3837bf0e`, tree
+  > `faf3154e8091a617902dfc1c97d4482886d4d881`. Clean EOF now follows existing Python
+  > completion behavior; DONE still terminates early. This explicitly supersedes only
+  > the historical native DONE-only proof choice, preserving all released assets.
+  > Full25 passes 4,536 Python cases plus 10 documented skips, 1,130 native unit and
+  > 93 conformance cases. Clean12 plus 134 focused cases (13 EOF completion), all five
+  > paired profiles 42/29/32/43/10 and Frozen DEVELOPMENT102/0/0/0 pass with independent
+  > actual evidence review. Root's 1,275 and selected checkout's 1,272 input maps are
+  > individually stable; nine normalized functional bodies agree across checkouts.
+  > The first clean attempt remains invalid after its extra Frozen output-path refusal;
+  > a separate reviewed launcher fixes only that proof output location for the accepted
+  > second run. Native6/9/120, Python106/129 and86 generated rows are unchanged.
+  > SSE.6 plan-only reconciliation is independently reviewed and complete; no provider or upstream behavior claim
+  > follows, and SDK.8a and all broader completeness gates remain open.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes
@@ -1074,8 +1089,19 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.8a further researched preset registration**. HYP.6 plan-only
-reconciliation is complete. Hyperbolic's endpoint migration and native generation registration
+Current resume point: **SDK.8a further researched provider registration**. SSE.6's
+plan-only reconciliation in `ANYINFER_CSHARP_SDK_SSE_COMPLETION.md` is independently
+reviewed and complete. The native
+SSE prerequisite is independently qualified at executable
+`d388e6832c0436d9aae3f884ca753cff3837bf0e`, tree
+`faf3154e8091a617902dfc1c97d4482886d4d881`: full25/4,536 Python plus10 documented skips,
+1,130 unit/93 conformance; clean12/134 focused cases; five paired profiles and Frozen102
+pass. The accepted second clean run preserves the first invalid output-path attempt.
+This aligns existing Python EOF behavior and registers no Nscale or other provider.
+Native6/9/120, Python106/129 and86 generated rows remain unchanged. Exact upstream
+framing/final-usage unknowns and typed reasoning-history gaps remain separate research
+limits. HYP.6 plan-only reconciliation is complete.
+Hyperbolic's endpoint migration and native generation registration
 are qualified at executable `b4456054d0d3f6d79113d04714b5c8baf99f2518`, tree
 `9fcf09fe47641d58d683466beadbabc29155055b`. All25 held-source checks, actual clean12-step
 C# gate and registered Python/C# producers/aggregate pass; independent actual evidence
