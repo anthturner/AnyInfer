@@ -969,6 +969,15 @@ must report a real conflict rather than silently changing a dependent public sig
   > tree44f6f2499762f11280badf16039034e35604fc4d. RDIR.8 plan-only reconciliation in
   > `ANYINFER_CSHARP_SDK_REDIRECTS.md` is independently reviewed and complete. Resume
   > SDK.8a researched registration from that qualified source.
+  > NOTE: The first default-registration tranche is Cerebras only, tracked in
+  > `ANYINFER_CSHARP_SDK_PRESET_REGISTRATION.md`. Its source checkpoint
+  > `a51f58461416ed869a2f7d8699deb04903be0086`, tree
+  > `094f2d6f19dcf7607d9b675c26f7f641c239728f`, passes all25 held-source checks and
+  > the registered12-step clean C# gate with1113unit/93conformance, Cerebras4/redirect56,
+  > five paired profiles, package/examples and Frozen102. Independent source, full and
+  > clean reviews are bounded clean. Native registration is five/eight,121 memberships
+  > pending; Python106/129 and86 generated rows are unchanged. CPR.6 plan-only
+  > reconciliation is complete; this does not check SDK.8a or admit other presets.
   > Current/minimum controls, all25 held workspace steps and the clean12-step C# gate plus56
   > redirect controls pass with bounded independent review. Provider breadth remains open.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
@@ -1054,13 +1063,16 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.8a researched preset registration**, after the completed
-`ANYINFER_CSHARP_SDK_REDIRECTS.md` leaf and its independently reviewed plan-only
-reconciliation. Remaining mixed-operation SDK.6c bindings stay separately unchecked. NCON.8 connection plan-only
+Current resume point: **SDK.8a further researched preset registration**, beginning with
+Hyperbolic's endpoint migration and native registration contract. CPR.6 reconciliation is
+complete. The first Cerebras tranche is qualified at source `a51f584` /
+tree `094f2d6`; its executable identity remains separate from this later plan record.
+`ANYINFER_CSHARP_SDK_REDIRECTS.md` and its independently reviewed plan-only
+reconciliation are complete. Remaining mixed-operation SDK.6c bindings stay separately unchecked. NCON.8 connection plan-only
 reconciliation is complete; its executable qualification remains the separate source below. The inventory leaf
 is complete at source 830673e56437a695ae26f579d7ca264139b7b0ba (tree
 35f35ca6a6a76291c0fe0fdf82affa6e4499cd88), with full held-source gate and clean focused
-qualification. Native preset runtime, dedicated dialects and mixed operations remain open.
+qualification. Further preset registrations, dedicated adapters and mixed operations remain open.
 The auth prerequisite is accepted at clean source c3d0e9a0d26bd253d58620f4bca623c02fac3d85,
 with full held-source workspace, registered clean propagation and Frozen preservation;
 it corrects Python metadata before native porting and creates no native preset binding.
@@ -1073,8 +1085,8 @@ The inert data leaf, `ANYINFER_CSHARP_SDK_PRESET_DATA.md`, is accepted at execut
 source `60e39c9ef011d9cbc3a03a61f330e3366e964558`, tree
 `a451153446bc4798c0b2e31a4d0c804109f3abaf`: all 25 held workspace steps, fresh registered
 12-step C# gate, 1014 native unit/93 conformance controls, five clean source-stamped pairs,
-generator byte equality, package/examples and Frozen 102 pass. The table stays outside the
-default registry, with source operations separate from singleton implemented Generation.
+generator byte equality, package/examples and Frozen 102 pass. That inert-data checkpoint
+did not register table rows; source operations remain separate from implemented Generation.
 The descriptive metadata leaf, `ANYINFER_CSHARP_SDK_MODEL_INVENTORY.md`, is qualified at
 executable source `afb3f86acfefd5a15f80de2389d4b0e0396e3a2b`, tree
 `d47d9a135207d335411c06609bda58dd95cba9f1`: all 25 held workspace steps, fresh registered
@@ -1116,7 +1128,7 @@ Python simultaneous read/cleanup behavior and opaque injected-handler hidden hop
 qualified limits; the historical connection external-close5s diagnostic remains unexplained.
 RDIR.8 parent/leaf/ticket reconciliation has bounded-clean independent critique. Resume
 SDK.8a researched registration; no broader SDK completion follows.
-Default registry remains four descriptors/seven bindings, with 122 operation memberships
+Default registry now has five descriptors/eight bindings, with 121 operation memberships
 pending. Compiling data does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12
 and all 235 root API rows remain open.
 SDK.7a/b are
