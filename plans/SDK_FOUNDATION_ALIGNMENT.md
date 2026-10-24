@@ -326,12 +326,14 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
     > `git show dc74a39:plans/SDK_CACHE_RESULT_PROJECTION.md`. Generation remains partial
     > for arena/context reduction. Counts remain 171 implemented / 26 partial / 37 deferred /
     > one different; all 235 root marks and 15 SDK milestone boxes remain open.
-  - [ ] **ALIGN.5e — Settle and execute context primitives.** Read the actual Python
+  - [ ] **ALIGN.5e — Settle and execute context primitives.** Execute
+    [native context documents, structure and chunks](SDK_CONTEXT_PRIMITIVES.md), beginning
+    with its independent contract/leaf critique. Read the actual Python
     `context/documents.py`, `structure.py` and `pack.py`, the proposed Traycer
     `sdk-foundation-alignment/context-primitives-contract`, and the measured
     `sdk-foundation-alignment/context-unicode-probe`. Settle scalar slicing, strict UTF-8,
-    language/generated/import/declaration behavior and deterministic Unicode word semantics
-    before creating `SDK_CONTEXT_PRIMITIVES.md`. Keep Python behavioral authority and all
+    language/generated/import/declaration behavior and deterministic Unicode word semantics.
+    Keep Python behavioral authority and all
     sealed assets unchanged. Gate: cold artifact critique resolves the Unicode data/version
     policy and public API, then a detailed executable leaf names disjoint source/control/
     observer ownership and independent development evidence. Execute that leaf under the
@@ -341,7 +343,7 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
 ## Handoff
 
 ALIGN.1–4 and ALIGN.5a–d are complete. The autonomous run resumes at
-**ALIGN.5e / context-primitives contract and Unicode decision** on
+**ALIGN.5e / CP.1–3 context-primitives implementation and controls** on
 `feature/language-neutral-foundation`, qualified executable checkpoint
 `dc74a3985bd0393ae81f199ef2b6b7657cd242c0` (cache result projection).
 The preceding qualified standalone context-tuning checkpoint is

@@ -1140,7 +1140,7 @@ ALIGN.1–4 and ALIGN.5a–d are complete: docs, the executable 235-export ledge
 map, catalog vocabulary, standalone context tuning and cache result projection are reconciled.
 The cache slice is qualified at clean source `dc74a3985bd0393ae81f199ef2b6b7657cd242c0`;
 its completion receipt and retired-checklist pin are in ALIGN.5d. Resume at ALIGN.5e's
-context-primitives contract and Unicode decision; broader context ports remain open. Provider work still resumes
+accepted context-primitives implementation and controls; broader context ports remain open. Provider work still resumes
 at SDK.8a with a separately researched binding. Existing SDK completion and release gates
 remain open. The paragraph below records the superseded branch-preparation pause.
 

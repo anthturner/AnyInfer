@@ -15,8 +15,8 @@ historical evidence, it links to the version-pinned source record.
   initial documentation correction, executable API reconciliation, and the distinction
   between sealed specification coverage, development profiles and shared build-time data.
   ALIGN.1–4, the public catalog vocabulary, standalone context tuning and cache result
-  projection are complete. The next bounded work is ALIGN.5e: settle the context-primitives
-  contract and Unicode semantics, then execute its reviewed implementation checklist.
+  projection are complete. ALIGN.5e / CP.0 contract and execution review is accepted;
+  CP.1–3 now implement and independently control the standalone context primitives.
   The 235-export evidence ledger
   and its workspace checker are active; their classifications are scoped evidence, not a
   full-parity claim.
@@ -26,6 +26,9 @@ historical evidence, it links to the version-pinned source record.
   the SDK.11c reconciliation.
 - [C# SDK retrieval operations](ANYINFER_CSHARP_SDK_RETRIEVAL.md) retains the open 6c.0
   retrieval-provider research preflight within SDK.6c.
+- [Native context documents, structure and chunks](SDK_CONTEXT_PRIMITIVES.md) ports the
+  standalone context primitives with scalar slicing and pinned Python-baseline Unicode
+  membership. Ranking, reducers, history and request/config integration remain open.
 - [Language-neutral foundation](language-neutral-foundation/ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md)
   retains M3.1 operation accounting and M4.1–M4.G additional-port feasibility and approval.
 
