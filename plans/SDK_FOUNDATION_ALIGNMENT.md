@@ -253,7 +253,7 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
   parent gates close only after actual implementation, independent review and the full
   serialized workspace gate. Publication requires its existing separate authorization.
 
-  - [ ] **ALIGN.5a — Expose the existing catalog category vocabulary.** Add public static
+  - [x] **ALIGN.5a — Expose the existing catalog category vocabulary.** Add public static
     `AnyInfer.Catalog.Catalog.BestAtCategories` as an immutable ordinal `IReadOnlySet<string>`
     over the existing 14 categories in `src/csharp/AnyInfer/Catalog/Catalog.cs`, using the
     .NET 8 BCL frozen set. The parser must use that same set; do not add a second vocabulary
@@ -261,22 +261,45 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
     `src/csharp/AnyInfer.Tests/CatalogTests.cs` to prove the exact Python `BEST_AT` set,
     case-sensitive membership, immutability and parser use. Describe the accessor in
     `docs/reference/csharp-sdk.md`; leave Python behavior and shared JSON untouched.
-    Gate: targeted `CatalogTests` pass with zero native warnings; independent source review
-    confirms the public set and parser share one authority. Root then updates only the
+    Gate: targeted `CatalogTests` pass with zero native warnings. Independent source review
+    and qualification belong to ALIGN.5b. Root then updates only the
     ledger's `BEST_AT` evidence after the fresh public reflection contains the accessor.
-  - [ ] **ALIGN.5b — Qualify the catalog gap closure and continue SDK.9.** Gate the coherent
-    accessor/docs/ledger slice with the real evidence checker and serialized full workspace,
+    > NOTE: Completed 2026-10-24: exposed the existing 14-category vocabulary as an ordinal
+    > frozen `IReadOnlySet<string>` and made the parser consume that same authority; targeted
+    > `CatalogTests` passed with zero native warnings.
+  - [x] **ALIGN.5b — Qualify the catalog gap closure and continue SDK.9.** Gate the coherent
+    accessor/docs/ledger slice with independent source review, the real evidence checker
+    and serialized full workspace,
     preserve frozen assets, then commit explicit paths. Proceed to a source-backed SDK.9a
     context/history implementation checklist and independent shared development evidence;
     the catalog accessor alone does not close SDK.4a again, SDK.9, SDK.11c or full parity.
+    > NOTE: Catalog source review is accepted in Traycer
+    > `sdk-foundation-alignment/catalog-vocabulary-review`. Full serialized shell
+    > `b4e4fc0a-5f2e-4609-8111-b7ebc62f3e96` passes all 26 steps in 271.6s,
+    > including 1,136 native unit / 93 conformance tests, the five paired profiles,
+    > package-only consumer, exact examples and docs. The accessor appears in the actual
+    > public reflection and BEST_AT is now implemented. Subsequent source adjudication
+    > correctly marks Generation/GenerationRequest partial for absent cache/context/arena/
+    > history members, and limits stream descriptions to generation. Final real checker
+    > passes at 171 implemented / 26 partial / 37 deferred / one different; these evidence
+    > corrections are not a runtime regression or a completion percentage. All root
+    > completion marks and 15 parent SDK milestones stay open.
+  - [ ] **ALIGN.5c — Port and qualify context tuning.** Execute the first unchecked box in
+    [native context tuning](SDK_CONTEXT_TUNING.md), the bounded SDK.9a prerequisite. Its
+    CTUNE.0 contract critique is accepted; resume CTUNE.1. Gate: actual native settings,
+    independent shared development observations, documentation and the leaf's full gates
+    pass before this box closes. Continue the remaining context document/representation,
+    ranking/deduplication, selection/packing and history ports after this bounded leaf.
 
 ## Handoff
 
-ALIGN.1–4 are complete. The autonomous run resumes at **ALIGN.5a** on
+ALIGN.1–4 and ALIGN.5a/b are complete. The autonomous run resumes at **ALIGN.5c / CTUNE.1** on
 `feature/language-neutral-foundation`, base commit
-`ea85ddd42f418cdf81f55638a2e8afd0af848daf`; the audit/documentation/checker changes are currently
-uncommitted in that working tree. Recheck Git status and preserve those edits before
-continuing. The last qualified executable remains the source checkpoint recorded above.
+`8ce6bc0` (audit, documentation, evidence ledger and checker checkpoint). The preceding
+baseline was `ea85ddd42f418cdf81f55638a2e8afd0af848daf`. Recheck Git status and preserve any
+ongoing ALIGN.5 edits before continuing. The last separately qualified executable remains
+the source checkpoint recorded above; the new checkpoint has the working-tree full gate
+recorded under ALIGN.3d.
 ALIGN.4 does not authorize changing sealed normative assets or moving data authority.
 The coordinator owns Git state and heavy checks; workers own disjoint paths and targeted
 checks. No runtime source change is required for the initial documentation correction.

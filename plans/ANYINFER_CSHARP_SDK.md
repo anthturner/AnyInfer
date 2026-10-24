@@ -1050,6 +1050,9 @@ must report a real conflict rather than silently changing a dependent public sig
 - [ ] **SDK.9a** Port pure context ranking/selection/representation/packing/history and
   tuning from `context/`, plus `ContextRequest`, estimates and fit gates. No filesystem walker
   in the reducer. Gate: common deterministic context-envelope/budget/selection corpus.
+  > NOTE: Autonomous execution begins with [native context tuning](SDK_CONTEXT_TUNING.md).
+  > Its reviewed CTUNE.0 contract covers the 17-setting foundation; CTUNE.1 is next.
+  > Settings alone do not implement reducers, history, request policy or shared config.
 - [ ] **SDK.9b** Port opt-in distillation, semantic ranking, request-path compaction and
   cache placement using already-implemented operation/accounting surfaces. Gate: bounded
   call counts, cancellation, unknown cost, tool-pair integrity and exact input privacy.
@@ -1131,7 +1134,7 @@ must report a real conflict rather than silently changing a dependent public sig
 **Current resume:** the user's 2026-10-24 parity/foundation request authorizes the bounded
 [alignment leaf](SDK_FOUNDATION_ALIGNMENT.md), starting at its first unchecked box.
 ALIGN.1–4 are complete: docs, the executable 235-export ledger and the existing evidence
-map are reconciled. ALIGN.5a begins implementation gap closure; provider work still resumes
+map are reconciled. ALIGN.5 resumes implementation gap closure; provider work still resumes
 at SDK.8a with a separately researched binding. Existing SDK completion and release gates
 remain open. The paragraph below records the superseded branch-preparation pause.
 

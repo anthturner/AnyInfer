@@ -11,6 +11,30 @@ using Catalog = global::AnyInfer.Catalog.Catalog;
 public sealed class CatalogTests
 {
     [Fact]
+    public void Best_at_categories_match_the_python_vocabulary_and_drive_parser_validation()
+    {
+        var expected = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "agentic", "code-completion", "coding", "drafting", "embeddings", "general-chat",
+            "long-context", "low-resource", "math", "multilingual", "rag", "reasoning", "tool-use", "vision",
+        };
+
+        Assert.Equal(expected, Catalog.BestAtCategories);
+        Assert.True(Catalog.BestAtCategories.Contains("coding"));
+        Assert.False(Catalog.BestAtCategories.Contains("Coding"));
+        var mutableView = Assert.IsAssignableFrom<ISet<string>>(Catalog.BestAtCategories);
+        Assert.Throws<NotSupportedException>(() => mutableView.Add("new-category"));
+
+        foreach (var category in expected)
+        {
+            var catalog = Catalog.Loads($$"""{ "models": [{ "id": "{{category}}", "best_at": ["{{category}}"] }] }""");
+            Assert.Equal(category, Assert.Single(catalog.Model(category).BestAt));
+        }
+
+        Assert.Throws<ConfigException>(() => Catalog.Loads("""{ "models": [{ "id": "unknown", "best_at": ["unknown"] }] }"""));
+    }
+
+    [Fact]
     public void Shared_input_parses_python_scalar_compatibility_and_derives_artifacts_without_acquisition()
     {
         var document = Fixture();

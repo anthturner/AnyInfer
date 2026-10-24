@@ -1,6 +1,7 @@
 using AnyInfer.Capabilities;
 using AnyInfer.Json;
 using AnyInfer.Providers;
+using System.Collections.Frozen;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
@@ -11,10 +12,11 @@ namespace AnyInfer.Catalog;
 public sealed class Catalog
 {
     private const int CurrentFormatVersion = 1;
-    private static readonly HashSet<string> BestAt = new(StringComparer.Ordinal)
+    /// <summary>Gets the closed ordinal vocabulary accepted by catalog <c>best_at</c> tags.</summary>
+    public static IReadOnlySet<string> BestAtCategories { get; } = new[]
     {
         "agentic", "code-completion", "coding", "drafting", "embeddings", "general-chat", "long-context", "low-resource", "math", "multilingual", "rag", "reasoning", "tool-use", "vision",
-    };
+    }.ToFrozenSet(StringComparer.Ordinal);
 
     /// <summary>Creates an immutable catalog snapshot.</summary>
     public Catalog(IReadOnlyDictionary<string, AliasEntry>? aliases = null, IReadOnlyDictionary<string, GgufArtifact>? artifacts = null, IReadOnlyDictionary<string, ModelEntry>? models = null, string defaultAlias = "medium", int formatVersion = CurrentFormatVersion)
@@ -262,7 +264,7 @@ public sealed class Catalog
             var embedding = ParseEmbedding(row, $"model {id}");
             if (embedding is not null && kind != ModelKind.Embedding) throw new ConfigException("Only embedding models may carry embedding metadata.");
             var tags = OptionalArray(row, "best_at")?.Items.Select(Py).Select(static tag => tag.Trim().ToLowerInvariant()).ToArray() ?? [];
-            if (tags.Any(tag => !BestAt.Contains(tag))) throw new ConfigException("Catalog best_at category is unknown.");
+            if (tags.Any(tag => !BestAtCategories.Contains(tag))) throw new ConfigException("Catalog best_at category is unknown.");
             var variants = OptionalArray(row, "variants")?.Items.Select(item => ParseVariant(id, RequireObject(item, "variant"))).ToArray() ?? [];
             if (variants.Select(static variant => variant.Id).Distinct(StringComparer.Ordinal).Count() != variants.Length)
             {

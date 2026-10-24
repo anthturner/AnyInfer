@@ -31,7 +31,7 @@ property corresponds to Python `Text.text`.
 | `ReasoningDelta`, `CitationDelta`, `ServerToolDelta` | Separate typed stream events for reasoning, citations, and provider-run tools. |
 | `AsyncStream`, `StreamEvent` | Streaming result and typed events. |
 | `AnyInferConfig` | Restricted version 1 configuration reader and writer. |
-| `Catalog`, `ResolvedTarget`, `PricingTable` | Pure target resolution and catalog-derived price facts. |
+| `Catalog`, `ResolvedTarget`, `PricingTable` | Pure target resolution and catalog-derived price facts; `Catalog.BestAtCategories` exposes the immutable ordinal vocabulary accepted by catalog `best_at` tags. |
 | `ModelCapabilities` | Provenance-bearing model facts; unknown values remain unknown. |
 | `AnyInfer.Providers.ModelInventoryKind`, `AnyInfer.Providers.ProviderDescriptor.ModelInventory` | Descriptive metadata for the category of model inventory a provider exposes. |
 | `PricingCalculator`, `ContextBudget`, `SpendLedger`, `SpendStore` | Explicit winning-request pricing, planning, and caller-owned accounting helpers. |

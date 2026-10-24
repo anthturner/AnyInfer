@@ -14,8 +14,8 @@ historical evidence, it links to the version-pinned source record.
 - [Foundation and SDK alignment](SDK_FOUNDATION_ALIGNMENT.md) tracks the parity audit,
   initial documentation correction, executable API reconciliation, and the distinction
   between sealed specification coverage, development profiles and shared build-time data.
-  ALIGN.1–4 are complete; the next unchecked box is ALIGN.5a, the public catalog vocabulary
-  gap, followed by the remaining SDK implementation work. The 235-export evidence ledger
+  ALIGN.1–4 and the public catalog vocabulary slice are complete; the next bounded work is
+  ALIGN.5c / CTUNE.1, native context tuning. The 235-export evidence ledger
   and its workspace checker are active; their classifications are scoped evidence, not a
   full-parity claim.
   It does not select a new provider or change asset authority.
@@ -24,6 +24,9 @@ historical evidence, it links to the version-pinned source record.
   the SDK.11c reconciliation.
 - [C# SDK retrieval operations](ANYINFER_CSHARP_SDK_RETRIEVAL.md) retains the open 6c.0
   retrieval-provider research preflight within SDK.6c.
+- [Native context tuning](SDK_CONTEXT_TUNING.md) starts SDK.9a with the immutable settings
+  foundation and separately qualified shared development evidence; context strategies and
+  request-path integration remain unfinished.
 - [Language-neutral foundation](language-neutral-foundation/ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md)
   retains M3.1 operation accounting and M4.1–M4.G additional-port feasibility and approval.
 
