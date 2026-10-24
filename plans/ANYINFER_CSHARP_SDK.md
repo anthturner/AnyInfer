@@ -1006,6 +1006,19 @@ must report a real conflict rather than silently changing a dependent public sig
   > second run. Native6/9/120, Python106/129 and86 generated rows are unchanged.
   > SSE.6 plan-only reconciliation is independently reviewed and complete; no provider or upstream behavior claim
   > follows, and SDK.8a and all broader completeness gates remain open.
+  > NOTE: Nscale's existing Python generation-row admission in
+  > `ANYINFER_CSHARP_SDK_NSCALE.md` is independently qualified at executable
+  > `952b678d2dc020075c09bc6f8d11e2879fc992bd`, tree
+  > `f5ddbe6d8f12bb9c04ee2b84bb393800908593f8`, with exactly16 functional paths.
+  > Full25 passes4,536 Python cases plus10 documented platform skips,1,135 native
+  > unit/93 conformance; clean12 plus67 focused controls, package/examples, five
+  > paired profiles42/29/32/43/10 and Frozen DEVELOPMENT102/0/0/0 pass. Actual
+  > full/clean evidence reviews are bounded clean. Root1,278/selected1,275 maps
+  > are individually stable; all16 normalized source bodies cross-match. Native
+  > defaults are7 descriptors/10 bindings/119 pending memberships; Python106/129
+  > and86 generated rows are unchanged. The metadata delta is provenance-only.
+  > NSC.6 plan-only reconciliation is independently reviewed and complete. Exact upstream streaming, reasoning
+  > values/history and hosted behavior remain unverified; no broader milestone closes.
 - [ ] **SDK.8b** Port dedicated adapters and optional auth bridges in the inventory, with
   declared-vs-implemented operation validation. Use optional assemblies for external identity/
   SDK requirements; fail clearly when unavailable. Gate: every supported operation passes
@@ -1089,23 +1102,34 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.8a further researched provider registration**. SSE.6's
-plan-only reconciliation in `ANYINFER_CSHARP_SDK_SSE_COMPLETION.md` is independently
-reviewed and complete. The native
-SSE prerequisite is independently qualified at executable
+Current resume point: **SDK.8a further researched provider registration**.
+NSC.6's plan-only reconciliation in `ANYINFER_CSHARP_SDK_NSCALE.md` is independently
+reviewed and complete.
+Nscale is independently qualified at executable
+`952b678d2dc020075c09bc6f8d11e2879fc992bd`, tree
+`f5ddbe6d8f12bb9c04ee2b84bb393800908593f8`: full25/4,536 Python plus10 documented
+skips/1,135 native unit/93 conformance; clean12/67 focused; five paired profiles
+and Frozen102 pass. Native defaults are7 descriptors/10 bindings/119 pending source
+memberships. Python106/129 and86 generated rows are unchanged. Source qualification
+is separate from the two-plan reconciliation record. Hosted behavior and the explicit
+streaming/reasoning watchlists remain unverified. Inception and Upstage are research
+only; no next provider is selected. SDK.8a, SDK.6c, SDK.8b–c, SDK.9–12 and235 API rows
+remain open.
+
+The earlier native SSE prerequisite is independently qualified at executable
 `d388e6832c0436d9aae3f884ca753cff3837bf0e`, tree
 `faf3154e8091a617902dfc1c97d4482886d4d881`: full25/4,536 Python plus10 documented skips,
 1,130 unit/93 conformance; clean12/134 focused cases; five paired profiles and Frozen102
 pass. The accepted second clean run preserves the first invalid output-path attempt.
-This aligns existing Python EOF behavior and registers no Nscale or other provider.
-Native6/9/120, Python106/129 and86 generated rows remain unchanged. Exact upstream
+That checkpoint aligns existing Python EOF behavior and registered no new provider.
+Its native counts were6/9/120; Python106/129 and86 generated rows are unchanged. Exact upstream
 framing/final-usage unknowns and typed reasoning-history gaps remain separate research
 limits. HYP.6 plan-only reconciliation is complete.
 Hyperbolic's endpoint migration and native generation registration
 are qualified at executable `b4456054d0d3f6d79113d04714b5c8baf99f2518`, tree
 `9fcf09fe47641d58d683466beadbabc29155055b`. All25 held-source checks, actual clean12-step
 C# gate and registered Python/C# producers/aggregate pass; independent actual evidence
-review and the separate root-file-boundary receipt are bounded clean. Native defaults are
+review and the separate root-file-boundary receipt are bounded clean. That checkpoint's native defaults were
 6 descriptors/9 bindings/120 pending memberships. Python106/129 and86 generated rows remain
 unchanged. The leaf `ANYINFER_CSHARP_SDK_HYPERBOLIC.md` is complete with bounded independent
 consistency review; qualified executable identity stays separate from its two-plan record.
@@ -1173,8 +1197,9 @@ Python simultaneous read/cleanup behavior and opaque injected-handler hidden hop
 qualified limits; the historical connection external-close5s diagnostic remains unexplained.
 RDIR.8 parent/leaf/ticket reconciliation has bounded-clean independent critique. Resume
 SDK.8a researched registration; no broader SDK completion follows.
-Default registry now has six descriptors/nine bindings, with 120 operation memberships
-pending. Compiling data does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12
+At the pre-Nscale Hyperbolic checkpoint `b445605`, the default registry had six
+descriptors/nine bindings, with 120 operation memberships pending. Compiling data
+does not certify a provider or complete SDK.8a; SDK.6c/8b-c/9–12
 and all 235 root API rows remain open.
 SDK.7a/b are
 accepted at clean source `b315ef73173b81ace643c41e95f4e6339db636b6`, tree
