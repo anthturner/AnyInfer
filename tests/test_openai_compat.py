@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import httpx2
 import pytest
 
 import anyinfer as ai
+from anyinfer.providers.base import AdapterFinal, ProviderConfig, WireRequest
+from anyinfer.providers.openai_compat import OpenAICompatAdapter
 from anyinfer.testing.fakes import FakeOpenAIServer, FakeResponse
+from anyinfer.types.messages import Message, Text
 from support import make_client
 
 
@@ -187,6 +191,53 @@ async def test_omitted_usage_chunk_yields_a_result_with_unknown_usage() -> None:
 
     assert result.text == "fine anyway"
     assert result.usage.output_tokens is None
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_text", "expected_finish"),
+    [
+        (
+            b'data: {"choices":[{"delta":{"content":"final"},"finish_reason":"length"}]}',
+            "final",
+            "length",
+        ),
+        (b'data: {"choices":[{"delta":{"content":"line"}}]}\n', "line", "stop"),
+        (b": keep-alive\n", "", "stop"),
+        (b"", "", "stop"),
+    ],
+)
+async def test_generic_adapter_clean_eof_consumes_final_record_and_synthesizes_terminal(
+    body: bytes, expected_text: str, expected_finish: str
+) -> None:
+    """The production generic adapter, not a parser clone, accepts a clean EOF."""
+    adapter = OpenAICompatAdapter(
+        ProviderConfig(
+            provider_id="openai-compat",
+            base_url="https://fixture.invalid/v1",
+            api_key="fixture-key",
+            transport=httpx2.MockTransport(
+                lambda _: httpx2.Response(
+                    200, content=body, headers={"content-type": "text/event-stream"}
+                )
+            ),
+        )
+    )
+    request = WireRequest(
+        model="fixture-model",
+        messages=(Message("user", (Text("question"),)),),
+        stream=True,
+    )
+    try:
+        events = [event async for event in adapter.generate(request)]
+    finally:
+        await adapter.aclose()
+
+    assert (
+        "".join(event.text for event in events if isinstance(event, ai.TextDelta)) == expected_text
+    )
+    final = next(event for event in events if isinstance(event, AdapterFinal))
+    assert final.finish_reason == expected_finish
+    assert final.usage is None
 
 
 async def test_retain_raw_keeps_the_provider_payload() -> None:

@@ -124,20 +124,8 @@ public sealed class OpenAIChatTests
     }
 
     [Fact]
-    public async Task Eof_malformed_sse_and_raw_multibyte_overflow_preserve_typed_stream_protocol_failure()
+    public async Task Malformed_sse_and_raw_multibyte_overflow_preserve_typed_stream_protocol_failure()
     {
-        var eof = new ScriptedHandler(Response(HttpStatusCode.OK, "text/event-stream", Sse("""{"choices":[{"delta":{"content":"partial"}}]}""")));
-        await using var eofAdapter = Adapter(eof);
-        var eofEvents = new List<AdapterEvent>();
-        var eofFailure = await Assert.ThrowsAsync<StreamProtocolException>(async () =>
-        {
-            await foreach (var item in eofAdapter.GenerateAsync(Request(stream: true))) eofEvents.Add(item);
-        });
-        Assert.Equal("stream_protocol", eofFailure.Category);
-        Assert.False(eofFailure.Retryable);
-        Assert.Equal("stream", eofFailure.Phase);
-        Assert.DoesNotContain(eofEvents, static item => item is AdapterFinal);
-
         var malformed = new ScriptedHandler(Response(HttpStatusCode.OK, "text/event-stream", Sse(
             """{"choices":[{"delta":{"content":"before"}}]}""",
             """{"choices":[{"delta":{},"finish_reason":"stop"}]}""",

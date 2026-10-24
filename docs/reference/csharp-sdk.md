@@ -90,6 +90,16 @@ Hyperbolic's default endpoint is `https://api.hyperbolic.ai/inference/v1`; its f
 C# registry. Choose a model available to the configured account through discovery; neither
 provider example represents a static model catalog guarantee.
 
+For native C# SSE streams, `[DONE]` ends reading immediately and later records are ignored.
+Clean body EOF also finalizes the stream: a final usable record is processed even without a
+trailing blank-line delimiter, and a missing finish reason defaults to `stop`. Empty,
+content-only, and comment-only streams are valid when they end cleanly. If usage is omitted, it
+remains unknown. A finish reason does not end an open stream, so reading continues for trailing
+usage and later errors until `[DONE]` or EOF. Malformed trailing JSON, invalid UTF-8, limit
+failures, and thrown
+body-read errors still fail. A normal zero-byte read is EOF; this does not mean every network
+truncation is reported as a read error.
+
 Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12. Draft 3 and Draft 4
 remain deferred. Numeric and regular-expression behavior is native to .NET, regular-expression
 timeouts apply per match, and external resources require an explicit retrieval callback.

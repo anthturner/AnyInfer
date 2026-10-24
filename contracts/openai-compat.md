@@ -101,6 +101,17 @@ the provider-support claim.
   final usage chunk when `stream_options.include_usage` set
 - `choices[0].logprobs` appears **per chunk**, covering only that chunk's tokens, so the
   adapter accumulates across chunks rather than replacing.
+
+**Implementation behavior (Python and native C# readers):** `[DONE]` ends reading early, so
+later records are ignored. At clean body EOF, a final usable record is processed even without
+a trailing blank-line delimiter, then the stream is finalized using the reported finish reason
+or `stop` when none was reported. An empty, content-only, or comment-only clean-EOF stream is
+valid. Usage remains unknown when the response omits it. A finish reason alone does not end an
+open stream: reading continues for trailing usage and later errors until `[DONE]` or EOF.
+Malformed trailing JSON,
+invalid native UTF-8, limit failures, and thrown body-read errors still fail. A zero-byte read
+is treated as EOF; this behavior does not assert that every network truncation throws.
+
 ### Errors
 - Non-2xx with `{"error": {"message", "type", "code"}}`; retryable statuses
   {408, 409, 425, 429} ∪ ≥500; `Retry-After` header honored

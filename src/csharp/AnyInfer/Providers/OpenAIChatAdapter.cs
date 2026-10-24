@@ -788,9 +788,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
         var line = new List<byte>();
         var dataLines = new List<string>();
         long bytesRead = 0;
-        Usage? finalUsage = null;
-        string? finishReason = null;
-        var logprobs = new List<TokenLogprob>();
+        var state = new SseStreamState();
 
         while (true)
         {
@@ -820,25 +818,7 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                     continue;
                 }
 
-                if (line.Count > 0 && line[^1] == (byte)'\r')
-                {
-                    line.RemoveAt(line.Count - 1);
-                }
-
-                var text = DecodeLine(line);
-                line.Clear();
-                if (text.Length != 0)
-                {
-                    if (text.StartsWith("data:", StringComparison.Ordinal))
-                    {
-                        var data = text[5..];
-                        dataLines.Add(data.StartsWith(' ') ? data[1..] : data);
-                    }
-
-                    continue;
-                }
-
-                if (dataLines.Count == 0)
+                if (!ReadSseLine(line, dataLines))
                 {
                     continue;
                 }
@@ -847,43 +827,108 @@ internal sealed class OpenAIChatAdapter : IProviderAdapter, IProviderLifecycle
                 dataLines.Clear();
                 if (frame == "[DONE]")
                 {
-                    yield return new AdapterFinal(finishReason ?? "stop", finalUsage, logprobs: logprobs);
+                    yield return state.Final();
                     yield break;
                 }
 
-                var chunk = ReadObject(StrictUtf8.GetBytes(frame));
-                var choice = OptionalFirstChoice(chunk);
-                if (choice is not null)
+                foreach (var adapterEvent in TranslateSseFrame(frame, state, toolsEnabled))
                 {
-                    logprobs.AddRange(ReadLogprobs(choice));
-                    var delta = OptionalObject(choice, "delta");
-                    var content = delta is null ? null : OptionalString(delta, "content");
-                    if (content is { Length: > 0 })
-                    {
-                        yield return new AdapterTextDelta(content);
-                    }
-
-                    if (toolsEnabled && delta is not null)
-                    {
-                        foreach (var toolDelta in ReadToolDeltas(delta))
-                        {
-                            yield return toolDelta;
-                        }
-                    }
-
-                    finishReason ??= OptionalString(choice, "finish_reason");
-                }
-
-                var usage = OptionalUsage(chunk);
-                if (usage is not null)
-                {
-                    finalUsage = usage;
-                    yield return new AdapterUsage(usage);
+                    yield return adapterEvent;
                 }
             }
         }
 
-        throw ProtocolFailure("The OpenAI-compatible event stream ended without a DONE sentinel.");
+        if (line.Count > 0)
+        {
+            ReadSseLine(line, dataLines);
+        }
+
+        if (dataLines.Count > 0)
+        {
+            var frame = string.Join("\n", dataLines);
+            if (frame == "[DONE]")
+            {
+                yield return state.Final();
+                yield break;
+            }
+
+            foreach (var adapterEvent in TranslateSseFrame(frame, state, toolsEnabled))
+            {
+                yield return adapterEvent;
+            }
+        }
+
+        yield return state.Final();
+    }
+
+    private bool ReadSseLine(List<byte> line, List<string> dataLines)
+    {
+        if (line.Count > 0 && line[^1] == (byte)'\r')
+        {
+            line.RemoveAt(line.Count - 1);
+        }
+
+        var text = DecodeLine(line);
+        line.Clear();
+        if (text.Length != 0)
+        {
+            if (text.StartsWith("data:", StringComparison.Ordinal))
+            {
+                var data = text[5..];
+                dataLines.Add(data.StartsWith(' ') ? data[1..] : data);
+            }
+
+            return false;
+        }
+
+        return dataLines.Count > 0;
+    }
+
+    private IEnumerable<AdapterEvent> TranslateSseFrame(
+        string frame,
+        SseStreamState state,
+        bool toolsEnabled)
+    {
+        var chunk = ReadObject(StrictUtf8.GetBytes(frame));
+        var choice = OptionalFirstChoice(chunk);
+        if (choice is not null)
+        {
+            state.Logprobs.AddRange(ReadLogprobs(choice));
+            var delta = OptionalObject(choice, "delta");
+            var content = delta is null ? null : OptionalString(delta, "content");
+            if (content is { Length: > 0 })
+            {
+                yield return new AdapterTextDelta(content);
+            }
+
+            if (toolsEnabled && delta is not null)
+            {
+                foreach (var toolDelta in ReadToolDeltas(delta))
+                {
+                    yield return toolDelta;
+                }
+            }
+
+            state.FinishReason ??= OptionalString(choice, "finish_reason");
+        }
+
+        var usage = OptionalUsage(chunk);
+        if (usage is not null)
+        {
+            state.FinalUsage = usage;
+            yield return new AdapterUsage(usage);
+        }
+    }
+
+    private sealed class SseStreamState
+    {
+        public Usage? FinalUsage { get; set; }
+
+        public string? FinishReason { get; set; }
+
+        public List<TokenLogprob> Logprobs { get; } = [];
+
+        public AdapterFinal Final() => new(FinishReason ?? "stop", FinalUsage, logprobs: Logprobs);
     }
 
     private IEnumerable<AdapterToolCallDelta> ReadToolDeltas(JsonObject container)
