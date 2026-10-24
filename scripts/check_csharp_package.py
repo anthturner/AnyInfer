@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 import hashlib
 import json
@@ -486,6 +487,22 @@ var hyperbolicSettings = ProviderSettings.Of(
 }
 if (hyperbolicHandler.RequestCount != 1 || hyperbolicHandler.DisposeCount != 1)
     throw new InvalidOperationException("default Hyperbolic transport ownership failed");
+
+var nscaleHandler = new NscaleHandler();
+var nscaleSettings = ProviderSettings.Of(
+    "nscale", apiKey: "offline-nscale-key", transport: nscaleHandler);
+{
+    await using var client = new AsyncClient([nscaleSettings]);
+    var generated = await client.GenerateAsync(
+        "package Nscale witness",
+        target: "nscale:meta-llama/Llama-3.1-8B-Instruct",
+        reasoning: "medium");
+    if (generated.Text != "package nscale"
+        || generated.Usage is not { InputTokens: 1, OutputTokens: 1, TotalTokens: 2 })
+        throw new InvalidOperationException("default Nscale registration witness failed");
+}
+if (nscaleHandler.RequestCount != 1 || nscaleHandler.DisposeCount != 1)
+    throw new InvalidOperationException("default Nscale transport ownership failed");
 
 var teiEmbedHandler = new TeiHandler(reranker: false);
 var teiRerankHandler = new TeiHandler(reranker: true);
@@ -1311,6 +1328,56 @@ sealed class HyperbolicHandler : HttpMessageHandler
     }
 }
 
+sealed class NscaleHandler : HttpMessageHandler
+{
+    private const string NscaleResponseJson = """
+        {
+          "choices": [{"message": {"content": "package nscale"}, "finish_reason": "stop"}],
+          "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+        }
+        """;
+
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = request.Content is null
+            ? ""
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(body);
+        if (request.Method != HttpMethod.Post
+            || request.RequestUri is not
+            {
+                Scheme: "https",
+                Host: "inference.api.nscale.com",
+                AbsolutePath: "/v1/chat/completions",
+            }
+            || request.Headers.Authorization?.Scheme != "Bearer"
+            || request.Headers.Authorization.Parameter != "offline-nscale-key"
+            || document.RootElement.GetProperty("model").GetString()
+                != "meta-llama/Llama-3.1-8B-Instruct"
+            || document.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()
+                != "package Nscale witness"
+            || document.RootElement.GetProperty("reasoning_effort").GetString() != "medium")
+            throw new InvalidOperationException(
+                "default Nscale registration lost the configured request");
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(NscaleResponseJson, Encoding.UTF8, "application/json"),
+        };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+}
+
 sealed class RichLoopAdapter(bool includeStreamWitness = false) : IProviderAdapter
 {
     public List<WireRequest> Requests { get; } = [];
@@ -1818,6 +1885,7 @@ sealed class JinaHandler : HttpMessageHandler
 def main(argv: list[str] | None = None) -> int:
     """Pack, inspect, and consume a package from an isolated local feed."""
     options = parse_args(sys.argv[1:] if argv is None else argv)
+    validate_embedded_nscale_fixture()
     output = options.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     version = package_version()
@@ -1854,6 +1922,35 @@ def main(argv: list[str] | None = None) -> int:
         shutil.copy2(artifact, output / artifact.name)
     print(f"validated {package.name} and {symbols.name} in {output}")
     return 0
+
+
+def validate_embedded_nscale_fixture() -> None:
+    """Statically parse the package consumer's embedded Nscale raw JSON fixture."""
+    module = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    consumer_source = next(
+        node.args[0].value
+        for node in ast.walk(module)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "write_text"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+        and "sealed class NscaleHandler" in node.args[0].value
+    )
+    match = re.search(
+        r'private const string NscaleResponseJson = """(.*?)""";',
+        consumer_source,
+        re.DOTALL,
+    )
+    if match is None:
+        raise RuntimeError("package consumer is missing the Nscale raw JSON fixture")
+    fixture = json.loads(match.group(1))
+    if fixture != {
+        "choices": [{"message": {"content": "package nscale"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+    }:
+        raise RuntimeError("package consumer has an unexpected Nscale raw JSON fixture")
 
 
 if __name__ == "__main__":

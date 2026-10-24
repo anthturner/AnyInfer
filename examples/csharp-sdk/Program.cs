@@ -41,6 +41,15 @@ static async Task VerifyAsync()
         && hyperbolicHandler.DisposeCount == 1,
         "Hyperbolic example did not use the default registration or preserve the scripted result.");
 
+    var nscaleHandler = new NscaleScriptedHandler();
+    var nscale = await NscaleExample.RunAsync(
+        NscaleExample.Settings(nscaleHandler, "offline-nscale-key"));
+    Require(nscale.Text == "hello from Nscale"
+        && nscale.Usage is { InputTokens: 1, OutputTokens: 1, TotalTokens: 2 }
+        && nscaleHandler.RequestCount == 1
+        && nscaleHandler.DisposeCount == 1,
+        "Nscale example did not use the default registration or preserve the scripted result.");
+
     var pureFactoryCalls = 0;
     var pureRegistry = new ProviderRegistry(
     [

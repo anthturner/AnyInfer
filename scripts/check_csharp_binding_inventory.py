@@ -52,6 +52,15 @@ EXPECTED_BINDINGS = [
         "contract_dependencies": ["contracts/jina.md"],
     },
     {
+        "provider_id": "nscale",
+        "operation": "generation",
+        "contract_dependencies": [
+            "contracts/openai-compat-presets.md",
+            "contracts/openai-compat-presets.md#nscale",
+            "contracts/openai-compat.md",
+        ],
+    },
+    {
         "provider_id": "openai-compat",
         "operation": "generation",
         "contract_dependencies": ["contracts/openai-compat.md"],

@@ -18,6 +18,7 @@ property corresponds to Python `Text.text`.
 | `ProviderSettings` | Provider setup including an `env://` credential reference. |
 | `cerebras:model` | Default-registry generation target for a configured Cerebras instance; use `ProviderSettings.Of("cerebras", apiKey: "env://CEREBRAS_API_KEY")`. |
 | `hyperbolic:model` | Default-registry generation target for a configured Hyperbolic instance; use `ProviderSettings.Of("hyperbolic", apiKey: "env://HYPERBOLIC_API_KEY")`. |
+| `nscale:model` | Default-registry generation target for a configured Nscale instance; use `ProviderSettings.Of("nscale", apiKey: "env://NSCALE_API_KEY")`. |
 | `ProviderProxy`, `TlsVerification`, `ClientCertificate` | Explicit HTTP(S) proxy, SDK-handler TLS verification, and PEM client-certificate settings attached to `ProviderSettings`. |
 | `AnyInfer.Providers.ProviderDescriptor.HonorsConnectionSettings` | Descriptor metadata, defaulting to `true`, indicating whether the provider supports configured proxy, TLS, and client-certificate settings. |
 | `AnyInferConfig.Loads`, `AnyInferConfig.Dumps` | Parse and render bounded version 1 JSON; configured proxy credentials and certificate paths/passwords remain literal configuration values. |
@@ -67,7 +68,7 @@ own-transport descriptor, or an opaque prebuilt registration with an active inje
 an outer slot before entry; this is not a universal provider transport guarantee.
 
 The proof demonstrates text generation through the chat-only OpenAI-compatible adapter and the
-registered Cerebras and Hyperbolic descriptors, plus buffered text embedding and reranking
+registered Cerebras, Hyperbolic, and Nscale descriptors, plus buffered text embedding and reranking
 through the built-in TEI, Voyage, or Jina adapter or optional application-owned retrieval
 adapters. Retrieval results carry reported usage, timing, attempts, warnings, optional raw
 payloads, and manifests just as their operation permits. `operationRoutes` can provide embedding or rerank defaults without
@@ -81,14 +82,18 @@ proof. Buffered C# embedding and reranking were exercised against the pinned TEI
 deployment on 2026-10-22. Voyage's built-in adapter has offline scripted-handler evidence only;
 hosted Voyage traffic has not been live-verified. Jina's built-in adapter has offline scripted-handler evidence only; hosted Jina traffic has not been live-verified.
 
-The default registry includes Cerebras and Hyperbolic for generation through the shared chat
-adapter. Use ordinary `ProviderSettings` and a provider-prefixed target. Their executable
-evidence uses scripted handlers only; hosted traffic for both providers remains unverified.
+The default registry includes Cerebras, Hyperbolic, and Nscale as its reviewed registered
+generation presets through the shared chat adapter. Use ordinary `ProviderSettings` and a
+provider-prefixed target. Their executable evidence uses scripted handlers only; hosted traffic
+for all three providers remains unverified.
 Hyperbolic's default endpoint is `https://api.hyperbolic.ai/inference/v1`; its former
 `https://api.hyperbolic.xyz/v1` endpoint is decommissioned. The example request retains the full
-`/inference/v1` path prefix. The other generated compatibility-preset rows remain inert in this
-C# registry. Choose a model available to the configured account through discovery; neither
-provider example represents a static model catalog guarantee.
+`/inference/v1` path prefix. Nscale's default endpoint is `https://inference.api.nscale.com/v1`.
+The other generated compatibility-preset rows remain inert in this C# registry. Choose a model
+available to the configured account through discovery; no provider example represents a static
+model catalog guarantee. For Nscale, exact SSE framing, terminal usage timing, and the accepted
+reasoning-effort enum remain unverified; generic typed history does not retain
+`reasoning_content`.
 
 For native C# SSE streams, `[DONE]` ends reading immediately and later records are ignored.
 Clean body EOF also finalizes the stream: a final usable record is processed even without a

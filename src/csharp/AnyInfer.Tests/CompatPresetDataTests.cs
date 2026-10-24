@@ -16,7 +16,7 @@ namespace AnyInfer.Tests;
 /// <summary>Independent controls for generated, inert compatibility-preset metadata.</summary>
 public sealed class CompatPresetDataTests
 {
-    private const string InventorySha256 = "5e2a30f3c9fbb39b35cc2c02c46d9aa1e506fbb62b1c2461ba70c532fd045e55";
+    private const string InventorySha256 = "f52e835ddc2e9afc62c8796279a1f44dd82faf38f6e2fe894000323d76c7ce7d";
 
     [Fact]
     public void Generated_table_joins_every_compat_row_to_independent_source_facts()
@@ -223,11 +223,11 @@ public sealed class CompatPresetDataTests
         var builtInIdentifiers = ProviderRegistry.CreateDefault().Descriptors
             .SelectMany(static descriptor => new[] { descriptor.Id }.Concat(descriptor.Aliases))
             .ToHashSet(StringComparer.Ordinal);
-        var admitted = CompatPresetTable.Rows.Where(static row => row.Source.Id is "cerebras" or "hyperbolic").ToArray();
-        Assert.Equal(["cerebras", "hyperbolic"], admitted.Select(static row => row.Generation.Descriptor.Id).OrderBy(static id => id, StringComparer.Ordinal));
+        var admitted = CompatPresetTable.Rows.Where(static row => row.Source.Id is "cerebras" or "hyperbolic" or "nscale").ToArray();
+        Assert.Equal(["cerebras", "hyperbolic", "nscale"], admitted.Select(static row => row.Generation.Descriptor.Id).OrderBy(static id => id, StringComparer.Ordinal));
         Assert.All(admitted, row => Assert.Contains(row.Generation.Descriptor.Id, builtInIdentifiers));
         var tableIdentifiers = CompatPresetTable.Rows
-            .Where(static row => row.Source.Id is not "cerebras" and not "hyperbolic")
+            .Where(static row => row.Source.Id is not "cerebras" and not "hyperbolic" and not "nscale")
             .SelectMany(static row => new[] { row.Generation.Descriptor.Id }.Concat(row.Generation.Descriptor.Aliases))
             .ToArray();
         Assert.Equal(tableIdentifiers.Length, tableIdentifiers.Distinct(StringComparer.Ordinal).Count());

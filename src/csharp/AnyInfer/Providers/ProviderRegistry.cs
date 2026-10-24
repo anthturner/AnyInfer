@@ -205,6 +205,7 @@ public sealed class ProviderRegistry
         },
         SelectReviewedGenerationPreset("cerebras"),
         SelectReviewedGenerationPreset("hyperbolic"),
+        SelectReviewedGenerationPreset("nscale"),
     ]);
 
     private static ProviderDescriptor SelectReviewedGenerationPreset(string presetId)

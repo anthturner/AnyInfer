@@ -1093,32 +1093,51 @@ one.
 ## nscale — Nscale
 
 - Base URL: `https://inference.api.nscale.com/v1`
-- Auth: Authorization: Bearer <service token> (the OpenAPI describes an "IdentityAuthorization" scheme accepting Unikorn Identity JWTs; the credential is a service token rather than a classic API key)
-- `GET /models`: yes
+- Auth: `Authorization: Bearer <service token>`. The operation schema describes
+  IdentityAuthorization as accepting Unikorn Identity JWTs. Current chat examples use
+  `NSCALE_SERVICE_TOKEN`; AnyInfer's `NSCALE_API_KEY` is its configuration convention,
+  not a provider-mandated variable name.
+- `GET /models`: yes, authenticated; the documented envelope is `{object, data: [...]}`
+  with model `id`, `object`, `owned_by`, optional `pricing` and `context_length`.
 - Compatibility notes:
-  Model ids are HF-style org/model (deepseek-ai/DeepSeek-R1-Distill-Qwen-32B). Both
-  max_completion_tokens and max_tokens are in the documented schema. tool_choice supports
-  only 'auto' and 'none' — docs state explicitly that "'required' tool_choice option requires
-  vllm>=0.8.3 and is not currently supported", so a forced-tool request cannot be expressed.
-  Unlike several peers, n, frequency_penalty, logit_bias, logprobs and top_logprobs ARE in
-  the schema. Docs state Nscale "doesn't enforce rate limits for serverless inference".
-  Prepaid credit model, $5 minimum. GET /v1/models returns per-model pricing{input, output}
-  and context_length — live rates, so no nscale section is in the bundled table; note that
-  for image models pricing.output is per million PIXELS, not tokens. stream_options.
-  include_usage is supported. The human-readable model catalogue page is access-code gated
-  and www.nscale.com/pricing returned 404, so no example prices could be read. The env var
-  NSCALE_API_KEY comes from Nscale's blog rather than the API docs — a convention, not a spec.
+  POST `/v1/chat/completions` accepts model/messages, both `max_tokens` and
+  `max_completion_tokens`, standard sampling/logprob fields, tools and response_format.
+  `tool_choice` supports auto/none; required is documented as currently unsupported.
+  Use account model discovery rather than a static catalog guarantee. Model pricing
+  distinguishes text-token and image-pixel units; no static rates are inferred here.
+- Streaming:
+  The operation schema declares `text/event-stream` containing typed choice/delta JSON
+  objects, accepts `stream_options.include_usage`, and makes streamed usage optional.
+  Buffered responses have choice/message fields and prompt/completion/total token usage.
+  **Unverified:** exact SSE byte framing, a DONE terminator, final usage timing and
+  behavior when usage is absent or the connection ends. No literal framing example was
+  found. The chat guide lists streaming success as 201; the operation schema uses 200.
+  Neither difference establishes deployed behavior. Shared reader EOF acceptance is an
+  implementation rule, not evidence about Nscale's emitted stream.
 - Reasoning:
-  A top-level reasoning_effort string IS present in the documented request schema, but the
-  docs specify NO allowed value set and there is no separate reasoning object. Whether
-  `minimal` is accepted could not be confirmed; the preset passes the normalized level
-  through unchanged and this is flagged for the next drift check.
-- Sources (verified 2026-08-07):
+  `reasoning_effort` is a string with example medium and no allowed-value enum. The
+  existing preset forwards the normalized level unchanged; other levels and per-model
+  support remain **Unverified**. Message/delta schemas include `reasoning_content`.
+  The generic adapters do not preserve it in typed assistant history; no Nscale replay
+  requirement was found, so neither a replay guarantee nor a server-rejection claim follows.
+- Errors and versioning:
+  Chat schema lists 400/401/404/429/500/502/503 with
+  `{error: {code, message, error_type, param?}}` and an INFERENCE-ID response header.
+  Retry/rate-limit header semantics are **Unverified**. The serverless rate FAQ says
+  there are no enforced rate limits, with workload bounded by allocated resources.
+  Embedded OpenAPI is 3.0.0, info.version 1.26.0; `/v1` is the URL version. No request
+  version pin or inference deprecation policy was found in the general changelog.
+- Watchlist: no authenticated hosted call or cassette verifies these published claims.
+  Exact streaming/usage, reasoning values/history, per-model features and retry semantics
+  remain unverified. The standalone OpenAPI URL was access-code gated; embedded operation
+  schemas were cross-checked against the rendered reference and chat guide. Documentation
+  is mutable and exposes no source commit pin.
+- Sources (fetched and verified as documentation 2026-10-24; hosted behavior unverified):
   - https://docs.nscale.com/api-reference/inference/create-chat-completion.md
   - https://docs.nscale.com/api-reference/models/list-models.md
-  - https://docs.nscale.com/docs/ai-services/models.md
-  - https://docs.nscale.com/docs/getting-started/quickstart.md
+  - https://docs.nscale.com/docs/use-cases/chat
   - https://docs.nscale.com/docs/faqs/rate-limits.md
+  - https://docs.nscale.com/changelog/changelog
 
 ## scaleway — Scaleway Generative APIs
 

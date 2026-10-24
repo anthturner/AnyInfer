@@ -6,7 +6,7 @@ repository's native C# work, while the supported product SDK and published packa
 Python.
 
 The generation examples use `ProviderSettings` and the built-in OpenAI-compatible, Cerebras,
-and Hyperbolic providers.
+Hyperbolic, and Nscale providers.
 The C# proof also includes built-in TEI, Voyage, and Jina adapters for buffered embeddings and
 reranking; other provider-specific retrieval remains application-owned. The async calls accept
 a cancellation token and use `await using`; the matching synchronous facade uses `using` and
@@ -70,8 +70,28 @@ The executable example uses a scripted handler to check the implicit default URI
 request model and body, returned text and usage, and disposal without contacting Hyperbolic.
 Hosted Hyperbolic traffic remains unverified. Choose a model available to the configured account
 through discovery; `glm-5.3-flash` is the documentation example identifier, not a static catalog
-guarantee. Only Cerebras and Hyperbolic have provider-specific generation registrations among the
-generated compatibility presets; the remaining preset rows are inert in this C# registry.
+guarantee. Cerebras, Hyperbolic, and Nscale are the reviewed registered generation presets in
+this C# registry; all other generated preset rows remain inert.
+
+## Use the registered Nscale provider
+
+The default C# registry includes Nscale for generation through the shared chat adapter. Use
+ordinary `ProviderSettings` with an explicit `env://NSCALE_API_KEY` credential reference and an
+`nscale:model` target; no base URL override is needed. Nscale's official examples use
+`NSCALE_SERVICE_TOKEN`, which callers can use by supplying that explicit environment reference.
+
+```csharp
+--8<-- "examples/csharp-sdk/NscaleExample.cs"
+```
+
+The executable example injects a literal offline key and uses a scripted handler to check the
+default HTTPS URI, Bearer header, model and request body, returned text and usage, and handler
+disposal. It does not make hosted Nscale traffic live-verified. The
+`meta-llama/Llama-3.1-8B-Instruct` target is a scripted documentation example, not an account
+catalog guarantee; discover models available to the configured account. Exact SSE framing and
+terminal usage timing remain unverified. Only the `medium` reasoning value is shown; the accepted
+effort enum remains unverified. Generic typed history does not retain `reasoning_content`.
+This remains a bounded prerelease proof; broader SDK work remains open.
 
 ## Configure provider connections
 

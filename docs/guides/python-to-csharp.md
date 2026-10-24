@@ -44,7 +44,7 @@ an `env://CEREBRAS_API_KEY` credential reference and use a `cerebras:model` targ
 the source-linked executable example.
 
 Its verifier uses a scripted handler, not hosted Cerebras traffic. Hosted behavior remains
-unverified; Hyperbolic is the other provider-specific preset selected in the default registry.
+unverified; Hyperbolic and Nscale are the other provider-specific presets selected in the default registry.
 Choose a model available to the configured account through discovery; the example's
 `gpt-oss-120b` is not a static catalog guarantee.
 
@@ -58,8 +58,21 @@ Its default endpoint migrated from the decommissioned `https://api.hyperbolic.xy
 offline; hosted Hyperbolic traffic remains unverified. Choose a model available to the account
 through discovery; `glm-5.3-flash` is an example identifier, not a static catalog guarantee.
 
-Cerebras and Hyperbolic are the two provider-specific generation presets selected in this C#
-proof; other generated compatibility-preset rows remain inert and are not default registrations.
+## Registered Nscale generation
+
+The C# default registry includes Nscale generation. Configure ordinary
+`ProviderSettings.Of("nscale", apiKey: "env://NSCALE_API_KEY")` and target `nscale:model`; see
+the [source-linked Nscale example](csharp-sdk.md#use-the-registered-nscale-provider). Nscale's
+official examples use `NSCALE_SERVICE_TOKEN`, which callers can supply as their explicit
+credential reference. The included handler is scripted and checks the default request offline;
+hosted Nscale traffic remains unverified. The example's
+`meta-llama/Llama-3.1-8B-Instruct` target is not an account catalog guarantee. Exact SSE framing,
+terminal usage timing, and the accepted reasoning-effort enum remain unverified; generic typed
+history does not retain `reasoning_content`.
+
+Cerebras, Hyperbolic, and Nscale are the reviewed registered generation presets selected in this
+C# proof; all other generated compatibility-preset rows remain inert and are not default
+registrations. Broader SDK work remains open.
 
 ## Shared configuration
 

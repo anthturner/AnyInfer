@@ -68,6 +68,7 @@ static IReadOnlyList<string> Dependencies(string providerId)
         "openai-compat" => ["contracts/openai-compat.md"],
         "cerebras" => ["contracts/openai-compat-presets.md", "contracts/openai-compat-presets.md#cerebras", "contracts/openai-compat.md"],
         "hyperbolic" => ["contracts/openai-compat-presets.md", "contracts/openai-compat-presets.md#hyperbolic", "contracts/openai-compat.md"],
+        "nscale" => ["contracts/openai-compat-presets.md", "contracts/openai-compat-presets.md#nscale", "contracts/openai-compat.md"],
         "tei" => ["contracts/tei.md"],
         "voyage" => ["contracts/voyage.md"],
         "jina" => ["contracts/jina.md"],
