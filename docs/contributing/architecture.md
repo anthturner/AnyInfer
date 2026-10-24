@@ -16,14 +16,14 @@ flowchart TD
 ```
 </div>
 
-## C# Core-Generation Proof
+## Independent C# SDK
 
-`src/csharp/` contains a bounded contributor proof of the shared core-generation contract. It
-reads the frozen corpus as input, performs native execution without using expected results, and
-compares the resulting observations afterward. It does not change the Python runtime architecture
-above or provide a supported C# SDK, provider surface, sync facade, or accounting implementation.
-Its local prerelease package validation does not change that product boundary.
-See [C# core-generation proof](csharp-proof.md) for the local commands and publication boundary.
+`src/csharp/` contains a native .NET 8 SDK in development, locally packaged as
+`0.1.0-proof`. Its conformance driver reads the frozen contract corpus and compares observations from
+native execution; ordinary SDK calls use public requests and execute independently. Shared
+declarative assets supply data to both implementations. Python remains the supported published
+SDK; C# is prerelease and does not claim full parity. See the [foundation](../concepts/foundation.md)
+for its capability map and [C# development guide](csharp-proof.md) for local workflow.
 
 ## The Load-Bearing Rules
 

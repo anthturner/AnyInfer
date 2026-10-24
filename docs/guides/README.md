@@ -1,6 +1,6 @@
 # Integrate AnyInfer
 
-Three supported production paths share the same core behavior and
+The Python SDK, CLI, and sidecar share the Python engine and
 [configuration file](../reference/configuration.md); only the process boundary changes.
 Not every application needs this layer at all; if a provider-switching client, an
 organization gateway, or a dedicated local server already solves your whole problem,
@@ -60,26 +60,16 @@ runs against in-process fakes with no credentials.
 - [Add your own provider](custom-providers.md)
 - [Embed, store, and query a small corpus](vector-store.md)
 
-## C# SDK Proof
+## C# SDK (Development)
 
-The C# surface is a bounded prerelease proof for contributors. It is not an installation or
-release path, and it does not change the supported Python SDK surface.
+The native .NET 8 SDK is in development as a prerelease surface, packaged locally as
+`0.1.0-proof`. Python remains the supported published SDK. C# executes independently and
+does not claim full parity. Current capabilities and exclusions are centralized in the
+[foundation](../concepts/foundation.md); see the source-linked [C# SDK guide](csharp-sdk.md),
+[reference](../reference/csharp-sdk.md), and migration guide for details.
 
-Its source-linked examples cover generation, routing, configuration, pure catalog and capability
-queries, explicit model discovery, health and capability probes for a configured instance,
-payload-free typed telemetry, immutable manifests, built-in TEI, Voyage, and Jina embedding and reranking,
-declarative provider setup metadata, bounded winning-request pricing, explicit budgeting,
-caller-owned ledger/store helpers, standalone pacing, explicit request-policy inputs, and modern
-JSON Schema validation with typed deserialization. They do not imply full provider parity,
-released NuGet distribution, provider invoice or all-wire accounting,
-automatic tool execution, rich-media input breadth, context/history reduction, or a supported
-application integration path. Typed raw tool values do not provide callable tool
-execution, and specialized context-window routes are public route values rather than version 1
-configuration syntax. Configured `RateLimits` pace normal provider HTTP inside the entry deadline;
-own-transport and opaque prebuilt cases have a separate outer-slot boundary.
-
-- [Explore the C# SDK proof](csharp-sdk.md)
-- [Move from Python to the C# SDK proof](python-to-csharp.md)
+- [Explore the C# SDK](csharp-sdk.md)
+- [Move from Python to C#](python-to-csharp.md)
 
 ## Operations
 

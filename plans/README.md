@@ -7,8 +7,18 @@ historical evidence, it links to the version-pinned source record.
 ## Current plans
 
 - [Python-aligned AnyInfer C# SDK](ANYINFER_CSHARP_SDK.md) is the active parent plan,
-  paused for branch handoff. Its 15 open milestone boxes remain SDK.6c, SDK.8a–c,
+  resumed for autonomous parity burn-down, beginning with
+  [foundation and SDK alignment](SDK_FOUNDATION_ALIGNMENT.md).
+  Its 15 open milestone boxes remain SDK.6c, SDK.8a–c,
   SDK.9a–b, SDK.10a–c, SDK.11a–c, and SDK.12a–c.
+- [Foundation and SDK alignment](SDK_FOUNDATION_ALIGNMENT.md) tracks the parity audit,
+  initial documentation correction, executable API reconciliation, and the distinction
+  between sealed specification coverage, development profiles and shared build-time data.
+  ALIGN.1–4 are complete; the next unchecked box is ALIGN.5a, the public catalog vocabulary
+  gap, followed by the remaining SDK implementation work. The 235-export evidence ledger
+  and its workspace checker are active; their classifications are scoped evidence, not a
+  full-parity claim.
+  It does not select a new provider or change asset authority.
 - [C# SDK API parity inventory](CSHARP_SDK_API_PARITY.md) is the parent plan's open
   inventory. All 235 root API rows remain unchecked pending their assigned semantics and
   the SDK.11c reconciliation.
@@ -23,4 +33,5 @@ historical evidence, it links to the version-pinned source record.
 - [Language-neutral foundation index](language-neutral-foundation/README.md) identifies the
   shared specification and the foundation plan's deferred scope.
 
-No plan checkbox is changed by this retirement maintenance.
+The retirement maintenance preserved every unfinished milestone. Subsequent alignment
+work records its own gates in the leaf above.

@@ -208,6 +208,6 @@ tools for those.
 
 - [Quickstart](guides/quickstart.md): install to first result.
 - [Integrate AnyInfer](guides/README.md): choosing between the SDK, CLI, and sidecar.
-- [Concepts](concepts/README.md): the eighteen ideas the API follows from.
+- [Concepts](concepts/README.md): the concepts the API follows from.
 
 </div>

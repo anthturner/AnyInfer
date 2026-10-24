@@ -1,16 +1,12 @@
 # C# Core-Generation Proof
 
-This repository contains a bounded native C# proof under `src/csharp/`. It independently reads
-the frozen shared `core-generation` corpus, executes the supported proof surface from fixture
-inputs, and compares the resulting observations afterward. Fixture expectations are comparison
-data; they do not drive native execution. The repository also carries source-linked async SDK
-proof examples under `examples/csharp-sdk/`.
-
-The proof exists to check the shared contract from another runtime. It does not provide a
-supported AnyInfer C# SDK, a registry-published NuGet package, a production integration path,
-provider parity or aggregate usage-accounting support. The supported runtime, public SDK,
-installation guidance, and downloads remain Python surfaces. The bounded C# proof includes both
-async and synchronous facades for contributor verification.
+The native C# SDK under `src/csharp/` is an independent .NET 8 implementation in
+development. Its conformance driver reads the frozen shared `core-generation` corpus, runs
+fixtures against the SDK, and compares observations; expectations do not drive execution.
+Ordinary SDK calls use public requests and execute natively without reading the corpus. The
+SDK also consumes shared declarative assets. It is locally packaged as `0.1.0-proof`, not published to NuGet.
+Python remains the supported published SDK, and C# does not claim full parity or provider
+invoice/all-wire accounting. See the [foundation capability map](../concepts/foundation.md).
 
 ## Run the proof locally
 

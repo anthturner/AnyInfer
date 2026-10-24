@@ -40,14 +40,14 @@ hide:
 
 </div>
 
-AnyInfer provides a provider-independent inference runtime for Python applications that
-span hosted providers and local models, as well as an OpenAI-compatible sidecar for
-everything that is not Python.
+AnyInfer provides a shared inference foundation with independent Python and C# SDK
+implementations. Python remains the supported published SDK; the native .NET 8 C# SDK is in
+development as a prerelease package. The Python SDK, CLI, and OpenAI-compatible sidecar use
+the same engine; C# executes a bounded native subset. See [the foundation](concepts/foundation.md).
 
-Contributors can also inspect the bounded [C# core-generation proof](contributing/csharp-proof.md)
-and its [async SDK proof examples](guides/csharp-sdk.md). They verify shared behavior inside this
-repository and do not add a supported C# SDK or installation path. Local prerelease package
-validation does not publish a package.
+The C# SDK is a native .NET 8 development surface distributed locally as package
+`0.1.0-proof`. It is not published to NuGet and does not claim full Python parity. See the
+[C# SDK guide](guides/csharp-sdk.md) and [foundation](concepts/foundation.md).
 
 ## Install
 

@@ -8,9 +8,15 @@
 
 ## 1. Product definition
 
-**AnyInfer** is an application-owned hybrid inference runtime for Python. It provides one
-normalized inference contract across hosted AI providers, routing hubs, existing local
-services, and a supervised `llama.cpp` process owned by the application.
+**AnyInfer** is an application-owned hybrid inference runtime with a shared foundation and
+independent Python and C# SDK implementations. The runtime provides one normalized inference
+contract across hosted AI providers, routing hubs, existing local services, and a supervised
+`llama.cpp` process. It owns routing, structured output, context preparation, telemetry, and
+configuration.
+
+The Python SDK is the supported published implementation. A native .NET 8 C# SDK is in
+development as a prerelease local package (`0.1.0-proof`). It implements a bounded subset and
+does not claim full parity or release support.
 
 Provider breadth is compatibility inventory, not the product definition. The public boundary
 is the combination of application-owned local lifecycle, portable behavior with explicit
@@ -865,9 +871,9 @@ src/python/anyinfer/
   serve/                 # openai_codec.py responses_codec.py embeddings_codec.py
                          # app.py service.py __main__.py — see §22, ADR-009
 
-src/csharp/              # bounded core-generation proof; not a supported SDK or registry package
-  AnyInfer/               # native proof runtime
-  AnyInfer.Conformance/   # corpus reader, comparison, and driver
+src/csharp/              # independent native .NET 8 SDK in development; local prerelease package
+  AnyInfer/               # SDK library, adapters, schema, capabilities, config, and clients
+  AnyInfer.Conformance/   # frozen-corpus reader, comparison, and native driver
   AnyInfer.Tests/         # native unit and lifecycle tests
 
 tests/                   # unit + conformance runs (cassette & fake modes)
@@ -875,11 +881,16 @@ contracts/               # per-provider protocol snapshots + DRIFT-CHECK.md (§2
 docs/                    # provider guides, published site sources (§25)
 ```
 
-`src/python/` is the current implementation root. The language-neutral behavior contract and
-data-only corpus live under `specification/`. The bounded C# core-generation proof has a separate
-`src/csharp/` root: it executes the frozen shared corpus, compares its observations, and validates
-a local prerelease package, but is not a supported implementation or release-ready product.
-Python remains the current product implementation.
+`src/python/` is the supported published SDK implementation root. The language-neutral
+behavior contract and data-only corpus live under `specification/`. Separately shared
+declarative assets include catalog, model, and pricing data currently sourced from
+Python-owned files and embedded into C#. Provider tables are checked in and maintained by
+repository scripts; C# has no runtime Python dependency. The independent native C# SDK under
+`src/csharp/` executes public requests natively. Its conformance driver reads and compares
+observations against the frozen shared corpus. It is locally packaged as
+`0.1.0-proof`, remains prerelease development, and is not a published NuGet package or a
+full-parity support commitment. The Python SDK, CLI, and sidecar share one engine; C# has
+its own native execution.
 
 **`context_request.py` stays a root module — pinned by contract, not by inertia.** The
 obvious homes are both closed. It cannot live under `types/`: it imports

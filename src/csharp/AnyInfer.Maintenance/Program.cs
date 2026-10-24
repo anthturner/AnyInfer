@@ -3,6 +3,13 @@ using AnyInfer.Providers;
 using System.Text;
 using System.Text.Json;
 
+if (PublicApiArguments.IsRequested(args))
+{
+    var publicApiArguments = PublicApiArguments.Parse(args);
+    await PublicApi.WriteAsync(publicApiArguments.Output);
+    return;
+}
+
 var arguments = Arguments.Parse(args);
 using var contextDocument = JsonDocument.Parse(await File.ReadAllBytesAsync(arguments.Context));
 var context = Context.Validate(contextDocument.RootElement);

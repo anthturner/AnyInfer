@@ -1,11 +1,10 @@
 # Move from Python to C# SDK (prerelease)
 
-The Python SDK remains the supported AnyInfer runtime and the source for installation,
-integration, and release guidance. The C# surface is a bounded prerelease SDK proof for .NET 8
-developers porting supported async text generation concepts. It has no released NuGet package and
-does not claim provider or feature parity with Python.
+Python remains the supported published SDK. The native .NET 8 C# SDK is in development as
+a prerelease local package (`0.1.0-proof`) and does not claim full parity. See the [shared
+foundation](../concepts/foundation.md) for its current capabilities and limits.
 
-| Python concept | C# SDK proof |
+| Python concept | C# SDK (development) |
 |---|---|
 | `AsyncClient` | `AsyncClient` |
 | `ProviderSettings.of(...)` | `ProviderSettings.Of(...)` |
@@ -196,14 +195,11 @@ Callers own supplied ledgers, estimators, limiters, and stores. Normal configure
 a supplied handler for a normal configured descriptor, is paced inside the entry deadline when
 `RateLimits` are active. An own-transport descriptor, or an opaque prebuilt registration with an
 active injected limiter, uses an outer slot before entry. This proof does not claim provider-invoice
-or all-wire accounting, context/history
-reduction, or universal provider transport parity.
+or all-wire accounting, context reduction, history reduction, or universal provider transport parity.
 
 ## What to use in an application
 
-Use the [Python SDK](python-sdk.md), sidecar, or CLI for supported application integration. The
-C# examples give .NET developers a concrete, source-linked async surface and synchronous facade
-over the same core for porting generation code. Rich input and bounded tool execution are
-additional prerelease proof surfaces; they do not change Python's supported-SDK status. The
-package and integration remain prerelease proof work rather than a separate installation path,
-with no released NuGet package or full provider parity.
+Use the [Python SDK](python-sdk.md), sidecar, or CLI for supported application integration. The native C# SDK gives .NET developers a source-linked async API and synchronous facade
+implemented by its own C# core. Rich inputs and bounded tool execution are available in that
+prerelease SDK. Python remains the supported published SDK; the local C# package is not published
+to NuGet and makes no full-parity claim.

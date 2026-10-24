@@ -185,6 +185,7 @@ class TestVerbs:
         assert "scripts/_tool_loop_python.py" in recorded[0]
         assert "scripts/check_csharp_tool_loop.py" in recorded[0]
         assert "scripts/check_csharp_binding_inventory.py" in recorded[0]
+        assert "scripts/check_sdk_api_parity.py" in recorded[0]
         assert "scripts/export_python_provider_bindings.py" in recorded[0]
         assert "scripts/export_python_provider_parity.py" in recorded[0]
         assert "scripts/generate_csharp_compat_presets.py" in recorded[0]
@@ -284,6 +285,10 @@ class TestVerbs:
             ),
             (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_binding_inventory.py")],
+                ROOT,
+            ),
+            (
+                [sys.executable, str(ROOT / "scripts" / "check_sdk_api_parity.py")],
                 ROOT,
             ),
             (
@@ -477,8 +482,8 @@ class TestVerbs:
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
         # Every default step must be attempted despite the failure, including the two
-        # in-process docs gates and twelve C# steps.
-        assert len(calls) == 25
+        # in-process docs gates and thirteen C# steps.
+        assert len(calls) == 26
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

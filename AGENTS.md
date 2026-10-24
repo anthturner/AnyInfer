@@ -5,7 +5,8 @@ others). Tool-specific files (`CLAUDE.md`, `.github/copilot-instructions.md`) de
 
 ## What this project is
 
-AnyInfer is an application-owned hybrid inference runtime for Python. One typed core spans
+AnyInfer is an application-owned hybrid inference runtime with a shared foundation and
+independent Python and C# SDK implementations. The supported Python SDK's typed core spans
 hosted providers, routing hubs, existing local services, and a supervised `llama.cpp`
 process; it also owns structured-output enforcement, context budgeting and reduction,
 routing, telemetry, and capability provenance. Provider breadth is compatibility inventory,
@@ -26,8 +27,9 @@ and the risk register. Read it before proposing or writing code. Do not contradi
 or a stated non-goal without flagging it explicitly as a proposed reversal.
 
 The current Python implementation lives under `src/python/`; the shared language-neutral
-contract and corpus live under `specification/`. A separate future C# proof root does not mean
-that a C# implementation is currently supported or release-ready.
+contract and corpus live under `specification/`. The native C# SDK is in independent .NET 8
+development as a prerelease surface. It is not a published NuGet package or full-parity
+support commitment. Python remains the supported published SDK.
 
 **Branch model:** `feature/*` → `develop` → `main`, both protected branches gated on the
 aggregate `ci-ok` check. Merges to `main` rebuild the library distribution and a Linux
@@ -60,6 +62,8 @@ Keep these product surfaces distinct:
 
 | Workstream | Owned paths | Boundary |
 |---|---|---|
+| Shared foundation | `specification/`, `contracts/`, `maintenance/` | Owns language-neutral behavioral profiles, immutable corpora, provider snapshots, and registered cross-implementation maintenance. Later SDK development profiles do not silently expand sealed releases. Existing Python-owned declarative assets feed native SDKs through reviewed build-time embedding/generation; moving their authority requires a separate decision. |
+| Native C# SDK | `src/csharp/`, `examples/csharp-sdk/`, C# SDK docs and verification scripts | Independent .NET execution over shared contracts and data, with an async core and sync facade. Adapters translate; orchestration stays in the native core. The current local prerelease package is not full Python parity or a published release. Preserve the frozen profile and documented native schema/TLS differences. |
 | Core SDK / inference engine | `src/python/anyinfer/` except `cli.py` and `serve/` | Owns normalized types, orchestration, providers, routing, local inference, config, and public Python APIs. It never depends on a frontend. **Model and runtime acquisition live in `local/`, never in an adapter** — fetching weights is not protocol translation. |
 | Demo application | `src/python/anyinfer_demo/`, `tests/demo_app/` | A reference integrator built on supported public APIs. It stays offline-capable with the fake provider and never becomes a second implementation of routing, validation, configuration, or telemetry. |
 | One-shot CLI and operator commands | `src/python/anyinfer/cli.py`, CLI tests | Owns argument parsing, terminal presentation, and process exit codes for `init`, `agents-md`, `run`, `embed`, `rerank`, `compare`, `verify`, `benchmark`, `doctor`, `providers`, `models`, `runtime`, `context`, `conform`, `mcp`, and `serve`. `serve`'s parser lives here, but its semantics belong to the sidecar workstream. It delegates inference, reduction, and config semantics to public core APIs. Collection (filesystem walking for `context`) belongs here, never in `anyinfer.context`, and endpoint/credential discovery for `init` belongs in `anyinfer.local.discovery`. |

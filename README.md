@@ -13,10 +13,15 @@
   <img src="https://img.shields.io/badge/python-3.11%2B-0B3B3C" alt="Python 3.11+" />
 </p>
 
-**An application-owned hybrid inference runtime for Python.** Send one typed request to
-hosted providers, routing hubs, existing local servers, or a supervised `llama.cpp`
-process. The same core owns routing, structured output, context budgeting and reduction,
-telemetry, and shared configuration.
+**AnyInfer is an application-owned hybrid inference runtime, with a shared foundation and
+independent Python and C# SDK implementations.** The runtime spans hosted providers, routing
+hubs, existing local services, and supervised `llama.cpp`; it owns routing, structured output,
+context preparation, telemetry, and configuration. The Python SDK, CLI, and OpenAI-compatible
+sidecar use the same engine.
+
+Python remains the supported published SDK. The native .NET 8 C# SDK is in development as a
+prerelease local package (`0.1.0-proof`), implementing a bounded subset without a full-parity
+or support-matrix claim. See the [shared foundation](https://anyinfer.dev/concepts/foundation/).
 
 ```python
 import anyinfer as ai
@@ -169,15 +174,16 @@ python workspace.py demo     # launch the demo app
 `python workspace.py` with no arguments lists every verb. See
 [Contributing](https://anyinfer.dev/contributing/).
 
-Contributors can also run the bounded [C# core-generation proof](https://anyinfer.dev/contributing/csharp-proof/)
-and its [async SDK proof examples](https://anyinfer.dev/guides/csharp-sdk/). They are repository
-verification infrastructure, not a supported AnyInfer SDK, integration API, registry-published
-package, or release artifact.
+The [C# SDK guide](https://anyinfer.dev/guides/csharp-sdk/) documents the native .NET 8
+development surface. It is locally packaged as `0.1.0-proof` and is not published to
+NuGet; Python remains the supported published SDK.
 
 ## Compatibility surface
 
 Provider breadth is compatibility inventory, not the product thesis. AnyInfer ships 20
 dedicated adapters plus 86 declarative OpenAI-compatible presets.
+This inventory describes the Python SDK; the native C# subset is listed in the
+[SDK capability map](https://anyinfer.dev/concepts/foundation/#c-capability-map).
 **[See the complete inventory →](https://anyinfer.dev/providers/all/)**
 
 The dedicated adapters, each handling provider-specific protocol or discovery behavior:
@@ -224,8 +230,10 @@ llama.cpp (against an embeddings-mode server), and four OpenAI-compatible preset
 | Python SDK | Python applications that want typed results and the full event stream | `Client` / `AsyncClient` |
 | Command-line tool | Shell scripts and one-off prompts | `anyinfer run` |
 | OpenAI-compatible sidecar | Non-Python applications and existing OpenAI clients | `anyinfer serve` (pip) or the standalone `anyinfer-serve` bundle |
+| C# SDK (development) | .NET applications evaluating the native prerelease subset | Local .NET 8 package `0.1.0-proof` |
 
-All three use the same engine and the same versioned JSON configuration format:
+The Python SDK, CLI, and sidecar use the same engine and versioned JSON configuration
+format. The C# SDK executes independently against shared contracts and assets:
 
 ```json
 {

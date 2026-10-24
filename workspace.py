@@ -144,6 +144,7 @@ LINT_PATHS = (
     "scripts/_tool_loop_python.py",
     "scripts/check_csharp_tool_loop.py",
     "scripts/check_csharp_binding_inventory.py",
+    "scripts/check_sdk_api_parity.py",
     "scripts/export_python_provider_bindings.py",
     "scripts/export_python_provider_parity.py",
     "scripts/generate_csharp_compat_presets.py",
@@ -1056,6 +1057,10 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                     lambda: python(
                         str(ROOT / "scripts" / "check_csharp_binding_inventory.py"), cwd=ROOT
                     ),
+                ),
+                (
+                    "validate SDK API evidence ledger",
+                    lambda: python(str(ROOT / "scripts" / "check_sdk_api_parity.py"), cwd=ROOT),
                 ),
                 (
                     "validate C# NuGet proof package",

@@ -1,8 +1,11 @@
 # AnyInfer language-neutral foundation
 
 **Start here: [master plan](ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md).** It retains the
-deferred M3/M4 gates. The [active but paused C# SDK parent](../ANYINFER_CSHARP_SDK.md)
-controls when SDK work resumes. The [shared specification](../../specification/core-generation.md)
+deferred M3/M4 gates. The [active C# SDK parent](../ANYINFER_CSHARP_SDK.md)
+now resumes [foundation/SDK alignment](../SDK_FOUNDATION_ALIGNMENT.md) and autonomous parity work.
+Its reviewed contract/evidence map distinguishes later SDK development profiles and build-time
+shared data from the sealed release; it does not complete M3 or change data authority.
+The [shared specification](../../specification/core-generation.md)
 and [maintenance contract](../../specification/MAINTENANCE.md) are the current authority for
 the frozen `core-generation` v0 profile. The completed C# proof and specification drafts are
 historical inputs, not normative specification.

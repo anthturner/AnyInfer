@@ -154,6 +154,7 @@ nav:
       - The Pack-In Demo Application: guides/demo-app.md
   - Concepts:
       - concepts/README.md
+      - Shared Foundation: concepts/foundation.md
       - The Request Path:
           - Targets and Aliases: concepts/targets.md
           - The Event Stream: concepts/events.md

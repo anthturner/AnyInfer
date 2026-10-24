@@ -2,9 +2,10 @@
 
 Look things up.
 
-This reference documents the supported Python `anyinfer` API. The repository also contains a
-bounded prerelease C# SDK proof with a hand-written surface map; it has no generated reference,
-released package, or supported application integration path.
+The Python reference documents the supported published SDK. The native .NET 8 SDK is in
+development as a prerelease local package (`0.1.0-proof`) with a hand-written reference. It
+is not published to NuGet and does not claim full parity. See the [foundation capability
+map](../concepts/foundation.md).
 
 - **[SDK reference](api/README.md)**: the generated API reference: every public class,
   function, and event, from the docstrings.

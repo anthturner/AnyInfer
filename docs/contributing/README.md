@@ -14,13 +14,13 @@ python workspace.py check                          # every gate CI runs
 ```
 
 Python 3.11+. Windows, macOS, and Linux are all first-class and all tested in CI.
-The complete quality gate also runs the bounded C# core-generation proof, so install the SDK
-selected by `src/csharp/global.json` before running `workspace check`. This is contributor
-proof infrastructure, not a supported package or application integration path. The full gate
-validates a local prerelease package without publishing it, then runs the offline async SDK proof
-examples.
+The native .NET 8 C# SDK is in development; Python remains the only supported published
+package. The complete quality gate also runs C# conformance checks, so install the SDK selected
+by `src/csharp/global.json` before running `workspace check`. The gate validates a local
+prerelease package without publishing it, then runs offline SDK examples.
 
-For the exact proof boundary and native commands, see [C# core-generation proof](csharp-proof.md).
+For the current C# development and conformance workflow, see
+[C# core-generation proof](csharp-proof.md).
 
 ## The Task Runner
 
@@ -71,8 +71,8 @@ The full code-change CI pipeline invokes these phases as
 `python workspace.py check --only=<phase>`. Docs-only changes deliberately skip jobs that do
 not apply to documentation, while a local `check` always runs every default phase. CI also runs
 the `test` phase across Python 3.11–3.14 on Linux, Windows, and macOS, which only the runners
-can cover. The `csharp` phase uses the SDK pinned under `src/csharp/`; it executes the bounded
-proof, validates a local prerelease package, then runs the offline async SDK proof examples. It
+can cover. The `csharp` phase uses the SDK pinned under `src/csharp/`; it runs native SDK tests and
+conformance checks, validates a local prerelease package, then runs offline SDK examples. It
 produces no canonical conformance report or registry publication.
 
 `--skip=a,b` leaves phases out; `--only=a,b` runs just those; the two are mutually

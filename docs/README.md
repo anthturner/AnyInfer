@@ -1,9 +1,11 @@
 # AnyInfer Documentation
 
-AnyInfer provides a provider-independent inference runtime for Python applications, as
-well as an OpenAI-compatible sidecar for everything else. This page is the table of
-contents; everything else is one click away. These same pages are published, with a
-generated SDK reference, at **[anyinfer.dev](https://anyinfer.dev/)**.
+AnyInfer is an application-owned hybrid inference runtime with a shared foundation and
+independent Python and C# SDK implementations. Python remains the supported published SDK;
+its CLI and OpenAI-compatible sidecar use the same engine. The native .NET 8 C# SDK is in
+development as a prerelease local package and does not claim full parity. See the
+[shared foundation](concepts/foundation.md) for the current capability map. This page is the
+table of contents; the documentation is published at **[anyinfer.dev](https://anyinfer.dev/)**.
 
 In a hurry? The [quickstart](guides/quickstart.md) gets you from `pip install` to a
 working `generate()` call in ~5 minutes.
@@ -29,12 +31,13 @@ arranged.
 Read in roughly this order:
 
 1. [Quickstart](guides/quickstart.md): install to first result.
-2. [Integrate AnyInfer](guides/README.md): Python SDK, command-line tool, or sidecar,
-   and the full list of task guides (streaming, schemas, fallback, tool loop, context,
-   offline testing, local models).
+2. [Integrate AnyInfer](guides/README.md): supported Python SDK, command-line tool, or
+   sidecar, plus task guides. The C# SDK in development has its own
+   [guide](guides/csharp-sdk.md) and [migration map](guides/python-to-csharp.md).
 3. [Installation and extras](guides/installation.md): which extras you need.
-4. [Shared configuration](reference/configuration.md): one file for every path.
-5. [Concepts](concepts/README.md): eighteen ideas, one line each; read them once and
+4. [Shared configuration](reference/configuration.md): one file for the Python SDK, CLI,
+   and sidecar. C# reads its [documented v1 subset](guides/python-to-csharp.md).
+5. [Concepts](concepts/README.md): one line each; read them once and
    the rest of the API follows.
 
 Letting a coding agent write the integration?
@@ -47,10 +50,11 @@ standalone builds on the [downloads page](downloads.md).
 
 - [Contributor guide](contributing/README.md): setup, the quality gates, and what CI
   checks.
-- [C# core-generation proof](contributing/csharp-proof.md): the bounded native proof for
-  contributors, including [async SDK proof examples](guides/csharp-sdk.md). It is not a
-  supported SDK or product integration path. Its local prerelease package check does not create
-  an installation path or registry release.
+- [C# SDK development and conformance](contributing/csharp-proof.md): native .NET 8
+  development workflow and frozen-contract verification. Python remains the supported
+  published SDK; the C# package is prerelease and not published to NuGet. See its
+  [capability map](concepts/foundation.md), [SDK guide](guides/csharp-sdk.md), and
+  [reference](reference/csharp-sdk.md).
 - [Architecture](contributing/architecture.md): the load-bearing rules.
 - [Writing a provider adapter](contributing/writing-an-adapter.md) and
   [the conformance suite](contributing/conformance.md).

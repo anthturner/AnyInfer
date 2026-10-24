@@ -1,5 +1,15 @@
 # AnyInfer language-neutral foundation
 
+> NOTE: Current cross-plan reconciliation (2026-10-24) is in
+> [foundation/SDK alignment](../SDK_FOUNDATION_ALIGNMENT.md). The native C# SDK has
+> advanced through accepted SDK.1–7 beyond the historical M2 proof described here.
+> Its later paired development profiles and accepted native dependencies do not widen
+> sealed `core-generation-v0`, close M3.1 aggregate accounting, or change historical
+> proof decisions A8/A11. The existing maintenance registry and build-time Python-owned
+> data boundary are accepted. ALIGN.4 maps remaining contract/evidence gaps before any
+> separately approved successor-profile or data-authority change; no `basis/` directory
+> or neutral-root migration is presumed. M3/M4 retain their own gates below.
+
 **Resume from the first unchecked box in §5. Read §1 to §4 of this file and the
 [shared specification](../../specification/core-generation.md) and
 [maintenance contract](../../specification/MAINTENANCE.md) before touching any box. Each box ends in a

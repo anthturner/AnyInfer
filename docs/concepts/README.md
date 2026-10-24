@@ -1,7 +1,11 @@
 # Concepts
 
-Eighteen ideas. Read them once and the rest of the API follows from them. They build on
+These concepts explain the shared foundation and runtime behavior. They build on
 each other roughly in this order, but each page stands alone.
+
+## Shared Foundation
+
+- [Shared foundation and SDK map](foundation.md) | How normative contracts, shared assets, and independent SDK implementations relate.
 
 ## The Request Path
 

@@ -1,9 +1,9 @@
 # C# SDK (prerelease)
 
-The repository includes a bounded, prerelease C# SDK proof for .NET 8. Its runnable source
-examples live in `examples/csharp-sdk/`; the proof uses the same shared contract checks as the
-repository's native C# work, while the supported product SDK and published package remain
-Python.
+The repository includes an independent native .NET 8 SDK in development. Its runnable
+source examples live in `examples/csharp-sdk/`. Python remains the supported published SDK;
+C# is locally packaged as `0.1.0-proof` without full-parity or support-matrix claims. See the
+[foundation capability map](../concepts/foundation.md).
 
 The generation examples use `ProviderSettings` and the built-in OpenAI-compatible, Cerebras,
 Hyperbolic, and Nscale providers.
@@ -91,7 +91,7 @@ disposal. It does not make hosted Nscale traffic live-verified. The
 catalog guarantee; discover models available to the configured account. Exact SSE framing and
 terminal usage timing remain unverified. Only the `medium` reasoning value is shown; the accepted
 effort enum remains unverified. Generic typed history does not retain `reasoning_content`.
-This remains a bounded prerelease proof; broader SDK work remains open.
+The current capability map and exclusions are maintained in the [shared foundation](../concepts/foundation.md).
 
 ## Configure provider connections
 
@@ -240,8 +240,7 @@ total.
 
 Pricing uses only trusted catalog, discovered, probed, or caller-override provenance. A
 default price leaves calculated cost unknown; a trusted zero price remains a known free result.
-`Budget` is a pure planning calculation for one explicit target. The request estimator currently
-counts text only: nontext parts are reported as unpriced, and there is no offered-tools input yet.
+`Budget` is a pure planning calculation for one explicit target. The request estimator currently counts text only: nontext parts are reported as unpriced, and it has no offered-tools input.
 
 The ledger, store, and limiter below are caller-selected helpers. They do not create default disk
 output, refuse a request, pace client transport, or provide a provider invoice or all-wire total.
@@ -333,17 +332,17 @@ verifier runs.
 
 ## Scope
 
-This proof covers asynchronous text generation and typed rich-input generation through the
-OpenAI-compatible adapter, plus a bounded registered-tool loop and a synchronous facade over
-that same core. It also covers buffered text embeddings and reranking through the
-built-in TEI, Voyage, and Jina adapters and application-owned retrieval adapters. The
+The native C# SDK currently covers asynchronous and synchronous text generation, typed rich-input
+generation through the OpenAI-compatible adapter, and an explicit bounded loop over registered
+tools. It also supports buffered text embeddings and reranking through built-in TEI, Voyage, and
+Jina adapters and application-owned retrieval adapters. The
 OpenAI-compatible adapter remains chat-only. It also covers structured JSON validation and repair,
 configuration, routing, reported token usage, bounded winning-request pricing, explicit budgets,
-caller-owned ledger and store helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free
-typed telemetry, immutable manifests, and declarative setup metadata. It does not provide a
-released NuGet package, full provider parity, provider invoice or all-wire totals, context/history
-reduction, or production report publication. Built-in retrieval coverage is limited to TEI, Voyage, and Jina; generic
-OpenAI-compatible retrieval is not implemented in this proof.
+caller-owned ledger and store helpers, standalone pacing, request-policy inputs, explicit capability probes, payload-free typed telemetry, immutable manifests, and declarative setup
+metadata. The local package is not published to NuGet and does not claim full provider parity,
+provider invoice or all-wire totals, context reduction, history reduction, or production report
+publication. Built-in retrieval coverage is limited to TEI, Voyage, and Jina; generic
+OpenAI-compatible retrieval is not implemented.
 
 For structured output, use `SchemaSpec` with Draft 6, Draft 7, Draft 2019-09, or Draft 2020-12.
 Draft 3 and Draft 4 remain deferred. Native numeric and regular-expression behavior applies, with

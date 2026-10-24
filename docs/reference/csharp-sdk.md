@@ -1,7 +1,8 @@
 # C# SDK (prerelease) Reference
 
-This page is a hand-written map of the bounded prerelease C# SDK proof. Python remains the
-supported public SDK and its generated Python API reference remains under
+This page maps the native .NET 8 C# SDK in development, locally packaged as
+`0.1.0-proof`. Python remains the supported published SDK and its generated API reference is
+under
 [SDK reference](api/README.md).
 
 The listed C# types are in the `AnyInfer` namespace unless otherwise noted. The C# `Text.Value`
@@ -67,18 +68,18 @@ Configured `RateLimits` can pace normal provider HTTP inside the generation entr
 own-transport descriptor, or an opaque prebuilt registration with an active injected limiter, uses
 an outer slot before entry; this is not a universal provider transport guarantee.
 
-The proof demonstrates text generation through the chat-only OpenAI-compatible adapter and the
+The SDK currently provides text generation through the chat-only OpenAI-compatible adapter and the
 registered Cerebras, Hyperbolic, and Nscale descriptors, plus buffered text embedding and reranking
 through the built-in TEI, Voyage, or Jina adapter or optional application-owned retrieval
 adapters. Retrieval results carry reported usage, timing, attempts, warnings, optional raw
 payloads, and manifests just as their operation permits. `operationRoutes` can provide embedding or rerank defaults without
 changing a generation route. The TEI descriptor does not hydrate deployment limits, so unknown
 provider batch ceilings do not cause guessed splitting;
-`BatchPolicy` supplies an explicit override when the application has verified a limit. It has no
-released NuGet package, full provider-parity guarantee, provider invoice or all-wire accounting,
-context/history reduction, or production
-report publication. Generic OpenAI-compatible retrieval remains unimplemented in this
-proof. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
+`BatchPolicy` supplies an explicit override when the application has verified a limit. The SDK
+is not published to NuGet and makes no full provider-parity guarantee. It does not provide provider
+invoice or all-wire accounting, context reduction, history reduction, or production report
+publication. Retrieval input batching is supported; batch inference jobs are not. Generic
+OpenAI-compatible retrieval remains unimplemented. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
 deployment on 2026-10-22. Voyage's built-in adapter has offline scripted-handler evidence only;
 hosted Voyage traffic has not been live-verified. Jina's built-in adapter has offline scripted-handler evidence only; hosted Jina traffic has not been live-verified.
 
@@ -92,7 +93,7 @@ Hyperbolic's default endpoint is `https://api.hyperbolic.ai/inference/v1`; its f
 The other generated compatibility-preset rows remain inert in this C# registry. Choose a model
 available to the configured account through discovery; no provider example represents a static
 model catalog guarantee. For Nscale, exact SSE framing, terminal usage timing, and the accepted
-reasoning-effort enum remain unverified; generic typed history does not retain
+reasoning-effort enum remain unverified; generic message history does not retain
 `reasoning_content`.
 
 For native C# SSE streams, `[DONE]` ends reading immediately and later records are ignored.
@@ -112,4 +113,4 @@ Modern schema input and generated values retain arbitrary-size integers, while n
 `enum`, and `uniqueItems` numeric comparisons use .NET `decimal`. Values outside that comparison
 range, such as `1e70`, raise a controlled schema-evaluation exception.
 
-See the executable [C# SDK proof guide](../guides/csharp-sdk.md) for the exact source examples.
+See the executable [C# SDK guide](../guides/csharp-sdk.md) for the exact source examples.

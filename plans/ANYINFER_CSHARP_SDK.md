@@ -1,11 +1,21 @@
 # Python-aligned AnyInfer C# SDK
 
-**Branch-preparation pause (2026-10-24):** this remains the active SDK plan, but it does
-not resume automatically from its first unchecked box. Freeze additional provider and SDK
-implementation while the feature branch is handed off as-is. Further SDK work requires a
-separate resumption at the researched-provider work in SDK.8a. The completed language-neutral
-foundation plans remain historical records for their frozen core-generation proof. The
-coordinator alone owns Git and shared build/test execution.
+**Resume from the first unchecked box in the bounded
+[foundation and SDK alignment leaf](SDK_FOUNDATION_ALIGNMENT.md).** On 2026-10-24 the user
+requested a fresh parity/foundation audit, accurate multi-SDK documentation, gap tracking,
+and an initial burn-down. This supersedes the branch-handoff pause for that bounded work.
+SDK.8a remains the provider implementation resume point and requires a researched binding
+brief; no next provider is selected. The completed language-neutral foundation work remains
+historical evidence for the frozen core-generation profile. The coordinator alone owns Git
+and shared build/test execution.
+
+> NOTE: The user subsequently authorized autonomous continuation through the remaining
+> burn-down until Python and C# are both usable SDKs with matching features and strategies
+> under predominantly similar native conventions. After ALIGN.3, proceed to the next
+> evidence-backed remaining SDK slices without a per-slice implementation prompt. Existing
+> explicit semantic differences stay visible for resolution/qualification; no missing
+> feature or unverified behavior is silently counted as parity. Separate publication,
+> immutable-release and data-authority gates remain in force.
 
 **Retired execution leaves:** completed child-plan names in historical notes below identify
 their retired records at source checkpoint
@@ -1071,6 +1081,11 @@ must report a real conflict rather than silently changing a dependent public sig
   platform-specific APIs. Add precise language-equivalent mappings for reflection/decorators,
   paths, exceptions and Python-only runtime constructs. Gate: no unassigned/deferred SDK item
   silently counted as implemented; remaining genuine platform exclusions are user-visible.
+  > NOTE: The 2026-10-24 audit is tracked in
+  > [SDK/foundation alignment](SDK_FOUNDATION_ALIGNMENT.md). ALIGN.3 owns the executable
+  > per-export evidence ledger; ALIGN.4 distinguishes frozen normative coverage from later
+  > development profiles and existing build-time data ownership. All 235 root completion
+  > rows remain open until their full assigned semantics pass.
   > NOTE: Explicit remaining schema work includes legacy Draft 3/4, deferred by the user
   > during SDK.4b qualification. Modern-schema support must not tick those semantics or
   > imply Python-identical numeric/regex behavior; the user approved documented native
@@ -1100,6 +1115,9 @@ must report a real conflict rather than silently changing a dependent public sig
   tabs, SDK entry, migration guide and reference against the final API rather than deferring
   all C# syntax documentation to this stage. Gate: doc coverage/links/site build, all examples
   offline runnable and actual parity inventory agrees with published claims.
+  > NOTE: ALIGN.2 in [SDK/foundation alignment](SDK_FOUNDATION_ALIGNMENT.md) pulls forward
+  > the stale overview/architecture correction and shared-foundation explanation. It does
+  > not complete the compiled reference, full cookbook, platform qualification or this box.
 - [ ] **SDK.12b** Qualify target frameworks, OS/runtime matrix, dependency licenses, package
   and symbols payload, source metadata and external consumers. Extend native CI deliberately
   for SDK support, preserving Python packaging and release behavior. Gate: full workspace,
@@ -1110,13 +1128,20 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-**Branch-preparation pause:** As of 2026-10-24, branch preparation overrides the
-first-unchecked-box convention. The committed plan-only baseline before this maintenance is B
+**Current resume:** the user's 2026-10-24 parity/foundation request authorizes the bounded
+[alignment leaf](SDK_FOUNDATION_ALIGNMENT.md), starting at its first unchecked box.
+ALIGN.1–4 are complete: docs, the executable 235-export ledger and the existing evidence
+map are reconciled. ALIGN.5a begins implementation gap closure; provider work still resumes
+at SDK.8a with a separately researched binding. Existing SDK completion and release gates
+remain open. The paragraph below records the superseded branch-preparation pause.
+
+**Historical branch-preparation pause:** On 2026-10-24, branch preparation overrode the
+first-unchecked-box convention. The committed plan-only baseline before that maintenance was B
 `552abd2dde65217ca8b2fb35277270ba567167d6`, tree
 `b736e72a820fff400cb464eebbda63a85fe3f815`; the last qualified source is A
 `952b678d2dc020075c09bc6f8d11e2879fc992bd`, tree
-`f5ddbe6d8f12bb9c04ee2b84bb393800908593f8`. Do not begin further provider or SDK
-implementation during this pause. A separate resumption after branch handoff starts at
+`f5ddbe6d8f12bb9c04ee2b84bb393800908593f8`. That pause held further provider and SDK
+implementation pending a separate resumption starting at
 **SDK.8a further researched provider registration**. Inactive scratch/cache/build
 cleanup is complete except the access-denied root `.pytest_cache`; all 22 individually
 approved ancillary worktree entries were removed through Traycer. Git now lists only the
