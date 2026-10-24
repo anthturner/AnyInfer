@@ -204,6 +204,7 @@ public sealed class ProviderRegistry
             PoolOwnsConfiguredTransport = true,
         },
         SelectReviewedGenerationPreset("cerebras"),
+        SelectReviewedGenerationPreset("hyperbolic"),
     ]);
 
     private static ProviderDescriptor SelectReviewedGenerationPreset(string presetId)

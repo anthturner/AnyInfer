@@ -373,9 +373,9 @@ COMPAT_PRESETS: tuple[CompatPreset, ...] = (
     CompatPreset(
         id="hyperbolic",
         display_name="Hyperbolic",
-        base_url="https://api.hyperbolic.xyz/v1",
+        base_url="https://api.hyperbolic.ai/inference/v1",
         key_env="HYPERBOLIC_API_KEY",
-        note="Open-model serving; reasoning models emit inline <think> content.",
+        note="Open-model serving; reasoning output varies by model.",
     ),
     CompatPreset(
         id="baseten",

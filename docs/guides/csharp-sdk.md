@@ -5,8 +5,8 @@ examples live in `examples/csharp-sdk/`; the proof uses the same shared contract
 repository's native C# work, while the supported product SDK and published package remain
 Python.
 
-The generation examples use `ProviderSettings` and the built-in OpenAI-compatible and Cerebras
-providers.
+The generation examples use `ProviderSettings` and the built-in OpenAI-compatible, Cerebras,
+and Hyperbolic providers.
 The C# proof also includes built-in TEI, Voyage, and Jina adapters for buffered embeddings and
 reranking; other provider-specific retrieval remains application-owned. The async calls accept
 a cancellation token and use `await using`; the matching synchronous facade uses `using` and
@@ -48,10 +48,30 @@ provider with `cerebras:model`; no generic OpenAI-compatible provider setup is n
 ```
 
 The included executable example substitutes a scripted HTTP handler and checks its request and
-result offline. It does not make hosted Cerebras traffic live-verified. Other generated
-OpenAI-compatible presets remain unavailable through the C# default registry.
+result offline. It does not make hosted Cerebras traffic live-verified. Hyperbolic is the other
+provider-specific generation preset selected in the C# default registry; remaining generated
+compatibility-preset rows are inert there.
 Choose a model available to the configured account through discovery; this example's
 `gpt-oss-120b` target is not a static catalog guarantee.
+
+## Use the registered Hyperbolic provider
+
+The default C# registry also includes Hyperbolic for generation through the shared chat adapter.
+Use ordinary `ProviderSettings` with an explicit `env://HYPERBOLIC_API_KEY` credential reference
+and a `hyperbolic:model` target. The default endpoint is
+`https://api.hyperbolic.ai/inference/v1`; Hyperbolic has decommissioned its former
+`https://api.hyperbolic.xyz/v1` endpoint. The adapter appends routes beneath the full new prefix.
+
+```csharp
+--8<-- "examples/csharp-sdk/HyperbolicExample.cs"
+```
+
+The executable example uses a scripted handler to check the implicit default URI, Bearer header,
+request model and body, returned text and usage, and disposal without contacting Hyperbolic.
+Hosted Hyperbolic traffic remains unverified. Choose a model available to the configured account
+through discovery; `glm-5.3-flash` is the documentation example identifier, not a static catalog
+guarantee. Only Cerebras and Hyperbolic have provider-specific generation registrations among the
+generated compatibility presets; the remaining preset rows are inert in this C# registry.
 
 ## Configure provider connections
 

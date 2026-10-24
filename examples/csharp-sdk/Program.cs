@@ -32,6 +32,15 @@ static async Task VerifyAsync()
         && cerebrasHandler.DisposeCount == 1,
         "Cerebras example did not use the default registration or preserve the scripted result.");
 
+    var hyperbolicHandler = new HyperbolicScriptedHandler();
+    var hyperbolic = await HyperbolicExample.RunAsync(
+        HyperbolicExample.Settings(hyperbolicHandler, "offline-hyperbolic-key"));
+    Require(hyperbolic.Text == "hello from Hyperbolic"
+        && hyperbolic.Usage is { InputTokens: 1, OutputTokens: 1, TotalTokens: 2 }
+        && hyperbolicHandler.RequestCount == 1
+        && hyperbolicHandler.DisposeCount == 1,
+        "Hyperbolic example did not use the default registration or preserve the scripted result.");
+
     var pureFactoryCalls = 0;
     var pureRegistry = new ProviderRegistry(
     [

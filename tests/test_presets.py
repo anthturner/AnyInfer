@@ -227,6 +227,75 @@ async def test_errors_are_attributed_to_the_preset_id() -> None:
     assert error.provider == "groq", "attribution must name the preset, not openai-compat"
 
 
+async def test_hyperbolic_public_client_keeps_the_inference_prefix_and_stream_usage() -> None:
+    """The migrated default address remains an ordinary shared-dialect preset."""
+    seen: list[tuple[httpx2.Request, dict | None]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content) if request.content else None
+        seen.append((request, body))
+        if request.url.path == "/inference/v1/models":
+            return httpx2.Response(200, json={"object": "list", "data": [{"id": "glm-5.3-flash"}]})
+        if body is not None and body.get("stream"):
+            return httpx2.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                content=(
+                    b'data: {"choices":[{"delta":{"content":"stream"}}]}\n\n'
+                    b'data: {"choices":[],"usage":{"prompt_tokens":4,"completion_tokens":5,"total_tokens":9}}\n\n'
+                    b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+                    b"data: [DONE]\n\n"
+                ),
+            )
+        return httpx2.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "buffered"}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5},
+            },
+        )
+
+    async with ai.AsyncClient(
+        [
+            ai.ProviderSettings.of(
+                "hyperbolic", api_key="fixture-key", transport=httpx2.MockTransport(handler)
+            )
+        ]
+    ) as client:
+        assert [model.id for model in await client.models("hyperbolic")] == ["glm-5.3-flash"]
+        buffered = await client.generate(
+            "hello",
+            target="hyperbolic:glm-5.3-flash",
+            sampling=ai.Sampling(max_output_tokens=7),
+            reasoning="low",
+        )
+        streamed = await client.stream(
+            "hello",
+            target="hyperbolic:glm-5.3-flash",
+            sampling=ai.Sampling(max_output_tokens=7),
+            reasoning="low",
+        ).collect()
+
+    assert buffered.text == "buffered"
+    assert buffered.usage.total_tokens == 5
+    assert streamed.text == "stream"
+    assert streamed.usage.total_tokens == 9
+    assert [request.url.path for request, _ in seen] == [
+        "/inference/v1/models",
+        "/inference/v1/chat/completions",
+        "/inference/v1/chat/completions",
+    ]
+    assert all(request.url.host == "api.hyperbolic.ai" for request, _ in seen)
+    assert all(request.headers["authorization"] == "Bearer fixture-key" for request, _ in seen)
+    assert seen[0][1] is None
+    for _, body in seen[1:]:
+        assert body is not None
+        assert body["max_tokens"] == 7
+        assert "max_completion_tokens" not in body
+        assert "reasoning_effort" not in body
+    assert seen[2][1]["stream_options"] == {"include_usage": True}
+
+
 def test_reasoning_translators_produce_the_documented_wire_fields() -> None:
     registry = ProviderRegistry(load_builtins=True, load_entry_points=False)
 

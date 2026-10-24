@@ -44,9 +44,22 @@ an `env://CEREBRAS_API_KEY` credential reference and use a `cerebras:model` targ
 the source-linked executable example.
 
 Its verifier uses a scripted handler, not hosted Cerebras traffic. Hosted behavior remains
-unverified, and the other generated OpenAI-compatible presets are not default C# registrations.
+unverified; Hyperbolic is the other provider-specific preset selected in the default registry.
 Choose a model available to the configured account through discovery; the example's
 `gpt-oss-120b` is not a static catalog guarantee.
+
+## Registered Hyperbolic generation
+
+The C# default registry also includes Hyperbolic generation. Configure the ordinary
+`ProviderSettings.Of("hyperbolic", apiKey: "env://HYPERBOLIC_API_KEY")` and target
+`hyperbolic:model`; see the [source-linked Hyperbolic example](csharp-sdk.md#use-the-registered-hyperbolic-provider).
+Its default endpoint migrated from the decommissioned `https://api.hyperbolic.xyz/v1` to
+`https://api.hyperbolic.ai/inference/v1`. The included example checks the default request path
+offline; hosted Hyperbolic traffic remains unverified. Choose a model available to the account
+through discovery; `glm-5.3-flash` is an example identifier, not a static catalog guarantee.
+
+Cerebras and Hyperbolic are the two provider-specific generation presets selected in this C#
+proof; other generated compatibility-preset rows remain inert and are not default registrations.
 
 ## Shared configuration
 

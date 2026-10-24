@@ -4866,7 +4866,7 @@
         "cache_max_marks": 0,
         "cache_mechanism": null,
         "cache_min_tokens": 0,
-        "default_base_url": "https://api.hyperbolic.xyz/v1",
+        "default_base_url": "https://api.hyperbolic.ai/inference/v1",
         "default_capabilities": {
           "context_window": null,
           "default_temperature": null,
@@ -4943,13 +4943,13 @@
             {
               "advanced": true,
               "choices": [],
-              "default_value": "https://api.hyperbolic.xyz/v1",
+              "default_value": "https://api.hyperbolic.ai/inference/v1",
               "env_var": "",
-              "help_text": "Defaults to https://api.hyperbolic.xyz/v1.",
+              "help_text": "Defaults to https://api.hyperbolic.ai/inference/v1.",
               "key": "base_url",
               "kind": "endpoint",
               "label": "Base URL",
-              "placeholder": "https://api.hyperbolic.xyz/v1",
+              "placeholder": "https://api.hyperbolic.ai/inference/v1",
               "required": false
             }
           ],
@@ -4975,7 +4975,7 @@
         "accepts_api_key": true,
         "aliases": [],
         "auth_header": "bearer",
-        "base_url": "https://api.hyperbolic.xyz/v1",
+        "base_url": "https://api.hyperbolic.ai/inference/v1",
         "base_url_example": "",
         "base_url_hint": "",
         "batches": false,
@@ -4994,7 +4994,7 @@
         "key_env": "HYPERBOLIC_API_KEY",
         "locality": "hosted",
         "models_listing": true,
-        "note": "Open-model serving; reasoning models emit inline <think> content.",
+        "note": "Open-model serving; reasoning output varies by model.",
         "output_tokens_field": "max_tokens",
         "reasoning": null,
         "requires_api_key": true,
@@ -16103,7 +16103,7 @@
     },
     {
       "path": "contracts/openai-compat-presets.md",
-      "sha256": "45c180817b1f12f869be107f21f0107a93023243fb89a79a0deb306185baae39"
+      "sha256": "d12842937992e13ab813872a8d7456c4e8947f5a39616c5c315bebaa2441ff0c"
     },
     {
       "path": "contracts/openai-compat.md",
@@ -16215,7 +16215,7 @@
     },
     {
       "path": "src/python/anyinfer/providers/presets.py",
-      "sha256": "90e34430fe2d373139e462019ae4e799aba4ce959997d74685744018d8cc566c"
+      "sha256": "587f0ef2a583c133c21d80667f64c96da8ee91e47458977b0bebf83650fa79c1"
     },
     {
       "path": "src/python/anyinfer/providers/tei.py",

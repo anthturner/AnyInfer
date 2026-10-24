@@ -85,7 +85,7 @@ model listing, reasoning translation. See [presets](presets.md) for the quirk no
 | Helicone AI Gateway | `helicone:` / `helicone-gateway:` | `HELICONE_API_KEY` | Routing with observability |
 | Hugging Face Inference Providers | `huggingface:` / `hf:` / `huggingface-router:` | `HF_TOKEN` | Routes HF-hub model ids across serving partners; append :provider to pin one (e.g. moonshotai/Kimi-K2-Instruct:groq) |
 | Tencent Hunyuan | `hunyuan:` / `tencent:` | `HUNYUAN_API_KEY` | Reasoning is mostly a model choice (the hunyuan-t1-* line), though hunyuan-a13b instead toggles it in-prompt with a /no_think prefix |
-| Hyperbolic | `hyperbolic:` | `HYPERBOLIC_API_KEY` | Open-model serving; reasoning models emit inline <think> content |
+| Hyperbolic | `hyperbolic:` | `HYPERBOLIC_API_KEY` | Open-model serving; reasoning output varies by model |
 | Hyperstack AI Studio | `hyperstack:` | `HYPERSTACK_API_KEY` | Base URL and model id are both read off the AI Studio playground's API panel, since they follow your deployment rather than a fixed catalog |
 | Inception (Mercury) | `inception:` / `mercury:` | `INCEPTION_API_KEY` | Diffusion LLMs rather than autoregressive ones, which shows up in the stream: with provider_options {'diffusing': True} the model emits blocks of noisy tokens that are refined in place, so deltas revise earlier text instead of only appending |
 | Inference.net | `inference-net:` / `inference:` | `INFERENCE_API_KEY` | Serverless ids plus team/model deployments; BYOK passthrough via provider headers |

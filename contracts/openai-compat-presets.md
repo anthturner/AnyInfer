@@ -340,25 +340,41 @@ one.
 
 ## hyperbolic — Hyperbolic
 
-- Base URL: `https://api.hyperbolic.xyz/v1`
-- Auth: Authorization: Bearer <API key> (keys from app.hyperbolic.ai)
-- `GET /models`: yes
-- Compatibility notes:
-  Docs have migrated: docs.hyperbolic.xyz now 301s through docs.hyperbolic.ai to
-  hyperbolic.ai/docs (inference docs at hyperbolic.ai/docs/inference/overview) — but the API
-  host remains api.hyperbolic.xyz/v1. Drop-in OpenAI replacement: POST /v1/chat/completions with
-  streaming, tool calling (18+ models), and structured JSON output; also a legacy OpenAI text-
-  completions endpoint for base-model prompting (notably Llama-3.1-405B-Base in BF16 and FP8).
-  Docs state the model list is available via the API but do not spell out the /v1/models path on
-  the overview page. ~25+ open-source models (Llama 3.1/3.2 Vision, Qwen 2.5/Qwen2-VL, DeepSeek
-  V3/R1, Hermes 3, Mistral). No Anthropic-compatible endpoint documented.
-- Reasoning:
-  Serves chain-of-thought models (e.g. DeepSeek R1); no dedicated reasoning field or reasoning-
-  token controls are documented — expect inline <think>-style content on reasoning models.
-  Reasoning tokens are not documented as billed separately from output tokens.
-- Sources (verified 2026-08-07):
-  - https://www.hyperbolic.ai/docs/inference/overview
-  - https://hyperbolic.ai/docs/
+- Base URL: `https://api.hyperbolic.ai/inference/v1`. The migration notice says the previous
+  `https://api.hyperbolic.xyz/v1` endpoint is decommissioned and returns 404. Preserve the
+  `/inference/v1` prefix when appending routes. Model identifiers changed with the migration;
+  discover the account's available models rather than relying on an old catalog.
+  [Overview and migration notice](https://www.hyperbolic.ai/docs/inference/overview).
+- Auth: `Authorization: Bearer <API key>`; conventional environment variable
+  `HYPERBOLIC_API_KEY`. Current documentation requires newly formatted `sk_live_` keys and
+  a qualifying account with credits. AnyInfer forwards the supplied credential; it does not
+  implement provider account or key-format validation.
+  [Overview](https://www.hyperbolic.ai/docs/inference/overview),
+  [SDK example](https://www.hyperbolic.ai/docs/inference/text-apis).
+- Wire: `POST /chat/completions`; `max_tokens` is the documented output cap. Responses use
+  `choices[].message.content` and reported prompt/completion/total usage. `GET /models`
+  returns an OpenAI list with `data[].id`. Streaming uses SSE `data:` chunks,
+  `choices[].delta.content`, and `[DONE]`; `stream_options.include_usage=true` requests a
+  final usage chunk. Tools and JSON/schema output depend on the model. No dedicated
+  reasoning-effort control is documented; reasoning content and token details vary by model.
+  Preserve the existing preset's features, empty ignored-parameter list and no translator.
+  [Chat, streaming and model-list reference](https://www.hyperbolic.ai/docs/inference/text-apis).
+- Errors: use HTTP status classification. The error reference documents top-level
+  `code`/`message` for 401, while the October 17 changelog describes an `error` object during
+  a gradual rollout. Other upstream error bodies vary; no provider-specific parser is
+  justified. [Error reference](https://www.hyperbolic.ai/docs/inference/errors),
+  [Changelog](https://www.hyperbolic.ai/docs/changelog).
+- Adopted change: correct the default endpoint and select the existing generation-only
+  native descriptor. This is a wire-only correction with unchanged normalized semantics;
+  it requires no shared-specification release or new capability claim.
+- Unverified: authenticated hosted traffic, deployed model capabilities, exact streaming
+  error payloads, rollout-specific 401 envelopes, retry/rate-limit header names, and any
+  additional required version pin. No current inference OpenAPI or provider SDK schema
+  was found in the documentation index; general OpenAI SDK examples are documentation
+  evidence. No static prices, limits or model counts are adopted.
+- Sources fetched 2026-10-24: the four provider-owned pages linked above and
+  [documentation index](https://www.hyperbolic.ai/docs/llms.txt). Published protocol facts
+  are verified against those pages; hosted behavior remains unverified.
 
 ## baseten — Baseten (Model APIs)
 

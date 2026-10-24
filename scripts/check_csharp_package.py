@@ -473,6 +473,20 @@ var cerebrasSettings = ProviderSettings.Of(
 if (cerebrasHandler.RequestCount != 1 || cerebrasHandler.DisposeCount != 1)
     throw new InvalidOperationException("default Cerebras transport ownership failed");
 
+var hyperbolicHandler = new HyperbolicHandler();
+var hyperbolicSettings = ProviderSettings.Of(
+    "hyperbolic", apiKey: "offline-hyperbolic-key", transport: hyperbolicHandler);
+{
+    await using var client = new AsyncClient([hyperbolicSettings]);
+    var generated = await client.GenerateAsync(
+        "package Hyperbolic witness", target: "hyperbolic:glm-5.3-flash");
+    if (generated.Text != "package hyperbolic"
+        || generated.Usage is not { InputTokens: 1, OutputTokens: 1, TotalTokens: 2 })
+        throw new InvalidOperationException("default Hyperbolic registration witness failed");
+}
+if (hyperbolicHandler.RequestCount != 1 || hyperbolicHandler.DisposeCount != 1)
+    throw new InvalidOperationException("default Hyperbolic transport ownership failed");
+
 var teiEmbedHandler = new TeiHandler(reranker: false);
 var teiRerankHandler = new TeiHandler(reranker: true);
 var teiEmbedSettings = ProviderSettings.Of(
@@ -1236,6 +1250,53 @@ sealed class CerebrasHandler : HttpMessageHandler
             Content = new StringContent(
                 """
                 {"choices":[{"message":{"content":"package cerebras"},"finish_reason":"stop"}],
+                "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                """,
+                Encoding.UTF8,
+                "application/json"),
+        };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+}
+
+sealed class HyperbolicHandler : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = request.Content is null
+            ? ""
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(body);
+        if (request.Method != HttpMethod.Post
+            || request.RequestUri is not
+            {
+                Scheme: "https",
+                Host: "api.hyperbolic.ai",
+                AbsolutePath: "/inference/v1/chat/completions",
+            }
+            || request.Headers.Authorization?.Scheme != "Bearer"
+            || request.Headers.Authorization.Parameter != "offline-hyperbolic-key"
+            || document.RootElement.GetProperty("model").GetString() != "glm-5.3-flash"
+            || document.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()
+                != "package Hyperbolic witness")
+            throw new InvalidOperationException(
+                "default Hyperbolic registration lost the configured request");
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """
+                {"choices":[{"message":{"content":"package hyperbolic"},"finish_reason":"stop"}],
                 "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
                 """,
                 Encoding.UTF8,

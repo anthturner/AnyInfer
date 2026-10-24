@@ -10,7 +10,7 @@ using Xunit;
 
 namespace AnyInfer.Tests;
 
-/// <summary>Offline controls for the one reviewed native compatibility-preset admission.</summary>
+/// <summary>Offline controls for the reviewed Cerebras native compatibility-preset admission.</summary>
 public sealed class CerebrasRegistrationTests
 {
     [Fact]
@@ -21,8 +21,8 @@ public sealed class CerebrasRegistrationTests
         var generated = CompatPresetTable.Rows.Single(row => row.Source.Id == "cerebras");
 
         Assert.Same(generated.Generation.Descriptor, descriptor);
-        Assert.Equal(["cerebras", "jina", "openai-compat", "tei", "voyage"], registry.Descriptors.Select(static item => item.Id));
-        Assert.Equal(8, registry.Descriptors.Sum(static item => item.Operations.Count));
+        Assert.Equal(["cerebras", "hyperbolic", "jina", "openai-compat", "tei", "voyage"], registry.Descriptors.Select(static item => item.Id));
+        Assert.Equal(9, registry.Descriptors.Sum(static item => item.Operations.Count));
         Assert.Empty(descriptor.Aliases);
         Assert.Equal("Cerebras Inference", descriptor.DisplayName);
         Assert.Equal("https://api.cerebras.ai/v1", descriptor.DefaultBaseUrl);
@@ -36,7 +36,7 @@ public sealed class CerebrasRegistrationTests
         Assert.Equal("max_tokens", generated.Generation.Dialect.OutputTokensField);
         Assert.Equal(CompatPresetReasoningStyle.EffortMinLow, generated.Generation.ReasoningStyle);
 
-        foreach (var row in CompatPresetTable.Rows.Where(static row => row.Source.Id != "cerebras"))
+        foreach (var row in CompatPresetTable.Rows.Where(static row => row.Source.Id is not "cerebras" and not "hyperbolic"))
         {
             Assert.False(registry.Has(row.Source.Id));
             Assert.All(row.Generation.Descriptor.Aliases, alias => Assert.False(registry.Has(alias)));

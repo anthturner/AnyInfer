@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "hyperbolic-base-url",
+  "sources": [
+    {
+      "url": "https://www.hyperbolic.ai/docs/inference/overview",
+      "fetched_at": "2026-10-24",
+      "version_pin": "Current unversioned documentation; explicit migration from the retired .xyz/v1 endpoint to .ai/inference/v1"
+    },
+    {
+      "url": "https://www.hyperbolic.ai/docs/inference/text-apis",
+      "fetched_at": "2026-10-24",
+      "version_pin": "Current unversioned inference/v1 chat, model-list and streaming reference"
+    },
+    {
+      "url": "https://www.hyperbolic.ai/docs/inference/errors",
+      "fetched_at": "2026-10-24",
+      "version_pin": "Current unversioned error reference; 401-envelope conflict retained as unverified"
+    },
+    {
+      "url": "https://www.hyperbolic.ai/docs/changelog",
+      "fetched_at": "2026-10-24",
+      "version_pin": "Includes October 17 and October 23, 2026 entries; gradual 401-envelope rollout remains unverified"
+    }
+  ],
+  "disposition": "adopted",
+  "changes": [
+    {
+      "contract_id": "contracts/openai-compat-presets.md#hyperbolic",
+      "scope": "inference",
+      "operations": ["generation"],
+      "summary": "Correct Hyperbolic's retired default base URL to https://api.hyperbolic.ai/inference/v1 in Python and the generated native descriptor, and select that existing generation-only descriptor for default native registration. Preserve normalized behavior and all existing auth/capability declarations."
+    }
+  ],
+  "shared_spec": {
+    "impact": "no_delta",
+    "rationale": "This changes provider wire addressing and admits an existing shared-adapter generation binding. Normalized request/result semantics, schemas, released fixtures, expectations and immutable release assets remain unchanged. No new normative profile or release is required. This declaration specifies work and required gates; it is not a verification outcome or hosted-service claim."
+  },
+  "implementations": [
+    {
+      "implementation_id": "anyinfer-python",
+      "status": "updated",
+      "rationale": "The existing Hyperbolic generation binding receives the migrated default endpoint and independent public-client wire controls. Canonical parity metadata is regenerated after source stabilization; descriptor counts, operations and capabilities remain unchanged. Run outcomes are separate evidence.",
+      "owned_paths": [
+        "contracts/openai-compat-presets.md",
+        "src/python/anyinfer/providers/presets.py",
+        "tests/test_presets.py",
+        "docs/providers/all.md",
+        "maintenance/provider-parity/python-builtins.json"
+      ],
+      "required_gate_ids": [
+        "python-contracts",
+        "python-fixtures",
+        "python-conformance",
+        "python-tests"
+      ]
+    },
+    {
+      "implementation_id": "anyinfer-csharp",
+      "status": "updated",
+      "rationale": "Select the existing generated Hyperbolic generation-only descriptor using reviewed-row admission, export its exact contract dependencies and verify default-factory wire behavior, documentation examples and package consumption. Every other inert row remains unregistered; run outcomes are separate evidence.",
+      "owned_paths": [
+        "src/csharp/AnyInfer/Providers/ProviderRegistry.cs",
+        "src/csharp/AnyInfer/Providers/CompatPresetTable.g.cs",
+        "src/csharp/AnyInfer.Maintenance/Program.cs",
+        "scripts/check_csharp_binding_inventory.py",
+        "src/csharp/AnyInfer.Tests/HyperbolicRegistrationTests.cs",
+        "src/csharp/AnyInfer.Tests/CerebrasRegistrationTests.cs",
+        "src/csharp/AnyInfer.Tests/CompatPresetDataTests.cs",
+        "docs/guides/csharp-sdk.md",
+        "docs/reference/csharp-sdk.md",
+        "docs/guides/python-to-csharp.md",
+        "examples/csharp-sdk/HyperbolicExample.cs",
+        "examples/csharp-sdk/Program.cs",
+        "scripts/check_csharp_package.py"
+      ],
+      "required_gate_ids": ["csharp-workspace"]
+    }
+  ]
+}
