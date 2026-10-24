@@ -1,8 +1,11 @@
 # Python-aligned AnyInfer C# SDK
 
-Resume from the first unchecked box. This is the active plan for SDK expansion; the
-completed language-neutral foundation plans remain historical records for their frozen
-core-generation proof. The coordinator alone owns Git and shared build/test execution.
+**Branch-preparation pause (2026-10-24):** this remains the active SDK plan, but it does
+not resume automatically from its first unchecked box. Freeze additional provider and SDK
+implementation while the feature branch is handed off as-is. Further SDK work requires a
+separate resumption at the researched-provider work in SDK.8a. The completed language-neutral
+foundation plans remain historical records for their frozen core-generation proof. The
+coordinator alone owns Git and shared build/test execution.
 
 ## 1. Authorization and destination
 
@@ -1102,7 +1105,20 @@ must report a real conflict rather than silently changing a dependent public sig
 
 ## 5. Resume and evidence log
 
-Current resume point: **SDK.8a further researched provider registration**.
+**Branch-preparation pause:** As of 2026-10-24, branch preparation overrides the
+first-unchecked-box convention. The committed plan-only baseline before this maintenance is B
+`552abd2dde65217ca8b2fb35277270ba567167d6`, tree
+`b736e72a820fff400cb464eebbda63a85fe3f815`; the last qualified source is A
+`952b678d2dc020075c09bc6f8d11e2879fc992bd`, tree
+`f5ddbe6d8f12bb9c04ee2b84bb393800908593f8`. Do not begin further provider or SDK
+implementation during this pause. A separate resumption after branch handoff starts at
+**SDK.8a further researched provider registration**. Inactive scratch/cache/build
+cleanup is complete except the access-denied root `.pytest_cache`; all 22 individually
+approved ancillary worktree entries were removed through Traycer. Git now lists only the
+current checkout. The final pre-commit `workspace check` passed all 25 steps again:
+4,536 Python passes plus 10 documented skips, 1,135 native unit passes and 93 conformance
+passes. `plans/README.md` records the handoff state; this maintenance leaves the accepted
+clean-source qualification and all open milestones unchanged.
 NSC.6's plan-only reconciliation in `ANYINFER_CSHARP_SDK_NSCALE.md` is independently
 reviewed and complete.
 Nscale is independently qualified at executable
