@@ -1,31 +1,22 @@
 # AnyInfer language-neutral foundation
 
-**Start here: [master plan](ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md).** Its §5 checklist is the only
-active execution list. The [shared specification](../../specification/core-generation.md)
-carries the profile, schema domain, issue model, fixture format and case inventory obligations.
-The [maintenance contract](../../specification/MAINTENANCE.md) defines release and reference
-rules. The [original draft](SPECIFICATION_DRAFT.md) is retained as input history.
+**Start here: [master plan](ANYINFER_LANGUAGE_NEUTRAL_FOUNDATION.md).** It retains the
+deferred M3/M4 gates. The [active but paused C# SDK parent](../ANYINFER_CSHARP_SDK.md)
+controls when SDK work resumes. The [shared specification](../../specification/core-generation.md)
+and [maintenance contract](../../specification/MAINTENANCE.md) are the current authority for
+the frozen `core-generation` v0 profile. The completed C# proof and specification drafts are
+historical inputs, not normative specification.
 
-| State | Goal |
-|---|---|
-| **Current: Python** | Preserve the existing implementation; its observed behaviour seeds the reference corpus. |
-| **Next: Python + C#** | Both pass the same frozen `core-generation` corpus through their own drivers. |
-| **Future: more languages** | Each port repeats milestone 4 against the same corpus revision. |
+## Deferred scope
 
-Milestones: M0 common source root (`src/python/`, `src/csharp/`), M1 specification and corpus
-with the Python driver, M2 C# proof, M3 operation accounting (separate plan), M4 further ports.
+M0–M2 are complete. The remaining work is M3.1 operation-accounting design and M4.1–M4.G
+feasibility, approval, implementation, and comparison for each additional language. M3.1
+uses its two version-pinned historical inputs named in the master plan; M4 begins only after
+a language-specific feasibility decision.
 
-The bounded proof includes structured-output repair, native timeout and byte-limit behavior,
-and outgoing as well as incoming OpenAI-compatible HTTP behavior. Coverage determines the
-corpus size. Python's existing behavior and error strings are preserved; the private
-assessment observation seam adds no SDK integration requirement. Unknown schema keywords
-are an explicitly reported Python extension.
+## Retired history
 
-The [rewrite review](evidence/REWRITTEN_PLAN_REVIEW.md) records the reviewed snapshot,
-findings, and their subsequent dispositions. It supplies review evidence; the master
-remains the execution authority. The user authorized M0–M2 implementation on 2026-10-15;
-the [execution log](EXECUTION_LOG.md) records the preserved baseline and validation evidence.
-Publishing and later product-scope decisions retain the gates named in the master plan.
-
-[evidence/](evidence/README.md) holds planning history, audits, and the six superseded contract
-drafts. They inform milestone 3 and supply rationale; they are not alternate plans.
+Completed planning records were removed from this working tree. The version-pinned
+[reviewed snapshot](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/language-neutral-foundation/evidence/REWRITTEN_PLAN_REVIEW.md)
+and [execution log](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/language-neutral-foundation/EXECUTION_LOG.md)
+remain historical evidence only.

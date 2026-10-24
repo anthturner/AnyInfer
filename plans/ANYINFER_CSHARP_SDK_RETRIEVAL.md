@@ -1,5 +1,10 @@
 # C# SDK retrieval operations — SDK.6a and SDK.6b
 
+**Retired execution leaves:** completed provider-lane names in historical notes below refer
+to their version-pinned records at source checkpoint
+[`015d09341df6dfd6bb1850578f71e4996f73a99b`](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/ANYINFER_CSHARP_SDK_RETRIEVAL.md).
+They are historical evidence, not local files or current execution instructions.
+
 Resume from the first unchecked box. Foundation work requires 6.0.1 and 6.0.2; raw
 retention requires 6.0.4; connected client/core work requires 6b.1–3; observers require
 6.0.3. It starts from accepted SDK.5c source

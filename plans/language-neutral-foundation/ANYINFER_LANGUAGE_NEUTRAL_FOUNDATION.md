@@ -10,8 +10,10 @@ test gate; a box is done when its gate passes, not when its edits exist.**
 Python and all affected tooling/docs, and implementing/testing the shared foundation and C#
 proof. This authorizes M0–M2 within the settled profile, including the bounded M2.1 proof
 plan; it does not authorize expanding product scope or publishing language packages.
-The [execution log](EXECUTION_LOG.md) records the baseline, work ownership and gate evidence.
-The prior [review](evidence/REWRITTEN_PLAN_REVIEW.md) remains supporting planning evidence.
+The version-pinned [execution log](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/language-neutral-foundation/EXECUTION_LOG.md)
+records the historical baseline, work ownership and gate evidence. The prior
+[review](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/language-neutral-foundation/evidence/REWRITTEN_PLAN_REVIEW.md)
+remains supporting historical planning evidence.
 Future boxes are checked only after their gates pass; runtime feasibility and publishing
 decisions retain their named gates.
 **Python evidence baseline:** `13b9e65acfb01038464069ca5fa80f50a9df035c` on `develop`.
@@ -25,8 +27,8 @@ Recheck `git rev-parse HEAD` and `anyinfer.__file__` before executing any box.
 
 Deviations are recorded in place with a `> NOTE:` line under the affected box, giving the
 reason and the new resume point. Historical rationale, audits, and superseded contract
-drafts live under [evidence/](evidence/README.md); they inform milestone 3 and later but
-are not alternate plans.
+drafts are retired from this working tree; the version-pinned records linked below inform
+milestone 3 and later but are not alternate plans.
 
 ## 1. Goal and the reason for native ports
 
@@ -66,12 +68,10 @@ path; it is not the strategy for first-class language support.
 | A13 | Writing or reproducing a reference run starts only from a clean committed implementation, driver, fixture, and specification-input revision. Its manifest binds `reference_run_revision`; actual imports; interpreter; complete runtime/dependency lock and resource identities (`httpx2`, `jsonschema`, `jsonschema-specifications`, `referencing`, `attrs`, `rpds-py` as applicable); selected validator/defaults/resources; warning policy; and production timestamp. Production dependency ranges remain unchanged. Ordinary later Python and native-language runs report their own source/environment bindings. | The oracle must identify the actual executable environment and the normative inputs it ran, without changing normal installation policy. |
 | A14 | Python gains a private time seam: `AsyncClient(..., _clock=None, _sleep=None)` keyword-only. `_clock` is passed to the existing `HealthCache(clock=...)` parameter; `_sleep` is stored as `self._sleep` on the client and used by the generation mixin's backoff in place of the bare `asyncio.sleep`. Production behaviour is unchanged when both are `None`. Zero-length backoffs are skipped and not recorded, as today. | Backoff currently calls `asyncio.sleep` directly and `HealthCache()` is constructed without a clock, so the existing `clock` parameter in `routing/health.py` is unreachable from the public client. |
 | A15 | Profile-boundary cases get the verdict `extension` only when the fixture explicitly marks the case and the implementation declares that exact feature name in its report's `extensions` list. `extension` never counts as `pass`; Python declares all eight v0 extension feature names, including `schema.unknown_keywords_ignored`. Selected native out-of-domain outcomes, including raw validation exceptions or warnings such as `$schema: null` with declared warnings-as-errors, may be recorded honestly as `extension`. Harness/setup/fatal-runtime failure, skipped execution, or missing required evidence is `error`. Unexpected cancellation cannot manufacture extension; genuine native cancellation propagates, while an explicit cancellation case compares its expected native outcome normally. Missing portable projection outside the admitted domain is expected, not a capture failure. | Python intentionally accepts broader schemas and inputs. The honest reference result is an explicit extension, not a fake driver-side failure. |
-| A16 | The prompt-mechanism schema injection is normative: the exact instruction text, the canonical JSON rendering of the schema (sorted keys, two-space indent, ASCII escapes), and the append-to-last-system-message rule are in the specification draft §5. Fixtures reference it with a `{"$schema_prompt": true}` segment rather than repeating it. | What the model sees is the contract. The rendering is small enough to specify exactly and the C# side can produce it without a Python dependency. |
+| A16 | The prompt-mechanism schema injection is normative: the exact instruction text, the canonical JSON rendering of the schema (sorted keys, two-space indent, ASCII escapes), and the append-to-last-system-message rule are in the [shared specification §5](../../specification/core-generation.md#5-mechanism-selection-and-prompt-injection). Fixtures reference it with a `{"$schema_prompt": true}` segment rather than repeating it. | What the model sees is the contract. The rendering is small enough to specify exactly and the C# side can produce it without a Python dependency. |
 
-Superseded directions, kept under `evidence/` for milestone 3 and later: I1 exact
-malformed-schema domain, F1 evidence-bridge comparison, the L1/C1/M1 accounting lifecycle
-matrix, and the operation accounting candidate contract. O1's full private capture remains
-archived as the fallback if A6's bounded proof or isolation gates fail.
+Superseded directions are retired historical material. Their version-pinned source records
+remain rationale only; the two accounting inputs required by M3.1 are linked in that box.
 
 ## 3. Profile `core-generation` v0
 
@@ -125,7 +125,7 @@ Literal paths. Create nothing until the box that owns it.
 | `tests/testing/portable/bad_fixtures/core-generation/missing-expected.json` | M1.3 | Deliberately broken fixture for the validator's negative test. |
 | `tests/testing/portable/` (everything else) | M1.5 | Python driver (private; promoted to `anyinfer.testing.portable` only if a second consumer appears). |
 | `src/csharp/AnyInfer.sln`, `src/csharp/AnyInfer/` (class library), `src/csharp/AnyInfer.Conformance/` (xunit project: driver and corpus runner), `src/csharp/AnyInfer.Tests/` (xunit unit tests) | M2.1 | C# library, driver, unit tests. |
-| `plans/language-neutral-foundation/ANYINFER_CSHARP_PROOF.md` | M2.1 | Bounded C# execution plan. |
+| Historical [C# proof record](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/language-neutral-foundation/ANYINFER_CSHARP_PROOF.md) | M2.1 | Completed bounded C# proof history. |
 
 ## 5. Execution checklist
 
@@ -145,7 +145,8 @@ M1 and later use `src/python/` paths and therefore depend on it.
   provenance for each original PR and explicit treatment of superseded snapshots.
   **Gate:** combined relevant updates pass `workspace check` and GitHub's required `ci-ok`;
   the upstream integration result, original PR dispositions, issues inventory and resulting
-  baseline commit are recorded in `EXECUTION_LOG.md`. No unrelated untracked work is removed.
+  baseline commit are recorded in the version-pinned historical execution log above. No unrelated
+  untracked work is removed.
   > NOTE: The reset and verified plan overlay completed at source HEAD `13b9e65`; the
   > user's existing untracked nested `AnyInfer/` checkout was retained during reset and
   > later removed at their explicit cleanup request. Content authoring for
@@ -171,8 +172,8 @@ M1 and later use `src/python/` paths and therefore depend on it.
   layout table and §Layout line; `DESIGN.md` §18 tree; `contracts/copilot.md`, `m365-copilot.md`,
   `NEW-PROVIDER.md`, `DRIFT-CHECK.md`; `docs/contributing/automation.md`, `branding.md`,
   `docs/guides/installation.md`, `confidentiality-tiers.md`, `vector-store.md`, `demo-app.md`,
-  `docs/contributing/README.md`; `CONTRIBUTING.md`; `.gitignore`; `plans/CODEBASE_STATUS.md`
-  and `plans/DEBLOAT.md`; `src/python/anyinfer_demo/sdk_help.py`;
+  `docs/contributing/README.md`; `CONTRIBUTING.md`; `.gitignore`; the then-current planning
+  status material; `src/python/anyinfer_demo/sdk_help.py`;
   `src/python/anyinfer/capabilities/pricing_table.py`; and the tests that assert path strings
   (`tests/test_workspace.py`, `test_agent_instructions.py`, `test_cli_context.py`,
   `test_catalog_data.py`, `test_branding.py`, `test_pricing_drift.py`, `test_pricing.py`);
@@ -1031,9 +1032,10 @@ M1 and later use `src/python/` paths and therefore depend on it.
 
 ### M3: Operation accounting (separate plan)
 
-- [ ] M3.1 Write `plans/language-neutral-foundation/ANYINFER_ACCOUNTING.md` using the archived
-  [operation accounting](evidence/ANYINFER_OPERATION_ACCOUNTING.md) and
-  [lifecycle](evidence/ANYINFER_ACCOUNTING_LIFECYCLE_DRAFT.md) contracts as input. It defines
+- [ ] M3.1 Write `plans/language-neutral-foundation/ANYINFER_ACCOUNTING.md` using the
+  version-pinned historical [operation accounting](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/language-neutral-foundation/evidence/ANYINFER_OPERATION_ACCOUNTING.md)
+  and [lifecycle](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/language-neutral-foundation/evidence/ANYINFER_ACCOUNTING_LIFECYCLE_DRAFT.md)
+  contracts as input. It defines
   the Python API, the `expected.accounting` fixture section (A4), lifecycle and
   usage-provenance observations, no-entry and terminal outcomes, and the C# instrumentation
   seams, including whether the invocation boundary needs companions. Not started until M2.G
@@ -1086,9 +1088,9 @@ classification.
 
 ## 8. Archived material
 
-`evidence/` holds the P0 to P2 planning history, the P1 and I1 audits, the choice records, the
-readiness review, and the six superseded contract drafts. They are consulted for milestone 3
-and for rationale; they do not supply boxes.
+Completed planning history, audits, choice records, and superseded contract drafts were
+retired from this working tree. The version-pinned records linked above are historical input
+only; they do not supply boxes.
 
 ## 9. Decisions reserved for later gates
 

@@ -7,6 +7,11 @@ separate resumption at the researched-provider work in SDK.8a. The completed lan
 foundation plans remain historical records for their frozen core-generation proof. The
 coordinator alone owns Git and shared build/test execution.
 
+**Retired execution leaves:** completed child-plan names in historical notes below identify
+their retired records at source checkpoint
+[`015d09341df6dfd6bb1850578f71e4996f73a99b`](https://github.com/anthturner/AnyInfer/blob/015d09341df6dfd6bb1850578f71e4996f73a99b/plans/ANYINFER_CSHARP_SDK.md).
+They are historical evidence, not local files or current execution instructions.
+
 ## 1. Authorization and destination
 
 On 2026-10-17 the user requested a C# SDK that a Python AnyInfer developer can readily
