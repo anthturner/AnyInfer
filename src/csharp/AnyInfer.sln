@@ -22,6 +22,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnyInfer.Maintenance", "Any
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnyInfer.TeiProbe", "AnyInfer.TeiProbe\AnyInfer.TeiProbe.csproj", "{DF60CE44-E638-45EB-B041-297077BCC7D6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnyInfer.ContextTuning", "AnyInfer.ContextTuning\AnyInfer.ContextTuning.csproj", "{10731CD2-FECD-4947-B555-18132E1DA6CC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,5 +70,9 @@ Global
 		{DF60CE44-E638-45EB-B041-297077BCC7D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DF60CE44-E638-45EB-B041-297077BCC7D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DF60CE44-E638-45EB-B041-297077BCC7D6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10731CD2-FECD-4947-B555-18132E1DA6CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10731CD2-FECD-4947-B555-18132E1DA6CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10731CD2-FECD-4947-B555-18132E1DA6CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10731CD2-FECD-4947-B555-18132E1DA6CC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

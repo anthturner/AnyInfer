@@ -205,6 +205,7 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
   | Retrieval | `tests/fixtures/retrieval-v1/{inputs.json,schema.json,observations.schema.json}` | `tests/test_retrieval_parity.py`, `src/csharp/AnyInfer.Retrieval/RetrievalProgram.cs`, `scripts/check_csharp_retrieval.py` | 32 paired cases. Input batching is distinct from provider batch jobs; provider coverage is independently tracked. |
   | Rich generation | `tests/fixtures/rich-generation-v1/{inputs.json,schema.json,observations.schema.json,README.md}` | `scripts/observe_python_rich_generation.py`, `src/csharp/AnyInfer.RichGeneration/Program.cs`, `scripts/check_csharp_rich_generation.py` | 43 paired cases. Fixture/schema/README hashes are frozen by the development checker. |
   | Tool loop | `tests/fixtures/tool-loop-v1/{inputs.json,schema.json,observations.schema.json,README.md}` | `scripts/observe_python_tool_loop.py` / `_tool_loop_python.py`, `src/csharp/AnyInfer.ToolLoop/Program.cs`, `scripts/check_csharp_tool_loop.py` | 10 paired cases. Fixed bounded execution, not an agent framework. |
+  | Context tuning | `tests/fixtures/context-tuning-v1/{inputs.json,schema.json,observations.schema.json,README.md}` | `scripts/observe_python_context_tuning.py`, `src/csharp/AnyInfer.ContextTuning/Program.cs`, `scripts/check_csharp_context_tuning.py` | 57 paired cases plus one separately observed native Int64 boundary. Standalone settings only; reducers, history and request/config wiring remain open. |
 
   `scripts/_csharp_observation.py` verifies exact input-byte digests and matching runtime
   source/corpus provenance. The profile-specific controls reject missing/extra cases,
@@ -286,16 +287,19 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
     > completion marks and 15 parent SDK milestones stay open.
   - [ ] **ALIGN.5c — Port and qualify context tuning.** Execute the first unchecked box in
     [native context tuning](SDK_CONTEXT_TUNING.md), the bounded SDK.9a prerequisite. Its
-    CTUNE.0 contract critique is accepted; resume CTUNE.1. Gate: actual native settings,
+    CTUNE.0–3 reviews are accepted; 24 native controls and 57 paired cases plus one separate
+    native boundary pass. Resume is CTUNE.4 full qualification. Gate: actual native settings,
     independent shared development observations, documentation and the leaf's full gates
     pass before this box closes. Continue the remaining context document/representation,
     ranking/deduplication, selection/packing and history ports after this bounded leaf.
 
 ## Handoff
 
-ALIGN.1–4 and ALIGN.5a/b are complete. The autonomous run resumes at **ALIGN.5c / CTUNE.1** on
+ALIGN.1–4 and ALIGN.5a/b are complete. The autonomous run resumes at **ALIGN.5c / CTUNE.4** on
 `feature/language-neutral-foundation`, base commit
-`8ce6bc0` (audit, documentation, evidence ledger and checker checkpoint). The preceding
+`028450eb4cc40d9b25a7bfff30d3ceeb5ab36234` (catalog vocabulary and context-plan checkpoint).
+The preceding audit, documentation, evidence ledger and checker checkpoint is `8ce6bc0`;
+the earlier
 baseline was `ea85ddd42f418cdf81f55638a2e8afd0af848daf`. Recheck Git status and preserve any
 ongoing ALIGN.5 edits before continuing. The last separately qualified executable remains
 the source checkpoint recorded above; the new checkpoint has the working-tree full gate

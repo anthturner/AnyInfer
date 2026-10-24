@@ -15,7 +15,8 @@ historical evidence, it links to the version-pinned source record.
   initial documentation correction, executable API reconciliation, and the distinction
   between sealed specification coverage, development profiles and shared build-time data.
   ALIGN.1–4 and the public catalog vocabulary slice are complete; the next bounded work is
-  ALIGN.5c / CTUNE.1, native context tuning. The 235-export evidence ledger
+  ALIGN.5c / CTUNE.4, full qualification of native context tuning after its reviewed
+  57-case paired evidence and separate native range boundary. The 235-export evidence ledger
   and its workspace checker are active; their classifications are scoped evidence, not a
   full-parity claim.
   It does not select a new provider or change asset authority.

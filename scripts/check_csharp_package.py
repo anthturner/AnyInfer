@@ -317,6 +317,7 @@ using AnyInfer;
 using AnyInfer.Capabilities;
 using AnyInfer.Catalog;
 using AnyInfer.Config;
+using AnyInfer.Context;
 using AnyInfer.Events;
 using AnyInfer.Json;
 using AnyInfer.Manifest;
@@ -325,6 +326,33 @@ using AnyInfer.Routing;
 using AnyInfer.Schema;
 using PeterO.Numbers;
 using JsonProperty = AnyInfer.Json.JsonProperty;
+
+var defaultTuning = ContextTuning.Default;
+var recommendedTuning = ContextTuning.Recommended();
+var tuningMapping = defaultTuning.ToMapping();
+var tuningRoundTrip = ContextTuning.FromMapping(tuningMapping);
+var mergedTuning = defaultTuning.Merged(new JsonObject(
+[
+    new JsonProperty("chunk_tokens", new JsonInteger(new BigInteger(64))),
+    new JsonProperty("diversity", JsonNull.Instance),
+]));
+var emptyMerge = defaultTuning.Merged(new JsonObject(
+[new JsonProperty("not_a_setting", JsonNull.Instance)]));
+if (!defaultTuning.CollapseDuplicates
+    || defaultTuning.ChunkTokens != ContextTuning.DefaultChunkTokens
+    || !defaultTuning.RankingIsDefault
+    || recommendedTuning.SelectionOrder != "density"
+    || !recommendedTuning.SplitIdentifiers
+    || tuningMapping.Properties.Count != 17
+    || tuningRoundTrip != defaultTuning
+    || mergedTuning.ChunkTokens != 64
+    || mergedTuning.Diversity != defaultTuning.Diversity
+    || defaultTuning.ChunkTokens != ContextTuning.DefaultChunkTokens
+    || !ReferenceEquals(defaultTuning, emptyMerge)
+    || ContextTuning.SelectionOrders.Count != 2
+    || ContextTuning.SelectionOrders[0] != "rank"
+    || ContextTuning.SelectionOrders[1] != "density")
+    throw new InvalidOperationException("public context-tuning package surface failed");
 
 var factoryCalls = 0;
 var descriptor = new ProviderDescriptor(

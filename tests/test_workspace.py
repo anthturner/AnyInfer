@@ -179,8 +179,10 @@ class TestVerbs:
         assert "workspace.py" in recorded[0]
         assert "scripts/check_csharp_accounting.py" in recorded[0]
         assert "scripts/_csharp_observation.py" in recorded[0]
+        assert "scripts/check_csharp_context_tuning.py" in recorded[0]
         assert "scripts/check_csharp_request_policy.py" in recorded[0]
         assert "scripts/check_csharp_rich_generation.py" in recorded[0]
+        assert "scripts/observe_python_context_tuning.py" in recorded[0]
         assert "scripts/observe_python_tool_loop.py" in recorded[0]
         assert "scripts/_tool_loop_python.py" in recorded[0]
         assert "scripts/check_csharp_tool_loop.py" in recorded[0]
@@ -284,6 +286,10 @@ class TestVerbs:
                 ROOT,
             ),
             (
+                [sys.executable, str(ROOT / "scripts" / "check_csharp_context_tuning.py")],
+                ROOT,
+            ),
+            (
                 [sys.executable, str(ROOT / "scripts" / "check_csharp_binding_inventory.py")],
                 ROOT,
             ),
@@ -336,6 +342,28 @@ class TestVerbs:
             '"AnyInfer.ToolLoop\\AnyInfer.ToolLoop.csproj", '
             f'"{identifier}"'
         ) in solution
+        for configuration in ("Debug", "Release"):
+            assert (
+                f"{identifier}.{configuration}|Any CPU.ActiveCfg = {configuration}|Any CPU"
+            ) in solution
+            assert (
+                f"{identifier}.{configuration}|Any CPU.Build.0 = {configuration}|Any CPU"
+            ) in solution
+
+    def test_csharp_solution_registers_the_nonpackable_context_tuning_observer(self):
+        solution = (ROOT / "src" / "csharp" / "AnyInfer.sln").read_text(encoding="utf-8")
+        project = (
+            ROOT / "src" / "csharp" / "AnyInfer.ContextTuning" / "AnyInfer.ContextTuning.csproj"
+        ).read_text(encoding="utf-8")
+
+        identifier = "{10731CD2-FECD-4947-B555-18132E1DA6CC}"
+        assert (
+            'Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = '
+            '"AnyInfer.ContextTuning", '
+            '"AnyInfer.ContextTuning\\AnyInfer.ContextTuning.csproj", '
+            f'"{identifier}"'
+        ) in solution
+        assert "<IsPackable>false</IsPackable>" in project
         for configuration in ("Debug", "Release"):
             assert (
                 f"{identifier}.{configuration}|Any CPU.ActiveCfg = {configuration}|Any CPU"
@@ -482,8 +510,8 @@ class TestVerbs:
         output = capsys.readouterr().out
         assert "FAIL" in output and "PASS" in output
         # Every default step must be attempted despite the failure, including the two
-        # in-process docs gates and thirteen C# steps.
-        assert len(calls) == 26
+        # in-process docs gates and fourteen C# steps.
+        assert len(calls) == 27
 
     def test_build_docs_builds_the_exact_pages_artifact(self, recorded):
         assert workspace.main(["build", "docs"]) == 0

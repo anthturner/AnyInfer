@@ -138,8 +138,10 @@ LINT_PATHS = (
     "workspace.py",
     "scripts/check_csharp_accounting.py",
     "scripts/_csharp_observation.py",
+    "scripts/check_csharp_context_tuning.py",
     "scripts/check_csharp_request_policy.py",
     "scripts/check_csharp_rich_generation.py",
+    "scripts/observe_python_context_tuning.py",
     "scripts/observe_python_tool_loop.py",
     "scripts/_tool_loop_python.py",
     "scripts/check_csharp_tool_loop.py",
@@ -1051,6 +1053,12 @@ def _gate_phases(*, fix: bool) -> dict[str, Phase]:
                 (
                     "validate C# tool-loop observations",
                     lambda: python(str(ROOT / "scripts" / "check_csharp_tool_loop.py"), cwd=ROOT),
+                ),
+                (
+                    "validate C# context-tuning observations",
+                    lambda: python(
+                        str(ROOT / "scripts" / "check_csharp_context_tuning.py"), cwd=ROOT
+                    ),
                 ),
                 (
                     "validate C# provider binding inventory",

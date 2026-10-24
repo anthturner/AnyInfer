@@ -1051,7 +1051,9 @@ must report a real conflict rather than silently changing a dependent public sig
   tuning from `context/`, plus `ContextRequest`, estimates and fit gates. No filesystem walker
   in the reducer. Gate: common deterministic context-envelope/budget/selection corpus.
   > NOTE: Autonomous execution begins with [native context tuning](SDK_CONTEXT_TUNING.md).
-  > Its reviewed CTUNE.0 contract covers the 17-setting foundation; CTUNE.1 is next.
+  > Its reviewed contract covers the 17-setting foundation; 24 targeted native controls
+  > and independent observations pass 57 shared cases plus one separate native boundary.
+  > CTUNE.0–3 are accepted; CTUNE.4 full workspace/package qualification is next.
   > Settings alone do not implement reducers, history, request policy or shared config.
 - [ ] **SDK.9b** Port opt-in distillation, semantic ranking, request-path compaction and
   cache placement using already-implemented operation/accounting surfaces. Gate: bounded

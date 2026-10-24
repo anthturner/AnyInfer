@@ -557,6 +557,14 @@ The following grouped inventory follows subsystem `__all__` declarations and API
 
 `DEFAULT_CHUNK_TOKENS`, `DEFAULT_KEEP_RECENT`, `DEFAULT_MAX_BYTES`, `DEFAULT_MAX_DOCUMENTS`, `DEFAULT_ROLLUP_SHARE`, `ENVELOPE_FORMAT`, `SELECTION_ORDERS`, `VALID_STRATEGIES`, `Chunk`, `CompactSource`, `ContextDocument`, `ContextRequest`, `ContextSummary`, `ContextTuning`, `Distillation`, `DuplicateMap`, `HistoryCompaction`, `RankCache`, `Reduction`, `ReductionPlan`, `ReductionState`, `RenderOrder`, `SelectionOrder`, `SemanticRanker`, `Strategy`, `StrategyOutlook`, `SupportsGenerate`, `build_rank_cache`, `compact_history`, `compact_source`, `detect_language`, `distill`, `distill_sync`, `expand_query`, `find_duplicates`, `imported_names`, `is_generated_path`, `module_surfaces`, `normalize_strategy`, `plan`, `rank`, `render_chunk_block`, `render_compact_block`, `render_corpus`, `render_duplicate_block`, `render_extract_block`, `render_file_block`, `salience`, `select`, `split_document`, `structural_extract`, `supports_compaction`, `tokenize`.
 
+> NOTE: `AnyInfer.Context.ContextTuning` now implements the standalone 17-setting model,
+> default/recommended constants and strict mapping/merge helpers. Source and independent
+> observer review, 24 native controls and 57 shared development cases plus one separate
+> native range boundary pass; full qualification is tracked by CTUNE.4 in
+> [native context tuning](SDK_CONTEXT_TUNING.md). This subsystem export is outside the 235
+> root rows. Reducers, document/ranking/selection/history and request/config wiring remain
+> open; settings evidence does not complete SDK.9a or a root completion mark.
+
 ### `src/python/anyinfer/events/__init__.py`
 
 `PAYLOAD_FIELDS`, `REDACTED`, `ArenaCompleted`, `AttemptCompleted`, `AttemptStarted`, `BatchCompleted`, `BatchSubmitted`, `CachePlanned`, `ContextReduced`, `CredentialRotated`, `DownloadProgress`, `EventDispatcher`, `FallbackTriggered`, `FirstToken`, `JsonlObserver`, `LoggingObserver`, `Observer`, `ParameterDropped`, `ProviderDiagnostic`, `RateLimitObserved`, `RateLimitWaited`, `RedactionRegistry`, `RepairAttempted`, `RequestCompleted`, `RequestFailed`, `RequestStarted`, `RetryScheduled`, `ServerLifecycle`, `Subscription`, `TargetResolved`, `TelemetryEvent`, `UsageEstimated`, `event_to_dict`, `redact`, `register_secret`, `strip_payloads`.

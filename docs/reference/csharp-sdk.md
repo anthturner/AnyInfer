@@ -24,6 +24,7 @@ property corresponds to Python `Text.text`.
 | `AnyInfer.Providers.ProviderDescriptor.HonorsConnectionSettings` | Descriptor metadata, defaulting to `true`, indicating whether the provider supports configured proxy, TLS, and client-certificate settings. |
 | `AnyInferConfig.Loads`, `AnyInferConfig.Dumps` | Parse and render bounded version 1 JSON; configured proxy credentials and certificate paths/passwords remain literal configuration values. |
 | `Route`, `Retry`, `Repair` | Routing, retry, and structured-output repair controls. |
+| `AnyInfer.Context.ContextTuning` | Immutable standalone context-reduction tuning settings with strict mapping helpers. |
 | `SchemaSpec`, `SchemaValidator`, `SchemaValidationOptions` | Modern schema specification, validation, and explicit resource controls. |
 | `Generation`, `Timing`, `Usage` | Buffered result, timing, and reported token usage. |
 | `ContentPart`, `Text`, `ImagePart`, `DocumentPart`, `AudioPart`, `VideoPart` | Typed text and media inputs; URL values are references and are never fetched by the core. |
@@ -45,6 +46,22 @@ property corresponds to Python `Text.text`.
 | `IObserver`, `TelemetryEvent` | Synchronous typed in-process telemetry; observers and sinks remain caller-owned. |
 | `RunManifest`, `ManifestUtilities` | Immutable per-call manifest values, serialization, schema, digest, and rendering helpers. |
 | `AttemptRecord.Timing`, `operationRoutes` | Per-attempt timing and optional retrieval-specific default routes on either client. |
+
+`ContextTuning` exposes 17 immutable settings: `CollapseDuplicates`,
+`NearDuplicateThreshold`, `ShingleSize`, `SelectionOrder`, `Diversity`, `SplitIdentifiers`,
+`QueryExpansion`, `ExpansionTerms`, `FeedbackDocuments`, `ExpansionWeight`, `SalienceWeight`,
+`SalienceDamping`, `SalienceIterations`, `CompactFallback`, `ChunkTokens`, `RollupShare`, and
+`CarryOverBonus`. Its static `Default` provides the default instance; `Recommended()` returns
+the documented recommended preset. `SelectionOrders` is the immutable ordered list `rank`,
+`density`, and `DefaultChunkTokens` is 512. Properties are get-only, with PascalCase names
+and native types (`bool`, `double`, `long`, and `string`).
+
+`FromMapping(JsonObject)` accepts the exact Python snake_case keys, rejects unknown keys,
+wrong JSON types, and invalid values, and returns a validated instance. `ToMapping()` returns
+a new mapping containing all 17 fields. `Merged(JsonObject)` ignores null-valued overrides,
+then strictly validates and applies the remaining entries; it does not mutate the original.
+These are standalone settings only. C# does not yet provide context reducers, history
+reduction, request-path context handling, or a configuration `context` block.
 
 `AnyInfer.Providers.ProviderDescriptor` exposes get-only `ModelInventory`; its optional `modelInventory` constructor argument defaults to `ModelInventoryKind.Served`. `Served` describes models exposed by an already-running engine; `Available` describes a catalog of models that could be run; `Installed` describes a provider-owned on-disk model store. This category is descriptive metadata, separate from model-listing support and the descriptor's implemented inference operations. Choosing a category does not filter discovered models, start a runtime, download models, or register a provider. The descriptor's get-only `HonorsConnectionSettings` value defaults to `true` and describes whether that provider supports configured connection settings.
 

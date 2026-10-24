@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "required": ["profile", "format_version", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "profile": {"const": "context-tuning-v1"},
+    "format_version": {"const": 1},
+    "cases": {"type": "array", "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "case": {
+      "type": "object", "required": ["id", "kind", "domain"],
+      "oneOf": [
+        {"properties": {"id":{"type":"string"},"kind":{"const":"default"},"domain":{"enum":["shared","native_range"]}},"additionalProperties":false},
+        {"properties": {"id":{"type":"string"},"kind":{"const":"recommended"},"domain":{"enum":["shared","native_range"]}},"additionalProperties":false},
+        {"properties": {"id":{"type":"string"},"kind":{"const":"from_mapping"},"domain":{"enum":["shared","native_range"]},"values":{"type":"object"}},"required":["values"],"additionalProperties":false},
+        {"properties": {"id":{"type":"string"},"kind":{"const":"merge"},"domain":{"enum":["shared","native_range"]},"base":{"type":"object"},"values":{"type":"object"}},"required":["base","values"],"additionalProperties":false}
+      ]
+    }
+  }
+}
+
