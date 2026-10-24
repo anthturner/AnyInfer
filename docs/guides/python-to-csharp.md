@@ -36,6 +36,18 @@ Python async clients and streams use `async with`; C# uses `await using` for the
 client and stream lifetime. C# also has `Client`/`SyncStream` for synchronous callers, using the
 .NET default task scheduler and `using`; it does not reproduce Python's loop facade.
 
+## Registered Cerebras generation
+
+The C# default registry includes the Cerebras generation descriptor. Configure it directly with
+an `env://CEREBRAS_API_KEY` credential reference and use a `cerebras:model` target. The
+[registered Cerebras provider example](csharp-sdk.md#use-the-registered-cerebras-provider) is
+the source-linked executable example.
+
+Its verifier uses a scripted handler, not hosted Cerebras traffic. Hosted behavior remains
+unverified, and the other generated OpenAI-compatible presets are not default C# registrations.
+Choose a model available to the configured account through discovery; the example's
+`gpt-oss-120b` is not a static catalog guarantee.
+
 ## Shared configuration
 
 `ConfigurationExample.RunAsync` accepts version 1 configuration JSON and creates a configured

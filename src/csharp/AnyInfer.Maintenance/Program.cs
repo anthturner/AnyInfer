@@ -66,6 +66,7 @@ static IReadOnlyList<string> Dependencies(string providerId)
     IReadOnlyList<string> dependencies = providerId switch
     {
         "openai-compat" => ["contracts/openai-compat.md"],
+        "cerebras" => ["contracts/openai-compat-presets.md", "contracts/openai-compat-presets.md#cerebras", "contracts/openai-compat.md"],
         "tei" => ["contracts/tei.md"],
         "voyage" => ["contracts/voyage.md"],
         "jina" => ["contracts/jina.md"],
@@ -73,7 +74,9 @@ static IReadOnlyList<string> Dependencies(string providerId)
     };
     foreach (var dependency in dependencies)
     {
-        if (!File.Exists(dependency)) throw new InvalidOperationException($"Mapped contract does not exist: {dependency}");
+        var fragmentStart = dependency.IndexOf('#');
+        var physicalPath = fragmentStart < 0 ? dependency : dependency[..fragmentStart];
+        if (!File.Exists(physicalPath)) throw new InvalidOperationException($"Mapped contract does not exist: {dependency}");
     }
     return dependencies;
 }

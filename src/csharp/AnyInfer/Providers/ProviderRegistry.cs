@@ -203,5 +203,28 @@ public sealed class ProviderRegistry
         {
             PoolOwnsConfiguredTransport = true,
         },
+        SelectReviewedGenerationPreset("cerebras"),
     ]);
+
+    private static ProviderDescriptor SelectReviewedGenerationPreset(string presetId)
+    {
+        var row = CompatPresetTable.Rows.Single(
+            definition => string.Equals(definition.Source.Id, presetId, StringComparison.Ordinal));
+        if (!row.Source.SourceOperations.SequenceEqual(["generation"], StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException("A reviewed compatibility preset must have generation as its only source operation.");
+        }
+
+        if (!row.Generation.Descriptor.Operations.SequenceEqual([InferenceOperation.Generation]))
+        {
+            throw new InvalidOperationException("A reviewed compatibility preset must have generation as its only native operation.");
+        }
+
+        if (row.PendingNativeParity.Count != 0)
+        {
+            throw new InvalidOperationException("A reviewed compatibility preset cannot have pending native parity work.");
+        }
+
+        return row.Generation.Descriptor;
+    }
 }

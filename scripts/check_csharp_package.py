@@ -459,6 +459,20 @@ var overrides = new Dictionary<string, IReadOnlyDictionary<string, ModelCapabili
 if (factoryCalls != 0)
     throw new InvalidOperationException("pure catalog queries constructed an adapter");
 
+var cerebrasHandler = new CerebrasHandler();
+var cerebrasSettings = ProviderSettings.Of(
+    "cerebras", apiKey: "offline-cerebras-key", transport: cerebrasHandler);
+{
+    await using var client = new AsyncClient([cerebrasSettings]);
+    var generated = await client.GenerateAsync(
+        "package Cerebras witness", target: "cerebras:gpt-oss-120b");
+    if (generated.Text != "package cerebras"
+        || generated.Usage is not { InputTokens: 1, OutputTokens: 1, TotalTokens: 2 })
+        throw new InvalidOperationException("default Cerebras registration witness failed");
+}
+if (cerebrasHandler.RequestCount != 1 || cerebrasHandler.DisposeCount != 1)
+    throw new InvalidOperationException("default Cerebras transport ownership failed");
+
 var teiEmbedHandler = new TeiHandler(reranker: false);
 var teiRerankHandler = new TeiHandler(reranker: true);
 var teiEmbedSettings = ProviderSettings.Of(
@@ -1193,6 +1207,48 @@ static bool HasPromptTokens(JsonValue? raw) => raw is JsonObject payload
     && usage.TryGetValue("prompt_tokens", out var promptTokens)
     && promptTokens is JsonInteger integer
     && integer.Value == 7;
+
+sealed class CerebrasHandler : HttpMessageHandler
+{
+    public int RequestCount { get; private set; }
+    public int DisposeCount { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestCount++;
+        var body = request.Content is null
+            ? ""
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        using var document = JsonDocument.Parse(body);
+        if (request.Method != HttpMethod.Post
+            || request.RequestUri?.AbsolutePath != "/v1/chat/completions"
+            || request.Headers.Authorization?.Scheme != "Bearer"
+            || request.Headers.Authorization.Parameter != "offline-cerebras-key"
+            || document.RootElement.GetProperty("model").GetString() != "gpt-oss-120b"
+            || document.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()
+                != "package Cerebras witness")
+            throw new InvalidOperationException(
+                "default Cerebras registration lost the configured request");
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """
+                {"choices":[{"message":{"content":"package cerebras"},"finish_reason":"stop"}],
+                "usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+                """,
+                Encoding.UTF8,
+                "application/json"),
+        };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeCount++;
+        base.Dispose(disposing);
+    }
+}
 
 sealed class RichLoopAdapter(bool includeStreamWitness = false) : IProviderAdapter
 {

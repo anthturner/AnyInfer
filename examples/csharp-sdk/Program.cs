@@ -23,6 +23,15 @@ static async Task VerifyAsync()
     Require(displayedSettings.ProviderId == "openai-compat", "Settings example did not produce the expected provider.");
     Require(ConnectionExample.VerifyRoundTrip(), "Connection settings example did not round-trip its inert values.");
 
+    var cerebrasHandler = new CerebrasScriptedHandler();
+    var cerebras = await CerebrasExample.RunAsync(
+        CerebrasExample.Settings(cerebrasHandler, "offline-cerebras-key"));
+    Require(cerebras.Text == "hello from Cerebras"
+        && cerebras.Usage is { InputTokens: 1, OutputTokens: 1, TotalTokens: 2 }
+        && cerebrasHandler.RequestCount == 1
+        && cerebrasHandler.DisposeCount == 1,
+        "Cerebras example did not use the default registration or preserve the scripted result.");
+
     var pureFactoryCalls = 0;
     var pureRegistry = new ProviderRegistry(
     [

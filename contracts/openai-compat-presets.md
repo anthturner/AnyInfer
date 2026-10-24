@@ -3,7 +3,8 @@
 Status: **implemented** — `providers/presets.py`, branded descriptors over the shared
 `openai-compat` adapter (see `contracts/openai-compat.md` for the base dialect this file
 inherits; only per-provider deltas are recorded here).
-Last verified: 2026-08-07 — live provider documentation, per the sources under each entry.
+Baseline verification: 2026-08-07 — live provider documentation. Later dates under an
+individual entry supersede this baseline for that entry only.
 Exception: **groq** could not be re-verified this session (console.groq.com and groq.com
 blocked automated access); its entry is built from the official groq-python SDK reference
 plus search excerpts of the official compatibility page, and is flagged for the next
@@ -80,43 +81,51 @@ one.
 
 ## cerebras — Cerebras Inference
 
-- Base URL: `https://api.cerebras.ai/v1`
-- Auth: Authorization: Bearer <key>
-- `GET /models`: yes
-- Compatibility notes:
-  GET https://api.cerebras.ai/v1/models documented and works (returns object=list with model
-  ids). Combining tools + response_format is model-dependent: gpt-oss-120b rejects requests
-  containing both fields; other models may accept the combination but prioritize tool calling
-  (docs say don't rely on response_format then). frequency_penalty, presence_penalty, logit_bias
-  are listed but 'parameter support can differ depending on the model used'.
-  stream_options.include_usage is NOT documented anywhere in the chat-completions spec or
-  streaming guide (usage-in-stream behavior undocumented). max_completion_tokens includes
-  reasoning tokens. usage object: prompt_tokens, completion_tokens, total_tokens, image_tokens
-  (vision), prompt_tokens_details.cached_tokens, completion_tokens_details. Prompt caching is
-  automatic (128-token prefix blocks, org-scoped, 5min-1hr TTL) with NO price discount: 'Input
-  tokens, whether served from the cache or processed fresh, are billed at the standard input
-  token rate'. Cerebras-specific params: reasoning_effort, reasoning_format, clear_thinking,
-  prompt_cache_key (requires enablement), prediction, service_tier (Private Preview:
-  priority/default/auto/flex). Free tier context 65k vs 131k paid. Model catalog is small: gpt-
-  oss-120b (production), gemma-4-31b (preview), zai-glm-4.7 (preview, deprecation Aug 17 2026).
-- Reasoning:
-  Controlled per model via reasoning_effort: gpt-oss-120b accepts low/medium/high (default
-  medium); zai-glm-4.7 accepts 'none' to disable (legacy disable_reasoning boolean deprecated
-  after Jul 21 2026); gemma-4-31b default 'none' (disabled), low/medium/high enable. Output
-  shape controlled by reasoning_format: 'parsed' = reasoning in separate `reasoning` field
-  (logprobs split into reasoning_logprobs); 'raw' = reasoning prepended to content (GLM wraps in
-  <think>...</think>); 'hidden' = generated but stripped from response; 'none' = model default.
-  Billing: reasoning tokens count toward completion_tokens and are billed as output even when
-  hidden/stripped; max_completion_tokens includes reasoning. Reasoning does not carry across
-  turns automatically — prior reasoning must be re-included manually in the model's native
-  format; clear_thinking param controls including thinking from previous turns.
-- Sources (verified 2026-08-07):
-  - https://inference-docs.cerebras.ai/llms.txt
-  - https://inference-docs.cerebras.ai/resources/openai.md
-  - https://inference-docs.cerebras.ai/api-reference/chat-completions.md
-  - https://inference-docs.cerebras.ai/api-reference/models/list-models.md
-  - https://inference-docs.cerebras.ai/capabilities/reasoning.md
-  - https://inference-docs.cerebras.ai/capabilities/streaming.md
+- Verified 2026-10-24 from the primary references below. This is protocol-documentation
+  and official SDK-source evidence; hosted traffic has **not** been live-verified.
+- Endpoint/auth: `https://api.cerebras.ai/v1`, Bearer authorization, conventional
+  `CEREBRAS_API_KEY`; JSON `POST /chat/completions`. The existing preset remains
+  generation-only even though the service documents other APIs. [Compatibility](https://inference-docs.cerebras.ai/resources/openai)
+  and [chat reference](https://inference-docs.cerebras.ai/api-reference/chat-completions).
+- Discovery: `GET /models` returns `object: "list"` and a `data` array with model `id`
+  values. Availability is discovered rather than pinned to an old model catalog.
+  [Models reference](https://inference-docs.cerebras.ai/api-reference/models/list-models).
+- Versioning: version 2 is the default while endpoint paths remain `/v1`; the
+  `X-Cerebras-Version-Patch: 2` override is optional. This preset sends no version
+  override. [Versions](https://inference-docs.cerebras.ai/api-reference/versions).
+- Request/response subset: messages/model, sampling, tools and response formats use the
+  chat dialect. `max_tokens` aliases `max_completion_tokens`; send only the former.
+  Reasoning effort supports low/medium/high/none with model-dependent behavior.
+  AnyInfer retains its existing minimal-to-low translator; it does not expose every
+  Cerebras extension. Reported usage includes prompt/completion/total tokens and nested
+  cache/reasoning details. Limits and feature combinations vary by model; in particular,
+  streaming cannot use `json_object`. [Chat reference](https://inference-docs.cerebras.ai/api-reference/chat-completions).
+- Streaming: `stream: true` yields incremental chunks. The official SDK documents usage
+  and timing in the final chunk. Its OpenAPI-generated request types expose
+  `stream_options.include_usage`, the resource forwards it, and its SSE decoder recognizes
+  `[DONE]`. This supersedes the earlier claim that stream usage had no published evidence.
+  Sources fetched 2026-10-24 at official SDK revision
+  `cacaf754daf384c7066e6584f06363b6f15f8599`:
+  [streaming guide](https://inference-docs.cerebras.ai/capabilities/streaming),
+  [SDK README](https://github.com/Cerebras/cerebras-cloud-sdk-python/blob/cacaf754daf384c7066e6584f06363b6f15f8599/README.md),
+  [request types](https://github.com/Cerebras/cerebras-cloud-sdk-python/blob/cacaf754daf384c7066e6584f06363b6f15f8599/src/cerebras/cloud/sdk/types/chat/completion_create_params.py),
+  [resource](https://github.com/Cerebras/cerebras-cloud-sdk-python/blob/cacaf754daf384c7066e6584f06363b6f15f8599/src/cerebras/cloud/sdk/resources/chat/completions.py),
+  [decoder](https://github.com/Cerebras/cerebras-cloud-sdk-python/blob/cacaf754daf384c7066e6584f06363b6f15f8599/src/cerebras/cloud/sdk/_streaming.py).
+- Failures/limits: documented statuses include 400/401/402/403/404/413/422/429/500/503;
+  shared AnyInfer status classification remains authoritative. Rate limits depend on
+  organization and model; no fixed ceiling is inferred.
+  [Errors](https://inference-docs.cerebras.ai/support/error),
+  [rate limits](https://inference-docs.cerebras.ai/support/rate-limits).
+- Change review: the fetched changelog includes 2026-10-09 service-tier clarification.
+  No new service-tier behavior is adopted by this preset.
+  [Changelog](https://inference-docs.cerebras.ai/support/change-log).
+- **Unverified:** authenticated buffered/streamed requests, exact final-chunk choices
+  shape and streaming-error payloads, retry/rate-limit header spelling and actual values,
+  current account/model-specific tools-plus-schema combinations, and provider-specific
+  extension behavior. No universal capability, model-limit, price or live-certification
+  claim follows from the shared adapter's offline controls. The service OpenAPI YAML
+  could not be read through the browser; official generated SDK types supply the bounded
+  schema cross-check above.
 
 ## sambanova — SambaNova Cloud (SambaCloud)
 

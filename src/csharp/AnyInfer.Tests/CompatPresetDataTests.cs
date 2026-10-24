@@ -16,7 +16,7 @@ namespace AnyInfer.Tests;
 /// <summary>Independent controls for generated, inert compatibility-preset metadata.</summary>
 public sealed class CompatPresetDataTests
 {
-    private const string InventorySha256 = "46dd2eb1681b9e78c5daa97c446e28934cc128e6b7875e7509a229436810bfb4";
+    private const string InventorySha256 = "c8e5314f566d352067928b2c7ce7b39e91b30ff15911b6b31c8cd79d83065a62";
 
     [Fact]
     public void Generated_table_joins_every_compat_row_to_independent_source_facts()
@@ -223,7 +223,10 @@ public sealed class CompatPresetDataTests
         var builtInIdentifiers = ProviderRegistry.CreateDefault().Descriptors
             .SelectMany(static descriptor => new[] { descriptor.Id }.Concat(descriptor.Aliases))
             .ToHashSet(StringComparer.Ordinal);
+        var admitted = CompatPresetTable.Rows.Single(static row => row.Source.Id == "cerebras");
+        Assert.Contains(admitted.Generation.Descriptor.Id, builtInIdentifiers);
         var tableIdentifiers = CompatPresetTable.Rows
+            .Where(static row => row.Source.Id != "cerebras")
             .SelectMany(static row => new[] { row.Generation.Descriptor.Id }.Concat(row.Generation.Descriptor.Aliases))
             .ToArray();
         Assert.Equal(tableIdentifiers.Length, tableIdentifiers.Distinct(StringComparer.Ordinal).Count());

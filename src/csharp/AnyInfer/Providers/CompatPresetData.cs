@@ -194,7 +194,7 @@ internal sealed record CompatPresetDefinition
     };
 }
 
-/// <summary>Generated compatibility-preset metadata; intentionally separate from the default registry.</summary>
+/// <summary>Generated compatibility-preset metadata from which reviewed entries may be selected for the default registry.</summary>
 internal static partial class CompatPresetTable
 {
 }

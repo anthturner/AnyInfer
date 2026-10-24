@@ -16,6 +16,7 @@ property corresponds to Python `Text.text`.
 | `BatchPolicy`, `BatchFailure` | Core-managed bounded batching controls and the failures retained when a batch operation fails. |
 | `IEmbedsText`, `IReranksText`, `InferenceOperation` | Optional retrieval adapter protocols; the built-in TEI, Voyage, and Jina adapters declare embedding and rerank operations. |
 | `ProviderSettings` | Provider setup including an `env://` credential reference. |
+| `cerebras:model` | Default-registry generation target for a configured Cerebras instance; use `ProviderSettings.Of("cerebras", apiKey: "env://CEREBRAS_API_KEY")`. |
 | `ProviderProxy`, `TlsVerification`, `ClientCertificate` | Explicit HTTP(S) proxy, SDK-handler TLS verification, and PEM client-certificate settings attached to `ProviderSettings`. |
 | `AnyInfer.Providers.ProviderDescriptor.HonorsConnectionSettings` | Descriptor metadata, defaulting to `true`, indicating whether the provider supports configured proxy, TLS, and client-certificate settings. |
 | `AnyInferConfig.Loads`, `AnyInferConfig.Dumps` | Parse and render bounded version 1 JSON; configured proxy credentials and certificate paths/passwords remain literal configuration values. |
@@ -64,9 +65,9 @@ Configured `RateLimits` can pace normal provider HTTP inside the generation entr
 own-transport descriptor, or an opaque prebuilt registration with an active injected limiter, uses
 an outer slot before entry; this is not a universal provider transport guarantee.
 
-The proof demonstrates text generation through the chat-only OpenAI-compatible adapter and
-buffered text embedding and reranking through the built-in TEI, Voyage, or Jina adapter or optional
-application-owned retrieval adapters. Retrieval results
+The proof demonstrates text generation through the chat-only OpenAI-compatible adapter and the
+registered Cerebras descriptor, plus buffered text embedding and reranking through the built-in
+TEI, Voyage, or Jina adapter or optional application-owned retrieval adapters. Retrieval results
 carry reported usage, timing, attempts, warnings, optional raw payloads, and manifests just as
 their operation permits. `operationRoutes` can provide embedding or rerank defaults without
 changing a generation route. The TEI descriptor does not hydrate deployment limits, so unknown
@@ -78,6 +79,12 @@ report publication. Generic OpenAI-compatible retrieval remains unimplemented in
 proof. Buffered C# embedding and reranking were exercised against the pinned TEI 1.9.4 CPU
 deployment on 2026-10-22. Voyage's built-in adapter has offline scripted-handler evidence only;
 hosted Voyage traffic has not been live-verified. Jina's built-in adapter has offline scripted-handler evidence only; hosted Jina traffic has not been live-verified.
+
+The default registry also includes Cerebras for generation through its existing shared chat
+adapter. Use ordinary `ProviderSettings` and a `cerebras:model` target. Its executable evidence
+uses a scripted handler only: hosted Cerebras traffic is not live-verified, and other generated
+OpenAI-compatible presets are not registered in this C# proof. Choose a model available to the
+configured account through discovery; the examples do not provide a static Cerebras catalog.
 
 Schema validation covers Draft 6, Draft 7, Draft 2019-09, and Draft 2020-12. Draft 3 and Draft 4
 remain deferred. Numeric and regular-expression behavior is native to .NET, regular-expression

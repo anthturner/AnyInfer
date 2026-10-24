@@ -5,7 +5,8 @@ examples live in `examples/csharp-sdk/`; the proof uses the same shared contract
 repository's native C# work, while the supported product SDK and published package remain
 Python.
 
-The generation examples use `ProviderSettings` and the built-in OpenAI-compatible provider.
+The generation examples use `ProviderSettings` and the built-in OpenAI-compatible and Cerebras
+providers.
 The C# proof also includes built-in TEI, Voyage, and Jina adapters for buffered embeddings and
 reranking; other provider-specific retrieval remains application-owned. The async calls accept
 a cancellation token and use `await using`; the matching synchronous facade uses `using` and
@@ -35,6 +36,22 @@ automatically. Resolution occurs only when the client first needs it.
 ```csharp
 --8<-- "examples/csharp-sdk/SettingsExample.cs"
 ```
+
+## Use the registered Cerebras provider
+
+The default C# registry includes Cerebras for generation. Configure it with ordinary
+`ProviderSettings`, retain the credential as an explicit environment reference, and target the
+provider with `cerebras:model`; no generic OpenAI-compatible provider setup is needed.
+
+```csharp
+--8<-- "examples/csharp-sdk/CerebrasExample.cs"
+```
+
+The included executable example substitutes a scripted HTTP handler and checks its request and
+result offline. It does not make hosted Cerebras traffic live-verified. Other generated
+OpenAI-compatible presets remain unavailable through the C# default registry.
+Choose a model available to the configured account through discovery; this example's
+`gpt-oss-120b` target is not a static catalog guarantee.
 
 ## Configure provider connections
 
