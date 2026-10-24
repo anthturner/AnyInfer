@@ -327,6 +327,12 @@ using AnyInfer.Schema;
 using PeterO.Numbers;
 using JsonProperty = AnyInfer.Json.JsonProperty;
 
+var cacheProjection = new Generation("cache projection", cacheMechanism: CacheMechanism.Explicit);
+var cacheProjectionClone = cacheProjection with { };
+if (cacheProjection.CacheMechanism != CacheMechanism.Explicit
+    || cacheProjectionClone.CacheMechanism != CacheMechanism.Explicit)
+    throw new InvalidOperationException("public cache result projection failed");
+
 var defaultTuning = ContextTuning.Default;
 var recommendedTuning = ContextTuning.Recommended();
 var tuningMapping = defaultTuning.ToMapping();

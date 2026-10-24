@@ -361,7 +361,8 @@ internal static class GenerationCore
                         raw: retainRaw && publicSdk ? current.Raw : null,
                         logprobs: current.Logprobs,
                         citations: current.Citations,
-                        serverToolUses: current.ServerToolUses);
+                        serverToolUses: current.ServerToolUses,
+                        cacheMechanism: cachePlan.Mechanism);
                     telemetry?.Emit(new AttemptCompleted(
                         telemetry.RequestId,
                         resolved.Target,

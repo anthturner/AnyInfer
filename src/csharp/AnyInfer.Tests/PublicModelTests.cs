@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using AnyInfer.Capabilities;
 using AnyInfer.Json;
 using AnyInfer.Providers;
 using AnyInfer.Schema;
@@ -139,6 +140,22 @@ public sealed class PublicModelTests
         Assert.Single(result.Warnings);
         Assert.Equal("transport", result.Attempts[0].Error!.Category);
         Assert.IsType<AttemptFailed>(new AttemptFailed(result.Attempts[0]));
+    }
+
+    [Fact]
+    public void Generation_cache_mechanism_constructor_and_clone_preserve_existing_record_semantics()
+    {
+        var defaultResult = new Generation("done");
+        var explicitResult = new Generation("done", cacheMechanism: CacheMechanism.Explicit);
+        var implicitResult = new Generation("done", cacheMechanism: CacheMechanism.Implicit);
+        var clone = explicitResult with { };
+
+        Assert.Null(defaultResult.CacheMechanism);
+        Assert.Equal(CacheMechanism.Explicit, explicitResult.CacheMechanism);
+        Assert.Equal(CacheMechanism.Implicit, implicitResult.CacheMechanism);
+        Assert.Equal(explicitResult.CacheMechanism, clone.CacheMechanism);
+        Assert.Equal(explicitResult, clone);
+        Assert.Equal(explicitResult.GetHashCode(), clone.GetHashCode());
     }
 
     [Fact]

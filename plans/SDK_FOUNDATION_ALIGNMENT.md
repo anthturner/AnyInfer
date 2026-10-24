@@ -316,9 +316,12 @@ run from `src/csharp/` so its SDK pin applies. Heavy checks remain serialized.
 
 ## Handoff
 
-ALIGN.1–4 and ALIGN.5a–c are complete. The autonomous run resumes at **ALIGN.5d / CACHE.1** on
+ALIGN.1–4 and ALIGN.5a–c are complete. The autonomous run resumes at
+**ALIGN.5d / CACHE.5 commit and clean qualification** on
 `feature/language-neutral-foundation`, executable base
 `146fbabed9e1b9fbbd90fb8242c7ea1109e333a9` (qualified standalone context tuning).
+Cache projection source/tests/docs are uncommitted on plan checkpoint `dcd3d7c`;
+the source build, 28 focused public controls, real ledger and all 27 workspace steps pass.
 The preceding catalog vocabulary and context-plan checkpoint is `028450e`.
 The preceding audit, documentation, evidence ledger and checker checkpoint is `8ce6bc0`;
 the earlier

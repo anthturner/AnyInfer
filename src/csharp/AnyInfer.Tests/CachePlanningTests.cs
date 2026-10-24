@@ -170,13 +170,29 @@ public sealed class CachePlanningTests
             [new Message("system", [new Text("system")]), Message.User("old"), Message.User("tail")],
             [Tool("tool", "description")]);
 
-        await client.GenerateAsync(request);
-        await client.GenerateAsync(new GenerationRequest(request.Messages, request.Route, tools: request.Tools, cache: new CachePolicy(CacheMode.Off)));
+        var planned = await client.GenerateAsync(request);
+        var disabled = await client.GenerateAsync(new GenerationRequest(request.Messages, request.Route, tools: request.Tools, cache: new CachePolicy(CacheMode.Off)));
 
         Assert.Equal([-2, -1, 1], adapter.Requests[0].CacheMarks);
         Assert.Empty(adapter.Requests[1].CacheMarks);
+        Assert.Equal(CacheMechanism.Explicit, planned.CacheMechanism);
+        Assert.Null(disabled.CacheMechanism);
         Assert.Collection(observer.Events.OfType<CachePlanned>(),
             planned => { Assert.Equal("explicit", planned.Mechanism); Assert.Equal(3, planned.MarkCount); });
+    }
+
+    [Fact]
+    public async Task Public_explicit_capable_client_without_an_active_policy_has_no_terminal_cache_mechanism()
+    {
+        var adapter = new CapturingAdapter();
+        var observer = new Collector();
+        await using var client = PublicClient(adapter, observer, CacheMechanism.Explicit, Placement());
+
+        var result = await client.GenerateAsync(Request());
+
+        Assert.Null(result.CacheMechanism);
+        Assert.Empty(Assert.Single(adapter.Requests).CacheMarks);
+        Assert.Empty(observer.Events.OfType<CachePlanned>());
     }
 
     [Fact]
@@ -186,7 +202,8 @@ public sealed class CachePlanningTests
         var implicitObserver = new Collector();
         await using (var implicitClient = PublicClient(implicitAdapter, implicitObserver, CacheMechanism.Implicit, Features(Feature.Streaming)))
         {
-            await implicitClient.GenerateAsync(Request(cache: new CachePolicy(CacheMode.Explicit, minSegmentTokens: 0)));
+            var result = await implicitClient.GenerateAsync(Request(cache: new CachePolicy(CacheMode.Explicit, minSegmentTokens: 0)));
+            Assert.Equal(CacheMechanism.Implicit, result.CacheMechanism);
         }
         Assert.Empty(Assert.Single(implicitAdapter.Requests).CacheMarks);
         Assert.Equal("implicit", Assert.Single(implicitObserver.Events.OfType<CachePlanned>()).Mechanism);
@@ -198,7 +215,8 @@ public sealed class CachePlanningTests
         var refusedObserver = new Collector();
         await using (var refusedClient = PublicClient(refusedAdapter, refusedObserver, CacheMechanism.Explicit, Features(Feature.Streaming)))
         {
-            await refusedClient.GenerateAsync(Request(cache: new CachePolicy(CacheMode.Explicit, minSegmentTokens: 0)));
+            var result = await refusedClient.GenerateAsync(Request(cache: new CachePolicy(CacheMode.Explicit, minSegmentTokens: 0)));
+            Assert.Null(result.CacheMechanism);
         }
         Assert.Empty(Assert.Single(refusedAdapter.Requests).CacheMarks);
         Assert.Empty(refusedObserver.Events.OfType<CachePlanned>());
@@ -208,7 +226,8 @@ public sealed class CachePlanningTests
         var genericObserver = new Collector();
         await using (var genericClient = PublicClient(genericAdapter, genericObserver, null, Placement()))
         {
-            await genericClient.GenerateAsync(Request(cache: new CachePolicy(minSegmentTokens: 0)));
+            var result = await genericClient.GenerateAsync(Request(cache: new CachePolicy(minSegmentTokens: 0)));
+            Assert.Null(result.CacheMechanism);
         }
         Assert.Empty(Assert.Single(genericAdapter.Requests).CacheMarks);
         Assert.Empty(genericObserver.Events.OfType<CachePlanned>());
@@ -226,9 +245,10 @@ public sealed class CachePlanningTests
         var retryObserver = new Collector();
         await using (var retryClient = PublicClient(retryAdapter, retryObserver, CacheMechanism.Explicit, Placement(), new CachePolicy(minSegmentTokens: 0)))
         {
-            await retryClient.GenerateAsync(new GenerationRequest(
+            var result = await retryClient.GenerateAsync(new GenerationRequest(
                 [new Message("system", [new Text("system")]), Message.User("old"), Message.User("tail")],
                 new Route(["cache:model"], new Retry(2, 0, 0)), cache: null));
+            Assert.Equal(CacheMechanism.Explicit, result.CacheMechanism);
         }
         Assert.Equal(2, retryAdapter.Requests.Count);
         Assert.Equal(2, retryObserver.Events.OfType<CachePlanned>().Count());
@@ -245,6 +265,7 @@ public sealed class CachePlanningTests
                 new Route(["cache:model"]), schema: new SchemaSpec(Assert.IsType<JsonObject>(JsonReader.Read("{\"const\":\"correct\"}"))), repair: new Repair(1)));
             Assert.Equal("explicit", result.Manifest!.Cache.Mechanism);
             Assert.Equal(2, result.Manifest.Cache.MarkCount);
+            Assert.Equal(CacheMechanism.Explicit, result.CacheMechanism);
         }
         Assert.Equal(2, repairAdapter.Requests.Count);
         Assert.Equal(repairAdapter.Requests[0].CacheMarks, repairAdapter.Requests[1].CacheMarks);
@@ -257,9 +278,69 @@ public sealed class CachePlanningTests
         var adapter = new CapturingAdapter();
         await using var client = new AsyncClient([new ProviderRegistration("cache", adapter)], new SystemOperationClock());
 
-        await client.GenerateAsync(Request(cache: new CachePolicy(minSegmentTokens: 0)));
+        var result = await client.GenerateAsync(Request(cache: new CachePolicy(minSegmentTokens: 0)));
 
         Assert.Empty(Assert.Single(adapter.Requests).CacheMarks);
+        Assert.Null(result.CacheMechanism);
+    }
+
+    [Fact]
+    public async Task Public_async_and_sync_streams_project_cache_mechanism_with_or_without_manifest_capture()
+    {
+        var asyncAdapter = new CapturingAdapter();
+        await using (var client = PublicClient(asyncAdapter, new Collector(), CacheMechanism.Explicit, Placement(), new CachePolicy(minSegmentTokens: 0)))
+        {
+            await using var capturedStream = client.StreamAsync(Request(), manifest: true);
+            var captured = await capturedStream.CollectAsync();
+            Assert.Equal(CacheMechanism.Explicit, captured.CacheMechanism);
+            Assert.Same(captured, capturedStream.Result);
+            Assert.NotNull(captured.Manifest);
+
+            await using var uncapturedStream = client.StreamAsync(Request(), manifest: false);
+            var uncaptured = await uncapturedStream.CollectAsync();
+            Assert.Equal(CacheMechanism.Explicit, uncaptured.CacheMechanism);
+            Assert.Same(uncaptured, uncapturedStream.Result);
+            Assert.Null(uncaptured.Manifest);
+        }
+
+        using var syncClient = PublicSyncClient(new CapturingAdapter(), CacheMechanism.Explicit, Placement(), new CachePolicy(minSegmentTokens: 0));
+        using var syncStream = syncClient.Stream(Request(), manifest: true);
+        var synchronous = syncStream.Collect();
+        Assert.Equal(CacheMechanism.Explicit, synchronous.CacheMechanism);
+        Assert.Same(synchronous, syncStream.Result);
+        Assert.NotNull(synchronous.Manifest);
+    }
+
+    [Fact]
+    public async Task Failed_explicit_target_does_not_leak_its_plan_when_implicit_fallback_wins()
+    {
+        var explicitAdapter = new ScriptedCapturingAdapter((_, _, token) =>
+            Throw(token, new TransportException("failed explicit", retryable: false, phase: "generate")));
+        var implicitAdapter = new CapturingAdapter();
+        var registry = new ProviderRegistry([
+            new ProviderDescriptor(
+                "explicit", "Explicit", (_, _) => ValueTask.FromResult<IAsyncDisposable>(explicitAdapter),
+                staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = Placement() },
+                cacheMechanism: CacheMechanism.Explicit),
+            new ProviderDescriptor(
+                "implicit", "Implicit", (_, _) => ValueTask.FromResult<IAsyncDisposable>(implicitAdapter),
+                staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = Features(Feature.Streaming) },
+                cacheMechanism: CacheMechanism.Implicit),
+        ]);
+        await using var client = new AsyncClient(
+            [ProviderSettings.Of("explicit"), ProviderSettings.Of("implicit")], registry,
+            cachePolicy: new CachePolicy(minSegmentTokens: 0), estimator: new RecordingEstimator(static _ => 10));
+
+        var result = await client.GenerateAsync(new GenerationRequest(
+            [new Message("system", [new Text("system")]), Message.User("old"), Message.User("tail")],
+            new Route(["explicit:model", "implicit:model"])));
+
+        Assert.Single(explicitAdapter.Requests);
+        Assert.Single(implicitAdapter.Requests);
+        Assert.NotEmpty(explicitAdapter.Requests[0].CacheMarks);
+        Assert.Empty(implicitAdapter.Requests[0].CacheMarks);
+        Assert.Equal("implicit", result.Target!.ProviderId);
+        Assert.Equal(CacheMechanism.Implicit, result.CacheMechanism);
     }
 
     [Fact]
@@ -344,6 +425,12 @@ public sealed class CachePlanningTests
             "cache", "Cache", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter),
             staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = capabilities },
             cacheMechanism: mechanism)]), observers: [observer], estimator: estimator ?? new RecordingEstimator(static _ => 10), cachePolicy: cachePolicy);
+
+    private static Client PublicSyncClient(IProviderAdapter adapter, CacheMechanism? mechanism, ModelCapabilities capabilities, CachePolicy? cachePolicy = null) =>
+        new([ProviderSettings.Of("cache")], new ProviderRegistry([new ProviderDescriptor(
+            "cache", "Cache", (_, _) => ValueTask.FromResult<IAsyncDisposable>(adapter),
+            staticCapabilities: new Dictionary<string, ModelCapabilities>(StringComparer.Ordinal) { ["model"] = capabilities },
+            cacheMechanism: mechanism)]), estimator: new RecordingEstimator(static _ => 10), cachePolicy: cachePolicy);
 
     private static AsyncClient ImplicitClient(IProviderAdapter alpha, IProviderAdapter beta, Collector observer) =>
         new([ProviderSettings.Of("alpha"), ProviderSettings.Of("beta")], new ProviderRegistry([

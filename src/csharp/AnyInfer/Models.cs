@@ -1,3 +1,4 @@
+using AnyInfer.Capabilities;
 using AnyInfer.Json;
 using AnyInfer.Internal;
 using AnyInfer.Manifest;
@@ -560,7 +561,8 @@ public sealed record Generation
         JsonValue? raw = null,
         IEnumerable<TokenLogprob>? logprobs = null,
         IEnumerable<Citation>? citations = null,
-        IEnumerable<ServerToolUse>? serverToolUses = null)
+        IEnumerable<ServerToolUse>? serverToolUses = null,
+        CacheMechanism? cacheMechanism = null)
     {
         Text = text ?? throw new ArgumentNullException(nameof(text));
         Structured = structured;
@@ -578,6 +580,7 @@ public sealed record Generation
         Logprobs = RichGenerationSnapshots.List(logprobs, nameof(logprobs));
         Citations = RichGenerationSnapshots.List(citations, nameof(citations));
         ServerToolUses = RichGenerationSnapshots.List(serverToolUses, nameof(serverToolUses));
+        CacheMechanism = cacheMechanism;
     }
 
     public string Text { get; }
@@ -602,6 +605,8 @@ public sealed record Generation
     public IReadOnlyList<Citation> Citations { get; }
     /// <summary>Gets copied counts of provider-run tool invocations.</summary>
     public IReadOnlyList<ServerToolUse> ServerToolUses { get; }
+    /// <summary>Gets the prompt-cache mechanism used by the winning attempt, or <see langword="null"/> when none engaged.</summary>
+    public CacheMechanism? CacheMechanism { get; }
 
     internal Generation WithManifest(RunManifest? manifest) => new(
         Text,
@@ -619,7 +624,8 @@ public sealed record Generation
         Raw,
         Logprobs,
         Citations,
-        ServerToolUses);
+        ServerToolUses,
+        CacheMechanism);
 
     /// <summary>Deserializes the structured result with the supplied serializer options.</summary>
     public T? DeserializeStructured<T>(System.Text.Json.JsonSerializerOptions? options = null)

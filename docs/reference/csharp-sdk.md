@@ -26,7 +26,7 @@ property corresponds to Python `Text.text`.
 | `Route`, `Retry`, `Repair` | Routing, retry, and structured-output repair controls. |
 | `AnyInfer.Context.ContextTuning` | Immutable standalone context-reduction tuning settings with strict mapping helpers. |
 | `SchemaSpec`, `SchemaValidator`, `SchemaValidationOptions` | Modern schema specification, validation, and explicit resource controls. |
-| `Generation`, `Timing`, `Usage` | Buffered result, timing, and reported token usage. |
+| `Generation`, `Generation.CacheMechanism`, `Timing`, `Usage` | Buffered result, its effective cache-plan mechanism, timing, and reported token usage. |
 | `ContentPart`, `Text`, `ImagePart`, `DocumentPart`, `AudioPart`, `VideoPart` | Typed text and media inputs; URL values are references and are never fetched by the core. |
 | `Citation`, `TokenLogprob`, `ServerToolUse`, `ServerToolSpec`, `ServerToolSource` | Normalized rich-generation output facts and provider-run tool declarations. |
 | `ReasoningDelta`, `CitationDelta`, `ServerToolDelta` | Separate typed stream events for reasoning, citations, and provider-run tools. |
@@ -62,6 +62,12 @@ a new mapping containing all 17 fields. `Merged(JsonObject)` ignores null-valued
 then strictly validates and applies the remaining entries; it does not mutate the original.
 These are standalone settings only. C# does not yet provide context reducers, history
 reduction, request-path context handling, or a configuration `context` block.
+
+`Generation.CacheMechanism` is nullable and reports the cache plan that applied to the
+winning attempt: `CacheMechanism.Explicit`, `CacheMechanism.Implicit`, or `null` when no
+mechanism engaged. It is not a provider-reported cache hit, cache saving, or cache-placement
+policy. Provider-reported cache read/write usage remains independent `Usage` accounting.
+Arena and context-reduction results remain unavailable.
 
 `AnyInfer.Providers.ProviderDescriptor` exposes get-only `ModelInventory`; its optional `modelInventory` constructor argument defaults to `ModelInventoryKind.Served`. `Served` describes models exposed by an already-running engine; `Available` describes a catalog of models that could be run; `Installed` describes a provider-owned on-disk model store. This category is descriptive metadata, separate from model-listing support and the descriptor's implemented inference operations. Choosing a category does not filter discovered models, start a runtime, download models, or register a provider. The descriptor's get-only `HonorsConnectionSettings` value defaults to `true` and describes whether that provider supports configured connection settings.
 

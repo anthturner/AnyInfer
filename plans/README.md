@@ -15,7 +15,8 @@ historical evidence, it links to the version-pinned source record.
   initial documentation correction, executable API reconciliation, and the distinction
   between sealed specification coverage, development profiles and shared build-time data.
   ALIGN.1–4, the public catalog vocabulary and standalone context tuning are complete;
-  the next bounded work is ALIGN.5d / CACHE.1, effective cache-mechanism result projection.
+  the next bounded work is ALIGN.5d / CACHE.5, commit and clean qualification of the
+  cache-mechanism result projection after 28 focused controls and the full 27-step gate.
   The 235-export evidence ledger
   and its workspace checker are active; their classifications are scoped evidence, not a
   full-parity claim.

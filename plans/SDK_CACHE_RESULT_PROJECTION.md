@@ -48,14 +48,17 @@ The cache field does not close `Generation`'s separate arena/context-reduction g
   > Review required explicit existing equality semantics and actual retry/repair terminal
   > result assertions. Root retained collection-reference behavior and a clone witness;
   > no broader equality or cache-policy change was authorized.
-- [ ] **CACHE.1 — Implement result state and propagation.** Own only
+- [x] **CACHE.1 — Implement result state and propagation.** Own only
   `src/csharp/AnyInfer/Models.cs` and `src/csharp/AnyInfer/Core/GenerationCore.cs`.
   Implement the property/final optional argument, `WithManifest` copy and winning-plan
   projection above. Do not validate or reinterpret cache policy in the result constructor.
   After root grants the sole native slot, gate from `src/csharp/`:
   `dotnet build AnyInfer/AnyInfer.csproj --no-restore -m:1` passes with zero warnings.
   Re-read this plan immediately before ticking only this box and adding a completion note.
-- [ ] **CACHE.2 — Independently control public behavior.** Own only
+
+  > NOTE: Completed 2026-10-24. `Generation.CacheMechanism` preserves the winning terminal
+  > cache plan through manifest capture; the scoped library build passed with zero warnings.
+- [x] **CACHE.2 — Independently control public behavior.** Own only
   `src/csharp/AnyInfer.Tests/CachePlanningTests.cs` and
   `src/csharp/AnyInfer.Tests/PublicModelTests.cs`. Extend real fake-provider public-client
   controls to retain and assert terminal results as well as existing events/wire marks:
@@ -71,7 +74,10 @@ The cache field does not close `Generation`'s separate arena/context-reduction g
   `dotnet test AnyInfer.Tests/AnyInfer.Tests.csproj --no-restore -m:1 --filter "FullyQualifiedName~CachePlanningTests|FullyQualifiedName~PublicModelTests"`
   passes with zero warnings. No sleeps, private hooks, new dependencies or full suites.
   Re-read the plan before a minimal tick/note; serialize that edit with CACHE.1's owner.
-- [ ] **CACHE.3 — Describe and consume the public field.** Own only
+
+  > NOTE: Completed 2026-10-24. Focused public cache/result projection controls pass 28/28
+  > with zero warnings, including the explicit no-active-policy public result/event/wire case.
+- [x] **CACHE.3 — Describe and consume the public field.** Own only
   `docs/reference/csharp-sdk.md` and `scripts/check_csharp_package.py`.
   Describe effective enum/null behavior and its distinction from provider-reported cache
   read/write usage. Extend the isolated package consumer with an actual constructor/property
@@ -79,12 +85,19 @@ The cache field does not close `Generation`'s separate arena/context-reduction g
   new unexecuted documentation code block. Gate: focused Markdown link check and Python
   Ruff/compile checks pass; root's final package gate compiles/runs the exact consumer.
   Root marks this box only after that package execution, so no plan writer conflicts occur.
-- [ ] **CACHE.4 — Reconcile scoped evidence.** Root updates only the `Generation` evidence
+  > NOTE: Completed 2026-10-24. Focused links, Ruff check/format, Python compilation and
+  > 23 pure packaging controls pass. The final full workspace gate compiles and runs the
+  > fresh isolated package consumer, including actual property/constructor/clone use.
+- [x] **CACHE.4 — Reconcile scoped evidence.** Root updates only the `Generation` evidence
   row in `CSHARP_SDK_API_PARITY.md`: add the reflected public property and actual cache tests,
   remove the absent-cache-field claim, retain partial status for arena/context-reduction.
   Gate: fresh `check_sdk_api_parity.py` passes against real metadata and all 235 original
   completion marks remain untouched. Expected status totals remain 171 implemented,
   26 partial, 37 deferred and one different; no provider membership changes.
+  > NOTE: Completed 2026-10-24. Real metadata projection/checker passes with
+  > `P:AnyInfer.Generation.CacheMechanism` and actual core/cache-test evidence. The row
+  > remains partial for arena/context reduction; counts and all root completion marks
+  > remain unchanged.
 - [ ] **CACHE.5 — Review, qualify, commit and continue.** Independently review changed
   source/tests/docs/package/evidence. Root runs one serialized full workspace gate using
   a fresh cache to avoid this checkout's known root `.pytest_cache` ACL:
@@ -98,10 +111,21 @@ The cache field does not close `Generation`'s separate arena/context-reduction g
   Root records exact checkpoint/failed attempts and reconciles parent/index before retiring
   this leaf. Continue SDK.9a context document/representation, ranking/deduplication,
   selection/packing and history work; SDK.6c/8–12 and release/publication gates remain open.
+  > NOTE: Final pre-gate source/control/docs/evidence review is accepted in Traycer
+  > `sdk-foundation-alignment/cache-result-source-review`. Full serialized shell
+  > `4d069937-0c62-4cef-9d7e-4b2444df2270` passes all 27 steps in 269.1s, including
+  > 1,164 native unit / 93 conformance tests, six paired development profiles, actual
+  > 235-row ledger, isolated package consumer, exact examples and strict docs. The fresh
+  > pytest cache is `.tmp-tests/pytest-cache/cache-result-full`; no failure was suppressed.
+  > Explicit sealed v0 verification retains
+  > `16122cca198d9e688d3c4b5724ac11f0324a4390d8e8589e443fe04a48e81391`.
+  > Explicit-path source commit and exact clean-revision qualification remain outstanding.
 
 ## Resume
 
-Resume at CACHE.1 on the source baseline above. No implementation is present yet. Source,
+Resume at CACHE.5's explicit source commit and clean-revision qualification. Source build,
+28 focused public controls, real ledger and all 27 workspace steps pass;
+implementation remains uncommitted on plan checkpoint `dcd3d7c`. Source,
 controls and docs/package briefs have disjoint owners; shared plan ticks and every native
 build are serialized by root. The accepted artifact contract is supporting review evidence;
 the settled behavior and executable gates are written here so implementation does not
