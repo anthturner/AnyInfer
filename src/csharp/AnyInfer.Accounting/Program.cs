@@ -480,6 +480,7 @@ sealed class FixtureTimeProvider(double initial) : TimeProvider
     public double Now => _ticks / (double)TimeSpan.TicksPerSecond;
     public override DateTimeOffset GetUtcNow() => _utc;
     public override long GetTimestamp() => _ticks;
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         var timer = new FixtureTimer(this, callback, state, dueTime, period);
