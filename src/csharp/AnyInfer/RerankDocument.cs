@@ -7,6 +7,14 @@ namespace AnyInfer;
 public sealed record RerankDocument
 {
     /// <summary>Creates a copied reranking document.</summary>
+    /// <param name="id">
+    /// The caller-owned identifier, reported back as <see cref="RankedItem.DocumentId"/>. Use a
+    /// non-empty value: <see cref="RankedItem"/> rejects an empty identifier.
+    /// </param>
+    /// <param name="text">The document text sent to the provider.</param>
+    /// <param name="metadata">Caller metadata kept with the document and not sent to the provider, or <see langword="null"/> for none. The map is copied.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="id"/> or <paramref name="text"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="metadata"/> contains a <see langword="null"/> value.</exception>
     public RerankDocument(string id, string text, IReadOnlyDictionary<string, string>? metadata = null)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));

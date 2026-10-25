@@ -17,6 +17,19 @@ public static class TokenEstimation
     private static readonly ITokenEstimator DefaultEstimator = new HeuristicTokenEstimator();
 
     /// <summary>Estimates the current request's text messages and optional schema without validation or dispatch.</summary>
+    /// <remarks>
+    /// Messages count their text, tool-call names and arguments, and tool-result content, plus
+    /// <see cref="PerMessageOverheadTokens"/> planning tokens each; other content parts, such as media, are
+    /// counted in <see cref="RequestEstimate.UnpricedParts"/> instead of being guessed. Tool declarations and the
+    /// schema are estimated from their JSON text. A calibration's envelope correction raises the planning count
+    /// only, never the floor.
+    /// </remarks>
+    /// <param name="request">Request to estimate.</param>
+    /// <param name="estimator">Token estimator, or <see langword="null"/> for the built-in <see cref="HeuristicTokenEstimator"/>.</param>
+    /// <param name="calibration">Provider envelope calibration, or <see langword="null"/> for none.</param>
+    /// <returns>The component estimate of the request's input size.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="estimator"/> returned <see langword="null"/>.</exception>
     public static RequestEstimate EstimateRequest(
         GenerationRequest request,
         ITokenEstimator? estimator = null,

@@ -3,8 +3,13 @@ using AnyInfer.Json;
 
 namespace AnyInfer.Schema;
 
+/// <summary>The outcome of extracting one JSON value from response text: either a value or a failure.</summary>
 public sealed record ExtractionResult
 {
+    /// <summary>Creates an extraction outcome.</summary>
+    /// <param name="value">The extracted value, or <see langword="null"/> when extraction failed.</param>
+    /// <param name="failure">The extraction failure, or <see langword="null"/> when a value was extracted.</param>
+    /// <exception cref="ArgumentException">Both or neither of <paramref name="value"/> and <paramref name="failure"/> are supplied.</exception>
     public ExtractionResult(JsonValue? value, NativeFinding? failure)
     {
         if ((value is null) == (failure is null))
@@ -16,12 +21,27 @@ public sealed record ExtractionResult
         Failure = failure;
     }
 
+    /// <summary>Gets the extracted value, or <see langword="null"/> when extraction failed.</summary>
     public JsonValue? Value { get; }
+    /// <summary>Gets the extraction failure, or <see langword="null"/> when a value was extracted.</summary>
     public NativeFinding? Failure { get; }
 }
 
+/// <summary>Extracts a single JSON value from model response text.</summary>
 public static class ResponseExtractor
 {
+    /// <summary>Extracts one JSON value, tolerating prose around a single JSON object or array.</summary>
+    /// <remarks>
+    /// Leading and trailing ASCII whitespace is ignored. When the remaining text is one strict JSON
+    /// value it is returned as is. Otherwise the first balanced <c>{...}</c> or <c>[...]</c>
+    /// candidate, found while skipping string contents, is parsed. Parsing follows
+    /// <see cref="JsonReader.Read(string)"/>, so integers whose magnitude exceeds 2^63 are
+    /// rejected. Failures are returned, not thrown, with the rule <c>response_empty</c>,
+    /// <c>no_json_candidate</c> or <c>malformed_json_candidate</c>.
+    /// </remarks>
+    /// <param name="text">The response text.</param>
+    /// <returns>The extracted value or the extraction failure.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>
     public static ExtractionResult Extract(string text)
         => ExtractCore(text, JsonReader.Read);
 

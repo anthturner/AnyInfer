@@ -4,12 +4,21 @@ using AnyInfer.Capabilities;
 namespace AnyInfer.Providers;
 
 /// <summary>Collision-safe registry of immutable provider descriptors.</summary>
+/// <remarks>
+/// Registering a descriptor makes its identifier and aliases resolvable; it invokes no factory and performs no
+/// I/O. All members are safe to call concurrently. A client built from a registry copies its descriptors when
+/// the client is created, so later registrations do not affect existing clients.
+/// </remarks>
 public sealed class ProviderRegistry
 {
     private readonly object _gate = new();
     private Dictionary<string, ProviderDescriptor> _descriptors = new(StringComparer.Ordinal);
     private Dictionary<string, string> _identifiers = new(StringComparer.Ordinal);
 
+    /// <summary>Creates a registry holding the supplied descriptors.</summary>
+    /// <param name="descriptors">Descriptors to register in order; <see langword="null"/> creates an empty registry.</param>
+    /// <exception cref="ArgumentNullException">A descriptor is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">Two descriptors share an identifier or alias.</exception>
     public ProviderRegistry(IEnumerable<ProviderDescriptor>? descriptors = null)
     {
         foreach (var descriptor in descriptors ?? [])
@@ -31,6 +40,9 @@ public sealed class ProviderRegistry
     }
 
     /// <summary>Registers one collision-free provider descriptor.</summary>
+    /// <param name="descriptor">Descriptor whose identifier and aliases must not collide with any registered identifier or alias.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="descriptor"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">The descriptor's identifier or an alias is already registered; the registry is unchanged.</exception>
     public void Register(ProviderDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
@@ -66,6 +78,11 @@ public sealed class ProviderRegistry
     }
 
     /// <summary>Gets a descriptor by canonical ID or registered alias.</summary>
+    /// <param name="providerId">Provider identifier or alias; normalized with <see cref="NormalizeProviderId"/>.</param>
+    /// <returns>The registered descriptor.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="providerId"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="providerId"/> is blank.</exception>
+    /// <exception cref="ConfigException">No registered descriptor has that identifier or alias.</exception>
     public ProviderDescriptor Get(string providerId)
     {
         var canonical = ResolveId(providerId);
@@ -76,6 +93,10 @@ public sealed class ProviderRegistry
     }
 
     /// <summary>Reports whether a canonical ID or alias is registered.</summary>
+    /// <param name="providerId">Provider identifier or alias; normalized with <see cref="NormalizeProviderId"/>.</param>
+    /// <returns><see langword="true"/> when the identifier or alias is registered.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="providerId"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="providerId"/> is blank.</exception>
     public bool Has(string providerId)
     {
         ArgumentNullException.ThrowIfNull(providerId);
@@ -87,6 +108,11 @@ public sealed class ProviderRegistry
     }
 
     /// <summary>Resolves a canonical descriptor ID from an ID or alias.</summary>
+    /// <param name="providerId">Provider identifier or alias; normalized with <see cref="NormalizeProviderId"/>.</param>
+    /// <returns>The canonical identifier of the registered descriptor.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="providerId"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="providerId"/> is blank.</exception>
+    /// <exception cref="ConfigException">No registered descriptor has that identifier or alias.</exception>
     public string ResolveId(string providerId)
     {
         ArgumentNullException.ThrowIfNull(providerId);
@@ -106,9 +132,21 @@ public sealed class ProviderRegistry
     }
 
     /// <summary>Normalizes a provider ID according to the public settings contract.</summary>
+    /// <param name="value">Identifier to normalize.</param>
+    /// <returns>The identifier trimmed, lower-cased, and with underscores replaced by hyphens.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is blank after trimming.</exception>
     public static string NormalizeProviderId(string value) => ProviderSettings.NormalizeId(value, nameof(value));
 
     /// <summary>Creates the bounded built-in descriptor registry.</summary>
+    /// <remarks>
+    /// The registry contains the chat-only <c>openai-compat</c> generation descriptor, the <c>tei</c>,
+    /// <c>voyage</c>, and <c>jina</c> embedding and rerank descriptors, and the reviewed <c>cerebras</c>,
+    /// <c>hyperbolic</c>, and <c>nscale</c> generation presets served through the shared chat adapter. Other
+    /// compatibility-preset data bundled in the assembly is inert and not registered. Each call returns a new,
+    /// independent registry.
+    /// </remarks>
+    /// <returns>A new registry holding the built-in descriptors.</returns>
     public static ProviderRegistry CreateDefault() => new([
         new ProviderDescriptor(
             "openai-compat",

@@ -4,6 +4,12 @@ namespace AnyInfer.Capabilities;
 public sealed record RequestEstimate
 {
     /// <summary>Initializes an immutable request-size estimate.</summary>
+    /// <param name="messages">Estimate for conversation messages, including per-message envelope overhead.</param>
+    /// <param name="tools">Estimate for offered tool declarations.</param>
+    /// <param name="schema">Estimate for the structured-output schema.</param>
+    /// <param name="envelope">Provider envelope correction, or <see langword="null"/> for none.</param>
+    /// <param name="unpricedParts">Number of content parts, such as media, that have no faithful estimate.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="messages"/>, <paramref name="tools"/>, or <paramref name="schema"/> is <see langword="null"/>.</exception>
     public RequestEstimate(
         TokenEstimate messages,
         TokenEstimate tools,
@@ -31,6 +37,7 @@ public sealed record RequestEstimate
     public TokenEstimate Envelope { get; }
 
     /// <summary>Gets the number of content parts for which no faithful native estimate exists.</summary>
+    /// <remarks>When nonzero, the totals undercount the request, so budgets report fit and cost as unknown.</remarks>
     public long UnpricedParts { get; }
 
     /// <summary>Gets the checked total planning estimate.</summary>

@@ -135,6 +135,12 @@ def _classify(source: str) -> tuple[str, str]:
         return "csharp", "/migrating-from-python/"
     if source == "reference/csharp-sdk.md":
         return "csharp", "/reference/"
+    if source == "guides/csharp-installation.md":
+        return "csharp", "/installation/"
+    if source == "guides/csharp-quickstart.md":
+        return "csharp", "/quickstart/"
+    if source.startswith("examples/csharp-") and source.endswith(".md"):
+        return "csharp", f"/examples/{source.removeprefix('examples/csharp-').removesuffix('.md')}/"
     stem = source.removesuffix(".md")
     if stem.endswith("/README"):
         stem = stem[: -len("/README")]

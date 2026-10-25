@@ -17,6 +17,11 @@ public enum ProbeOutcome
 public sealed record FeatureProbe
 {
     /// <summary>Creates an immutable feature-probe result.</summary>
+    /// <param name="feature">Feature that was tested.</param>
+    /// <param name="outcome">What the probe established.</param>
+    /// <param name="detail">Provider rejection or observed-result detail, or an empty string.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="outcome"/> is not a defined value.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="detail"/> is <see langword="null"/>.</exception>
     public FeatureProbe(Feature feature, ProbeOutcome outcome, string detail = "")
     {
         if (!Enum.IsDefined(outcome))
@@ -43,6 +48,13 @@ public sealed record FeatureProbe
 public sealed record ProbeReport
 {
     /// <summary>Creates an immutable probe report.</summary>
+    /// <param name="target">Concrete target that was probed.</param>
+    /// <param name="probes">Results in probe order; <see langword="null"/> means none.</param>
+    /// <param name="capabilities">Measured capability facts, or <see langword="null"/> when nothing conclusive was measured.</param>
+    /// <param name="requests">Number of generation requests the probe run spent.</param>
+    /// <param name="usage">Usage reported by those requests; <see langword="null"/> uses an empty <see cref="AnyInfer.Usage"/>.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="probes"/> contains <see langword="null"/>.</exception>
     public ProbeReport(
         ResolvedTarget target,
         IEnumerable<FeatureProbe>? probes = null,
@@ -63,6 +75,11 @@ public sealed record ProbeReport
     /// <summary>Gets the copied results in probe order.</summary>
     public IReadOnlyList<FeatureProbe> Probes { get; }
     /// <summary>Gets measured capabilities merged with prior facts, or <see langword="null"/>.</summary>
+    /// <remarks>
+    /// For a report produced by the client's probe call, this holds only feature flags: the previously known
+    /// flags with every conclusive result applied, at <see cref="Provenance.Probed"/> provenance. It is
+    /// <see langword="null"/> when no probe was conclusive; inconclusive results are never recorded.
+    /// </remarks>
     public ModelCapabilities? Capabilities { get; }
     /// <summary>Gets the number of generation requests spent.</summary>
     public int Requests { get; }
@@ -70,6 +87,8 @@ public sealed record ProbeReport
     public Usage Usage { get; }
 
     /// <summary>Gets the first recorded outcome for a feature, or <see langword="null"/>.</summary>
+    /// <param name="feature">Feature to look up.</param>
+    /// <returns>The outcome of the first probe of <paramref name="feature"/>, or <see langword="null"/> when it was not probed.</returns>
     public ProbeOutcome? OutcomeFor(Feature feature)
     {
         foreach (var probe in Probes)
@@ -139,6 +158,11 @@ public static class CapabilityProbes
         ]));
 
     /// <summary>Gets the forced structured-output mechanism for a feature, if any.</summary>
+    /// <param name="feature">Feature being probed.</param>
+    /// <returns>
+    /// <c>json_schema</c>, <c>json_mode</c>, or <c>grammar</c> for the matching structured-output feature;
+    /// otherwise <see langword="null"/>.
+    /// </returns>
     public static string? MechanismFor(Feature feature) => feature switch
     {
         Feature.JsonSchema => "json_schema",
@@ -148,6 +172,8 @@ public static class CapabilityProbes
     };
 
     /// <summary>Gets the literal request text for a feature probe.</summary>
+    /// <param name="feature">Feature being probed.</param>
+    /// <returns>The tool prompt for <see cref="Feature.Tools"/>, the counting prompt for <see cref="Feature.Streaming"/>, and the JSON prompt for any other feature.</returns>
     public static string ProbePrompt(Feature feature) => feature switch
     {
         Feature.Tools => "The user mentioned the colour blue. Record it with the tool provided.",
@@ -156,6 +182,12 @@ public static class CapabilityProbes
     };
 
     /// <summary>Applies conclusive probe bits to known features at probed provenance.</summary>
+    /// <param name="known">Previously known features, or <see langword="null"/> to start from <see cref="Feature.None"/>.</param>
+    /// <param name="probes">Probe results in order; a supported result sets its bit, an unsupported result clears it, and an inconclusive result is ignored.</param>
+    /// <returns>
+    /// The updated flags at <see cref="Provenance.Probed"/> provenance, or <see langword="null"/> when no probe was conclusive.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="probes"/> is or contains <see langword="null"/>.</exception>
     public static Sourced<Feature>? ProbedFeatures(Sourced<Feature>? known, IEnumerable<FeatureProbe> probes)
     {
         ArgumentNullException.ThrowIfNull(probes);

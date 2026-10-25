@@ -56,6 +56,10 @@ public enum InferenceOperation
     /// <summary>Document reranking.</summary>
     Rerank,
     /// <summary>Provider-managed batch execution.</summary>
+    /// <remarks>
+    /// This release has no batch-job adapter protocol, so a descriptor that declares this operation cannot build
+    /// an adapter.
+    /// </remarks>
     Batch,
 }
 
@@ -131,6 +135,9 @@ public sealed record Pricing
     public IReadOnlyDictionary<string, EDecimal> PerServerToolUse { get; }
 
     /// <summary>Compares all pricing values and tool-price pairs independent of map insertion order.</summary>
+    /// <remarks>Amounts compare numerically, so <c>1.0</c> equals <c>1.00</c>.</remarks>
+    /// <param name="other">Pricing to compare with this instance.</param>
+    /// <returns><see langword="true"/> when every amount, the currency, and every tool price are equal.</returns>
     public bool Equals(Pricing? other)
     {
         return ReferenceEquals(this, other) ||
@@ -145,6 +152,7 @@ public sealed record Pricing
     }
 
     /// <summary>Returns a hash code consistent with value-based map equality.</summary>
+    /// <returns>A hash code that is equal for pricing values that compare equal.</returns>
     public override int GetHashCode()
     {
         var hash = new HashCode();
@@ -263,6 +271,12 @@ public sealed record RateLimitHeaders
 public sealed record LocalModelInfo
 {
     /// <summary>Creates local-artifact facts; each nullable parameter remains unknown when omitted.</summary>
+    /// <param name="artifactSizeBytes">Artifact size on disk in bytes, or <see langword="null"/> when unknown.</param>
+    /// <param name="parameterSize">Runtime-reported parameter-size label, or <see langword="null"/> when unknown.</param>
+    /// <param name="quantization">Artifact quantization label, or <see langword="null"/> when unknown.</param>
+    /// <param name="estRamBytes">Estimated system RAM in bytes, or <see langword="null"/> when unknown.</param>
+    /// <param name="estVramBytes">Estimated GPU memory in bytes, or <see langword="null"/> when unknown.</param>
+    /// <param name="observedVramBytes">Observed GPU memory in bytes, or <see langword="null"/> when unmeasured.</param>
     public LocalModelInfo(
         long? artifactSizeBytes = null,
         string? parameterSize = null,
@@ -338,6 +352,8 @@ public sealed record EmbeddingCapabilities
     public bool? Normalized { get; }
 
     /// <summary>Compares copied dimension and intent sequences in order with all scalar metadata.</summary>
+    /// <param name="other">Embedding metadata to compare with this instance.</param>
+    /// <returns><see langword="true"/> when every scalar and both ordered sequences are equal.</returns>
     public bool Equals(EmbeddingCapabilities? other)
     {
         return ReferenceEquals(this, other) ||
@@ -352,6 +368,7 @@ public sealed record EmbeddingCapabilities
     }
 
     /// <summary>Returns a hash code consistent with ordered sequence equality.</summary>
+    /// <returns>A hash code that is equal for embedding metadata that compares equal.</returns>
     public override int GetHashCode()
     {
         var hash = new HashCode();
@@ -367,6 +384,9 @@ public sealed record EmbeddingCapabilities
 
     /// <summary>Layers known metadata from <paramref name="other"/> over this instance.</summary>
     /// <remarks>Nonempty sequences replace prior sequences; explicit <see langword="false"/> normalization replaces <see langword="true"/>.</remarks>
+    /// <param name="other">Metadata whose known values take precedence.</param>
+    /// <returns>New metadata in which each value known in <paramref name="other"/> replaces this instance's value.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
     public EmbeddingCapabilities Overlay(EmbeddingCapabilities other)
     {
         ArgumentNullException.ThrowIfNull(other);
@@ -411,7 +431,10 @@ public sealed record RerankCapabilities
     public bool NativeTopN { get; }
 
     /// <summary>Layers known metadata from <paramref name="other"/> over this instance.</summary>
-    /// <remarks>Native top-N remains true once known, matching the source metadata overlay.</remarks>
+    /// <remarks>Native top-N remains true once either side reports it.</remarks>
+    /// <param name="other">Metadata whose known limits take precedence.</param>
+    /// <returns>New metadata in which each limit known in <paramref name="other"/> replaces this instance's limit.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
     public RerankCapabilities Overlay(RerankCapabilities other)
     {
         ArgumentNullException.ThrowIfNull(other);
@@ -427,6 +450,9 @@ public sealed record RerankCapabilities
 public sealed record Health
 {
     /// <summary>Creates a readiness result.</summary>
+    /// <param name="ok">Whether the provider answered its readiness check successfully.</param>
+    /// <param name="detail">Explanation, typically of a failure; may be empty on success.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="detail"/> is <see langword="null"/>.</exception>
     public Health(bool ok, string detail = "")
     {
         Ok = ok;
@@ -443,6 +469,12 @@ public sealed record Health
 public sealed record DiscoveredModel
 {
     /// <summary>Creates a discovered model entry.</summary>
+    /// <param name="id">Model identifier exactly as the provider listing reports it.</param>
+    /// <param name="capabilities">
+    /// Facts the listing itself reported, normally tagged <see cref="Provenance.Discovered"/>, or
+    /// <see langword="null"/> for an identifier-only listing. Never fill this with guesses.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="id"/> is <see langword="null"/>.</exception>
     public DiscoveredModel(string id, ModelCapabilities? capabilities = null)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));

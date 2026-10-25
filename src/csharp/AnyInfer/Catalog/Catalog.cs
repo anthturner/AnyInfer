@@ -18,7 +18,17 @@ public sealed class Catalog
         "agentic", "code-completion", "coding", "drafting", "embeddings", "general-chat", "long-context", "low-resource", "math", "multilingual", "rag", "reasoning", "tool-use", "vision",
     }.ToFrozenSet(StringComparer.Ordinal);
 
-    /// <summary>Creates an immutable catalog snapshot.</summary>
+    /// <summary>Creates an immutable catalog snapshot, copying each dictionary.</summary>
+    /// <remarks>
+    /// Keys are kept exactly as given. <see cref="Alias"/> and <see cref="HasAlias"/> trim and lower-case the
+    /// requested name, so alias keys should be lower-case to be reachable.
+    /// </remarks>
+    /// <param name="aliases">Tier aliases keyed by lower-case alias name; <see langword="null"/> means none.</param>
+    /// <param name="artifacts">GGUF artifacts keyed by artifact identifier; <see langword="null"/> means none.</param>
+    /// <param name="models">Logical models keyed by model identifier; <see langword="null"/> means none.</param>
+    /// <param name="defaultAlias">Default alias name.</param>
+    /// <param name="formatVersion">Declared catalog format version; not validated here.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="defaultAlias"/> is <see langword="null"/>.</exception>
     public Catalog(IReadOnlyDictionary<string, AliasEntry>? aliases = null, IReadOnlyDictionary<string, GgufArtifact>? artifacts = null, IReadOnlyDictionary<string, ModelEntry>? models = null, string defaultAlias = "medium", int formatVersion = CurrentFormatVersion)
     {
         Aliases = Copy(aliases); Artifacts = Copy(artifacts); Models = Copy(models);
@@ -37,17 +47,34 @@ public sealed class Catalog
     /// <summary>Gets the declared catalog format version.</summary>
     public int FormatVersion { get; }
 
-    /// <summary>Parses a tagged JSON catalog object.</summary>
+    /// <summary>Parses a catalog JSON object in the bundled catalog format.</summary>
+    /// <remarks>
+    /// Alias names are lower-cased, model <c>best_at</c> tags must belong to <see cref="BestAtCategories"/>,
+    /// and GGUF model variants whose source lists files (a Hugging Face repository and revision, or direct URLs)
+    /// also yield derived GGUF artifacts unless an explicit artifact already uses that identifier.
+    /// </remarks>
+    /// <param name="data">Parsed catalog object.</param>
+    /// <returns>An immutable catalog containing the parsed aliases, artifacts, and models.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="data"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ConfigException">The format version is unsupported or a row is malformed.</exception>
     public static Catalog FromMapping(JsonObject data)
     {
         ArgumentNullException.ThrowIfNull(data);
         return Parser.Parse(data);
     }
 
-    /// <summary>Parses one UTF-8 catalog JSON document.</summary>
+    /// <summary>Parses one catalog JSON document from text.</summary>
+    /// <param name="json">Catalog JSON text whose root must be an object.</param>
+    /// <returns>An immutable catalog parsed from <paramref name="json"/>.</returns>
+    /// <exception cref="ConfigException">The text is not valid JSON, its root is not an object, or a row is malformed.</exception>
     public static Catalog Loads(string json) => ParseDocument(ReadJson(json));
 
     /// <summary>Loads one catalog document from disk.</summary>
+    /// <param name="path">Path of a UTF-8 catalog JSON file.</param>
+    /// <returns>An immutable catalog parsed from the file.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="path"/> is empty.</exception>
+    /// <exception cref="ConfigException">The file cannot be read, is not valid JSON, or is not a valid catalog.</exception>
     public static Catalog Load(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -57,6 +84,10 @@ public sealed class Catalog
     }
 
     /// <summary>Loads catalog documents and overlays them left to right.</summary>
+    /// <param name="paths">Catalog file paths; each later file overlays the earlier ones with <see cref="Overlay"/>.</param>
+    /// <returns>The merged immutable catalog.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="paths"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ConfigException"><paramref name="paths"/> is empty, or a file cannot be read or parsed.</exception>
     public static Catalog Load(IEnumerable<string> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
@@ -68,27 +99,52 @@ public sealed class Catalog
     }
 
     /// <summary>Loads the bundled default and model catalog resources.</summary>
+    /// <remarks>Each call parses the embedded resources again and returns a new snapshot.</remarks>
+    /// <returns>The bundled alias catalog overlaid with the bundled model catalog.</returns>
+    /// <exception cref="ConfigException">A bundled resource is missing or invalid.</exception>
     public static Catalog LoadDefault() => ReadResource("AnyInfer.Catalog.default.json").Overlay(ReadResource("AnyInfer.Catalog.models.json"));
 
     /// <summary>Reports whether a catalog alias exists.</summary>
+    /// <param name="name">Alias name; trimmed and lower-cased before lookup.</param>
+    /// <returns><see langword="true"/> when the alias exists.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is <see langword="null"/>.</exception>
     public bool HasAlias(string name) => Aliases.ContainsKey(CatalogKey(name));
 
     /// <summary>Gets a catalog alias.</summary>
+    /// <param name="name">Alias name; trimmed and lower-cased before lookup.</param>
+    /// <returns>The alias entry.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ConfigException">The alias is unknown.</exception>
     public AliasEntry Alias(string name) => Aliases.TryGetValue(CatalogKey(name), out var entry) ? entry : throw new ConfigException("Catalog alias is unknown.", detail: name);
 
     /// <summary>Gets the targets for a catalog alias.</summary>
+    /// <param name="name">Alias name; trimmed and lower-cased before lookup.</param>
+    /// <returns>The alias targets keyed by catalog provider spelling.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ConfigException">The alias is unknown.</exception>
     public IReadOnlyDictionary<string, TargetEntry> TargetsForAlias(string name) => Alias(name).Targets;
 
     /// <summary>Gets a GGUF artifact.</summary>
+    /// <param name="id">Exact, case-sensitive artifact identifier.</param>
+    /// <returns>The artifact with that identifier.</returns>
+    /// <exception cref="ConfigException">The artifact is unknown.</exception>
     public GgufArtifact Artifact(string id) => Artifacts.TryGetValue(id, out var entry) ? entry : throw new ConfigException("Catalog artifact is unknown.", detail: id);
 
     /// <summary>Gets a logical model.</summary>
+    /// <param name="id">Exact, case-sensitive model identifier.</param>
+    /// <returns>The model with that identifier.</returns>
+    /// <exception cref="ConfigException">The model is unknown.</exception>
     public ModelEntry Model(string id) => Models.TryGetValue(id, out var entry) ? entry : throw new ConfigException("Catalog model is unknown.", detail: id);
 
     /// <summary>Gets alias names in ordinal order.</summary>
+    /// <returns>A new immutable list of alias keys.</returns>
     public IReadOnlyList<string> AliasNames() => System.Array.AsReadOnly(Aliases.Keys.OrderBy(static key => key, StringComparer.Ordinal).ToArray());
 
     /// <summary>Filters models by optional channel, best-at category, and kind.</summary>
+    /// <param name="providerId">Serving channel such as <c>llama-cpp</c>, <c>vllm</c>, or <c>ollama</c> (see <see cref="ModelEntry.Channels"/>), trimmed and lower-cased; <see langword="null"/> or empty matches every model.</param>
+    /// <param name="bestAt">Best-at category, matched as by <see cref="ModelEntry.MatchesBestAt"/>; <see langword="null"/> or empty matches every model.</param>
+    /// <param name="kind">Model kind, or <see langword="null"/> for every kind.</param>
+    /// <returns>A new immutable list of matching models in ordinal identifier order.</returns>
     public IReadOnlyList<ModelEntry> ModelsFor(string? providerId = null, string? bestAt = null, ModelKind? kind = null)
     {
         var channel = string.IsNullOrEmpty(providerId) ? null : providerId.Trim().ToLowerInvariant();
@@ -99,6 +155,17 @@ public sealed class Catalog
     }
 
     /// <summary>Returns a catalog with one alias target replaced by a selected model reference.</summary>
+    /// <remarks>
+    /// For <c>ollama</c> the target names the model's Ollama tag; for any other provider it names the model's
+    /// headline GGUF artifact. The new target carries the model's context window and display name. This
+    /// catalog is not changed.
+    /// </remarks>
+    /// <param name="alias">Existing alias name; trimmed and lower-cased.</param>
+    /// <param name="providerId">Catalog provider spelling of the target to set; trimmed and lower-cased.</param>
+    /// <param name="modelId">Exact identifier of a model in this catalog.</param>
+    /// <returns>A new catalog in which the alias's target for <paramref name="providerId"/> refers to the model.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    /// <exception cref="ConfigException">The alias or model is unknown, or the model has no reference for that provider.</exception>
     public Catalog WithAliasTarget(string alias, string providerId, string modelId)
     {
         var aliasKey = CatalogKey(alias);
@@ -121,6 +188,12 @@ public sealed class Catalog
     }
 
     /// <summary>Overlays aliases, artifacts, and models wholesale by key.</summary>
+    /// <param name="other">Catalog whose entries replace same-keyed entries in this catalog.</param>
+    /// <returns>
+    /// A new catalog. Its default alias comes from <paramref name="other"/> unless that is empty, and its
+    /// format version is the larger of the two.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
     public Catalog Overlay(Catalog other)
     {
         ArgumentNullException.ThrowIfNull(other);
@@ -131,6 +204,24 @@ public sealed class Catalog
     }
 
     /// <summary>Resolves a target without resolving credentials, invoking factories, or doing network I/O.</summary>
+    /// <remarks>
+    /// A <c>provider:model</c> target resolves its provider part to a configured instance with that identity,
+    /// or else to the canonical identifier of a registered descriptor or descriptor alias. Any other target is
+    /// treated as a catalog alias: the first configured instance, in <paramref name="configured"/> order, whose
+    /// identity matches one of the alias's provider keys supplies the target.
+    /// </remarks>
+    /// <param name="target">A <c>provider:model</c> target or a catalog alias name; surrounding whitespace is ignored.</param>
+    /// <param name="registry">Registry used to resolve provider identifiers and aliases.</param>
+    /// <param name="configured">Configured instances, in preference order for alias resolution.</param>
+    /// <returns>
+    /// The resolved instance and model; for an alias, <see cref="ResolvedTarget.ViaAlias"/> holds the trimmed alias text.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">The provider part of a <c>provider:model</c> target is blank.</exception>
+    /// <exception cref="ConfigException">
+    /// The target is empty, names no model, names an unregistered provider, names an unknown alias, or names an
+    /// alias with no target among the configured instances.
+    /// </exception>
     public ResolvedTarget ResolveTarget(string target, ProviderRegistry registry, IReadOnlyList<CatalogProviderBinding> configured)
     {
         ArgumentNullException.ThrowIfNull(target); ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(configured);

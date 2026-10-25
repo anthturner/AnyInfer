@@ -6,8 +6,20 @@ using System.Net.Http;
 namespace AnyInfer.Providers;
 
 /// <summary>Resolved adapter-facing configuration for one provider instance.</summary>
+/// <remarks>
+/// The client builds this after resolving the instance's credential and setup options, and passes it to the
+/// descriptor's <see cref="ProviderDescriptor.Factory"/>. It holds a resolved secret in <see cref="ApiKey"/>,
+/// which <see cref="ToString"/> never renders.
+/// </remarks>
 public sealed record ProviderConfig
 {
+    /// <summary>Creates adapter configuration from settings and already-resolved values.</summary>
+    /// <param name="settings">Configured instance settings; the base URL, headers, timeout, transport, and connection settings are copied from it.</param>
+    /// <param name="engineId">Descriptor provider identity serving the instance; trimmed, lower-cased, and with underscores replaced by hyphens.</param>
+    /// <param name="resolvedApiKey">Resolved API secret, or <see langword="null"/> when the instance has none.</param>
+    /// <param name="resolvedOptions">Resolved setup options, or <see langword="null"/> to use the options from <paramref name="settings"/>.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="settings"/> or <paramref name="engineId"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="engineId"/> is blank.</exception>
     public ProviderConfig(
         ProviderSettings settings,
         string engineId,
@@ -81,5 +93,7 @@ public sealed record ProviderConfig
         TransportOwnedByPool = transportOwnedByPool;
     }
 
+    /// <summary>Returns a diagnostic rendering that names only the instance and engine identities.</summary>
+    /// <returns><c>ProviderConfig(instance, engine)</c>; the secret, headers, and options are never included.</returns>
     public override string ToString() => $"ProviderConfig({ProviderId}, {EngineId})";
 }

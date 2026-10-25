@@ -8,6 +8,20 @@ namespace AnyInfer;
 public sealed record RerankResult
 {
     /// <summary>Creates a copied reranking result snapshot.</summary>
+    /// <param name="items">
+    /// The ranked items in provider result order, or <see langword="null"/> for none. When a request
+    /// was split into batches, the clients concatenate each batch's ranking, and scores are
+    /// comparable only within a batch. The sequence is copied.
+    /// </param>
+    /// <param name="target">The target that produced the ranking.</param>
+    /// <param name="usage">The provider usage, with unknown counts left <see langword="null"/>.</param>
+    /// <param name="timing">The operation timing.</param>
+    /// <param name="attempts">The routing attempts in order, or <see langword="null"/> for none.</param>
+    /// <param name="warnings">Nonfatal warnings, or <see langword="null"/> for none.</param>
+    /// <param name="raw">The raw provider payload when retention was requested, or <see langword="null"/>.</param>
+    /// <param name="manifest">The content-free operation manifest, or <see langword="null"/> when manifests are disabled.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/>, <paramref name="usage"/> or <paramref name="timing"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">A supplied sequence contains <see langword="null"/>.</exception>
     public RerankResult(
         IEnumerable<RankedItem> items,
         ResolvedTarget target,

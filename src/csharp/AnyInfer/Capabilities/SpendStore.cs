@@ -6,6 +6,12 @@ using AnyInfer.Json;
 namespace AnyInfer.Capabilities;
 
 /// <summary>Persists caller-selected ledger snapshots in the version-one accounting format.</summary>
+/// <remarks>
+/// The store writes only when the caller calls <see cref="Accumulate"/>; the library never persists spend on
+/// its own. A file holds at most 512 named buckets; when a new bucket would exceed that, the earliest buckets
+/// in file order are dropped. Writes are not coordinated across threads or processes: concurrent writers to the
+/// same path can lose updates.
+/// </remarks>
 public sealed class SpendStore
 {
     /// <summary>Gets the persisted accounting format version.</summary>
@@ -13,6 +19,9 @@ public sealed class SpendStore
     private const int MaximumBuckets = 512;
 
     /// <summary>Creates an inert store at a caller-selected path.</summary>
+    /// <remarks>Nothing is read or written until <see cref="Load"/> or <see cref="Accumulate"/> is called.</remarks>
+    /// <param name="path">Store file path, used as given; <c>~</c> is not expanded.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is <see langword="null"/>.</exception>
     public SpendStore(string path)
     {
         Path = path ?? throw new ArgumentNullException(nameof(path));
@@ -22,6 +31,10 @@ public sealed class SpendStore
     public string Path { get; }
 
     /// <summary>Loads readable version-one buckets, skipping unreadable individual bucket values.</summary>
+    /// <returns>
+    /// A new immutable snapshot keyed by bucket name. A missing, unreadable, malformed, or foreign file yields an
+    /// empty snapshot rather than an exception.
+    /// </returns>
     public IReadOnlyDictionary<string, SpendTotals> Load()
     {
         try
@@ -70,6 +83,16 @@ public sealed class SpendStore
     }
 
     /// <summary>Adds a ledger snapshot to one named bucket and atomically replaces the store file.</summary>
+    /// <remarks>
+    /// The ledger's current <see cref="SpendLedger.Totals"/> are added to the stored bucket; the ledger itself is
+    /// not reset, so accumulating the same ledger again adds its totals again. The file is rewritten through a
+    /// temporary file in the same directory, which is created if needed.
+    /// </remarks>
+    /// <param name="ledger">Ledger whose overall totals are added.</param>
+    /// <param name="bucket">Name of the bucket to add to.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="ledger"/> or <paramref name="bucket"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">The stored bucket uses a different currency than the ledger.</exception>
+    /// <exception cref="IOException">The store file or its directory cannot be written.</exception>
     public void Accumulate(SpendLedger ledger, string bucket = "total")
     {
         ArgumentNullException.ThrowIfNull(ledger);

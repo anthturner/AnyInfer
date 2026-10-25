@@ -5,6 +5,13 @@ using System.Text.RegularExpressions;
 
 namespace AnyInfer.Json;
 
+/// <summary>Writes native <see cref="JsonValue"/> trees as JSON text.</summary>
+/// <remarks>
+/// Both public forms accept only integers whose magnitude is at most 2^63 and strings without
+/// unpaired UTF-16 surrogates. Quotation marks, backslashes and characters below U+0020 are
+/// always escaped. A <see cref="JsonNumber"/> with an integral value is written with a <c>.0</c>
+/// suffix so it stays distinguishable from a <see cref="JsonInteger"/>.
+/// </remarks>
 public static partial class JsonWriter
 {
     private static readonly BigInteger IntegerLimit = BigInteger.One << 63;
@@ -32,9 +39,32 @@ public static partial class JsonWriter
     private static readonly WritePolicy ManifestCanonicalPolicy = new(true, true, true, NumberFormat.Python, null, Compact: true, SpaceAfterComma: false, SpaceAfterColon: false);
     private static readonly WritePolicy AccountingPolicy = new(false, true, true, NumberFormat.Python, null, Compact: true, SpaceAfterComma: true, SpaceAfterColon: true);
 
+    /// <summary>Writes compact JSON without insignificant whitespace.</summary>
+    /// <remarks>
+    /// Object properties keep their stored order and non-ASCII characters are written
+    /// unescaped. A number keeps its <see cref="JsonNumber.SourceLexeme"/> when that lexeme
+    /// still denotes exactly the same value; otherwise it is written in shortest round-trip form.
+    /// </remarks>
+    /// <param name="value">The value to write.</param>
+    /// <returns>The compact JSON text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">An integer has a magnitude greater than 2^63.</exception>
+    /// <exception cref="ArgumentException">A string or property name contains an unpaired UTF-16 surrogate.</exception>
     public static string Write(JsonValue value)
         => WriteCore(value, DefaultPolicy);
 
+    /// <summary>Writes deterministic, ASCII-only, indented JSON.</summary>
+    /// <remarks>
+    /// Object properties are sorted by Unicode code point, every non-ASCII character is escaped
+    /// as <c>\uXXXX</c>, nesting is indented by two spaces per level with <c>": "</c> after each
+    /// property name, and numbers are written in shortest round-trip form regardless of their
+    /// source lexeme.
+    /// </remarks>
+    /// <param name="value">The value to write.</param>
+    /// <returns>The canonical JSON text, without a trailing newline.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">An integer has a magnitude greater than 2^63.</exception>
+    /// <exception cref="ArgumentException">A string or property name contains an unpaired UTF-16 surrogate.</exception>
     public static string WriteCanonical(JsonValue value)
         => WriteCore(value, CanonicalPolicy);
 

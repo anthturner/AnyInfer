@@ -3,6 +3,10 @@ using AnyInfer.Json;
 namespace AnyInfer.Schema;
 
 /// <summary>Admits only the frozen v0 JSON Schema surface before native execution.</summary>
+/// <remarks>
+/// This is a narrower subset than <see cref="SchemaValidator"/> supports. Requests sent through
+/// <see cref="AnyInfer.AsyncClient"/> and <see cref="AnyInfer.Client"/> are not limited to it.
+/// </remarks>
 public static class SchemaAdmission
 {
     private const string Draft202012 = "https://json-schema.org/draft/2020-12/schema";
@@ -29,6 +33,21 @@ public static class SchemaAdmission
     };
 
     /// <summary>Validates the profile-admitted schema subset; a null reference means no schema.</summary>
+    /// <remarks>
+    /// The root must be an object schema. Each object schema may use only <c>$schema</c> (exactly
+    /// <c>https://json-schema.org/draft/2020-12/schema</c>), <c>type</c> as a single string,
+    /// <c>properties</c> without Boolean subschemas, <c>required</c>, Boolean
+    /// <c>additionalProperties</c>, object-valued <c>items</c>, <c>enum</c>, <c>const</c>,
+    /// <c>minimum</c>, <c>maximum</c>, <c>minLength</c>, <c>maxLength</c>, <c>minItems</c>,
+    /// <c>maxItems</c>, <c>title</c>, <c>description</c>, <c>$comment</c>, <c>default</c> and
+    /// <c>examples</c>. References and every other keyword are rejected. Apart from the forms
+    /// named here, keyword values are not checked for well-formedness.
+    /// </remarks>
+    /// <param name="specification">The schema to check, or <see langword="null"/> when the request has no schema.</param>
+    /// <exception cref="ProviderException">
+    /// The schema uses a form outside the subset; the exception has the <c>unsupported_input</c>
+    /// category and is not retryable.
+    /// </exception>
     public static void Validate(SchemaSpec? specification)
     {
         var schema = specification?.JsonSchema;

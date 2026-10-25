@@ -5,11 +5,28 @@ using System.Text.Json;
 
 namespace AnyInfer.Json;
 
+/// <summary>Parses strict JSON text into the native <see cref="JsonValue"/> model.</summary>
+/// <remarks>
+/// Input must be exactly one JSON value: comments, trailing commas, trailing content, invalid
+/// UTF-8 and escaped unpaired surrogates are rejected. A number lexeme without <c>.</c>,
+/// <c>e</c> or <c>E</c> becomes a <see cref="JsonInteger"/>, which must have a magnitude of at
+/// most 2^63; any other number becomes a finite <see cref="JsonNumber"/> that keeps its source
+/// lexeme. When an object repeats a property name, the later value wins. Nesting deeper than
+/// 64 levels is rejected. Every rejection is reported as a <see cref="FormatException"/>.
+/// </remarks>
 public static class JsonReader
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly BigInteger IntegerLimit = BigInteger.One << 63;
 
+    /// <summary>Parses one strict JSON value from a string.</summary>
+    /// <param name="json">The JSON text.</param>
+    /// <returns>The parsed immutable value.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+    /// <exception cref="FormatException">
+    /// <paramref name="json"/> is empty, is not strict JSON, contains an unpaired UTF-16
+    /// surrogate, or contains a number outside the supported range.
+    /// </exception>
     public static JsonValue Read(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
@@ -23,6 +40,13 @@ public static class JsonReader
         }
     }
 
+    /// <summary>Parses one strict JSON value from UTF-8 bytes.</summary>
+    /// <param name="utf8">The UTF-8 encoded JSON text.</param>
+    /// <returns>The parsed immutable value.</returns>
+    /// <exception cref="FormatException">
+    /// <paramref name="utf8"/> is empty, is not valid UTF-8 or strict JSON, or contains a number
+    /// outside the supported range.
+    /// </exception>
     public static JsonValue Read(ReadOnlySpan<byte> utf8)
         => ReadCore(utf8, allowLargeIntegers: false);
 

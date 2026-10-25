@@ -1,9 +1,28 @@
 namespace AnyInfer.Schema;
 
 /// <summary>Performs construction and profile admission before an adapter entry exists.</summary>
+/// <remarks>
+/// The public check applies the frozen core-generation v0 profile. Requests sent through
+/// <see cref="AnyInfer.AsyncClient"/> and <see cref="AnyInfer.Client"/> are admitted under the
+/// broader SDK profile instead, so calling this method does not change how a client handles a
+/// request.
+/// </remarks>
 public static class RequestAdmission
 {
     /// <summary>Validates construction constraints and the frozen request profile.</summary>
+    /// <remarks>
+    /// The profile admits only <c>system</c>, <c>user</c> and <c>assistant</c> messages with text
+    /// content; provider-prefixed targets rather than aliases; no reasoning, provider options,
+    /// metadata, log probabilities, citations or server tools; the default input byte limits; and a
+    /// schema accepted by <see cref="SchemaAdmission.Validate(SchemaSpec)"/>.
+    /// </remarks>
+    /// <param name="request">The request to check.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ProviderException">
+    /// The request has a negative sampling seed or a non-finite penalty (category
+    /// <c>invalid_request</c>), or uses input outside the profile (category
+    /// <c>unsupported_input</c>). Neither is retryable.
+    /// </exception>
     public static void Validate(GenerationRequest request) => Validate(request, allowTargetAliases: false);
 
     internal static void Validate(GenerationRequest request, bool allowTargetAliases, SchemaExecutionProfile profile = SchemaExecutionProfile.FrozenV0)

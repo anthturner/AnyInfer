@@ -7,6 +7,10 @@ namespace AnyInfer.Capabilities;
 public sealed record CostEstimate
 {
     /// <summary>Initializes an exact preflight cost range.</summary>
+    /// <param name="low">Estimated minimum cost under the estimate's assumptions.</param>
+    /// <param name="high">Estimated maximum cost under the estimate's assumptions.</param>
+    /// <param name="currency">Currency code of both amounts.</param>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
     public CostEstimate(EDecimal low, EDecimal high, string currency = "USD")
     {
         Low = low ?? throw new ArgumentNullException(nameof(low));

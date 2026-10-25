@@ -6,8 +6,78 @@ using AnyInfer.Json;
 namespace AnyInfer.Providers;
 
 /// <summary>Immutable provider metadata and a lazy adapter factory.</summary>
+/// <remarks>
+/// A descriptor is inert data until it is registered in a <see cref="ProviderRegistry"/> that a client uses;
+/// constructing one performs no I/O and starts nothing.
+/// </remarks>
 public sealed record ProviderDescriptor
 {
+    /// <summary>Creates a validated, immutable provider descriptor, copying every collection argument.</summary>
+    /// <param name="id">Canonical provider identifier; trimmed, lower-cased, and with underscores replaced by hyphens.</param>
+    /// <param name="displayName">Human-readable provider name.</param>
+    /// <param name="factory">
+    /// Lazy adapter factory. A client calls it when a target on a configured instance first needs an adapter,
+    /// passing the resolved <see cref="ProviderConfig"/> and a cancellation token, and reuses the adapter it
+    /// returns. That adapter must implement <see cref="IGeneratesText"/>, <see cref="IEmbedsText"/>, or
+    /// <see cref="IReranksText"/> for each declared operation, and may implement <see cref="IProviderLifecycle"/>;
+    /// the client owns and disposes it.
+    /// </param>
+    /// <param name="aliases">Additional identifiers accepted for this provider, normalized like <paramref name="id"/>; <see langword="null"/> means none.</param>
+    /// <param name="setup">Declarative setup metadata; <see langword="null"/> declares no fields.</param>
+    /// <param name="defaultBaseUrl">Base URL used when an instance configures none, or <see langword="null"/>.</param>
+    /// <param name="requiresBaseUrl">Whether a base URL must be present after <paramref name="defaultBaseUrl"/> is applied.</param>
+    /// <param name="structuredOutputProfiles">
+    /// Native structured-output mechanisms keyed by exact model name; a model without a row uses prompt-based
+    /// structured output. <see langword="null"/> means none.
+    /// </param>
+    /// <param name="maxRepairAttempts">
+    /// Ceiling on structured-output repair round trips, or <see langword="null"/> for no provider ceiling; a larger
+    /// requested budget is lowered and reported as a dropped parameter.
+    /// </param>
+    /// <param name="locality">
+    /// Where the provider normally runs. A <see cref="ProviderLocality.Local"/> provider reached through a
+    /// non-loopback base URL is treated as remote, and a locally served model with no other price is priced at zero.
+    /// </param>
+    /// <param name="defaultCapabilities">Baseline facts for every model; <see langword="null"/> leaves every fact unknown.</param>
+    /// <param name="staticCapabilities">Facts keyed by exact model name, layered over the baseline with the provenance they carry; <see langword="null"/> means none.</param>
+    /// <param name="operations">Implemented inference operations; <see langword="null"/> declares generation only.</param>
+    /// <param name="staticEmbeddingCapabilities">Embedding facts keyed by exact model name; <see langword="null"/> means none.</param>
+    /// <param name="staticRerankCapabilities">Rerank facts keyed by exact model name; <see langword="null"/> means none.</param>
+    /// <param name="tokenCalibration">Envelope token calibration; <see langword="null"/> uses identity calibration.</param>
+    /// <param name="rateLimitHeaders">Rate-limit response header names; <see langword="null"/> declares none.</param>
+    /// <param name="cacheMechanism">Prompt-cache mechanism, or <see langword="null"/> when the provider has none.</param>
+    /// <param name="cacheMaxMarks">Maximum explicit cache marks per request, or zero to use the cache policy's ceiling.</param>
+    /// <param name="cacheMinTokens">Minimum estimated tokens for a cache mark, or zero to use the cache policy's floor.</param>
+    /// <param name="governsOwnTransport">
+    /// Whether the adapter owns its HTTP transport, so configured pacing acquires a slot around each call instead
+    /// of inside the SDK-created handler.
+    /// </param>
+    /// <param name="reasoningTranslator">
+    /// Translation from a normalized reasoning effort to provider wire fields, applied only when the model may
+    /// reason; <see langword="null"/> sends no reasoning fields.
+    /// </param>
+    /// <param name="ignoredParameters">
+    /// Request parameter names, such as <c>temperature</c>, that the provider accepts but ignores; supplying one
+    /// is reported as a dropped parameter. <see langword="null"/> means none.
+    /// </param>
+    /// <param name="serverTools">
+    /// Provider-run tool kinds the adapter can place on the wire; a request for any other kind is refused before
+    /// dispatch. <see langword="null"/> means none.
+    /// </param>
+    /// <param name="modelInventory">Descriptive category of the provider's model inventory; it changes no behavior.</param>
+    /// <param name="honorsConnectionSettings">
+    /// Whether configured proxy, TLS-verification, and client-certificate settings are supported; when
+    /// <see langword="false"/>, an instance that sets them without supplying its own transport fails to build.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="id"/>, <paramref name="displayName"/>, or <paramref name="factory"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="id"/> is blank, <paramref name="displayName"/> is empty, aliases repeat or equal the
+    /// identifier, or <paramref name="ignoredParameters"/> or <paramref name="serverTools"/> contains <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// A count is negative, or <paramref name="locality"/>, an operation, <paramref name="cacheMechanism"/>, or
+    /// <paramref name="modelInventory"/> is not a defined value.
+    /// </exception>
     public ProviderDescriptor(
         string id,
         string displayName,
@@ -127,7 +197,7 @@ public sealed record ProviderDescriptor
     public int? MaxRepairAttempts { get; }
     /// <summary>Gets the descriptor's default locality.</summary>
     public ProviderLocality Locality { get; }
-    /// <summary>Gets baseline facts for models without a static row.</summary>
+    /// <summary>Gets baseline facts every model starts from; a model's static row is layered over them.</summary>
     public ModelCapabilities DefaultCapabilities { get; }
     /// <summary>Gets immutable static facts keyed by exact model name.</summary>
     public IReadOnlyDictionary<string, ModelCapabilities> StaticCapabilities { get; }

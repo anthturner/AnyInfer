@@ -6,6 +6,18 @@ using PeterO.Numbers;
 namespace AnyInfer.Capabilities;
 
 /// <summary>Rolls completed request spend into caller-owned, in-process immutable snapshots.</summary>
+/// <remarks>
+/// <para>
+/// The ledger is accounting for the clients it is given to, in this process only; there is no process-wide
+/// ledger, and nothing is persisted unless the caller uses <see cref="SpendStore"/>. A client constructed with
+/// a ledger subscribes it to its telemetry, and two clients share a total only when given the same ledger.
+/// </para>
+/// <para>
+/// Costs come from each request's reported <see cref="Usage.CostUsd"/>. A request whose cost is unknown is
+/// counted in <see cref="SpendTotals.UnknownRequests"/> and never treated as free. All members are safe to
+/// call concurrently.
+/// </para>
+/// </remarks>
 public sealed class SpendLedger : IObserver
 {
     private readonly object _gate = new();
@@ -17,6 +29,8 @@ public sealed class SpendLedger : IObserver
     private readonly Dictionary<string, EDecimal> _reservations = new(StringComparer.Ordinal);
 
     /// <summary>Creates an empty ledger for the supplied currency spelling.</summary>
+    /// <param name="currency">Currency code recorded on every snapshot; costs are summed without conversion.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="currency"/> is <see langword="null"/>.</exception>
     public SpendLedger(string currency = "USD")
     {
         _currency = currency ?? throw new ArgumentNullException(nameof(currency));
@@ -24,6 +38,13 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Records telemetry without owning observer lifetime or performing I/O.</summary>
+    /// <remarks>
+    /// <see cref="RequestStarted"/> metadata is held as labels until the request ends, <see cref="RequestCompleted"/>
+    /// is folded in with <see cref="Record"/>, and <see cref="RequestFailed"/> discards the request's labels and
+    /// reservation. Other events are ignored.
+    /// </remarks>
+    /// <param name="telemetryEvent">Event emitted by a client.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="telemetryEvent"/> is <see langword="null"/>.</exception>
     public void OnEvent(TelemetryEvent telemetryEvent)
     {
         ArgumentNullException.ThrowIfNull(telemetryEvent);
@@ -49,6 +70,13 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Folds one successful request into overall, target, and caller-label snapshots.</summary>
+    /// <param name="target">Target that served the request; its <c>provider:model</c> text keys <see cref="ByTarget"/>.</param>
+    /// <param name="usage">Reported usage; a <see langword="null"/> cost counts the request as unknown-cost.</param>
+    /// <param name="requestId">
+    /// Request correlation identifier whose held labels and reservation are consumed, or <see langword="null"/>
+    /// to record without labels.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> or <paramref name="usage"/> is <see langword="null"/>.</exception>
     public void Record(ResolvedTarget target, Usage usage, string? requestId = null)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -80,6 +108,19 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Replaces one request reservation if its total remains within the supplied ceiling.</summary>
+    /// <remarks>
+    /// The check and the reservation happen atomically under the ledger's lock. A refused reservation leaves any
+    /// earlier reservation for <paramref name="requestId"/> in place.
+    /// </remarks>
+    /// <param name="requestId">Request correlation identifier the reservation belongs to.</param>
+    /// <param name="estimate">Estimated cost to reserve; replaces this request's previous reservation.</param>
+    /// <param name="ceiling">Total-spend ceiling, or <see langword="null"/> to reserve without a limit.</param>
+    /// <returns>
+    /// Whether the reservation was accepted, the known completed spend, and the sum of other requests'
+    /// reservations; it is refused when spend plus those reservations plus <paramref name="estimate"/> exceeds
+    /// <paramref name="ceiling"/>.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="requestId"/> or <paramref name="estimate"/> is <see langword="null"/>.</exception>
     public (bool Accepted, EDecimal Spent, EDecimal Reserved) Reserve(string requestId, EDecimal estimate, EDecimal? ceiling)
     {
         ArgumentNullException.ThrowIfNull(requestId);
@@ -107,6 +148,8 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Releases a request reservation without changing completed spend.</summary>
+    /// <param name="requestId">Request correlation identifier; releasing an unknown identifier does nothing.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="requestId"/> is <see langword="null"/>.</exception>
     public void Release(string requestId)
     {
         ArgumentNullException.ThrowIfNull(requestId);
@@ -128,6 +171,7 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Gets the exact sum of current reservations.</summary>
+    /// <returns>The sum of outstanding reserved estimates; zero when none are held.</returns>
     public EDecimal Reserved()
     {
         lock (_gate)
@@ -143,6 +187,10 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Gets all completed spend observed by this ledger.</summary>
+    /// <returns>
+    /// An immutable snapshot. Read <see cref="SpendTotals.Cost"/> together with
+    /// <see cref="SpendTotals.UnknownRequests"/>: the cost omits requests that could not be priced.
+    /// </returns>
     public SpendTotals Totals()
     {
         lock (_gate)
@@ -152,6 +200,7 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Gets completed spend by resolved target in first-seen order.</summary>
+    /// <returns>A new immutable snapshot keyed by <c>provider:model</c> target text.</returns>
     public IReadOnlyDictionary<string, SpendTotals> ByTarget()
     {
         lock (_gate)
@@ -161,6 +210,10 @@ public sealed class SpendLedger : IObserver
     }
 
     /// <summary>Gets completed spend by one caller metadata label in first-seen order.</summary>
+    /// <remarks>Labels are the request metadata the caller supplied; the ledger never interprets them.</remarks>
+    /// <param name="key">Metadata key, such as a tenant or feature label.</param>
+    /// <returns>A new immutable snapshot keyed by that label's values; empty when the key was never seen.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
     public IReadOnlyDictionary<string, SpendTotals> ByLabel(string key)
     {
         ArgumentNullException.ThrowIfNull(key);

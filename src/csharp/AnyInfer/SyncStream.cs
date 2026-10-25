@@ -7,6 +7,11 @@ using AnyInfer.Manifest;
 namespace AnyInfer;
 
 /// <summary>Provides a bounded, single-consumer synchronous view of an asynchronous stream.</summary>
+/// <remarks>
+/// The stream starts its generation as soon as it is created and buffers up to 256 events ahead of the
+/// consumer. Enumerate it once or call <see cref="Collect"/>, and dispose it, for example with a
+/// <c>using</c> statement, to release it and to cancel a generation that is still running.
+/// </remarks>
 public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
 {
     private readonly Client _client;
@@ -36,6 +41,9 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
     }
 
     /// <summary>Gets the terminal generation after completion has committed.</summary>
+    /// <exception cref="System.InvalidOperationException">
+    /// The generation has not completed successfully.
+    /// </exception>
     public Generation Result
     {
         get
@@ -56,7 +64,25 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
     /// <summary>Gets the partial or terminal manifest when manifest capture is enabled.</summary>
     public RunManifest? Manifest => _inner.Manifest;
 
-    /// <summary>Drains this stream once and returns its terminal generation.</summary>
+    /// <summary>Drains this stream once, returns its terminal generation and disposes the stream.</summary>
+    /// <param name="cancellationToken">
+    /// Stops waiting for the next event. Cancelling it closes the stream, which cancels the generation, and
+    /// throws <see cref="System.OperationCanceledException"/>.
+    /// </param>
+    /// <returns>The winning generation, the same value as <see cref="Result"/>.</returns>
+    /// <remarks>The stream is disposed when this method returns or throws.</remarks>
+    /// <exception cref="System.ObjectDisposedException">The stream was already disposed.</exception>
+    /// <exception cref="System.InvalidOperationException">
+    /// The stream is already being enumerated or collected, or it ended without a successful generation.
+    /// </exception>
+    /// <exception cref="AnyInferException">
+    /// The generation failed, for example with <see cref="AllTargetsFailedException"/>,
+    /// <see cref="SchemaViolationException"/> or <see cref="SpendLimitException"/>.
+    /// </exception>
+    /// <exception cref="System.OperationCanceledException">
+    /// <paramref name="cancellationToken"/>, or the token supplied when the stream was created, was
+    /// cancelled.
+    /// </exception>
     public Generation Collect(CancellationToken cancellationToken = default)
     {
         Claim();
@@ -82,7 +108,15 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>Claims the stream's single enumeration and returns an enumerator over its events.</summary>
+    /// <returns>
+    /// An enumerator whose <c>MoveNext</c> blocks until the next buffered event arrives. Disposing it
+    /// disposes the stream, and <c>Reset</c> throws <see cref="System.NotSupportedException"/>.
+    /// </returns>
+    /// <exception cref="System.ObjectDisposedException">The stream was already disposed.</exception>
+    /// <exception cref="System.InvalidOperationException">
+    /// The stream is already being enumerated or collected.
+    /// </exception>
     public IEnumerator<StreamEvent> GetEnumerator()
     {
         Claim();
@@ -93,10 +127,18 @@ public sealed class SyncStream : IEnumerable<StreamEvent>, IDisposable
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <summary>
-    /// Closes this stream. A Public SDK callback running for this same stream must return before
-    /// disposing it; dispose from outside that callback instead. If the owning client already
-    /// reported this Public SDK stream's close failure, later disposal completes without reporting it again.
+    /// Closes this stream, cancelling its generation if it is still running, and blocks until its
+    /// background pump has stopped.
     /// </summary>
+    /// <remarks>
+    /// A failure raised while closing is rethrown; when disposing the owning <see cref="Client"/> already
+    /// reported this stream's close failure, disposing the stream afterwards does not report it again. A
+    /// callback that this stream is itself running, such as an observer notified by its generation, must
+    /// return before the stream is disposed; dispose it from outside that callback instead.
+    /// </remarks>
+    /// <exception cref="System.InvalidOperationException">
+    /// Called from a callback this stream is running.
+    /// </exception>
     public void Dispose()
     {
         ThrowIfOwnedSelfClose();

@@ -146,7 +146,12 @@ def effective_comment(member: ET.Element, comments: Mapping[str, ET.Element]) ->
 
 
 def _same_slot(left: ET.Element, right: ET.Element) -> bool:
-    return left.tag == right.tag and left.get("name") == right.get("name")
+    # Parameters and type parameters are keyed by name, exceptions by the type they cite.
+    return (
+        left.tag == right.tag
+        and left.get("name") == right.get("name")
+        and left.get("cref") == right.get("cref")
+    )
 
 
 def _member_problems(

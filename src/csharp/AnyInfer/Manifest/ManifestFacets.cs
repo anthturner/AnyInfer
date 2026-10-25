@@ -5,9 +5,14 @@ using AnyInfer.Schema;
 namespace AnyInfer.Manifest;
 
 /// <summary>Records one consumed capability value and its provenance.</summary>
+/// <remarks>Equality compares <see cref="Value"/> with <see cref="JsonEquality.TypeAwareEquals(JsonValue, JsonValue)"/>.</remarks>
 public sealed record SourcedFact
 {
     /// <summary>Initializes a provenance-preserving capability fact.</summary>
+    /// <param name="name">The capability field name, such as <c>context_window</c> or <c>features</c>.</param>
+    /// <param name="value">The consumed value.</param>
+    /// <param name="provenance">The lowercase name of the value's provenance.</param>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null"/>.</exception>
     public SourcedFact(string name, JsonValue value, string provenance)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -47,6 +52,29 @@ public sealed record SourcedFact
 public sealed record RequestFacet
 {
     /// <summary>Initializes an immutable request facet.</summary>
+    /// <param name="messageCount">The number of request messages.</param>
+    /// <param name="roleCounts">The number of messages per role, or <see langword="null"/> for none. The pairs are copied.</param>
+    /// <param name="charCount">The total length of the messages' text parts; clients count Unicode scalar values.</param>
+    /// <param name="estimatedTokens">A planning token estimate, or <see langword="null"/> when none was recorded.</param>
+    /// <param name="schemaPresent">Whether the request had a schema.</param>
+    /// <param name="schemaName">The schema's <see cref="SchemaSpec.Name"/>, or <see langword="null"/> without a schema.</param>
+    /// <param name="schemaDigest">
+    /// The <see cref="ManifestUtilities.SchemaDigest(JsonObject)"/>-style <c>sha256:</c> digest of the
+    /// schema, or <see langword="null"/> without a schema or when it could not be computed.
+    /// </param>
+    /// <param name="toolNames">Declared tool names in request order, or <see langword="null"/> for none.</param>
+    /// <param name="toolChoice">The tool-choice spelling; defaults to <c>auto</c>.</param>
+    /// <param name="sampling">
+    /// Explicitly set sampling values keyed by name, or <see langword="null"/> for none. Clients
+    /// record <c>temperature</c>, <c>top_p</c>, <c>max_output_tokens</c> and <c>stop_count</c>,
+    /// the number of stop sequences rather than their text.
+    /// </param>
+    /// <param name="reasoning">The requested reasoning effort, or <see langword="null"/>.</param>
+    /// <param name="timeoutS">The request timeout in seconds, or <see langword="null"/> when none was set.</param>
+    /// <param name="repairBudget">The maximum number of schema repair attempts allowed.</param>
+    /// <param name="metadataKeys">Request metadata keys, without their values, or <see langword="null"/> for none. Clients record them in ordinal order.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="toolChoice"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">A supplied collection contains a <see langword="null"/> element, key or value.</exception>
     public RequestFacet(
         int messageCount = 0,
         IEnumerable<KeyValuePair<string, int>>? roleCounts = null,
@@ -111,6 +139,13 @@ public sealed record RequestFacet
 public sealed record RouteStep
 {
     /// <summary>Initializes one route target decision.</summary>
+    /// <param name="target">The target, as written in <c>provider:model</c> form.</param>
+    /// <param name="outcome">
+    /// The outcome spelling; clients record values such as <c>ok</c>, <c>retried</c>,
+    /// <c>failed</c>, <c>abandoned</c>, <c>redirected</c> and <c>skipped_unhealthy</c>.
+    /// </param>
+    /// <param name="reason">The recorded reason, or empty (the default) when none applies.</param>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null"/>.</exception>
     public RouteStep(string target, string outcome, string reason = "")
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -131,6 +166,10 @@ public sealed record RouteStep
 public sealed record RouteFacet
 {
     /// <summary>Initializes an immutable route facet.</summary>
+    /// <param name="requested">The route's targets as requested, or <see langword="null"/> for none.</param>
+    /// <param name="resolved">The target that produced the result, or <see langword="null"/> when none did.</param>
+    /// <param name="considered">Target decisions in route order, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentException">A supplied list contains <see langword="null"/>.</exception>
     public RouteFacet(
         IEnumerable<string>? requested = null,
         string? resolved = null,
@@ -151,6 +190,10 @@ public sealed record RouteFacet
 public sealed record CapabilityFacet
 {
     /// <summary>Initializes immutable capability facts.</summary>
+    /// <param name="target">The target whose capabilities were consumed, or empty (the default) when none were recorded.</param>
+    /// <param name="facts">The consumed facts in order, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="facts"/> contains <see langword="null"/>.</exception>
     public CapabilityFacet(string target = "", IEnumerable<SourcedFact>? facts = null)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -167,6 +210,18 @@ public sealed record CapabilityFacet
 public sealed record AttemptFacet
 {
     /// <summary>Initializes an immutable attempt record.</summary>
+    /// <param name="target">The attempted target in <c>provider:model</c> form.</param>
+    /// <param name="attemptNumber">The one-based attempt number; defaults to 1.</param>
+    /// <param name="outcome">The outcome spelling, such as <c>ok</c> (the default), <c>retried</c> or <c>failed</c>.</param>
+    /// <param name="error">The error snapshot when the attempt failed or was retried, or <see langword="null"/>.</param>
+    /// <param name="firstTokenMs">Time to first token in milliseconds, or <see langword="null"/> when not observed.</param>
+    /// <param name="totalMs">Total attempt time in milliseconds, or <see langword="null"/> when not observed.</param>
+    /// <param name="queuedMs">Time spent queued in milliseconds, or <see langword="null"/> when not observed.</param>
+    /// <param name="retryReason">Why a retry was scheduled, or <see langword="null"/>.</param>
+    /// <param name="retryDelayS">The scheduled retry delay in seconds, or <see langword="null"/>.</param>
+    /// <param name="pacedS">Rate-limit pacing waits in seconds keyed by reason, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> or <paramref name="outcome"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="pacedS"/> contains a <see langword="null"/> key.</exception>
     public AttemptFacet(
         string target,
         int attemptNumber = 1,
@@ -226,6 +281,10 @@ public sealed record AttemptFacet
 public sealed record RepairRecord
 {
     /// <summary>Initializes one immutable schema repair record.</summary>
+    /// <param name="attemptNumber">The one-based repair attempt number.</param>
+    /// <param name="mechanism">The structured-output mechanism in use, or <see langword="null"/> when unknown.</param>
+    /// <param name="errors">The validation messages that triggered the repair, in observation order, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentException"><paramref name="errors"/> contains <see langword="null"/>.</exception>
     public RepairRecord(int attemptNumber, string? mechanism = null, IEnumerable<string>? errors = null)
     {
         AttemptNumber = attemptNumber;
@@ -247,6 +306,14 @@ public sealed record RepairRecord
 public sealed record SchemaFacet
 {
     /// <summary>Initializes immutable structured-output facts.</summary>
+    /// <param name="requested">Whether the request asked for structured output.</param>
+    /// <param name="chosen">The mechanism selected before execution, or <see langword="null"/>.</param>
+    /// <param name="used">The mechanism that produced the final response, or <see langword="null"/> when none did.</param>
+    /// <param name="ladder">Mechanism rungs in preference order, or <see langword="null"/> for none.</param>
+    /// <param name="repairAttempts">The number of repair attempts made.</param>
+    /// <param name="repairs">Repair records in attempt order, or <see langword="null"/> for none.</param>
+    /// <param name="validated">Whether the final output passed schema validation.</param>
+    /// <exception cref="ArgumentException">A supplied list contains <see langword="null"/>.</exception>
     public SchemaFacet(
         bool requested = false,
         string? chosen = null,
@@ -291,6 +358,15 @@ public sealed record SchemaFacet
 public sealed record CacheFacet
 {
     /// <summary>Initializes immutable cache facts.</summary>
+    /// <param name="policyMode">
+    /// The lowercase <see cref="CacheMode"/> name of the effective cache policy (<c>off</c>,
+    /// <c>auto</c> or <c>explicit</c>), or <see langword="null"/> when no policy applied.
+    /// </param>
+    /// <param name="mechanism">The planned cache mechanism, or <see langword="null"/> when none engaged.</param>
+    /// <param name="markCount">The number of cache marks placed.</param>
+    /// <param name="estimatedCacheableTokens">The planner's estimate of cacheable prefix tokens.</param>
+    /// <param name="readTokens">Provider-reported cache read tokens, or <see langword="null"/> when not reported.</param>
+    /// <param name="writeTokens">Provider-reported cache write tokens, or <see langword="null"/> when not reported.</param>
     public CacheFacet(string? policyMode = null, string? mechanism = null, int markCount = 0, long estimatedCacheableTokens = 0, long? readTokens = null, long? writeTokens = null)
     {
         PolicyMode = policyMode;
@@ -321,9 +397,26 @@ public sealed record CacheFacet
 }
 
 /// <summary>Records one context reduction.</summary>
+/// <remarks>
+/// The C# SDK performs no context reduction, so manifests it produces contain no reduction
+/// records; this type represents the format-1 shape, for example in a manifest read with
+/// <see cref="RunManifest.FromJson(string)"/>.
+/// </remarks>
 public sealed record ReductionRecord
 {
     /// <summary>Initializes one immutable context reduction.</summary>
+    /// <param name="strategy">The reduction strategy name.</param>
+    /// <param name="representation">The representation the selected content was rendered in.</param>
+    /// <param name="candidateCount">The number of candidates considered.</param>
+    /// <param name="selectedCount">The number of candidates selected.</param>
+    /// <param name="omittedCount">The number of candidates omitted.</param>
+    /// <param name="estimatedTokens">The estimated token count of the reduced content.</param>
+    /// <param name="maxTokens">The token budget of the reduction.</param>
+    /// <param name="bindingConstraints">The constraints that limited the reduction, in source order, or <see langword="null"/> for none.</param>
+    /// <param name="calls">The number of reduction calls.</param>
+    /// <param name="complete">Whether the reduction completed; defaults to <see langword="true"/>.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="strategy"/> or <paramref name="representation"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="bindingConstraints"/> contains <see langword="null"/>.</exception>
     public ReductionRecord(string strategy, string representation, int candidateCount = 0, int selectedCount = 0, int omittedCount = 0, int estimatedTokens = 0, int maxTokens = 0, IEnumerable<string>? bindingConstraints = null, int calls = 0, bool complete = true)
     {
         Strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
@@ -370,9 +463,12 @@ public sealed record ReductionRecord
 }
 
 /// <summary>Records context reductions in applied order.</summary>
+/// <remarks>The C# SDK performs no context reduction, so this facet is empty in manifests it produces.</remarks>
 public sealed record ContextFacet
 {
     /// <summary>Initializes immutable context facts.</summary>
+    /// <param name="reductions">Reductions in application order, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentException"><paramref name="reductions"/> contains <see langword="null"/>.</exception>
     public ContextFacet(IEnumerable<ReductionRecord>? reductions = null)
     {
         Reductions = ImmutableValues.List(reductions, nameof(reductions));
@@ -386,6 +482,10 @@ public sealed record ContextFacet
 public sealed record DroppedParameter
 {
     /// <summary>Initializes one parameter degradation record.</summary>
+    /// <param name="target">The target in <c>provider:model</c> form where the parameter was dropped.</param>
+    /// <param name="parameter">The dropped parameter name.</param>
+    /// <param name="reason">Why the parameter was dropped.</param>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null"/>.</exception>
     public DroppedParameter(string target, string parameter, string reason)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -407,6 +507,20 @@ public sealed record DroppedParameter
 public sealed record UsageFacet
 {
     /// <summary>Initializes immutable usage facts.</summary>
+    /// <remarks>A <see langword="null"/> count or cost means unknown, never zero.</remarks>
+    /// <param name="inputTokens">Input tokens, or <see langword="null"/> when unknown.</param>
+    /// <param name="outputTokens">Output tokens, or <see langword="null"/> when unknown.</param>
+    /// <param name="totalTokens">Total tokens, or <see langword="null"/> when unknown.</param>
+    /// <param name="cacheReadTokens">Cache read tokens, or <see langword="null"/> when unknown.</param>
+    /// <param name="cacheWriteTokens">Cache write tokens, or <see langword="null"/> when unknown.</param>
+    /// <param name="reasoningTokens">Reasoning tokens, or <see langword="null"/> when unknown.</param>
+    /// <param name="costUsd">The cost in US dollars as decimal text, or <see langword="null"/> when no trusted price applied.</param>
+    /// <param name="estimatedFields">
+    /// The estimation method for each usage field that was estimated rather than provider-reported,
+    /// keyed by field name, or <see langword="null"/> for none.
+    /// </param>
+    /// <param name="searchUnits">Provider-reported search units, or <see langword="null"/> when unknown.</param>
+    /// <exception cref="ArgumentException"><paramref name="estimatedFields"/> contains a <see langword="null"/> key or value.</exception>
     public UsageFacet(long? inputTokens = null, long? outputTokens = null, long? totalTokens = null, long? cacheReadTokens = null, long? cacheWriteTokens = null, long? reasoningTokens = null, string? costUsd = null, IEnumerable<KeyValuePair<string, string>>? estimatedFields = null, long? searchUnits = null)
     {
         InputTokens = inputTokens;
@@ -452,6 +566,11 @@ public sealed record UsageFacet
 public sealed record TimingFacet
 {
     /// <summary>Initializes immutable timing facts.</summary>
+    /// <param name="firstTokenMs">Time to first token in milliseconds, or <see langword="null"/> when not observed.</param>
+    /// <param name="totalMs">Total time in milliseconds, or <see langword="null"/> when not observed.</param>
+    /// <param name="outputTokensPerS">Output tokens per second, or <see langword="null"/> when not observed.</param>
+    /// <param name="phases">Named timing phases in milliseconds, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentException"><paramref name="phases"/> contains a <see langword="null"/> key.</exception>
     public TimingFacet(double? firstTokenMs = null, double? totalMs = null, double? outputTokensPerS = null, IEnumerable<KeyValuePair<string, double>>? phases = null)
     {
         FirstTokenMs = firstTokenMs;
@@ -474,9 +593,23 @@ public sealed record TimingFacet
 }
 
 /// <summary>Records redacted payload content when explicitly captured.</summary>
+/// <remarks>
+/// Clients record this facet only when payload capture is enabled, and only for generation.
+/// Redaction replaces secret values registered with <see cref="AnyInfer.Redaction"/>; all
+/// other content, including personal data, is kept.
+/// </remarks>
 public sealed record PayloadFacet
 {
     /// <summary>Initializes immutable redacted payload facts.</summary>
+    /// <param name="promptText">The text parts of the request messages joined by blank lines, or <see langword="null"/> when empty.</param>
+    /// <param name="responseText">The final response text, or <see langword="null"/> when empty.</param>
+    /// <param name="schemaBody">The request schema as compact JSON, or <see langword="null"/> without a schema.</param>
+    /// <param name="toolArguments">The arguments of each returned tool call as compact JSON, in call order, or <see langword="null"/> for none.</param>
+    /// <param name="repairTexts">
+    /// Response texts that triggered schema repairs, in repair order, or <see langword="null"/> for
+    /// none; the same response can appear more than once.
+    /// </param>
+    /// <exception cref="ArgumentException">A supplied list contains <see langword="null"/>.</exception>
     public PayloadFacet(string? promptText = null, string? responseText = null, string? schemaBody = null, IEnumerable<string>? toolArguments = null, IEnumerable<string>? repairTexts = null)
     {
         PromptText = promptText;

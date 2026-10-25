@@ -4,6 +4,10 @@ using AnyInfer.Internal;
 namespace AnyInfer;
 
 /// <summary>Ordered caller-authorized tools available to one bounded tool loop.</summary>
+/// <remarks>
+/// The registered tools are fixed at construction; only <see cref="Dispatched"/> changes
+/// afterwards, and it is updated atomically.
+/// </remarks>
 public sealed class ToolRegistry
 {
     private readonly Dictionary<string, Tool> _byName = new(StringComparer.Ordinal);
@@ -11,6 +15,11 @@ public sealed class ToolRegistry
     private long _dispatched;
 
     /// <summary>Registers tools, replacing duplicate names in their first declaration slot.</summary>
+    /// <param name="tools">
+    /// The tools in declaration order. A later tool whose name, compared ordinally, is already
+    /// registered replaces the earlier tool at the earlier tool's position.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="tools"/> or one of its elements is <see langword="null"/>.</exception>
     public ToolRegistry(IEnumerable<Tool> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);
@@ -38,6 +47,18 @@ public sealed class ToolRegistry
     public long Dispatched => Interlocked.Read(ref _dispatched);
 
     /// <summary>Dispatches one call, converting ordinary handler failures to a conversational tool result.</summary>
+    /// <remarks>
+    /// A known tool increments <see cref="Dispatched"/> before its handler runs. The handler's
+    /// result is rendered as described for <see cref="Tool(ToolSpec, Func{Json.JsonObject, CancellationToken, ValueTask{object}})"/>.
+    /// Any exception other than <see cref="OperationCanceledException"/> becomes an error result
+    /// whose content is the exception's type name and message.
+    /// </remarks>
+    /// <param name="call">The model's tool call.</param>
+    /// <param name="cancellationToken">Passed to the tool's handler.</param>
+    /// <returns>A result for <paramref name="call"/>, marked as an error when the handler failed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="call"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ToolLoopException">No tool with the call's name is registered.</exception>
+    /// <exception cref="OperationCanceledException">The handler was cancelled.</exception>
     public async Task<ToolResult> DispatchAsync(ToolCall call, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);

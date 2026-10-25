@@ -8,6 +8,17 @@ namespace AnyInfer;
 public sealed record EmbeddingResult
 {
     /// <summary>Creates a copied embedding result snapshot.</summary>
+    /// <param name="vectors">The vectors in request input order, or <see langword="null"/> for none. The sequence is copied.</param>
+    /// <param name="target">The target that produced the vectors.</param>
+    /// <param name="space">The embedding space the vectors belong to.</param>
+    /// <param name="usage">The provider usage, with unknown counts left <see langword="null"/>.</param>
+    /// <param name="timing">The operation timing.</param>
+    /// <param name="attempts">The routing attempts in order, or <see langword="null"/> for none.</param>
+    /// <param name="warnings">Nonfatal warnings, or <see langword="null"/> for none.</param>
+    /// <param name="raw">The raw provider payload when retention was requested, or <see langword="null"/>.</param>
+    /// <param name="manifest">The content-free operation manifest, or <see langword="null"/> when manifests are disabled.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/>, <paramref name="space"/>, <paramref name="usage"/> or <paramref name="timing"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">A supplied sequence contains <see langword="null"/>.</exception>
     public EmbeddingResult(
         IEnumerable<EmbeddingVector> vectors,
         ResolvedTarget target,

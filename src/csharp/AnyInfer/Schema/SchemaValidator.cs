@@ -7,15 +7,54 @@ using Json.Schema;
 namespace AnyInfer.Schema;
 
 /// <summary>Retrieves an explicitly allowed external schema resource.</summary>
+/// <remarks>
+/// Validation calls the retriever only for a referenced resource that is not registered in
+/// <see cref="SchemaValidationOptions.Resources"/>, at most once per resource URI in one
+/// validation. A retrieved document is used for that validation only and is not cached.
+/// </remarks>
 /// <param name="resourceUri">The fragment-free resource URI.</param>
 /// <param name="cancellationToken">Cancellation for the retrieval operation.</param>
-/// <returns>The resource document, or <see langword="null"/> when unavailable.</returns>
+/// <returns>
+/// The resource document, or <see langword="null"/> when unavailable, which fails validation
+/// with <see cref="SchemaReferenceException"/>.
+/// </returns>
 public delegate ValueTask<JsonValue?> SchemaResourceRetriever(Uri resourceUri, CancellationToken cancellationToken);
 
 /// <summary>Controls modern JSON Schema validation resources and limits.</summary>
+/// <remarks>
+/// Validation never fetches a resource implicitly: a reference resolves only to the schema
+/// itself or one of its embedded resources, the bundled meta-schemas of the supported dialects,
+/// a document in <see cref="Resources"/>, or a document returned by <see cref="Retrieve"/>. The same options can be passed to
+/// <see cref="SchemaValidator.ValidateAsync(JsonValue, SchemaSpec, SchemaValidationOptions, CancellationToken)"/>
+/// or to a client for structured-output validation.
+/// </remarks>
 public sealed class SchemaValidationOptions
 {
     /// <summary>Initializes validation options with copied resource bindings.</summary>
+    /// <param name="resources">
+    /// Schema documents keyed by absolute URI without a fragment, or <see langword="null"/> for
+    /// none. The mapping is copied.
+    /// </param>
+    /// <param name="retrieve">
+    /// Callback for referenced resources missing from <paramref name="resources"/>, or
+    /// <see langword="null"/> so that such references fail with <see cref="SchemaReferenceException"/>.
+    /// </param>
+    /// <param name="baseUri">
+    /// Absolute URI that identifies a root schema without <c>$id</c> and against which a
+    /// relative root <c>$id</c> resolves, or <see langword="null"/> to use a
+    /// <c>urn:anyinfer:schema:</c> URN derived from the schema's SHA-256 digest.
+    /// </param>
+    /// <param name="regexTimeout">
+    /// Timeout applied to each individual <c>pattern</c> or <c>patternProperties</c> regular
+    /// expression match, or <see langword="null"/> for one second. It is not an overall
+    /// evaluation deadline. It must be positive and at most <see cref="int.MaxValue"/> - 1
+    /// milliseconds.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="baseUri"/> is relative, or a resource key is relative or has a fragment, or a
+    /// resource value is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="regexTimeout"/> is outside the allowed range.</exception>
     public SchemaValidationOptions(IReadOnlyDictionary<Uri, JsonValue>? resources = null, SchemaResourceRetriever? retrieve = null, Uri? baseUri = null, TimeSpan? regexTimeout = null)
     {
         if (baseUri is not null && !baseUri.IsAbsoluteUri) throw new ArgumentException("The schema base URI must be absolute.", nameof(baseUri));
@@ -50,6 +89,19 @@ public enum SchemaValidationKind
     InvalidSchema,
 }
 /// <summary>A validation diagnostic with native JSON Pointer locations when available.</summary>
+/// <param name="Rule">
+/// The failing keyword, such as <c>type</c> or <c>required</c>; <c>$schema</c> for an
+/// unsupported dialect; or <c>invalid_schema</c> when the schema could not be built.
+/// </param>
+/// <param name="InstanceLocation">
+/// JSON Pointer to the failing part of the instance (empty for the root), or
+/// <see langword="null"/> for a schema-definition failure.
+/// </param>
+/// <param name="SchemaLocation">
+/// Location of the failing schema keyword as reported by the native evaluator, usually an
+/// absolute URI with a JSON Pointer fragment, or <see langword="null"/> when not reported.
+/// </param>
+/// <param name="Message">The human-readable diagnostic produced by the native evaluator.</param>
 public sealed record SchemaValidationIssue(
     string Rule,
     string? InstanceLocation,
@@ -62,20 +114,67 @@ public sealed class SchemaValidationResult
     { Kind = kind; var copy = issues.ToArray(); Issues = Array.AsReadOnly(copy); Messages = Array.AsReadOnly(copy.Select(static x => x.Message).ToArray()); IsValid = isValid ?? (kind == SchemaValidationKind.Validation && copy.Length == 0); }
     /// <summary>Whether the result is an instance validation or invalid-schema outcome.</summary>
     public SchemaValidationKind Kind { get; }
-    /// <summary>Native validity, retained even when the validator emits no flattened issue.</summary>
+    /// <summary>Native validity, retained even when the validator emits no flattened issue; always <see langword="false"/> for an invalid schema.</summary>
     public bool IsValid { get; }
-    /// <summary>Copied diagnostics, capped only when projected into repair assessment.</summary>
+    /// <summary>
+    /// Diagnostics in native output order, capped at <see cref="SchemaValidator.MaxReportedErrors"/>
+    /// entries; may be empty even when <see cref="IsValid"/> is <see langword="false"/>.
+    /// </summary>
     public IReadOnlyList<SchemaValidationIssue> Issues { get; }
     /// <summary>Messages corresponding to <see cref="Issues"/>.</summary>
     public IReadOnlyList<string> Messages { get; }
 }
 
 /// <summary>Modern JSON Schema validation entry point.</summary>
+/// <remarks>
+/// Supported dialects are Draft 6, Draft 7, Draft 2019-09 and Draft 2020-12; Draft 3 and
+/// Draft 4 are not supported. Numeric and regular-expression behavior is native to .NET:
+/// <c>pattern</c> and <c>patternProperties</c> use .NET regular expressions with a per-match
+/// timeout, and numeric <c>const</c>, <c>enum</c> and <c>uniqueItems</c> comparisons use .NET
+/// <see cref="decimal"/>, so values outside that range, such as <c>1e70</c>, fail with
+/// <see cref="SchemaEvaluationException"/>. Schemas and instances otherwise retain
+/// arbitrary-size integers.
+/// </remarks>
 public static class SchemaValidator
 {
-    /// <summary>Maximum findings selected for schema repair assessment.</summary>
+    /// <summary>
+    /// Maximum number of diagnostics a validation result reports, which is also the number of
+    /// findings selected for schema repair feedback.
+    /// </summary>
     public const int MaxReportedErrors = 5;
     /// <summary>Validates an instance against a modern JSON Schema without implicit retrieval.</summary>
+    /// <remarks>
+    /// The dialect is chosen by the schema's <c>$schema</c> keyword; a schema without one, or a
+    /// schema that is not an object, is evaluated as Draft 2020-12. The schema is first checked
+    /// against its dialect's meta-schema, and an unsupported <c>$schema</c> or a schema that fails
+    /// that check produces a <see cref="SchemaValidationKind.InvalidSchema"/> result instead of an
+    /// exception. During instance validation <c>format</c> is treated as an annotation and is not
+    /// asserted. External references resolve only through <paramref name="options"/>.
+    /// </remarks>
+    /// <param name="value">The instance to validate.</param>
+    /// <param name="schema">The schema specification; only its <see cref="SchemaSpec.JsonSchema"/> document is used.</param>
+    /// <param name="options">
+    /// Resource bindings, retrieval callback, base URI and regex timeout, or <see langword="null"/>
+    /// for no resources, no retrieval and a one-second per-match regex timeout.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Cancels validation; it is checked before evaluation and after each retrieval and is passed
+    /// to <see cref="SchemaValidationOptions.Retrieve"/>.
+    /// </param>
+    /// <returns>
+    /// A <see cref="SchemaValidationKind.Validation"/> result whose <see cref="SchemaValidationResult.IsValid"/>
+    /// reports the outcome, or a <see cref="SchemaValidationKind.InvalidSchema"/> result.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> or <paramref name="schema"/> is <see langword="null"/>.</exception>
+    /// <exception cref="SchemaReferenceException">
+    /// A reference cannot be resolved: the resource is not registered and no retriever is set, the
+    /// retriever returned <see langword="null"/>, or distinct documents claim the same resource URI.
+    /// </exception>
+    /// <exception cref="SchemaEvaluationException">
+    /// The native evaluator cannot represent or evaluate the schema or instance, including a
+    /// regular-expression match that exceeds the configured timeout.
+    /// </exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public static Task<SchemaValidationResult> ValidateAsync(JsonValue value, SchemaSpec schema, SchemaValidationOptions? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(value);

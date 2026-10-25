@@ -1,15 +1,29 @@
 namespace AnyInfer.Providers;
 
 /// <summary>Raw event emitted by a provider adapter.</summary>
-public abstract record AdapterEvent;
+/// <remarks>
+/// An <see cref="IGeneratesText"/> adapter yields these while translating one provider response. The client
+/// projects them into public stream events and result fields; the event types carry translated provider facts
+/// only.
+/// </remarks>
+public abstract record AdapterEvent
+{
+    /// <summary>Initializes the base state of a derived adapter event.</summary>
+    protected AdapterEvent()
+    {
+    }
+}
 
 /// <summary>Raw text delta emitted by a provider adapter.</summary>
+/// <param name="Text">Output text fragment, appended to the generated text in emission order.</param>
 public sealed record AdapterTextDelta(string Text) : AdapterEvent;
 
 /// <summary>Raw reasoning delta emitted by a provider adapter.</summary>
 public sealed record AdapterReasoningDelta : AdapterEvent
 {
     /// <summary>Creates a raw reasoning fragment.</summary>
+    /// <param name="text">Provider-reported reasoning text fragment.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>
     public AdapterReasoningDelta(string text) => Text = text ?? throw new ArgumentNullException(nameof(text));
     /// <summary>Gets the raw reasoning fragment.</summary>
     public string Text { get; }
@@ -19,6 +33,8 @@ public sealed record AdapterReasoningDelta : AdapterEvent
 public sealed record AdapterCitationDelta : AdapterEvent
 {
     /// <summary>Creates a raw citation update.</summary>
+    /// <param name="citation">Provider-reported citation, collected into the result's citations.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="citation"/> is <see langword="null"/>.</exception>
     public AdapterCitationDelta(Citation citation) => Citation = citation ?? throw new ArgumentNullException(nameof(citation));
     /// <summary>Gets the raw provider citation.</summary>
     public Citation Citation { get; }
@@ -28,6 +44,12 @@ public sealed record AdapterCitationDelta : AdapterEvent
 public sealed record AdapterServerToolDelta : AdapterEvent
 {
     /// <summary>Creates a raw provider-run tool lifecycle update.</summary>
+    /// <param name="kind">Normalized provider-run tool kind, such as <c>web_search</c>.</param>
+    /// <param name="status">Provider-reported lifecycle status.</param>
+    /// <param name="sources">Provider-reported sources, copied; <see langword="null"/> means none.</param>
+    /// <param name="output">Provider-reported tool output, or an empty string.</param>
+    /// <param name="detail">Provider-reported failure detail, or an empty string.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="kind"/>, <paramref name="status"/>, <paramref name="output"/>, or <paramref name="detail"/> is <see langword="null"/>.</exception>
     public AdapterServerToolDelta(string kind, string status, IEnumerable<ServerToolSource>? sources = null, string output = "", string detail = "")
     {
         Kind = kind ?? throw new ArgumentNullException(nameof(kind));
@@ -49,12 +71,24 @@ public sealed record AdapterServerToolDelta : AdapterEvent
 }
 
 /// <summary>Raw usage observation emitted by a provider adapter.</summary>
+/// <param name="Usage">Provider-reported usage; fields the provider did not report stay <see langword="null"/>.</param>
 public sealed record AdapterUsage(Usage Usage) : AdapterEvent;
 
 /// <summary>Raw terminal event emitted by a provider adapter.</summary>
+/// <remarks>
+/// The client reads the finish reason, terminal usage, raw payload, phase timings, log-probabilities, and
+/// provider-run tool-use counts from this event.
+/// </remarks>
 public sealed record AdapterFinal : AdapterEvent
 {
     /// <summary>Creates a terminal adapter event with copied rich terminal fields.</summary>
+    /// <param name="FinishReason">Provider finish reason, such as <c>stop</c> or <c>length</c>.</param>
+    /// <param name="Usage">Terminal provider-reported usage, or <see langword="null"/> when the provider reported none.</param>
+    /// <param name="Raw">Raw provider payload, or <see langword="null"/>; the client keeps it only when raw retention is enabled.</param>
+    /// <param name="phases">Provider-reported phase timings in milliseconds keyed by phase name; <see langword="null"/> means none.</param>
+    /// <param name="logprobs">Terminal token log-probabilities, copied; <see langword="null"/> means none.</param>
+    /// <param name="serverToolUses">Terminal provider-run tool-use counts, copied; <see langword="null"/> means none.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="FinishReason"/> is <see langword="null"/>.</exception>
     public AdapterFinal(string FinishReason, Usage? Usage = null, AnyInfer.Json.JsonValue? Raw = null, IEnumerable<KeyValuePair<string, double>>? phases = null, IEnumerable<TokenLogprob>? logprobs = null, IEnumerable<ServerToolUse>? serverToolUses = null)
     {
         this.FinishReason = FinishReason ?? throw new ArgumentNullException(nameof(FinishReason));
@@ -64,8 +98,11 @@ public sealed record AdapterFinal : AdapterEvent
         Logprobs = RichGenerationSnapshots.List(logprobs, nameof(logprobs));
         ServerToolUses = RichGenerationSnapshots.List(serverToolUses, nameof(serverToolUses));
     }
+    /// <summary>Gets the provider finish reason.</summary>
     public string FinishReason { get; }
+    /// <summary>Gets terminal provider-reported usage, or <see langword="null"/> when none was reported.</summary>
     public Usage? Usage { get; }
+    /// <summary>Gets the raw provider payload, or <see langword="null"/>.</summary>
     public AnyInfer.Json.JsonValue? Raw { get; }
     /// <summary>Gets copied provider-reported phase timings in milliseconds.</summary>
     public IReadOnlyDictionary<string, double> Phases { get; }

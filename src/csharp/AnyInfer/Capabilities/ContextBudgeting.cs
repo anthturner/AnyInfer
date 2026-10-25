@@ -16,6 +16,11 @@ public static class ContextBudgeting
     public const long MaximumHeadroomTokens = 8_192;
 
     /// <summary>Computes clamped default headroom from a known context-window count.</summary>
+    /// <param name="contextWindowTokens">Context window in tokens.</param>
+    /// <returns>
+    /// <see cref="HeadroomFraction"/> of the window rounded up, clamped to
+    /// [<see cref="MinimumHeadroomTokens"/>, <see cref="MaximumHeadroomTokens"/>].
+    /// </returns>
     public static long HeadroomFor(long contextWindowTokens)
     {
         var candidate = checked((long)Math.Ceiling(contextWindowTokens * HeadroomFraction));
@@ -23,6 +28,24 @@ public static class ContextBudgeting
     }
 
     /// <summary>Builds a pure context budget without dispatching, validating schemas, or resolving a provider.</summary>
+    /// <param name="request">Request to estimate.</param>
+    /// <param name="capabilities">
+    /// Target capabilities supplying the context window, maximum output, and pricing facts with their provenance;
+    /// <see langword="null"/> leaves all three unknown.
+    /// </param>
+    /// <param name="estimator">Token estimator, or <see langword="null"/> for the built-in <see cref="HeuristicTokenEstimator"/>.</param>
+    /// <param name="calibration">Provider envelope calibration, or <see langword="null"/> for none.</param>
+    /// <param name="outputReserveTokens">
+    /// Response reserve; <see langword="null"/> uses the request's maximum output tokens, else
+    /// <see cref="DefaultOutputReserveTokens"/> capped by a known maximum output.
+    /// </param>
+    /// <param name="headroomTokens">
+    /// Safety headroom; <see langword="null"/> uses <see cref="HeadroomFor"/> when a window is known and zero otherwise.
+    /// </param>
+    /// <returns>A budget whose window, allowance, and fit stay unknown when no context window is known.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="outputReserveTokens"/> or <paramref name="headroomTokens"/> is negative.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="estimator"/> returned <see langword="null"/>.</exception>
     public static ContextBudget BuildContextBudget(
         GenerationRequest request,
         ModelCapabilities? capabilities,
@@ -58,6 +81,16 @@ public static class ContextBudgeting
     }
 
     /// <summary>Returns a context-length error only when a trusted whole-window lower bound is provably exceeded.</summary>
+    /// <remarks>
+    /// Only a window with catalog, discovered, probed, or override provenance can gate, and only the estimate's
+    /// low-biased floor is compared against the whole window, without reserve or headroom. A
+    /// <see cref="Provenance.Default"/> window or an estimate with unpriced content parts never gates.
+    /// </remarks>
+    /// <param name="budget">Budget to check.</param>
+    /// <param name="provider">Provider identity recorded on the error, or <see langword="null"/>.</param>
+    /// <param name="model">Model name used in the error message, or <see langword="null"/> for a generic name.</param>
+    /// <returns>An unthrown <see cref="ContextLengthException"/>, or <see langword="null"/> when the request may fit.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="budget"/> is <see langword="null"/>.</exception>
     public static ContextLengthException? ContextGateError(ContextBudget budget, string? provider = null, string? model = null)
     {
         ArgumentNullException.ThrowIfNull(budget);
@@ -77,6 +110,18 @@ public static class ContextBudgeting
     }
 
     /// <summary>Builds a budget and throws its explicit context-length refusal when one is proven.</summary>
+    /// <remarks>Uses the default headroom; see <see cref="BuildContextBudget"/> and <see cref="ContextGateError"/>.</remarks>
+    /// <param name="request">Request to estimate.</param>
+    /// <param name="capabilities">Target capabilities, or <see langword="null"/> when unknown.</param>
+    /// <param name="estimator">Token estimator, or <see langword="null"/> for the built-in heuristic.</param>
+    /// <param name="calibration">Provider envelope calibration, or <see langword="null"/> for none.</param>
+    /// <param name="outputReserveTokens">Response reserve, or <see langword="null"/> for the derived default.</param>
+    /// <param name="provider">Provider identity recorded on a refusal, or <see langword="null"/>.</param>
+    /// <param name="model">Model name used in a refusal message, or <see langword="null"/>.</param>
+    /// <returns>The budget, when no trusted refusal is proven.</returns>
+    /// <exception cref="ContextLengthException">The estimate's floor exceeds a trusted context window.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="outputReserveTokens"/> is negative.</exception>
     public static ContextBudget CheckContextFit(
         GenerationRequest request,
         ModelCapabilities? capabilities,

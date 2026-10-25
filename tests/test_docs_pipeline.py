@@ -533,3 +533,14 @@ def test_docs_only_roots_without_docfx_configuration_skip_the_native_reference(
     manifest = prepare(root, renderer=lambda symbol: symbol)
     assert manifest["generated"] == {}
     assert not any(page.get("generated") for page in manifest["pages"])
+
+
+def test_native_learning_path_and_cookbook_sources_route_into_the_csharp_plugin() -> None:
+    from scripts.docs_common import _classify
+
+    assert _classify("guides/csharp-installation.md") == ("csharp", "/installation/")
+    assert _classify("guides/csharp-quickstart.md") == ("csharp", "/quickstart/")
+    assert _classify("examples/csharp-streaming.md") == ("csharp", "/examples/streaming/")
+    # The Python learning path and shared cookbook keep their existing routes.
+    assert _classify("guides/quickstart.md") == ("python", "/quickstart/")
+    assert _classify("examples/semantic-search.md") == ("shared", "/examples/semantic-search/")

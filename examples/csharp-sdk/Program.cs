@@ -13,6 +13,7 @@ using AnyInfer.Providers;
 using PeterO.Numbers;
 
 await VerifyAsync();
+await AnyInfer.Examples.Cases.ExampleCases.RunAllAsync();
 
 static async Task VerifyAsync()
 {
@@ -373,20 +374,7 @@ static async Task VerifyAsync()
 }
 
 static ProviderSettings WithTransport(ProviderSettings source, HttpMessageHandler transport) =>
-    ProviderSettings.Of(
-        source.ProviderId,
-        source.BaseUrl,
-        source.ApiKey,
-        source.ApiVersion,
-        source.Headers,
-        source.Options,
-        source.TimeoutS,
-        transport,
-        source.Alias,
-        source.Limits,
-        source.Proxy,
-        source.Verify,
-        source.ClientCertificate);
+    AnyInfer.Examples.Cases.ExampleSupport.WithTransport(source, transport);
 
 static ProviderRegistry BuiltinRegistry(HttpMessageHandler transport)
 {

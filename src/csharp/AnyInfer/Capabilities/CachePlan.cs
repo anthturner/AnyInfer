@@ -18,6 +18,11 @@ public enum CacheMechanism
 public sealed record CacheMark
 {
     /// <summary>Creates a segment mark with its planning-side token estimate.</summary>
+    /// <param name="segment">
+    /// <see cref="CachePlanning.ToolsSegment"/> (-2) for tool declarations, <see cref="CachePlanning.SystemSegment"/>
+    /// (-1) for the joined system block, or a zero-based message index for the stable conversation prefix ending there.
+    /// </param>
+    /// <param name="estimatedTokens">Planning-side token estimate for the segment; not a provider-reported count.</param>
     public CacheMark(int segment, long estimatedTokens)
     {
         Segment = segment;
@@ -34,7 +39,13 @@ public sealed record CacheMark
 /// <summary>Immutable prompt-cache recommendation for one request and selected target.</summary>
 public sealed record CachePlan
 {
-    /// <summary>Creates an immutable cache plan.</summary>
+    /// <summary>Creates an immutable cache plan, copying <paramref name="marks"/> and <paramref name="reasons"/>.</summary>
+    /// <param name="mechanism">Engaged cache mechanism, or <see langword="null"/> for an inactive plan.</param>
+    /// <param name="marks">Explicit segment marks in wire order; <see langword="null"/> means none.</param>
+    /// <param name="estimatedCacheableTokens">Planning-side estimate of cacheable tokens; not a reported saving.</param>
+    /// <param name="reasons">Content-free explanations for an inactive or constrained plan; <see langword="null"/> means none.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mechanism"/> is not a defined value.</exception>
+    /// <exception cref="ArgumentException"><paramref name="marks"/> or <paramref name="reasons"/> contains <see langword="null"/>.</exception>
     public CachePlan(
         CacheMechanism? mechanism = null,
         IEnumerable<CacheMark>? marks = null,
@@ -70,9 +81,18 @@ public sealed record CachePlan
     public bool Active => Mechanism is not null;
 
     /// <summary>
-    /// Computes a process-local prefix-change diagnostic from system text and sorted tool declarations.
+    /// Computes a process-local prefix-change diagnostic from system text and tool declarations.
     /// </summary>
-    /// <remarks>The returned hash portions are not stable across processes or runtimes.</remarks>
+    /// <remarks>
+    /// Tool declarations are serialized in request order with sorted JSON keys. The returned hash portions are
+    /// not stable across processes or runtimes, so compare signatures only within one process.
+    /// </remarks>
+    /// <param name="request">Request whose system messages and tool declarations form the cacheable prefix.</param>
+    /// <returns>
+    /// A <c>length:hash:hash</c> string: the system text's Unicode scalar count, then hashes of the system text
+    /// and of the tool declarations. Different signatures mean the system text or tool declarations differ.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
     public string PrefixSignature(GenerationRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);

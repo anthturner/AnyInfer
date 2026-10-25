@@ -7,7 +7,43 @@ namespace AnyInfer;
 /// <summary>One immutable request to embed ordered text inputs.</summary>
 public sealed record EmbeddingRequest
 {
-    /// <summary>Creates an embedding request with the source-compatible defaults.</summary>
+    /// <summary>Creates an immutable embedding request from copies of its inputs and options.</summary>
+    /// <remarks>
+    /// Only argument shape is checked here. The client enforces batching, the expected space and
+    /// fallback compatibility when the request runs, raising <see cref="ConfigException"/> for a
+    /// violation; without a known or overridden batch limit, a request with more than 2048 inputs
+    /// is refused.
+    /// </remarks>
+    /// <param name="inputs">The texts to embed, in order; at least one is required. The sequence is copied.</param>
+    /// <param name="inputType">
+    /// The input intent, or <see langword="null"/> to leave it unspecified. When the target's
+    /// capability facts show it does not distinguish intents, the result carries a warning.
+    /// </param>
+    /// <param name="dimensions">The requested output dimensionality, or <see langword="null"/> for the model default.</param>
+    /// <param name="expectedSpace">
+    /// The space the result must be compatible with under <see cref="EmbeddingSpace.CompatibleWith(EmbeddingSpace)"/>,
+    /// or <see langword="null"/> for no check.
+    /// </param>
+    /// <param name="timeoutS">The timeout in seconds for each provider attempt, or <see langword="null"/> for 120 seconds.</param>
+    /// <param name="maxResponseBytes">The response-body size cap in bytes given to the adapter; defaults to 64 MiB.</param>
+    /// <param name="metadata">Caller metadata reported to telemetry observers, or <see langword="null"/> for none. The map is copied.</param>
+    /// <param name="providerOptions">
+    /// Extra adapter options keyed by provider instance identifier, or <see langword="null"/> for
+    /// none; each attempt passes only the map for its own provider instance. The maps are copied.
+    /// </param>
+    /// <param name="batch">The batching policy, or <see langword="null"/> for <see cref="BatchPolicy"/> defaults.</param>
+    /// <param name="retainRaw">Whether to keep the provider's raw response payload on <see cref="EmbeddingResult.Raw"/>.</param>
+    /// <param name="allowIncompatibleFallback">
+    /// Whether route fallback may move to a target with a different provider instance or model.
+    /// When <see langword="false"/> (the default), such a fallback raises
+    /// <see cref="ConfigException"/>; when <see langword="true"/>, it proceeds and the result
+    /// carries a warning that its vectors may not be comparable with the primary target's.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="inputs"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="inputs"/> is empty or contains <see langword="null"/>, or a map contains a
+    /// <see langword="null"/> key or value.
+    /// </exception>
     public EmbeddingRequest(
         IEnumerable<string> inputs,
         EmbeddingInputIntent? inputType = null,

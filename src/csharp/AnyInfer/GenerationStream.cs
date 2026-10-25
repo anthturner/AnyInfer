@@ -4,6 +4,11 @@ using AnyInfer.Manifest;
 namespace AnyInfer;
 
 /// <summary>Represents one lazy generation operation and its ordered public events.</summary>
+/// <remarks>
+/// The operation starts when the stream is first enumerated, and the stream has a single consumer.
+/// Dispose it, for example with <c>await using</c>, to release it and to cancel a generation that is
+/// still running.
+/// </remarks>
 public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposable
 {
     private readonly AsyncClient _client;
@@ -60,6 +65,9 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     }
 
     /// <summary>Gets the winning result after successful terminal completion.</summary>
+    /// <exception cref="System.InvalidOperationException">
+    /// The stream has not completed successfully.
+    /// </exception>
     public Generation Result
     {
         get
@@ -84,6 +92,23 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
     }
 
     /// <summary>Consumes this stream once and returns its successful terminal generation.</summary>
+    /// <param name="cancellationToken">
+    /// Cancels the collection, in addition to the token supplied when the stream was created. Cancellation
+    /// surfaces as <see cref="System.OperationCanceledException"/>.
+    /// </param>
+    /// <returns>
+    /// A task whose result is the winning generation, the same value as <see cref="Result"/>.
+    /// </returns>
+    /// <exception cref="System.InvalidOperationException">
+    /// The stream is already being, or has been, enumerated, or it was disposed before collection began.
+    /// </exception>
+    /// <exception cref="AnyInferException">
+    /// The generation failed, for example with <see cref="AllTargetsFailedException"/>,
+    /// <see cref="SchemaViolationException"/> or <see cref="SpendLimitException"/>.
+    /// </exception>
+    /// <exception cref="System.OperationCanceledException">
+    /// A cancellation token was cancelled, or the stream or its client was disposed during collection.
+    /// </exception>
     public async Task<Generation> CollectAsync(CancellationToken cancellationToken = default)
     {
         bool beganBeforeClose;
@@ -131,7 +156,18 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>Starts the stream's single enumeration.</summary>
+    /// <param name="cancellationToken">
+    /// Cancels this enumeration, in addition to the token supplied when the stream was created.
+    /// </param>
+    /// <returns>
+    /// An enumerator over the operation's events; the generation starts with its first <c>MoveNextAsync</c>
+    /// call, and disposing it before the end cancels the generation. A stream that was already disposed
+    /// yields no events.
+    /// </returns>
+    /// <exception cref="System.InvalidOperationException">
+    /// The stream is already being, or has been, enumerated.
+    /// </exception>
     public IAsyncEnumerator<StreamEvent> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
         lock (_gate)
@@ -172,10 +208,16 @@ public sealed class AsyncStream : IAsyncEnumerable<StreamEvent>, IAsyncDisposabl
         }
     }
 
-    /// <summary>
-    /// Closes this stream. A Public SDK callback running for this same stream must return before
-    /// disposing it; dispose from outside that callback instead.
-    /// </summary>
+    /// <summary>Closes this stream, cancelling its generation if it is still running.</summary>
+    /// <remarks>
+    /// The returned task completes once the enumeration has released its resources; calling this method
+    /// again returns the same task. A callback that this stream is itself running, such as an observer
+    /// notified during its enumeration, must return before the stream is disposed; dispose it from outside
+    /// that callback instead.
+    /// </remarks>
+    /// <exception cref="System.InvalidOperationException">
+    /// Called from a callback this stream is running.
+    /// </exception>
     public ValueTask DisposeAsync()
     {
         ThrowIfOwnedSelfDispose();

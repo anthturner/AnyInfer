@@ -4,6 +4,12 @@ namespace AnyInfer.Capabilities;
 public sealed record ContextBudget
 {
     /// <summary>Initializes an immutable context budget without substituting unknown capacity or cost.</summary>
+    /// <param name="contextWindow">Context-window fact with its provenance, or <see langword="null"/> when unknown.</param>
+    /// <param name="estimate">Estimated input size of the request.</param>
+    /// <param name="outputReserveTokens">Tokens reserved for the response.</param>
+    /// <param name="headroomTokens">Safety headroom in tokens held back against estimation error.</param>
+    /// <param name="pricing">Pricing fact with its provenance for preflight cost estimation, or <see langword="null"/> when unknown.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="estimate"/> is <see langword="null"/>.</exception>
     public ContextBudget(
         Sourced<int>? contextWindow,
         RequestEstimate estimate,
@@ -34,6 +40,11 @@ public sealed record ContextBudget
     public Sourced<Pricing>? Pricing { get; }
 
     /// <summary>Gets input allowance, or null when no context window is known.</summary>
+    /// <remarks>
+    /// The allowance is the window minus the output reserve and headroom, never below zero. It uses
+    /// <see cref="ContextWindow"/> whatever its provenance; a <see cref="Provenance.Default"/> window is a
+    /// placeholder, so check the provenance before treating the allowance as a real bound.
+    /// </remarks>
     public long? InputAllowanceTokens
     {
         get
@@ -48,6 +59,10 @@ public sealed record ContextBudget
     }
 
     /// <summary>Gets planning allowance remaining, or null when capacity or input coverage is unknown.</summary>
+    /// <remarks>
+    /// Computed from the high-biased planning estimate; negative when the request is over budget. It is
+    /// <see langword="null"/> whenever the estimate has unpriced content parts.
+    /// </remarks>
     public long? RemainingTokens
     {
         get
@@ -65,6 +80,7 @@ public sealed record ContextBudget
     public bool? Fits => RemainingTokens is { } remaining ? remaining >= 0 : null;
 
     /// <summary>Gets the preflight cost range, or null when input coverage or trusted pricing is unavailable.</summary>
+    /// <remarks>This is an estimate from <see cref="PricingCalculator.EstimateCost"/>, never reported spend.</remarks>
     public CostEstimate? EstimatedCost => Estimate.UnpricedParts != 0
         ? null
         : PricingCalculator.EstimateCost(Estimate, OutputReserveTokens, Pricing);

@@ -61,6 +61,8 @@ public sealed record ModelCapabilities
     public EmbeddingCapabilities? Embedding { get; }
 
     /// <summary>Compares scalar facts, copied operation membership and nested SDK-owned metadata by value.</summary>
+    /// <param name="other">Capabilities to compare with this instance.</param>
+    /// <returns><see langword="true"/> when every fact and its provenance are equal; operation sets compare by membership.</returns>
     public bool Equals(ModelCapabilities? other)
     {
         return ReferenceEquals(this, other) ||
@@ -77,6 +79,7 @@ public sealed record ModelCapabilities
     }
 
     /// <summary>Returns a hash code consistent with value-based operation-set equality.</summary>
+    /// <returns>A hash code that is equal for capabilities that compare equal.</returns>
     public override int GetHashCode()
     {
         var hash = new HashCode();
@@ -98,7 +101,15 @@ public sealed record ModelCapabilities
     }
 
     /// <summary>Layers stronger or equally sourced fields from <paramref name="other"/> over this instance.</summary>
-    /// <remarks>Equal provenance lets <paramref name="other"/> replace this instance's sourced field.</remarks>
+    /// <remarks>
+    /// Equal provenance lets <paramref name="other"/> replace this instance's sourced field; a weaker field never
+    /// displaces a stronger one, and an unknown field in <paramref name="other"/> leaves this instance's value.
+    /// Local facts from <paramref name="other"/> replace this instance's when present, and embedding metadata is
+    /// merged with <see cref="EmbeddingCapabilities.Overlay"/>.
+    /// </remarks>
+    /// <param name="other">Capabilities to layer over this instance.</param>
+    /// <returns>New capabilities holding the stronger value of each field.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
     public ModelCapabilities Overlay(ModelCapabilities other)
     {
         ArgumentNullException.ThrowIfNull(other);

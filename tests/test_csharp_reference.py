@@ -361,3 +361,29 @@ def test_committed_fixture_matches_a_fresh_extraction(tmp_path: Path) -> None:
             f"{relative} is stale; run `python scripts/generate_csharp_reference.py --refresh-fixture`"
         )
     json.loads((fresh / "inventory.json").read_text(encoding="utf-8"))
+
+
+def test_inheritdoc_merges_exceptions_by_cited_type() -> None:
+    from scripts.check_csharp_docs import effective_comment
+
+    comments = {
+        "M:N.T.A": ET.fromstring(
+            '<member name="M:N.T.A"><summary>A.</summary>'
+            '<exception cref="T:System.ArgumentException">Bad.</exception>'
+            '<exception cref="T:System.ObjectDisposedException">Closed.</exception></member>'
+        ),
+        "M:N.T.B": ET.fromstring(
+            '<member name="M:N.T.B"><summary>B.</summary><inheritdoc cref="M:N.T.A"/>'
+            '<exception cref="T:System.ArgumentException">Bad input.</exception>'
+            '<exception cref="T:System.InvalidOperationException">Busy.</exception></member>'
+        ),
+    }
+    merged = effective_comment(comments["M:N.T.B"], comments)
+    assert merged is not None
+    exceptions = {node.get("cref"): node.text for node in merged.findall("exception")}
+    assert exceptions == {
+        "T:System.ArgumentException": "Bad input.",
+        "T:System.InvalidOperationException": "Busy.",
+        "T:System.ObjectDisposedException": "Closed.",
+    }
+    assert merged.find("summary").text == "B."  # type: ignore[union-attr]

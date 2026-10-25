@@ -6,7 +6,40 @@ namespace AnyInfer;
 /// <summary>One immutable request to rank documents against a query.</summary>
 public sealed record RerankRequest
 {
-    /// <summary>Creates a reranking request with the source-compatible defaults.</summary>
+    /// <summary>Creates an immutable reranking request from copies of its documents and options.</summary>
+    /// <remarks>
+    /// Only argument shape is checked here. When the request runs, a document count above the
+    /// provider's batch limit requires both <see cref="BatchPolicy.AllowSplit"/> and
+    /// <see cref="BatchPolicy.RerankCrossBatch"/>; otherwise the client raises
+    /// <see cref="ConfigException"/>. Without a known or overridden limit, more than 1000
+    /// documents are refused.
+    /// </remarks>
+    /// <param name="query">The non-empty query text.</param>
+    /// <param name="documents">
+    /// The documents to rank, in order; at least one is required and identifiers must be unique
+    /// under ordinal comparison. The sequence is copied.
+    /// </param>
+    /// <param name="topN">
+    /// The maximum number of ranked items to request, or <see langword="null"/> for the provider
+    /// default. When the request is split into batches, it applies within each batch.
+    /// </param>
+    /// <param name="timeoutS">The timeout in seconds for each provider attempt, or <see langword="null"/> for 120 seconds.</param>
+    /// <param name="maxResponseBytes">The response-body size cap in bytes given to the adapter; defaults to 8 MiB.</param>
+    /// <param name="metadata">Caller metadata reported to telemetry observers, or <see langword="null"/> for none. The map is copied.</param>
+    /// <param name="providerOptions">
+    /// Extra adapter options keyed by provider instance identifier, or <see langword="null"/> for
+    /// none; each attempt passes only the map for its own provider instance. The maps are copied.
+    /// </param>
+    /// <param name="batch">The batching policy, or <see langword="null"/> for <see cref="BatchPolicy"/> defaults.</param>
+    /// <param name="returnDocuments">Whether to copy each ranked document's text into <see cref="RankedItem.Text"/>.</param>
+    /// <param name="retainRaw">Whether to keep the provider's raw response payload on <see cref="RerankResult.Raw"/>.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="query"/> or <paramref name="documents"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="query"/> is empty; <paramref name="documents"/> is empty, contains
+    /// <see langword="null"/> or repeats an identifier; or a map contains a <see langword="null"/>
+    /// key or value.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="topN"/> is zero or negative.</exception>
     public RerankRequest(
         string query,
         IEnumerable<RerankDocument> documents,

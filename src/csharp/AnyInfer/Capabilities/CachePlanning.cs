@@ -13,6 +13,22 @@ public static class CachePlanning
     public const int SystemSegment = -1;
 
     /// <summary>Plans prompt-cache placement without dispatching, mutating a request, or performing I/O.</summary>
+    /// <remarks>
+    /// An implicit-cache target gets an implicit plan with an estimate of its stable prefix. An explicit-cache
+    /// target gets candidate marks for the tool block and system block (when the policy includes them) and for
+    /// the conversation prefix through the second-to-last non-system message; segments below the larger of the
+    /// policy and descriptor token floors are dropped, and only the largest segments up to the smaller mark
+    /// ceiling are kept. Token counts are planning estimates from <paramref name="estimator"/>, not
+    /// provider-reported cache usage.
+    /// </remarks>
+    /// <param name="request">Request to plan for; it is not modified.</param>
+    /// <param name="policy">Caller cache policy; <see langword="null"/> or an inactive policy yields an inactive plan with no reasons.</param>
+    /// <param name="capabilities">Selected model's capabilities; explicit placement requires <see cref="Feature.CachePlacement"/> in its features.</param>
+    /// <param name="descriptor">Selected provider descriptor, which declares the cache mechanism and its mark limits.</param>
+    /// <param name="estimator">Token estimator used to size candidate segments.</param>
+    /// <returns>An active plan, or an inactive plan whose reasons explain why caching was not engaged.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/>, <paramref name="capabilities"/>, <paramref name="descriptor"/>, or <paramref name="estimator"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="estimator"/> returned <see langword="null"/>.</exception>
     public static CachePlan Plan(
         GenerationRequest request,
         CachePolicy? policy,

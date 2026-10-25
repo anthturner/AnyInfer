@@ -3,9 +3,39 @@ using AnyInfer.Json;
 namespace AnyInfer.Providers;
 
 /// <summary>Immutable normalized request passed to a provider adapter.</summary>
+/// <remarks>
+/// The client builds one wire request per attempt after routing, structured-output mechanism selection, and
+/// capability checks; an <see cref="IGeneratesText"/> adapter only translates it into one provider call.
+/// </remarks>
 public sealed record WireRequest
 {
-    /// <summary>Creates a public wire request using the frozen serialization profile.</summary>
+    /// <summary>Creates an immutable wire request, copying every collection argument.</summary>
+    /// <param name="model">Concrete provider model identifier.</param>
+    /// <param name="messages">Conversation messages in order; copied.</param>
+    /// <param name="sampling">Sampling controls.</param>
+    /// <param name="schema">JSON Schema for structured output, or <see langword="null"/> when none is requested.</param>
+    /// <param name="mechanism">
+    /// Selected structured-output mechanism, such as <c>grammar</c>, <c>json_schema</c>, <c>json_mode</c>, or
+    /// <c>prompt</c>, or <see langword="null"/> when no schema is requested.
+    /// </param>
+    /// <param name="stream">Whether the provider should stream its response.</param>
+    /// <param name="timeoutS">Provider timeout in seconds.</param>
+    /// <param name="maxResponseBytes">Maximum provider response size in bytes.</param>
+    /// <param name="schemaName">Schema name for providers whose structured-output projection requires one.</param>
+    /// <param name="tools">Tool declarations, copied; <see langword="null"/> means none.</param>
+    /// <param name="toolChoice">Raw provider tool-choice spelling; anything other than <c>auto</c> requires at least one tool.</param>
+    /// <param name="cacheMarks">Prompt-cache segment marks selected by the client's cache plan; <see langword="null"/> means none.</param>
+    /// <param name="reasoningWire">Provider-specific reasoning fields, copied; <see langword="null"/> means none.</param>
+    /// <param name="serverTools">Provider-run tool declarations, copied; <see langword="null"/> means none.</param>
+    /// <param name="citeDocuments">Whether citations are requested for supplied documents.</param>
+    /// <param name="logprobs">Requested number of alternative log-probabilities, or <see langword="null"/> for none.</param>
+    /// <param name="extraOptions">Provider-specific wire options, copied; <see langword="null"/> means none.</param>
+    /// <param name="sessionState">Opaque continuation state, copied, or <see langword="null"/> when no session is open.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="model"/>, <paramref name="messages"/>, <paramref name="sampling"/>, or <paramref name="toolChoice"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="messages"/> or <paramref name="tools"/> contains <see langword="null"/>, or
+    /// <paramref name="toolChoice"/> is not <c>auto</c> while no tools are declared.
+    /// </exception>
     public WireRequest(
         string model,
         IEnumerable<Message> messages,
@@ -99,6 +129,10 @@ public sealed record WireRequest
     /// <summary>Gets the raw provider tool-choice spelling.</summary>
     public string ToolChoice { get; }
     /// <summary>Gets copied cache segment marks selected by the core.</summary>
+    /// <remarks>
+    /// Each mark is <see cref="AnyInfer.Capabilities.CachePlanning.ToolsSegment"/>,
+    /// <see cref="AnyInfer.Capabilities.CachePlanning.SystemSegment"/>, or a zero-based message index.
+    /// </remarks>
     public IReadOnlyList<int> CacheMarks { get; }
     /// <summary>Gets copied provider-specific reasoning fields.</summary>
     public JsonObject ReasoningWire { get; }

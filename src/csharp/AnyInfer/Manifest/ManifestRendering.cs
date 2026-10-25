@@ -10,6 +10,8 @@ public static partial class ManifestUtilities
     /// <param name="manifest">The immutable manifest to render.</param>
     /// <param name="width">The column budget used to wrap long reasons and notes.</param>
     /// <returns>A human-readable presentation of the manifest.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="manifest"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="width"/> is not positive and a line needs wrapping.</exception>
     public static string Render(RunManifest manifest, int width = 80)
     {
         ArgumentNullException.ThrowIfNull(manifest);

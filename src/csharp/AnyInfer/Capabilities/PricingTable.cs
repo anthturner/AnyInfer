@@ -13,6 +13,8 @@ public sealed class PricingTable
     private readonly IReadOnlyDictionary<string, IReadOnlyList<PricingEntry>> _entries;
 
     /// <summary>Creates an immutable table with ordinal provider and model spellings.</summary>
+    /// <param name="entries">Pricing rows keyed by provider identifier; each row list is copied in order.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="entries"/>, a provider key, or a row list is <see langword="null"/>.</exception>
     public PricingTable(IReadOnlyDictionary<string, IReadOnlyList<PricingEntry>> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -28,8 +30,17 @@ public sealed class PricingTable
     /// <summary>Gets covered provider IDs in ordinal order.</summary>
     public IReadOnlyList<string> Providers => Array.AsReadOnly(_entries.Keys.OrderBy(static key => key, StringComparer.Ordinal).ToArray());
     /// <summary>Gets a provider's rows, or an empty immutable list.</summary>
+    /// <param name="providerId">Exact, case-sensitive provider identifier.</param>
+    /// <returns>The provider's rows in table order, or an empty list when the provider is not covered.</returns>
     public IReadOnlyList<PricingEntry> EntriesFor(string providerId) => _entries.TryGetValue(providerId, out var entries) ? entries : Array.Empty<PricingEntry>();
     /// <summary>Looks up exact pricing first, then the longest valid model-prefix row.</summary>
+    /// <remarks>
+    /// A prefix row matches only at a boundary: the model must continue with <c>-</c>, <c>.</c>, <c>:</c>, or
+    /// <c>@</c> after the row's model spelling.
+    /// </remarks>
+    /// <param name="providerId">Exact, case-sensitive provider identifier.</param>
+    /// <param name="model">Exact, case-sensitive model identifier.</param>
+    /// <returns>The matching pricing at <see cref="Provenance.Catalog"/> provenance, or <see langword="null"/> when no row matches.</returns>
     public Sourced<Pricing>? Lookup(string providerId, string model)
     {
         PricingEntry? best = null;
@@ -42,6 +53,14 @@ public sealed class PricingTable
     }
 
     /// <summary>Parses the bundled pricing JSON representation.</summary>
+    /// <remarks>
+    /// Rates must be non-negative decimal strings. Provider and tool keys beginning with an underscore are
+    /// skipped, and provider-run tool prices from the <c>server_tools</c> section are attached to matching rows.
+    /// </remarks>
+    /// <param name="data">Parsed pricing object with <c>format_version</c> 1 and a <c>providers</c> object.</param>
+    /// <returns>An immutable table of the parsed rows.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="data"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ConfigException">The format version is unsupported or a row or rate is malformed.</exception>
     public static PricingTable FromMapping(JsonObject data)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -70,6 +89,12 @@ public sealed class PricingTable
     }
 
     /// <summary>Loads the pricing resource embedded in this assembly.</summary>
+    /// <remarks>
+    /// The bundled prices are a snapshot from when this assembly was built; each row records when and against
+    /// what source it was last verified. Each call parses the resource again.
+    /// </remarks>
+    /// <returns>An immutable table of the bundled catalog prices.</returns>
+    /// <exception cref="ConfigException">The bundled resource is missing or invalid.</exception>
     public static PricingTable LoadDefault()
     {
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("AnyInfer.Capabilities.pricing.json") ?? throw new ConfigException("Bundled pricing resource is unavailable.");

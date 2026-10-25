@@ -3,6 +3,10 @@ using System.Collections.ObjectModel;
 namespace AnyInfer.Providers;
 
 /// <summary>Declarative metadata for one provider setup field.</summary>
+/// <remarks>
+/// Setup metadata is inert: it describes what an application's configuration surface should ask for and
+/// never resolves secrets or reads environment variables itself.
+/// </remarks>
 public sealed record SetupField
 {
     private static readonly ISet<string> KnownKinds = new HashSet<string>(StringComparer.Ordinal)
@@ -10,6 +14,25 @@ public sealed record SetupField
         "endpoint", "secret", "api-version", "model-list", "reasoning-efforts", "host-profile", "text", "choice", "path", "directory",
     };
 
+    /// <summary>Creates validated setup-field metadata.</summary>
+    /// <param name="key">Stable configuration key, such as <c>base_url</c> or <c>api_key</c>.</param>
+    /// <param name="label">Human-readable label.</param>
+    /// <param name="kind">
+    /// Value kind: <c>endpoint</c>, <c>secret</c>, <c>api-version</c>, <c>model-list</c>, <c>reasoning-efforts</c>,
+    /// <c>host-profile</c>, <c>text</c>, <c>choice</c>, <c>path</c>, or <c>directory</c>.
+    /// </param>
+    /// <param name="required">Whether a value must be supplied; a required field cannot be advanced.</param>
+    /// <param name="helpText">User guidance, or <see langword="null"/> for none.</param>
+    /// <param name="placeholder">Placeholder text for an input control, or <see langword="null"/> for none.</param>
+    /// <param name="envVar">Bare environment-variable name to suggest, or <see langword="null"/>; never a <c>scheme://</c> reference or a secret.</param>
+    /// <param name="advanced">Whether this optional field belongs with advanced settings.</param>
+    /// <param name="defaultValue">Default value, or <see langword="null"/>; only advanced fields may declare one.</param>
+    /// <param name="choices">Allowed values for a <c>choice</c> field, unique and copied in order; other kinds must declare none.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="key"/> or <paramref name="label"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="key"/> or <paramref name="label"/> is empty, <paramref name="kind"/> is unsupported, or the
+    /// field combines settings that are not allowed together, as described for each parameter.
+    /// </exception>
     public SetupField(
         string key,
         string label,
@@ -108,6 +131,9 @@ public sealed record SetupField
 public sealed record HostShorthand
 {
     /// <summary>Initializes a bare-host expansion rule.</summary>
+    /// <param name="scheme">URL scheme to prepend, such as <c>http</c>.</param>
+    /// <param name="defaultPort">Port to append when the host names none.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="scheme"/> is <see langword="null"/>.</exception>
     public HostShorthand(string scheme, int defaultPort)
     {
         ArgumentNullException.ThrowIfNull(scheme);
@@ -121,6 +147,12 @@ public sealed record HostShorthand
     public int DefaultPort { get; }
 
     /// <summary>Expands a bare host while preserving explicit URLs and ports through literal string rules.</summary>
+    /// <param name="host">Host text; surrounding whitespace is removed.</param>
+    /// <returns>
+    /// The trimmed text unchanged when it contains <c>://</c>; otherwise the scheme prepended, plus
+    /// <see cref="DefaultPort"/> when the part before the first <c>/</c> has no <c>:</c>. The result is not validated as a URL.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="host"/> is <see langword="null"/>.</exception>
     public string Expand(string host)
     {
         ArgumentNullException.ThrowIfNull(host);
@@ -142,6 +174,21 @@ public sealed record HostShorthand
 public sealed record ProviderSetupSpec
 {
     /// <summary>Initializes declarative provider setup metadata.</summary>
+    /// <param name="fields">Setup fields in display order, with unique keys; <see langword="null"/> means none.</param>
+    /// <param name="modelSelection">
+    /// <c>discover-or-manual</c> when models may be discovered or typed, or <c>manual-only</c> when they must be typed.
+    /// </param>
+    /// <param name="hostShorthand">Bare-host expansion rule for base URLs, or <see langword="null"/> for none.</param>
+    /// <param name="anyOf">
+    /// Groups of field keys of which at least one must have a value; advanced fields cannot appear in a group.
+    /// <see langword="null"/> means none.
+    /// </param>
+    /// <param name="requirementNote">Provider-authored explanation of the setup requirements; <see langword="null"/> is treated as empty.</param>
+    /// <exception cref="ArgumentNullException">A group in <paramref name="anyOf"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// Fields contain <see langword="null"/> or repeat a key, <paramref name="modelSelection"/> is unsupported, a group
+    /// contains a <see langword="null"/> key, or an advanced field appears in a group.
+    /// </exception>
     public ProviderSetupSpec(
         IEnumerable<SetupField>? fields = null,
         string modelSelection = "discover-or-manual",
@@ -195,6 +242,9 @@ public sealed record ProviderSetupSpec
     public IReadOnlyList<SetupField> AdvancedFields => Array.AsReadOnly(Fields.Where(static field => field.Advanced).ToArray());
 
     /// <summary>Returns groups for which none of the declared keys has a non-blank value.</summary>
+    /// <param name="values">Candidate setup values keyed by field key.</param>
+    /// <returns>The unsatisfied <see cref="AnyOf"/> groups in declared order; empty when every group is satisfied.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="values"/> is <see langword="null"/>.</exception>
     public IReadOnlyList<IReadOnlyList<string>> UnsatisfiedGroups(IReadOnlyDictionary<string, string> values)
     {
         ArgumentNullException.ThrowIfNull(values);
@@ -203,6 +253,9 @@ public sealed record ProviderSetupSpec
     }
 
     /// <summary>Returns a declared field label, or the supplied key when no field has that exact key.</summary>
+    /// <param name="key">Exact, case-sensitive field key.</param>
+    /// <returns>The field's label, or <paramref name="key"/> itself when no field matches.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
     public string LabelFor(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
